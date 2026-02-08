@@ -1,0 +1,45 @@
+{
+  "claude.mcpServers": {
+    "playwright": {
+      "command": "npx",
+      "args": ["-y", "@playwright/mcp@latest"]
+    },
+    "ref": {
+      "command": "npx",
+      "args": ["-y", "ref-tools-mcp@latest"],
+      "env": {
+        "REF_API_KEY": "ref-854695ee43c6c91a5392"
+      }
+    },
+    "duckduckgo-search": {
+      "command": "C:/Users/kepne/.local/bin/uvx.exe",
+      "args": ["mcp-server-duckduckgo-search"]
+    },
+    "sequential-thinking": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "env": {
+        "MEMORY_FILE_PATH": "c:/Users/kepne/OneDrive/Documents/GitHub/pvtkrrx/project-memory.json"
+      }
+    }
+  },
+  "workbench.colorCustomizations": {
+    "titleBar.activeBackground": "#407076",
+    "titleBar.activeForeground": "#F8F7FF",
+    "titleBar.inactiveBackground": "#407076cc",
+    "titleBar.inactiveForeground": "#F8F7FFaa",
+    "activityBar.background": "#407076",
+    "activityBar.foreground": "#F8F7FF",
+    "statusBar.background": "#698996",
+    "statusBar.foreground": "#F8F7FF",
+    "sideBar.background": "#F8F7FF",
+    "sideBar.foreground": "#407076",
+    "editor.background": "#F8F7FF"
+  },
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true
+}
