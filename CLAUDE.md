@@ -78,9 +78,13 @@ npm start
 ## Available Skills
 
 ### CCC - Claude Code Construction (`/ccc:`)
-- `/ccc:md` - Managing Director
-- `/ccc:pm` - Project Manager
-- `/ccc:production` - Production Engineer
+- `/ccc:md` - Mr Gurr (Managing Director)
+- `/ccc:pm` - Glen (Project Manager)
+- `/ccc:planning` - Jonathan (Project Architect)
+- `/ccc:technical` - Colin (CTO)
+- `/ccc:commercial` - Stewart (Cost Analyst)
+- `/ccc:production` - Peter (Production Engineer)
+- `/ccc:sales` - Jason (Sales) & Jasmine (Marketing)
 - `/ccc:support` - Customer Services
 
 ### CU - Claude Utilities (`/cu:`)
