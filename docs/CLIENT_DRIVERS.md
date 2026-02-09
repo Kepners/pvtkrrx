@@ -1,7 +1,7 @@
 # Client Drivers - PVTKRRX
 
 > **Meeting Date:** February 8, 2026
-> **MD Present:** Yes — Mr Gurr attended, issued 4 binding directives
+> **MD Present:** Yes — Mr Gurr attended, issued 5 binding directives
 > **Attendees:** Glen (PM), Colin (CTO), Peter (Production), Stewart (Commercial), Jason & Jasmine (Sales), Mr Gurr (MD), Auditor
 > **Meeting Type:** Native Agent Team — real inter-specialist messaging
 
