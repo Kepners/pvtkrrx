@@ -23,6 +23,12 @@ The addon handles: search → download → stream. You bring the seedbox, the ad
 
 ## Quick Start
 
+### Use the Hosted Service (£1/month)
+
+Visit **[pvtkrrx.vercel.app](https://pvtkrrx.vercel.app)** to sign up and configure your addon in 60 seconds.
+
+### Self-Host (Free)
+
 ```bash
 git clone https://github.com/Kepners/pvtkrrx.git
 cd pvtkrrx
