@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PVTKRRX — Configure</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #FFEEDD;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+    .container {
+      max-width: 520px;
+      width: 100%;
+    }
+    h1 {
+      color: #407076;
+      font-size: 1.8rem;
+      margin-bottom: 0.3rem;
+      text-align: center;
+    }
+    .subtitle {
+      color: #698996;
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 0.9rem;
+    }
+    .card {
+      background: #F8F7FF;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    }
+    .card h2 {
+      color: #407076;
+      font-size: 1rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #FFD8BE;
+    }
+    label {
+      display: block;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #555;
+      margin-bottom: 0.3rem;
+    }
+    input, select {
+      width: 100%;
+      padding: 0.6rem 0.8rem;
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      margin-bottom: 0.8rem;
+      background: #fff;
+      transition: border-color 0.2s;
+    }
+    input:focus, select:focus {
+      outline: none;
+      border-color: #407076;
+    }
+    .row {
+      display: flex;
+      gap: 0.8rem;
+    }
+    .row > div { flex: 1; }
+    .hint {
+      font-size: 0.75rem;
+      color: #999;
+      margin-top: -0.5rem;
+      margin-bottom: 0.8rem;
+    }
+    button {
+      width: 100%;
+      padding: 0.75rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+    }
+    button:hover { opacity: 0.85; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-test {
+      background: #698996;
+      color: #fff;
+      margin-bottom: 0.5rem;
+    }
+    .btn-install {
+      background: #407076;
+      color: #fff;
+    }
+    .status {
+      text-align: center;
+      padding: 0.6rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      margin-bottom: 0.8rem;
+      display: none;
+    }
+    .status.ok { display: block; background: #d4edda; color: #155724; }
+    .status.err { display: block; background: #f8d7da; color: #721c24; }
+    .status.info { display: block; background: #d1ecf1; color: #0c5460; }
+    .install-link {
+      display: none;
+      text-align: center;
+      margin-top: 1rem;
+    }
+    .install-link a {
+      display: inline-block;
+      background: #407076;
+      color: #fff;
+      text-decoration: none;
+      padding: 0.8rem 2rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 1.1rem;
+    }
+    .install-link a:hover { opacity: 0.85; }
+    .install-link .url-display {
+      font-size: 0.7rem;
+      color: #999;
+      margin-top: 0.5rem;
+      word-break: break-all;
+    }
+    footer {
+      margin-top: 2rem;
+      color: #999;
+      font-size: 0.75rem;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>PVTKRRX</h1>
+    <p class="subtitle">Connect your private tracker seedbox to Stremio</p>
+
+    <div class="card">
+      <h2>Jackett / Prowlarr</h2>
+      <label for="jackettUrl">Torznab URL</label>
+      <input type="url" id="jackettUrl" placeholder="https://jackett.example.com:9117/api/v2.0/indexers/all/results/torznab">
+      <label for="jackettApiKey">API Key</label>
+      <input type="text" id="jackettApiKey" placeholder="Your Jackett/Prowlarr API key">
+    </div>
+
+    <div class="card">
+      <h2>qBittorrent</h2>
+      <label for="qbitUrl">WebUI URL</label>
+      <input type="url" id="qbitUrl" placeholder="https://qbit.example.com:8080">
+      <div class="row">
+        <div>
+          <label for="qbitUsername">Username</label>
+          <input type="text" id="qbitUsername" placeholder="admin">
+        </div>
+        <div>
+          <label for="qbitPassword">Password</label>
+          <input type="password" id="qbitPassword" placeholder="password">
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>File Server</h2>
+      <label for="provider">Seedbox Provider</label>
+      <select id="provider">
+        <option value="custom">Custom / Other</option>
+        <option value="feral">Feral Hosting</option>
+        <option value="ultra">Ultra.cc</option>
+        <option value="whatbox">Whatbox</option>
+        <option value="swizzin">Swizzin</option>
+      </select>
+      <label for="fileServerUrl">HTTP File Server URL</label>
+      <input type="url" id="fileServerUrl" placeholder="https://username.seedbox.com/files">
+      <label for="fileServerAuth">Basic Auth (optional)</label>
+      <input type="text" id="fileServerAuth" placeholder="user:password">
+      <p class="hint">Leave empty if no authentication required</p>
+      <div class="row">
+        <div>
+          <label for="pathFrom">Path Mapping: From</label>
+          <input type="text" id="pathFrom" placeholder="/downloads/">
+        </div>
+        <div>
+          <label for="pathTo">Path Mapping: To</label>
+          <input type="text" id="pathTo" placeholder="/files/">
+        </div>
+      </div>
+      <p class="hint">Maps qBit save path to file server URL path</p>
+    </div>
+
+    <div class="card">
+      <h2>Options</h2>
+      <label for="maxResults">Max Results Per Search</label>
+      <input type="number" id="maxResults" value="50" min="10" max="200">
+    </div>
+
+    <div id="testStatus" class="status"></div>
+    <button class="btn-test" onclick="testConnection()">Test Connection</button>
+
+    <div id="installStatus" class="status"></div>
+    <button class="btn-install" onclick="install()">Install in Stremio</button>
+
+    <div id="installLink" class="install-link">
+      <a id="stremioLink" href="#">Open in Stremio</a>
+      <p class="url-display" id="urlDisplay"></p>
+    </div>
+
+    <footer>
+      PVTKRRX &mdash; Your credentials are encrypted and never stored.
+    </footer>
+  </div>
+
+  <script>
+    const providers = {
+      feral: { from: '/media/', to: '/' },
+      ultra: { from: '/home/', to: '/' },
+      whatbox: { from: '/home/', to: '/' },
+      swizzin: { from: '/home/', to: '/' },
+      custom: { from: '', to: '' }
+    };
+
+    document.getElementById('provider').addEventListener('change', function() {
+      const p = providers[this.value];
+      if (p) {
+        document.getElementById('pathFrom').value = p.from;
+        document.getElementById('pathTo').value = p.to;
+      }
+    });
+
+    function getConfig() {
+      return {
+        jackettUrl: document.getElementById('jackettUrl').value.replace(/\/+$/, ''),
+        jackettApiKey: document.getElementById('jackettApiKey').value.trim(),
+        qbitUrl: document.getElementById('qbitUrl').value.replace(/\/+$/, ''),
+        qbitUsername: document.getElementById('qbitUsername').value.trim(),
+        qbitPassword: document.getElementById('qbitPassword').value,
+        fileServerUrl: document.getElementById('fileServerUrl').value.replace(/\/+$/, ''),
+        fileServerAuth: document.getElementById('fileServerAuth').value.trim(),
+        pathMapping: {
+          from: document.getElementById('pathFrom').value,
+          to: document.getElementById('pathTo').value
+        },
+        maxResults: parseInt(document.getElementById('maxResults').value, 10) || 50
+      };
+    }
+
+    function setStatus(id, type, msg) {
+      const el = document.getElementById(id);
+      el.className = 'status ' + type;
+      el.textContent = msg;
+    }
+
+    async function testConnection() {
+      const config = getConfig();
+      if (!config.jackettUrl || !config.jackettApiKey) {
+        return setStatus('testStatus', 'err', 'Jackett URL and API key are required');
+      }
+      if (!config.qbitUrl || !config.qbitUsername) {
+        return setStatus('testStatus', 'err', 'qBittorrent URL and username are required');
+      }
+
+      setStatus('testStatus', 'info', 'Testing connections...');
+
+      try {
+        const res = await fetch('/test-connection', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config)
+        });
+        const data = await res.json();
+
+        if (data.jackett && data.qbit) {
+          setStatus('testStatus', 'ok', 'Both connections successful!');
+        } else {
+          const msgs = [];
+          if (!data.jackett) msgs.push('Jackett: ' + (data.jackettError || 'failed'));
+          if (!data.qbit) msgs.push('qBit: ' + (data.qbitError || 'failed'));
+          setStatus('testStatus', 'err', msgs.join(' | '));
+        }
+      } catch (err) {
+        setStatus('testStatus', 'err', 'Connection test failed: ' + err.message);
+      }
+    }
+
+    async function install() {
+      const config = getConfig();
+      if (!config.jackettUrl || !config.jackettApiKey || !config.qbitUrl || !config.fileServerUrl) {
+        return setStatus('installStatus', 'err', 'Please fill in all required fields');
+      }
+
+      setStatus('installStatus', 'info', 'Encrypting configuration...');
+
+      try {
+        const res = await fetch('/encrypt', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(config)
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          return setStatus('installStatus', 'err', data.error);
+        }
+
+        const host = window.location.host;
+        const manifestUrl = host + '/' + data.token + '/manifest.json';
+        const stremioUrl = 'stremio://' + manifestUrl;
+
+        document.getElementById('stremioLink').href = stremioUrl;
+        document.getElementById('urlDisplay').textContent = manifestUrl;
+        document.getElementById('installLink').style.display = 'block';
+        setStatus('installStatus', 'ok', 'Configuration encrypted — click below to install');
+      } catch (err) {
+        setStatus('installStatus', 'err', 'Encryption failed: ' + err.message);
+      }
+    }
+  </script>
+</body>
+</html>
