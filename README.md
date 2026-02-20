@@ -38,6 +38,21 @@ npm start
 
 Then open `http://localhost:7000/configure` to enter your seedbox details.
 
+## Verify Stremio Config Flow
+
+Run this smoke check to validate the configuration page, token encryption, and install manifest routes:
+
+```bash
+npm run smoke:config
+```
+
+This verifies:
+- `/configure` loads
+- `POST /encrypt` returns a token
+- `/:token/manifest.json` resolves
+- `/:token/configure` resolves
+- invalid token routes return `400`
+
 ## How It Works
 
 ```

@@ -1,3 +1,5 @@
+const fs = require('fs')
+const http = require('http')
 const path = require('path')
 const express = require('express')
 const { addonBuilder, getRouter } = require('stremio-addon-sdk')
@@ -10,6 +12,35 @@ const { TorznabClient } = require('./src/clients/torznab')
 const { QBitClient } = require('./src/clients/qbittorrent')
 const { mapPath } = require('./src/utils/pathMapper')
 const { findVideoFile } = require('./src/utils/streams')
+
+function loadLocalEnv() {
+  const envPath = path.join(__dirname, '.env')
+  if (!fs.existsSync(envPath)) return
+
+  const lines = fs.readFileSync(envPath, 'utf8').split(/\r?\n/)
+  for (const raw of lines) {
+    const line = raw.trim()
+    if (!line || line.startsWith('#')) continue
+    const idx = line.indexOf('=')
+    if (idx === -1) continue
+    const key = line.slice(0, idx).trim()
+    let value = line.slice(idx + 1).trim()
+    if (
+      (value.startsWith('"') && value.endsWith('"')) ||
+      (value.startsWith("'") && value.endsWith("'"))
+    ) {
+      value = value.slice(1, -1)
+    }
+    if (!process.env[key]) process.env[key] = value
+  }
+}
+
+loadLocalEnv()
+
+if (!process.env.ENCRYPTION_SECRET && process.env.NODE_ENV !== 'production') {
+  process.env.ENCRYPTION_SECRET = 'pvtkrrx-local-dev-secret-change-me'
+  console.warn('[PVTKRRX] ENCRYPTION_SECRET missing; using local development fallback secret.')
+}
 
 const app = express()
 app.use(express.json())
@@ -24,9 +55,40 @@ app.use((req, res, next) => {
 })
 
 // ─── Static routes ──────────────────────────────────────────
-const configPage = path.join(__dirname, 'public', 'configure.html')
+const publicDir = path.join(__dirname, 'public')
+const configPage = path.join(publicDir, 'configure.html')
+app.use(express.static(publicDir))
 app.get('/configure', (req, res) => res.sendFile(configPage))
 app.get('/:config/configure', (req, res) => res.sendFile(configPage))
+
+function getPublicBaseUrl(req) {
+  const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim()
+  const protocol = forwardedProto || req.protocol || 'http'
+  return `${protocol}://${req.get('host')}`
+}
+
+function isLoopbackHost(req) {
+  const hostHeader = String(req.get('host') || '')
+  const hostname = hostHeader.split(':')[0].toLowerCase()
+  return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
+}
+
+function getInstallMode(req) {
+  const mode = String(req.query.mode || '').toLowerCase()
+  if (mode === 'local' || mode === 'hosted') return mode
+  return isLoopbackHost(req) ? 'local' : 'hosted'
+}
+
+function getManifest(req) {
+  const mode = getInstallMode(req)
+  const modeLabel = mode === 'local' ? 'Local' : 'Hosted'
+  return {
+    ...manifest,
+    id: `com.kepners.pvtkrrx.${mode}`,
+    name: `PVTKRRX (${modeLabel})`,
+    logo: `${getPublicBaseUrl(req)}/logo.svg`
+  }
+}
 
 // ─── POST /encrypt — server-side config encryption ─────────
 app.post('/encrypt', (req, res) => {
@@ -80,7 +142,16 @@ function withConfig(req, res, next) {
 
 // ─── Stremio addon routes (config-authenticated) ────────────
 app.get('/:config/manifest.json', withConfig, (req, res) => {
-  res.json(manifest)
+  res.json(getManifest(req))
+})
+
+app.get('/:config/config.json', withConfig, (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  res.json(req.config)
+})
+
+app.get('/manifest.json', (req, res) => {
+  res.json(getManifest(req))
 })
 
 app.get('/:config/catalog/:type/:id.json', withConfig, async (req, res) => {
@@ -146,7 +217,11 @@ app.get('/:config/playback/:info', withConfig, async (req, res) => {
 })
 
 // ─── SDK router (fallback — serves /manifest.json at root) ──
-const builder = new addonBuilder(manifest)
+const builder = new addonBuilder({
+  ...manifest,
+  id: 'com.kepners.pvtkrrx.hosted',
+  name: 'PVTKRRX (Hosted)'
+})
 builder.defineCatalogHandler(async () => ({ metas: [] }))
 builder.defineStreamHandler(async () => ({ streams: [] }))
 builder.defineMetaHandler(async () => ({ meta: null }))
@@ -155,9 +230,15 @@ app.use(getRouter(addonInterface))
 
 // ─── Local dev server ───────────────────────────────────────
 if (require.main === module) {
-  app.listen(7000, () => {
-    console.log('PVTKRRX running at http://localhost:7000')
-    console.log('Configure: http://localhost:7000/configure')
+  const port = parseInt(process.env.PORT || '7000', 10)
+  const server = http.createServer(app)
+  server.listen(port, () => {
+    console.log(`PVTKRRX running at http://localhost:${port}`)
+    console.log(`Configure: http://localhost:${port}/configure`)
+  })
+  server.on('error', (err) => {
+    console.error('Server failed to start:', err.message)
+    process.exit(1)
   })
 }
 

@@ -146,6 +146,16 @@
     <p class="subtitle">Connect your private tracker seedbox to Stremio</p>
 
     <div class="card">
+      <h2>Install Mode</h2>
+      <label for="installMode">Addon Variant</label>
+      <select id="installMode">
+        <option value="hosted">Hosted (public URLs)</option>
+        <option value="local">Local / LAN (localhost or private IP)</option>
+      </select>
+      <p class="hint" id="installModeHint">Hosted mode requires public URLs for all services.</p>
+    </div>
+
+    <div class="card">
       <h2>Jackett / Prowlarr</h2>
       <label for="jackettUrl">Torznab URL</label>
       <input type="url" id="jackettUrl" placeholder="https://jackett.example.com:9117/api/v2.0/indexers/all/results/torznab">
@@ -228,6 +238,20 @@
       custom: { from: '', to: '' }
     };
 
+    function getInstallMode() {
+      return document.getElementById('installMode').value;
+    }
+
+    function setInstallModeHint() {
+      const mode = getInstallMode();
+      const hint = document.getElementById('installModeHint');
+      if (mode === 'local') {
+        hint.textContent = 'Local mode allows localhost/private IPs. Use this for self-hosting on your own machine.';
+      } else {
+        hint.textContent = 'Hosted mode requires public URLs for Torznab, qBittorrent, and file server.';
+      }
+    }
+
     document.getElementById('provider').addEventListener('change', function() {
       const p = providers[this.value];
       if (p) {
@@ -235,6 +259,10 @@
         document.getElementById('pathTo').value = p.to;
       }
     });
+
+    document.getElementById('installMode').addEventListener('change', setInstallModeHint);
+    setInstallModeHint();
+    maybePrefillFromToken();
 
     function getConfig() {
       return {
@@ -253,6 +281,81 @@
       };
     }
 
+    function fillConfig(config) {
+      if (!config || typeof config !== 'object') return;
+
+      if (config.jackettUrl) document.getElementById('jackettUrl').value = config.jackettUrl;
+      if (config.jackettApiKey) document.getElementById('jackettApiKey').value = config.jackettApiKey;
+      if (config.qbitUrl) document.getElementById('qbitUrl').value = config.qbitUrl;
+      if (config.qbitUsername) document.getElementById('qbitUsername').value = config.qbitUsername;
+      if (config.qbitPassword) document.getElementById('qbitPassword').value = config.qbitPassword;
+      if (config.fileServerUrl) document.getElementById('fileServerUrl').value = config.fileServerUrl;
+      if (config.fileServerAuth) document.getElementById('fileServerAuth').value = config.fileServerAuth;
+      if (config.pathMapping && typeof config.pathMapping === 'object') {
+        if (config.pathMapping.from) document.getElementById('pathFrom').value = config.pathMapping.from;
+        if (config.pathMapping.to) document.getElementById('pathTo').value = config.pathMapping.to;
+      }
+      if (typeof config.maxResults === 'number' && Number.isFinite(config.maxResults)) {
+        document.getElementById('maxResults').value = String(config.maxResults);
+      }
+    }
+
+    function getConfigTokenFromPath() {
+      const parts = window.location.pathname.split('/').filter(Boolean);
+      if (parts.length === 2 && parts[1] === 'configure') return parts[0];
+      return null;
+    }
+
+    async function maybePrefillFromToken() {
+      const token = getConfigTokenFromPath();
+      if (!token) return;
+      try {
+        const res = await fetch(`/${encodeURIComponent(token)}/config.json`, { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json();
+        fillConfig(data);
+      } catch (err) {
+        // keep form usable if prefill fails
+      }
+    }
+
+    function isPrivateHostname(hostname) {
+      if (!hostname) return false;
+      const host = hostname.toLowerCase();
+      if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
+      if (host.startsWith('10.')) return true;
+      if (host.startsWith('192.168.')) return true;
+      const m = host.match(/^172\.(\d+)\./);
+      if (m) {
+        const second = parseInt(m[1], 10);
+        if (second >= 16 && second <= 31) return true;
+      }
+      return false;
+    }
+
+    function validateReachability(config, installMode) {
+      if (installMode === 'local') return null;
+
+      const checks = [
+        ['Torznab URL', config.jackettUrl],
+        ['qBittorrent URL', config.qbitUrl],
+        ['HTTP File Server URL', config.fileServerUrl]
+      ];
+
+      for (const [label, value] of checks) {
+        try {
+          const u = new URL(value);
+          if (isPrivateHostname(u.hostname)) {
+            return `${label} uses ${u.hostname}. Hosted mode needs public URLs. Use local addon mode for localhost/LAN.`;
+          }
+        } catch (e) {
+          return `${label} is not a valid URL`;
+        }
+      }
+
+      return null;
+    }
+
     function setStatus(id, type, msg) {
       const el = document.getElementById(id);
       el.className = 'status ' + type;
@@ -261,6 +364,11 @@
 
     async function testConnection() {
       const config = getConfig();
+      const installMode = getInstallMode();
+      const modeValidationError = validateReachability(config, installMode);
+      if (modeValidationError) {
+        return setStatus('testStatus', 'err', modeValidationError);
+      }
       if (!config.jackettUrl || !config.jackettApiKey) {
         return setStatus('testStatus', 'err', 'Jackett URL and API key are required');
       }
@@ -293,6 +401,11 @@
 
     async function install() {
       const config = getConfig();
+      const installMode = getInstallMode();
+      const modeValidationError = validateReachability(config, installMode);
+      if (modeValidationError) {
+        return setStatus('installStatus', 'err', modeValidationError);
+      }
       if (!config.jackettUrl || !config.jackettApiKey || !config.qbitUrl || !config.fileServerUrl) {
         return setStatus('installStatus', 'err', 'Please fill in all required fields');
       }
@@ -312,13 +425,18 @@
         }
 
         const host = window.location.host;
-        const manifestUrl = host + '/' + data.token + '/manifest.json';
+        const port = window.location.port || '7000';
+        const installHost = installMode === 'local' ? ('127.0.0.1:' + port) : host;
+        const token = encodeURIComponent(data.token);
+        const modeQuery = installMode === 'hosted' ? ('?mode=' + encodeURIComponent(installMode)) : '';
+        const manifestUrl = installHost + '/' + token + '/manifest.json' + modeQuery;
+        const manifestHttpUrl = (installMode === 'local' ? 'http://' : (window.location.protocol + '//')) + manifestUrl;
         const stremioUrl = 'stremio://' + manifestUrl;
 
         document.getElementById('stremioLink').href = stremioUrl;
-        document.getElementById('urlDisplay').textContent = manifestUrl;
+        document.getElementById('urlDisplay').textContent = manifestHttpUrl;
         document.getElementById('installLink').style.display = 'block';
-        setStatus('installStatus', 'ok', 'Configuration encrypted — click below to install');
+        setStatus('installStatus', 'ok', 'Configuration encrypted — click below to install. If it hangs, paste the full manifest URL shown below into Stremio Add addon.');
       } catch (err) {
         setStatus('installStatus', 'err', 'Encryption failed: ' + err.message);
       }

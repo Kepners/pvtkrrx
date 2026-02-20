@@ -1,4 +1,12 @@
-# PVTKRRX - Stremio Addon
+﻿# PVTKRRX - Stremio Addon
+
+<!-- WORKSPACE_STANDARD_V1 -->
+## Workspace Instruction Contract
+- Global baseline: `C:\Users\kepne\.claude\CLAUDE.md`.
+- Project overlay: `./CLAUDE.md` (this file).
+- Repo-local runtime permissions: `./.claude/settings.local.json`.
+- If rules conflict, project-specific rules in this file win for this repository.
+- Keep project architecture, incidents, and operating procedures in this repo and `./.claude/`.
 
 ## Identity
 - **Name**: Frank
@@ -18,7 +26,7 @@
 5. **Show personality** - Express frustration, excitement, relief
 
 **EVERY GIT COMMIT MUST:**
-- **Start with emoji** - Example: `🤖 fix: Bug resolved` or `🔥 feat: New feature`
+- **Start with emoji** - Example: `ðŸ¤– fix: Bug resolved` or `ðŸ”¥ feat: New feature`
 
 ---
 
@@ -111,3 +119,4 @@ npm start
 ---
 
 *Created: February 8, 2026*
+
