@@ -122,22 +122,21 @@ User clicks "📥 Available" stream
     → If not complete: 504 "Download started — check qBittorrent"
 ```
 
-### File Serving — Two Paths
+### File Serving - Two Paths
 ```
-buildFileUrl() selects path based on config:
+buildFileUrl() chooses runtime path per stream:
 
-Path A — External file server (config.fileServerUrl set):
-    fileServerUrl + pathMapping → mapPath() → external HTTP URL
-    → Stremio streams directly from user's nginx/caddy/ruTorrent
-    → PVTKRRX not involved in video data transfer
+Path A - Built-in file server (preferred when file exists on local disk):
+    -> URL: /{token}/file/{base64(hash+filename)}
+    -> PVTKRRX looks up torrent save_path from qBit
+    -> Serves file from disk with HTTP 206 Range support
+    -> Protects local installs from stale fileServerUrl values
 
-Path B — Built-in file server (no fileServerUrl set):
-    → URL: /{token}/file/{base64(hash+filename)}
-    → PVTKRRX looks up torrent save_path from qBit
-    → Serves file from disk with HTTP 206 Range support
-    → Works on local installs with no HTTP file server configured
+Path B - External file server (when file is not locally accessible):
+    fileServerUrl + pathMapping -> mapPath() -> external HTTP URL
+    -> Used for remote/hosted setups where addon cannot read seedbox disk
+    -> Stremio streams directly from user's nginx/caddy/ruTorrent
 ```
-
 ---
 
 ## Filter Chain Detail
@@ -207,16 +206,18 @@ Queries run in parallel via `Promise.allSettled()`. Partial results returned if 
 | Sports catalog | ✅ Working | EPL, F1, UFC returning tiles |
 | Movie/TV streams | ✅ Working | 225+ results for Predator Badlands after filtering |
 | Sports contamination filter | ✅ Working | SportsCult excluded; title filter kills cross-contamination |
-| Already-downloaded playback | ⚠️ Under investigation | Built-in /file/ endpoint implemented; black screen may be stale config with old fileServerUrl set |
+| Already-downloaded playback | ⚠️ Monitoring | Runtime now prefers built-in `/file/` when local file is readable; stale fileServerUrl tokens should no longer break local playback |
 | On-tracker download + play | ✅ Code complete | Comet pattern: triggers download, polls, redirects |
 | Local HTTPS | ✅ Working | Self-signed cert on port 7001 for LAN streaming |
 
 ### Diagnosing Black Screen (playback issue)
 If files appear to download but Stremio shows black screen:
-1. In Stremio player, click `⋮ → Copy stream link`
-2. Paste the URL — if it contains `fileServerUrl` path, the config has an old external URL set
-3. Fix: go to `http://localhost:7000/configure` → clear the "File Server URL" field → reinstall
-4. With empty fileServerUrl, the built-in `/file/` endpoint is used instead
+1. In Stremio player, click `⋯ -> Copy stream link`
+2. Paste the URL to confirm endpoint:
+   - `/{token}/file/...` = built-in path
+   - external host/path = external file server path
+3. If it still points to an old external host, reinstall from `http://localhost:7000/configure` with File Server URL blank
+4. Runtime now auto-prefers built-in `/file/` whenever the addon can read the file locally
 
 ---
 

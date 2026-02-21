@@ -66,7 +66,11 @@ app.get('/:config/configure', (req, res) => res.sendFile(configPage))
 // Build a URL to serve a local file — uses the built-in /file/ endpoint when no
 // external fileServerUrl is configured (e.g. local qBit setup with no HTTP server).
 function buildFileUrl(config, configToken, baseUrl, hash, savePath, fileName) {
-  if (config.fileServerUrl) {
+  // Prefer built-in serving when the addon can access files on local disk.
+  // This protects local installs from stale external fileServerUrl values in older config tokens.
+  const localPath = path.join(savePath || '', fileName || '')
+  const localFileAvailable = Boolean(savePath && fileName && fs.existsSync(localPath))
+  if (config.fileServerUrl && !localFileAvailable) {
     return mapPath(savePath, fileName, config.fileServerUrl, config.pathMapping)
   }
   const info = Buffer.from(JSON.stringify({ h: hash.toLowerCase(), p: fileName })).toString('base64url')
@@ -96,6 +100,7 @@ function getManifest(req) {
   const modeLabel = mode === 'local' ? 'Local' : 'Hosted'
   return {
     ...manifest,
+    behaviorHints: { ...(manifest.behaviorHints || {}) },
     id: `com.kepners.pvtkrrx.${mode}`,
     name: `PVTKRRX (${modeLabel})`,
     logo: `${getPublicBaseUrl(req)}/logo.svg`
@@ -180,7 +185,7 @@ app.get('/:config/catalog/:type/:id/:extra.json', withConfig, async (req, res) =
 })
 
 app.get('/:config/stream/:type/:id.json', withConfig, async (req, res) => {
-  const addonUrl = `${req.protocol}://${req.get('host')}`
+  const addonUrl = getPublicBaseUrl(req)
   const result = await handleStream(req.config, req.params.type, req.params.id, addonUrl, req.params.config)
   res.json(result)
 })

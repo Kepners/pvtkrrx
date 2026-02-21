@@ -499,7 +499,7 @@
         <option value="hosted">Hosted (public URLs)</option>
         <option value="local">Local / LAN (localhost or private IP)</option>
       </select>
-      <p class="hint" id="installModeHint">Hosted mode requires public URLs for all services.</p>
+      <p class="hint" id="installModeHint">Hosted mode requires public URLs for Prowlarr and qBittorrent.</p>
     </div>
 
     <div class="card">
@@ -616,7 +616,7 @@
       if (mode === 'local') {
         hint.textContent = 'Local mode allows localhost/private IPs. Use this for self-hosting on your own machine.';
       } else {
-        hint.textContent = 'Hosted mode requires public URLs for Torznab, qBittorrent, and file server.';
+        hint.textContent = 'Hosted mode requires public URLs for Prowlarr and qBittorrent. File server URL is optional.';
       }
     }
 
@@ -635,13 +635,14 @@
     maybePrefillFromToken();
 
     function getConfig() {
+      const fileServerUrlInput = document.getElementById('fileServerUrl').value.trim();
       return {
         jackettUrl: document.getElementById('jackettUrl').value.replace(/\/+$/, ''),
         jackettApiKey: document.getElementById('jackettApiKey').value.trim(),
         qbitUrl: document.getElementById('qbitUrl').value.replace(/\/+$/, ''),
         qbitUsername: document.getElementById('qbitUsername').value.trim(),
         qbitPassword: document.getElementById('qbitPassword').value,
-        fileServerUrl: document.getElementById('fileServerUrl').value.replace(/\/+$/, ''),
+        fileServerUrl: fileServerUrlInput ? fileServerUrlInput.replace(/\/+$/, '') : '',
         fileServerAuth: document.getElementById('fileServerAuth').value.trim(),
         pathMapping: {
           from: document.getElementById('pathFrom').value,
@@ -707,10 +708,12 @@
       if (installMode === 'local') return null;
 
       const checks = [
-        ['Torznab URL', config.jackettUrl],
-        ['qBittorrent URL', config.qbitUrl],
-        ['HTTP File Server URL', config.fileServerUrl]
+        ['Prowlarr URL', config.jackettUrl],
+        ['qBittorrent URL', config.qbitUrl]
       ];
+      if (config.fileServerUrl) {
+        checks.push(['HTTP File Server URL', config.fileServerUrl]);
+      }
 
       for (const [label, value] of checks) {
         try {
@@ -788,7 +791,7 @@
       if (modeValidationError) {
         return setStatus('installStatus', 'err', modeValidationError);
       }
-      if (!config.jackettUrl || !config.jackettApiKey || !config.qbitUrl || !config.fileServerUrl) {
+      if (!config.jackettUrl || !config.jackettApiKey || !config.qbitUrl || !config.qbitUsername) {
         return setStatus('installStatus', 'err', 'Please fill in all required fields');
       }
 

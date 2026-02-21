@@ -129,11 +129,11 @@ ENCRYPTION_SECRET=your-secret-here npm start
 
 ### Black screen when playing a downloaded file
 
-1. In the Stremio player click `⋯ → Copy stream link`
+1. In the Stremio player click `⋯ -> Copy stream link`
 2. Paste it somewhere to inspect the URL
-3. If it contains your old file server URL → your config has a stale `fileServerUrl` set
-4. Fix: go to `http://localhost:7000/configure`, **clear the File Server URL field**, and reinstall the addon
-5. With File Server URL empty, PVTKRRX uses its built-in file server
+3. `/{token}/file/...` means built-in serving; external host/path means external file server serving
+4. If it still points to an old external host, go to `http://localhost:7000/configure`, clear File Server URL, and reinstall the addon
+5. Runtime now auto-prefers built-in `/file/` whenever the addon can read the file locally
 
 ### PVTKRRX not appearing in stream dropdown
 

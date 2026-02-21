@@ -1,3 +1,5 @@
+const fs = require('fs')
+const path = require('path')
 const { ProwlarrClient } = require('../clients/prowlarr')
 const { QBitClient } = require('../clients/qbittorrent')
 const { CinemetaClient } = require('../clients/cinemeta')
@@ -7,8 +9,19 @@ const { mapPath } = require('../utils/pathMapper')
 const { buildOnSeedboxStream, buildOnTrackerStream, findVideoFile, findEpisodeFile, sortStreams } = require('../utils/streams')
 
 // Build URL for a local file — uses PVTKRRX built-in file server when no external fileServerUrl set
+function canServeFromLocalDisk(savePath, fileName) {
+  if (!savePath || !fileName) return false
+  try {
+    return fs.existsSync(path.join(savePath, fileName))
+  } catch (_) {
+    return false
+  }
+}
+
 function buildFileUrl(config, configToken, addonUrl, hash, savePath, fileName) {
-  if (config.fileServerUrl) {
+  // Prefer built-in serving when the addon can read the file locally.
+  // This prevents stale external fileServerUrl values from causing black screens on local installs.
+  if (config.fileServerUrl && !canServeFromLocalDisk(savePath, fileName)) {
     return mapPath(savePath, fileName, config.fileServerUrl, config.pathMapping)
   }
   const info = Buffer.from(JSON.stringify({ h: hash.toLowerCase(), p: fileName })).toString('base64url')

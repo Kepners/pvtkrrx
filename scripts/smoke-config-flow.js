@@ -20,7 +20,7 @@ async function run() {
       qbitUrl: 'http://127.0.0.1:8080',
       qbitUsername: 'admin',
       qbitPassword: 'adminadmin',
-      fileServerUrl: 'http://127.0.0.1/files',
+      fileServerUrl: '',
       fileServerAuth: '',
       pathMapping: { from: '/', to: '/' },
       maxResults: 50
@@ -50,7 +50,7 @@ async function run() {
     const tokenManifest = await tokenManifestRes.json()
     assert.equal(tokenManifest.id, 'com.kepners.pvtkrrx.hosted')
     assert.equal(tokenManifest.behaviorHints?.configurable, true)
-    assert.equal(tokenManifest.behaviorHints?.configurationRequired, true)
+    assert.equal(tokenManifest.behaviorHints?.configurationRequired, false)
 
     const tokenManifestLocalRes = await fetch(`${base}/${token}/manifest.json?mode=local`)
     assert.equal(tokenManifestLocalRes.status, 200, 'GET /:token/manifest.json?mode=local should return 200')
