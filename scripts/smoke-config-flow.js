@@ -32,6 +32,27 @@ async function run() {
     assert.match(configureHtml, /Install in Stremio/, 'configure page should render install action')
     assert.match(configureHtml, /testConnection\(\)/, 'configure page should expose test connection action')
 
+    const localSaveRes = await fetch(`${base}/local-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(sampleConfig)
+    })
+    assert.equal(localSaveRes.status, 200, 'POST /local-config should return 200')
+    const localSavePayload = await localSaveRes.json()
+    assert.equal(localSavePayload.ok, true, 'local config save should return ok=true')
+
+    const localConfigRes = await fetch(`${base}/local/config.json`)
+    assert.equal(localConfigRes.status, 200, 'GET /local/config.json should return 200 after save')
+    const localConfig = await localConfigRes.json()
+    assert.equal(localConfig.jackettUrl, sampleConfig.jackettUrl)
+    assert.equal(localConfig.qbitUrl, sampleConfig.qbitUrl)
+
+    const localManifestRes = await fetch(`${base}/local/manifest.json?mode=local`)
+    assert.equal(localManifestRes.status, 200, 'GET /local/manifest.json should return 200 after local config save')
+    const localManifest = await localManifestRes.json()
+    assert.equal(localManifest.id, 'com.kepners.pvtkrrx.local')
+    assert.equal(localManifest.behaviorHints?.configurationRequired, false)
+
     const encryptRes = await fetch(`${base}/encrypt`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

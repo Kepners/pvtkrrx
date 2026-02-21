@@ -679,9 +679,9 @@
 
     async function maybePrefillFromToken() {
       const token = getConfigTokenFromPath();
-      if (!token) return;
+      const path = token ? `/${encodeURIComponent(token)}/config.json` : '/local/config.json';
       try {
-        const res = await fetch(`/${encodeURIComponent(token)}/config.json`, { cache: 'no-store' });
+        const res = await fetch(path, { cache: 'no-store' });
         if (!res.ok) return;
         const data = await res.json();
         fillConfig(data);
@@ -795,30 +795,31 @@
         return setStatus('installStatus', 'err', 'Please fill in all required fields');
       }
 
-      setStatus('installStatus', 'info', 'Encrypting configuration...');
+      setStatus('installStatus', 'info', installMode === 'local'
+        ? 'Saving local configuration...'
+        : 'Encrypting configuration...');
 
       try {
-        const res = await fetch('/encrypt', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(config)
-        });
-        const data = await res.json();
-
-        if (data.error) {
-          return setStatus('installStatus', 'err', data.error);
-        }
-
         const host = window.location.host;
         const port = window.location.port || '7000';
-        const token = encodeURIComponent(data.token);
 
         if (installMode === 'local') {
+          const saveRes = await fetch('/local-config', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+          });
+          const saveData = await saveRes.json();
+          if (saveData.error || !saveRes.ok) {
+            return setStatus('installStatus', 'err', saveData.error || 'Failed to save local config');
+          }
+
           const httpsPort = String(parseInt(port, 10) + 1);
-          const httpManifestUrl = 'http://127.0.0.1:' + port + '/' + token + '/manifest.json';
-          const httpsManifestUrl = 'https://127.0.0.1:' + httpsPort + '/' + token + '/manifest.json';
-          const httpsAddonUrl = 'https://127.0.0.1:' + httpsPort + '/manifest.json';
-          const stremioUrl = 'stremio://127.0.0.1:' + httpsPort + '/' + token + '/manifest.json';
+          const modeQuery = '?mode=local';
+          const httpManifestUrl = 'http://127.0.0.1:' + port + '/local/manifest.json' + modeQuery;
+          const httpsManifestUrl = 'https://127.0.0.1:' + httpsPort + '/local/manifest.json' + modeQuery;
+          const httpsAddonUrl = 'https://127.0.0.1:' + httpsPort + '/local/manifest.json' + modeQuery;
+          const stremioUrl = 'stremio://127.0.0.1:' + httpsPort + '/local/manifest.json' + modeQuery;
 
           document.getElementById('httpUrlInput').value = httpManifestUrl;
           document.getElementById('httpsUrlInput').value = httpsManifestUrl;
@@ -826,7 +827,23 @@
           document.getElementById('stremioLink').href = stremioUrl;
           document.getElementById('localInstall').style.display = 'block';
           document.getElementById('hostedInstall').style.display = 'none';
+
+          document.getElementById('installLink').style.display = 'block';
+          setStatus('installStatus', 'ok',
+            'Local config saved. Install once using this /local URL; future config updates do not require reinstall.');
         } else {
+          const res = await fetch('/encrypt', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(config)
+          });
+          const data = await res.json();
+
+          if (data.error) {
+            return setStatus('installStatus', 'err', data.error);
+          }
+
+          const token = encodeURIComponent(data.token);
           const modeQuery = '?mode=' + encodeURIComponent(installMode);
           const manifestUrl = host + '/' + token + '/manifest.json' + modeQuery;
           const manifestHttpUrl = window.location.protocol + '//' + manifestUrl;
@@ -836,14 +853,12 @@
           document.getElementById('hostedUrlDisplay').textContent = manifestHttpUrl;
           document.getElementById('localInstall').style.display = 'none';
           document.getElementById('hostedInstall').style.display = 'block';
-        }
 
-        document.getElementById('installLink').style.display = 'block';
-        setStatus('installStatus', 'ok', installMode === 'local'
-          ? 'Ready — use Method 1 (paste URL) or Method 2 (trust cert first, then deep link)'
-          : 'Configuration encrypted — click below to install in Stremio');
+          document.getElementById('installLink').style.display = 'block';
+          setStatus('installStatus', 'ok', 'Configuration encrypted — click below to install in Stremio');
+        }
       } catch (err) {
-        setStatus('installStatus', 'err', 'Encryption failed: ' + err.message);
+        setStatus('installStatus', 'err', 'Install failed: ' + err.message);
       }
     }
   </script>

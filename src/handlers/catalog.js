@@ -4,6 +4,29 @@ const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { cleanTitle } = require('../utils/parser')
 const { formatSize } = require('../utils/streams')
 
+const SPORTS_ONLY_INDEXERS = new Set([
+  'sportscult',
+  'beyondhd-sports',
+  'tvvault-sports'
+])
+
+function isSportsOnlyIndexer(indexerName) {
+  const normalized = String(indexerName || '').trim().toLowerCase()
+  if (SPORTS_ONLY_INDEXERS.has(normalized)) return true
+  return normalized.includes('sportscult')
+}
+
+function imdbPoster(imdbId, size = 'medium') {
+  const id = String(imdbId || '').trim()
+  if (!id) return ''
+  return `https://images.metahub.space/poster/${size}/${id}/img`
+}
+
+function placeholderPoster(title) {
+  const safe = encodeURIComponent(String(title || 'PVTKRRX').slice(0, 28))
+  return `https://via.placeholder.com/300x450/407076/FFEEDD?text=${safe}`
+}
+
 // Parse Stremio extra path segment into object
 // e.g. "genre=Football&search=UFC&skip=10" → { genre: 'Football', search: 'UFC', skip: '10' }
 function parseExtra(extraStr) {
@@ -53,12 +76,15 @@ async function sportsCatalog(config, extra) {
     id: 'pvtkrrx:' + Buffer.from(JSON.stringify({
       t: item.title,
       h: item.infohash,
+      l: item.link,
+      i: item.indexer,
       s: item.size,
       d: item.seeders
     })).toString('base64url'),
     type: 'tv',
     name: item.title,
     description: `${item.seeders} seeders | ${formatSize(item.size)}`,
+    poster: placeholderPoster(cleanTitle(item.title)),
     posterShape: 'landscape'
   }))
 
@@ -70,18 +96,20 @@ async function moviesCatalog(config, extra) {
   const items = extra.search
     ? await torznab.search(extra.search, MOVIE_CATS)
     : await torznab.search('', MOVIE_CATS)
+  const filtered = items.filter(item => item.imdbId && !isSportsOnlyIndexer(item.indexer))
 
   const skip = parseInt(extra.skip || '0', 10)
   const seen = new Set()
   const metas = []
 
-  for (const item of items) {
+  for (const item of filtered) {
     if (item.imdbId && !seen.has(item.imdbId)) {
       seen.add(item.imdbId)
       metas.push({
         id: item.imdbId,
         type: 'movie',
-        name: cleanTitle(item.title)
+        name: cleanTitle(item.title),
+        poster: imdbPoster(item.imdbId)
       })
     }
   }
@@ -94,21 +122,21 @@ async function tvCatalog(config, extra) {
   const items = extra.search
     ? await torznab.search(extra.search, TV_CATS)
     : await torznab.search('', TV_CATS)
+  const filtered = items.filter(item => item.imdbId && !isSportsOnlyIndexer(item.indexer))
 
   const skip = parseInt(extra.skip || '0', 10)
   const seen = new Set()
   const metas = []
 
-  for (const item of items) {
-    const metaId = item.imdbId || ('pvtkrrx:' + Buffer.from(JSON.stringify({
-      t: item.title, h: item.infohash, s: item.size, d: item.seeders
-    })).toString('base64url'))
+  for (const item of filtered) {
+    const metaId = item.imdbId
     if (seen.has(metaId)) continue
     seen.add(metaId)
     metas.push({
       id: metaId,
-      type: item.imdbId ? 'series' : 'tv',
-      name: cleanTitle(item.title)
+      type: 'series',
+      name: cleanTitle(item.title),
+      poster: imdbPoster(item.imdbId)
     })
   }
 
@@ -137,7 +165,7 @@ async function libraryCatalog(config, extra) {
     type: 'movie',
     name: cleanTitle(t.name),
     description: formatSize(t.size),
-    poster: `https://via.placeholder.com/200x300/407076/FFEEDD?text=${encodeURIComponent(cleanTitle(t.name).slice(0, 20))}`
+    poster: placeholderPoster(cleanTitle(t.name))
   }))
 
   return { metas, cacheMaxAge: 300 }

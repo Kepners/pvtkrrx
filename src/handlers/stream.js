@@ -46,10 +46,47 @@ async function handleStream(config, type, id, addonUrl, configToken) {
 
 // Indexers that only carry sports content — never relevant for movie/TV IMDB searches.
 const SPORTS_ONLY_INDEXERS = new Set([
-  'SportsCult',
-  'BeyondHD-Sports',
-  'TVVault-Sports'
+  'sportscult',
+  'beyondhd-sports',
+  'tvvault-sports'
 ])
+
+function isSportsOnlyIndexer(indexerName) {
+  const normalized = String(indexerName || '').trim().toLowerCase()
+  if (SPORTS_ONLY_INDEXERS.has(normalized)) return true
+  return normalized.includes('sportscult')
+}
+
+function normalizeForMatch(value) {
+  return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+function findTorrentByTitle(torrents, targetTitle) {
+  const target = normalizeForMatch(targetTitle)
+  if (!target) return null
+
+  for (const torrent of torrents) {
+    const name = normalizeForMatch(torrent.name)
+    if (!name) continue
+    if (name === target || name.includes(target) || target.includes(name)) return torrent
+  }
+
+  const words = target.split(/\s+/).filter(w => w.length > 2)
+  if (words.length === 0) return null
+
+  let best = null
+  let bestScore = 0
+  for (const torrent of torrents) {
+    const name = normalizeForMatch(torrent.name)
+    const score = words.reduce((acc, word) => acc + (name.includes(word) ? 1 : 0), 0)
+    if (score > bestScore) {
+      bestScore = score
+      best = torrent
+    }
+  }
+
+  return bestScore >= Math.max(2, Math.ceil(words.length * 0.6)) ? best : null
+}
 
 // Keep only results where the significant words from the query appear in the result title.
 // Prevents sports indexers returning F1/Olympics results when searching for a movie.
@@ -103,7 +140,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
   // full library. The filter strips those out. We then check if anything useful survived before
   // deciding whether to fall back to a title search.
   function applyFilters(items) {
-    items = items.filter(item => !SPORTS_ONLY_INDEXERS.has(item.indexer))
+    items = items.filter(item => !isSportsOnlyIndexer(item.indexer))
     if (contentTitle) {
       const before = items.length
       items = items.filter(item => titleRelevant(item.title, contentTitle))
@@ -175,13 +212,18 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
 async function handleCustomStream(config, id, addonUrl, configToken) {
   const encoded = id.replace('pvtkrrx:', '')
   const info = JSON.parse(Buffer.from(encoded, 'base64url').toString())
+  const infoHash = String(info.h || '').toLowerCase()
+  const directLink = String(info.l || '')
 
   const qbit = new QBitClient(config.qbitUrl, config.qbitUsername, config.qbitPassword)
   const torrents = await qbit.torrents('completed')
-  const matched = torrents.find(t => t.hash.toLowerCase() === info.h)
+  let matched = infoHash ? torrents.find(t => t.hash.toLowerCase() === infoHash) : null
+  if (!matched) matched = findTorrentByTitle(torrents, info.t)
 
   const parsed = parse(info.t)
   const streams = []
+
+  console.log(`[stream] custom title="${info.t}" hash=${infoHash || 'none'} matched=${matched ? matched.hash : 'none'}`)
 
   if (matched) {
     // Already on seedbox
@@ -194,17 +236,36 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
         fileUrl, videoFile.name, videoFile.size, config, parsed
       ))
     } catch (e) {
-      // File listing failed
+      console.error('[stream] custom file listing failed:', e.message)
     }
   } else {
-    // Not on seedbox — re-search Jackett to get download link
+    // Not on seedbox — use embedded link from catalog if available.
+    if (directLink) {
+      const playbackInfo = Buffer.from(JSON.stringify({
+        h: infoHash,
+        l: directLink
+      })).toString('base64url')
+      streams.push(buildOnTrackerStream(
+        { title: info.t, size: info.s, seeders: info.d, indexer: info.i || '' },
+        `${addonUrl}/${configToken}/playback/${playbackInfo}`,
+        parsed
+      ))
+      return { streams: sortStreams(streams), cacheMaxAge: 0 }
+    }
+
+    // No embedded link — re-search Prowlarr as fallback.
     try {
       const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
       const results = await torznab.search(info.t, SPORT_CATS)
-      const match = results.find(r => r.infohash === info.h)
+      let match = null
+      if (infoHash) match = results.find(r => r.infohash === infoHash)
+      if (!match) {
+        const normalizedTitle = normalizeForMatch(info.t)
+        match = results.find(r => normalizeForMatch(r.title) === normalizedTitle)
+      }
       if (match) {
         const playbackInfo = Buffer.from(JSON.stringify({
-          h: match.infohash,
+          h: match.infohash || infoHash,
           l: match.link
         })).toString('base64url')
         streams.push(buildOnTrackerStream(
@@ -212,7 +273,7 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
         ))
       }
     } catch (e) {
-      // Re-search failed
+      console.error('[stream] custom re-search failed:', e.message)
     }
   }
 

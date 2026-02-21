@@ -47,6 +47,27 @@ if (!process.env.ENCRYPTION_SECRET && process.env.NODE_ENV !== 'production') {
 const app = express()
 app.use(express.json())
 
+const runtimeDir = path.join(__dirname, '.runtime')
+const localConfigPath = path.join(runtimeDir, 'local-config.json')
+
+function loadLocalConfigFile() {
+  try {
+    if (!fs.existsSync(localConfigPath)) return null
+    const raw = fs.readFileSync(localConfigPath, 'utf8')
+    if (!raw.trim()) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    return parsed
+  } catch (_) {
+    return null
+  }
+}
+
+function saveLocalConfigFile(config) {
+  fs.mkdirSync(runtimeDir, { recursive: true })
+  fs.writeFileSync(localConfigPath, JSON.stringify(config), 'utf8')
+}
+
 // ─── CORS ───────────────────────────────────────────────────
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
@@ -120,6 +141,21 @@ app.post('/encrypt', (req, res) => {
   }
 })
 
+// Save local-mode config to disk so Stremio can use a stable /local manifest URL.
+app.post('/local-config', (req, res) => {
+  const cfg = req.body || {}
+  if (!cfg.jackettUrl || !cfg.jackettApiKey || !cfg.qbitUrl || !cfg.qbitUsername) {
+    return res.status(400).json({ error: 'Missing required local config fields' })
+  }
+
+  try {
+    saveLocalConfigFile(cfg)
+    res.json({ ok: true })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save local config' })
+  }
+})
+
 // ─── POST /test-connection — validate credentials ──────────
 app.post('/test-connection', async (req, res) => {
   const { jackettUrl, jackettApiKey, qbitUrl, qbitUsername, qbitPassword } = req.body
@@ -146,6 +182,13 @@ app.post('/test-connection', async (req, res) => {
 
 // ─── withConfig middleware ──────────────────────────────────
 function withConfig(req, res, next) {
+  if (req.params.config === 'local') {
+    const localConfig = loadLocalConfigFile()
+    if (!localConfig) return res.status(400).json({ error: 'Local config not found. Open /configure and save local config first.' })
+    req.config = localConfig
+    return next()
+  }
+
   const secret = process.env.ENCRYPTION_SECRET
   if (!secret) return res.status(500).json({ error: 'ENCRYPTION_SECRET not configured' })
 
@@ -186,7 +229,10 @@ app.get('/:config/catalog/:type/:id/:extra.json', withConfig, async (req, res) =
 
 app.get('/:config/stream/:type/:id.json', withConfig, async (req, res) => {
   const addonUrl = getPublicBaseUrl(req)
+  const tokenShort = String(req.params.config || '').slice(0, 8)
+  console.log(`[stream-route] token=${tokenShort} type=${req.params.type} id=${req.params.id}`)
   const result = await handleStream(req.config, req.params.type, req.params.id, addonUrl, req.params.config)
+  console.log(`[stream-route] token=${tokenShort} streams=${Array.isArray(result?.streams) ? result.streams.length : 0}`)
   res.json(result)
 })
 
@@ -199,14 +245,22 @@ app.get('/:config/meta/:type/:id.json', withConfig, async (req, res) => {
 // Used when no external fileServerUrl is configured (e.g. local qBit setup).
 app.get('/:config/file/:info', withConfig, async (req, res) => {
   try {
+    const tokenShort = String(req.params.config || '').slice(0, 8)
     const { h, p } = JSON.parse(Buffer.from(req.params.info, 'base64url').toString())
+    console.log(`[file-route] token=${tokenShort} hash=${String(h || '').slice(0, 8)} file="${p}"`)
     const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
     const torrents = await qbit.torrents('completed')
     const torrent = torrents.find(t => t.hash.toLowerCase() === h.toLowerCase())
-    if (!torrent) return res.status(404).json({ error: 'Torrent not found' })
+    if (!torrent) {
+      console.warn(`[file-route] torrent not found hash=${String(h || '').slice(0, 8)}`)
+      return res.status(404).json({ error: 'Torrent not found' })
+    }
 
     const filePath = path.join(torrent.save_path, p)
-    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found on disk' })
+    if (!fs.existsSync(filePath)) {
+      console.warn(`[file-route] file not found on disk path="${filePath}"`)
+      return res.status(404).json({ error: 'File not found on disk' })
+    }
 
     const stat = fs.statSync(filePath)
     const fileSize = stat.size
@@ -239,7 +293,9 @@ app.get('/:config/file/:info', withConfig, async (req, res) => {
 // ─── Playback endpoint — Comet pattern ──────────────────────
 app.get('/:config/playback/:info', withConfig, async (req, res) => {
   try {
+    const tokenShort = String(req.params.config || '').slice(0, 8)
     const info = JSON.parse(Buffer.from(req.params.info, 'base64url').toString())
+    console.log(`[playback-route] token=${tokenShort} hash=${String(info.h || '').slice(0, 8)} hasLink=${Boolean(info.l)}`)
     const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
 
     // Check if already downloaded (only possible if we have the infohash)
@@ -250,6 +306,7 @@ app.get('/:config/playback/:info', withConfig, async (req, res) => {
         const files = await qbit.files(found.hash)
         const videoFile = findVideoFile(files)
         const fileUrl = buildFileUrl(req.config, req.params.config, getPublicBaseUrl(req), found.hash, found.save_path, videoFile.name)
+        console.log(`[playback-route] token=${tokenShort} hit completed torrent -> redirect file`)
         return res.redirect(302, fileUrl)
       }
     }
@@ -268,14 +325,17 @@ app.get('/:config/playback/:info', withConfig, async (req, res) => {
           const files = await qbit.files(done.hash)
           const videoFile = findVideoFile(files)
           const fileUrl = buildFileUrl(req.config, req.params.config, getPublicBaseUrl(req), done.hash, done.save_path, videoFile.name)
+          console.log(`[playback-route] token=${tokenShort} download completed during poll -> redirect file`)
           return res.redirect(302, fileUrl)
         }
       }
     }
 
     // No hash or download not complete — torrent has been added to qBit queue
+    console.warn(`[playback-route] token=${tokenShort} timeout waiting for completion`)
     res.status(504).json({ error: 'Download started — wait for it to finish in qBittorrent, then try again' })
   } catch (err) {
+    console.error('[playback-route] Error:', err.message)
     res.status(500).json({ error: 'Playback failed' })
   }
 })
