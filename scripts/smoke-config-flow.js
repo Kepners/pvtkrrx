@@ -15,7 +15,7 @@ async function run() {
     const base = `http://${host}`
 
     const sampleConfig = {
-      jackettUrl: 'http://127.0.0.1:9117/api/v2.0/indexers/all/results/torznab',
+      jackettUrl: 'http://127.0.0.1:9696',
       jackettApiKey: 'test-key',
       qbitUrl: 'http://127.0.0.1:8080',
       qbitUsername: 'admin',
@@ -31,6 +31,25 @@ async function run() {
     const configureHtml = await configureRes.text()
     assert.match(configureHtml, /Install in Stremio/, 'configure page should render install action')
     assert.match(configureHtml, /testConnection\(\)/, 'configure page should expose test connection action')
+    assert.match(configureHtml, /Auto Setup Local \/ LAN/, 'configure page should render auto setup action')
+
+    const networkInfoRes = await fetch(`${base}/network-info`)
+    assert.equal(networkInfoRes.status, 200, 'GET /network-info should return 200')
+    const networkInfo = await networkInfoRes.json()
+    assert.equal(typeof networkInfo.loopback?.httpManifest, 'string')
+    assert.match(networkInfo.loopback.httpManifest, /\/local\/manifest\.json\?mode=local$/)
+
+    const autoProvisionRes = await fetch(`${base}/auto-provision`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        installIfMissing: false,
+        startIfStopped: false,
+        configureQbitLocalNoAuth: false,
+        openFirewall: false
+      })
+    })
+    assert.equal(autoProvisionRes.status, 200, 'POST /auto-provision should return 200')
 
     const localSaveRes = await fetch(`${base}/local-config`, {
       method: 'POST',

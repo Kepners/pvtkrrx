@@ -100,6 +100,7 @@
       color: #f8f7ff;
       position: relative;
       display: inline-block;
+      text-shadow: 0 0 10px rgba(248, 247, 255, 0.18);
     }
 
     h1::before,
@@ -191,6 +192,7 @@
       margin-bottom: 1rem;
       padding-bottom: 0.5rem;
       border-bottom: 1px solid rgba(0, 255, 65, 0.08);
+      text-shadow: 0 0 8px rgba(0, 255, 65, 0.2);
     }
 
     /* Form elements */
@@ -203,6 +205,7 @@
       margin-bottom: 0.3rem;
       text-transform: uppercase;
       letter-spacing: 1px;
+      text-shadow: 0 0 6px rgba(138, 176, 187, 0.16);
     }
 
     input, select {
@@ -305,6 +308,7 @@
       color: var(--blue);
       border: 1px solid rgba(0, 128, 255, 0.2);
       margin-bottom: 0.5rem;
+      box-shadow: 0 0 14px rgba(0, 128, 255, 0.1);
     }
 
     .btn-test:hover {
@@ -317,6 +321,7 @@
       background: linear-gradient(135deg, rgba(0, 255, 65, 0.12), rgba(0, 255, 65, 0.06));
       color: var(--green);
       border: 1px solid rgba(0, 255, 65, 0.2);
+      box-shadow: 0 0 14px rgba(0, 255, 65, 0.1);
     }
 
     .btn-install:hover {
@@ -342,6 +347,7 @@
       background: rgba(0, 255, 65, 0.06);
       color: var(--green);
       border: 1px solid rgba(0, 255, 65, 0.15);
+      box-shadow: 0 0 12px rgba(0, 255, 65, 0.12);
     }
 
     .status.err {
@@ -349,6 +355,7 @@
       background: rgba(255, 0, 64, 0.06);
       color: var(--red);
       border: 1px solid rgba(255, 0, 64, 0.15);
+      box-shadow: 0 0 12px rgba(255, 0, 64, 0.1);
     }
 
     .status.info {
@@ -356,6 +363,7 @@
       background: rgba(0, 128, 255, 0.06);
       color: var(--blue);
       border: 1px solid rgba(0, 128, 255, 0.15);
+      box-shadow: 0 0 12px rgba(0, 128, 255, 0.1);
     }
 
     /* Install link section */
@@ -414,6 +422,7 @@
       letter-spacing: 1px;
       text-transform: uppercase;
       transition: all 0.2s;
+      box-shadow: 0 0 8px rgba(0, 128, 255, 0.1);
     }
 
     .btn-copy:hover {
@@ -503,11 +512,20 @@
     </div>
 
     <div class="card">
+      <h2>Auto Setup</h2>
+      <p class="hint">One click: local defaults + LAN install links for TV/phone clients.</p>
+      <button class="btn-test" onclick="autoSetup()">Auto Setup Local / LAN</button>
+      <div id="autoStatus" class="status"></div>
+      <p class="hint">Uses built-in file serving. Works with NAS storage if the PC can read qBit save paths.</p>
+    </div>
+
+    <div class="card">
       <h2>Prowlarr</h2>
       <label for="jackettUrl">Prowlarr Base URL — <code>http://localhost:9696</code></label>
       <input type="url" id="jackettUrl" placeholder="http://localhost:9696">
+      <p class="hint">Paste the base URL only. Legacy Torznab/API URLs are auto-normalized.</p>
       <label for="jackettApiKey">API Key</label>
-      <input type="text" id="jackettApiKey" placeholder="Your Jackett/Prowlarr API key">
+      <input type="text" id="jackettApiKey" placeholder="Your Prowlarr API key">
     </div>
 
     <div class="card">
@@ -567,24 +585,33 @@
     <button class="btn-install" onclick="install()">Install in Stremio</button>
 
     <div id="installLink" class="install-link">
-      <!-- Local mode: HTTP + HTTPS copy rows -->
+      <!-- Local mode: localhost + mDNS + LAN IP fallback -->
       <div id="localInstall">
-        <p class="install-section-title">Method 1 — Paste into Stremio (easiest)</p>
+        <p class="install-section-title">Method 1 - This PC (localhost)</p>
         <div class="url-row">
           <input type="text" id="httpUrlInput" readonly>
           <button class="btn-copy" onclick="copyUrl('httpUrlInput', this)">Copy</button>
         </div>
-        <p class="install-note">Open Stremio &rarr; Search bar &rarr; paste the URL above &rarr; press Enter</p>
+        <p class="install-note">Use when Stremio runs on the same machine as PVTKRRX.</p>
 
-        <p class="install-section-title" style="margin-top:1rem">Method 2 — Open in Stremio (requires HTTPS trust)</p>
+        <p class="install-section-title" style="margin-top:1rem">Method 2 - TV / Phone using hostname (recommended)</p>
+        <div class="url-row">
+          <input type="text" id="lanUrlInput" readonly>
+          <button class="btn-copy" onclick="copyUrl('lanUrlInput', this)">Copy</button>
+        </div>
+        <p class="install-note" id="lanInstallNote">Uses <code>pvtkrrx.local</code> (auto-discovered on most home networks).</p>
+
+        <p class="install-section-title" style="margin-top:1rem">Method 3 - TV / Phone fallback by LAN IP</p>
         <div class="url-row">
           <input type="text" id="httpsUrlInput" readonly>
           <button class="btn-copy" onclick="copyUrl('httpsUrlInput', this)">Copy</button>
         </div>
-        <a id="stremioLink" href="#" style="display:inline-block;margin-top:0.5rem;color:var(--blue);font-family:'JetBrains Mono',monospace;font-size:0.8rem">Open in Stremio</a>
-        <p class="install-note">First open <span id="httpsAddonUrl" style="font-family:monospace;color:var(--teal-bright)"></span> in your browser and click <strong>Accept / Proceed</strong> to trust the certificate. Then click Open in Stremio.</p>
-      </div>
+        <p class="install-note" id="lanFallbackNote">Use this only if Method 2 hostname does not resolve on your network.</p>
 
+        <p class="install-section-title" style="margin-top:1rem">Quick Launch</p>
+        <a id="stremioLink" href="#" style="display:inline-block;margin-top:0.5rem;color:var(--blue);font-family:'JetBrains Mono',monospace;font-size:0.8rem">Open in Stremio</a>
+        <p class="install-note" id="openLinkNote">Uses Method 2 first; falls back to Method 3 when needed.</p>
+      </div>
       <!-- Hosted mode: just the stremio:// link -->
       <div id="hostedInstall" style="text-align:center">
         <a id="stremioLinkHosted" href="#">Open in Stremio</a>
@@ -606,6 +633,16 @@
       custom: { from: '', to: '' }
     };
 
+    function normalizeProwlarrBaseUrl(raw) {
+      return String(raw || '')
+        .trim()
+        .replace(/\/api\/v2\.0\/indexers\/all\/results\/torznab.*$/i, '')
+        .replace(/\/api\/v1.*$/i, '')
+        .replace(/\/[a-z0-9]{16,}\/api.*$/i, '')
+        .replace(/\/\d+\/api.*$/i, '')
+        .replace(/\/+$/, '');
+    }
+
     function getInstallMode() {
       return document.getElementById('installMode').value;
     }
@@ -614,7 +651,7 @@
       const mode = getInstallMode();
       const hint = document.getElementById('installModeHint');
       if (mode === 'local') {
-        hint.textContent = 'Local mode allows localhost/private IPs. Use this for self-hosting on your own machine.';
+        hint.textContent = 'Local mode exposes 3 install methods: localhost, pvtkrrx.local, and LAN-IP fallback.';
       } else {
         hint.textContent = 'Hosted mode requires public URLs for Prowlarr and qBittorrent. File server URL is optional.';
       }
@@ -628,16 +665,138 @@
       }
     });
 
+    document.getElementById('jackettUrl').addEventListener('blur', function() {
+      this.value = normalizeProwlarrBaseUrl(this.value);
+    });
+
     document.getElementById('installMode').addEventListener('change', setInstallModeHint);
     setInstallModeHint();
     document.getElementById('localInstall').style.display = 'none';
     document.getElementById('hostedInstall').style.display = 'none';
     maybePrefillFromToken();
 
+    function applyLocalDefaults() {
+      document.getElementById('installMode').value = 'local';
+      setInstallModeHint();
+      if (!document.getElementById('jackettUrl').value.trim()) {
+        document.getElementById('jackettUrl').value = 'http://localhost:9696';
+      }
+      if (!document.getElementById('qbitUrl').value.trim()) {
+        document.getElementById('qbitUrl').value = 'http://localhost:8080';
+      }
+      document.getElementById('provider').value = 'custom';
+      document.getElementById('fileServerUrl').value = '';
+      document.getElementById('fileServerAuth').value = '';
+      document.getElementById('pathFrom').value = '';
+      document.getElementById('pathTo').value = '';
+    }
+
+    function fallbackNetworkInfo() {
+      const port = parseInt(window.location.port || '7000', 10);
+      const modeQuery = '?mode=local';
+      const mdnsHost = 'pvtkrrx.local';
+      return {
+        loopback: {
+          httpManifest: `http://127.0.0.1:${port}/local/manifest.json${modeQuery}`,
+          stremio: `stremio://127.0.0.1:${port}/local/manifest.json${modeQuery}`
+        },
+        mdns: {
+          hostname: mdnsHost,
+          httpManifest: `http://${mdnsHost}:${port}/local/manifest.json${modeQuery}`,
+          stremio: `stremio://${mdnsHost}:${port}/local/manifest.json${modeQuery}`
+        },
+        lan: null,
+        lanCandidates: []
+      };
+    }
+
+    async function getNetworkInfo() {
+      try {
+        const res = await fetch('/network-info', { cache: 'no-store' });
+        if (!res.ok) return fallbackNetworkInfo();
+        return await res.json();
+      } catch (_) {
+        return fallbackNetworkInfo();
+      }
+    }
+
+    function fillLocalInstallLinks(networkInfo) {
+      const info = networkInfo || fallbackNetworkInfo();
+      const loopback = info.loopback || fallbackNetworkInfo().loopback;
+      const mdns = info.mdns || fallbackNetworkInfo().mdns;
+      const lan = info.lan || null;
+      const method2Field = document.getElementById('lanUrlInput');
+      const method2Note = document.getElementById('lanInstallNote');
+      const method3Field = document.getElementById('httpsUrlInput');
+      const method3Note = document.getElementById('lanFallbackNote');
+      const openNote = document.getElementById('openLinkNote');
+      const openHref = (mdns && mdns.stremio) || (lan && lan.stremio) || loopback.stremio || '#';
+
+      document.getElementById('httpUrlInput').value = loopback.httpManifest || '';
+      document.getElementById('stremioLink').href = openHref;
+
+      if (mdns && mdns.httpManifest) {
+        method2Field.value = mdns.httpManifest;
+        method2Note.textContent = `Preferred LAN URL via hostname (${mdns.hostname || 'pvtkrrx.local'}).`;
+      } else {
+        method2Field.value = '';
+        method2Note.textContent = 'mDNS hostname unavailable. Use Method 3 fallback URL.';
+      }
+
+      if (lan && lan.httpManifest) {
+        method3Field.value = lan.httpManifest;
+        method3Note.textContent = 'Direct IP fallback for networks where .local resolution is blocked.';
+      } else {
+        method3Field.value = '';
+        method3Note.textContent = 'No LAN IP detected yet. Use Method 1 on this PC.';
+      }
+
+      if (openNote) {
+        openNote.textContent = (mdns && mdns.httpManifest)
+          ? 'Uses Method 2 hostname first; Method 3 is your manual fallback.'
+          : 'Hostname unavailable here; use Method 3 LAN-IP fallback.';
+      }
+    }
+
+    async function autoSetup() {
+      setStatus('autoStatus', 'info', 'Auto-provisioning Prowlarr + qBittorrent...');
+      applyLocalDefaults();
+      try {
+        const res = await fetch('/auto-provision', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            installIfMissing: true,
+            startIfStopped: true,
+            configureQbitLocalNoAuth: true,
+            openFirewall: true
+          })
+        });
+        const data = await res.json();
+        if (data && data.config) fillConfig(data.config);
+
+        const net = await getNetworkInfo();
+        fillLocalInstallLinks(net);
+
+        document.getElementById('installLink').style.display = 'block';
+        document.getElementById('localInstall').style.display = 'block';
+        document.getElementById('hostedInstall').style.display = 'none';
+
+        if (data && data.ok) {
+          setStatus('autoStatus', 'ok', 'Auto setup complete. Click Install to save and use LAN links for TV/phone.');
+        } else {
+          const note = Array.isArray(data?.notes) && data.notes.length ? data.notes[0] : (data?.message || 'Provisioning incomplete');
+          setStatus('autoStatus', 'err', 'Auto setup incomplete: ' + note);
+        }
+      } catch (err) {
+        setStatus('autoStatus', 'err', 'Auto setup failed: ' + err.message);
+      }
+    }
+
     function getConfig() {
       const fileServerUrlInput = document.getElementById('fileServerUrl').value.trim();
       return {
-        jackettUrl: document.getElementById('jackettUrl').value.replace(/\/+$/, ''),
+        jackettUrl: normalizeProwlarrBaseUrl(document.getElementById('jackettUrl').value),
         jackettApiKey: document.getElementById('jackettApiKey').value.trim(),
         qbitUrl: document.getElementById('qbitUrl').value.replace(/\/+$/, ''),
         qbitUsername: document.getElementById('qbitUsername').value.trim(),
@@ -655,7 +814,7 @@
     function fillConfig(config) {
       if (!config || typeof config !== 'object') return;
 
-      if (config.jackettUrl) document.getElementById('jackettUrl').value = config.jackettUrl;
+      if (config.jackettUrl) document.getElementById('jackettUrl').value = normalizeProwlarrBaseUrl(config.jackettUrl);
       if (config.jackettApiKey) document.getElementById('jackettApiKey').value = config.jackettApiKey;
       if (config.qbitUrl) document.getElementById('qbitUrl').value = config.qbitUrl;
       if (config.qbitUsername) document.getElementById('qbitUsername').value = config.qbitUsername;
@@ -743,10 +902,10 @@
         return setStatus('testStatus', 'err', modeValidationError);
       }
       if (!config.jackettUrl || !config.jackettApiKey) {
-        return setStatus('testStatus', 'err', 'Jackett URL and API key are required');
+        return setStatus('testStatus', 'err', 'Prowlarr URL and API key are required');
       }
-      if (!config.qbitUrl || !config.qbitUsername) {
-        return setStatus('testStatus', 'err', 'qBittorrent URL and username are required');
+      if (!config.qbitUrl) {
+        return setStatus('testStatus', 'err', 'qBittorrent URL is required');
       }
 
       setStatus('testStatus', 'info', 'Testing connections...');
@@ -763,7 +922,7 @@
           setStatus('testStatus', 'ok', 'Both connections successful!');
         } else {
           const msgs = [];
-          if (!data.jackett) msgs.push('Jackett: ' + (data.jackettError || 'failed'));
+          if (!data.jackett) msgs.push('Prowlarr: ' + (data.jackettError || 'failed'));
           if (!data.qbit) msgs.push('qBit: ' + (data.qbitError || 'failed'));
           setStatus('testStatus', 'err', msgs.join(' | '));
         }
@@ -791,7 +950,7 @@
       if (modeValidationError) {
         return setStatus('installStatus', 'err', modeValidationError);
       }
-      if (!config.jackettUrl || !config.jackettApiKey || !config.qbitUrl || !config.qbitUsername) {
+      if (!config.jackettUrl || !config.jackettApiKey || !config.qbitUrl) {
         return setStatus('installStatus', 'err', 'Please fill in all required fields');
       }
 
@@ -801,7 +960,6 @@
 
       try {
         const host = window.location.host;
-        const port = window.location.port || '7000';
 
         if (installMode === 'local') {
           const saveRes = await fetch('/local-config', {
@@ -814,23 +972,14 @@
             return setStatus('installStatus', 'err', saveData.error || 'Failed to save local config');
           }
 
-          const httpsPort = String(parseInt(port, 10) + 1);
-          const modeQuery = '?mode=local';
-          const httpManifestUrl = 'http://127.0.0.1:' + port + '/local/manifest.json' + modeQuery;
-          const httpsManifestUrl = 'https://127.0.0.1:' + httpsPort + '/local/manifest.json' + modeQuery;
-          const httpsAddonUrl = 'https://127.0.0.1:' + httpsPort + '/local/manifest.json' + modeQuery;
-          const stremioUrl = 'stremio://127.0.0.1:' + httpsPort + '/local/manifest.json' + modeQuery;
-
-          document.getElementById('httpUrlInput').value = httpManifestUrl;
-          document.getElementById('httpsUrlInput').value = httpsManifestUrl;
-          document.getElementById('httpsAddonUrl').textContent = httpsAddonUrl;
-          document.getElementById('stremioLink').href = stremioUrl;
+          const net = await getNetworkInfo();
+          fillLocalInstallLinks(net);
           document.getElementById('localInstall').style.display = 'block';
           document.getElementById('hostedInstall').style.display = 'none';
 
           document.getElementById('installLink').style.display = 'block';
           setStatus('installStatus', 'ok',
-            'Local config saved. Install once using this /local URL; future config updates do not require reinstall.');
+            'Local config saved. Install once using Method 1/2/3; future updates do not require reinstall.');
         } else {
           const res = await fetch('/encrypt', {
             method: 'POST',

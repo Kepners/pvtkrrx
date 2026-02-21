@@ -13,3 +13,9 @@ node_modules/
 # Nested repos (separate projects)
 pvtkrrx-web/
 website/
+
+# Local runtime state (logs + secrets)
+.runtime/
+
+# Electron unpacked build output (very large; installers are in Dist/*.exe)
+Dist/win-unpacked/

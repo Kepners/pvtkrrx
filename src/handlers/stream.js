@@ -6,7 +6,7 @@ const { CinemetaClient } = require('../clients/cinemeta')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { parse, matchesEpisode } = require('../utils/parser')
 const { mapPath } = require('../utils/pathMapper')
-const { buildOnSeedboxStream, buildOnTrackerStream, findVideoFile, findEpisodeFile, sortStreams } = require('../utils/streams')
+const { buildOnSeedboxStream, buildOnBufferingStream, buildOnTrackerStream, findVideoFile, findEpisodeFile, sortStreams } = require('../utils/streams')
 
 // Build URL for a local file — uses PVTKRRX built-in file server when no external fileServerUrl set
 function canServeFromLocalDisk(savePath, fileName) {
@@ -99,6 +99,13 @@ function titleRelevant(resultTitle, queryTitle) {
   return queryWords.every(w => resultLower.includes(w))
 }
 
+function isCompletedTorrent(torrent, fileProgress = null) {
+  const torrentProgress = Number(torrent?.progress || 0)
+  if (torrentProgress >= 0.999) return true
+  if (Number.isFinite(fileProgress) && fileProgress >= 0.999) return true
+  return false
+}
+
 async function handleImdbStream(config, type, id, addonUrl, configToken) {
   const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
   const qbit = new QBitClient(config.qbitUrl, config.qbitUsername, config.qbitPassword)
@@ -123,7 +130,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
   const cinemeta = new CinemetaClient()
   const [jackettResult, qbitResult, cinemetaResult] = await Promise.allSettled([
     torznab.searchImdb(imdbId, cats, searchType),
-    qbit.torrents('completed'),
+    qbit.torrents('all'),
     type === 'series' ? cinemeta.getSeries(imdbId) : cinemeta.getMovie(imdbId)
   ])
 
@@ -131,7 +138,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
   const qbitTorrents = qbitResult.status === 'fulfilled' ? qbitResult.value : []
   const contentTitle = cinemetaResult.status === 'fulfilled' ? cinemetaResult.value?.name : null
 
-  console.log(`[stream] IMDB search returned ${jackettItems.length} results, qBit has ${qbitTorrents.length} completed, title="${contentTitle}"`)
+  console.log(`[stream] IMDB search returned ${jackettItems.length} results, qBit has ${qbitTorrents.length} torrents, title="${contentTitle}"`)
   if (jackettResult.status === 'rejected') console.error('[stream] Prowlarr IMDB error:', jackettResult.reason?.message)
   if (qbitResult.status === 'rejected') console.error('[stream] qBit error:', qbitResult.reason?.message)
 
@@ -185,14 +192,20 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
     const matched = item.infohash ? qbitMap.get(item.infohash) : null
 
     if (matched) {
-      // On seedbox — get files for URL and videoSize
+      // On seedbox or buffering — get files for URL and videoSize
       try {
         const files = await qbit.files(matched.hash)
         const videoFile = (season && episode)
           ? findEpisodeFile(files, season, episode)
           : findVideoFile(files)
         const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched.save_path, videoFile.name)
-        streams.push(buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed))
+        const videoProgress = Number(videoFile?.progress || 0)
+        if (isCompletedTorrent(matched, videoProgress)) {
+          streams.push(buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed))
+        } else {
+          const percent = Math.max(0, Math.min(99, Math.floor(videoProgress * 100)))
+          streams.push(buildOnBufferingStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed, percent))
+        }
       } catch (e) {
         // File listing failed, skip this stream
       }
@@ -216,7 +229,7 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
   const directLink = String(info.l || '')
 
   const qbit = new QBitClient(config.qbitUrl, config.qbitUsername, config.qbitPassword)
-  const torrents = await qbit.torrents('completed')
+  const torrents = await qbit.torrents('all')
   let matched = infoHash ? torrents.find(t => t.hash.toLowerCase() === infoHash) : null
   if (!matched) matched = findTorrentByTitle(torrents, info.t)
 
@@ -226,15 +239,19 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
   console.log(`[stream] custom title="${info.t}" hash=${infoHash || 'none'} matched=${matched ? matched.hash : 'none'}`)
 
   if (matched) {
-    // Already on seedbox
+    // Already in qBit (complete or in-progress)
     try {
       const files = await qbit.files(matched.hash)
       const videoFile = findVideoFile(files)
       const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched.save_path, videoFile.name)
-      streams.push(buildOnSeedboxStream(
-        { title: info.t, size: info.s, seeders: info.d },
-        fileUrl, videoFile.name, videoFile.size, config, parsed
-      ))
+      const item = { title: info.t, size: info.s, seeders: info.d }
+      const videoProgress = Number(videoFile?.progress || 0)
+      if (isCompletedTorrent(matched, videoProgress)) {
+        streams.push(buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed))
+      } else {
+        const percent = Math.max(0, Math.min(99, Math.floor(videoProgress * 100)))
+        streams.push(buildOnBufferingStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed, percent))
+      }
     } catch (e) {
       console.error('[stream] custom file listing failed:', e.message)
     }

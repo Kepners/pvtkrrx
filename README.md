@@ -49,6 +49,15 @@ npm start
 
 Then open `http://localhost:7000/configure` to enter your seedbox details.
 
+Use **Auto Setup Local / LAN** on the configure page to prefill local defaults and generate install links for:
+- this PC (`127.0.0.1`)
+- Android TV / phone on the same network (LAN IP)
+
+Auto Setup also attempts to:
+- install/start Prowlarr and qBittorrent (Windows, via winget + service/process start)
+- disable qBittorrent localhost auth for zero-config local API access
+- open Windows Firewall ports `7000/7001` for LAN devices
+
 ## Requirements
 
 Your seedbox needs:
@@ -132,8 +141,14 @@ ENCRYPTION_SECRET=your-secret-here npm start
 1. In the Stremio player click `⋯ -> Copy stream link`
 2. Paste it somewhere to inspect the URL
 3. `/{token}/file/...` means built-in serving; external host/path means external file server serving
-4. If it still points to an old external host, go to `http://localhost:7000/configure`, clear File Server URL, and reinstall the addon
+4. If it still points to an old external host, go to `http://localhost:7000/configure`, clear File Server URL, and save local config
 5. Runtime now auto-prefers built-in `/file/` whenever the addon can read the file locally
+
+### Android TV / mobile cannot reach addon
+
+1. Use the **Method 2 - TV / Phone on same LAN** URL from configure page
+2. Ensure TV/phone and PC are on the same network
+3. Allow inbound TCP `7000` in Windows Firewall on the PC
 
 ### PVTKRRX not appearing in stream dropdown
 

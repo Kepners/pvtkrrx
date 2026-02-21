@@ -73,10 +73,13 @@ pvtkrrx/
 User visits /configure
     → Enters: Prowlarr URL + API key, qBit URL + credentials,
               (optional) external file server URL, path mapping
+    → Optional: "Auto Setup Local / LAN" pre-fills localhost defaults
+      and fetches /network-info for LAN install URLs
     → "Test Connection" validates Prowlarr + qBit live
-    → Server encrypts config (AES-256-GCM) → URL token
-    → User gets stremio:// install link (Local or Hosted mode)
-    → Stremio installs addon with token in URL
+    → Local mode: server saves config to .runtime/local-config.json
+      and uses stable /local/manifest.json URL (no reinstall on config edits)
+    → Hosted mode: server encrypts config (AES-256-GCM) → URL token
+    → Stremio installs addon (local stable URL or hosted token URL)
 ```
 
 ### Stream Flow — Movies & TV (IMDB IDs)

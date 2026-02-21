@@ -5,8 +5,10 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "dev": "node index.js",
-    "smoke:config": "node scripts/smoke-config-flow.js"
+    "dev": "node --watch index.js",
+    "smoke:config": "node scripts/smoke-config-flow.js",
+    "desktop:dev": "electron electron/main.js",
+    "dist:win": "electron-builder --win nsis portable --publish never"
   },
   "repository": {
     "type": "git",
@@ -29,7 +31,43 @@
   "dependencies": {
     "express": "^5.2.1",
     "fast-xml-parser": "^4.5.0",
+    "multicast-dns": "^7.2.5",
     "selfsigned": "^5.5.0",
     "stremio-addon-sdk": "^1.6.10"
+  },
+  "devDependencies": {
+    "electron": "^31.7.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.kepners.pvtkrrx",
+    "productName": "PVTKRRX",
+    "directories": {
+      "output": "Dist"
+    },
+    "files": [
+      "index.js",
+      "src/**/*",
+      "public/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "electron/main.js"
+    },
+    "win": {
+      "icon": "electron/assets/logo.ico",
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "electron/assets/logo.ico",
+      "uninstallerIcon": "electron/assets/logo.ico",
+      "installerHeaderIcon": "electron/assets/logo.ico"
+    }
   }
 }

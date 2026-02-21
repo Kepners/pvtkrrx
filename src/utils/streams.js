@@ -1,6 +1,4 @@
-// Build Stremio stream objects — two patterns: on-seedbox and on-tracker
-
-const { parse } = require('./parser')
+// Build Stremio stream objects - two patterns: on-seedbox and on-tracker
 
 const VIDEO_EXTENSIONS = ['.mkv', '.mp4', '.avi', '.wmv', '.ts', '.m4v']
 
@@ -12,8 +10,8 @@ function formatSize(bytes) {
   return (bytes / 1e3).toFixed(0) + ' KB'
 }
 
-function buildStreamName(parsed, onSeedbox) {
-  const icon = onSeedbox ? '\u26A1' : '\uD83D\uDCE5'
+function buildStreamName(parsed, mode) {
+  const icon = mode === 'seedbox' ? '\u26A1' : mode === 'buffering' ? '\u23F3' : '\uD83D\uDCE5'
   const parts = [parsed.quality, parsed.source]
   if (parsed.remux) parts.push('REMUX')
   if (parsed.hdr) parts.push(parsed.hdr)
@@ -22,24 +20,28 @@ function buildStreamName(parsed, onSeedbox) {
   return `${icon} ${label}`
 }
 
-function buildDescription(item, parsed, onSeedbox) {
+function buildDescription(item, parsed, mode, progressPercent = null) {
   const title = String(item.title || '').replace(/[^\w.\-()[\] ]/g, ' ').trim()
   const stats = []
-  if (onSeedbox) {
+  if (mode === 'seedbox') {
     stats.push('On Seedbox')
+  } else if (mode === 'buffering') {
+    stats.push(`Buffering ${Number.isFinite(progressPercent) ? progressPercent : 0}%`)
+    stats.push('Starts before complete')
   } else {
-    stats.push(`👤 ${item.seeders}`)
+    stats.push(`Seeders ${item.seeders}`)
+    stats.push('Auto-buffer')
   }
   if (parsed.audio) stats.push(parsed.audio)
-  stats.push(`💾 ${formatSize(item.size)}`)
+  stats.push(`Size ${formatSize(item.size)}`)
   if (item.indexer) stats.push(`[${item.indexer}]`)
   return title ? `${title}\n${stats.join(' ')}` : stats.join(' ')
 }
 
 function buildOnSeedboxStream(item, fileUrl, fileName, videoSize, config, parsed) {
   const stream = {
-    name: buildStreamName(parsed, true),
-    description: buildDescription(item, parsed, true),
+    name: buildStreamName(parsed, 'seedbox'),
+    description: buildDescription(item, parsed, 'seedbox'),
     url: fileUrl,
     behaviorHints: {
       notWebReady: true,
@@ -60,11 +62,34 @@ function buildOnSeedboxStream(item, fileUrl, fileName, videoSize, config, parsed
   return stream
 }
 
+function buildOnBufferingStream(item, fileUrl, fileName, videoSize, config, parsed, progressPercent) {
+  const stream = {
+    name: buildStreamName(parsed, 'buffering'),
+    description: buildDescription(item, parsed, 'buffering', progressPercent),
+    url: fileUrl,
+    behaviorHints: {
+      notWebReady: true,
+      bingeGroup: `pvtkrrx-buffering-${parsed.quality || 'unknown'}`,
+      filename: fileName
+    }
+  }
+
+  if (videoSize) stream.behaviorHints.videoSize = videoSize
+  if (config.fileServerAuth) {
+    const encoded = Buffer.from(config.fileServerAuth).toString('base64')
+    stream.behaviorHints.proxyHeaders = {
+      request: { Authorization: `Basic ${encoded}` }
+    }
+  }
+
+  return stream
+}
+
 function buildOnTrackerStream(item, playbackUrl, parsed) {
   const safeName = (item.title || 'download').replace(/[^\w.\-()[\] ]/g, '')
   return {
-    name: buildStreamName(parsed, false),
-    description: buildDescription(item, parsed, false),
+    name: buildStreamName(parsed, 'tracker'),
+    description: buildDescription(item, parsed, 'tracker'),
     url: playbackUrl,
     behaviorHints: {
       notWebReady: true,
@@ -76,7 +101,7 @@ function buildOnTrackerStream(item, playbackUrl, parsed) {
 // Find the main video file in a list of torrent files
 function findVideoFile(files) {
   const videoFiles = files.filter(f =>
-    VIDEO_EXTENSIONS.some(ext => f.name.toLowerCase().endsWith(ext))
+    VIDEO_EXTENSIONS.some(ext => String(f.name || '').toLowerCase().endsWith(ext))
   )
   if (videoFiles.length === 0) return files.reduce((a, b) => a.size > b.size ? a : b, files[0])
   return videoFiles.reduce((a, b) => a.size > b.size ? a : b)
@@ -86,26 +111,32 @@ function findVideoFile(files) {
 function findEpisodeFile(files, season, episode) {
   const sePat = new RegExp(`S0?${season}E0?${episode}`, 'i')
   const videoFiles = files.filter(f =>
-    VIDEO_EXTENSIONS.some(ext => f.name.toLowerCase().endsWith(ext))
+    VIDEO_EXTENSIONS.some(ext => String(f.name || '').toLowerCase().endsWith(ext))
   )
-  const match = videoFiles.find(f => sePat.test(f.name))
+  const match = videoFiles.find(f => sePat.test(String(f.name || '')))
   return match || findVideoFile(files)
 }
 
-// Sort: on-seedbox first, then by seeders desc
+// Sort: on-seedbox first, then keep original order in each group.
 function sortStreams(streams) {
+  function rank(stream) {
+    if (stream.name.includes('\u26A1')) return 0
+    if (stream.name.includes('\u23F3')) return 1
+    return 2
+  }
+
   return streams.sort((a, b) => {
-    const aLocal = a.name.includes('\u26A1')
-    const bLocal = b.name.includes('\u26A1')
-    if (aLocal && !bLocal) return -1
-    if (!aLocal && bLocal) return 1
-    return 0 // preserve original order within same group
+    const ra = rank(a)
+    const rb = rank(b)
+    if (ra !== rb) return ra - rb
+    return 0
   })
 }
 
 module.exports = {
   formatSize,
   buildOnSeedboxStream,
+  buildOnBufferingStream,
   buildOnTrackerStream,
   findVideoFile,
   findEpisodeFile,
