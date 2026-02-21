@@ -4,146 +4,493 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PVTKRRX — Configure</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --void: #0A0A0A;
+      --surface: #111111;
+      --card: #141414;
+      --card-hover: #1a1a1a;
+      --border: rgba(0, 255, 65, 0.1);
+      --border-hover: rgba(0, 255, 65, 0.25);
+      --green: #00FF41;
+      --green-dim: rgba(0, 255, 65, 0.6);
+      --green-glow: rgba(0, 255, 65, 0.15);
+      --blue: #0080FF;
+      --blue-glow: rgba(0, 128, 255, 0.15);
+      --red: #FF0040;
+      --teal: #407076;
+      --teal-bright: #8ab0bb;
+      --text: #e0e0e0;
+      --text-dim: #777;
+      --text-muted: #444;
+      --input-bg: #0d0d0d;
+    }
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #FFEEDD;
-      color: #333;
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--void);
+      color: var(--text);
       min-height: 100vh;
       display: flex;
       flex-direction: column;
       align-items: center;
       padding: 2rem 1rem;
+      position: relative;
     }
+
+    /* Scanlines */
+    body::before {
+      content: '';
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 1px,
+        rgba(0, 0, 0, 0.08) 1px,
+        rgba(0, 0, 0, 0.08) 2px
+      );
+      pointer-events: none;
+      z-index: 9999;
+    }
+
+    /* Subtle gradient glow at top */
+    body::after {
+      content: '';
+      position: fixed;
+      top: -200px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 400px;
+      background: radial-gradient(ellipse, rgba(0, 255, 65, 0.04), transparent 70%);
+      pointer-events: none;
+      z-index: -1;
+    }
+
     .container {
       max-width: 520px;
       width: 100%;
+      animation: fadeUp 0.4s ease-out;
     }
-    h1 {
-      color: #407076;
-      font-size: 1.8rem;
-      margin-bottom: 0.3rem;
-      text-align: center;
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
     }
-    .subtitle {
-      color: #698996;
+
+    /* Header */
+    .logo-header {
       text-align: center;
       margin-bottom: 2rem;
-      font-size: 0.9rem;
     }
+
+    h1 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 2rem;
+      font-weight: 700;
+      letter-spacing: 6px;
+      color: #f8f7ff;
+      position: relative;
+      display: inline-block;
+    }
+
+    h1::before,
+    h1::after {
+      content: 'PVTKRRX';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+    }
+
+    h1::before {
+      color: #FF0040;
+      animation: glitch-red 4s infinite;
+      z-index: -1;
+      opacity: 0.5;
+    }
+
+    h1::after {
+      color: #0080FF;
+      animation: glitch-blue 4s infinite;
+      z-index: -2;
+      opacity: 0.5;
+    }
+
+    @keyframes glitch-red {
+      0%, 90%, 100% { transform: translate(0); }
+      91% { transform: translate(3px, -1px); }
+      93% { transform: translate(-2px, 1px); }
+      95% { transform: translate(2px, 0); }
+    }
+
+    @keyframes glitch-blue {
+      0%, 90%, 100% { transform: translate(0); }
+      92% { transform: translate(-3px, 1px); }
+      94% { transform: translate(2px, -1px); }
+      96% { transform: translate(-1px, 0); }
+    }
+
+    .subtitle {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-dim);
+      text-align: center;
+      margin-top: 0.4rem;
+      font-size: 0.8rem;
+      letter-spacing: 1px;
+    }
+
+    /* Cards */
     .card {
-      background: #F8F7FF;
-      border-radius: 12px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 0;
       padding: 1.5rem;
       margin-bottom: 1rem;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+      transition: border-color 0.3s, box-shadow 0.3s;
+      position: relative;
     }
+
+    .card:hover {
+      border-color: var(--border-hover);
+      box-shadow: 0 0 20px var(--green-glow);
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: linear-gradient(90deg, transparent, var(--green-dim), transparent);
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .card:hover::before {
+      opacity: 0.4;
+    }
+
     .card h2 {
-      color: #407076;
-      font-size: 1rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--green);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 2px;
       margin-bottom: 1rem;
       padding-bottom: 0.5rem;
-      border-bottom: 2px solid #FFD8BE;
+      border-bottom: 1px solid rgba(0, 255, 65, 0.08);
     }
+
+    /* Form elements */
     label {
       display: block;
-      font-size: 0.85rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
       font-weight: 600;
-      color: #555;
+      color: var(--teal-bright);
       margin-bottom: 0.3rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
     }
+
     input, select {
       width: 100%;
-      padding: 0.6rem 0.8rem;
-      border: 1px solid #ddd;
-      border-radius: 6px;
-      font-size: 0.9rem;
+      padding: 0.65rem 0.8rem;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
       margin-bottom: 0.8rem;
-      background: #fff;
-      transition: border-color 0.2s;
+      background: var(--input-bg);
+      color: var(--text);
+      transition: border-color 0.2s, box-shadow 0.2s;
     }
+
+    input::placeholder {
+      color: var(--text-muted);
+    }
+
     input:focus, select:focus {
       outline: none;
-      border-color: #407076;
+      border-color: var(--green);
+      box-shadow: 0 0 10px rgba(0, 255, 65, 0.12);
     }
+
+    select {
+      cursor: pointer;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23555' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 0.8rem center;
+      padding-right: 2.2rem;
+    }
+
+    select option {
+      background: var(--void);
+      color: var(--text);
+    }
+
     .row {
       display: flex;
       gap: 0.8rem;
     }
+
     .row > div { flex: 1; }
+
     .hint {
-      font-size: 0.75rem;
-      color: #999;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--text-muted);
       margin-top: -0.5rem;
       margin-bottom: 0.8rem;
+      letter-spacing: 0.5px;
     }
+
+    /* Buttons */
     button {
       width: 100%;
       padding: 0.75rem;
       border: none;
-      border-radius: 8px;
-      font-size: 1rem;
+      border-radius: 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
       font-weight: 600;
       cursor: pointer;
-      transition: opacity 0.2s;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all 0.25s ease;
+      position: relative;
+      overflow: hidden;
     }
-    button:hover { opacity: 0.85; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+    button:disabled {
+      opacity: 0.3;
+      cursor: not-allowed;
+    }
+
+    button::after {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      transition: width 0.4s, height 0.4s;
+    }
+
+    button:hover::after {
+      width: 400px;
+      height: 400px;
+    }
+
     .btn-test {
-      background: #698996;
-      color: #fff;
+      background: linear-gradient(135deg, rgba(64, 112, 118, 0.3), rgba(0, 128, 255, 0.2));
+      color: var(--blue);
+      border: 1px solid rgba(0, 128, 255, 0.2);
       margin-bottom: 0.5rem;
     }
-    .btn-install {
-      background: #407076;
+
+    .btn-test:hover {
+      border-color: rgba(0, 128, 255, 0.5);
+      box-shadow: 0 0 20px var(--blue-glow);
       color: #fff;
     }
+
+    .btn-install {
+      background: linear-gradient(135deg, rgba(0, 255, 65, 0.12), rgba(0, 255, 65, 0.06));
+      color: var(--green);
+      border: 1px solid rgba(0, 255, 65, 0.2);
+    }
+
+    .btn-install:hover {
+      border-color: rgba(0, 255, 65, 0.5);
+      box-shadow: 0 0 24px var(--green-glow);
+      color: #fff;
+    }
+
+    /* Status messages */
     .status {
       text-align: center;
       padding: 0.6rem;
-      border-radius: 6px;
-      font-size: 0.85rem;
+      border-radius: 0;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.78rem;
       margin-bottom: 0.8rem;
       display: none;
+      letter-spacing: 0.5px;
     }
-    .status.ok { display: block; background: #d4edda; color: #155724; }
-    .status.err { display: block; background: #f8d7da; color: #721c24; }
-    .status.info { display: block; background: #d1ecf1; color: #0c5460; }
+
+    .status.ok {
+      display: block;
+      background: rgba(0, 255, 65, 0.06);
+      color: var(--green);
+      border: 1px solid rgba(0, 255, 65, 0.15);
+    }
+
+    .status.err {
+      display: block;
+      background: rgba(255, 0, 64, 0.06);
+      color: var(--red);
+      border: 1px solid rgba(255, 0, 64, 0.15);
+    }
+
+    .status.info {
+      display: block;
+      background: rgba(0, 128, 255, 0.06);
+      color: var(--blue);
+      border: 1px solid rgba(0, 128, 255, 0.15);
+    }
+
+    /* Install link section */
     .install-link {
       display: none;
-      text-align: center;
       margin-top: 1rem;
     }
+
     .install-link a {
       display: inline-block;
-      background: #407076;
-      color: #fff;
+      background: linear-gradient(135deg, var(--green), #00cc33);
+      color: var(--void);
       text-decoration: none;
       padding: 0.8rem 2rem;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 1.1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      font-size: 0.9rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all 0.25s ease;
     }
-    .install-link a:hover { opacity: 0.85; }
-    .install-link .url-display {
+
+    .install-link a:hover {
+      box-shadow: 0 0 24px var(--green-glow);
+    }
+
+    .url-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .url-row input[type="text"] {
+      flex: 1;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      padding: 0.5rem 0.6rem;
+      background: var(--void);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      color: var(--teal-bright);
+      margin-bottom: 0;
+    }
+
+    .btn-copy {
+      flex-shrink: 0;
+      width: auto;
+      padding: 0.5rem 0.9rem;
       font-size: 0.7rem;
-      color: #999;
-      margin-top: 0.5rem;
-      word-break: break-all;
+      background: rgba(0, 128, 255, 0.1);
+      color: var(--blue);
+      border: 1px solid rgba(0, 128, 255, 0.2);
+      cursor: pointer;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all 0.2s;
     }
+
+    .btn-copy:hover {
+      background: rgba(0, 128, 255, 0.2);
+      border-color: rgba(0, 128, 255, 0.4);
+      box-shadow: 0 0 12px var(--blue-glow);
+    }
+
+    .install-section-title {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--green);
+      margin-bottom: 0.3rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .install-note {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-top: 0.3rem;
+      line-height: 1.5;
+    }
+
+    .install-note strong {
+      color: var(--text-dim);
+    }
+
     footer {
       margin-top: 2rem;
-      color: #999;
-      font-size: 0.75rem;
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-muted);
+      font-size: 0.65rem;
       text-align: center;
+      letter-spacing: 1px;
+    }
+
+    /* Terminal cursor blink on focused inputs */
+    input:focus {
+      caret-color: var(--green);
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    ::-webkit-scrollbar-track {
+      background: var(--void);
+    }
+
+    ::-webkit-scrollbar-thumb {
+      background: rgba(0, 255, 65, 0.15);
+      border-radius: 2px;
+    }
+
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 255, 65, 0.3);
+    }
+
+    /* Mobile tweaks */
+    @media (max-width: 600px) {
+      body::before { display: none; }
+      body { padding: 1rem 0.75rem; }
+      .card { padding: 1.2rem; }
+      h1 { font-size: 1.6rem; letter-spacing: 4px; }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>PVTKRRX</h1>
-    <p class="subtitle">Connect your private tracker seedbox to Stremio</p>
+    <div class="logo-header">
+      <h1>PVTKRRX</h1>
+      <p class="subtitle">Connect your private tracker seedbox to Stremio</p>
+    </div>
 
     <div class="card">
       <h2>Install Mode</h2>
@@ -157,8 +504,8 @@
 
     <div class="card">
       <h2>Jackett / Prowlarr</h2>
-      <label for="jackettUrl">Torznab URL</label>
-      <input type="url" id="jackettUrl" placeholder="https://jackett.example.com:9117/api/v2.0/indexers/all/results/torznab">
+      <label for="jackettUrl">Torznab URL — Prowlarr: <code>http://localhost:9696/{API-KEY}/api</code> · Jackett: <code>http://localhost:9117/api/v2.0/indexers/all/results/torznab</code></label>
+      <input type="url" id="jackettUrl" placeholder="http://localhost:9696/{YOUR-API-KEY}/api">
       <label for="jackettApiKey">API Key</label>
       <input type="text" id="jackettApiKey" placeholder="Your Jackett/Prowlarr API key">
     </div>
@@ -220,8 +567,29 @@
     <button class="btn-install" onclick="install()">Install in Stremio</button>
 
     <div id="installLink" class="install-link">
-      <a id="stremioLink" href="#">Open in Stremio</a>
-      <p class="url-display" id="urlDisplay"></p>
+      <!-- Local mode: HTTP + HTTPS copy rows -->
+      <div id="localInstall">
+        <p class="install-section-title">Method 1 — Paste into Stremio (easiest)</p>
+        <div class="url-row">
+          <input type="text" id="httpUrlInput" readonly>
+          <button class="btn-copy" onclick="copyUrl('httpUrlInput', this)">Copy</button>
+        </div>
+        <p class="install-note">Open Stremio &rarr; Search bar &rarr; paste the URL above &rarr; press Enter</p>
+
+        <p class="install-section-title" style="margin-top:1rem">Method 2 — Open in Stremio (requires HTTPS trust)</p>
+        <div class="url-row">
+          <input type="text" id="httpsUrlInput" readonly>
+          <button class="btn-copy" onclick="copyUrl('httpsUrlInput', this)">Copy</button>
+        </div>
+        <a id="stremioLink" href="#" style="display:inline-block;margin-top:0.5rem;color:var(--blue);font-family:'JetBrains Mono',monospace;font-size:0.8rem">Open in Stremio</a>
+        <p class="install-note">First open <span id="httpsAddonUrl" style="font-family:monospace;color:var(--teal-bright)"></span> in your browser and click <strong>Accept / Proceed</strong> to trust the certificate. Then click Open in Stremio.</p>
+      </div>
+
+      <!-- Hosted mode: just the stremio:// link -->
+      <div id="hostedInstall" style="text-align:center">
+        <a id="stremioLinkHosted" href="#">Open in Stremio</a>
+        <p class="install-note" style="margin-top:0.5rem" id="hostedUrlDisplay"></p>
+      </div>
     </div>
 
     <footer>
@@ -262,6 +630,8 @@
 
     document.getElementById('installMode').addEventListener('change', setInstallModeHint);
     setInstallModeHint();
+    document.getElementById('localInstall').style.display = 'none';
+    document.getElementById('hostedInstall').style.display = 'none';
     maybePrefillFromToken();
 
     function getConfig() {
@@ -399,6 +769,18 @@
       }
     }
 
+    function copyUrl(inputId, btn) {
+      const input = document.getElementById(inputId);
+      navigator.clipboard.writeText(input.value).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = orig; }, 1500);
+      }).catch(() => {
+        input.select();
+        document.execCommand('copy');
+      });
+    }
+
     async function install() {
       const config = getConfig();
       const installMode = getInstallMode();
@@ -426,17 +808,37 @@
 
         const host = window.location.host;
         const port = window.location.port || '7000';
-        const installHost = installMode === 'local' ? ('127.0.0.1:' + port) : host;
         const token = encodeURIComponent(data.token);
-        const modeQuery = installMode === 'hosted' ? ('?mode=' + encodeURIComponent(installMode)) : '';
-        const manifestUrl = installHost + '/' + token + '/manifest.json' + modeQuery;
-        const manifestHttpUrl = (installMode === 'local' ? 'http://' : (window.location.protocol + '//')) + manifestUrl;
-        const stremioUrl = 'stremio://' + manifestUrl;
 
-        document.getElementById('stremioLink').href = stremioUrl;
-        document.getElementById('urlDisplay').textContent = manifestHttpUrl;
+        if (installMode === 'local') {
+          const httpsPort = String(parseInt(port, 10) + 1);
+          const httpManifestUrl = 'http://127.0.0.1:' + port + '/' + token + '/manifest.json';
+          const httpsManifestUrl = 'https://127.0.0.1:' + httpsPort + '/' + token + '/manifest.json';
+          const httpsAddonUrl = 'https://127.0.0.1:' + httpsPort + '/manifest.json';
+          const stremioUrl = 'stremio://127.0.0.1:' + httpsPort + '/' + token + '/manifest.json';
+
+          document.getElementById('httpUrlInput').value = httpManifestUrl;
+          document.getElementById('httpsUrlInput').value = httpsManifestUrl;
+          document.getElementById('httpsAddonUrl').textContent = httpsAddonUrl;
+          document.getElementById('stremioLink').href = stremioUrl;
+          document.getElementById('localInstall').style.display = 'block';
+          document.getElementById('hostedInstall').style.display = 'none';
+        } else {
+          const modeQuery = '?mode=' + encodeURIComponent(installMode);
+          const manifestUrl = host + '/' + token + '/manifest.json' + modeQuery;
+          const manifestHttpUrl = window.location.protocol + '//' + manifestUrl;
+          const stremioUrl = 'stremio://' + manifestUrl;
+
+          document.getElementById('stremioLinkHosted').href = stremioUrl;
+          document.getElementById('hostedUrlDisplay').textContent = manifestHttpUrl;
+          document.getElementById('localInstall').style.display = 'none';
+          document.getElementById('hostedInstall').style.display = 'block';
+        }
+
         document.getElementById('installLink').style.display = 'block';
-        setStatus('installStatus', 'ok', 'Configuration encrypted — click below to install. If it hangs, paste the full manifest URL shown below into Stremio Add addon.');
+        setStatus('installStatus', 'ok', installMode === 'local'
+          ? 'Ready — use Method 1 (paste URL) or Method 2 (trust cert first, then deep link)'
+          : 'Configuration encrypted — click below to install in Stremio');
       } catch (err) {
         setStatus('installStatus', 'err', 'Encryption failed: ' + err.message);
       }

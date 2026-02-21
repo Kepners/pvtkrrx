@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PVTKRRX</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'JetBrains Mono', monospace;
+      background: transparent;
+      color: #e0e0e0;
+      width: 360px;
+      overflow: hidden;
+      -webkit-app-region: no-drag;
+      user-select: none;
+    }
+
+    .window {
+      background: rgba(10, 10, 10, 0.92);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      border: 1px solid rgba(0, 255, 65, 0.15);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow:
+        0 8px 32px rgba(0, 0, 0, 0.6),
+        0 0 1px rgba(0, 255, 65, 0.3),
+        inset 0 1px 0 rgba(255, 255, 255, 0.04);
+      animation: fadeIn 0.2s ease-out;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+      to { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
+    /* Drag region */
+    .drag-bar {
+      -webkit-app-region: drag;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .drag-bar::after {
+      content: '';
+      width: 32px;
+      height: 3px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 2px;
+    }
+
+    /* Header */
+    .header {
+      padding: 0 20px 16px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      border-bottom: 1px solid rgba(0, 255, 65, 0.08);
+    }
+
+    .logo-container {
+      width: 44px;
+      height: 44px;
+      flex-shrink: 0;
+    }
+
+    .logo-container svg {
+      width: 100%;
+      height: 100%;
+    }
+
+    .header-text {
+      flex: 1;
+    }
+
+    .app-name {
+      font-size: 16px;
+      font-weight: 700;
+      letter-spacing: 3px;
+      color: #f8f7ff;
+      position: relative;
+    }
+
+    .app-name::before,
+    .app-name::after {
+      content: 'PVTKRRX';
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .app-name::before {
+      color: #FF0040;
+      animation: glitch-r 3s infinite;
+      z-index: -1;
+      opacity: 0.5;
+    }
+
+    .app-name::after {
+      color: #0080FF;
+      animation: glitch-b 3s infinite;
+      z-index: -2;
+      opacity: 0.5;
+    }
+
+    @keyframes glitch-r {
+      0%, 92%, 100% { transform: translate(0); }
+      93% { transform: translate(2px, -1px); }
+      96% { transform: translate(-1px, 1px); }
+    }
+
+    @keyframes glitch-b {
+      0%, 92%, 100% { transform: translate(0); }
+      94% { transform: translate(-2px, 1px); }
+      97% { transform: translate(1px, -1px); }
+    }
+
+    .version {
+      font-size: 10px;
+      color: #555;
+      margin-top: 2px;
+      letter-spacing: 1px;
+    }
+
+    /* Status section */
+    .status-section {
+      padding: 16px 20px;
+    }
+
+    .status-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 14px;
+      background: rgba(0, 255, 65, 0.04);
+      border: 1px solid rgba(0, 255, 65, 0.1);
+      border-radius: 8px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #00FF41;
+      box-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
+      animation: pulse 2s ease-in-out infinite;
+      flex-shrink: 0;
+    }
+
+    .status-dot.stopped {
+      background: #FF0040;
+      box-shadow: 0 0 8px rgba(255, 0, 64, 0.6);
+      animation: none;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(0, 255, 65, 0.6); }
+      50% { opacity: 0.6; box-shadow: 0 0 14px rgba(0, 255, 65, 0.4); }
+    }
+
+    .status-label {
+      font-size: 12px;
+      font-weight: 600;
+      color: #00FF41;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .status-label.stopped {
+      color: #FF0040;
+    }
+
+    .status-port {
+      margin-left: auto;
+      font-size: 11px;
+      color: #555;
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    .status-port span {
+      color: #8ab0bb;
+    }
+
+    /* Actions */
+    .actions {
+      padding: 12px 20px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 16px;
+      border: none;
+      border-radius: 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      -webkit-app-region: no-drag;
+    }
+
+    .btn-configure {
+      background: linear-gradient(135deg, rgba(0, 128, 255, 0.15), rgba(64, 112, 118, 0.2));
+      color: #0080FF;
+      border: 1px solid rgba(0, 128, 255, 0.25);
+    }
+
+    .btn-configure:hover {
+      background: linear-gradient(135deg, rgba(0, 128, 255, 0.25), rgba(64, 112, 118, 0.35));
+      border-color: rgba(0, 128, 255, 0.5);
+      box-shadow: 0 0 16px rgba(0, 128, 255, 0.15);
+    }
+
+    .btn-quit {
+      background: rgba(255, 0, 64, 0.06);
+      color: #666;
+      border: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .btn-quit:hover {
+      background: rgba(255, 0, 64, 0.12);
+      color: #FF0040;
+      border-color: rgba(255, 0, 64, 0.2);
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    /* Scanlines (very subtle) */
+    .window::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 1px,
+        rgba(0, 0, 0, 0.03) 1px,
+        rgba(0, 0, 0, 0.03) 2px
+      );
+      pointer-events: none;
+      z-index: 10;
+      border-radius: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="window">
+    <div class="drag-bar"></div>
+
+    <div class="header">
+      <div class="logo-container">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PVTKRRX logo">
+          <defs>
+            <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stop-color="#0a0a0a" />
+              <stop offset="100%" stop-color="#182127" />
+            </linearGradient>
+            <linearGradient id="accent" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0%" stop-color="#00d4ff" />
+              <stop offset="100%" stop-color="#407076" />
+            </linearGradient>
+          </defs>
+          <rect width="512" height="512" rx="72" fill="url(#bg)" />
+          <rect x="40" y="40" width="432" height="432" rx="52" fill="none" stroke="url(#accent)" stroke-width="16" />
+          <text x="256" y="288" font-family="JetBrains Mono, Menlo, Consolas, monospace" font-size="88" font-weight="700" text-anchor="middle" fill="#f8f7ff" letter-spacing="4">PVTK</text>
+          <text x="256" y="360" font-family="JetBrains Mono, Menlo, Consolas, monospace" font-size="68" font-weight="600" text-anchor="middle" fill="#8ab0bb" letter-spacing="5">RRX</text>
+        </svg>
+      </div>
+      <div class="header-text">
+        <div class="app-name">PVTKRRX</div>
+        <div class="version">v1.0.0</div>
+      </div>
+    </div>
+
+    <div class="status-section">
+      <div class="status-row">
+        <div class="status-dot" id="statusDot"></div>
+        <span class="status-label" id="statusLabel">Running</span>
+        <span class="status-port" id="statusPort">port <span>7000</span></span>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="btn btn-configure" id="btnConfigure" onclick="openConfigure()">
+        Open Configure
+      </button>
+      <button class="btn btn-quit" id="btnQuit" onclick="quitApp()">
+        Quit
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // Electron IPC bridge — these get called by the main process
+    function openConfigure() {
+      if (window.electronAPI) {
+        window.electronAPI.openConfigure();
+      } else {
+        // Fallback for browser testing
+        window.open('/configure', '_blank');
+      }
+    }
+
+    function quitApp() {
+      if (window.electronAPI) {
+        window.electronAPI.quit();
+      } else {
+        window.close();
+      }
+    }
+
+    // Update status from main process
+    function setStatus(running, port) {
+      const dot = document.getElementById('statusDot');
+      const label = document.getElementById('statusLabel');
+      const portEl = document.getElementById('statusPort');
+
+      if (running) {
+        dot.className = 'status-dot';
+        label.className = 'status-label';
+        label.textContent = 'Running';
+        portEl.innerHTML = 'port <span>' + port + '</span>';
+        portEl.style.display = '';
+      } else {
+        dot.className = 'status-dot stopped';
+        label.className = 'status-label stopped';
+        label.textContent = 'Stopped';
+        portEl.style.display = 'none';
+      }
+    }
+
+    function setVersion(version) {
+      document.querySelector('.version').textContent = 'v' + version;
+    }
+
+    // Expose for Electron preload
+    window.popupAPI = { setStatus, setVersion };
+  </script>
+</body>
+</html>

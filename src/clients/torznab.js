@@ -16,7 +16,7 @@ class TorznabClient {
   }
 
   _buildUrl(params) {
-    const u = new URL(`${this.url}/api`)
+    const u = new URL(this.url)
     u.searchParams.set('apikey', this.apiKey)
     for (const [key, value] of Object.entries(params)) {
       u.searchParams.set(key, String(value))

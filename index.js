@@ -1,6 +1,8 @@
 const fs = require('fs')
 const http = require('http')
+const https = require('https')
 const path = require('path')
+const selfsigned = require('selfsigned')
 const express = require('express')
 const { addonBuilder, getRouter } = require('stremio-addon-sdk')
 const manifest = require('./src/config/manifest')
@@ -142,7 +144,10 @@ function withConfig(req, res, next) {
 
 // ─── Stremio addon routes (config-authenticated) ────────────
 app.get('/:config/manifest.json', withConfig, (req, res) => {
-  res.json(getManifest(req))
+  const m = getManifest(req)
+  // Configured URL — user is already set up, show Install not Configure
+  if (m.behaviorHints) m.behaviorHints.configurationRequired = false
+  res.json(m)
 })
 
 app.get('/:config/config.json', withConfig, (req, res) => {
@@ -231,15 +236,33 @@ app.use(getRouter(addonInterface))
 // ─── Local dev server ───────────────────────────────────────
 if (require.main === module) {
   const port = parseInt(process.env.PORT || '7000', 10)
-  const server = http.createServer(app)
-  server.listen(port, () => {
-    console.log(`PVTKRRX running at http://localhost:${port}`)
-    console.log(`Configure: http://localhost:${port}/configure`)
+  const httpsPort = parseInt(process.env.HTTPS_PORT || '7001', 10)
+
+  // HTTP
+  const httpServer = http.createServer(app)
+  httpServer.listen(port, () => {
+    console.log(`PVTKRRX HTTP  → http://localhost:${port}`)
+    console.log(`Configure:      http://localhost:${port}/configure`)
   })
-  server.on('error', (err) => {
-    console.error('Server failed to start:', err.message)
+  httpServer.on('error', (err) => {
+    console.error('HTTP server failed to start:', err.message)
     process.exit(1)
   })
+
+  // HTTPS (self-signed — must be trusted in OS/browser first)
+  try {
+    const attrs = [{ name: 'commonName', value: '127.0.0.1' }]
+    const pems = selfsigned.generate(attrs, { days: 365, algorithm: 'sha256' })
+    const httpsServer = https.createServer({ key: pems.private, cert: pems.cert }, app)
+    httpsServer.listen(httpsPort, () => {
+      console.log(`PVTKRRX HTTPS → https://localhost:${httpsPort} (self-signed — trust cert in browser first)`)
+    })
+    httpsServer.on('error', (err) => {
+      console.warn(`HTTPS server failed to start on port ${httpsPort}:`, err.message)
+    })
+  } catch (err) {
+    console.warn('HTTPS server skipped:', err.message)
+  }
 }
 
 module.exports = app
