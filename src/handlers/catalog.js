@@ -1,4 +1,4 @@
-const { TorznabClient } = require('../clients/torznab')
+const { ProwlarrClient } = require('../clients/prowlarr')
 const { QBitClient } = require('../clients/qbittorrent')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { cleanTitle } = require('../utils/parser')
@@ -42,11 +42,11 @@ async function handleCatalog(config, type, id, extraStr) {
 }
 
 async function sportsCatalog(config, extra) {
-  const torznab = new TorznabClient(config.jackettUrl, config.jackettApiKey)
+  const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
   const query = extra.genre || extra.search || ''
   const items = query
     ? await torznab.search(query, SPORT_CATS)
-    : await torznab.rss(SPORT_CATS)
+    : await torznab.search('', SPORT_CATS)
 
   const skip = parseInt(extra.skip || '0', 10)
   const metas = items.slice(skip, skip + 50).map(item => ({
@@ -66,10 +66,10 @@ async function sportsCatalog(config, extra) {
 }
 
 async function moviesCatalog(config, extra) {
-  const torznab = new TorznabClient(config.jackettUrl, config.jackettApiKey)
+  const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
   const items = extra.search
     ? await torznab.search(extra.search, MOVIE_CATS)
-    : await torznab.rss(MOVIE_CATS)
+    : await torznab.search('', MOVIE_CATS)
 
   const skip = parseInt(extra.skip || '0', 10)
   const seen = new Set()
@@ -90,24 +90,26 @@ async function moviesCatalog(config, extra) {
 }
 
 async function tvCatalog(config, extra) {
-  const torznab = new TorznabClient(config.jackettUrl, config.jackettApiKey)
+  const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
   const items = extra.search
     ? await torznab.search(extra.search, TV_CATS)
-    : await torznab.rss(TV_CATS)
+    : await torznab.search('', TV_CATS)
 
   const skip = parseInt(extra.skip || '0', 10)
   const seen = new Set()
   const metas = []
 
   for (const item of items) {
-    if (item.imdbId && !seen.has(item.imdbId)) {
-      seen.add(item.imdbId)
-      metas.push({
-        id: item.imdbId,
-        type: 'series',
-        name: cleanTitle(item.title)
-      })
-    }
+    const metaId = item.imdbId || ('pvtkrrx:' + Buffer.from(JSON.stringify({
+      t: item.title, h: item.infohash, s: item.size, d: item.seeders
+    })).toString('base64url'))
+    if (seen.has(metaId)) continue
+    seen.add(metaId)
+    metas.push({
+      id: metaId,
+      type: item.imdbId ? 'series' : 'tv',
+      name: cleanTitle(item.title)
+    })
   }
 
   return { metas: metas.slice(skip, skip + 50), cacheMaxAge: 300 }
@@ -134,7 +136,8 @@ async function libraryCatalog(config, extra) {
     })).toString('base64url'),
     type: 'movie',
     name: cleanTitle(t.name),
-    description: formatSize(t.size)
+    description: formatSize(t.size),
+    poster: `https://via.placeholder.com/200x300/407076/FFEEDD?text=${encodeURIComponent(cleanTitle(t.name).slice(0, 20))}`
   }))
 
   return { metas, cacheMaxAge: 300 }

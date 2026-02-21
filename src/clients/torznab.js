@@ -62,7 +62,8 @@ class TorznabClient {
 
   async searchImdb(imdbId, cats, type = 'movie') {
     const t = type === 'series' ? 'tvsearch' : 'movie'
-    const parsed = await this._fetch({ t, imdbid: imdbId, cat: cats, timeout: SERVER_TIMEOUT })
+    const numericId = String(imdbId).replace(/^tt/i, '')
+    const parsed = await this._fetch({ t, imdbid: numericId, cat: cats, timeout: SERVER_TIMEOUT })
     return this._parseItems(parsed)
   }
 

@@ -10,7 +10,7 @@ const { encrypt, decrypt } = require('./src/utils/crypto')
 const { handleCatalog } = require('./src/handlers/catalog')
 const { handleStream } = require('./src/handlers/stream')
 const { handleMeta } = require('./src/handlers/meta')
-const { TorznabClient } = require('./src/clients/torznab')
+const { ProwlarrClient } = require('./src/clients/prowlarr')
 const { QBitClient } = require('./src/clients/qbittorrent')
 const { mapPath } = require('./src/utils/pathMapper')
 const { findVideoFile } = require('./src/utils/streams')
@@ -63,6 +63,16 @@ app.use(express.static(publicDir))
 app.get('/configure', (req, res) => res.sendFile(configPage))
 app.get('/:config/configure', (req, res) => res.sendFile(configPage))
 
+// Build a URL to serve a local file — uses the built-in /file/ endpoint when no
+// external fileServerUrl is configured (e.g. local qBit setup with no HTTP server).
+function buildFileUrl(config, configToken, baseUrl, hash, savePath, fileName) {
+  if (config.fileServerUrl) {
+    return mapPath(savePath, fileName, config.fileServerUrl, config.pathMapping)
+  }
+  const info = Buffer.from(JSON.stringify({ h: hash.toLowerCase(), p: fileName })).toString('base64url')
+  return `${baseUrl}/${configToken}/file/${info}`
+}
+
 function getPublicBaseUrl(req) {
   const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim()
   const protocol = forwardedProto || req.protocol || 'http'
@@ -111,8 +121,8 @@ app.post('/test-connection', async (req, res) => {
   const results = { jackett: false, qbit: false }
 
   try {
-    const torznab = new TorznabClient(jackettUrl, jackettApiKey)
-    await torznab.caps()
+    const prowlarr = new ProwlarrClient(jackettUrl, jackettApiKey)
+    await prowlarr.caps()
     results.jackett = true
   } catch (err) {
     results.jackettError = err.message
@@ -180,42 +190,86 @@ app.get('/:config/meta/:type/:id.json', withConfig, async (req, res) => {
   res.json(result)
 })
 
+// ─── Built-in file server — serves local files with Range support ───
+// Used when no external fileServerUrl is configured (e.g. local qBit setup).
+app.get('/:config/file/:info', withConfig, async (req, res) => {
+  try {
+    const { h, p } = JSON.parse(Buffer.from(req.params.info, 'base64url').toString())
+    const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
+    const torrents = await qbit.torrents('completed')
+    const torrent = torrents.find(t => t.hash.toLowerCase() === h.toLowerCase())
+    if (!torrent) return res.status(404).json({ error: 'Torrent not found' })
+
+    const filePath = path.join(torrent.save_path, p)
+    if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found on disk' })
+
+    const stat = fs.statSync(filePath)
+    const fileSize = stat.size
+    const ext = path.extname(filePath).toLowerCase()
+    const mime = { '.mp4': 'video/mp4', '.mkv': 'video/x-matroska', '.avi': 'video/x-msvideo', '.wmv': 'video/x-ms-wmv', '.ts': 'video/mp2t', '.m4v': 'video/x-m4v' }
+    const contentType = mime[ext] || 'application/octet-stream'
+
+    const range = req.headers.range
+    if (range) {
+      const [startStr, endStr] = range.replace(/bytes=/, '').split('-')
+      const start = parseInt(startStr, 10)
+      const end = endStr ? parseInt(endStr, 10) : fileSize - 1
+      res.writeHead(206, {
+        'Content-Range': `bytes ${start}-${end}/${fileSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': end - start + 1,
+        'Content-Type': contentType
+      })
+      fs.createReadStream(filePath, { start, end }).pipe(res)
+    } else {
+      res.writeHead(200, { 'Content-Length': fileSize, 'Content-Type': contentType, 'Accept-Ranges': 'bytes' })
+      fs.createReadStream(filePath).pipe(res)
+    }
+  } catch (err) {
+    console.error('[file] Error:', err.message)
+    if (!res.headersSent) res.status(500).json({ error: 'File serve failed' })
+  }
+})
+
 // ─── Playback endpoint — Comet pattern ──────────────────────
 app.get('/:config/playback/:info', withConfig, async (req, res) => {
   try {
     const info = JSON.parse(Buffer.from(req.params.info, 'base64url').toString())
     const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
 
-    // Check if already downloaded
-    const torrents = await qbit.torrents('completed')
-    const found = torrents.find(t => t.hash.toLowerCase() === info.h)
-
-    if (found) {
-      const files = await qbit.files(found.hash)
-      const videoFile = findVideoFile(files)
-      const fileUrl = mapPath(found.save_path, videoFile.name, req.config.fileServerUrl, req.config.pathMapping)
-      return res.redirect(302, fileUrl)
-    }
-
-    // Not downloaded — trigger qBit add
-    await qbit.add(info.l)
-
-    // Poll within budget (~6s on Hobby tier, max 2 cycles)
-    const deadline = Date.now() + 6000
-    while (Date.now() < deadline) {
-      await new Promise(r => setTimeout(r, 3000))
-      const updated = await qbit.torrents('completed')
-      const done = updated.find(t => t.hash.toLowerCase() === info.h)
-      if (done) {
-        const files = await qbit.files(done.hash)
+    // Check if already downloaded (only possible if we have the infohash)
+    if (info.h) {
+      const torrents = await qbit.torrents('completed')
+      const found = torrents.find(t => t.hash.toLowerCase() === info.h)
+      if (found) {
+        const files = await qbit.files(found.hash)
         const videoFile = findVideoFile(files)
-        const fileUrl = mapPath(done.save_path, videoFile.name, req.config.fileServerUrl, req.config.pathMapping)
+        const fileUrl = buildFileUrl(req.config, req.params.config, getPublicBaseUrl(req), found.hash, found.save_path, videoFile.name)
         return res.redirect(302, fileUrl)
       }
     }
 
-    // Timeout — download started but not ready yet
-    res.status(504).json({ error: 'Download started — close and try again' })
+    // Not downloaded — trigger qBit add via torrent download URL
+    await qbit.add(info.l)
+
+    // Poll within budget — if we have a hash we can detect completion
+    if (info.h) {
+      const deadline = Date.now() + 6000
+      while (Date.now() < deadline) {
+        await new Promise(r => setTimeout(r, 3000))
+        const updated = await qbit.torrents('completed')
+        const done = updated.find(t => t.hash.toLowerCase() === info.h)
+        if (done) {
+          const files = await qbit.files(done.hash)
+          const videoFile = findVideoFile(files)
+          const fileUrl = buildFileUrl(req.config, req.params.config, getPublicBaseUrl(req), done.hash, done.save_path, videoFile.name)
+          return res.redirect(302, fileUrl)
+        }
+      }
+    }
+
+    // No hash or download not complete — torrent has been added to qBit queue
+    res.status(504).json({ error: 'Download started — wait for it to finish in qBittorrent, then try again' })
   } catch (err) {
     res.status(500).json({ error: 'Playback failed' })
   }

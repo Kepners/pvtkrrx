@@ -23,16 +23,17 @@ function buildStreamName(parsed, onSeedbox) {
 }
 
 function buildDescription(item, parsed, onSeedbox) {
-  const parts = []
+  const title = String(item.title || '').replace(/[^\w.\-()[\] ]/g, ' ').trim()
+  const stats = []
   if (onSeedbox) {
-    parts.push('On Seedbox')
+    stats.push('On Seedbox')
   } else {
-    parts.push(`${item.seeders} seeders`)
+    stats.push(`👤 ${item.seeders}`)
   }
-  if (parsed.audio) parts.push(parsed.audio)
-  parts.push(formatSize(item.size))
-  if (!onSeedbox) parts.push('Click to stream')
-  return parts.join(' | ')
+  if (parsed.audio) stats.push(parsed.audio)
+  stats.push(`💾 ${formatSize(item.size)}`)
+  if (item.indexer) stats.push(`[${item.indexer}]`)
+  return title ? `${title}\n${stats.join(' ')}` : stats.join(' ')
 }
 
 function buildOnSeedboxStream(item, fileUrl, fileName, videoSize, config, parsed) {

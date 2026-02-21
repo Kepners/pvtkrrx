@@ -4,7 +4,11 @@ const manifest = {
   name: 'PVTKRRX',
   description: 'Stream from your private tracker seedbox through Stremio — sports, movies, TV, and your library.',
   logo: 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg',
-  resources: ['catalog', 'meta', 'stream'],
+  resources: [
+    'catalog',
+    'meta',
+    { name: 'stream', types: ['movie', 'series', 'tv'] }
+  ],
   types: ['movie', 'series', 'tv'],
   catalogs: [
     {
