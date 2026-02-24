@@ -327,9 +327,8 @@ function getSportMatchScore(titleSport, eventSportText) {
   return isMatch ? 8 : -6
 }
 
-function scoreEvent(event, title, dateHint) {
+function scoreEvent(event, title, dateHint, titleSport = '') {
   const titleTokens = tokenize(title)
-  const titleSport = detectSport(title)
   const eventText = [
     event?.strEvent,
     event?.strEventAlternate,
@@ -452,8 +451,8 @@ function pickTeamImage(team) {
   return ''
 }
 
-function cacheKey(apiKey, title, publishDate, eventId = '') {
-  return `${CACHE_KEY_VERSION}|${String(apiKey || '').trim().toLowerCase()}|${String(eventId || '').trim().toLowerCase()}|${normalizeToken(title)}|${String(publishDate || '').slice(0, 10)}`
+function cacheKey(apiKey, title, publishDate, eventId = '', sportHint = '') {
+  return `${CACHE_KEY_VERSION}|${String(apiKey || '').trim().toLowerCase()}|${String(eventId || '').trim().toLowerCase()}|${normalizeToken(title)}|${String(publishDate || '').slice(0, 10)}|${normalizeToken(sportHint)}`
 }
 
 class SportsDbClient {
@@ -628,9 +627,11 @@ class SportsDbClient {
 
     const title = String(item?.title || '').trim()
     const publishDate = String(item?.publishDate || item?.pubDate || '').trim()
+    const itemSportHint = String(item?.sportHint || item?.sport || '').trim().toLowerCase()
+    const titleSport = itemSportHint || detectSport(title)
     if (!title) return null
 
-    const key = cacheKey(this.apiKey, title, publishDate)
+    const key = cacheKey(this.apiKey, title, publishDate, '', titleSport)
     const now = Date.now()
     const hit = cache.get(key)
     if (hit && hit.expiresAt > now) return hit.value
@@ -641,7 +642,7 @@ class SportsDbClient {
     const pending = (async () => {
       try {
         const dateHint = extractDateHint(title, publishDate)
-        const sportHint = sportsDbNameForSportKey(detectSport(title))
+        const sportHint = sportsDbNameForSportKey(titleSport)
         const queries = buildCandidateQueries(title)
         if (queries.length === 0 && !(dateHint && sportHint)) {
           cache.set(key, { value: null, expiresAt: now + this.missTtlMs })
@@ -677,7 +678,7 @@ class SportsDbClient {
 
         const ranked = [...byId.values()]
           .map(event => {
-            const scored = scoreEvent(event, title, dateHint)
+            const scored = scoreEvent(event, title, dateHint, titleSport)
             return { event, ...scored }
           })
           .filter(entry =>

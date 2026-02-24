@@ -46,6 +46,7 @@ async function handleCustomMeta(config, id, context = {}) {
   const carriedBackground = String(info.b || '').trim()
   const carriedEventDate = String(info.e || '').trim()
   const carriedLeague = String(info.g || '').trim()
+  const carriedSportHint = String(info.r || '').trim()
   const shouldLookupSportsArtwork = isSports && (!carriedArtwork || !carriedEventDate || !carriedLeague || !carriedBackground)
   if (shouldLookupSportsArtwork) {
     try {
@@ -54,7 +55,8 @@ async function handleCustomMeta(config, id, context = {}) {
       })
       sportsArtwork = await sportsDb.getEventArtwork({
         title: info.t,
-        publishDate: info.p
+        publishDate: info.p,
+        sportHint: carriedSportHint
       })
     } catch (_) {
       sportsArtwork = null
@@ -87,7 +89,7 @@ async function handleCustomMeta(config, id, context = {}) {
   }
 
   const posterFallback = isSports && baseUrl
-    ? makeSportsThumbUrl(baseUrl, { title: info.t, publishDate: info.p })
+    ? makeSportsThumbUrl(baseUrl, { title: info.t, publishDate: info.p, sportHint: carriedSportHint })
     : BRAND_POSTER
   const poster = carriedArtwork || sportsArtwork?.poster || sportsArtwork?.image || posterFallback
   const background = carriedBackground || String(sportsArtwork?.backgroundImage || sportsArtwork?.image || '').trim() || poster

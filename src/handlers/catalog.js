@@ -27,6 +27,10 @@ function isLikelySportsTitle(title) {
   return isSportsTitle(title)
 }
 
+function hasSportsHint(item) {
+  return Boolean(String(item?.sportHint || '').trim())
+}
+
 function isLikelySportsNoiseTitle(title) {
   const value = String(title || '')
   return (
@@ -378,14 +382,14 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
     items = [...byKey.values()]
   }
   const strictFiltered = items.filter(item =>
-    (isSportsOnlyIndexer(item.indexer) || isLikelySportsTitle(item.title)) &&
+    (isSportsOnlyIndexer(item.indexer) || isLikelySportsTitle(item.title) || hasSportsHint(item)) &&
     isLikelySportsEventRelease(item.title) &&
     !isLikelyPackedReleaseTitle(item.title)
   )
   let filtered = strictFiltered
   if (filtered.length < Math.min(12, limit) && String(extra.search || '').trim()) {
     filtered = items.filter(item =>
-      (isSportsOnlyIndexer(item.indexer) || isLikelySportsTitle(item.title)) &&
+      (isSportsOnlyIndexer(item.indexer) || isLikelySportsTitle(item.title) || hasSportsHint(item)) &&
       !isLikelySportsNoiseTitle(item.title) &&
       !isLikelyPackedReleaseTitle(item.title)
     )
@@ -405,7 +409,8 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
         if (!sportsArtwork) {
           sportsArtwork = await sportsDb.getEventArtwork({
             title: displayTitle,
-            publishDate: item.pubDate
+            publishDate: item.pubDate,
+            sportHint: item.sportHint
           })
         }
         if (!sportsArtwork) {
@@ -432,7 +437,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
     const posterUrl = sportsArtwork?.poster || sportsArtwork?.image ||
       (item.imdbId
         ? (imdbPoster(item.imdbId) || placeholderPoster())
-        : makeSportsThumbUrl(options.baseUrl, { ...item, publishDate: item.pubDate || item.publishDate || '' }))
+        : makeSportsThumbUrl(options.baseUrl, { ...item, publishDate: item.pubDate || item.publishDate || '', sportHint: item.sportHint }))
     const backgroundUrl = sportsArtwork?.backgroundImage || posterUrl
 
     return {
@@ -450,6 +455,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
       c: group.count,
       e: eventDate,
       g: league,
+      r: item.sportHint || '',
       a: sportsArtwork?.poster || sportsArtwork?.image || posterUrl || '',
       b: backgroundUrl
     })).toString('base64url'),

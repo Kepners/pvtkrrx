@@ -36,6 +36,17 @@ function detectSportFromTitle(title) {
   return 'generic'
 }
 
+function normalizeThemeSportKey(value) {
+  const key = String(value || '').trim().toLowerCase()
+  if (!key) return ''
+  if (THEMES[key]) return key
+  if (key === 'basketball') return 'nba'
+  if (key === 'mma' || key === 'boxing' || key === 'wrestling') return 'ufc'
+  if (key === 'motorsport') return 'f1'
+  if (key === 'american-football') return 'football'
+  return ''
+}
+
 function formatDateLabel(rawDate) {
   const date = new Date(rawDate || '')
   if (!Number.isFinite(date.getTime())) return ''
@@ -79,10 +90,11 @@ function decodeSportsThumbToken(token) {
 }
 
 function makeSportsThumbUrl(baseUrl, item) {
+  const hinted = normalizeThemeSportKey(item?.sportHint || item?.sport)
   const token = encodeSportsThumbToken({
     t: String(item?.title || ''),
     d: String(item?.publishDate || ''),
-    s: detectSportFromTitle(item?.title || '')
+    s: hinted || detectSportFromTitle(item?.title || '')
   })
   const root = String(baseUrl || '').replace(/\/+$/, '')
   return `${root}/thumb/sports/${token}.svg`
@@ -132,4 +144,3 @@ module.exports = {
   decodeSportsThumbToken,
   renderSportsThumbSvg
 }
-

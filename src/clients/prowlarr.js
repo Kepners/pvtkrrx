@@ -1,4 +1,6 @@
 const TIMEOUT_MS = 20000
+const INDEXER_CATEGORY_TTL_MS = 6 * 60 * 60 * 1000
+const { sportHintFromCategory } = require('../utils/sportsCategoryHint')
 
 function normalizeProwlarrBaseUrl(input) {
   let url = String(input || '').trim()
@@ -33,15 +35,48 @@ class ProwlarrClient {
     // Accept either base URL (http://host:port) or legacy torznab URL; normalize to base.
     this.baseUrl = normalizeProwlarrBaseUrl(baseUrl)
     this.apiKey = apiKey
+    this.indexerCategoryLookup = new Map()
+    this.indexerCategoryLookupExpiresAt = 0
+    this.indexerCategoryLookupInFlight = null
   }
 
-  _mapResult(r) {
+  _mapResult(r, categoryLookup = new Map()) {
     // Try to extract infohash from guid or infoUrl (some indexers embed SHA1 hash in URL)
     let infohash = ''
     const hashMatch = (r.guid || r.infoUrl || '').match(/[?&]id=([0-9a-f]{40})/i)
     if (hashMatch) infohash = hashMatch[1].toLowerCase()
 
     const imdbId = normalizeImdbId(r.imdbId)
+    const indexerId = String(r.indexerId ?? '').trim()
+    const categoryMap = categoryLookup.get(indexerId) || new Map()
+    const rawCategories = Array.isArray(r.categories) ? r.categories : []
+    const categoryIds = []
+    const categoryNames = []
+    const seenIds = new Set()
+    const seenNames = new Set()
+
+    for (const entry of rawCategories) {
+      const id = String(entry?.id ?? '').trim()
+      if (id && !seenIds.has(id)) {
+        seenIds.add(id)
+        categoryIds.push(id)
+      }
+      const fallbackName = id ? String(categoryMap.get(id) || '').trim() : ''
+      const name = String(entry?.name || fallbackName || '').trim()
+      if (name) {
+        const key = name.toLowerCase()
+        if (!seenNames.has(key)) {
+          seenNames.add(key)
+          categoryNames.push(name)
+        }
+      }
+    }
+
+    const sportHint = sportHintFromCategory({
+      indexerName: r.indexer,
+      categoryIds,
+      categoryNames
+    })
 
     return {
       title: String(r.title || ''),
@@ -51,9 +86,60 @@ class ProwlarrClient {
       infohash,
       imdbId,
       indexer: r.indexer ? String(r.indexer) : '',
-      category: r.categories?.[0]?.id ? String(r.categories[0].id) : '',
+      category: categoryIds[0] || '',
+      categoryIds,
+      categoryNames,
+      sportHint,
       pubDate: r.publishDate || ''
     }
+  }
+
+  async _getIndexerCategoryLookup() {
+    const now = Date.now()
+    if (this.indexerCategoryLookup.size > 0 && this.indexerCategoryLookupExpiresAt > now) {
+      return this.indexerCategoryLookup
+    }
+    if (this.indexerCategoryLookupInFlight) return this.indexerCategoryLookupInFlight
+
+    const pending = (async () => {
+      try {
+        const res = await fetch(`${this.baseUrl}/api/v1/indexer?apikey=${encodeURIComponent(this.apiKey)}`, {
+          signal: AbortSignal.timeout(TIMEOUT_MS)
+        })
+        if (!res.ok) throw new Error(`Prowlarr HTTP ${res.status}`)
+        const rows = await res.json()
+        const lookup = new Map()
+        for (const row of (Array.isArray(rows) ? rows : [])) {
+          const indexerId = String(row?.id ?? '').trim()
+          if (!indexerId) continue
+
+          const cats = Array.isArray(row?.capabilities?.categories) ? row.capabilities.categories : []
+          const idToName = new Map()
+          for (const cat of cats) {
+            const catId = String(cat?.id ?? '').trim()
+            const catName = String(cat?.name || '').trim()
+            if (catId && catName) idToName.set(catId, catName)
+
+            for (const sub of (Array.isArray(cat?.subCategories) ? cat.subCategories : [])) {
+              const subId = String(sub?.id ?? '').trim()
+              const subName = String(sub?.name || '').trim()
+              if (subId && subName) idToName.set(subId, subName)
+            }
+          }
+          lookup.set(indexerId, idToName)
+        }
+        this.indexerCategoryLookup = lookup
+        this.indexerCategoryLookupExpiresAt = Date.now() + INDEXER_CATEGORY_TTL_MS
+        return this.indexerCategoryLookup
+      } catch (_) {
+        return this.indexerCategoryLookup
+      } finally {
+        this.indexerCategoryLookupInFlight = null
+      }
+    })()
+
+    this.indexerCategoryLookupInFlight = pending
+    return pending
   }
 
   async _search(params) {
@@ -61,7 +147,8 @@ class ProwlarrClient {
     const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
     if (!res.ok) throw new Error(`Prowlarr HTTP ${res.status}`)
     const data = await res.json()
-    return (Array.isArray(data) ? data : []).map(r => this._mapResult(r))
+    const categoryLookup = await this._getIndexerCategoryLookup()
+    return (Array.isArray(data) ? data : []).map(r => this._mapResult(r, categoryLookup))
   }
 
   async search(query, cats, type = 'search', options = {}) {
