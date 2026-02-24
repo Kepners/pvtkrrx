@@ -128,11 +128,27 @@ class QBitClient {
     return this.request(`/api/v2/torrents/files?hash=${encodeURIComponent(hash)}`)
   }
 
-  async add(magnetOrUrl) {
+  async add(magnetOrUrl, options = {}) {
+    const params = new URLSearchParams()
+    params.set('urls', String(magnetOrUrl || ''))
+    if (options.sequentialDownload === true) params.set('sequentialDownload', 'true')
+    if (options.firstLastPiecePrio === true) params.set('firstLastPiecePrio', 'true')
+    if (options.paused === true) params.set('paused', 'true')
+
     return this.request('/api/v2/torrents/add', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: `urls=${encodeURIComponent(magnetOrUrl)}`,
+      body: params.toString(),
+      expect: 'text'
+    })
+  }
+
+  async delete(hashes, deleteFiles = true) {
+    const value = Array.isArray(hashes) ? hashes.join('|') : String(hashes || '')
+    return this.request('/api/v2/torrents/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `hashes=${encodeURIComponent(value)}&deleteFiles=${deleteFiles ? 'true' : 'false'}`,
       expect: 'text'
     })
   }

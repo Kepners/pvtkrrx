@@ -1,8 +1,72 @@
 
-> pvtkrrx@1.0.0 start
-> node index.js
+> pvtkrrx@1.0.0 dev
+> node --watch index.js
 
-[PVTKRRX] ENCRYPTION_SECRET missing; using local development fallback secret.
 PVTKRRX HTTP  → http://localhost:7000
 Configure:      http://localhost:7000/configure
 PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Restarting 'index.js'
+PVTKRRX HTTP  → http://localhost:7000
+Configure:      http://localhost:7000/configure
+PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Restarting 'index.js'
+PVTKRRX HTTP  → http://localhost:7000
+Configure:      http://localhost:7000/configure
+PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Restarting 'index.js'
+PVTKRRX HTTP  → http://localhost:7000
+Configure:      http://localhost:7000/configure
+PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Restarting 'index.js'
+PVTKRRX HTTP  → http://localhost:7000
+Configure:      http://localhost:7000/configure
+PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Restarting 'index.js'
+PVTKRRX HTTP  → http://localhost:7000
+Configure:      http://localhost:7000/configure
+PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Restarting 'index.js'
+PVTKRRX HTTP  → http://localhost:7000
+Configure:      http://localhost:7000/configure
+PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Restarting 'index.js'
+PVTKRRX HTTP  → http://localhost:7000
+Configure:      http://localhost:7000/configure
+PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Restarting 'index.js'
+PVTKRRX HTTP  → http://localhost:7000
+Configure:      http://localhost:7000/configure
+PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Restarting 'index.js'
+PVTKRRX HTTP  → http://localhost:7000
+Configure:      http://localhost:7000/configure
+PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Restarting 'index.js'
+PVTKRRX HTTP  → http://localhost:7000
+Configure:      http://localhost:7000/configure
+PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Restarting 'index.js'
+PVTKRRX HTTP  → http://localhost:7000
+Configure:      http://localhost:7000/configure
+PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Restarting 'index.js'
+PVTKRRX HTTP  → http://localhost:7000
+Configure:      http://localhost:7000/configure
+PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Restarting 'index.js'
+PVTKRRX HTTP  → http://localhost:7000
+Configure:      http://localhost:7000/configure
+PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Restarting 'index.js'
+PVTKRRX HTTP  → http://localhost:7000
+Configure:      http://localhost:7000/configure
+PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Restarting 'index.js'
+PVTKRRX HTTP  → http://localhost:7000
+Configure:      http://localhost:7000/configure
+PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Restarting 'index.js'
+PVTKRRX HTTP  → http://localhost:7000
+Configure:      http://localhost:7000/configure
+PVTKRRX HTTPS → https://localhost:7001 (self-signed — trust cert in browser first)
+Failed running 'index.js'. Waiting for file changes before restarting...

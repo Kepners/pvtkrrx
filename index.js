@@ -16,12 +16,39 @@ const { autoProvisionWindows } = require('./src/utils/provision')
 const { getLanIpv4Addresses, normalizeLocalHostname, startLanAlias } = require('./src/utils/lanAlias')
 const { decodeSportsThumbToken, renderSportsThumbSvg } = require('./src/utils/sportsThumb')
 const { mapPath } = require('./src/utils/pathMapper')
-const { findVideoFile } = require('./src/utils/streams')
+const { findVideoFile, hasPackedArchiveFiles, isSampleVideoName } = require('./src/utils/streams')
 
 const STREAM_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_WAIT_TIMEOUT_MS || '90000', 10)
 const STREAM_WAIT_INTERVAL_MS = parseInt(process.env.STREAM_WAIT_INTERVAL_MS || '2000', 10)
-const STREAM_READY_MIN_BYTES = parseInt(process.env.STREAM_READY_MIN_BYTES || String(24 * 1024 * 1024), 10)
-const STREAM_READY_MIN_PROGRESS = parseFloat(process.env.STREAM_READY_MIN_PROGRESS || '0.02')
+const STREAM_RANGE_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_RANGE_WAIT_TIMEOUT_MS || '15000', 10)
+const STREAM_RANGE_WAIT_INTERVAL_MS = parseInt(process.env.STREAM_RANGE_WAIT_INTERVAL_MS || '500', 10)
+const STREAM_READY_START_FRACTION = parseStartFraction(
+  process.env.STREAM_READY_START_PERCENT ||
+  process.env.STREAM_READY_MIN_PROGRESS ||
+  '0.5%'
+)
+const STREAM_PRIORITIZE_LAST_PIECES = String(process.env.STREAM_PRIORITIZE_LAST_PIECES || '').trim().toLowerCase() === 'true'
+const WATCHED_DELETE_THRESHOLD = Math.max(0.5, Math.min(0.99, parseFloat(process.env.PVTKRRX_WATCHED_DELETE_THRESHOLD || '0.95')))
+const WATCHED_DELETE_GRACE_MS = Math.max(0, parseInt(process.env.PVTKRRX_WATCHED_DELETE_GRACE_MS || '180000', 10))
+const watchedDeleteTimers = new Map()
+const watchedDeleteInFlight = new Set()
+const DEFAULT_LOCAL_HOSTNAME = 'pvtkrrx.local'
+
+function parseStartFraction(raw) {
+  const text = String(raw || '').trim()
+  if (!text) return 0.005
+  const hasPercent = text.endsWith('%')
+  const numeric = parseFloat(hasPercent ? text.slice(0, -1) : text)
+  if (!Number.isFinite(numeric) || numeric <= 0) return 0.005
+
+  let fraction
+  if (hasPercent || numeric > 1) {
+    fraction = numeric / 100
+  } else {
+    fraction = numeric
+  }
+  return Math.max(0.001, Math.min(0.99, fraction))
+}
 
 function loadLocalEnv() {
   const envPath = path.join(__dirname, '.env')
@@ -81,7 +108,15 @@ function detectLanAddresses() {
 }
 
 function getMdnsHost() {
-  return normalizeLocalHostname(process.env.PVTKRRX_LOCAL_HOSTNAME || 'pvtkrrx.local')
+  const localConfig = loadLocalConfigFile()
+  const configured = normalizeLocalHostname(String(localConfig?.localHostname || '').trim())
+  const configuredCustom = localConfig?.localHostnameCustom === true
+  const envConfigured = String(process.env.PVTKRRX_LOCAL_HOSTNAME || '').trim()
+  // Force a stable default alias for all installs unless explicitly customized by the user.
+  if (configuredCustom && configured) return configured
+  if (configured === DEFAULT_LOCAL_HOSTNAME) return configured
+  if (envConfigured) return normalizeLocalHostname(envConfigured)
+  return DEFAULT_LOCAL_HOSTNAME
 }
 
 function buildLocalModeUrls(hostname, port, httpsPort) {
@@ -89,15 +124,40 @@ function buildLocalModeUrls(hostname, port, httpsPort) {
   return {
     httpManifest: `http://${hostname}:${port}/local/manifest.json${modeQuery}`,
     httpsManifest: `https://${hostname}:${httpsPort}/local/manifest.json${modeQuery}`,
-    stremio: `stremio://${hostname}:${httpsPort}/local/manifest.json${modeQuery}`
+    stremio: `stremio://${hostname}:${port}/local/manifest.json${modeQuery}`
   }
+}
+
+function sanitizeHostForUrl(value) {
+  const host = String(value || '')
+    .trim()
+    .replace(/[^a-zA-Z0-9.\-:]/g, '')
+  return host || ''
 }
 
 // ─── CORS ───────────────────────────────────────────────────
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+  const requestedHeaders = String(req.headers['access-control-request-headers'] || '').trim()
+  const defaultHeaders = [
+    'Content-Type',
+    'Authorization',
+    'Range',
+    'Accept',
+    'Stremio-Protocol-Version',
+    'Access-Control-Request-Private-Network'
+  ]
+  res.setHeader(
+    'Access-Control-Allow-Headers',
+    requestedHeaders || defaultHeaders.join(', ')
+  )
+  // Needed for browser-based clients (e.g. web Stremio) requesting local/LAN URLs.
+  // Without this, Chrome/Edge may block with generic "Failed to fetch".
+  if (String(req.headers['access-control-request-private-network'] || '').toLowerCase() === 'true') {
+    res.setHeader('Access-Control-Allow-Private-Network', 'true')
+  }
+  res.setHeader('Access-Control-Max-Age', '600')
   if (req.method === 'OPTIONS') return res.sendStatus(204)
   next()
 })
@@ -147,9 +207,54 @@ function isLoopbackHost(req) {
 }
 
 function getInstallMode(req) {
-  const mode = String(req.query.mode || '').toLowerCase()
+  const mode = String(req.query.mode || req.query.node || '').toLowerCase()
   if (mode === 'local' || mode === 'hosted') return mode
   return isLoopbackHost(req) ? 'local' : 'hosted'
+}
+
+function parseBoolean(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on'
+}
+
+function autoDeleteWatchedEnabled(config) {
+  if (typeof config?.autoDeleteWatched === 'boolean') return config.autoDeleteWatched
+  return parseBoolean(process.env.PVTKRRX_AUTO_DELETE_WATCHED)
+}
+
+function watchedDeleteGraceMs(config) {
+  const cfgSeconds = Number.parseInt(String(config?.watchedDeleteGraceSeconds || ''), 10)
+  if (Number.isFinite(cfgSeconds) && cfgSeconds >= 0) return cfgSeconds * 1000
+  return WATCHED_DELETE_GRACE_MS
+}
+
+function scheduleWatchedCleanup(config, hash, reason = 'watched-threshold') {
+  const normalizedHash = String(hash || '').toLowerCase()
+  if (!normalizedHash) return
+  if (!autoDeleteWatchedEnabled(config)) return
+  if (watchedDeleteInFlight.has(normalizedHash)) return
+
+  const existing = watchedDeleteTimers.get(normalizedHash)
+  if (existing?.timer) clearTimeout(existing.timer)
+
+  const delay = watchedDeleteGraceMs(config)
+  const timer = setTimeout(async () => {
+    watchedDeleteTimers.delete(normalizedHash)
+    if (watchedDeleteInFlight.has(normalizedHash)) return
+    watchedDeleteInFlight.add(normalizedHash)
+    try {
+      const qbit = new QBitClient(config.qbitUrl, config.qbitUsername, config.qbitPassword)
+      await qbit.delete(normalizedHash, true)
+      console.log(`[watch-cleanup] removed torrent ${normalizedHash.slice(0, 8)} (${reason})`)
+    } catch (err) {
+      console.warn(`[watch-cleanup] failed ${normalizedHash.slice(0, 8)}: ${err.message}`)
+    } finally {
+      watchedDeleteInFlight.delete(normalizedHash)
+    }
+  }, delay)
+
+  if (typeof timer.unref === 'function') timer.unref()
+  watchedDeleteTimers.set(normalizedHash, { timer, reason, scheduledAt: Date.now(), delay })
 }
 
 function getManifest(req) {
@@ -271,12 +376,11 @@ function getReadableBytes(fileEntry, torrent, diskBytes) {
 function isPlaybackReady(fileEntry, readableBytes) {
   const size = Number(fileEntry?.size || 0)
   if (!size) return false
-  const minByProgress = Math.floor(size * STREAM_READY_MIN_PROGRESS)
-  const required = Math.min(size, Math.max(STREAM_READY_MIN_BYTES, minByProgress))
+  const required = Math.min(size, Math.max(1, Math.floor(size * STREAM_READY_START_FRACTION)))
   return readableBytes >= required || Number(fileEntry?.progress || 0) >= 0.999
 }
 
-async function primeTorrentForStreaming(qbit, torrent, videoFile) {
+async function primeTorrentForStreaming(qbit, torrent, videoFile, allFiles = null) {
   const hash = String(torrent?.hash || '').toLowerCase()
   if (!hash) return
 
@@ -290,16 +394,31 @@ async function primeTorrentForStreaming(qbit, torrent, videoFile) {
       console.warn(`[streaming-prime] sequential toggle failed ${hash.slice(0, 8)}: ${err.message}`)
     }
   }
-  if (!firstLastEnabled) {
+  // "first + last" can make the piece map appear scattered.
+  // Keep it optional so local playback can stay head-first by default.
+  if (STREAM_PRIORITIZE_LAST_PIECES && !firstLastEnabled) {
     try {
       await qbit.toggleFirstLastPiecePrio(hash)
     } catch (err) {
       console.warn(`[streaming-prime] first/last toggle failed ${hash.slice(0, 8)}: ${err.message}`)
     }
+  } else if (!STREAM_PRIORITIZE_LAST_PIECES && firstLastEnabled) {
+    try {
+      await qbit.toggleFirstLastPiecePrio(hash)
+    } catch (err) {
+      console.warn(`[streaming-prime] first/last untoggle failed ${hash.slice(0, 8)}: ${err.message}`)
+    }
   }
 
   if (videoFile && Number.isInteger(videoFile.index)) {
     try {
+      const files = Array.isArray(allFiles) ? allFiles : []
+      const otherFileIds = files
+        .filter(f => Number.isInteger(f?.index) && f.index !== videoFile.index)
+        .map(f => f.index)
+      if (otherFileIds.length > 0) {
+        await qbit.setFilePriority(hash, otherFileIds, 0)
+      }
       await qbit.setFilePriority(hash, [videoFile.index], 7)
     } catch (err) {
       console.warn(`[streaming-prime] file priority failed ${hash.slice(0, 8)}: ${err.message}`)
@@ -326,7 +445,21 @@ async function loadTorrentPlaybackState(qbit, hash, targetPath) {
       ready: false
     }
   }
-  const chosenFile = findTorrentFileByPath(files, targetPath) || findVideoFile(files)
+  const targetFile = findTorrentFileByPath(files, targetPath)
+  const preferredVideoFile = findVideoFile(files)
+  const packedArchive = hasPackedArchiveFiles(files)
+
+  // If a previous URL points to a Sample file, upgrade to the primary video when available.
+  // For packed scene releases (RAR + Sample), avoid selecting Sample as main playback target.
+  let chosenFile = null
+  if (targetFile && !isSampleVideoName(targetFile.name)) {
+    chosenFile = targetFile
+  } else if (preferredVideoFile) {
+    chosenFile = preferredVideoFile
+  } else if (targetFile && !packedArchive) {
+    chosenFile = targetFile
+  }
+
   const resolvedFilePath = resolveTorrentFilePath(torrent, chosenFile?.name || targetPath)
   const fileExists = Boolean(resolvedFilePath && fs.existsSync(resolvedFilePath))
   const diskSize = fileExists ? fs.statSync(resolvedFilePath).size : 0
@@ -339,6 +472,7 @@ async function loadTorrentPlaybackState(qbit, hash, targetPath) {
     fileExists,
     diskSize,
     readableBytes,
+    packedArchive,
     ready: isPlaybackReady(chosenFile, readableBytes)
   }
 }
@@ -364,8 +498,14 @@ app.post('/local-config', (req, res) => {
   }
 
   try {
-    saveLocalConfigFile(cfg)
-    res.json({ ok: true })
+    const localHostname = normalizeLocalHostname(cfg.localHostname || DEFAULT_LOCAL_HOSTNAME)
+    const localHostnameCustom = localHostname !== DEFAULT_LOCAL_HOSTNAME
+    saveLocalConfigFile({
+      ...cfg,
+      localHostname,
+      localHostnameCustom
+    })
+    res.json({ ok: true, localHostname })
   } catch (err) {
     res.status(500).json({ error: 'Failed to save local config' })
   }
@@ -374,11 +514,23 @@ app.post('/local-config', (req, res) => {
 app.post('/auto-provision', async (req, res) => {
   try {
     const options = req.body || {}
-    const result = await autoProvisionWindows(options)
+    const localHostname = normalizeLocalHostname(options.localHostname || DEFAULT_LOCAL_HOSTNAME)
+    const localHostnameCustom = localHostname !== DEFAULT_LOCAL_HOSTNAME
+    const result = await autoProvisionWindows({
+      ...options,
+      localHostname
+    })
     if (result.config && result.config.qbitUrl) {
-      saveLocalConfigFile(result.config)
+      saveLocalConfigFile({
+        ...result.config,
+        localHostname,
+        localHostnameCustom
+      })
     }
-    res.json(result)
+    res.json({
+      ...result,
+      localHostname
+    })
   } catch (err) {
     res.status(500).json({ ok: false, error: 'Auto provision failed', detail: err.message })
   }
@@ -398,6 +550,7 @@ app.get('/network-info', (req, res) => {
   res.json({
     port,
     httpsPort,
+    localHostname: mdnsHost,
     loopback,
     mdns: { hostname: mdnsHost, ...mdns },
     lan,
@@ -408,6 +561,70 @@ app.get('/network-info', (req, res) => {
       { id: 'lan-ip', url: lan ? lan.httpManifest : '' }
     ]
   })
+})
+
+// Local install helper page (localhost copy workflow).
+// Open on the same PC that runs PVTKRRX:
+// http://127.0.0.1:7000/local/install
+app.get('/local/install', (req, res) => {
+  const port = parseInt(process.env.PORT || '7000', 10)
+  const loopbackManifest = `http://127.0.0.1:${port}/local/manifest.json?mode=local`
+  const requestedHost = sanitizeHostForUrl(req.query.host)
+  const headerHost = sanitizeHostForUrl(String(req.get('host') || '').split(':')[0])
+  const fallbackHost = sanitizeHostForUrl(getMdnsHost())
+  const host = requestedHost || headerHost || fallbackHost || '127.0.0.1'
+  const lanDebugManifest = `http://${host}:${port}/local/manifest.json?mode=local`
+
+  res.setHeader('Cache-Control', 'no-store')
+  res.setHeader('Content-Type', 'text/html; charset=utf-8')
+  res.send(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PVTKRRX Local Install</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 24px; background: #101018; color: #e8e8ff; }
+    .card { max-width: 720px; padding: 16px; border: 1px solid #2a2a3a; border-radius: 10px; background: #151526; }
+    button.btn { display: inline-block; margin-top: 10px; padding: 10px 14px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
+    code { display: block; margin-top: 10px; padding: 10px; background: #0c0c15; border-radius: 6px; word-break: break-all; }
+    p { line-height: 1.45; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>PVTKRRX Local Install</h2>
+    <p>Use this on the same Windows PC that runs PVTKRRX. Click once to copy the correct URL.</p>
+    <button class="btn" id="copyBtn" type="button">Copy local Addon URL</button>
+    <p>Paste into Stremio: <code>Addons -> + Add Addon URL</code></p>
+    <code id="manifestCode">${loopbackManifest}</code>
+    <p>LAN debug URL (not recommended for install):</p>
+    <code>${lanDebugManifest}</code>
+    <p>For phone/TV installs, use hosted HTTPS mode from the configure page.</p>
+  </div>
+  <script>
+    const btn = document.getElementById('copyBtn')
+    const text = document.getElementById('manifestCode').textContent.trim()
+    btn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(text)
+        const prev = btn.textContent
+        btn.textContent = 'Copied!'
+        setTimeout(() => { btn.textContent = prev }, 1400)
+      } catch (_) {
+        const range = document.createRange()
+        const code = document.getElementById('manifestCode')
+        range.selectNodeContents(code)
+        const sel = window.getSelection()
+        sel.removeAllRanges()
+        sel.addRange(range)
+        try { document.execCommand('copy') } catch (_) {}
+        sel.removeAllRanges()
+      }
+    })
+  </script>
+</body>
+</html>`)
 })
 
 // ─── POST /test-connection — validate credentials ──────────
@@ -436,9 +653,15 @@ app.post('/test-connection', async (req, res) => {
 
 // ─── withConfig middleware ──────────────────────────────────
 function withConfig(req, res, next) {
+  req.localConfigMissing = false
   if (req.params.config === 'local') {
     const localConfig = loadLocalConfigFile()
-    if (!localConfig) return res.status(400).json({ error: 'Local config not found. Open /configure and save local config first.' })
+    if (!localConfig) {
+      // Allow local manifest/configure bootstrap even before credentials are saved.
+      req.localConfigMissing = true
+      req.config = {}
+      return next()
+    }
     req.config = localConfig
     return next()
   }
@@ -457,8 +680,10 @@ function withConfig(req, res, next) {
 // ─── Stremio addon routes (config-authenticated) ────────────
 app.get('/:config/manifest.json', withConfig, (req, res) => {
   const m = getManifest(req)
-  // Configured URL — user is already set up, show Install not Configure
-  if (m.behaviorHints) m.behaviorHints.configurationRequired = false
+  // Configured URL — user is already set up, show Install not Configure.
+  // For /local without saved credentials, keep configurationRequired=true
+  // so Stremio can install and then guide user to Configure instead of failing fetch.
+  if (m.behaviorHints) m.behaviorHints.configurationRequired = Boolean(req.localConfigMissing)
   res.json(m)
 })
 
@@ -546,10 +771,15 @@ app.get('/:config/file/:info', withConfig, async (req, res) => {
       return res.status(404).json({ error: 'Torrent not found' })
     }
 
-    const { torrent, file, resolvedFilePath } = playback
-    if (file) {
-      await primeTorrentForStreaming(qbit, torrent, file)
+    const { torrent, files, file, resolvedFilePath } = playback
+    const torrentHash = String(torrent?.hash || h || '').toLowerCase()
+    if (!file) {
+      const errMsg = playback.packedArchive
+        ? 'Packed archive release detected (RAR) with no direct video file. Choose a WEB-DL/REMUX source.'
+        : 'No playable video file found in torrent.'
+      return res.status(422).json({ error: errMsg })
     }
+    await primeTorrentForStreaming(qbit, torrent, file, files)
     if (!playback.fileExists || !resolvedFilePath) {
       console.warn(`[file-route] file not found on disk path="${resolvedFilePath || 'n/a'}"`)
       return res.status(425).json({
@@ -558,9 +788,9 @@ app.get('/:config/file/:info', withConfig, async (req, res) => {
       })
     }
 
-    const fileSize = Math.max(0, Number(file?.size || playback.diskSize || 0))
-    const readableBytes = Number(playback.readableBytes || 0)
-    const isComplete = Number(file?.progress || torrent.progress || 0) >= 0.999
+    let fileSize = Math.max(0, Number(file?.size || playback.diskSize || 0))
+    let readableBytes = Number(playback.readableBytes || 0)
+    let isComplete = Number(file?.progress || torrent.progress || 0) >= 0.999
 
     const ext = path.extname(resolvedFilePath).toLowerCase()
     const mime = { '.mp4': 'video/mp4', '.mkv': 'video/x-matroska', '.avi': 'video/x-msvideo', '.wmv': 'video/x-ms-wmv', '.ts': 'video/mp2t', '.m4v': 'video/x-m4v' }
@@ -573,7 +803,7 @@ app.get('/:config/file/:info', withConfig, async (req, res) => {
       })
     }
 
-    const maxReadable = isComplete ? fileSize : Math.max(0, Math.min(fileSize, readableBytes))
+    let maxReadable = isComplete ? fileSize : Math.max(0, Math.min(fileSize, readableBytes))
     const range = req.headers.range
     res.setHeader('Accept-Ranges', 'bytes')
     res.setHeader('Content-Type', contentType)
@@ -593,9 +823,32 @@ app.get('/:config/file/:info', withConfig, async (req, res) => {
       }
 
       if (!Number.isFinite(start) || start < 0 || start >= maxReadable) {
-        res.setHeader('Content-Range', `bytes */${fileSize}`)
-        res.setHeader('Retry-After', '2')
-        return res.sendStatus(416)
+        // Stremio can request ranges ahead of currently downloaded bytes.
+        // Avoid immediate hard failure: wait briefly for the needed range.
+        if (!isComplete && Number.isFinite(start) && start >= 0) {
+          const waitUntil = Date.now() + STREAM_RANGE_WAIT_TIMEOUT_MS
+          while (Date.now() < waitUntil && start >= maxReadable) {
+            await sleep(STREAM_RANGE_WAIT_INTERVAL_MS)
+            const refreshed = await loadTorrentPlaybackState(qbit, torrentHash, file?.name || p)
+            if (!refreshed?.torrent || !refreshed?.file) break
+            fileSize = Math.max(0, Number(refreshed.file?.size || refreshed.diskSize || fileSize))
+            readableBytes = Number(refreshed.readableBytes || readableBytes)
+            isComplete = Number(refreshed.file?.progress || refreshed.torrent.progress || 0) >= 0.999
+            maxReadable = isComplete ? fileSize : Math.max(0, Math.min(fileSize, readableBytes))
+            if (start < maxReadable) break
+          }
+        }
+
+        if (start >= maxReadable) {
+          // Return a retryable status for progressive playback instead of a hard 416.
+          res.setHeader('Content-Range', `bytes */${fileSize}`)
+          res.setHeader('Retry-After', '2')
+          return res.status(503).json({
+            error: 'Requested byte range not available yet',
+            progress: Number(file?.progress || torrent.progress || 0),
+            retryAfterSeconds: 2
+          })
+        }
       }
 
       const end = Math.min(requestedEnd, maxReadable - 1)
@@ -603,6 +856,13 @@ app.get('/:config/file/:info', withConfig, async (req, res) => {
         res.setHeader('Content-Range', `bytes */${fileSize}`)
         res.setHeader('Retry-After', '2')
         return res.sendStatus(416)
+      }
+
+      if (isComplete && fileSize > 0) {
+        const watchedRatio = (end + 1) / fileSize
+        if (watchedRatio >= WATCHED_DELETE_THRESHOLD) {
+          scheduleWatchedCleanup(req.config, torrentHash, `range-${Math.round(watchedRatio * 100)}pct`)
+        }
       }
 
       res.status(206)
@@ -644,20 +904,32 @@ app.get('/:config/playback/:info', withConfig, async (req, res) => {
     console.log(`[playback-route] token=${tokenShort} hash=${trackedHash.slice(0, 8)} hasLink=${Boolean(info.l)}`)
     const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
     const waitDeadline = Date.now() + STREAM_WAIT_TIMEOUT_MS
-    let primed = false
+    let primedTorrent = false
+    let primedFile = false
     let lastProgress = 0
     let hasTorrent = false
     let knownHashesBeforeAdd = null
+    let maxAvailability = 0
+    let maxSeedersSeen = 0
+    let maxPeersSeen = 0
 
     // If we can identify the torrent hash, check whether it's already playable.
     if (trackedHash) {
       const existing = await loadTorrentPlaybackState(qbit, trackedHash)
       if (existing?.torrent) {
-        hasTorrent = true
-        if (!primed) {
-          await primeTorrentForStreaming(qbit, existing.torrent, existing.file)
-          primed = true
+        if (!primedTorrent || (!primedFile && existing.file)) {
+          await primeTorrentForStreaming(qbit, existing.torrent, existing.file, existing.files)
+          primedTorrent = true
+          if (existing.file) primedFile = true
         }
+        if (!existing.file && (existing.packedArchive || Number(existing.torrent.progress || 0) >= 0.999)) {
+          return res.status(422).json({
+            error: existing.packedArchive
+              ? 'Packed archive release detected (RAR). Pick a source with direct .mkv/.mp4 video.'
+              : 'Torrent completed but no playable video file was detected.'
+          })
+        }
+        hasTorrent = true
         if ((existing.ready || Number(existing.torrent.progress || 0) >= 0.999) && existing.file?.name) {
           const fileUrl = buildFileUrl(
             req.config,
@@ -671,6 +943,9 @@ app.get('/:config/playback/:info', withConfig, async (req, res) => {
           return res.redirect(302, fileUrl)
         }
         lastProgress = Number(existing.file?.progress || existing.torrent.progress || 0)
+        maxAvailability = Math.max(maxAvailability, Number(existing.torrent?.availability || 0))
+        maxSeedersSeen = Math.max(maxSeedersSeen, Number(existing.torrent?.num_seeds || 0))
+        maxPeersSeen = Math.max(maxPeersSeen, Number(existing.torrent?.num_leechs || 0))
       }
     }
 
@@ -688,7 +963,15 @@ app.get('/:config/playback/:info', withConfig, async (req, res) => {
 
     // Not ready yet — add to qBit queue if we have a tracker/magnet link.
     if (info.l && !hasTorrent) {
-      await qbit.add(info.l)
+      try {
+        await qbit.add(info.l, {
+          sequentialDownload: true,
+          firstLastPiecePrio: STREAM_PRIORITIZE_LAST_PIECES
+        })
+      } catch (addErr) {
+        // qBit may reject duplicate/stale URLs; continue probing torrent list.
+        console.warn(`[playback-route] add rejected: ${addErr.message}`)
+      }
     }
 
     // Keep request open and auto-redirect once enough start-buffer exists.
@@ -711,13 +994,31 @@ app.get('/:config/playback/:info', withConfig, async (req, res) => {
         trackedHash = ''
         continue
       }
-      hasTorrent = true
-      if (!primed) {
-        await primeTorrentForStreaming(qbit, state.torrent, state.file)
-        primed = true
+      if (!primedTorrent || (!primedFile && state.file)) {
+        await primeTorrentForStreaming(qbit, state.torrent, state.file, state.files)
+        primedTorrent = true
+        if (state.file) primedFile = true
       }
+      if (!state.file) {
+        if (state.packedArchive || Number(state.torrent.progress || 0) >= 0.999) {
+          return res.status(422).json({
+            error: state.packedArchive
+              ? 'Packed archive release detected (RAR). Pick a source with direct .mkv/.mp4 video.'
+              : 'Torrent completed but no playable video file was detected.'
+          })
+        }
+        lastProgress = Number(state.torrent.progress || 0)
+        maxAvailability = Math.max(maxAvailability, Number(state.torrent?.availability || 0))
+        maxSeedersSeen = Math.max(maxSeedersSeen, Number(state.torrent?.num_seeds || 0))
+        maxPeersSeen = Math.max(maxPeersSeen, Number(state.torrent?.num_leechs || 0))
+        continue
+      }
+      hasTorrent = true
 
       lastProgress = Number(state.file?.progress || state.torrent.progress || 0)
+      maxAvailability = Math.max(maxAvailability, Number(state.torrent?.availability || 0))
+      maxSeedersSeen = Math.max(maxSeedersSeen, Number(state.torrent?.num_seeds || 0))
+      maxPeersSeen = Math.max(maxPeersSeen, Number(state.torrent?.num_leechs || 0))
       if ((state.ready || Number(state.torrent.progress || 0) >= 0.999) && state.file?.name) {
         const fileUrl = buildFileUrl(
           req.config,
@@ -733,10 +1034,20 @@ app.get('/:config/playback/:info', withConfig, async (req, res) => {
     }
 
     // Still buffering.
-    console.warn(`[playback-route] token=${tokenShort} timeout waiting for buffer hash=${trackedHash.slice(0, 8)} progress=${Math.round(lastProgress * 100)}%`)
+    const stalledNoPieces = lastProgress <= 0.001 && maxAvailability < 0.01
+    console.warn(
+      `[playback-route] token=${tokenShort} timeout waiting for buffer hash=${trackedHash.slice(0, 8)} ` +
+      `progress=${Math.round(lastProgress * 100)}% availability=${maxAvailability.toFixed(3)} ` +
+      `seeders=${maxSeedersSeen} peers=${maxPeersSeen}`
+    )
     res.status(503).json({
-      error: 'Download queued — still buffering start of file',
+      error: stalledNoPieces
+        ? 'Source stalled - no available pieces from peers. Pick another source.'
+        : 'Download queued - still buffering start of file',
       progress: lastProgress,
+      availability: Number(maxAvailability.toFixed(3)),
+      seedersSeen: maxSeedersSeen,
+      peersSeen: maxPeersSeen,
       retryAfterSeconds: 4
     })
   } catch (err) {

@@ -302,6 +302,20 @@
       color: #cfe9ff;
     }
 
+    .btn-copy-url {
+      background: linear-gradient(135deg, rgba(0, 255, 65, 0.14), rgba(0, 255, 65, 0.07));
+      color: #00FF41;
+      border: 1px solid rgba(0, 255, 65, 0.25);
+      box-shadow: 0 0 12px rgba(0, 255, 65, 0.16);
+    }
+
+    .btn-copy-url:hover {
+      background: linear-gradient(135deg, rgba(0, 255, 65, 0.24), rgba(0, 255, 65, 0.12));
+      border-color: rgba(0, 255, 65, 0.45);
+      box-shadow: 0 0 18px rgba(0, 255, 65, 0.28);
+      color: #d5ffe2;
+    }
+
     .btn-quit {
       background: rgba(255, 0, 64, 0.06);
       color: #8b8b8b;
@@ -324,6 +338,14 @@
       line-height: 1.45;
       text-shadow: 0 0 8px rgba(0, 128, 255, 0.16);
       margin-top: 2px;
+    }
+
+    .install-copy-note {
+      text-align: center;
+      font-size: 9px;
+      min-height: 14px;
+      color: #6f6f6f;
+      letter-spacing: 0.5px;
     }
 
     .credit .brand {
@@ -467,9 +489,11 @@
         </div>
 
         <div class="actions">
+          <button class="btn btn-copy-url" id="btnCopyInstall" onclick="copyLocalInstallUrl()">Copy Addon URL</button>
           <button class="btn btn-configure" id="btnConfigure" onclick="openConfigure()">Open Configure</button>
           <button class="btn btn-quit" id="btnQuit" onclick="quitApp()">Quit</button>
         </div>
+        <div class="install-copy-note" id="installCopyNote"></div>
 
         <div class="credit">
           <span class="brand">PVTKRRX</span>
@@ -550,6 +574,25 @@
       const el = document.getElementById('pathNote');
       el.textContent = text || '';
       el.style.color = isError ? '#FF6A8A' : '#6f6f6f';
+    }
+
+    function setInstallCopyNote(text, isError = false) {
+      const el = document.getElementById('installCopyNote');
+      if (!el) return;
+      el.textContent = text || '';
+      el.style.color = isError ? '#FF6A8A' : '#6f6f6f';
+    }
+
+    async function copyLocalInstallUrl() {
+      try {
+        if (!window.electronAPI || !window.electronAPI.copyLocalInstallUrl) throw new Error('Desktop bridge not available');
+        const url = await window.electronAPI.copyLocalInstallUrl();
+        setInstallCopyNote('Copied localhost addon URL. Paste in Stremio Addons -> + Add Addon URL');
+        setPathNote('Addon URL copied');
+        if (!url) throw new Error('No URL returned');
+      } catch (err) {
+        setInstallCopyNote(err.message || 'Failed to copy addon URL', true);
+      }
     }
 
     async function refreshDownloadPath() {

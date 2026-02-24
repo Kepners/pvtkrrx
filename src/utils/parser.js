@@ -1,4 +1,5 @@
 // Parse torrent names: quality, codec, audio, source, HDR, REMUX, season/episode
+const PACKED_RELEASE_TITLE_RE = /(?:\.rar\b|\.r\d{2,3}\b|\.zip\b|\.7z\b|\.001\b|\bpart\d{1,3}\.rar\b|\brar\b|\br\d{2,3}\b)/i
 
 function parse(title) {
   const t = title || ''
@@ -8,6 +9,8 @@ function parse(title) {
     audio: extractAudio(t),
     source: extractSource(t),
     hdr: extractHDR(t),
+    bitDepth: extractBitDepth(t),
+    languages: extractLanguages(t),
     remux: /\bremux\b/i.test(t)
   }
 }
@@ -21,8 +24,8 @@ function extractQuality(t) {
 }
 
 function extractCodec(t) {
-  if (/\bx265\b|\bHEVC\b/i.test(t)) return 'x265'
-  if (/\bx264\b|\bAVC\b/i.test(t)) return 'x264'
+  if (/\bx265\b|\bh[\s.\-_]?265\b|\bHEVC\b/i.test(t)) return 'x265'
+  if (/\bx264\b|\bh[\s.\-_]?264\b|\bAVC\b/i.test(t)) return 'x264'
   if (/\bAV1\b/i.test(t)) return 'AV1'
   return ''
 }
@@ -44,6 +47,7 @@ function extractSource(t) {
   if (/\bBlu[\.\-\s]?Ray\b|\bBDRip\b/i.test(t)) return 'BluRay'
   if (/\bWEB[\.\-\s]?DL\b/i.test(t)) return 'WEB-DL'
   if (/\bWEBRip\b/i.test(t)) return 'WEBRip'
+  if (/\bWEB\b/i.test(t)) return 'WEB'
   if (/\bHDTV\b/i.test(t)) return 'HDTV'
   if (/\bHDRip\b/i.test(t)) return 'HDRip'
   if (/\bDVDRip\b/i.test(t)) return 'DVDRip'
@@ -56,6 +60,34 @@ function extractHDR(t) {
   if (/\bHDR10\b/i.test(t)) return 'HDR10'
   if (/\bHDR\b/i.test(t)) return 'HDR'
   return ''
+}
+
+function extractBitDepth(t) {
+  if (/\b12[\s.\-_]?bit\b/i.test(t)) return '12bit'
+  if (/\b10[\s.\-_]?bit\b/i.test(t)) return '10bit'
+  if (/\b8[\s.\-_]?bit\b/i.test(t)) return '8bit'
+  return ''
+}
+
+function extractLanguages(t) {
+  const patterns = [
+    { code: 'MULTI', re: /\bmulti\b/i },
+    { code: 'EN', re: /\b(en|eng|english)\b/i },
+    { code: 'FR', re: /\b(fr|fre|french|vostfr)\b/i },
+    { code: 'ES', re: /\b(es|spa|spanish)\b/i },
+    { code: 'IT', re: /\b(it|ita|italian)\b/i },
+    { code: 'DE', re: /\b(de|ger|german)\b/i },
+    { code: 'PT', re: /\b(pt|por|portuguese)\b/i },
+    { code: 'NL', re: /\b(nl|dut|dutch)\b/i },
+    { code: 'RU', re: /\b(ru|rus|russian)\b/i },
+    { code: 'PL', re: /\b(pl|pol|polish)\b/i },
+    { code: 'JP', re: /\b(jp|jpn|japanese)\b/i }
+  ]
+  const found = []
+  for (const p of patterns) {
+    if (p.re.test(t)) found.push(p.code)
+  }
+  return [...new Set(found)].join('/')
 }
 
 // Match torrent title against specific season/episode
@@ -83,4 +115,8 @@ function cleanTitle(name) {
     .trim()
 }
 
-module.exports = { parse, matchesEpisode, cleanTitle }
+function isLikelyPackedReleaseTitle(title) {
+  return PACKED_RELEASE_TITLE_RE.test(String(title || ''))
+}
+
+module.exports = { parse, matchesEpisode, cleanTitle, isLikelyPackedReleaseTitle }

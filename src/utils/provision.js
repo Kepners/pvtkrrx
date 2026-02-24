@@ -1,6 +1,7 @@
 const fs = require('fs')
 const path = require('path')
 const { spawn } = require('child_process')
+const { deriveDefaultLocalHostname, normalizeLocalHostname } = require('./lanAlias')
 
 const PROWLARR_CONFIG_PATHS = [
   path.join(process.env.ProgramData || 'C:\\ProgramData', 'Prowlarr', 'config.xml'),
@@ -194,23 +195,74 @@ async function tryInstallWinget(id, notes) {
 
 async function ensureFirewallRules(notes) {
   const script = `
-    $ports = @(7000, 7001)
-    foreach ($p in $ports) {
-      $name = "PVTKRRX TCP $p"
+    $rules = @(
+      @{ Name = "PVTKRRX TCP 7000"; Protocol = "TCP"; Port = 7000 },
+      @{ Name = "PVTKRRX TCP 7001"; Protocol = "TCP"; Port = 7001 },
+      @{ Name = "PVTKRRX UDP 5353"; Protocol = "UDP"; Port = 5353 },
+      @{ Name = "Stremio TCP 11470"; Protocol = "TCP"; Port = 11470 },
+      @{ Name = "Stremio TCP 12470"; Protocol = "TCP"; Port = 12470 }
+    )
+
+    foreach ($r in $rules) {
+      $name = [string]$r.Name
       $rule = Get-NetFirewallRule -DisplayName $name -ErrorAction SilentlyContinue
       if (-not $rule) {
-        New-NetFirewallRule -DisplayName $name -Direction Inbound -Action Allow -Protocol TCP -LocalPort $p | Out-Null
+        New-NetFirewallRule -DisplayName $name -Direction Inbound -Action Allow -Protocol $r.Protocol -LocalPort $r.Port -Profile Private | Out-Null
       }
     }
     Write-Output 'ok'
   `
   const r = await runPowerShell(script, 120000)
   if (r.code === 0) {
-    notes.push('Windows Firewall inbound rules ensured for ports 7000/7001')
+    notes.push('Windows Firewall rules ensured for LAN ports 7000/7001, mDNS 5353, and Stremio 11470/12470')
     return true
   }
   notes.push('Firewall rule update failed (run installer/app as Administrator for LAN access)')
   return false
+}
+
+async function ensureBonjourMdns(installIfMissing, startIfStopped, notes) {
+  async function readBonjourState() {
+    const script = `
+      $svc = Get-Service -ErrorAction SilentlyContinue | Where-Object { $_.Name -like 'Bonjour*' -or $_.DisplayName -like 'Bonjour*' } | Select-Object -First 1
+      if ($svc) {
+        @{
+          installed = $true
+          running = ($svc.Status -eq 'Running')
+          name = [string]$svc.Name
+          displayName = [string]$svc.DisplayName
+        } | ConvertTo-Json -Compress
+      } else {
+        @{ installed = $false; running = $false; name = ''; displayName = '' } | ConvertTo-Json -Compress
+      }
+    `
+    const result = await runPowerShell(script, 120000)
+    if (result.code !== 0) return { installed: false, running: false, name: '', displayName: '' }
+    try { return JSON.parse(String(result.stdout || '{}')) } catch (_) { return { installed: false, running: false, name: '', displayName: '' } }
+  }
+
+  let state = await readBonjourState()
+  if (!state.installed && installIfMissing) {
+    const installed =
+      await tryInstallWinget('Apple.BonjourPrintServices', notes) ||
+      await tryInstallWinget('Apple.Bonjour', notes)
+    if (installed) state = await readBonjourState()
+  }
+
+  if (state.installed && startIfStopped && !state.running && state.name) {
+    const startResult = await runPowerShell(`Start-Service -Name '${String(state.name).replace(/'/g, "''")}' -ErrorAction SilentlyContinue`, 120000)
+    if (startResult.code === 0) state = await readBonjourState()
+  }
+
+  if (state.installed && state.running) {
+    notes.push(`mDNS responder ready (${state.displayName || state.name})`)
+  } else if (state.installed) {
+    notes.push('Bonjour service detected but not running')
+  } else {
+    notes.push('Bonjour/mDNS service not detected; .local hostname discovery may fail on some devices')
+  }
+
+  return state
 }
 
 async function ensureProwlarrRunning(installIfMissing, startIfStopped, notes) {
@@ -442,6 +494,7 @@ async function autoProvisionWindows(options = {}) {
   const startIfStopped = options.startIfStopped !== false
   const configureQbitLocalNoAuth = options.configureQbitLocalNoAuth !== false
   const openFirewall = options.openFirewall !== false
+  const localHostname = normalizeLocalHostname(options.localHostname || deriveDefaultLocalHostname())
   const notes = []
 
   if (process.platform !== 'win32') {
@@ -454,18 +507,24 @@ async function autoProvisionWindows(options = {}) {
 
   const prowlarr = await ensureProwlarrRunning(installIfMissing, startIfStopped, notes)
   const qbit = await ensureQbitRunning(installIfMissing, startIfStopped, configureQbitLocalNoAuth, notes)
+  const bonjour = await ensureBonjourMdns(installIfMissing, startIfStopped, notes)
   if (openFirewall) await ensureFirewallRules(notes)
 
   const config = {
     jackettUrl: prowlarr.url,
     jackettApiKey: prowlarr.apiKey || '',
+    sportsDbApiKey: '123',
+    sportsDbCacheHours: 24,
     qbitUrl: qbit.url,
     qbitUsername: qbit.username || '',
     qbitPassword: '',
     fileServerUrl: '',
     fileServerAuth: '',
     pathMapping: { from: '', to: '' },
-    maxResults: 50
+    maxResults: 50,
+    autoDeleteWatched: true,
+    watchedDeleteGraceSeconds: 300,
+    localHostname
   }
 
   const ok = Boolean(config.jackettUrl && config.jackettApiKey && config.qbitUrl)
@@ -476,6 +535,7 @@ async function autoProvisionWindows(options = {}) {
       : 'Provisioning completed with gaps. Check notes.',
     prowlarr,
     qbit,
+    bonjour,
     config,
     notes
   }

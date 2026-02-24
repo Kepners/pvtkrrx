@@ -14,11 +14,30 @@ function getLanIpv4Addresses() {
   return [...new Set(addrs)]
 }
 
+function sanitizeDnsLabel(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 63)
+}
+
+function deriveDefaultLocalHostname() {
+  const preferred = sanitizeDnsLabel(process.env.PVTKRRX_LOCAL_HOSTNAME || '')
+  if (preferred) return `${preferred}.local`
+  return 'pvtkrrx.local'
+}
+
 function normalizeLocalHostname(value) {
   let host = String(value || '').trim().toLowerCase()
-  if (!host) host = 'pvtkrrx.local'
-  if (!host.endsWith('.local')) host = `${host}.local`
-  return host
+  if (!host) return deriveDefaultLocalHostname()
+
+  host = host.replace(/\.local$/i, '')
+  host = sanitizeDnsLabel(host)
+  if (!host) return deriveDefaultLocalHostname()
+  return `${host}.local`
 }
 
 function startLanAlias(options = {}) {
@@ -26,7 +45,7 @@ function startLanAlias(options = {}) {
   const hostname = normalizeLocalHostname(options.hostname)
   const port = Number.parseInt(options.port || '7000', 10)
   const serviceType = '_http._tcp.local'
-  const serviceInstance = 'PVTKRRX._http._tcp.local'
+  const serviceInstance = `${hostname.replace(/\.local$/i, '')}._http._tcp.local`
   const hostnameLower = hostname.toLowerCase()
   const serviceTypeLower = serviceType.toLowerCase()
   const serviceInstanceLower = serviceInstance.toLowerCase()
@@ -116,7 +135,7 @@ function startLanAlias(options = {}) {
 
 module.exports = {
   getLanIpv4Addresses,
+  deriveDefaultLocalHostname,
   normalizeLocalHostname,
   startLanAlias
 }
-

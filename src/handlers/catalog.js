@@ -1,8 +1,10 @@
 const { ProwlarrClient } = require('../clients/prowlarr')
 const { QBitClient } = require('../clients/qbittorrent')
 const { CinemetaClient } = require('../clients/cinemeta')
+const { SportsDbClient } = require('../clients/sportsdb')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
-const { cleanTitle } = require('../utils/parser')
+const { cleanTitle, isLikelyPackedReleaseTitle } = require('../utils/parser')
+const { isSportsTitle } = require('../utils/sportClassifier')
 const { formatSize } = require('../utils/streams')
 const { makeSportsThumbUrl } = require('../utils/sportsThumb')
 
@@ -22,8 +24,39 @@ function isSportsOnlyIndexer(indexerName) {
 }
 
 function isLikelySportsTitle(title) {
-  const t = String(title || '').toLowerCase()
-  return /\b(epl|premier league|la liga|serie a|bundesliga|champions league|football|soccer|f1|formula[\s-]?1|grand prix|ufc|mma|boxing|nba|wnba|nfl|mlb|nhl|cricket|ipl|rugby|tennis|wta|atp|olympic|motogp|wwe)\b/.test(t)
+  return isSportsTitle(title)
+}
+
+function isLikelySportsNoiseTitle(title) {
+  const value = String(title || '')
+  return (
+    /\bS\d{1,2}E\d{1,3}\b/i.test(value) ||
+    /\b\d{1,2}x\d{1,3}\b/i.test(value) ||
+    /\bSeason[\s._-]*\d{1,2}\b/i.test(value) ||
+    /\b(?:ebook|e[\s.\-_]*book|audiobook|retail|node|novel)\b/i.test(value) ||
+    /\b(?:update|patch|trainer|unlocker|dlc|mod|manager)\b/i.test(value) ||
+    /\b(?:tutorial|how[\s.\-_]*to|guide)\b/i.test(value)
+  )
+}
+
+function isLikelySportsEventRelease(title) {
+  const value = String(title || '')
+  if (isLikelySportsNoiseTitle(value)) return false
+
+  const hasVersus = /\b(?:vs\.?|v)\b/i.test(value)
+  const hasDate = (
+    /\b(?:19|20)\d{2}[.\-_\s]\d{2}[.\-_\s]\d{2}\b/i.test(value) ||
+    /\b\d{2}[.\-_\s]\d{2}[.\-_\s](?:19|20)\d{2}\b/i.test(value) ||
+    /\b(?:19|20)\d{2}\d{2}\d{2}\b/i.test(value)
+  )
+  const combatEvent = /\b(?:ufc|bellator|pfl|one[\s.\-_]*championship|fight[\s.\-_]*night|main[\s.\-_]*card|prelims?|wwe|aew|smackdown|raw|wrestlemania|royal[\s.\-_]*rumble)\b/i.test(value)
+  const motorsportEvent = /\b(?:f1|formula[\s.\-_]*1|motogp|indycar|nascar|wrc|grand[\s.\-_]*prix|gp)\b/i.test(value)
+  const leagueEvent = /\b(?:nba|nfl|mlb|nhl|epl|premier[\s.\-_]*league|la[\s.\-_]*liga|serie[\s.\-_]*a|bundesliga|uefa|champions[\s.\-_]*league|ncaa)\b/i.test(value)
+  const tournamentEvent = /\b(?:open|masters|cup|championship|playoffs?|qualifier|quarter[\s.\-_]*final|semi[\s.\-_]*final|final|round[\s.\-_]*\d+|\br\d{1,2}\b)\b/i.test(value)
+
+  if (hasVersus || combatEvent) return true
+  if (hasDate && (motorsportEvent || leagueEvent || tournamentEvent)) return true
+  return false
 }
 
 function isLikelySeriesRelease(title) {
@@ -51,6 +84,13 @@ function placeholderPoster() {
 function extractYear(value) {
   const m = String(value || '').match(/\b(19|20)\d{2}\b/)
   return m ? m[0] : ''
+}
+
+function normalizeImdbId(value) {
+  const raw = String(value || '').trim()
+  const m = raw.match(/^tt(\d{5,10})$/i)
+  if (!m) return ''
+  return `tt${m[1].padStart(7, '0')}`
 }
 
 function cacheKey(type, imdbId) {
@@ -142,6 +182,35 @@ function tokenize(value) {
     .filter(w => w.length > 1)
 }
 
+function tokenizeLoose(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2)
+}
+
+function libraryLookupQuery(name) {
+  return cleanTitle(name)
+    .replace(/\bS\d{1,2}E\d{1,3}\b/ig, ' ')
+    .replace(/\b\d{1,2}x\d{1,3}\b/ig, ' ')
+    .replace(/\bSeason[\s._-]*\d{1,2}\b/ig, ' ')
+    .replace(/\b(?:19|20)\d{2}\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function matchScore(name, candidateName) {
+  const a = tokenizeLoose(name)
+  const bText = String(candidateName || '').toLowerCase()
+  if (a.length === 0) return 0
+  let score = 0
+  for (const token of a) {
+    if (bText.includes(token)) score += token.length
+  }
+  return score
+}
+
 function relevanceScore(title, query) {
   const q = String(query || '').trim().toLowerCase()
   if (!q) return 0
@@ -190,6 +259,54 @@ function dedupeByImdbBest(items, query = '') {
   return [...bestById.values()].sort((a, b) => compareItems(a, b, query))
 }
 
+function normalizeSportsEventTitle(title) {
+  return cleanTitle(title)
+    .replace(/\butd\b/gi, 'united')
+    .replace(/\b\d{3,4}p\d*\b/gi, ' ')
+    .replace(/\b(?:mini|full|extended|highlights?|replay|pre[\s.\-_]*match|post[\s.\-_]*match|match)\b/gi, ' ')
+    .replace(/\b(?:web[\s.\-_]*dl|webrip|hdtv|h264|h265|x264|x265|hevc|aac|ac3|ddp|multi|english|en|skynz|fubo)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function sportsEventKey(title) {
+  const stop = new Set(['vs', 'v', 'at', 'fps', 'hotspur', 'super', 'sunday'])
+  const tokens = normalizeSportsEventTitle(title)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(/\s+/)
+    .map(w => w.replace(/\d+/g, ''))
+    .filter(w => w.length > 1 && !stop.has(w) && !w.endsWith('fps'))
+  const unique = [...new Set(tokens)].sort()
+  return unique.join(' ')
+}
+
+function getSportsVariantTag(title) {
+  const t = String(title || '').toLowerCase()
+  if (/\bearly[\s.\-_]*prelims?\b/.test(t)) return 'early-prelims'
+  if (/\bprelims?\b/.test(t)) return 'prelims'
+  if (/\bmain[\s.\-_]*card\b/.test(t)) return 'main-card'
+  return 'main'
+}
+
+function groupSportsItems(items, query = '') {
+  const groups = new Map()
+  for (const item of items || []) {
+    const display = normalizeSportsEventTitle(item.title) || cleanTitle(item.title) || String(item.title || '').trim()
+    if (!display) continue
+    const baseKey = sportsEventKey(item.title)
+    const key = `${baseKey}|${getSportsVariantTag(item.title)}`
+    const current = groups.get(key)
+    if (!current) {
+      groups.set(key, { display, baseKey, best: item, count: 1 })
+      continue
+    }
+    current.count += 1
+    if (compareItems(item, current.best, query) < 0) current.best = item
+  }
+  return [...groups.values()].sort((a, b) => compareItems(a.best, b.best, query))
+}
+
 function getCatalogLimit(config) {
   const raw = Number.parseInt(String(config?.maxResults || '50'), 10)
   if (!Number.isFinite(raw)) return 50
@@ -221,7 +338,7 @@ async function handleCatalog(config, type, id, extraStr, context = {}) {
 
     switch (id) {
       case 'pvtkrrx-sports':
-        return await sportsCatalog(config, extra, opts)
+        return await sportsCatalog(config, extra, opts, type)
       case 'pvtkrrx-movies':
         return await moviesCatalog(config, extra, opts)
       case 'pvtkrrx-tv':
@@ -236,36 +353,114 @@ async function handleCatalog(config, type, id, extraStr, context = {}) {
   }
 }
 
-async function sportsCatalog(config, extra, options = {}) {
+async function sportsCatalog(config, extra, options = {}, catalogType = 'movie') {
   const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
+  const sportsDb = new SportsDbClient(config.sportsDbApiKey, {
+    cacheHours: config.sportsDbCacheHours
+  })
+  const mediaType = String(catalogType || 'movie').trim().toLowerCase() || 'movie'
   const query = extra.genre || extra.search || ''
   const limit = getCatalogLimit(config)
-  const items = query
-    ? await torznab.search(query, SPORT_CATS)
-    : await torznab.search('', SPORT_CATS)
-  const filtered = items.filter(item => isSportsOnlyIndexer(item.indexer) || isLikelySportsTitle(item.title))
-  const sorted = filtered.sort((a, b) => compareItems(a, b, query))
+  const strictItems = query
+    ? await torznab.search(query, SPORT_CATS, 'search', { useCategories: true })
+    : await torznab.search('', SPORT_CATS, 'search', { useCategories: true })
+  let items = strictItems
+  if (items.length < Math.min(80, limit * 2)) {
+    const broadItems = query
+      ? await torznab.search(query, SPORT_CATS)
+      : await torznab.search('', SPORT_CATS)
+    const byKey = new Map()
+    for (const item of [...strictItems, ...broadItems]) {
+      const key = `${String(item?.indexer || '').trim().toLowerCase()}|${String(item?.title || '').trim().toLowerCase()}`
+      if (!key || byKey.has(key)) continue
+      byKey.set(key, item)
+    }
+    items = [...byKey.values()]
+  }
+  const strictFiltered = items.filter(item =>
+    (isSportsOnlyIndexer(item.indexer) || isLikelySportsTitle(item.title)) &&
+    isLikelySportsEventRelease(item.title) &&
+    !isLikelyPackedReleaseTitle(item.title)
+  )
+  let filtered = strictFiltered
+  if (filtered.length < Math.min(12, limit) && String(extra.search || '').trim()) {
+    filtered = items.filter(item =>
+      (isSportsOnlyIndexer(item.indexer) || isLikelySportsTitle(item.title)) &&
+      !isLikelySportsNoiseTitle(item.title) &&
+      !isLikelyPackedReleaseTitle(item.title)
+    )
+  }
+  const grouped = groupSportsItems(filtered.sort((a, b) => compareItems(a, b, query)), query)
 
   const skip = parseInt(extra.skip || '0', 10)
-  const metas = sorted.slice(skip, skip + limit).map(item => ({
+  const pageGroups = grouped.slice(skip, skip + limit)
+  const sportsDbLookupLimit = Math.min(pageGroups.length, 10)
+  const artworkByBaseKey = new Map()
+  const metas = await mapLimit(pageGroups, 6, async (group, index) => {
+    const item = group.best
+    const displayTitle = group.display || cleanTitle(item.title) || item.title
+    let sportsArtwork = artworkByBaseKey.get(group.baseKey) || null
+    if (index < sportsDbLookupLimit) {
+      try {
+        if (!sportsArtwork) {
+          sportsArtwork = await sportsDb.getEventArtwork({
+            title: displayTitle,
+            publishDate: item.pubDate
+          })
+        }
+        if (!sportsArtwork) {
+          sportsArtwork = await sportsDb.getEventArtwork(item)
+        }
+      } catch (_) {
+        // keep fallback flow below
+      }
+      if (sportsArtwork && group.baseKey) {
+        artworkByBaseKey.set(group.baseKey, sportsArtwork)
+      }
+    }
+
+    const eventDate = String(sportsArtwork?.eventDate || '').trim()
+    const league = String(sportsArtwork?.league || '').trim()
+    const descriptionParts = [
+      `${item.seeders} seeders`,
+      formatSize(item.size),
+      `${group.count} source${group.count === 1 ? '' : 's'}`
+    ]
+    if (eventDate) descriptionParts.push(eventDate)
+    if (league) descriptionParts.push(league)
+
+    const posterUrl = sportsArtwork?.poster || sportsArtwork?.image ||
+      (item.imdbId
+        ? (imdbPoster(item.imdbId) || placeholderPoster())
+        : makeSportsThumbUrl(options.baseUrl, { ...item, publishDate: item.pubDate || item.publishDate || '' }))
+    const backgroundUrl = sportsArtwork?.backgroundImage || posterUrl
+
+    return {
     id: 'pvtkrrx:' + Buffer.from(JSON.stringify({
-      y: 'tv',
-      t: item.title,
-      h: item.infohash,
-      l: item.link,
+      y: mediaType,
+      k: 'sports',
+      n: displayTitle,
+      t: displayTitle,
+      h: '',
+      l: '',
       i: item.indexer,
       s: item.size,
       d: item.seeders,
-      p: item.publishDate || ''
+      p: item.pubDate || '',
+      c: group.count,
+      e: eventDate,
+      g: league,
+      a: sportsArtwork?.poster || sportsArtwork?.image || posterUrl || '',
+      b: backgroundUrl
     })).toString('base64url'),
-    type: 'tv',
-    name: item.title,
-    description: `${item.seeders} seeders | ${formatSize(item.size)}`,
-    poster: item.imdbId
-      ? (imdbPoster(item.imdbId) || placeholderPoster())
-      : makeSportsThumbUrl(options.baseUrl, item),
+    type: mediaType,
+    name: displayTitle,
+    description: descriptionParts.join(' | '),
+    poster: posterUrl,
+    background: backgroundUrl,
+    releaseInfo: eventDate || undefined,
     posterShape: 'landscape'
-  }))
+  }})
 
   return { metas, cacheMaxAge: 120 }
 }
@@ -280,7 +475,8 @@ async function moviesCatalog(config, extra) {
   const filtered = items.filter(item =>
     item.imdbId &&
     !isSportsOnlyIndexer(item.indexer) &&
-    !isLikelySeriesRelease(item.title)
+    !isLikelySeriesRelease(item.title) &&
+    !isLikelyPackedReleaseTitle(item.title)
   )
   const best = dedupeByImdbBest(filtered, query)
   const inspectCount = Math.min(best.length, Math.max(80, (parseInt(extra.skip || '0', 10) + limit) * 3))
@@ -315,11 +511,50 @@ async function tvCatalog(config, extra) {
     ? await torznab.search(extra.search, TV_CATS)
     : await torznab.search('', TV_CATS)
   const filtered = items.filter(item =>
-    item.imdbId &&
     !isSportsOnlyIndexer(item.indexer) &&
-    (isLikelySeriesRelease(item.title) || Boolean(extra.search))
+    (isLikelySeriesRelease(item.title) || Boolean(extra.search)) &&
+    !isLikelyPackedReleaseTitle(item.title)
   )
-  const best = dedupeByImdbBest(filtered, query)
+
+  const withImdb = []
+  const missingImdb = []
+  for (const item of filtered) {
+    const imdbId = normalizeImdbId(item.imdbId)
+    if (imdbId) {
+      withImdb.push({ ...item, imdbId })
+    } else {
+      missingImdb.push(item)
+    }
+  }
+
+  const titleResolveLimit = Math.min(missingImdb.length, Math.max(120, limit * 4))
+  const resolvedFromTitle = await mapLimit(missingImdb.slice(0, titleResolveLimit), 6, async (item) => {
+    try {
+      const lookup = libraryLookupQuery(item.title) || cleanTitle(item.title)
+      if (!lookup) return null
+      const candidates = await cinemeta.searchSeries(lookup)
+      if (!Array.isArray(candidates) || candidates.length === 0) return null
+
+      let best = candidates[0]
+      let bestScore = matchScore(lookup, best?.name)
+      for (const candidate of candidates.slice(1, 8)) {
+        const score = matchScore(lookup, candidate?.name)
+        if (score > bestScore) {
+          best = candidate
+          bestScore = score
+        }
+      }
+
+      const imdbId = normalizeImdbId(best?.imdb_id || best?.id || '')
+      if (!imdbId) return null
+      return { ...item, imdbId }
+    } catch (_) {
+      return null
+    }
+  })
+
+  const merged = [...withImdb, ...resolvedFromTitle.filter(Boolean)]
+  const best = dedupeByImdbBest(merged, query)
   const inspectCount = Math.min(best.length, Math.max(80, (parseInt(extra.skip || '0', 10) + limit) * 3))
   const enriched = await enrichImdbEntries('series', best, {
     inspectCount,
@@ -363,19 +598,62 @@ async function libraryCatalog(config, extra) {
     filtered = torrents.filter(t => t.name.toLowerCase().includes(q))
   }
 
-  const metas = filtered.slice(skip, skip + limit).map(t => ({
-    id: 'pvtkrrx:' + Buffer.from(JSON.stringify({
-      y: 'movie',
-      t: t.name,
-      h: t.hash,
-      s: t.size,
-      d: 0
-    })).toString('base64url'),
-    type: 'movie',
-    name: cleanTitle(t.name),
-    description: formatSize(t.size),
-    poster: placeholderPoster()
-  }))
+  const page = filtered.slice(skip, skip + limit)
+  const metas = await mapLimit(page, 6, async (t) => {
+    const seriesLike = isLikelySeriesRelease(t.name)
+    const type = seriesLike ? 'series' : 'movie'
+    const fallbackName = cleanTitle(t.name)
+    const query = libraryLookupQuery(t.name) || fallbackName
+
+    let poster = placeholderPoster()
+    let displayName = fallbackName
+    let background = ''
+    let imdbId = ''
+    let resolvedType = type
+
+    try {
+      const candidates = seriesLike
+        ? await cinemeta.searchSeries(query)
+        : await cinemeta.searchMovies(query)
+      if (Array.isArray(candidates) && candidates.length > 0) {
+        let best = candidates[0]
+        let bestScore = matchScore(fallbackName, best?.name)
+        for (const c of candidates.slice(1, 8)) {
+          const score = matchScore(fallbackName, c?.name)
+          if (score > bestScore) {
+            best = c
+            bestScore = score
+          }
+        }
+        const candidateImdb = String(best?.imdb_id || best?.id || '').trim()
+        if (/^tt\d{5,10}$/i.test(candidateImdb)) imdbId = candidateImdb
+        if (best?.type === 'movie' || best?.type === 'series') resolvedType = best.type
+        if (best?.poster) poster = String(best.poster)
+        if (best?.background) background = String(best.background)
+        if (best?.name) displayName = String(best.name)
+      }
+    } catch (_) {
+      // keep fallback title/poster
+    }
+
+    return {
+      id: 'pvtkrrx:' + Buffer.from(JSON.stringify({
+        y: resolvedType,
+        t: t.name,
+        n: displayName,
+        h: t.hash,
+        s: t.size,
+        d: 0,
+        m: imdbId,
+        a: poster,
+        b: background
+      })).toString('base64url'),
+      type: resolvedType,
+      name: displayName,
+      description: formatSize(t.size),
+      poster
+    }
+  })
 
   return { metas, cacheMaxAge: 300 }
 }

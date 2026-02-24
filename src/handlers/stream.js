@@ -4,7 +4,7 @@ const { ProwlarrClient } = require('../clients/prowlarr')
 const { QBitClient } = require('../clients/qbittorrent')
 const { CinemetaClient } = require('../clients/cinemeta')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
-const { parse, matchesEpisode } = require('../utils/parser')
+const { parse, matchesEpisode, isLikelyPackedReleaseTitle } = require('../utils/parser')
 const { mapPath } = require('../utils/pathMapper')
 const { buildOnSeedboxStream, buildOnBufferingStream, buildOnTrackerStream, findVideoFile, findEpisodeFile, sortStreams } = require('../utils/streams')
 
@@ -59,6 +59,58 @@ function isSportsOnlyIndexer(indexerName) {
 
 function normalizeForMatch(value) {
   return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+function scoreCandidate(item) {
+  const title = String(item?.title || '')
+  let quality = 0
+  if (/2160p/i.test(title)) quality = 3
+  else if (/1080p/i.test(title)) quality = 2
+  else if (/720p/i.test(title)) quality = 1
+  const seeders = Math.max(0, Number(item?.seeders || 0))
+  const sizeGb = Math.max(0, Number(item?.size || 0)) / 1e9
+  return (
+    (seeders * 1000000) +
+    (quality * 10000) +
+    Math.min(sizeGb, 500)
+  )
+}
+
+function hasActiveSeeders(item) {
+  return Number(item?.seeders || 0) > 0
+}
+
+function preferSeededResults(items, contextLabel, keepZeroSeederPredicate = null) {
+  const list = Array.isArray(items) ? items : []
+  if (list.length === 0) return list
+
+  const preferred = []
+  const delayed = []
+  for (const item of list) {
+    const keepNearTop = hasActiveSeeders(item) || (
+      typeof keepZeroSeederPredicate === 'function' && keepZeroSeederPredicate(item)
+    )
+    if (keepNearTop) preferred.push(item)
+    else delayed.push(item)
+  }
+
+  if (preferred.length === 0 || delayed.length === 0) return list
+  if (delayed.length > 0) {
+    console.log(`[stream] ${contextLabel}: moved ${delayed.length} zero-seeder source(s) to the end`)
+  }
+  return [...preferred, ...delayed]
+}
+
+function similarTitle(candidateTitle, targetTitle) {
+  const candidate = normalizeForMatch(candidateTitle)
+  const target = normalizeForMatch(targetTitle)
+  if (!candidate || !target) return false
+  if (candidate === target || candidate.includes(target) || target.includes(candidate)) return true
+
+  const words = target.split(/\s+/).filter(w => w.length > 2)
+  if (words.length === 0) return false
+  const hits = words.reduce((acc, word) => acc + (candidate.includes(word) ? 1 : 0), 0)
+  return hits >= Math.max(2, Math.ceil(words.length * 0.6))
 }
 
 function findTorrentByTitle(torrents, targetTitle) {
@@ -148,6 +200,11 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
   // deciding whether to fall back to a title search.
   function applyFilters(items) {
     items = items.filter(item => !isSportsOnlyIndexer(item.indexer))
+    const beforePacked = items.length
+    items = items.filter(item => !isLikelyPackedReleaseTitle(item.title))
+    if (items.length < beforePacked) {
+      console.log(`[stream] Packed-release filter removed ${beforePacked - items.length} source(s)`)
+    }
     if (contentTitle) {
       const before = items.length
       items = items.filter(item => titleRelevant(item.title, contentTitle))
@@ -174,7 +231,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
   }
 
   // Filter by episode if series
-  const filtered = (season && episode)
+  let filtered = (season && episode)
     ? jackettItems.filter(item => matchesEpisode(item.title, season, episode))
     : jackettItems
 
@@ -183,6 +240,12 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
   for (const t of qbitTorrents) {
     qbitMap.set(t.hash.toLowerCase(), t)
   }
+
+  filtered = preferSeededResults(filtered, 'imdb candidates', (item) => {
+    const hash = String(item?.infohash || '').toLowerCase()
+    if (!hash) return false
+    return qbitMap.has(hash)
+  })
 
   const streams = []
   for (const item of filtered) {
@@ -198,6 +261,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
         const videoFile = (season && episode)
           ? findEpisodeFile(files, season, episode)
           : findVideoFile(files)
+        if (!videoFile?.name) continue
         const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched.save_path, videoFile.name)
         const videoProgress = Number(videoFile?.progress || 0)
         if (isCompletedTorrent(matched, videoProgress)) {
@@ -239,10 +303,11 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
   console.log(`[stream] custom title="${info.t}" hash=${infoHash || 'none'} matched=${matched ? matched.hash : 'none'}`)
 
   if (matched) {
-    // Already in qBit (complete or in-progress)
     try {
       const files = await qbit.files(matched.hash)
       const videoFile = findVideoFile(files)
+      if (!videoFile?.name) throw new Error('No playable video in matched torrent')
+
       const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched.save_path, videoFile.name)
       const item = { title: info.t, size: info.s, seeders: info.d }
       const videoProgress = Number(videoFile?.progress || 0)
@@ -255,38 +320,51 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
     } catch (e) {
       console.error('[stream] custom file listing failed:', e.message)
     }
-  } else {
-    // Not on seedbox — use embedded link from catalog if available.
-    if (directLink) {
-      const playbackInfo = Buffer.from(JSON.stringify({
-        h: infoHash,
-        l: directLink
-      })).toString('base64url')
-      streams.push(buildOnTrackerStream(
-        { title: info.t, size: info.s, seeders: info.d, indexer: info.i || '' },
-        `${addonUrl}/${configToken}/playback/${playbackInfo}`,
-        parsed
-      ))
-      return { streams: sortStreams(streams), cacheMaxAge: 0 }
-    }
+  }
 
-    // No embedded link — re-search Prowlarr as fallback.
+  if (streams.length === 0 && directLink) {
+    const playbackInfo = Buffer.from(JSON.stringify({
+      h: infoHash,
+      l: directLink
+    })).toString('base64url')
+    streams.push(buildOnTrackerStream(
+      { title: info.t, size: info.s, seeders: info.d, indexer: info.i || '' },
+      `${addonUrl}/${configToken}/playback/${playbackInfo}`,
+      parsed
+    ))
+  }
+
+  if (streams.length === 0) {
     try {
       const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
       const results = await torznab.search(info.t, SPORT_CATS)
-      let match = null
-      if (infoHash) match = results.find(r => r.infohash === infoHash)
-      if (!match) {
-        const normalizedTitle = normalizeForMatch(info.t)
-        match = results.find(r => normalizeForMatch(r.title) === normalizedTitle)
+      let filtered = results.filter(r => {
+        if (!r?.link) return false
+        if (infoHash && String(r.infohash || '').toLowerCase() === infoHash) return true
+        if (isLikelyPackedReleaseTitle(r.title)) return false
+        return similarTitle(r.title, info.t)
+      })
+
+      const seen = new Set()
+      const deduped = []
+      for (const item of filtered.sort((a, b) => scoreCandidate(b) - scoreCandidate(a))) {
+        const key = String(item.infohash || item.link || '').toLowerCase()
+        if (!key || seen.has(key)) continue
+        seen.add(key)
+        deduped.push(item)
+        if (deduped.length >= 20) break
       }
-      if (match) {
+      const ordered = preferSeededResults(deduped, 'custom re-search')
+
+      for (const item of ordered) {
         const playbackInfo = Buffer.from(JSON.stringify({
-          h: match.infohash || infoHash,
-          l: match.link
+          h: item.infohash || '',
+          l: item.link
         })).toString('base64url')
         streams.push(buildOnTrackerStream(
-          match, `${addonUrl}/${configToken}/playback/${playbackInfo}`, parsed
+          item,
+          `${addonUrl}/${configToken}/playback/${playbackInfo}`,
+          parse(item.title || info.t)
         ))
       }
     } catch (e) {

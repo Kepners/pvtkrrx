@@ -22,14 +22,15 @@ function normalizeImdbId(value) {
   const raw = String(value ?? '').trim()
   if (!raw || raw === '0') return ''
 
-  if (/^tt\d{5,10}$/i.test(raw)) return `tt${raw.replace(/^tt/i, '')}`
-  if (/^\d{5,10}$/.test(raw)) return `tt${raw}`
+  const canonical = (digits) => `tt${String(digits).padStart(7, '0')}`
+  if (/^tt\d{5,10}$/i.test(raw)) return canonical(raw.replace(/^tt/i, ''))
+  if (/^\d{5,10}$/.test(raw)) return canonical(raw)
   return ''
 }
 
 class ProwlarrClient {
   constructor(baseUrl, apiKey) {
-    // Accept either base URL (http://host:port) or legacy torznab URL - normalise to base
+    // Accept either base URL (http://host:port) or legacy torznab URL; normalize to base.
     this.baseUrl = normalizeProwlarrBaseUrl(baseUrl)
     this.apiKey = apiKey
   }
@@ -63,10 +64,11 @@ class ProwlarrClient {
     return (Array.isArray(data) ? data : []).map(r => this._mapResult(r))
   }
 
-  async search(query, _cats, type = 'search') {
-    // Note: categories intentionally omitted — private trackers don't tag with standard Torznab
-    // categories in Prowlarr, so filtering by category returns 0 results. indexerIds=-2 = all.
+  async search(query, cats, type = 'search', options = {}) {
     const params = new URLSearchParams({ query, type, indexerIds: -2, apikey: this.apiKey })
+    if (options.useCategories && String(cats || '').trim()) {
+      params.set('categories', String(cats).trim())
+    }
     return this._search(params)
   }
 

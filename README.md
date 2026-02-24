@@ -14,6 +14,7 @@ The addon handles: search → download → stream. PVTKRRX has a **built-in file
 ## Key Features
 
 - **Sports** — Browse and search private tracker sports content (EPL, F1, UFC) directly in Stremio
+- **Sports artwork enrichment** — Optional TheSportsDB posters/thumbs with cache-aware lookups
 - **Movies & TV** — IMDb-matched content from your private trackers
 - **Seedbox Library** — Browse everything already downloaded on your seedbox
 - **Smart filtering** — Sports indexers never contaminate movie/TV searches
@@ -74,6 +75,8 @@ That's it. PVTKRRX has a **built-in file server** and will stream files directly
 |-------|----------|-------------|
 | Prowlarr URL | Yes | e.g. `http://seedbox.example.com:9696` |
 | Prowlarr API Key | Yes | Found in Prowlarr → Settings → General |
+| TheSportsDB API Key | No | Defaults to free key `123`; add your own key for higher limits |
+| TheSportsDB Cache (hours) | No | How long sports artwork lookups are reused before refresh |
 | qBittorrent URL | Yes | e.g. `http://seedbox.example.com:8080` |
 | qBittorrent Username | Yes | qBit WebUI credentials |
 | qBittorrent Password | Yes | qBit WebUI credentials |
@@ -149,6 +152,18 @@ ENCRYPTION_SECRET=your-secret-here npm start
 1. Use the **Method 2 - TV / Phone on same LAN** URL from configure page
 2. Ensure TV/phone and PC are on the same network
 3. Allow inbound TCP `7000` in Windows Firewall on the PC
+
+### Install URL protocol rules (important)
+
+Stremio addon install URLs are HTTPS-first, with only one HTTP exception:
+- `http://127.0.0.1/...` (same machine loopback)
+
+Practical result:
+- `http://127.0.0.1:7000/local/manifest.json?mode=local` works on the same PC.
+- `http://192.168.x.x:7000/...` may open in browser but still fail in Stremio install flow.
+
+Track current verified behavior in:
+- `docs/STREMIO_INSTALL_TRACKER.md`
 
 ### PVTKRRX not appearing in stream dropdown
 

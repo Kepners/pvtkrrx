@@ -57,6 +57,7 @@
     },
     "win": {
       "icon": "electron/assets/logo.ico",
+      "requestedExecutionLevel": "highestAvailable",
       "target": [
         "nsis",
         "portable"
@@ -65,6 +66,8 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
+      "allowElevation": true,
+      "runAfterFinish": true,
       "installerIcon": "electron/assets/logo.ico",
       "uninstallerIcon": "electron/assets/logo.ico",
       "installerHeaderIcon": "electron/assets/logo.ico"

@@ -526,6 +526,11 @@
       <p class="hint">Paste the base URL only. Legacy Torznab/API URLs are auto-normalized.</p>
       <label for="jackettApiKey">API Key</label>
       <input type="text" id="jackettApiKey" placeholder="Your Prowlarr API key">
+      <label for="sportsDbApiKey">TheSportsDB API Key (optional)</label>
+      <input type="text" id="sportsDbApiKey" value="123" placeholder="123">
+      <label for="sportsDbCacheHours">TheSportsDB Cache (hours)</label>
+      <input type="number" id="sportsDbCacheHours" value="24" min="1" max="168">
+      <p class="hint">Used for sports posters only. Cached to avoid repeated API calls on each catalog request.</p>
     </div>
 
     <div class="card">
@@ -576,6 +581,16 @@
       <h2>Options</h2>
       <label for="maxResults">Max Results Per Search</label>
       <input type="number" id="maxResults" value="50" min="10" max="200">
+      <label for="localHostname">Local Hostname (.local alias)</label>
+      <input type="text" id="localHostname" value="pvtkrrx.local" placeholder="pvtkrrx.local">
+      <p class="hint">Used by TV/phone on LAN. Keep this stable so clients do not need reinstall.</p>
+      <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.9rem;">
+        <input type="checkbox" id="autoDeleteWatched" checked style="width:auto;transform:scale(1.15);">
+        Auto-delete torrent + files after watched threshold
+      </label>
+      <label for="watchedDeleteGraceSeconds">Delete Grace Period (seconds)</label>
+      <input type="number" id="watchedDeleteGraceSeconds" value="300" min="0" max="86400">
+      <p class="hint">Uses near-end playback detection because Stremio does not emit direct watched callbacks to addons.</p>
     </div>
 
     <div id="testStatus" class="status"></div>
@@ -594,23 +609,23 @@
         </div>
         <p class="install-note">Use when Stremio runs on the same machine as PVTKRRX.</p>
 
-        <p class="install-section-title" style="margin-top:1rem">Method 2 - TV / Phone using hostname (recommended)</p>
+        <p class="install-section-title" style="margin-top:1rem">Method 2 - LAN hostname (reachability check)</p>
         <div class="url-row">
           <input type="text" id="lanUrlInput" readonly>
           <button class="btn-copy" onclick="copyUrl('lanUrlInput', this)">Copy</button>
         </div>
-        <p class="install-note" id="lanInstallNote">Uses <code>pvtkrrx.local</code> (auto-discovered on most home networks).</p>
+        <p class="install-note" id="lanInstallNote">Uses <code id="lanHostCode">pvtkrrx.local</code> for LAN reachability checks. Stremio install on non-loopback hosts may require hosted HTTPS mode.</p>
 
-        <p class="install-section-title" style="margin-top:1rem">Method 3 - TV / Phone fallback by LAN IP</p>
+        <p class="install-section-title" style="margin-top:1rem">Method 3 - LAN IP fallback (reachability check)</p>
         <div class="url-row">
           <input type="text" id="httpsUrlInput" readonly>
           <button class="btn-copy" onclick="copyUrl('httpsUrlInput', this)">Copy</button>
         </div>
-        <p class="install-note" id="lanFallbackNote">Use this only if Method 2 hostname does not resolve on your network.</p>
+        <p class="install-note" id="lanFallbackNote">Use this only if Method 2 hostname does not resolve. For phone/TV installs, hosted HTTPS mode is recommended.</p>
 
-        <p class="install-section-title" style="margin-top:1rem">Quick Launch</p>
-        <a id="stremioLink" href="#" style="display:inline-block;margin-top:0.5rem;color:var(--blue);font-family:'JetBrains Mono',monospace;font-size:0.8rem">Open in Stremio</a>
-        <p class="install-note" id="openLinkNote">Uses Method 2 first; falls back to Method 3 when needed.</p>
+        <p class="install-section-title" style="margin-top:1rem">Quick Install (This PC)</p>
+        <a id="stremioLink" href="#" style="display:inline-block;margin-top:0.5rem;color:var(--blue);font-family:'JetBrains Mono',monospace;font-size:0.8rem">Copy local Addon URL</a>
+        <p class="install-note" id="openLinkNote">Click to copy Method 1 URL, then paste it in Stremio Addons -> + Add Addon URL.</p>
       </div>
       <!-- Hosted mode: just the stremio:// link -->
       <div id="hostedInstall" style="text-align:center">
@@ -625,6 +640,9 @@
   </div>
 
   <script>
+    const defaultLocalHostname = 'pvtkrrx.local';
+    let activeLocalHostname = defaultLocalHostname;
+
     const providers = {
       feral: { from: '/media/', to: '/' },
       ultra: { from: '/home/', to: '/' },
@@ -632,6 +650,48 @@
       swizzin: { from: '/home/', to: '/' },
       custom: { from: '', to: '' }
     };
+
+    function normalizeLocalHostname(raw) {
+      const label = String(raw || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\.local$/i, '')
+        .replace(/[^a-z0-9-]/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-+/, '')
+        .replace(/-+$/, '');
+      return `${label || 'pvtkrrx'}.local`;
+    }
+
+    function setActiveLocalHostname(raw) {
+      activeLocalHostname = normalizeLocalHostname(raw || defaultLocalHostname);
+      const codeEl = document.getElementById('lanHostCode');
+      if (codeEl) {
+        codeEl.textContent = activeLocalHostname;
+      }
+      const inputEl = document.getElementById('localHostname');
+      if (inputEl) {
+        inputEl.value = activeLocalHostname;
+      }
+      return activeLocalHostname;
+    }
+
+    function setLanInstallNote(hostname, available) {
+      const note = document.getElementById('lanInstallNote');
+      if (!note) return;
+
+      if (!available) {
+        note.textContent = 'mDNS hostname unavailable. Use Method 3 fallback URL for reachability checks.';
+        return;
+      }
+
+      note.textContent = 'LAN URL via hostname (';
+      const code = document.createElement('code');
+      code.id = 'lanHostCode';
+      code.textContent = hostname;
+      note.appendChild(code);
+      note.append('). For Stremio installs on phone/TV, hosted HTTPS mode is recommended.');
+    }
 
     function normalizeProwlarrBaseUrl(raw) {
       return String(raw || '')
@@ -651,7 +711,7 @@
       const mode = getInstallMode();
       const hint = document.getElementById('installModeHint');
       if (mode === 'local') {
-        hint.textContent = 'Local mode exposes 3 install methods: localhost, pvtkrrx.local, and LAN-IP fallback.';
+        hint.textContent = 'Local mode: use localhost on this PC. LAN hostname/IP links are for network checks or advanced setups.';
       } else {
         hint.textContent = 'Hosted mode requires public URLs for Prowlarr and qBittorrent. File server URL is optional.';
       }
@@ -668,6 +728,10 @@
     document.getElementById('jackettUrl').addEventListener('blur', function() {
       this.value = normalizeProwlarrBaseUrl(this.value);
     });
+    document.getElementById('localHostname').addEventListener('blur', function() {
+      setActiveLocalHostname(this.value);
+      setInstallModeHint();
+    });
 
     document.getElementById('installMode').addEventListener('change', setInstallModeHint);
     setInstallModeHint();
@@ -678,8 +742,15 @@
     function applyLocalDefaults() {
       document.getElementById('installMode').value = 'local';
       setInstallModeHint();
+      setActiveLocalHostname(defaultLocalHostname);
       if (!document.getElementById('jackettUrl').value.trim()) {
         document.getElementById('jackettUrl').value = 'http://localhost:9696';
+      }
+      if (!document.getElementById('sportsDbApiKey').value.trim()) {
+        document.getElementById('sportsDbApiKey').value = '123';
+      }
+      if (!document.getElementById('sportsDbCacheHours').value.trim()) {
+        document.getElementById('sportsDbCacheHours').value = '24';
       }
       if (!document.getElementById('qbitUrl').value.trim()) {
         document.getElementById('qbitUrl').value = 'http://localhost:8080';
@@ -689,13 +760,16 @@
       document.getElementById('fileServerAuth').value = '';
       document.getElementById('pathFrom').value = '';
       document.getElementById('pathTo').value = '';
+      document.getElementById('autoDeleteWatched').checked = true;
+      document.getElementById('watchedDeleteGraceSeconds').value = '300';
     }
 
     function fallbackNetworkInfo() {
       const port = parseInt(window.location.port || '7000', 10);
       const modeQuery = '?mode=local';
-      const mdnsHost = 'pvtkrrx.local';
+      const mdnsHost = activeLocalHostname;
       return {
+        localHostname: mdnsHost,
         loopback: {
           httpManifest: `http://127.0.0.1:${port}/local/manifest.json${modeQuery}`,
           stremio: `stremio://127.0.0.1:${port}/local/manifest.json${modeQuery}`
@@ -714,47 +788,88 @@
       try {
         const res = await fetch('/network-info', { cache: 'no-store' });
         if (!res.ok) return fallbackNetworkInfo();
-        return await res.json();
+        const data = await res.json();
+        setActiveLocalHostname(data.localHostname || data?.mdns?.hostname || activeLocalHostname);
+        setInstallModeHint();
+        return data;
       } catch (_) {
         return fallbackNetworkInfo();
       }
     }
 
-    function fillLocalInstallLinks(networkInfo) {
+    async function canReachManifest(url) {
+      const target = String(url || '').trim();
+      if (!target) return false;
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 2500);
+      try {
+        const res = await fetch(target, { cache: 'no-store', signal: controller.signal });
+        return res.ok;
+      } catch (_) {
+        return false;
+      } finally {
+        clearTimeout(timer);
+      }
+    }
+
+    async function fillLocalInstallLinks(networkInfo) {
       const info = networkInfo || fallbackNetworkInfo();
-      const loopback = info.loopback || fallbackNetworkInfo().loopback;
-      const mdns = info.mdns || fallbackNetworkInfo().mdns;
+      const fallback = fallbackNetworkInfo();
+      setActiveLocalHostname(info.localHostname || info?.mdns?.hostname || activeLocalHostname);
+      const loopback = info.loopback || fallback.loopback;
+      const mdns = info.mdns || fallback.mdns;
       const lan = info.lan || null;
+      const mdnsReachable = await canReachManifest(mdns && mdns.httpManifest);
+      const lanReachable = await canReachManifest(lan && lan.httpManifest);
       const method2Field = document.getElementById('lanUrlInput');
-      const method2Note = document.getElementById('lanInstallNote');
       const method3Field = document.getElementById('httpsUrlInput');
       const method3Note = document.getElementById('lanFallbackNote');
       const openNote = document.getElementById('openLinkNote');
-      const openHref = (mdns && mdns.stremio) || (lan && lan.stremio) || loopback.stremio || '#';
+      // Quick launch must always target loopback on this PC.
+      // LAN/mDNS links can be rewritten by Stremio/Chromium in some flows.
+      const openManifestUrl = (loopback && loopback.httpManifest) || '';
+      const openLink = document.getElementById('stremioLink');
 
       document.getElementById('httpUrlInput').value = loopback.httpManifest || '';
-      document.getElementById('stremioLink').href = openHref;
+      if (openLink) {
+        openLink.href = '#';
+        openLink.onclick = async (event) => {
+          event.preventDefault();
+          if (!openManifestUrl) return;
+          try {
+            await navigator.clipboard.writeText(openManifestUrl);
+            const original = openLink.textContent;
+            openLink.textContent = 'Copied!';
+            setTimeout(() => { openLink.textContent = original; }, 1500);
+          } catch (_) {
+            const input = document.getElementById('httpUrlInput');
+            input.focus();
+            input.select();
+            document.execCommand('copy');
+          }
+        };
+      }
 
       if (mdns && mdns.httpManifest) {
         method2Field.value = mdns.httpManifest;
-        method2Note.textContent = `Preferred LAN URL via hostname (${mdns.hostname || 'pvtkrrx.local'}).`;
+        setLanInstallNote(mdns.hostname || activeLocalHostname, mdnsReachable);
       } else {
         method2Field.value = '';
-        method2Note.textContent = 'mDNS hostname unavailable. Use Method 3 fallback URL.';
+        setLanInstallNote(activeLocalHostname, false);
       }
 
       if (lan && lan.httpManifest) {
         method3Field.value = lan.httpManifest;
-        method3Note.textContent = 'Direct IP fallback for networks where .local resolution is blocked.';
+        method3Note.textContent = lanReachable
+          ? 'Direct IP fallback when .local resolution is blocked (reachability/debug).'
+          : 'LAN-IP URL detected but currently unreachable from this device.';
       } else {
         method3Field.value = '';
         method3Note.textContent = 'No LAN IP detected yet. Use Method 1 on this PC.';
       }
 
       if (openNote) {
-        openNote.textContent = (mdns && mdns.httpManifest)
-          ? 'Uses Method 2 hostname first; Method 3 is your manual fallback.'
-          : 'Hostname unavailable here; use Method 3 LAN-IP fallback.';
+        openNote.textContent = 'Click to copy localhost URL. Paste it in Stremio Addons -> + Add Addon URL. For phone/TV, use hosted HTTPS install mode.';
       }
     }
 
@@ -769,21 +884,26 @@
             installIfMissing: true,
             startIfStopped: true,
             configureQbitLocalNoAuth: true,
-            openFirewall: true
+            openFirewall: true,
+            localHostname: activeLocalHostname
           })
         });
         const data = await res.json();
         if (data && data.config) fillConfig(data.config);
+        if (data && data.localHostname) {
+          setActiveLocalHostname(data.localHostname);
+          setInstallModeHint();
+        }
 
         const net = await getNetworkInfo();
-        fillLocalInstallLinks(net);
+        await fillLocalInstallLinks(net);
 
         document.getElementById('installLink').style.display = 'block';
         document.getElementById('localInstall').style.display = 'block';
         document.getElementById('hostedInstall').style.display = 'none';
 
         if (data && data.ok) {
-          setStatus('autoStatus', 'ok', 'Auto setup complete. Click Install to save and use LAN links for TV/phone.');
+          setStatus('autoStatus', 'ok', 'Auto setup complete. Click Install to save. Use localhost for this PC; use hosted HTTPS mode for phone/TV.');
         } else {
           const note = Array.isArray(data?.notes) && data.notes.length ? data.notes[0] : (data?.message || 'Provisioning incomplete');
           setStatus('autoStatus', 'err', 'Auto setup incomplete: ' + note);
@@ -795,9 +915,15 @@
 
     function getConfig() {
       const fileServerUrlInput = document.getElementById('fileServerUrl').value.trim();
+      const localHostnameInput = document.getElementById('localHostname').value.trim();
+      const localHostname = normalizeLocalHostname(localHostnameInput || activeLocalHostname);
+      const localHostnameCustom = localHostname !== normalizeLocalHostname(defaultLocalHostname);
+      setActiveLocalHostname(localHostname);
       return {
         jackettUrl: normalizeProwlarrBaseUrl(document.getElementById('jackettUrl').value),
         jackettApiKey: document.getElementById('jackettApiKey').value.trim(),
+        sportsDbApiKey: document.getElementById('sportsDbApiKey').value.trim() || '123',
+        sportsDbCacheHours: Math.max(1, Math.min(168, parseInt(document.getElementById('sportsDbCacheHours').value, 10) || 24)),
         qbitUrl: document.getElementById('qbitUrl').value.replace(/\/+$/, ''),
         qbitUsername: document.getElementById('qbitUsername').value.trim(),
         qbitPassword: document.getElementById('qbitPassword').value,
@@ -807,7 +933,11 @@
           from: document.getElementById('pathFrom').value,
           to: document.getElementById('pathTo').value
         },
-        maxResults: parseInt(document.getElementById('maxResults').value, 10) || 50
+        maxResults: parseInt(document.getElementById('maxResults').value, 10) || 50,
+        autoDeleteWatched: document.getElementById('autoDeleteWatched').checked,
+        watchedDeleteGraceSeconds: Math.max(0, parseInt(document.getElementById('watchedDeleteGraceSeconds').value, 10) || 0),
+        localHostname,
+        localHostnameCustom
       };
     }
 
@@ -816,6 +946,10 @@
 
       if (config.jackettUrl) document.getElementById('jackettUrl').value = normalizeProwlarrBaseUrl(config.jackettUrl);
       if (config.jackettApiKey) document.getElementById('jackettApiKey').value = config.jackettApiKey;
+      if (config.sportsDbApiKey) document.getElementById('sportsDbApiKey').value = config.sportsDbApiKey;
+      if (typeof config.sportsDbCacheHours === 'number' && Number.isFinite(config.sportsDbCacheHours)) {
+        document.getElementById('sportsDbCacheHours').value = String(config.sportsDbCacheHours);
+      }
       if (config.qbitUrl) document.getElementById('qbitUrl').value = config.qbitUrl;
       if (config.qbitUsername) document.getElementById('qbitUsername').value = config.qbitUsername;
       if (config.qbitPassword) document.getElementById('qbitPassword').value = config.qbitPassword;
@@ -827,6 +961,19 @@
       }
       if (typeof config.maxResults === 'number' && Number.isFinite(config.maxResults)) {
         document.getElementById('maxResults').value = String(config.maxResults);
+      }
+      if (typeof config.autoDeleteWatched === 'boolean') {
+        document.getElementById('autoDeleteWatched').checked = config.autoDeleteWatched;
+      }
+      if (typeof config.watchedDeleteGraceSeconds === 'number' && Number.isFinite(config.watchedDeleteGraceSeconds)) {
+        document.getElementById('watchedDeleteGraceSeconds').value = String(config.watchedDeleteGraceSeconds);
+      }
+      if (config.localHostname) {
+        const normalizedDefault = normalizeLocalHostname(defaultLocalHostname);
+        const normalizedConfigHost = normalizeLocalHostname(config.localHostname);
+        const useConfiguredHostname = config.localHostnameCustom === true || normalizedConfigHost === normalizedDefault;
+        setActiveLocalHostname(useConfiguredHostname ? normalizedConfigHost : normalizedDefault);
+        setInstallModeHint();
       }
     }
 
@@ -971,15 +1118,19 @@
           if (saveData.error || !saveRes.ok) {
             return setStatus('installStatus', 'err', saveData.error || 'Failed to save local config');
           }
+          if (saveData.localHostname) {
+            setActiveLocalHostname(saveData.localHostname);
+            setInstallModeHint();
+          }
 
           const net = await getNetworkInfo();
-          fillLocalInstallLinks(net);
+          await fillLocalInstallLinks(net);
           document.getElementById('localInstall').style.display = 'block';
           document.getElementById('hostedInstall').style.display = 'none';
 
           document.getElementById('installLink').style.display = 'block';
           setStatus('installStatus', 'ok',
-            'Local config saved. Install once using Method 1/2/3; future updates do not require reinstall.');
+            'Local config saved. Install using Method 1 localhost URL; Method 2/3 are for LAN reachability checks.');
         } else {
           const res = await fetch('/encrypt', {
             method: 'POST',
