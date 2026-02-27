@@ -502,19 +502,19 @@
     </div>
 
     <div class="card">
-      <h2>Install Mode</h2>
-      <label for="installMode">Addon Variant</label>
+      <h2>Addon Profile</h2>
+      <label for="installMode">Choose where this addon will run</label>
       <select id="installMode">
-        <option value="hosted">Hosted (public URLs)</option>
-        <option value="local">Local / LAN (localhost or private IP)</option>
+        <option value="local">PC + Home LAN (Recommended)</option>
+        <option value="hosted">Cloud / Remote Seedbox (Online)</option>
       </select>
-      <p class="hint" id="installModeHint">Hosted mode requires public URLs for Prowlarr and qBittorrent.</p>
+      <p class="hint" id="installModeHint">Recommended for home setup. Installs PC Local on this machine and LAN Bridge on phone/TV.</p>
     </div>
 
     <div class="card">
       <h2>Auto Setup</h2>
-      <p class="hint">One click: local defaults + LAN install links for TV/phone clients.</p>
-      <button class="btn-test" onclick="autoSetup()">Auto Setup Local / LAN</button>
+      <p class="hint">One click setup for home use: local defaults plus install links for this PC and phone/TV.</p>
+      <button class="btn-test" onclick="autoSetup()">Auto Setup (Home LAN)</button>
       <div id="autoStatus" class="status"></div>
       <p class="hint">Uses built-in file serving. Works with NAS storage if the PC can read qBit save paths.</p>
     </div>
@@ -600,34 +600,34 @@
     <button class="btn-install" onclick="install()">Install in Stremio</button>
 
     <div id="installLink" class="install-link">
-      <!-- Local mode: localhost + mDNS + LAN IP fallback -->
+      <!-- Local mode: PC Local + LAN Bridge -->
       <div id="localInstall">
-        <p class="install-section-title">Method 1 - This PC (localhost)</p>
+        <p class="install-section-title">Step 1 - Install on this PC (PVTKRRX PC Local)</p>
         <div class="url-row">
           <input type="text" id="httpUrlInput" readonly>
           <button class="btn-copy" onclick="copyUrl('httpUrlInput', this)">Copy</button>
         </div>
-        <p class="install-note">Use when Stremio runs on the same machine as PVTKRRX.</p>
+        <p class="install-note">Use this only on the same Windows PC that runs PVTKRRX.</p>
 
-        <p class="install-section-title" style="margin-top:1rem">Method 2 - LAN hostname (reachability check)</p>
+        <p class="install-section-title" style="margin-top:1rem">Optional network test - LAN hostname</p>
         <div class="url-row">
           <input type="text" id="lanUrlInput" readonly>
           <button class="btn-copy" onclick="copyUrl('lanUrlInput', this)">Copy</button>
         </div>
-        <p class="install-note" id="lanInstallNote">Uses <code id="lanHostCode">pvtkrrx.local</code> for LAN reachability checks. Stremio install on non-loopback hosts may require hosted HTTPS mode.</p>
+        <p class="install-note" id="lanInstallNote">Use <code id="lanHostCode">pvtkrrx.local</code> to test LAN reachability from this browser.</p>
 
-        <p class="install-section-title" style="margin-top:1rem">Method 3 - LAN IP fallback (reachability check)</p>
+        <p class="install-section-title" style="margin-top:1rem">Optional network test - LAN IP fallback</p>
         <div class="url-row">
           <input type="text" id="httpsUrlInput" readonly>
           <button class="btn-copy" onclick="copyUrl('httpsUrlInput', this)">Copy</button>
         </div>
-        <p class="install-note" id="lanFallbackNote">Use this only if Method 2 hostname does not resolve. For phone/TV installs, hosted HTTPS mode is recommended.</p>
+        <p class="install-note" id="lanFallbackNote">Use this only if hostname resolution fails.</p>
 
-        <p class="install-section-title" style="margin-top:1rem">Quick Install (This PC)</p>
+        <p class="install-section-title" style="margin-top:1rem">Quick copy (This PC)</p>
         <a id="stremioLink" href="#" style="display:inline-block;margin-top:0.5rem;color:var(--blue);font-family:'JetBrains Mono',monospace;font-size:0.8rem">Copy local Addon URL</a>
-        <p class="install-note" id="openLinkNote">Click to copy Method 1 URL, then paste it in Stremio Addons -> + Add Addon URL.</p>
+        <p class="install-note" id="openLinkNote">Copy and paste into Stremio -> Addons -> + Add Addon URL.</p>
 
-        <p class="install-section-title" style="margin-top:1rem">Method 4 - Mobile/TV via Hosted LAN Pair</p>
+        <p class="install-section-title" style="margin-top:1rem">Step 2 - Install on phone/TV (PVTKRRX LAN Bridge)</p>
         <div class="url-row">
           <input type="text" id="pairHostedManifestInput" readonly>
           <button class="btn-copy" onclick="copyUrl('pairHostedManifestInput', this)">Copy</button>
@@ -636,13 +636,14 @@
           <input type="text" id="pairHostedStremioInput" readonly>
           <button class="btn-copy" onclick="copyUrl('pairHostedStremioInput', this)">Copy</button>
         </div>
-        <p class="install-note" id="pairRelayNote">After local save, this generates a hosted install URL that silently routes account-sync devices to your active LAN server.</p>
-        <p class="install-note" id="pairStatusNote">Pair status: waiting for local save.</p>
+        <p class="install-note" id="pairRelayNote">After local save, this URL installs LAN Bridge and silently routes playback to your active home PC.</p>
+        <p class="install-note" id="pairStatusNote">LAN Bridge status: waiting for local save.</p>
       </div>
       <!-- Hosted mode: just the stremio:// link -->
       <div id="hostedInstall" style="text-align:center">
-        <a id="stremioLinkHosted" href="#">Open in Stremio</a>
+        <a id="stremioLinkHosted" href="#">Install PVTKRRX (Online)</a>
         <p class="install-note" style="margin-top:0.5rem" id="hostedUrlDisplay"></p>
+        <p class="install-note" style="margin-top:0.5rem">Use this only when Prowlarr and qBittorrent are publicly reachable.</p>
       </div>
     </div>
 
@@ -702,16 +703,16 @@
       if (!note) return;
 
       if (!available) {
-        note.textContent = 'mDNS hostname unavailable. Use Method 3 fallback URL for reachability checks.';
+        note.textContent = 'Hostname check unavailable. Use the LAN IP fallback test below.';
         return;
       }
 
-      note.textContent = 'LAN URL via hostname (';
+      note.textContent = 'LAN hostname test (';
       const code = document.createElement('code');
       code.id = 'lanHostCode';
       code.textContent = hostname;
       note.appendChild(code);
-      note.append('). For Stremio installs on phone/TV, hosted HTTPS mode is recommended.');
+      note.append(').');
     }
 
     function normalizeRelayUrl(raw) {
@@ -774,7 +775,7 @@
 
     async function refreshLanPairStatus() {
       if (!lanPair.enabled || !lanPair.pairId || !lanPair.pairKey) {
-        setPairStatusNote('Pair status: local config not saved yet.');
+        setPairStatusNote('LAN Bridge status: local config not saved yet.');
         return;
       }
       const relayBase = normalizeRelayUrl(lanPair.relayUrl);
@@ -789,22 +790,22 @@
         });
         if (!res.ok) {
           if (res.status === 429) {
-            setPairStatusNote('Pair status temporarily rate-limited. Retrying shortly.', true);
+            setPairStatusNote('LAN Bridge status temporarily rate-limited. Retrying shortly.', true);
             return;
           }
-          setPairStatusNote(`Pair status unavailable (${res.status}).`, true);
+          setPairStatusNote(`LAN Bridge status unavailable (${res.status}).`, true);
           return;
         }
         const data = await res.json();
         if (!data || data.online !== true) {
-          setPairStatusNote('Pair offline - open PVTKRRX desktop on the host PC.', true);
+          setPairStatusNote('LAN Bridge offline - open PVTKRRX desktop on the host PC.', true);
           return;
         }
         const lastSeen = formatRelativeTime(data.updatedAt);
         const suffix = lastSeen ? ` (${lastSeen})` : '';
-        setPairStatusNote(`Pair online${suffix}.`);
+        setPairStatusNote(`LAN Bridge online${suffix}.`);
       } catch (_) {
-        setPairStatusNote('Pair status check failed - relay unreachable.', true);
+        setPairStatusNote('LAN Bridge status check failed - relay unreachable.', true);
       }
     }
 
@@ -832,9 +833,9 @@
       const mode = getInstallMode();
       const hint = document.getElementById('installModeHint');
       if (mode === 'local') {
-        hint.textContent = 'Local mode: localhost install for this PC plus hosted LAN pairing URLs for Android TV/mobile.';
+        hint.textContent = 'Recommended for home setup. Install PC Local on this machine and LAN Bridge on phone/TV.';
       } else {
-        hint.textContent = 'Hosted mode requires public URLs for Prowlarr and qBittorrent. File server URL is optional.';
+        hint.textContent = 'Use only when Prowlarr and qBittorrent are publicly reachable. This installs the Online profile.';
       }
     }
 
@@ -996,7 +997,7 @@
           : 'LAN-IP URL detected but currently unreachable from this device.';
       } else {
         method3Field.value = '';
-        method3Note.textContent = 'No LAN IP detected yet. Use Method 1 on this PC.';
+        method3Note.textContent = 'No LAN IP detected yet. Use Step 1 on this PC.';
       }
 
       if (openNote) {
@@ -1011,14 +1012,14 @@
         return;
       }
       if (!lanPair.pairId || !lanPair.pairKey) {
-        setPairStatusNote('Pair status: local pair keys missing.', true);
+        setPairStatusNote('LAN Bridge status: local pair keys missing.', true);
         return;
       }
 
       const relayBase = normalizeRelayUrl(lanPair.relayUrl);
       const noteEl = document.getElementById('pairRelayNote');
       if (noteEl) {
-        noteEl.textContent = `Relay: ${relayBase} (tokenized hosted URL for LAN account-sync devices)`;
+        noteEl.textContent = `LAN Bridge relay: ${relayBase}`;
       }
 
       const payload = {
@@ -1037,12 +1038,12 @@
           body: JSON.stringify(payload)
         });
         if (!res.ok) {
-          setPairStatusNote(`Pair relay token failed (${res.status}).`, true);
+          setPairStatusNote(`LAN Bridge token failed (${res.status}).`, true);
           return;
         }
         const data = await res.json();
         if (!data || !data.token) {
-          setPairStatusNote('Pair relay token response was invalid.', true);
+          setPairStatusNote('LAN Bridge token response was invalid.', true);
           return;
         }
 
@@ -1060,7 +1061,7 @@
 
         startLanPairStatusPolling();
       } catch (_) {
-        setPairStatusNote('Pair relay token request failed - check relay URL/connectivity.', true);
+        setPairStatusNote('LAN Bridge token request failed - check relay URL/connectivity.', true);
       }
     }
 
@@ -1095,7 +1096,7 @@
         document.getElementById('hostedInstall').style.display = 'none';
 
         if (data && data.ok) {
-          setStatus('autoStatus', 'ok', 'Auto setup complete. Click Install to save local config, then use Method 4 for Android TV/mobile account-sync.');
+          setStatus('autoStatus', 'ok', 'Auto setup complete. Click Install, then use Step 1 for this PC and Step 2 for phone/TV.');
         } else {
           const note = Array.isArray(data?.notes) && data.notes.length ? data.notes[0] : (data?.message || 'Provisioning incomplete');
           setStatus('autoStatus', 'err', 'Auto setup incomplete: ' + note);
@@ -1226,7 +1227,7 @@
         try {
           const u = new URL(value);
           if (isPrivateHostname(u.hostname)) {
-            return `${label} uses ${u.hostname}. Hosted mode needs public URLs. Use local addon mode for localhost/LAN.`;
+            return `${label} uses ${u.hostname}. Online profile needs public URLs. Use PC + Home LAN mode instead.`;
           }
         } catch (e) {
           return `${label} is not a valid URL`;
@@ -1303,8 +1304,8 @@
       }
 
       setStatus('installStatus', 'info', installMode === 'local'
-        ? 'Saving local configuration...'
-        : 'Encrypting configuration...');
+        ? 'Saving Home LAN profile...'
+        : 'Preparing Online profile...');
 
       try {
         const host = window.location.host;
@@ -1333,11 +1334,11 @@
 
           document.getElementById('installLink').style.display = 'block';
           setStatus('installStatus', 'ok',
-            'Local config saved. Use Method 1 on this PC, Method 4 for Android TV/mobile via hosted LAN pair.');
+            'Saved. Step 1 installs PC Local on this machine. Step 2 installs LAN Bridge on phone/TV.');
         } else {
           stopLanPairStatusPolling();
           clearLanPairInstallFields();
-          setPairStatusNote('Pair status: idle (hosted mode selected).');
+          setPairStatusNote('LAN Bridge status: idle (Online profile selected).');
           const hostedPayload = {
             ...config,
             lanPairEnabled: false,
@@ -1366,7 +1367,7 @@
           document.getElementById('hostedInstall').style.display = 'block';
 
           document.getElementById('installLink').style.display = 'block';
-          setStatus('installStatus', 'ok', 'Configuration encrypted — click below to install in Stremio');
+          setStatus('installStatus', 'ok', 'Online profile ready — click below to install in Stremio');
         }
       } catch (err) {
         setStatus('installStatus', 'err', 'Install failed: ' + err.message);

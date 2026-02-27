@@ -31,7 +31,7 @@ async function run() {
     const configureHtml = await configureRes.text()
     assert.match(configureHtml, /Install in Stremio/, 'configure page should render install action')
     assert.match(configureHtml, /testConnection\(\)/, 'configure page should expose test connection action')
-    assert.match(configureHtml, /Auto Setup Local \/ LAN/, 'configure page should render auto setup action')
+    assert.match(configureHtml, /Auto Setup \(Home LAN\)/, 'configure page should render auto setup action')
 
     const networkInfoRes = await fetch(`${base}/network-info`)
     assert.equal(networkInfoRes.status, 200, 'GET /network-info should return 200')
