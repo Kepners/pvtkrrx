@@ -19,3 +19,5 @@ website/
 
 # Electron unpacked build output (very large; installers are in Dist/*.exe)
 Dist/win-unpacked/
+
+.vercel
