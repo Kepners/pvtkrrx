@@ -26,12 +26,17 @@ The addon handles: search → download → stream. PVTKRRX has a **built-in file
 
 | Feature | Status |
 |---------|--------|
-| Sports catalog (EPL, F1, UFC tiles) | ✅ Working |
-| Movie/TV streams from private trackers | ✅ Working |
-| Sports contamination filter | ✅ Working — SportsCult never appears in movie searches |
-| Already-downloaded files | ✅ Working — built-in file server with Range support |
-| On-tracker download + play | ✅ Working — Comet pattern triggers download, redirects when done |
-| Local + Hosted install modes | ✅ Working |
+| Sports catalog (EPL, F1, UFC tiles) | Working |
+| Movie/TV streams from private trackers | Working |
+| Sports contamination filter | Working (SportsCult excluded from movie searches) |
+| Already-downloaded files | Working (built-in file server with Range support) |
+| On-tracker download + play | Working (Comet pattern: queue then redirect) |
+| Local + Hosted install modes | Working |
+| Hosted LAN pair mode (Android TV/mobile) | Implemented (requires relay config) |
+
+## Current Project Status
+
+See [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for the authoritative current stage, active worktree items, and deployment checklist.
 
 ## Quick Start
 
@@ -52,7 +57,7 @@ Then open `http://localhost:7000/configure` to enter your seedbox details.
 
 Use **Auto Setup Local / LAN** on the configure page to prefill local defaults and generate install links for:
 - this PC (`127.0.0.1`)
-- Android TV / phone on the same network (LAN IP)
+- Android TV / phone on the same network (Method 4 hosted LAN pair URL)
 
 Auto Setup also attempts to:
 - install/start Prowlarr and qBittorrent (Windows, via winget + service/process start)
@@ -135,7 +140,15 @@ ENCRYPTION_SECRET=your-secret-here npm start
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `ENCRYPTION_SECRET` | Yes | Key for encrypting/decrypting user configs |
+| ENCRYPTION_SECRET | Yes | Key for encrypting/decrypting user configs |
+| KV_REST_API_URL | Recommended | Persist LAN pair heartbeat state on Vercel |
+| KV_REST_API_TOKEN | Recommended | Auth token for KV REST API |
+| PVTKRRX_PAIR_RELAY_URL | Optional | Hosted relay base URL (default https://pvtkrrx.vercel.app) |
+| PVTKRRX_LAN_PAIR_TTL_SECONDS | Optional | Pair record TTL (default 120) |
+| PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP | Optional | Bind hosted pair redirects to heartbeat source network (default true) |
+| PVTKRRX_LAN_PAIR_RATE_LIMIT_WINDOW_MS | Optional | Pair API rate-limit window in ms (default 60000) |
+| PVTKRRX_LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW | Optional | Max heartbeat calls per window (default 30) |
+| PVTKRRX_LAN_PAIR_STATUS_MAX_PER_WINDOW | Optional | Max status calls per window (default 60) |
 
 ## Troubleshooting
 
@@ -149,9 +162,12 @@ ENCRYPTION_SECRET=your-secret-here npm start
 
 ### Android TV / mobile cannot reach addon
 
-1. Use the **Method 2 - TV / Phone on same LAN** URL from configure page
-2. Ensure TV/phone and PC are on the same network
-3. Allow inbound TCP `7000` in Windows Firewall on the PC
+1. In local mode, use **Method 4 - Mobile/TV via Hosted LAN Pair** from configure page
+2. Ensure the desktop app is running on the host PC (heartbeat keeps pair active silently)
+3. Ensure TV/phone and PC are on the same network
+4. Ensure firewall allows inbound TCP `7000/7001` + UDP `5353`
+5. If pair shows offline in configure page, restart desktop app and re-check pair status
+
 
 ### Install URL protocol rules (important)
 

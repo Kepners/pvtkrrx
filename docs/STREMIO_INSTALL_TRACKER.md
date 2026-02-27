@@ -1,6 +1,6 @@
 # Stremio Install Protocol Tracker (Truth Table)
 
-Updated: 2026-02-23
+Updated: 2026-02-27
 
 ## Why this file exists
 We keep this as a single source of truth so we stop repeating failed install patterns.
@@ -26,12 +26,14 @@ Link: https://github.com/Stremio/stremio-addon-client
 | `stremio://192.168.50.48:7000/local/manifest.json?mode=local` | FAIL | Ends up as `https://192.168.50.48:7000/...` and fails |
 | `https://192.168.50.48:7000/local/manifest.json?mode=local` | FAIL | Server on 7000 is HTTP, not TLS |
 | Browser test: `http://192.168.50.48:7000/local/manifest.json?mode=local` | PASS | Confirms server + firewall path is OK |
+| `https://pvtkrrx.vercel.app/{token}/manifest.json?mode=hosted` with LAN pair enabled | PASS* | Requires active desktop heartbeat + hosted pair relay config |
 
 ## Conclusion
 - LAN HTTP endpoint is reachable.
 - Stremio install failure is protocol-policy mismatch, not LAN reachability.
 - Local/LAN mobile install from raw `192.168.x.x:7000` is not a stable supported path.
 - Browser-to-Stremio deep link (`Open in Stremio`) can also mis-handle localhost port/query on some client versions.
+- Hosted LAN pair mode is now the preferred account-sync path for Android TV/mobile on local networks.
 
 ## Supported install modes going forward
 
@@ -39,6 +41,11 @@ Link: https://github.com/Stremio/stremio-addon-client
    - `http://127.0.0.1:7000/local/manifest.json?mode=local`
 2. Hosted mode (phone/TV/account-sync):
    - Use HTTPS-hosted manifest URL (Vercel/public domain).
+3. Hosted LAN pair mode (phone/TV/account-sync on same LAN as host PC):
+   - Install Method 4 URL from configure page (hosted token with `lanPair*` fields).
+   - Desktop app sends silent relay heartbeat every ~30s.
+   - Hosted requests 307-redirect to active LAN endpoint when pair is online.
+   - Pair status responses are metadata-minimized (no LAN endpoint list).
 
 ## UX update applied
 
@@ -64,6 +71,6 @@ Get-Content "$env:APPDATA\PVTKRRX\runtime\logs\desktop-$(Get-Date -Format yyyy-M
 
 ## Next work items
 
-1. Keep local install flow strictly loopback-first (`127.0.0.1`).
-2. Move phone/TV install flow to hosted HTTPS configuration UX.
+1. Validate Method 4 end-to-end on Android TV + Android mobile with Stremio account sync.
+2. Verify offline behavior when desktop app is closed (pair status + addon response clarity).
 3. Keep this file updated after each install test.

@@ -626,6 +626,18 @@
         <p class="install-section-title" style="margin-top:1rem">Quick Install (This PC)</p>
         <a id="stremioLink" href="#" style="display:inline-block;margin-top:0.5rem;color:var(--blue);font-family:'JetBrains Mono',monospace;font-size:0.8rem">Copy local Addon URL</a>
         <p class="install-note" id="openLinkNote">Click to copy Method 1 URL, then paste it in Stremio Addons -> + Add Addon URL.</p>
+
+        <p class="install-section-title" style="margin-top:1rem">Method 4 - Mobile/TV via Hosted LAN Pair</p>
+        <div class="url-row">
+          <input type="text" id="pairHostedManifestInput" readonly>
+          <button class="btn-copy" onclick="copyUrl('pairHostedManifestInput', this)">Copy</button>
+        </div>
+        <div class="url-row">
+          <input type="text" id="pairHostedStremioInput" readonly>
+          <button class="btn-copy" onclick="copyUrl('pairHostedStremioInput', this)">Copy</button>
+        </div>
+        <p class="install-note" id="pairRelayNote">After local save, this generates a hosted install URL that silently routes account-sync devices to your active LAN server.</p>
+        <p class="install-note" id="pairStatusNote">Pair status: waiting for local save.</p>
       </div>
       <!-- Hosted mode: just the stremio:// link -->
       <div id="hostedInstall" style="text-align:center">
@@ -641,7 +653,16 @@
 
   <script>
     const defaultLocalHostname = 'pvtkrrx.local';
+    const defaultLanPairRelayUrl = 'https://pvtkrrx.vercel.app';
     let activeLocalHostname = defaultLocalHostname;
+    let pairStatusTimer = null;
+    const lanPair = {
+      enabled: true,
+      required: true,
+      pairId: '',
+      pairKey: '',
+      relayUrl: defaultLanPairRelayUrl
+    };
 
     const providers = {
       feral: { from: '/media/', to: '/' },
@@ -693,6 +714,106 @@
       note.append('). For Stremio installs on phone/TV, hosted HTTPS mode is recommended.');
     }
 
+    function normalizeRelayUrl(raw) {
+      const text = String(raw || '').trim().replace(/\/+$/, '');
+      if (!text) return defaultLanPairRelayUrl;
+      try {
+        const url = new URL(text);
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') return defaultLanPairRelayUrl;
+        return `${url.protocol}//${url.host}`;
+      } catch (_) {
+        return defaultLanPairRelayUrl;
+      }
+    }
+
+    function setPairStatusNote(text, forceError = false) {
+      const el = document.getElementById('pairStatusNote');
+      if (!el) return;
+      el.textContent = text;
+      el.style.color = forceError ? 'var(--red)' : 'var(--text-muted)';
+    }
+
+    function clearLanPairInstallFields() {
+      const manifestInput = document.getElementById('pairHostedManifestInput');
+      const stremioInput = document.getElementById('pairHostedStremioInput');
+      if (manifestInput) manifestInput.value = '';
+      if (stremioInput) stremioInput.value = '';
+    }
+
+    function stopLanPairStatusPolling() {
+      if (pairStatusTimer) {
+        clearInterval(pairStatusTimer);
+        pairStatusTimer = null;
+      }
+    }
+
+    function setLanPairStateFromConfig(config) {
+      if (!config || typeof config !== 'object') return;
+      if (typeof config.lanPairEnabled === 'boolean') lanPair.enabled = config.lanPairEnabled;
+      if (typeof config.lanPairRequired === 'boolean') lanPair.required = config.lanPairRequired;
+      if (config.lanPairId) lanPair.pairId = String(config.lanPairId).trim();
+      if (config.lanPairKey) lanPair.pairKey = String(config.lanPairKey).trim();
+      if (config.lanPairRelayUrl) lanPair.relayUrl = normalizeRelayUrl(config.lanPairRelayUrl);
+      if (!lanPair.relayUrl) lanPair.relayUrl = defaultLanPairRelayUrl;
+    }
+
+    function formatRelativeTime(timestamp) {
+      const value = Number(timestamp || 0);
+      if (!Number.isFinite(value) || value <= 0) return '';
+      const diffMs = Date.now() - value;
+      if (diffMs < 0) return 'just now';
+      const sec = Math.floor(diffMs / 1000);
+      if (sec < 60) return `${sec}s ago`;
+      const min = Math.floor(sec / 60);
+      if (min < 60) return `${min}m ago`;
+      const hr = Math.floor(min / 60);
+      if (hr < 24) return `${hr}h ago`;
+      const d = Math.floor(hr / 24);
+      return `${d}d ago`;
+    }
+
+    async function refreshLanPairStatus() {
+      if (!lanPair.enabled || !lanPair.pairId || !lanPair.pairKey) {
+        setPairStatusNote('Pair status: local config not saved yet.');
+        return;
+      }
+      const relayBase = normalizeRelayUrl(lanPair.relayUrl);
+      try {
+        const res = await fetch(`${relayBase}/pair/status`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            pairId: lanPair.pairId,
+            pairKey: lanPair.pairKey
+          })
+        });
+        if (!res.ok) {
+          if (res.status === 429) {
+            setPairStatusNote('Pair status temporarily rate-limited. Retrying shortly.', true);
+            return;
+          }
+          setPairStatusNote(`Pair status unavailable (${res.status}).`, true);
+          return;
+        }
+        const data = await res.json();
+        if (!data || data.online !== true) {
+          setPairStatusNote('Pair offline - open PVTKRRX desktop on the host PC.', true);
+          return;
+        }
+        const lastSeen = formatRelativeTime(data.updatedAt);
+        const suffix = lastSeen ? ` (${lastSeen})` : '';
+        setPairStatusNote(`Pair online${suffix}.`);
+      } catch (_) {
+        setPairStatusNote('Pair status check failed - relay unreachable.', true);
+      }
+    }
+
+    function startLanPairStatusPolling() {
+      stopLanPairStatusPolling();
+      refreshLanPairStatus();
+      pairStatusTimer = setInterval(refreshLanPairStatus, 30000);
+    }
+
     function normalizeProwlarrBaseUrl(raw) {
       return String(raw || '')
         .trim()
@@ -711,7 +832,7 @@
       const mode = getInstallMode();
       const hint = document.getElementById('installModeHint');
       if (mode === 'local') {
-        hint.textContent = 'Local mode: use localhost on this PC. LAN hostname/IP links are for network checks or advanced setups.';
+        hint.textContent = 'Local mode: localhost install for this PC plus hosted LAN pairing URLs for Android TV/mobile.';
       } else {
         hint.textContent = 'Hosted mode requires public URLs for Prowlarr and qBittorrent. File server URL is optional.';
       }
@@ -733,7 +854,14 @@
       setInstallModeHint();
     });
 
-    document.getElementById('installMode').addEventListener('change', setInstallModeHint);
+    document.getElementById('installMode').addEventListener('change', function() {
+      setInstallModeHint();
+      if (getInstallMode() !== 'local') {
+        stopLanPairStatusPolling();
+      } else if (document.getElementById('installLink').style.display === 'block') {
+        startLanPairStatusPolling();
+      }
+    });
     setInstallModeHint();
     document.getElementById('localInstall').style.display = 'none';
     document.getElementById('hostedInstall').style.display = 'none';
@@ -743,6 +871,9 @@
       document.getElementById('installMode').value = 'local';
       setInstallModeHint();
       setActiveLocalHostname(defaultLocalHostname);
+      lanPair.enabled = true;
+      lanPair.required = true;
+      if (!lanPair.relayUrl) lanPair.relayUrl = defaultLanPairRelayUrl;
       if (!document.getElementById('jackettUrl').value.trim()) {
         document.getElementById('jackettUrl').value = 'http://localhost:9696';
       }
@@ -873,6 +1004,66 @@
       }
     }
 
+    async function buildLanPairInstallLinks(config) {
+      clearLanPairInstallFields();
+      if (!lanPair.enabled) {
+        setPairStatusNote('Pairing disabled in local config.');
+        return;
+      }
+      if (!lanPair.pairId || !lanPair.pairKey) {
+        setPairStatusNote('Pair status: local pair keys missing.', true);
+        return;
+      }
+
+      const relayBase = normalizeRelayUrl(lanPair.relayUrl);
+      const noteEl = document.getElementById('pairRelayNote');
+      if (noteEl) {
+        noteEl.textContent = `Relay: ${relayBase} (tokenized hosted URL for LAN account-sync devices)`;
+      }
+
+      const payload = {
+        ...config,
+        lanPairEnabled: true,
+        lanPairRequired: true,
+        lanPairId: lanPair.pairId,
+        lanPairKey: lanPair.pairKey,
+        lanPairRelayUrl: relayBase
+      };
+
+      try {
+        const res = await fetch(`${relayBase}/encrypt`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        if (!res.ok) {
+          setPairStatusNote(`Pair relay token failed (${res.status}).`, true);
+          return;
+        }
+        const data = await res.json();
+        if (!data || !data.token) {
+          setPairStatusNote('Pair relay token response was invalid.', true);
+          return;
+        }
+
+        const relayHost = new URL(relayBase).host;
+        const token = encodeURIComponent(data.token);
+        const modeQuery = '?mode=hosted';
+        const manifestPath = `/${token}/manifest.json${modeQuery}`;
+        const hostedManifestUrl = `${relayBase}${manifestPath}`;
+        const hostedStremioUrl = `stremio://${relayHost}${manifestPath}`;
+
+        const manifestInput = document.getElementById('pairHostedManifestInput');
+        const stremioInput = document.getElementById('pairHostedStremioInput');
+        if (manifestInput) manifestInput.value = hostedManifestUrl;
+        if (stremioInput) stremioInput.value = hostedStremioUrl;
+
+        startLanPairStatusPolling();
+      } catch (_) {
+        setPairStatusNote('Pair relay token request failed - check relay URL/connectivity.', true);
+      }
+    }
+
     async function autoSetup() {
       setStatus('autoStatus', 'info', 'Auto-provisioning Prowlarr + qBittorrent...');
       applyLocalDefaults();
@@ -897,13 +1088,14 @@
 
         const net = await getNetworkInfo();
         await fillLocalInstallLinks(net);
+        await buildLanPairInstallLinks(getConfig());
 
         document.getElementById('installLink').style.display = 'block';
         document.getElementById('localInstall').style.display = 'block';
         document.getElementById('hostedInstall').style.display = 'none';
 
         if (data && data.ok) {
-          setStatus('autoStatus', 'ok', 'Auto setup complete. Click Install to save. Use localhost for this PC; use hosted HTTPS mode for phone/TV.');
+          setStatus('autoStatus', 'ok', 'Auto setup complete. Click Install to save local config, then use Method 4 for Android TV/mobile account-sync.');
         } else {
           const note = Array.isArray(data?.notes) && data.notes.length ? data.notes[0] : (data?.message || 'Provisioning incomplete');
           setStatus('autoStatus', 'err', 'Auto setup incomplete: ' + note);
@@ -937,12 +1129,18 @@
         autoDeleteWatched: document.getElementById('autoDeleteWatched').checked,
         watchedDeleteGraceSeconds: Math.max(0, parseInt(document.getElementById('watchedDeleteGraceSeconds').value, 10) || 0),
         localHostname,
-        localHostnameCustom
+        localHostnameCustom,
+        lanPairEnabled: lanPair.enabled,
+        lanPairRequired: lanPair.required,
+        lanPairId: lanPair.pairId,
+        lanPairKey: lanPair.pairKey,
+        lanPairRelayUrl: normalizeRelayUrl(lanPair.relayUrl)
       };
     }
 
     function fillConfig(config) {
       if (!config || typeof config !== 'object') return;
+      setLanPairStateFromConfig(config);
 
       if (config.jackettUrl) document.getElementById('jackettUrl').value = normalizeProwlarrBaseUrl(config.jackettUrl);
       if (config.jackettApiKey) document.getElementById('jackettApiKey').value = config.jackettApiKey;
@@ -991,6 +1189,9 @@
         if (!res.ok) return;
         const data = await res.json();
         fillConfig(data);
+        if (!token && lanPair.pairId && lanPair.pairKey) {
+          startLanPairStatusPolling();
+        }
       } catch (err) {
         // keep form usable if prefill fails
       }
@@ -1118,6 +1319,7 @@
           if (saveData.error || !saveRes.ok) {
             return setStatus('installStatus', 'err', saveData.error || 'Failed to save local config');
           }
+          setLanPairStateFromConfig(saveData);
           if (saveData.localHostname) {
             setActiveLocalHostname(saveData.localHostname);
             setInstallModeHint();
@@ -1125,17 +1327,26 @@
 
           const net = await getNetworkInfo();
           await fillLocalInstallLinks(net);
+          await buildLanPairInstallLinks(getConfig());
           document.getElementById('localInstall').style.display = 'block';
           document.getElementById('hostedInstall').style.display = 'none';
 
           document.getElementById('installLink').style.display = 'block';
           setStatus('installStatus', 'ok',
-            'Local config saved. Install using Method 1 localhost URL; Method 2/3 are for LAN reachability checks.');
+            'Local config saved. Use Method 1 on this PC, Method 4 for Android TV/mobile via hosted LAN pair.');
         } else {
+          stopLanPairStatusPolling();
+          clearLanPairInstallFields();
+          setPairStatusNote('Pair status: idle (hosted mode selected).');
+          const hostedPayload = {
+            ...config,
+            lanPairEnabled: false,
+            lanPairRequired: false
+          };
           const res = await fetch('/encrypt', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(config)
+            body: JSON.stringify(hostedPayload)
           });
           const data = await res.json();
 

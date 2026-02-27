@@ -1,6 +1,7 @@
 # PVTKRRX — Build Summary
 
-**Status**: Phase 0-3 COMPLETE ✅ | Phase 4 READY FOR TESTING
+**Status**: Historical snapshot from initial MVP build (Feb 2026).
+For current stage and active work, see `docs/PROJECT_STATUS.md`.
 
 ---
 

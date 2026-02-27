@@ -2,6 +2,7 @@ const fs = require('fs')
 const http = require('http')
 const https = require('https')
 const path = require('path')
+const crypto = require('crypto')
 const selfsigned = require('selfsigned')
 const express = require('express')
 const { addonBuilder, getRouter } = require('stremio-addon-sdk')
@@ -17,6 +18,7 @@ const { getLanIpv4Addresses, normalizeLocalHostname, startLanAlias } = require('
 const { decodeSportsThumbToken, renderSportsThumbSvg } = require('./src/utils/sportsThumb')
 const { mapPath } = require('./src/utils/pathMapper')
 const { findVideoFile, hasPackedArchiveFiles, isSampleVideoName } = require('./src/utils/streams')
+const { PairStore } = require('./src/utils/pairStore')
 
 const STREAM_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_WAIT_TIMEOUT_MS || '90000', 10)
 const STREAM_WAIT_INTERVAL_MS = parseInt(process.env.STREAM_WAIT_INTERVAL_MS || '2000', 10)
@@ -30,8 +32,14 @@ const STREAM_READY_START_FRACTION = parseStartFraction(
 const STREAM_PRIORITIZE_LAST_PIECES = String(process.env.STREAM_PRIORITIZE_LAST_PIECES || '').trim().toLowerCase() === 'true'
 const WATCHED_DELETE_THRESHOLD = Math.max(0.5, Math.min(0.99, parseFloat(process.env.PVTKRRX_WATCHED_DELETE_THRESHOLD || '0.95')))
 const WATCHED_DELETE_GRACE_MS = Math.max(0, parseInt(process.env.PVTKRRX_WATCHED_DELETE_GRACE_MS || '180000', 10))
+const LAN_PAIR_TTL_SECONDS = Math.max(30, parseInt(process.env.PVTKRRX_LAN_PAIR_TTL_SECONDS || '120', 10))
+const LAN_PAIR_BIND_PUBLIC_IP = String(process.env.PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP || 'true').trim().toLowerCase() !== 'false'
+const LAN_PAIR_RATE_LIMIT_WINDOW_MS = Math.max(1000, parseInt(process.env.PVTKRRX_LAN_PAIR_RATE_LIMIT_WINDOW_MS || '60000', 10))
+const LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW || '30', 10))
+const LAN_PAIR_STATUS_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_LAN_PAIR_STATUS_MAX_PER_WINDOW || '60', 10))
 const watchedDeleteTimers = new Map()
 const watchedDeleteInFlight = new Set()
+const lanPairRateBuckets = new Map()
 const DEFAULT_LOCAL_HOSTNAME = 'pvtkrrx.local'
 
 function parseStartFraction(raw) {
@@ -84,6 +92,9 @@ app.use(express.json())
 
 const runtimeDir = process.env.PVTKRRX_RUNTIME_DIR || path.join(__dirname, '.runtime')
 const localConfigPath = path.join(runtimeDir, 'local-config.json')
+const lanPairStore = new PairStore({
+  filePath: process.env.PVTKRRX_PAIR_STORE_FILE || path.join(runtimeDir, 'lan-pair-store.json')
+})
 
 function loadLocalConfigFile() {
   try {
@@ -126,6 +137,220 @@ function buildLocalModeUrls(hostname, port, httpsPort) {
     httpsManifest: `https://${hostname}:${httpsPort}/local/manifest.json${modeQuery}`,
     stremio: `stremio://${hostname}:${port}/local/manifest.json${modeQuery}`
   }
+}
+
+function normalizeBaseUrl(input) {
+  const value = String(input || '').trim().replace(/\/+$/, '')
+  if (!value) return ''
+  return value
+}
+
+function normalizeRelayUrl(input) {
+  const fallback = normalizeBaseUrl(process.env.PVTKRRX_PAIR_RELAY_URL || 'https://pvtkrrx.vercel.app')
+  const raw = normalizeBaseUrl(input)
+  if (!raw) return fallback
+  try {
+    const parsed = new URL(raw)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return fallback
+    return normalizeBaseUrl(parsed.origin)
+  } catch (_) {
+    return fallback
+  }
+}
+
+function parseBooleanLoose(value, fallback = false) {
+  if (typeof value === 'boolean') return value
+  if (value === null || value === undefined || value === '') return fallback
+  return parseBoolean(value)
+}
+
+function sanitizePairId(value) {
+  const id = String(value || '').trim().toLowerCase()
+  if (!id) return ''
+  if (!/^[a-z0-9_-]{8,64}$/.test(id)) return ''
+  return id
+}
+
+function makePairId() {
+  return crypto.randomBytes(9).toString('base64url').toLowerCase()
+}
+
+function sanitizePairKey(value) {
+  const key = String(value || '').trim()
+  if (!key) return ''
+  if (!/^[A-Za-z0-9_-]{16,256}$/.test(key)) return ''
+  return key
+}
+
+function makePairKey() {
+  return crypto.randomBytes(24).toString('base64url')
+}
+
+function hashPairKey(value) {
+  return crypto.createHash('sha256').update(String(value || '')).digest('hex')
+}
+
+function normalizeClientIp(value) {
+  let ip = String(value || '').trim()
+  if (!ip) return ''
+  if (ip.includes(',')) ip = ip.split(',')[0].trim()
+  if (ip.startsWith('::ffff:')) ip = ip.slice(7)
+  const zoneIndex = ip.indexOf('%')
+  if (zoneIndex !== -1) ip = ip.slice(0, zoneIndex)
+  return ip.replace(/[^a-fA-F0-9:.]/g, '').toLowerCase()
+}
+
+function getClientIp(req) {
+  const forwarded = normalizeClientIp(String(req.headers['x-forwarded-for'] || ''))
+  const realIp = normalizeClientIp(String(req.headers['x-real-ip'] || ''))
+  const remote = normalizeClientIp(String(req.socket?.remoteAddress || req.ip || ''))
+  return forwarded || realIp || remote
+}
+
+function hashClientIp(req) {
+  const ip = getClientIp(req)
+  if (!ip) return ''
+  return crypto.createHash('sha256').update(ip).digest('hex')
+}
+
+function consumeLanPairRateLimit(scope, key, maxPerWindow) {
+  const now = Date.now()
+  const safeScope = String(scope || 'default').trim() || 'default'
+  const safeKey = String(key || 'anon').trim() || 'anon'
+  const bucketKey = `${safeScope}:${safeKey}`
+  let bucket = lanPairRateBuckets.get(bucketKey)
+  if (!bucket || Number(bucket.resetAt || 0) <= now) {
+    bucket = { count: 0, resetAt: now + LAN_PAIR_RATE_LIMIT_WINDOW_MS }
+  }
+  bucket.count += 1
+  lanPairRateBuckets.set(bucketKey, bucket)
+
+  if (lanPairRateBuckets.size > 4096) {
+    for (const [k, v] of lanPairRateBuckets.entries()) {
+      if (Number(v?.resetAt || 0) <= now) lanPairRateBuckets.delete(k)
+    }
+  }
+
+  return {
+    allowed: bucket.count <= maxPerWindow,
+    retryAfterSeconds: Math.max(1, Math.ceil((Number(bucket.resetAt || now) - now) / 1000))
+  }
+}
+
+function isPrivateIpv4(hostname) {
+  const host = String(hostname || '').trim().toLowerCase()
+  if (!host) return false
+  if (host === 'localhost' || host === '127.0.0.1') return true
+  if (host.startsWith('10.')) return true
+  if (host.startsWith('192.168.')) return true
+  const parts = host.split('.')
+  if (parts.length === 4 && parts.every(p => /^\d+$/.test(p))) {
+    const second = Number.parseInt(parts[1], 10)
+    if (parts[0] === '172' && second >= 16 && second <= 31) return true
+  }
+  return false
+}
+
+function isLikelyLanHost(hostname) {
+  const host = String(hostname || '').trim().toLowerCase()
+  if (!host) return false
+  if (host.endsWith('.local')) return true
+  return isPrivateIpv4(host)
+}
+
+function sanitizeLanBaseUrl(input) {
+  const raw = String(input || '').trim()
+  if (!raw) return ''
+  try {
+    const parsed = new URL(raw)
+    const protocol = String(parsed.protocol || '').toLowerCase()
+    if (protocol !== 'http:' && protocol !== 'https:') return ''
+    if (!isLikelyLanHost(parsed.hostname)) return ''
+    return normalizeBaseUrl(parsed.origin)
+  } catch (_) {
+    return ''
+  }
+}
+
+function normalizePairEndpoints(endpoints) {
+  if (!Array.isArray(endpoints)) return []
+  const out = []
+  const seen = new Set()
+  for (const entry of endpoints) {
+    const baseUrl = sanitizeLanBaseUrl(entry?.baseUrl || '')
+    if (!baseUrl) continue
+    if (seen.has(baseUrl)) continue
+    seen.add(baseUrl)
+    out.push({
+      baseUrl,
+      source: String(entry?.source || '').trim() || 'unknown'
+    })
+  }
+  return out
+}
+
+function buildLanPairEndpoints(port, httpsPort) {
+  const mdnsHost = getMdnsHost()
+  const lanIps = detectLanAddresses()
+  const entries = []
+  for (const ip of lanIps) {
+    const urls = buildLocalModeUrls(ip, port, httpsPort)
+    entries.push({ baseUrl: normalizeBaseUrl(urls.httpManifest.replace(/\/local\/manifest\.json\?mode=local$/i, '')), source: 'lan-ip' })
+  }
+  const mdnsUrls = buildLocalModeUrls(mdnsHost, port, httpsPort)
+  entries.push({ baseUrl: normalizeBaseUrl(mdnsUrls.httpManifest.replace(/\/local\/manifest\.json\?mode=local$/i, '')), source: 'mdns' })
+  const loopbackUrls = buildLocalModeUrls('127.0.0.1', port, httpsPort)
+  entries.push({ baseUrl: normalizeBaseUrl(loopbackUrls.httpManifest.replace(/\/local\/manifest\.json\?mode=local$/i, '')), source: 'loopback' })
+  return normalizePairEndpoints(entries)
+}
+
+function ensureLanPairConfig(config = {}, options = {}) {
+  const pairId = sanitizePairId(config.lanPairId) || makePairId()
+  const pairKey = sanitizePairKey(config.lanPairKey) || makePairKey()
+  const relayUrl = normalizeRelayUrl(config.lanPairRelayUrl || options.lanPairRelayUrl)
+  const pairEnabled = parseBooleanLoose(config.lanPairEnabled, options.defaultEnabled !== false)
+  const pairRequired = parseBooleanLoose(config.lanPairRequired, options.defaultRequired === true)
+
+  return {
+    ...config,
+    lanPairEnabled: pairEnabled,
+    lanPairRequired: pairRequired,
+    lanPairId: pairId,
+    lanPairKey: pairKey,
+    lanPairRelayUrl: relayUrl
+  }
+}
+
+function chooseLanPairEndpoint(state) {
+  const endpoints = normalizePairEndpoints(state?.endpoints || [])
+  if (!endpoints.length) return null
+  const score = (entry) => {
+    let points = 0
+    if (entry.source === 'lan-ip') points += 30
+    if (entry.source === 'mdns') points += 20
+    if (entry.source === 'loopback') points += 1
+    try {
+      const host = new URL(entry.baseUrl).hostname
+      if (isPrivateIpv4(host) && host !== '127.0.0.1') points += 10
+      if (host.endsWith('.local')) points += 5
+    } catch (_) {}
+    return points
+  }
+  return [...endpoints].sort((a, b) => score(b) - score(a))[0]
+}
+
+function buildLanRedirectUrl(req, baseUrl) {
+  const origin = sanitizeLanBaseUrl(baseUrl)
+  if (!origin) return ''
+  const raw = String(req.originalUrl || '')
+  const qIndex = raw.indexOf('?')
+  const pathname = qIndex === -1 ? raw : raw.slice(0, qIndex)
+  const query = qIndex === -1 ? '' : raw.slice(qIndex)
+  const localPath = pathname.replace(/^\/[^/]+/, '/local')
+  const params = new URLSearchParams(query.startsWith('?') ? query.slice(1) : query)
+  params.set('mode', 'local')
+  const queryText = params.toString()
+  return `${origin}${localPath}${queryText ? `?${queryText}` : ''}`
 }
 
 function sanitizeHostForUrl(value) {
@@ -500,12 +725,24 @@ app.post('/local-config', (req, res) => {
   try {
     const localHostname = normalizeLocalHostname(cfg.localHostname || DEFAULT_LOCAL_HOSTNAME)
     const localHostnameCustom = localHostname !== DEFAULT_LOCAL_HOSTNAME
-    saveLocalConfigFile({
+    const saved = ensureLanPairConfig({
       ...cfg,
       localHostname,
       localHostnameCustom
+    }, {
+      defaultEnabled: true,
+      defaultRequired: true
     })
-    res.json({ ok: true, localHostname })
+    saveLocalConfigFile(saved)
+    res.json({
+      ok: true,
+      localHostname,
+      lanPairId: saved.lanPairId,
+      lanPairKey: saved.lanPairKey,
+      lanPairEnabled: saved.lanPairEnabled,
+      lanPairRequired: saved.lanPairRequired,
+      lanPairRelayUrl: saved.lanPairRelayUrl
+    })
   } catch (err) {
     res.status(500).json({ error: 'Failed to save local config' })
   }
@@ -520,20 +757,44 @@ app.post('/auto-provision', async (req, res) => {
       ...options,
       localHostname
     })
-    if (result.config && result.config.qbitUrl) {
-      saveLocalConfigFile({
+    const provisionedConfig = result.config
+      ? ensureLanPairConfig({
         ...result.config,
         localHostname,
         localHostnameCustom
+      }, {
+        defaultEnabled: true,
+        defaultRequired: true
       })
+      : null
+
+    if (result.config && result.config.qbitUrl) {
+      saveLocalConfigFile(provisionedConfig)
     }
     res.json({
       ...result,
+      config: provisionedConfig || result.config,
+      lanPair: provisionedConfig
+        ? {
+            lanPairId: provisionedConfig.lanPairId,
+            lanPairKey: provisionedConfig.lanPairKey,
+            lanPairEnabled: provisionedConfig.lanPairEnabled,
+            lanPairRequired: provisionedConfig.lanPairRequired,
+            lanPairRelayUrl: provisionedConfig.lanPairRelayUrl
+          }
+        : null,
       localHostname
     })
   } catch (err) {
     res.status(500).json({ ok: false, error: 'Auto provision failed', detail: err.message })
   }
+})
+
+app.get('/health', (req, res) => {
+  res.json({
+    ok: true,
+    time: new Date().toISOString()
+  })
 })
 
 // Returns local/lan install URLs for one-click setup across PC + TV/phone on same LAN.
@@ -559,8 +820,103 @@ app.get('/network-info', (req, res) => {
       { id: 'localhost', url: loopback.httpManifest },
       { id: 'mdns', url: mdns.httpManifest },
       { id: 'lan-ip', url: lan ? lan.httpManifest : '' }
-    ]
+    ],
+    pairEndpoints: buildLanPairEndpoints(port, httpsPort)
   })
+})
+
+app.post('/pair/heartbeat', async (req, res) => {
+  try {
+    const pairId = sanitizePairId(req.body?.pairId)
+    const pairKey = sanitizePairKey(req.body?.pairKey)
+    const localHostname = normalizeLocalHostname(req.body?.localHostname || DEFAULT_LOCAL_HOSTNAME)
+    const relayUrl = normalizeRelayUrl(req.body?.relayUrl || '')
+    const endpoints = normalizePairEndpoints(req.body?.endpoints || [])
+
+    if (!pairId || !pairKey) {
+      return res.status(400).json({ ok: false, error: 'pairId and pairKey are required' })
+    }
+    if (!endpoints.length) {
+      return res.status(400).json({ ok: false, error: 'At least one valid LAN endpoint is required' })
+    }
+    const clientIp = getClientIp(req)
+    const limit = consumeLanPairRateLimit(
+      'pair-heartbeat',
+      `${clientIp || 'unknown'}:${pairId}`,
+      LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW
+    )
+    if (!limit.allowed) {
+      res.setHeader('Retry-After', String(limit.retryAfterSeconds))
+      return res.status(429).json({ ok: false, error: 'too many requests' })
+    }
+
+    const now = Date.now()
+    const state = {
+      pairId,
+      keyHash: hashPairKey(pairKey),
+      clientIpHash: LAN_PAIR_BIND_PUBLIC_IP ? hashClientIp(req) : '',
+      endpoints,
+      localHostname,
+      relayUrl,
+      appVersion: String(req.body?.appVersion || '').trim(),
+      updatedAt: now,
+      expiresAt: now + LAN_PAIR_TTL_SECONDS * 1000
+    }
+    await lanPairStore.set(pairId, state, LAN_PAIR_TTL_SECONDS)
+    res.json({
+      ok: true,
+      online: true,
+      ttlSeconds: LAN_PAIR_TTL_SECONDS,
+      updatedAt: state.updatedAt
+    })
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'heartbeat failed', detail: err.message })
+  }
+})
+
+app.post('/pair/status', async (req, res) => {
+  try {
+    const pairId = sanitizePairId(req.body?.pairId)
+    const pairKey = sanitizePairKey(req.body?.pairKey)
+    if (!pairId || !pairKey) return res.status(400).json({ ok: false, error: 'pairId and pairKey are required' })
+    const clientIp = getClientIp(req)
+    const limit = consumeLanPairRateLimit(
+      'pair-status',
+      `${clientIp || 'unknown'}:${pairId}`,
+      LAN_PAIR_STATUS_MAX_PER_WINDOW
+    )
+    if (!limit.allowed) {
+      res.setHeader('Retry-After', String(limit.retryAfterSeconds))
+      return res.status(429).json({ ok: false, error: 'too many requests' })
+    }
+
+    const state = await lanPairStore.get(pairId)
+    if (!state) {
+      return res.json({ ok: true, online: false })
+    }
+
+    if (hashPairKey(pairKey) !== String(state.keyHash || '')) {
+      return res.json({ ok: true, online: false })
+    }
+
+    if (LAN_PAIR_BIND_PUBLIC_IP) {
+      const stateIpHash = String(state.clientIpHash || '')
+      const requestIpHash = hashClientIp(req)
+      if (stateIpHash && requestIpHash && stateIpHash !== requestIpHash) {
+        return res.json({ ok: true, online: false })
+      }
+    }
+
+    const preferred = chooseLanPairEndpoint(state)
+    res.json({
+      ok: true,
+      online: Boolean(preferred),
+      updatedAt: Number(state.updatedAt || 0),
+      expiresAt: Number(state.expiresAt || 0)
+    })
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'status failed', detail: err.message })
+  }
 })
 
 // Local install helper page (localhost copy workflow).
@@ -662,7 +1018,20 @@ function withConfig(req, res, next) {
       req.config = {}
       return next()
     }
-    req.config = localConfig
+    const normalizedLocal = ensureLanPairConfig(localConfig, {
+      defaultEnabled: true,
+      defaultRequired: true
+    })
+    if (
+      normalizedLocal.lanPairId !== localConfig.lanPairId ||
+      normalizedLocal.lanPairKey !== localConfig.lanPairKey ||
+      normalizedLocal.lanPairEnabled !== localConfig.lanPairEnabled ||
+      normalizedLocal.lanPairRequired !== localConfig.lanPairRequired ||
+      normalizedLocal.lanPairRelayUrl !== localConfig.lanPairRelayUrl
+    ) {
+      saveLocalConfigFile(normalizedLocal)
+    }
+    req.config = normalizedLocal
     return next()
   }
 
@@ -677,8 +1046,95 @@ function withConfig(req, res, next) {
   }
 }
 
+async function resolveLanPair(config, req) {
+  const enabled = parseBooleanLoose(config?.lanPairEnabled, false)
+  if (!enabled) return { enabled: false, online: false, reason: 'disabled' }
+
+  const pairId = sanitizePairId(config?.lanPairId)
+  const pairKey = sanitizePairKey(config?.lanPairKey)
+  if (!pairId || !pairKey) return { enabled: true, online: false, reason: 'missing-config' }
+
+  const state = await lanPairStore.get(pairId)
+  if (!state) return { enabled: true, online: false, reason: 'offline' }
+  if (hashPairKey(pairKey) !== String(state.keyHash || '')) {
+    return { enabled: true, online: false, reason: 'key-mismatch' }
+  }
+  if (LAN_PAIR_BIND_PUBLIC_IP) {
+    const stateIpHash = String(state.clientIpHash || '')
+    const requestIpHash = hashClientIp(req)
+    if (stateIpHash && requestIpHash && stateIpHash !== requestIpHash) {
+      return { enabled: true, online: false, reason: 'network-mismatch' }
+    }
+  }
+
+  const endpoint = chooseLanPairEndpoint(state)
+  if (!endpoint) return { enabled: true, online: false, reason: 'no-endpoint' }
+
+  return {
+    enabled: true,
+    online: true,
+    endpoint,
+    state
+  }
+}
+
+function lanPairOfflineResponse(req, res, routeKind) {
+  res.setHeader('Cache-Control', 'no-store')
+  res.setHeader('X-PVTKRRX-LAN-Pair', 'offline')
+
+  if (routeKind === 'manifest') {
+    const m = getManifest(req)
+    if (m.behaviorHints) m.behaviorHints.configurationRequired = true
+    return res.json(m)
+  }
+  if (routeKind === 'catalog') return res.json({ metas: [], cacheMaxAge: 0 })
+  if (routeKind === 'stream') return res.json({ streams: [], cacheMaxAge: 0 })
+  if (routeKind === 'meta') return res.json({ meta: null })
+  return res.status(503).json({
+    error: 'LAN pair offline. Open PVTKRRX desktop on the host PC.'
+  })
+}
+
+function maybeLanPairRedirect(routeKind) {
+  return async (req, res, next) => {
+    try {
+      if (req.params.config === 'local') return next()
+      if (isLoopbackHost(req)) return next()
+
+      const resolution = await resolveLanPair(req.config || {}, req)
+      req.lanPair = resolution
+
+      if (!resolution.enabled) return next()
+
+      if (!resolution.online) {
+        if (parseBooleanLoose(req.config?.lanPairRequired, false)) {
+          return lanPairOfflineResponse(req, res, routeKind)
+        }
+        return next()
+      }
+
+      const redirectUrl = buildLanRedirectUrl(req, resolution.endpoint.baseUrl)
+      if (!redirectUrl) {
+        if (parseBooleanLoose(req.config?.lanPairRequired, false)) {
+          return lanPairOfflineResponse(req, res, routeKind)
+        }
+        return next()
+      }
+
+      res.setHeader('Cache-Control', 'no-store')
+      res.setHeader('X-PVTKRRX-LAN-Pair', 'redirect')
+      res.redirect(307, redirectUrl)
+    } catch (err) {
+      if (parseBooleanLoose(req.config?.lanPairRequired, false)) {
+        return lanPairOfflineResponse(req, res, routeKind)
+      }
+      next()
+    }
+  }
+}
+
 // ─── Stremio addon routes (config-authenticated) ────────────
-app.get('/:config/manifest.json', withConfig, (req, res) => {
+app.get('/:config/manifest.json', withConfig, maybeLanPairRedirect('manifest'), (req, res) => {
   const m = getManifest(req)
   // Configured URL — user is already set up, show Install not Configure.
   // For /local without saved credentials, keep configurationRequired=true
@@ -696,21 +1152,21 @@ app.get('/manifest.json', (req, res) => {
   res.json(getManifest(req))
 })
 
-app.get('/:config/catalog/:type/:id.json', withConfig, async (req, res) => {
+app.get('/:config/catalog/:type/:id.json', withConfig, maybeLanPairRedirect('catalog'), async (req, res) => {
   const result = await handleCatalog(req.config, req.params.type, req.params.id, null, {
     baseUrl: getPublicBaseUrl(req)
   })
   res.json(result)
 })
 
-app.get('/:config/catalog/:type/:id/:extra.json', withConfig, async (req, res) => {
+app.get('/:config/catalog/:type/:id/:extra.json', withConfig, maybeLanPairRedirect('catalog'), async (req, res) => {
   const result = await handleCatalog(req.config, req.params.type, req.params.id, req.params.extra, {
     baseUrl: getPublicBaseUrl(req)
   })
   res.json(result)
 })
 
-app.get('/:config/stream/:type/:id.json', withConfig, async (req, res) => {
+app.get('/:config/stream/:type/:id.json', withConfig, maybeLanPairRedirect('stream'), async (req, res) => {
   const addonUrl = getPublicBaseUrl(req)
   const tokenShort = String(req.params.config || '').slice(0, 8)
   console.log(`[stream-route] token=${tokenShort} type=${req.params.type} id=${req.params.id}`)
@@ -719,7 +1175,7 @@ app.get('/:config/stream/:type/:id.json', withConfig, async (req, res) => {
   res.json(result)
 })
 
-app.get('/:config/meta/:type/:id.json', withConfig, async (req, res) => {
+app.get('/:config/meta/:type/:id.json', withConfig, maybeLanPairRedirect('meta'), async (req, res) => {
   const result = await handleMeta(req.config, req.params.type, req.params.id, {
     baseUrl: getPublicBaseUrl(req)
   })
@@ -759,7 +1215,7 @@ app.post('/:config/qbit/download-path', withConfig, async (req, res) => {
 
 // ─── Built-in file server — serves local files with Range support ───
 // Used when no external fileServerUrl is configured (e.g. local qBit setup).
-app.get('/:config/file/:info', withConfig, async (req, res) => {
+app.get('/:config/file/:info', withConfig, maybeLanPairRedirect('file'), async (req, res) => {
   try {
     const tokenShort = String(req.params.config || '').slice(0, 8)
     const { h, p } = JSON.parse(Buffer.from(req.params.info, 'base64url').toString())
@@ -895,7 +1351,7 @@ app.get('/:config/file/:info', withConfig, async (req, res) => {
 })
 
 // ─── Playback endpoint — Comet pattern ──────────────────────
-app.get('/:config/playback/:info', withConfig, async (req, res) => {
+app.get('/:config/playback/:info', withConfig, maybeLanPairRedirect('playback'), async (req, res) => {
   try {
     const tokenShort = String(req.params.config || '').slice(0, 8)
     const info = JSON.parse(Buffer.from(req.params.info, 'base64url').toString())

@@ -20,6 +20,7 @@ const WINDOW_HEIGHT = 416
 const PROVISION_ONLY_ARG = '--pvtkrrx-provision-only'
 const provisionOnlyMode = process.argv.includes(PROVISION_ONLY_ARG)
 let hasRetriedPortRecovery = false
+const LAN_PAIR_HEARTBEAT_MS = Math.max(15000, parseInt(process.env.PVTKRRX_LAN_PAIR_HEARTBEAT_MS || '30000', 10))
 
 function readPersistedLocalHostname() {
   try {
@@ -229,6 +230,8 @@ let httpServer = null
 let port = parseInt(process.env.PORT || '7000', 10)
 let running = false
 let ownsServer = false
+let lanPairTimer = null
+let lanPairFailureCount = 0
 
 function getLocalInstallManifestUrl() {
   return `http://127.0.0.1:${port}/local/manifest.json?mode=local`
@@ -354,6 +357,119 @@ async function getServiceUrls() {
     prowlarrUrl: cfg?.jackettUrl || 'http://127.0.0.1:9696',
     qbitUrl: cfg?.qbitUrl || 'http://127.0.0.1:8080'
   }
+}
+
+function normalizeRelayUrl(raw) {
+  const text = String(raw || '').trim().replace(/\/+$/, '')
+  if (!text) return ''
+  try {
+    const url = new URL(text)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return ''
+    return `${url.protocol}//${url.host}`
+  } catch (_) {
+    return ''
+  }
+}
+
+function sanitizeBaseUrl(raw) {
+  const text = String(raw || '').trim()
+  if (!text) return ''
+  try {
+    const url = new URL(text)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return ''
+    return `${url.protocol}//${url.host}`
+  } catch (_) {
+    return ''
+  }
+}
+
+function dedupeEndpoints(list) {
+  const out = []
+  const seen = new Set()
+  for (const item of Array.isArray(list) ? list : []) {
+    const baseUrl = sanitizeBaseUrl(item?.baseUrl)
+    if (!baseUrl) continue
+    if (seen.has(baseUrl)) continue
+    seen.add(baseUrl)
+    out.push({
+      baseUrl,
+      source: String(item?.source || '').trim() || 'unknown'
+    })
+  }
+  return out
+}
+
+async function buildLanPairHeartbeatPayload() {
+  const cfg = await getLocalConfig()
+  if (!cfg || cfg.lanPairEnabled === false) return null
+
+  const pairId = String(cfg.lanPairId || '').trim().toLowerCase()
+  const pairKey = String(cfg.lanPairKey || '').trim()
+  const relayUrl = normalizeRelayUrl(cfg.lanPairRelayUrl || process.env.PVTKRRX_PAIR_RELAY_URL || '')
+  if (!pairId || !pairKey || !relayUrl) return null
+
+  const networkInfo = await fetchJson(`http://127.0.0.1:${port}/network-info`, {}, 4000).catch(() => null)
+  const endpoints = dedupeEndpoints(networkInfo?.pairEndpoints || [])
+  if (!endpoints.length) return null
+
+  return {
+    relayUrl,
+    body: {
+      pairId,
+      pairKey,
+      localHostname: String(cfg.localHostname || '').trim(),
+      relayUrl,
+      appVersion: String(pkg.version || ''),
+      endpoints
+    }
+  }
+}
+
+async function sendLanPairHeartbeat() {
+  try {
+    const payload = await buildLanPairHeartbeatPayload()
+    if (!payload) return
+
+    const res = await fetch(`${payload.relayUrl}/pair/heartbeat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload.body),
+      signal: AbortSignal.timeout(4000)
+    })
+
+    if (!res.ok) {
+      lanPairFailureCount += 1
+      if (lanPairFailureCount >= 3) {
+        console.warn('[desktop] lan pair heartbeat failed with status', res.status)
+      }
+      return
+    }
+
+    if (lanPairFailureCount >= 3) {
+      console.log('[desktop] lan pair heartbeat restored')
+    }
+    lanPairFailureCount = 0
+  } catch (err) {
+    lanPairFailureCount += 1
+    if (lanPairFailureCount >= 3) {
+      console.warn('[desktop] lan pair heartbeat error:', err.message)
+    }
+  }
+}
+
+function startLanPairHeartbeatLoop() {
+  stopLanPairHeartbeatLoop()
+  sendLanPairHeartbeat().catch(() => {})
+  lanPairTimer = setInterval(() => {
+    sendLanPairHeartbeat().catch(() => {})
+  }, LAN_PAIR_HEARTBEAT_MS)
+  if (typeof lanPairTimer.unref === 'function') lanPairTimer.unref()
+}
+
+function stopLanPairHeartbeatLoop() {
+  if (!lanPairTimer) return
+  clearInterval(lanPairTimer)
+  lanPairTimer = null
 }
 
 function pushStatus() {
@@ -539,6 +655,7 @@ app.whenReady().then(async () => {
   await bootstrapAutoProvision()
   running = await isServerReachable(port)
   pushStatus()
+  startLanPairHeartbeatLoop()
   showMainAndCloseSplash()
 })
 
@@ -547,6 +664,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  stopLanPairHeartbeatLoop()
   stopAddonServer()
 })
 
