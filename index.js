@@ -586,12 +586,25 @@ function scheduleWatchedCleanup(config, hash, reason = 'watched-threshold') {
 
 function getManifest(req) {
   const mode = getInstallMode(req)
-  const modeLabel = mode === 'local' ? 'Local' : 'Hosted'
+  let profile = 'online'
+  if (mode === 'local') {
+    profile = 'local'
+  } else if (req?.params?.config && req.params.config !== 'local' && parseBooleanLoose(req?.config?.lanPairEnabled, false)) {
+    profile = 'lan'
+  }
+
+  const idSuffix = profile
+  const nameLabel = profile === 'local'
+    ? 'PC Local'
+    : profile === 'lan'
+      ? 'LAN Bridge'
+      : 'Online'
+
   return {
     ...manifest,
     behaviorHints: { ...(manifest.behaviorHints || {}) },
-    id: `com.kepners.pvtkrrx.${mode}`,
-    name: `PVTKRRX (${modeLabel})`,
+    id: `com.kepners.pvtkrrx.${idSuffix}`,
+    name: `PVTKRRX (${nameLabel})`,
     logo: `${getPublicBaseUrl(req)}/logo.ico`
   }
 }

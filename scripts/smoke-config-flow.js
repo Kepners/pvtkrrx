@@ -88,7 +88,7 @@ async function run() {
     const tokenManifestRes = await fetch(`${base}/${token}/manifest.json?mode=hosted`)
     assert.equal(tokenManifestRes.status, 200, 'GET /:token/manifest.json should return 200')
     const tokenManifest = await tokenManifestRes.json()
-    assert.equal(tokenManifest.id, 'com.kepners.pvtkrrx.hosted')
+    assert.equal(tokenManifest.id, 'com.kepners.pvtkrrx.online')
     assert.equal(tokenManifest.behaviorHints?.configurable, true)
     assert.equal(tokenManifest.behaviorHints?.configurationRequired, false)
 
