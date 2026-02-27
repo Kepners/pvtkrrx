@@ -21,6 +21,8 @@ const PROVISION_ONLY_ARG = '--pvtkrrx-provision-only'
 const provisionOnlyMode = process.argv.includes(PROVISION_ONLY_ARG)
 let hasRetriedPortRecovery = false
 const LAN_PAIR_HEARTBEAT_MS = Math.max(15000, parseInt(process.env.PVTKRRX_LAN_PAIR_HEARTBEAT_MS || '30000', 10))
+const STREMIO_LAUNCH_WATCH_ENABLED = String(process.env.PVTKRRX_STREMIO_LAUNCH_WATCH_ENABLED || 'true').trim().toLowerCase() !== 'false'
+const STREMIO_LAUNCH_POLL_MS = Math.max(5000, parseInt(process.env.PVTKRRX_STREMIO_LAUNCH_POLL_MS || '10000', 10))
 
 function readPersistedLocalHostname() {
   try {
@@ -232,6 +234,9 @@ let running = false
 let ownsServer = false
 let lanPairTimer = null
 let lanPairFailureCount = 0
+let stremioLaunchWatchTimer = null
+let stremioWasRunning = false
+let stremioLaunchWatchFailureCount = 0
 
 function getLocalInstallManifestUrl() {
   return `http://127.0.0.1:${port}/local/manifest.json?mode=local`
@@ -457,6 +462,64 @@ async function sendLanPairHeartbeat() {
   }
 }
 
+async function isStremioRunning() {
+  if (process.platform !== 'win32') return false
+  const script = `
+    try {
+      $proc = Get-Process -ErrorAction SilentlyContinue | Where-Object { $_.ProcessName -match 'stremio' } | Select-Object -First 1
+      if ($proc) { Write-Output '1' } else { Write-Output '0' }
+      exit 0
+    } catch {
+      Write-Error $_.Exception.Message
+      exit 1
+    }
+  `
+  const result = await runPowerShell(script, 10000)
+  if (result.code !== 0) {
+    throw new Error((result.stderr || result.stdout || '').trim() || 'failed to inspect stremio process')
+  }
+  return /\b1\b/.test(String(result.stdout || ''))
+}
+
+async function pulseLanPairOnStremioLaunch() {
+  try {
+    const runningNow = await isStremioRunning()
+    const launched = runningNow && !stremioWasRunning
+    stremioWasRunning = runningNow
+
+    if (launched) {
+      sendLanPairHeartbeat().catch(() => {})
+    }
+
+    if (stremioLaunchWatchFailureCount >= 3) {
+      console.log('[desktop] stremio launch watch restored')
+    }
+    stremioLaunchWatchFailureCount = 0
+  } catch (err) {
+    stremioLaunchWatchFailureCount += 1
+    if (stremioLaunchWatchFailureCount >= 3) {
+      console.warn('[desktop] stremio launch watch error:', err.message)
+    }
+  }
+}
+
+function startStremioLaunchWatch() {
+  stopStremioLaunchWatch()
+  if (!STREMIO_LAUNCH_WATCH_ENABLED) return
+  if (process.platform !== 'win32') return
+  pulseLanPairOnStremioLaunch().catch(() => {})
+  stremioLaunchWatchTimer = setInterval(() => {
+    pulseLanPairOnStremioLaunch().catch(() => {})
+  }, STREMIO_LAUNCH_POLL_MS)
+  if (typeof stremioLaunchWatchTimer.unref === 'function') stremioLaunchWatchTimer.unref()
+}
+
+function stopStremioLaunchWatch() {
+  if (stremioLaunchWatchTimer) clearInterval(stremioLaunchWatchTimer)
+  stremioLaunchWatchTimer = null
+  stremioWasRunning = false
+}
+
 function startLanPairHeartbeatLoop() {
   stopLanPairHeartbeatLoop()
   sendLanPairHeartbeat().catch(() => {})
@@ -656,6 +719,7 @@ app.whenReady().then(async () => {
   running = await isServerReachable(port)
   pushStatus()
   startLanPairHeartbeatLoop()
+  startStremioLaunchWatch()
   showMainAndCloseSplash()
 })
 
@@ -664,6 +728,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  stopStremioLaunchWatch()
   stopLanPairHeartbeatLoop()
   stopAddonServer()
 })

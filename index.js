@@ -34,9 +34,14 @@ const WATCHED_DELETE_THRESHOLD = Math.max(0.5, Math.min(0.99, parseFloat(process
 const WATCHED_DELETE_GRACE_MS = Math.max(0, parseInt(process.env.PVTKRRX_WATCHED_DELETE_GRACE_MS || '180000', 10))
 const LAN_PAIR_TTL_SECONDS = Math.max(30, parseInt(process.env.PVTKRRX_LAN_PAIR_TTL_SECONDS || '120', 10))
 const LAN_PAIR_BIND_PUBLIC_IP = String(process.env.PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP || 'true').trim().toLowerCase() !== 'false'
+const LAN_PAIR_LOCK_HOST = String(process.env.PVTKRRX_LAN_PAIR_LOCK_HOST || 'true').trim().toLowerCase() !== 'false'
 const LAN_PAIR_RATE_LIMIT_WINDOW_MS = Math.max(1000, parseInt(process.env.PVTKRRX_LAN_PAIR_RATE_LIMIT_WINDOW_MS || '60000', 10))
 const LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW || '30', 10))
 const LAN_PAIR_STATUS_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_LAN_PAIR_STATUS_MAX_PER_WINDOW || '60', 10))
+const ENCRYPT_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_ENCRYPT_MAX_PER_WINDOW || '30', 10))
+const SENSITIVE_WEB_ORIGINS = parseOriginAllowlist(
+  process.env.PVTKRRX_ALLOWED_WEB_ORIGINS || 'https://pvtkrrx.vercel.app'
+)
 const watchedDeleteTimers = new Map()
 const watchedDeleteInFlight = new Set()
 const lanPairRateBuckets = new Map()
@@ -360,9 +365,98 @@ function sanitizeHostForUrl(value) {
   return host || ''
 }
 
+function normalizeOrigin(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  try {
+    const parsed = new URL(raw)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return ''
+    return `${parsed.protocol}//${parsed.host}`.toLowerCase()
+  } catch (_) {
+    return ''
+  }
+}
+
+function parseOriginAllowlist(raw) {
+  const out = new Set()
+  const parts = String(raw || '').split(',')
+  for (const part of parts) {
+    const origin = normalizeOrigin(part)
+    if (origin) out.add(origin)
+  }
+  return out
+}
+
+function requestHostname(req) {
+  const hostHeader = String(req.get('host') || '')
+  if (hostHeader.startsWith('[')) {
+    const end = hostHeader.indexOf(']')
+    if (end > 1) return hostHeader.slice(1, end).trim().toLowerCase()
+  }
+  return String(hostHeader.split(':')[0] || '').trim().toLowerCase()
+}
+
+function isLocalNetworkRequest(req) {
+  const host = requestHostname(req)
+  if (!host) return false
+  if (host === '::1') return true
+  return isLikelyLanHost(host)
+}
+
+function isSensitiveCorsRoute(req) {
+  const pathName = String(req.path || '')
+  return pathName === '/encrypt' || pathName.startsWith('/pair/')
+}
+
+function isAllowedSensitiveOrigin(req) {
+  const rawOrigin = String(req.headers.origin || '').trim()
+  if (!rawOrigin) return true
+  const origin = normalizeOrigin(rawOrigin)
+  if (!origin) return false
+
+  const currentOrigin = normalizeOrigin(getPublicBaseUrl(req))
+  if (currentOrigin && origin === currentOrigin) return true
+  if (SENSITIVE_WEB_ORIGINS.has(origin)) return true
+
+  try {
+    const host = String(new URL(origin).hostname || '').toLowerCase()
+    if (host === '::1') return true
+    if (isLikelyLanHost(host)) return true
+  } catch (_) {}
+  return false
+}
+
+function requireLocalNetworkRoute(req, res, next) {
+  if (isLocalNetworkRequest(req)) return next()
+  return res.status(403).json({ error: 'Local network route only' })
+}
+
+function requireLoopbackLocalConfig(req, res, next) {
+  if (req.params.config !== 'local') return next()
+  if (isLoopbackHost(req)) return next()
+  return res.status(403).json({ error: 'Local config route requires loopback host' })
+}
+
+function requireLocalQbitControl(req, res, next) {
+  if (req.params.config === 'local' && isLoopbackHost(req)) return next()
+  return res.status(403).json({ error: 'qBittorrent control route is local-only' })
+}
+
 // ─── CORS ───────────────────────────────────────────────────
 app.use((req, res, next) => {
-  res.setHeader('Access-Control-Allow-Origin', '*')
+  const sensitiveCorsRoute = isSensitiveCorsRoute(req)
+  const sensitiveOriginAllowed = !sensitiveCorsRoute || isAllowedSensitiveOrigin(req)
+  const requestOrigin = normalizeOrigin(String(req.headers.origin || ''))
+
+  if (sensitiveCorsRoute) {
+    if (requestOrigin && sensitiveOriginAllowed) {
+      res.setHeader('Access-Control-Allow-Origin', requestOrigin)
+      res.setHeader('Vary', 'Origin')
+    }
+  } else {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+  }
+
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
   const requestedHeaders = String(req.headers['access-control-request-headers'] || '').trim()
   const defaultHeaders = [
@@ -373,17 +467,26 @@ app.use((req, res, next) => {
     'Stremio-Protocol-Version',
     'Access-Control-Request-Private-Network'
   ]
-  res.setHeader(
-    'Access-Control-Allow-Headers',
-    requestedHeaders || defaultHeaders.join(', ')
-  )
-  // Needed for browser-based clients (e.g. web Stremio) requesting local/LAN URLs.
-  // Without this, Chrome/Edge may block with generic "Failed to fetch".
+  res.setHeader('Access-Control-Allow-Headers', requestedHeaders || defaultHeaders.join(', '))
   if (String(req.headers['access-control-request-private-network'] || '').toLowerCase() === 'true') {
     res.setHeader('Access-Control-Allow-Private-Network', 'true')
   }
   res.setHeader('Access-Control-Max-Age', '600')
-  if (req.method === 'OPTIONS') return res.sendStatus(204)
+  res.setHeader('X-Content-Type-Options', 'nosniff')
+  res.setHeader('X-Frame-Options', 'DENY')
+  res.setHeader('Referrer-Policy', 'no-referrer')
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()')
+  if (String(req.headers['x-forwarded-proto'] || req.protocol || '').toLowerCase().includes('https')) {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
+  }
+
+  if (req.method === 'OPTIONS') {
+    if (sensitiveCorsRoute && !sensitiveOriginAllowed) return res.sendStatus(403)
+    return res.sendStatus(204)
+  }
+  if (sensitiveCorsRoute && !sensitiveOriginAllowed) {
+    return res.status(403).json({ error: 'Origin not allowed' })
+  }
   next()
 })
 
@@ -426,8 +529,7 @@ function getPublicBaseUrl(req) {
 }
 
 function isLoopbackHost(req) {
-  const hostHeader = String(req.get('host') || '')
-  const hostname = hostHeader.split(':')[0].toLowerCase()
+  const hostname = requestHostname(req)
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
 }
 
@@ -706,6 +808,15 @@ async function loadTorrentPlaybackState(qbit, hash, targetPath) {
 app.post('/encrypt', (req, res) => {
   const secret = process.env.ENCRYPTION_SECRET
   if (!secret) return res.status(500).json({ error: 'ENCRYPTION_SECRET not configured' })
+  const clientIp = getClientIp(req)
+  const limit = consumeLanPairRateLimit('encrypt', clientIp || 'unknown', ENCRYPT_MAX_PER_WINDOW)
+  if (!limit.allowed) {
+    res.setHeader('Retry-After', String(limit.retryAfterSeconds))
+    return res.status(429).json({ error: 'too many requests' })
+  }
+  if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+    return res.status(400).json({ error: 'Invalid config payload' })
+  }
 
   try {
     const token = encrypt(req.body, secret)
@@ -716,7 +827,7 @@ app.post('/encrypt', (req, res) => {
 })
 
 // Save local-mode config to disk so Stremio can use a stable /local manifest URL.
-app.post('/local-config', (req, res) => {
+app.post('/local-config', requireLocalNetworkRoute, (req, res) => {
   const cfg = req.body || {}
   if (!cfg.qbitUrl) {
     return res.status(400).json({ error: 'qBit URL is required for local config' })
@@ -748,7 +859,7 @@ app.post('/local-config', (req, res) => {
   }
 })
 
-app.post('/auto-provision', async (req, res) => {
+app.post('/auto-provision', requireLocalNetworkRoute, async (req, res) => {
   try {
     const options = req.body || {}
     const localHostname = normalizeLocalHostname(options.localHostname || DEFAULT_LOCAL_HOSTNAME)
@@ -798,7 +909,7 @@ app.get('/health', (req, res) => {
 })
 
 // Returns local/lan install URLs for one-click setup across PC + TV/phone on same LAN.
-app.get('/network-info', (req, res) => {
+app.get('/network-info', requireLocalNetworkRoute, (req, res) => {
   const port = parseInt(process.env.PORT || '7000', 10)
   const httpsPort = parseInt(process.env.HTTPS_PORT || '7001', 10)
   const lanIps = detectLanAddresses()
@@ -850,11 +961,26 @@ app.post('/pair/heartbeat', async (req, res) => {
       return res.status(429).json({ ok: false, error: 'too many requests' })
     }
 
+    const incomingKeyHash = hashPairKey(pairKey)
+    const incomingIpHash = LAN_PAIR_BIND_PUBLIC_IP ? hashClientIp(req) : ''
+    const existingState = await lanPairStore.get(pairId)
+    if (existingState) {
+      if (incomingKeyHash !== String(existingState.keyHash || '')) {
+        return res.status(403).json({ ok: false, error: 'invalid pair key' })
+      }
+      if (LAN_PAIR_BIND_PUBLIC_IP && LAN_PAIR_LOCK_HOST) {
+        const existingIpHash = String(existingState.clientIpHash || '')
+        if (existingIpHash && incomingIpHash && existingIpHash !== incomingIpHash) {
+          return res.status(409).json({ ok: false, error: 'pair host mismatch' })
+        }
+      }
+    }
+
     const now = Date.now()
     const state = {
       pairId,
-      keyHash: hashPairKey(pairKey),
-      clientIpHash: LAN_PAIR_BIND_PUBLIC_IP ? hashClientIp(req) : '',
+      keyHash: incomingKeyHash,
+      clientIpHash: incomingIpHash,
       endpoints,
       localHostname,
       relayUrl,
@@ -922,7 +1048,7 @@ app.post('/pair/status', async (req, res) => {
 // Local install helper page (localhost copy workflow).
 // Open on the same PC that runs PVTKRRX:
 // http://127.0.0.1:7000/local/install
-app.get('/local/install', (req, res) => {
+app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
   const port = parseInt(process.env.PORT || '7000', 10)
   const loopbackManifest = `http://127.0.0.1:${port}/local/manifest.json?mode=local`
   const requestedHost = sanitizeHostForUrl(req.query.host)
@@ -1143,7 +1269,7 @@ app.get('/:config/manifest.json', withConfig, maybeLanPairRedirect('manifest'), 
   res.json(m)
 })
 
-app.get('/:config/config.json', withConfig, (req, res) => {
+app.get('/:config/config.json', withConfig, requireLoopbackLocalConfig, (req, res) => {
   res.setHeader('Cache-Control', 'no-store')
   res.json(req.config)
 })
@@ -1182,7 +1308,7 @@ app.get('/:config/meta/:type/:id.json', withConfig, maybeLanPairRedirect('meta')
   res.json(result)
 })
 
-app.get('/:config/qbit/preferences', withConfig, async (req, res) => {
+app.get('/:config/qbit/preferences', withConfig, requireLocalQbitControl, async (req, res) => {
   try {
     const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
     const prefs = await qbit.preferences()
@@ -1196,7 +1322,7 @@ app.get('/:config/qbit/preferences', withConfig, async (req, res) => {
   }
 })
 
-app.post('/:config/qbit/download-path', withConfig, async (req, res) => {
+app.post('/:config/qbit/download-path', withConfig, requireLocalQbitControl, async (req, res) => {
   try {
     const savePath = String(req.body?.savePath || '').trim()
     if (!savePath) return res.status(400).json({ error: 'savePath is required' })

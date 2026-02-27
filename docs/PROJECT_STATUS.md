@@ -20,7 +20,7 @@ PVTKRRX is in **post-MVP hardening and multi-device LAN pairing**.
    - `POST /pair/heartbeat`
    - `POST /pair/status`
    - hosted route redirect to active LAN endpoint when pair is online
-   - desktop background heartbeat loop
+   - desktop background heartbeat loop + Stremio launch pulse
    - configure UI Method 4 hosted LAN-pair install URL generation
 6. LAN pair privacy hardening:
    - `/pair/status` now requires both `pairId` and `pairKey`
@@ -28,6 +28,9 @@ PVTKRRX is in **post-MVP hardening and multi-device LAN pairing**.
    - hosted fallback responses avoid exposing resolver reason details
    - heartbeat/status endpoints are rate limited
    - optional public-IP binding blocks pair reuse from other networks by default (`PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP=true`)
+   - heartbeat host-lock can reject active-session takeover from a different source IP (`PVTKRRX_LAN_PAIR_LOCK_HOST=true`)
+   - sensitive routes (`/encrypt`, `/pair/*`) use strict browser-origin allowlists
+   - local admin routes (`/local-config`, `/auto-provision`, `/network-info`, local qBit control) are local-network/loopback guarded
 
 ## Active Worktree Items
 
@@ -47,9 +50,12 @@ Use these on the hosted deployment:
 4. Optional: `PVTKRRX_LAN_PAIR_TTL_SECONDS` (default `120`).
 5. Optional security tuning:
    - `PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP` (default `true`)
+   - `PVTKRRX_LAN_PAIR_LOCK_HOST` (default `true`)
    - `PVTKRRX_LAN_PAIR_RATE_LIMIT_WINDOW_MS` (default `60000`)
    - `PVTKRRX_LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW` (default `30`)
    - `PVTKRRX_LAN_PAIR_STATUS_MAX_PER_WINDOW` (default `60`)
+   - `PVTKRRX_ENCRYPT_MAX_PER_WINDOW` (default `30`)
+   - `PVTKRRX_ALLOWED_WEB_ORIGINS` (browser allowlist, defaults to hosted production origin)
 
 Without KV, pair state falls back to in-memory state and may be unreliable on cold starts.
 
