@@ -1172,6 +1172,46 @@ function withConfig(req, res, next) {
   }
 }
 
+function isMagnetLink(link) {
+  return String(link || '').trim().toLowerCase().startsWith('magnet:')
+}
+
+function parseTorrentFileName(contentDisposition, fallback = 'download.torrent') {
+  const text = String(contentDisposition || '')
+  const utf8Match = text.match(/filename\*=UTF-8''([^;]+)/i)
+  if (utf8Match && utf8Match[1]) {
+    try {
+      const decoded = decodeURIComponent(utf8Match[1]).trim()
+      if (decoded) return decoded
+    } catch (_) {}
+  }
+  const plainMatch = text.match(/filename="?([^\";]+)"?/i)
+  if (plainMatch && plainMatch[1]) {
+    const value = String(plainMatch[1]).trim()
+    if (value) return value
+  }
+  return fallback
+}
+
+async function fetchTorrentPayload(link) {
+  const target = String(link || '').trim()
+  if (!target) throw new Error('Empty tracker link')
+  const response = await fetch(target, {
+    redirect: 'follow',
+    signal: AbortSignal.timeout(10000),
+    headers: {
+      Accept: 'application/x-bittorrent, application/octet-stream, */*'
+    }
+  })
+  if (!response.ok) {
+    throw new Error(`tracker download HTTP ${response.status}`)
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer())
+  if (!bytes.length) throw new Error('tracker download returned empty payload')
+  const fileName = parseTorrentFileName(response.headers.get('content-disposition'), 'download.torrent')
+  return { bytes, fileName }
+}
+
 async function resolveLanPair(config, req) {
   const enabled = parseBooleanLoose(config?.lanPairEnabled, false)
   if (!enabled) return { enabled: false, online: false, reason: 'disabled' }
@@ -1546,10 +1586,18 @@ app.get('/:config/playback/:info', withConfig, maybeLanPairRedirect('playback'),
     // Not ready yet — add to qBit queue if we have a tracker/magnet link.
     if (info.l && !hasTorrent) {
       try {
-        await qbit.add(info.l, {
-          sequentialDownload: true,
-          firstLastPiecePrio: STREAM_PRIORITIZE_LAST_PIECES
-        })
+        if (isMagnetLink(info.l)) {
+          await qbit.add(info.l, {
+            sequentialDownload: true,
+            firstLastPiecePrio: STREAM_PRIORITIZE_LAST_PIECES
+          })
+        } else {
+          const payload = await fetchTorrentPayload(info.l)
+          await qbit.addTorrentFile(payload.bytes, payload.fileName, {
+            sequentialDownload: true,
+            firstLastPiecePrio: STREAM_PRIORITIZE_LAST_PIECES
+          })
+        }
       } catch (addErr) {
         // qBit may reject duplicate/stale URLs; continue probing torrent list.
         console.warn(`[playback-route] add rejected: ${addErr.message}`)

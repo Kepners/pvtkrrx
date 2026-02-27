@@ -143,6 +143,29 @@ class QBitClient {
     })
   }
 
+  async addTorrentFile(bytes, fileName = 'download.torrent', options = {}) {
+    const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || [])
+    if (!payload || payload.length === 0) {
+      throw new Error('torrent payload is empty')
+    }
+
+    const form = new FormData()
+    form.append(
+      'torrents',
+      new Blob([payload], { type: 'application/x-bittorrent' }),
+      String(fileName || 'download.torrent')
+    )
+    if (options.sequentialDownload === true) form.append('sequentialDownload', 'true')
+    if (options.firstLastPiecePrio === true) form.append('firstLastPiecePrio', 'true')
+    if (options.paused === true) form.append('paused', 'true')
+
+    return this.request('/api/v2/torrents/add', {
+      method: 'POST',
+      body: form,
+      expect: 'text'
+    })
+  }
+
   async delete(hashes, deleteFiles = true) {
     const value = Array.isArray(hashes) ? hashes.join('|') : String(hashes || '')
     return this.request('/api/v2/torrents/delete', {
