@@ -1260,7 +1260,7 @@ function maybeLanPairRedirect(routeKind) {
 }
 
 // ─── Stremio addon routes (config-authenticated) ────────────
-app.get('/:config/manifest.json', withConfig, maybeLanPairRedirect('manifest'), (req, res) => {
+app.get('/:config/manifest.json', withConfig, (req, res) => {
   const m = getManifest(req)
   // Configured URL — user is already set up, show Install not Configure.
   // For /local without saved credentials, keep configurationRequired=true
