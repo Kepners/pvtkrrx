@@ -38,9 +38,6 @@
         linear-gradient(180deg, #03050a 0%, #090f1c 100%);
       color: var(--text);
       min-height: 100vh;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
       padding: 2rem 1rem;
       position: relative;
     }
@@ -68,17 +65,187 @@
       background: linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
     }
 
+    .vortex,
+    .scanlines,
+    .noise,
+    .glitch-flash {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .vortex {
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .vortex-layer {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 170vmax;
+      height: 170vmax;
+      transform: translate(-50%, -50%);
+      border-radius: 999px;
+      mix-blend-mode: screen;
+      opacity: 0.1;
+    }
+
+    .vortex-layer.one {
+      background:
+        repeating-radial-gradient(circle at center, rgba(0, 246, 255, 0.5) 0 1px, transparent 1px 14px),
+        conic-gradient(from 0deg, transparent, rgba(0, 246, 255, 0.2), transparent, rgba(255, 0, 212, 0.16), transparent);
+      animation: vortex-spin-a 30s linear infinite;
+    }
+
+    .vortex-layer.two {
+      background:
+        repeating-radial-gradient(circle at center, rgba(0, 255, 102, 0.45) 0 1px, transparent 1px 16px),
+        conic-gradient(from 130deg, transparent, rgba(255, 49, 95, 0.16), transparent, rgba(0, 246, 255, 0.16), transparent);
+      animation: vortex-spin-b 44s linear infinite reverse;
+      opacity: 0.08;
+    }
+
+    .scanlines {
+      z-index: 4;
+      opacity: 0.25;
+      background:
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 3px),
+        repeating-linear-gradient(90deg, rgba(0, 246, 255, 0.04) 0 1px, transparent 1px 2px);
+      animation: scan-drift 8s linear infinite;
+    }
+
+    .noise {
+      z-index: 5;
+      opacity: 0.05;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84' viewBox='0 0 84 84'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='84' height='84' filter='url(%23n)'/%3E%3C/svg%3E");
+      animation: noise-jump 0.2s steps(2) infinite;
+    }
+
+    .glitch-flash {
+      z-index: 6;
+      opacity: 0;
+      background:
+        linear-gradient(90deg, rgba(255, 19, 79, 0.13), transparent 30%, rgba(0, 246, 255, 0.12) 62%, transparent 90%),
+        radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.12), transparent 58%);
+      mix-blend-mode: screen;
+    }
+
+    body.glitch-burst .glitch-flash {
+      opacity: 1;
+    }
+
+    .shell {
+      width: min(1200px, 94vw);
+      margin: 0 auto;
+      position: relative;
+      z-index: 7;
+    }
+
+    .topbar {
+      border: 1px solid rgba(0, 246, 255, 0.2);
+      background: rgba(6, 9, 16, 0.74);
+      border-radius: 14px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+        0 0 22px rgba(0, 168, 255, 0.14);
+    }
+
+    .topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .topbar-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--accent);
+      box-shadow: 0 0 12px var(--accent), 0 0 26px rgba(0, 246, 255, 0.75);
+      flex: 0 0 auto;
+    }
+
+    .topbar-text {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #d2e4ff;
+      text-shadow: 0 0 8px rgba(0, 168, 255, 0.45);
+      white-space: nowrap;
+    }
+
+    .topbar-nav {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .topbar-nav a {
+      text-decoration: none;
+      border: 1px solid rgba(0, 246, 255, 0.28);
+      border-radius: 999px;
+      padding: 6px 10px;
+      color: #bfd6ff;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all 0.18s ease;
+      background: rgba(2, 8, 18, 0.58);
+    }
+
+    .topbar-nav a:hover {
+      color: #fff;
+      border-color: rgba(255, 0, 212, 0.55);
+      box-shadow: 0 0 0 2px rgba(255, 0, 212, 0.18), 0 0 14px rgba(0, 246, 255, 0.3);
+      transform: translateY(-1px);
+    }
+
     .container {
-      max-width: 680px;
+      max-width: 760px;
       width: 100%;
       animation: fadeUp 0.4s ease-out;
       position: relative;
       z-index: 3;
+      margin: 0 auto;
     }
 
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(12px); }
       to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes vortex-spin-a {
+      0% { transform: translate(-50%, -50%) rotate(0deg) scale(0.92); }
+      100% { transform: translate(-50%, -50%) rotate(360deg) scale(1.08); }
+    }
+
+    @keyframes vortex-spin-b {
+      0% { transform: translate(-50%, -50%) rotate(0deg) scale(1.08); }
+      100% { transform: translate(-50%, -50%) rotate(360deg) scale(0.9); }
+    }
+
+    @keyframes scan-drift {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(120px); }
+    }
+
+    @keyframes noise-jump {
+      0% { transform: translate(0, 0); }
+      25% { transform: translate(-1px, 1px); }
+      50% { transform: translate(1px, -1px); }
+      75% { transform: translate(-1px, -1px); }
+      100% { transform: translate(0, 0); }
     }
 
     .logo-header {
