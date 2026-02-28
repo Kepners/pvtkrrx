@@ -20,6 +20,7 @@ const teamCache = new Map()
 const eventCache = new Map()
 const endpointCache = new Map()
 const endpointInFlight = new Map()
+const leaguesBySportCache = new Map()
 const persistentStore = new Map()
 let rateLimitedUntil = 0
 let persistentLoaded = false
@@ -426,7 +427,26 @@ function pickLeagueImage(league) {
   const candidates = [
     league?.strPoster,
     league?.strFanart1,
+    league?.strFanart2,
+    league?.strFanart3,
     league?.strBanner,
+    league?.strLogo,
+    league?.strBadge
+  ]
+  for (const value of candidates) {
+    const url = String(value || '').trim()
+    if (url) return url
+  }
+  return ''
+}
+
+function pickLeagueBackgroundImage(league) {
+  const candidates = [
+    league?.strFanart1,
+    league?.strFanart2,
+    league?.strFanart3,
+    league?.strBanner,
+    league?.strPoster,
     league?.strLogo,
     league?.strBadge
   ]
@@ -453,6 +473,49 @@ function pickTeamImage(team) {
 
 function cacheKey(apiKey, title, publishDate, eventId = '', sportHint = '') {
   return `${CACHE_KEY_VERSION}|${String(apiKey || '').trim().toLowerCase()}|${String(eventId || '').trim().toLowerCase()}|${normalizeToken(title)}|${String(publishDate || '').slice(0, 10)}|${normalizeToken(sportHint)}`
+}
+
+function scoreLeague(league, title, titleSport) {
+  const leagueText = [
+    league?.strLeague,
+    league?.strLeagueAlternate,
+    league?.strNaming,
+    league?.strCountry
+  ].filter(Boolean).join(' ')
+  const titleTokens = tokenize(title)
+  const leagueTokens = new Set(tokenize(leagueText))
+  let overlap = 0
+  for (const token of titleTokens) {
+    if (!leagueTokens.has(token)) continue
+    overlap += token.length >= 4 ? 3 : 1
+  }
+
+  const normalizedTitle = normalizeToken(title)
+  const normalizedLeague = normalizeToken(leagueText)
+  let bonus = 0
+  if (titleSport && normalizeToken(league?.strSport || '').includes(normalizeToken(titleSport))) bonus += 6
+  if (/\bwta\b/.test(normalizedTitle) && /\bwta\b/.test(normalizedLeague)) bonus += 8
+  if (/\batp\b/.test(normalizedTitle) && /\batp\b/.test(normalizedLeague)) bonus += 8
+  if (/\bolympic/.test(normalizedTitle) && /\bolympic/.test(normalizedLeague)) bonus += 10
+  if (/\bdavis[\s-]*cup\b/.test(normalizedTitle) && /\bdavis[\s-]*cup\b/.test(normalizedLeague)) bonus += 10
+  if (/\blaver[\s-]*cup\b/.test(normalizedTitle) && /\blaver[\s-]*cup\b/.test(normalizedLeague)) bonus += 10
+  if (normalizedTitle.includes(normalizedLeague) || normalizedLeague.includes(normalizedTitle)) bonus += 5
+  return overlap + bonus
+}
+
+function toLeagueFallbackValue(leagueFallback, dateHint, sportHint) {
+  if (!leagueFallback?.poster) return null
+  return {
+    image: leagueFallback.poster,
+    poster: leagueFallback.poster,
+    backgroundImage: leagueFallback.backgroundImage || leagueFallback.poster,
+    eventId: '',
+    eventName: '',
+    eventDate: dateHint,
+    sport: leagueFallback.sport || sportHint || '',
+    league: leagueFallback.league || '',
+    source: 'thesportsdb-league'
+  }
 }
 
 class SportsDbClient {
@@ -602,6 +665,77 @@ class SportsDbClient {
     }
   }
 
+  async _fetchLeaguesBySport(sportName) {
+    const sport = String(sportName || '').trim()
+    if (!sport) return []
+    if (Date.now() < rateLimitedUntil) return []
+
+    const key = normalizeToken(sport)
+    const now = Date.now()
+    const hit = leaguesBySportCache.get(key)
+    if (hit && hit.expiresAt > now) return hit.value
+
+    try {
+      const url = `${BASE_URL}/${encodeURIComponent(this.apiKey)}/search_all_leagues.php?s=${encodeURIComponent(sport)}`
+      const res = await fetch(url, { signal: AbortSignal.timeout(this.timeoutMs) })
+      if (res.status === 429 || res.status === 403) {
+        rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
+      }
+      if (!res.ok) {
+        leaguesBySportCache.set(key, { value: [], expiresAt: Date.now() + this.missTtlMs })
+        return []
+      }
+      const raw = await res.text()
+      const trimmed = String(raw || '').trim()
+      if (trimmed.startsWith('<')) {
+        rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
+        leaguesBySportCache.set(key, { value: [], expiresAt: Date.now() + this.missTtlMs })
+        return []
+      }
+
+      let data = null
+      try {
+        data = trimmed ? JSON.parse(trimmed) : null
+      } catch (_) {
+        rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
+        leaguesBySportCache.set(key, { value: [], expiresAt: Date.now() + this.missTtlMs })
+        return []
+      }
+      const leagues = Array.isArray(data?.countries) ? data.countries : []
+      const ttlMs = leagues.length > 0 ? Math.min(this.hitTtlMs, 24 * 60 * 60 * 1000) : this.missTtlMs
+      leaguesBySportCache.set(key, { value: leagues, expiresAt: Date.now() + ttlMs })
+      return leagues
+    } catch (_) {
+      leaguesBySportCache.set(key, { value: [], expiresAt: Date.now() + this.missTtlMs })
+      return []
+    }
+  }
+
+  async _resolveLeagueArtworkFromTitle(title, titleSport) {
+    const sportName = sportsDbNameForSportKey(titleSport)
+    if (!sportName) return null
+    const leagues = await this._fetchLeaguesBySport(sportName)
+    if (!Array.isArray(leagues) || leagues.length === 0) return null
+
+    const ranked = leagues
+      .map(league => ({ league, score: scoreLeague(league, title, sportName) }))
+      .sort((a, b) => b.score - a.score)
+
+    const best = ranked[0]?.league
+    if (!best) return null
+
+    const poster = pickLeagueImage(best)
+    const backgroundImage = pickLeagueBackgroundImage(best) || poster
+    if (!poster) return null
+
+    return {
+      poster,
+      backgroundImage,
+      league: String(best.strLeague || '').trim(),
+      sport: String(best.strSport || '').trim()
+    }
+  }
+
   async _resolveFallbackImage(bestEvent, prefer = 'poster') {
     if (!bestEvent) return ''
     let image = prefer === 'background'
@@ -610,7 +744,9 @@ class SportsDbClient {
     if (image) return image
 
     const league = await this._lookupLeague(bestEvent.idLeague)
-    image = pickLeagueImage(league)
+    image = prefer === 'background'
+      ? (pickLeagueBackgroundImage(league) || pickLeagueImage(league))
+      : (pickLeagueImage(league) || pickLeagueBackgroundImage(league))
     if (image) return image
 
     const home = await this._lookupTeam(bestEvent.idHomeTeam)
@@ -672,6 +808,14 @@ class SportsDbClient {
         }
 
         if (byId.size === 0) {
+          const leagueFallback = await this._resolveLeagueArtworkFromTitle(title, titleSport)
+          const leagueValue = toLeagueFallbackValue(leagueFallback, dateHint, sportHint)
+          if (leagueValue) {
+            const expiresAt = Date.now() + this.hitTtlMs
+            cache.set(key, { value: leagueValue, expiresAt })
+            persistResolvedPoster(key, leagueValue, expiresAt)
+            return leagueValue
+          }
           cache.set(key, { value: null, expiresAt: Date.now() + this.missTtlMs })
           return null
         }
@@ -692,6 +836,14 @@ class SportsDbClient {
         const image = await this._resolveFallbackImage(best, 'poster')
         const backgroundImage = await this._resolveFallbackImage(best, 'background') || image
         if (!best || !image) {
+          const leagueFallback = await this._resolveLeagueArtworkFromTitle(title, titleSport)
+          const leagueValue = toLeagueFallbackValue(leagueFallback, dateHint, sportHint)
+          if (leagueValue) {
+            const expiresAt = Date.now() + this.hitTtlMs
+            cache.set(key, { value: leagueValue, expiresAt })
+            persistResolvedPoster(key, leagueValue, expiresAt)
+            return leagueValue
+          }
           cache.set(key, { value: null, expiresAt: Date.now() + this.missTtlMs })
           return null
         }

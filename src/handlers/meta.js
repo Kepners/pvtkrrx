@@ -2,6 +2,7 @@ const { CinemetaClient } = require('../clients/cinemeta')
 const { SportsDbClient } = require('../clients/sportsdb')
 const { formatSize } = require('../utils/streams')
 const { makeSportsThumbUrl } = require('../utils/sportsThumb')
+const { resolveSportHint } = require('../utils/sportsRules')
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 
 function normalizeImdbId(value) {
@@ -39,7 +40,6 @@ async function handleCustomMeta(config, id, context = {}) {
   const encoded = id.replace('pvtkrrx:', '')
   const info = JSON.parse(Buffer.from(encoded, 'base64url').toString())
   const baseUrl = String(context.baseUrl || '').replace(/\/+$/, '')
-  const isSports = String(info.k || '').toLowerCase() === 'sports' || /ufc|f1|formula[\s-]?1|premier league|nba|tennis|rugby|cricket/i.test(String(info.t || ''))
   const imdbId = normalizeImdbId(String(info.m || '').trim())
   let sportsArtwork = null
   const carriedArtwork = String(info.a || '').trim()
@@ -47,6 +47,11 @@ async function handleCustomMeta(config, id, context = {}) {
   const carriedEventDate = String(info.e || '').trim()
   const carriedLeague = String(info.g || '').trim()
   const carriedSportHint = String(info.r || '').trim()
+  const resolvedSportHint = resolveSportHint({
+    explicitHint: carriedSportHint,
+    title: info.t
+  })
+  const isSports = String(info.k || '').toLowerCase() === 'sports' || Boolean(resolvedSportHint)
   const shouldLookupSportsArtwork = isSports && (!carriedArtwork || !carriedEventDate || !carriedLeague || !carriedBackground)
   if (shouldLookupSportsArtwork) {
     try {
@@ -56,7 +61,7 @@ async function handleCustomMeta(config, id, context = {}) {
       sportsArtwork = await sportsDb.getEventArtwork({
         title: info.t,
         publishDate: info.p,
-        sportHint: carriedSportHint
+        sportHint: resolvedSportHint
       })
     } catch (_) {
       sportsArtwork = null
@@ -89,7 +94,7 @@ async function handleCustomMeta(config, id, context = {}) {
   }
 
   const posterFallback = isSports && baseUrl
-    ? makeSportsThumbUrl(baseUrl, { title: info.t, publishDate: info.p, sportHint: carriedSportHint })
+    ? makeSportsThumbUrl(baseUrl, { title: info.t, publishDate: info.p, sportHint: resolvedSportHint })
     : BRAND_POSTER
   const poster = carriedArtwork || sportsArtwork?.poster || sportsArtwork?.image || posterFallback
   const background = carriedBackground || String(sportsArtwork?.backgroundImage || sportsArtwork?.image || '').trim() || poster

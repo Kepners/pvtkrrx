@@ -32,6 +32,14 @@ async function run() {
     assert.match(configureHtml, /Install in Stremio/, 'configure page should render install action')
     assert.match(configureHtml, /testConnection\(\)/, 'configure page should expose test connection action')
     assert.match(configureHtml, /Auto Setup \(Home LAN\)/, 'configure page should render auto setup action')
+    assert.match(configureHtml, /Seedbox Runbooks/, 'configure page should link to seedbox runbooks')
+
+    const runbooksRes = await fetch(`${base}/runbooks`)
+    assert.equal(runbooksRes.status, 200, 'GET /runbooks should return 200')
+    const runbooksHtml = await runbooksRes.text()
+    assert.match(runbooksHtml, /Seedbox Runbooks/, 'runbooks page should render heading')
+    assert.match(runbooksHtml, /Whatbox Runbook/, 'runbooks page should include Whatbox runbook')
+    assert.match(runbooksHtml, /Ultra\.cc Runbook/, 'runbooks page should include Ultra.cc runbook')
 
     const networkInfoRes = await fetch(`${base}/network-info`)
     assert.equal(networkInfoRes.status, 200, 'GET /network-info should return 200')

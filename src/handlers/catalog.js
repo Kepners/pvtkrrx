@@ -4,7 +4,7 @@ const { CinemetaClient } = require('../clients/cinemeta')
 const { SportsDbClient } = require('../clients/sportsdb')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { cleanTitle, isLikelyPackedReleaseTitle } = require('../utils/parser')
-const { isSportsTitle } = require('../utils/sportClassifier')
+const { resolveSportHint, isSportsNoiseTitle, isLikelySportsEventTitle } = require('../utils/sportsRules')
 const { formatSize } = require('../utils/streams')
 const { makeSportsThumbUrl } = require('../utils/sportsThumb')
 
@@ -21,46 +21,6 @@ function isSportsOnlyIndexer(indexerName) {
   const normalized = String(indexerName || '').trim().toLowerCase()
   if (SPORTS_ONLY_INDEXERS.has(normalized)) return true
   return normalized.includes('sportscult')
-}
-
-function isLikelySportsTitle(title) {
-  return isSportsTitle(title)
-}
-
-function hasSportsHint(item) {
-  return Boolean(String(item?.sportHint || '').trim())
-}
-
-function isLikelySportsNoiseTitle(title) {
-  const value = String(title || '')
-  return (
-    /\bS\d{1,2}E\d{1,3}\b/i.test(value) ||
-    /\b\d{1,2}x\d{1,3}\b/i.test(value) ||
-    /\bSeason[\s._-]*\d{1,2}\b/i.test(value) ||
-    /\b(?:ebook|e[\s.\-_]*book|audiobook|retail|node|novel)\b/i.test(value) ||
-    /\b(?:update|patch|trainer|unlocker|dlc|mod|manager)\b/i.test(value) ||
-    /\b(?:tutorial|how[\s.\-_]*to|guide)\b/i.test(value)
-  )
-}
-
-function isLikelySportsEventRelease(title) {
-  const value = String(title || '')
-  if (isLikelySportsNoiseTitle(value)) return false
-
-  const hasVersus = /\b(?:vs\.?|v)\b/i.test(value)
-  const hasDate = (
-    /\b(?:19|20)\d{2}[.\-_\s]\d{2}[.\-_\s]\d{2}\b/i.test(value) ||
-    /\b\d{2}[.\-_\s]\d{2}[.\-_\s](?:19|20)\d{2}\b/i.test(value) ||
-    /\b(?:19|20)\d{2}\d{2}\d{2}\b/i.test(value)
-  )
-  const combatEvent = /\b(?:ufc|bellator|pfl|one[\s.\-_]*championship|fight[\s.\-_]*night|main[\s.\-_]*card|prelims?|wwe|aew|smackdown|raw|wrestlemania|royal[\s.\-_]*rumble)\b/i.test(value)
-  const motorsportEvent = /\b(?:f1|formula[\s.\-_]*1|motogp|indycar|nascar|wrc|grand[\s.\-_]*prix|gp)\b/i.test(value)
-  const leagueEvent = /\b(?:nba|nfl|mlb|nhl|epl|premier[\s.\-_]*league|la[\s.\-_]*liga|serie[\s.\-_]*a|bundesliga|uefa|champions[\s.\-_]*league|ncaa)\b/i.test(value)
-  const tournamentEvent = /\b(?:open|masters|cup|championship|playoffs?|qualifier|quarter[\s.\-_]*final|semi[\s.\-_]*final|final|round[\s.\-_]*\d+|\br\d{1,2}\b)\b/i.test(value)
-
-  if (hasVersus || combatEvent) return true
-  if (hasDate && (motorsportEvent || leagueEvent || tournamentEvent)) return true
-  return false
 }
 
 function isLikelySeriesRelease(title) {
@@ -381,16 +341,27 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
     }
     items = [...byKey.values()]
   }
-  const strictFiltered = items.filter(item =>
-    (isSportsOnlyIndexer(item.indexer) || isLikelySportsTitle(item.title) || hasSportsHint(item)) &&
-    isLikelySportsEventRelease(item.title) &&
+
+  const requestedSportHint = resolveSportHint({ explicitHint: extra.genre })
+  const normalizedItems = items.map(item => ({
+    ...item,
+    sportHint: resolveSportHint({
+      explicitHint: item?.sportHint,
+      categoryHint: requestedSportHint,
+      title: item?.title
+    })
+  }))
+
+  const strictFiltered = normalizedItems.filter(item =>
+    (isSportsOnlyIndexer(item.indexer) || Boolean(item.sportHint)) &&
+    isLikelySportsEventTitle(item.title, item.sportHint) &&
     !isLikelyPackedReleaseTitle(item.title)
   )
   let filtered = strictFiltered
   if (filtered.length < Math.min(12, limit) && String(extra.search || '').trim()) {
-    filtered = items.filter(item =>
-      (isSportsOnlyIndexer(item.indexer) || isLikelySportsTitle(item.title) || hasSportsHint(item)) &&
-      !isLikelySportsNoiseTitle(item.title) &&
+    filtered = normalizedItems.filter(item =>
+      (isSportsOnlyIndexer(item.indexer) || Boolean(item.sportHint)) &&
+      !isSportsNoiseTitle(item.title) &&
       !isLikelyPackedReleaseTitle(item.title)
     )
   }
@@ -403,6 +374,11 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
   const metas = await mapLimit(pageGroups, 6, async (group, index) => {
     const item = group.best
     const displayTitle = group.display || cleanTitle(item.title) || item.title
+    const resolvedSportHint = resolveSportHint({
+      explicitHint: item?.sportHint,
+      categoryHint: requestedSportHint,
+      title: displayTitle
+    })
     let sportsArtwork = artworkByBaseKey.get(group.baseKey) || null
     if (index < sportsDbLookupLimit) {
       try {
@@ -410,11 +386,11 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
           sportsArtwork = await sportsDb.getEventArtwork({
             title: displayTitle,
             publishDate: item.pubDate,
-            sportHint: item.sportHint
+            sportHint: resolvedSportHint
           })
         }
         if (!sportsArtwork) {
-          sportsArtwork = await sportsDb.getEventArtwork(item)
+          sportsArtwork = await sportsDb.getEventArtwork({ ...item, sportHint: resolvedSportHint })
         }
       } catch (_) {
         // keep fallback flow below
@@ -437,7 +413,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
     const posterUrl = sportsArtwork?.poster || sportsArtwork?.image ||
       (item.imdbId
         ? (imdbPoster(item.imdbId) || placeholderPoster())
-        : makeSportsThumbUrl(options.baseUrl, { ...item, publishDate: item.pubDate || item.publishDate || '', sportHint: item.sportHint }))
+        : makeSportsThumbUrl(options.baseUrl, { ...item, publishDate: item.pubDate || item.publishDate || '', sportHint: resolvedSportHint }))
     const backgroundUrl = sportsArtwork?.backgroundImage || posterUrl
 
     return {
@@ -455,7 +431,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
       c: group.count,
       e: eventDate,
       g: league,
-      r: item.sportHint || '',
+      r: resolvedSportHint,
       a: sportsArtwork?.poster || sportsArtwork?.image || posterUrl || '',
       b: backgroundUrl
     })).toString('base64url'),

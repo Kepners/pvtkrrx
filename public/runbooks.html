@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PVTKRRX Seedbox Runbooks</title>
+  <meta name="description" content="Provider runbooks for PVTKRRX deployment on major seedbox platforms with LAN Bridge, Online profile, and direct-host options.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #05070d;
+      --surface: #0d1220;
+      --card: #111726;
+      --line: rgba(0, 246, 255, 0.32);
+      --line-soft: rgba(0, 246, 255, 0.17);
+      --text: #eaf3ff;
+      --muted: #a5bbd8;
+      --green: #00ff66;
+      --blue: #00f6ff;
+      --red: #ff4d4d;
+      --amber: #ffb347;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background:
+        radial-gradient(900px 600px at 90% -10%, rgba(0, 246, 255, 0.18), transparent 58%),
+        radial-gradient(700px 450px at -12% 24%, rgba(255, 0, 212, 0.1), transparent 58%),
+        linear-gradient(180deg, #060a12 0%, #0a1220 100%);
+      color: var(--text);
+      font-family: "Space Grotesk", sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 10;
+      opacity: 0.2;
+      background-image:
+        linear-gradient(rgba(0, 246, 255, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 246, 255, 0.08) 1px, transparent 1px);
+      background-size: 56px 56px;
+      mask-image: radial-gradient(ellipse at center, black 58%, transparent 100%);
+    }
+
+    .shell {
+      width: min(1160px, 94vw);
+      margin: 0 auto;
+      padding: 28px 0 52px;
+      position: relative;
+      z-index: 20;
+    }
+
+    .topbar {
+      border: 1px solid var(--line-soft);
+      background: linear-gradient(180deg, rgba(16, 24, 41, 0.9), rgba(12, 20, 34, 0.9));
+      border-radius: 12px;
+      padding: 10px 12px;
+      margin-bottom: 14px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .brand {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--green);
+    }
+
+    .nav {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .nav a {
+      text-decoration: none;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #aac0db;
+      border: 1px solid rgba(0, 246, 255, 0.22);
+      border-radius: 999px;
+      padding: 6px 10px;
+    }
+
+    .nav a:hover {
+      color: #e5f2ff;
+      border-color: rgba(0, 255, 102, 0.56);
+    }
+
+    .hero {
+      border: 1px solid var(--line-soft);
+      background: linear-gradient(160deg, rgba(18, 31, 52, 0.92), rgba(13, 22, 37, 0.92));
+      border-radius: 14px;
+      padding: 24px;
+      margin-bottom: 14px;
+    }
+
+    .hero h1 {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: clamp(24px, 4.6vw, 38px);
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+    }
+
+    .hero p {
+      color: #c5c5c5;
+      line-height: 1.45;
+      margin-bottom: 10px;
+      max-width: 980px;
+    }
+
+    .stamp {
+      display: inline-block;
+      margin-top: 4px;
+      padding: 4px 8px;
+      border: 1px solid rgba(0, 128, 255, 0.4);
+      color: #95bfff;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.6px;
+      text-transform: uppercase;
+    }
+
+    .panel {
+      border: 1px solid var(--line-soft);
+      background: linear-gradient(180deg, rgba(19, 31, 52, 0.9), rgba(14, 23, 39, 0.9));
+      border-radius: 12px;
+      padding: 18px;
+      margin-bottom: 12px;
+    }
+
+    .panel h2 {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 13px;
+      color: var(--green);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+
+    .note {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.4;
+      margin-top: 8px;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    .chip {
+      border: 1px solid #2e2e2e;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+      color: #b9b9b9;
+      padding: 4px 8px;
+      text-decoration: none;
+    }
+
+    .chip:hover {
+      border-color: var(--blue);
+      color: #a8ccff;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    th, td {
+      border: 1px solid #262626;
+      padding: 10px;
+      vertical-align: top;
+      text-align: left;
+    }
+
+    th {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: #a8a8a8;
+      background: #101010;
+    }
+
+    .ok { color: #80f0a2; }
+    .warn { color: #ffd08c; }
+    .no { color: #ff9090; }
+
+    h3 {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 14px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: #d7d7d7;
+      margin-bottom: 8px;
+    }
+
+    .meta {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
+    }
+
+    .badge {
+      padding: 4px 8px;
+      border: 1px solid #2c2c2c;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      text-transform: uppercase;
+      color: #bbbbbb;
+    }
+
+    ol {
+      margin-left: 18px;
+      margin-bottom: 10px;
+      line-height: 1.45;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    pre {
+      background: #0d0d0d;
+      border: 1px solid #222;
+      padding: 10px;
+      overflow: auto;
+      margin: 8px 0;
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    code {
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    .docs {
+      margin-top: 10px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .docs a {
+      color: #98bfff;
+      text-decoration: none;
+    }
+
+    .docs a:hover {
+      text-decoration: underline;
+    }
+
+    footer {
+      margin-top: 16px;
+      font-size: 12px;
+      color: #8f8f8f;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    @media (max-width: 860px) {
+      th, td {
+        font-size: 13px;
+        padding: 8px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">PVTKRRX / Seedbox Runbooks</div>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/configure">Configure</a>
+        <a href="/runbooks">Runbooks</a>
+        <a href="/health">Health</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <h1>Seedbox Runbooks</h1>
+      <p>This page maps PVTKRRX to major seedbox platforms. It covers current install paths for PC Local, LAN Bridge, Online profile, and direct addon hosting when your provider supports it.</p>
+      <p>Use this as the operational checklist before you buy a plan or migrate providers.</p>
+      <div class="stamp">Updated: February 28, 2026</div>
+    </section>
+
+    <section class="panel">
+      <h2>Quick Jumps</h2>
+      <div class="chips">
+        <a class="chip" href="#whatbox">Whatbox</a>
+        <a class="chip" href="#ultra">Ultra.cc</a>
+        <a class="chip" href="#seedhost">SeedHost</a>
+        <a class="chip" href="#feral">Feral</a>
+        <a class="chip" href="#rapid">RapidSeedbox</a>
+        <a class="chip" href="#bytesized">Bytesized</a>
+        <a class="chip" href="#swizzin">Swizzin</a>
+        <a class="chip" href="#hbd">HostingByDesign</a>
+        <a class="chip" href="#other">Other Providers</a>
+      </div>
+      <p class="note">Hard rule: Stremio install is HTTPS-first for remote hosts. HTTP loopback (<code>127.0.0.1</code>) is only for same-device local installs.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Compatibility Matrix</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Provider</th>
+            <th>LAN Bridge</th>
+            <th>Online Profile</th>
+            <th>Direct Addon On Box</th>
+            <th>Notes</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Whatbox</td>
+            <td class="ok">Yes</td>
+            <td class="ok">Yes</td>
+            <td class="ok">Yes</td>
+            <td>SSH + Node available; Managed Links can expose custom HTTP apps over HTTPS.</td>
+          </tr>
+          <tr>
+            <td>Ultra.cc</td>
+            <td class="ok">Yes</td>
+            <td class="ok">Yes</td>
+            <td class="warn">Conditional</td>
+            <td>No root. Custom app ports and Nginx path proxy are supported; root-path hosting depends on your routing setup.</td>
+          </tr>
+          <tr>
+            <td>SeedHost Shared</td>
+            <td class="ok">Yes</td>
+            <td class="ok">Yes</td>
+            <td class="warn">Conditional</td>
+            <td>No root on shared plans. SSH available on shared except HD1.</td>
+          </tr>
+          <tr>
+            <td>Feral Hosting</td>
+            <td class="ok">Yes</td>
+            <td class="ok">Yes</td>
+            <td class="warn">Conditional</td>
+            <td>No root/sudo/apt. User-space Node install works. HTTPS needs proxypass setup.</td>
+          </tr>
+          <tr>
+            <td>RapidSeedbox Lean</td>
+            <td class="ok">Yes</td>
+            <td class="ok">Yes</td>
+            <td class="no">No</td>
+            <td>No SSH on Lean plans.</td>
+          </tr>
+          <tr>
+            <td>RapidSeedbox Premium</td>
+            <td class="ok">Yes</td>
+            <td class="ok">Yes</td>
+            <td class="ok">Yes</td>
+            <td>SSH is available on Premium; custom software flow supported.</td>
+          </tr>
+          <tr>
+            <td>Bytesized Appbox</td>
+            <td class="ok">Yes</td>
+            <td class="ok">Yes</td>
+            <td class="warn">Conditional</td>
+            <td>SSH is available. Bytesized Connect requires Docker and root on the target server.</td>
+          </tr>
+          <tr>
+            <td>Swizzin (self-hosted)</td>
+            <td class="ok">Yes</td>
+            <td class="ok">Yes</td>
+            <td class="ok">Yes</td>
+            <td>Best on your own VPS where you control root, Nginx, and domain routing.</td>
+          </tr>
+          <tr>
+            <td>HostingByDesign</td>
+            <td class="ok">Yes</td>
+            <td class="ok">Yes</td>
+            <td class="ok">Yes</td>
+            <td>SSH and box tooling available on app hosting slots.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="whatbox" class="panel">
+      <h3>Whatbox Runbook</h3>
+      <div class="meta">
+        <span class="badge">No Sudo Required</span>
+        <span class="badge">Best Mode: Online or Direct</span>
+      </div>
+      <ol>
+        <li>Install or verify qBittorrent and Prowlarr from the Manage Apps panel.</li>
+        <li>Use their HTTPS Managed Links URLs in <code>/configure</code> and save profile.</li>
+        <li>If you want to host PVTKRRX directly on Whatbox, run:</li>
+      </ol>
+      <pre><code>ssh user@server.whatbox.ca
+mkdir -p ~/apps
+cd ~/apps
+git clone https://github.com/Kepners/pvtkrrx.git
+cd pvtkrrx
+npm ci --omit=dev
+PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pvtkrrx.log 2&gt;&amp;1 &amp;</code></pre>
+      <ol start="4">
+        <li>Add this app as a custom Managed Link (port <code>15000</code>) to get HTTPS endpoint for Stremio install.</li>
+      </ol>
+    </section>
+
+    <section id="ultra" class="panel">
+      <h3>Ultra.cc Runbook</h3>
+      <div class="meta">
+        <span class="badge">No Root/Sudo Apps</span>
+        <span class="badge">Best Mode: LAN Bridge or Online</span>
+      </div>
+      <ol>
+        <li>Install Node in user space and select a free assigned port:</li>
+      </ol>
+      <pre><code>ssh username@host
+bash &lt;(wget -qO- https://scripts.ultra.cc/util-v2/LanguageInstaller/Node-Installer/main.sh)
+app-ports free</code></pre>
+      <ol start="2">
+        <li>Run PVTKRRX on a free assigned port:</li>
+      </ol>
+      <pre><code>mkdir -p ~/apps
+cd ~/apps
+git clone https://github.com/Kepners/pvtkrrx.git
+cd pvtkrrx
+npm ci --omit=dev
+PORT=&lt;free-port&gt; ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pvtkrrx.log 2&gt;&amp;1 &amp;</code></pre>
+      <ol start="3">
+        <li>Proxy through <code>~/.apps/nginx/proxy.d/</code> and restart <code>app-nginx</code> for HTTPS.</li>
+        <li>If your route is path-only, prefer LAN Bridge mode or an external relay host for root-path addon URLs.</li>
+      </ol>
+    </section>
+
+    <section id="seedhost" class="panel">
+      <h3>SeedHost Runbook</h3>
+      <div class="meta">
+        <span class="badge">Shared: No Root</span>
+        <span class="badge">SSH: Shared Except HD1</span>
+      </div>
+      <ol>
+        <li>Install qBittorrent and Prowlarr from one-click apps.</li>
+        <li>For Online profile, use your public HTTPS app URLs in PVTKRRX configure page.</li>
+        <li>If hosting addon directly, install Node with SeedHost method:</li>
+      </ol>
+      <pre><code>if ! grep -qw "PATH=$HOME/bin" ~/.bashrc ; then mkdir -p ~/bin &amp;&amp; echo "PATH=$HOME/bin:$PATH" &gt;&gt; ~/.bashrc &amp;&amp; source ~/.bashrc ; fi
+cd &amp;&amp; wget -q https://nodejs.org/dist/v21.1.0/node-v21.1.0-linux-x64.tar.gz
+tar xf ~/node-v21.1.0-linux-x64.tar.gz --strip-components=1 -C ~/
+rm -f ~/node-v21.1.0-linux-x64.tar.gz</code></pre>
+      <ol start="4">
+        <li>Use LAN Bridge if your exact plan cannot expose a clean HTTPS root route for custom Node apps.</li>
+      </ol>
+    </section>
+
+    <section id="feral" class="panel">
+      <h3>Feral Hosting Runbook</h3>
+      <div class="meta">
+        <span class="badge">No Root/Sudo/Apt</span>
+        <span class="badge">Best Mode: Online or LAN Bridge</span>
+      </div>
+      <ol>
+        <li>Install Node in home directory and ensure <code>~/bin</code> is in PATH:</li>
+      </ol>
+      <pre><code>mkdir -p ~/bin &amp;&amp; bash
+wget -qO ~/node.js.tar.gz https://nodejs.org/dist/v12.18.3/node-v12.18.3-linux-x64.tar.gz
+tar xf ~/node.js.tar.gz --strip-components=1 -C ~/
+mkdir -p ~/node/apps
+cd &amp;&amp; rm -rf node.js.tar.gz</code></pre>
+      <ol start="2">
+        <li>Run addon on a high user port and configure proxypass for HTTPS.</li>
+        <li>If proxypass gives a subpath route only, use LAN Bridge or external relay for stable install URL behavior.</li>
+      </ol>
+    </section>
+
+    <section id="rapid" class="panel">
+      <h3>RapidSeedbox Runbook</h3>
+      <div class="meta">
+        <span class="badge">Lean: No SSH</span>
+        <span class="badge">Premium: SSH + Custom Software</span>
+      </div>
+      <ol>
+        <li>Lean plans: use PVTKRRX Online profile against your existing public app URLs, or keep LAN Bridge mode. Direct hosting is not available.</li>
+        <li>Premium plans: SSH in, install/run PVTKRRX directly, then expose via your HTTPS routing layer.</li>
+        <li>Lean to Premium migration path: keep same provider and switch plan when direct addon hosting becomes needed.</li>
+      </ol>
+    </section>
+
+    <section id="bytesized" class="panel">
+      <h3>Bytesized Runbook</h3>
+      <div class="meta">
+        <span class="badge">Appbox + Connect Modes</span>
+        <span class="badge">Connect Requires Docker + Root</span>
+      </div>
+      <ol>
+        <li>Use Online profile first: keep PVTKRRX hosted elsewhere and connect to Bytesized qBittorrent/Prowlarr endpoints.</li>
+        <li>Use Bytesized Connect only when you control a server where Connect prerequisites are met (Docker and root).</li>
+        <li>If your plan does not provide clean routing for custom app root paths, keep LAN Bridge mode.</li>
+      </ol>
+    </section>
+
+    <section id="swizzin" class="panel">
+      <h3>Swizzin Runbook (Own VPS or Swizzin Provider)</h3>
+      <div class="meta">
+        <span class="badge">Best Direct-Host Option</span>
+        <span class="badge">Requires Root/Sudo On VPS</span>
+      </div>
+      <ol>
+        <li>Install Swizzin on supported OS and add Nginx/panel.</li>
+        <li>Deploy PVTKRRX as a service and reverse proxy a dedicated domain/subdomain to <code>127.0.0.1:7000</code>.</li>
+        <li>Use this mode if you want full control over paths, HTTPS, and process supervision.</li>
+      </ol>
+      <pre><code># after Node install
+git clone https://github.com/Kepners/pvtkrrx.git
+cd pvtkrrx
+npm ci --omit=dev
+ENCRYPTION_SECRET=$(openssl rand -hex 32) PORT=7000 node index.js</code></pre>
+    </section>
+
+    <section id="hbd" class="panel">
+      <h3>HostingByDesign Runbook</h3>
+      <div class="meta">
+        <span class="badge">SSH + box Tooling</span>
+        <span class="badge">Good For Direct Hosting</span>
+      </div>
+      <ol>
+        <li>Confirm SSH and app management via <code>box</code> command.</li>
+        <li>Run PVTKRRX in user space or system service depending your plan access.</li>
+        <li>Expose through your HTTPS route and set <code>PVTKRRX_ALLOWED_WEB_ORIGINS</code> to that exact origin.</li>
+      </ol>
+    </section>
+
+    <section id="other" class="panel">
+      <h3>Other Provider Runbook (Generic)</h3>
+      <div class="meta">
+        <span class="badge">Use This If Not Listed</span>
+      </div>
+      <ol>
+        <li>Check 4 requirements:
+          <ol>
+            <li>SSH access</li>
+            <li>Node.js availability (or install in home directory)</li>
+            <li>Long-running process support (<code>screen</code>, <code>tmux</code>, supervisor)</li>
+            <li>HTTPS endpoint for remote Stremio install</li>
+          </ol>
+        </li>
+        <li>If any requirement fails, use PC Local + LAN Bridge and keep seedbox as backend only.</li>
+        <li>Only use Online profile when Prowlarr and qBittorrent endpoints are intentionally public and authenticated.</li>
+      </ol>
+      <pre><code>git clone https://github.com/Kepners/pvtkrrx.git
+cd pvtkrrx
+npm ci --omit=dev
+PORT=7000 ENCRYPTION_SECRET=$(openssl rand -hex 32) node index.js</code></pre>
+    </section>
+
+    <section class="panel">
+      <h2>Reference Links</h2>
+      <p class="docs">
+        Whatbox:
+        <a href="https://whatbox.ca/wiki/Managed_Links" target="_blank" rel="noopener noreferrer">Managed Links</a>,
+        <a href="https://whatbox.ca/wiki/Installing_Software" target="_blank" rel="noopener noreferrer">Installing Software</a>,
+        <a href="https://whatbox.ca/wiki/ssh" target="_blank" rel="noopener noreferrer">SSH</a><br>
+        Ultra.cc:
+        <a href="https://docs.ultra.cc/unofficial-language-installers/install-nodejs" target="_blank" rel="noopener noreferrer">Install Node.js</a>,
+        <a href="https://docs.ultra.cc/unofficial-application-installers/generic-software-installation" target="_blank" rel="noopener noreferrer">Generic Software</a>,
+        <a href="https://docs.ultra.cc/unofficial-ssh-utilities/assigned-ports-command" target="_blank" rel="noopener noreferrer">Assigned Ports</a><br>
+        SeedHost:
+        <a href="https://www.seedhost.eu/client-area/knowledgebase/256/node.js-installation.html" target="_blank" rel="noopener noreferrer">Node Install</a>,
+        <a href="https://www.seedhost.eu/wspoldzielony-hosting.php" target="_blank" rel="noopener noreferrer">Shared App FAQ</a>,
+        <a href="https://www.seedhost.eu/client-area/knowledgebase/303/List-of-available-apps.html" target="_blank" rel="noopener noreferrer">Available Apps</a><br>
+        Feral:
+        <a href="https://www.feralhosting.com/wiki/slots/generic-install-guide" target="_blank" rel="noopener noreferrer">Generic Install</a>,
+        <a href="https://www.feralhosting.com/wiki/software/nodejs" target="_blank" rel="noopener noreferrer">Node.js</a>,
+        <a href="https://www.feralhosting.com/wiki/slots/proxypass" target="_blank" rel="noopener noreferrer">Proxypass</a><br>
+        RapidSeedbox:
+        <a href="https://help.rapidseedbox.com/en/articles/6998134-faq-lean-seedbox" target="_blank" rel="noopener noreferrer">Lean FAQ</a>,
+        <a href="https://help.rapidseedbox.com/en/articles/903924-how-to-connect-to-your-seedbox-using-ssh" target="_blank" rel="noopener noreferrer">SSH Access</a>,
+        <a href="https://help.rapidseedbox.com/en/articles/5945962-install-uninstall-apps-using-the-one-click-installers-on-the-premium-seedbox" target="_blank" rel="noopener noreferrer">Premium One-Click / Custom</a><br>
+        Bytesized:
+        <a href="https://bytesized-hosting.com/pages/connect" target="_blank" rel="noopener noreferrer">Connect</a>,
+        <a href="https://bytesized-hosting.com/pages/ssh" target="_blank" rel="noopener noreferrer">SSH</a>,
+        <a href="https://bytesized-hosting.com/pages/flood-installation-guide" target="_blank" rel="noopener noreferrer">Custom App Example</a><br>
+        Swizzin:
+        <a href="https://swizzin.ltd/" target="_blank" rel="noopener noreferrer">Swizzin Docs</a>,
+        <a href="https://github.com/swizzin/swizzin" target="_blank" rel="noopener noreferrer">Swizzin GitHub</a><br>
+        HostingByDesign:
+        <a href="https://docs.hostingby.design/application-hosting/getting-started/box-basics" target="_blank" rel="noopener noreferrer">box Basics</a>,
+        <a href="https://docs.hostingby.design/application-hosting/applications/jackett" target="_blank" rel="noopener noreferrer">App Example</a>
+      </p>
+    </section>
+
+    <footer>
+      <span>PVTKRRX runbook matrix for active provider docs.</span>
+      <span>If your provider changed features, update this page before deployment.</span>
+    </footer>
+  </main>
+</body>
+</html>
+

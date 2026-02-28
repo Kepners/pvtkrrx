@@ -493,9 +493,12 @@ app.use((req, res, next) => {
 // ─── Static routes ──────────────────────────────────────────
 const publicDir = path.join(__dirname, 'public')
 const configPage = path.join(publicDir, 'configure.html')
+const runbooksPage = path.join(publicDir, 'runbooks.html')
 app.use(express.static(publicDir))
 app.get('/configure', (req, res) => res.sendFile(configPage))
 app.get('/:config/configure', (req, res) => res.sendFile(configPage))
+app.get('/runbooks', (req, res) => res.sendFile(runbooksPage))
+app.get('/seedbox-runbooks', (req, res) => res.sendFile(runbooksPage))
 app.get('/thumb/sports/:info.svg', (req, res) => {
   try {
     const payload = decodeSportsThumbToken(req.params.info)

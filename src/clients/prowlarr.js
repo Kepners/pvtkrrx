@@ -1,6 +1,7 @@
 const TIMEOUT_MS = 20000
 const INDEXER_CATEGORY_TTL_MS = 6 * 60 * 60 * 1000
 const { sportHintFromCategory } = require('../utils/sportsCategoryHint')
+const { resolveSportHint } = require('../utils/sportsRules')
 
 function normalizeProwlarrBaseUrl(input) {
   let url = String(input || '').trim()
@@ -72,10 +73,14 @@ class ProwlarrClient {
       }
     }
 
-    const sportHint = sportHintFromCategory({
+    const categoryHint = sportHintFromCategory({
       indexerName: r.indexer,
       categoryIds,
       categoryNames
+    })
+    const sportHint = resolveSportHint({
+      categoryHint,
+      title: r.title
     })
 
     return {
