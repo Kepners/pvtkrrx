@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PVTKRRX - Digital Corruption Relay</title>
+  <meta name="description" content="PVTKRRX routes Stremio through your own stack with PC Local, LAN Bridge, and Online profiles.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --void-black: #0A0A0A;
+      --static-gray: #1A1A1A;
+      --ghost-white: #E0E0E0;
+      --toxic-green: #00FF41;
+      --glitch-blue: #0080FF;
+      --corrupt-red: #FF0040;
+      --neon-purple: #B026FF;
+      --line-green: rgba(0, 255, 65, 0.34);
+      --line-soft: rgba(0, 255, 65, 0.16);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background: var(--void-black);
+      color: var(--ghost-white);
+      font-family: "Inter", sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+      position: relative;
+      opacity: 0;
+      animation: pageIn 0.48s ease forwards;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: repeating-linear-gradient(
+        0deg,
+        rgba(0, 0, 0, 0.15),
+        rgba(0, 0, 0, 0.15) 1px,
+        transparent 1px,
+        transparent 2px
+      );
+      opacity: 0.5;
+      pointer-events: none;
+      z-index: 40;
+      animation: scanline-scroll 10s linear infinite;
+    }
+
+    .noise {
+      position: fixed;
+      inset: 0;
+      opacity: 0.03;
+      pointer-events: none;
+      z-index: 2;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 96 96'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.05' numOctaves='1' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='96' height='96' filter='url(%23n)' opacity='0.9'/%3E%3C/svg%3E");
+      animation: noise-step 0.12s steps(2) infinite;
+    }
+
+    .shell {
+      width: min(1120px, 94vw);
+      margin: 0 auto;
+      padding: 28px 0 44px;
+      position: relative;
+      z-index: 5;
+    }
+
+    .topbar {
+      border: 1px solid var(--line-soft);
+      background: #101010;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .nav-link {
+      text-decoration: none;
+      color: #A4A4A4;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border: 1px solid #2A2A2A;
+      padding: 5px 9px;
+      transition: border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+    }
+
+    .nav-link:hover {
+      color: var(--glitch-blue);
+      border-color: var(--glitch-blue);
+      box-shadow: 0 0 16px rgba(0, 128, 255, 0.24);
+    }
+
+    .logo-block {
+      border: 1px solid var(--line-soft);
+      background: #121212;
+      padding: 28px 26px;
+      margin-bottom: 14px;
+    }
+
+    .signal-tape {
+      border: 1px solid rgba(176, 38, 255, 0.45);
+      background: #101010;
+      margin-bottom: 14px;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    .signal-track {
+      display: inline-block;
+      padding: 8px 0;
+      padding-left: 100%;
+      font-family: "JetBrains Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: var(--neon-purple);
+      animation: tape-run 20s linear infinite;
+    }
+
+    .kicker {
+      font-family: "JetBrains Mono", monospace;
+      color: var(--toxic-green);
+      font-size: 11px;
+      letter-spacing: 1.7px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+
+    .ascii-logo {
+      font-family: "JetBrains Mono", monospace;
+      color: #B0B0B0;
+      font-size: clamp(9px, 1.2vw, 12px);
+      line-height: 1.2;
+      margin-bottom: 16px;
+      white-space: pre;
+      user-select: none;
+      opacity: 0.86;
+    }
+
+    .glitch-text {
+      position: relative;
+      color: var(--ghost-white);
+      font-family: "JetBrains Mono", monospace;
+      font-size: clamp(42px, 9vw, 78px);
+      font-weight: 700;
+      line-height: 0.92;
+      letter-spacing: 2px;
+      display: inline-block;
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      isolation: isolate;
+    }
+
+    .glitch-text::before,
+    .glitch-text::after {
+      content: attr(data-text);
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .glitch-text::before {
+      color: var(--corrupt-red);
+      opacity: 0.7;
+      z-index: -1;
+      animation: glitch-red 0.3s infinite;
+    }
+
+    .glitch-text::after {
+      color: var(--glitch-blue);
+      opacity: 0.7;
+      z-index: -2;
+      animation: glitch-blue 0.3s infinite;
+    }
+
+    .hero-copy {
+      max-width: 780px;
+      color: #C5C5C5;
+      font-size: 16px;
+      line-height: 1.45;
+      margin-bottom: 18px;
+    }
+
+    .cta-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      text-decoration: none;
+      font-family: "JetBrains Mono", monospace;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-size: 13px;
+      font-weight: 600;
+      border: 1px solid transparent;
+      padding: 14px 18px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s ease, box-shadow 0.25s ease, border-color 0.25s ease, color 0.25s ease, background 0.25s ease;
+    }
+
+    .btn-primary {
+      background: var(--glitch-blue);
+      border-color: var(--glitch-blue);
+      color: #0A0A0A;
+      isolation: isolate;
+    }
+
+    .btn-primary::before {
+      content: "";
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 0;
+      height: 0;
+      border-radius: 999px;
+      background: var(--corrupt-red);
+      transform: translate(-50%, -50%);
+      transition: width 0.3s ease, height 0.3s ease;
+      z-index: -1;
+      opacity: 0.65;
+    }
+
+    .btn-primary:hover::before {
+      width: 280px;
+      height: 280px;
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 0 24px rgba(255, 0, 64, 0.35);
+    }
+
+    .btn-secondary {
+      background: transparent;
+      border-color: var(--glitch-blue);
+      color: var(--glitch-blue);
+    }
+
+    .btn-secondary:hover {
+      background: var(--glitch-blue);
+      color: #0A0A0A;
+      box-shadow: 0 0 22px rgba(0, 128, 255, 0.28);
+      transform: translateY(-2px);
+    }
+
+    .section-title {
+      font-family: "JetBrains Mono", monospace;
+      color: var(--toxic-green);
+      font-size: 13px;
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .feature-card {
+      border: 1px solid var(--line-soft);
+      background: var(--static-gray);
+      padding: 18px;
+      min-height: 216px;
+      transition: border-color 0.28s ease, box-shadow 0.28s ease, transform 0.25s ease;
+    }
+
+    .feature-card:hover {
+      border-color: var(--toxic-green);
+      box-shadow: 0 0 20px rgba(0, 255, 65, 0.24);
+      transform: translateY(-3px);
+    }
+
+    .feature-head {
+      font-family: "JetBrains Mono", monospace;
+      color: var(--toxic-green);
+      font-size: 14px;
+      margin-bottom: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .meter {
+      font-family: "JetBrains Mono", monospace;
+      color: #A0A0A0;
+      font-size: 12px;
+      letter-spacing: 1px;
+      margin-bottom: 12px;
+    }
+
+    .feature-card p {
+      color: #BABABA;
+      font-size: 14px;
+      line-height: 1.45;
+      margin-bottom: 8px;
+    }
+
+    .tag {
+      display: inline-block;
+      border: 1px solid rgba(176, 38, 255, 0.45);
+      color: var(--neon-purple);
+      font-family: "JetBrains Mono", monospace;
+      text-transform: uppercase;
+      font-size: 11px;
+      letter-spacing: 1px;
+      padding: 4px 6px;
+      margin-top: 4px;
+    }
+
+    .terminal {
+      border: 1px solid var(--line-soft);
+      background: #101010;
+      padding: 18px;
+      margin-bottom: 14px;
+    }
+
+    .terminal-line {
+      border-left: 2px solid rgba(0, 255, 65, 0.45);
+      padding-left: 10px;
+      margin-bottom: 10px;
+      font-family: "JetBrains Mono", monospace;
+    }
+
+    .prompt {
+      display: block;
+      color: var(--toxic-green);
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .terminal-line p {
+      color: #B8B8B8;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .status-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+
+    .status-box {
+      border: 1px solid #2A2A2A;
+      background: #121212;
+      padding: 10px;
+      font-family: "JetBrains Mono", monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      font-size: 11px;
+      color: #9E9E9E;
+    }
+
+    .status-box strong {
+      display: block;
+      color: var(--toxic-green);
+      font-size: 12px;
+      margin-top: 6px;
+      text-transform: none;
+      letter-spacing: 0;
+      word-break: break-word;
+    }
+
+    footer {
+      border-top: 1px solid #272727;
+      padding-top: 14px;
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-family: "JetBrains Mono", monospace;
+      color: #6F6F6F;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .glitch-active {
+      animation: glitch-flicker 0.1s ease-in-out;
+    }
+
+    @keyframes pageIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    @keyframes glitch-red {
+      0%, 100% { transform: translate(3px, -1px); opacity: 0.7; }
+      50% { transform: translate(4px, 0); opacity: 0.6; }
+    }
+
+    @keyframes glitch-blue {
+      0%, 100% { transform: translate(-3px, 1px); opacity: 0.7; }
+      50% { transform: translate(-4px, 0); opacity: 0.6; }
+    }
+
+    @keyframes scanline-scroll {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(100px); }
+    }
+
+    @keyframes noise-step {
+      0% { transform: translate(0, 0); }
+      50% { transform: translate(-2px, 1px); }
+      100% { transform: translate(0, 0); }
+    }
+
+    @keyframes tape-run {
+      0% { transform: translateX(0); }
+      100% { transform: translateX(-100%); }
+    }
+
+    @keyframes glitch-flicker {
+      0%, 100% { filter: invert(0); }
+      50% { filter: invert(1); }
+    }
+
+    @media (max-width: 1024px) {
+      .feature-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 768px) {
+      body::before {
+        display: none;
+      }
+
+      .noise {
+        display: none;
+      }
+
+      .shell {
+        width: 95vw;
+        padding-top: 18px;
+      }
+
+      .ascii-logo {
+        display: none;
+      }
+
+      .feature-grid,
+      .status-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .glitch-text::before,
+      .glitch-text::after {
+        animation-duration: 1.1s;
+      }
+
+      .signal-track {
+        animation-duration: 32s;
+      }
+
+      .cta-row {
+        flex-direction: column;
+      }
+
+      .btn {
+        text-align: center;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="noise"></div>
+  <main class="shell">
+    <header class="topbar">
+      <div class="glitch-text" data-text="PVTKRRX">PVTKRRX</div>
+      <nav class="nav-links">
+        <a class="nav-link" href="/configure">Configure</a>
+        <a class="nav-link" href="/manifest.json">Manifest</a>
+        <a class="nav-link" href="/health">Health</a>
+      </nav>
+    </header>
+
+    <div class="signal-tape">
+      <div class="signal-track">
+        [LAN_PAIR: ARMED] [RELAY: SYNCED] [PROFILES: LOCAL/LAN/ONLINE] [TRUTH PRIVACY CONTROL] [NO PUBLIC INDEXING] [LAN_PAIR: ARMED] [RELAY: SYNCED]
+      </div>
+    </div>
+
+    <section class="logo-block">
+      <p class="kicker">Digital Corruption Relay / Private Tracker Stack</p>
+      <pre class="ascii-logo">PPPPPP  VV    VV TTTTTTTT KK   KK RRRRRR  RRRRRR  XX    XX
+PP   PP VV    VV    TT    KK  KK  RR   RR RR   RR  XX  XX
+PPPPPP   VV  VV     TT    KKKKK   RRRRRR  RRRRRR    XXXX
+PP        VVVV      TT    KK  KK  RR  RR  RR  RR   XX  XX
+PP         VV       TT    KK   KK RR   RR RR   RR XX    XX</pre>
+      <p class="hero-copy">
+        Your seedbox. Your Stremio. No middleman. PVTKRRX keeps torrent control local,
+        pushes LAN clients through secure relay pairing, and lets you split installs between
+        PC Local, LAN Bridge, and Online profiles.
+      </p>
+      <div class="cta-row">
+        <a class="btn btn-primary" href="/configure">Get Started</a>
+        <a class="btn btn-secondary" href="/local/install">Local Installer</a>
+      </div>
+    </section>
+
+    <section>
+      <h2 class="section-title">Core Profiles</h2>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <h3 class="feature-head">Private</h3>
+          <p class="meter">[########..] LOCAL CONTROL 80%</p>
+          <p>PC Local profile stays on the host machine and talks to local services directly.</p>
+          <p>Use this when qBittorrent and Prowlarr live on your own desktop or NAS network.</p>
+          <span class="tag">PC Local</span>
+        </article>
+        <article class="feature-card">
+          <h3 class="feature-head">Fast</h3>
+          <p class="meter">[#########.] LAN BRIDGE 90%</p>
+          <p>LAN Bridge profile installs on phone and TV and fetches active LAN route data silently.</p>
+          <p>Desktop heartbeat keeps route handshakes fresh so mobile clients stay seamless.</p>
+          <span class="tag">LAN Bridge</span>
+        </article>
+        <article class="feature-card">
+          <h3 class="feature-head">Secure</h3>
+          <p class="meter">[#######...] ONLINE MODE 70%</p>
+          <p>Online profile is for public-reachable seedbox stacks where cloud runtime can reach all services.</p>
+          <p>Use only when your service endpoints are intentionally exposed with proper auth.</p>
+          <span class="tag">Online</span>
+        </article>
+      </div>
+    </section>
+
+    <section class="terminal">
+      <h2 class="section-title">How It Works</h2>
+      <div class="terminal-line">
+        <span class="prompt">&gt; STEP 1: Configure</span>
+        <p>Run Auto Setup in Configure and save your local profile from the Windows host.</p>
+      </div>
+      <div class="terminal-line">
+        <span class="prompt">&gt; STEP 2: Install</span>
+        <p>Install PC Local on the host machine. Install LAN Bridge on phone or Android TV.</p>
+      </div>
+      <div class="terminal-line">
+        <span class="prompt">&gt; STEP 3: Stream</span>
+        <p>Stremio resolves stream metadata through hosted relay and plays over your LAN route.</p>
+      </div>
+    </section>
+
+    <section class="status-grid">
+      <div class="status-box">Profiles<strong>PC Local / LAN Bridge / Online</strong></div>
+      <div class="status-box">Relay<strong>https://pvtkrrx.vercel.app</strong></div>
+      <div class="status-box">Builds<strong>Windows Setup + Portable EXE</strong></div>
+    </section>
+
+    <footer>
+      <span>PVTKRRX / Source Available / MIT</span>
+      <span>Built for the underground</span>
+    </footer>
+  </main>
+
+  <script>
+    function scheduleFlicker() {
+      const isMobile = window.innerWidth < 768;
+      if (isMobile) return;
+      const waitMs = 15000 + Math.floor(Math.random() * 15000);
+      window.setTimeout(() => {
+        if (Math.random() > 0.5) {
+          document.body.classList.add("glitch-active");
+          window.setTimeout(() => document.body.classList.remove("glitch-active"), 100);
+        }
+        scheduleFlicker();
+      }, waitMs);
+    }
+    scheduleFlicker();
+  </script>
+</body>
+</html>
