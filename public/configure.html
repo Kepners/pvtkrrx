@@ -66,6 +66,7 @@
     }
 
     .vortex,
+    .floating-debrid,
     .scanlines,
     .noise,
     .glitch-flash {
@@ -104,6 +105,36 @@
         conic-gradient(from 130deg, transparent, rgba(255, 49, 95, 0.16), transparent, rgba(0, 246, 255, 0.16), transparent);
       animation: vortex-spin-b 44s linear infinite reverse;
       opacity: 0.08;
+    }
+
+    .vortex-layer.three {
+      background:
+        repeating-radial-gradient(circle at center, rgba(255, 0, 212, 0.42) 0 1px, transparent 1px 13px),
+        conic-gradient(from 220deg, transparent, rgba(0, 255, 102, 0.2), transparent, rgba(0, 246, 255, 0.18), transparent);
+      animation: vortex-spin-c 56s linear infinite;
+      opacity: 0.07;
+    }
+
+    .floating-debrid {
+      z-index: 1;
+      overflow: hidden;
+    }
+
+    .debrid-dot {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: var(--size);
+      height: var(--size);
+      border-radius: 2px;
+      opacity: 0.56;
+      background: hsl(var(--hue), 100%, 62%);
+      box-shadow:
+        0 0 10px hsla(var(--hue), 100%, 62%, 0.75),
+        0 0 20px hsla(var(--hue), 100%, 62%, 0.44);
+      transform: translate3d(var(--x), var(--y), 0) scale(0.66);
+      animation: debrid-float var(--dur) linear infinite;
+      animation-delay: var(--delay);
     }
 
     .scanlines {
@@ -235,9 +266,26 @@
       100% { transform: translate(-50%, -50%) rotate(360deg) scale(0.9); }
     }
 
+    @keyframes vortex-spin-c {
+      0% { transform: translate(-50%, -50%) rotate(0deg) scale(1.02); }
+      100% { transform: translate(-50%, -50%) rotate(360deg) scale(0.95); }
+    }
+
     @keyframes scan-drift {
       0% { transform: translateY(0); }
       100% { transform: translateY(120px); }
+    }
+
+    @keyframes debrid-float {
+      0% {
+        transform: translate3d(var(--x), calc(var(--y) + 10vh), 0) scale(0.5);
+        opacity: 0;
+      }
+      16% { opacity: 0.58; }
+      100% {
+        transform: translate3d(calc(var(--x) + 18px), calc(var(--y) - 100vh), 0) scale(0.28);
+        opacity: 0;
+      }
     }
 
     @keyframes noise-jump {
@@ -417,6 +465,33 @@
       margin-bottom: 0.8rem;
       letter-spacing: 0.5px;
       line-height: 1.45;
+    }
+
+    .hint a {
+      color: var(--blue);
+      text-decoration: none;
+      border-bottom: 1px dotted rgba(0, 246, 255, 0.45);
+    }
+
+    .hint a:hover {
+      color: #dffaff;
+      border-bottom-color: rgba(0, 246, 255, 0.85);
+    }
+
+    .action-row {
+      display: flex;
+      gap: 0.6rem;
+      margin-bottom: 0.65rem;
+      flex-wrap: wrap;
+    }
+
+    .action-row .btn-copy {
+      margin: 0;
+      width: auto;
+      min-width: 220px;
+      padding: 0.62rem 0.75rem;
+      font-size: 0.74rem;
+      letter-spacing: 0.7px;
     }
 
     button {
@@ -642,6 +717,15 @@
   </style>
 </head>
 <body>
+  <div class="vortex" aria-hidden="true">
+    <div class="vortex-layer one"></div>
+    <div class="vortex-layer two"></div>
+    <div class="vortex-layer three"></div>
+  </div>
+  <div class="floating-debrid" aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div class="noise" aria-hidden="true"></div>
+  <div class="glitch-flash" aria-hidden="true"></div>
   <div class="container">
     <div class="logo-header">
       <h1>PVTKRRX</h1>
@@ -667,6 +751,11 @@
       <label for="stremioAuthKey">Stremio AuthKey (optional)</label>
       <input type="password" id="stremioAuthKey" placeholder="Paste Stremio AuthKey for account linking">
       <p class="hint">Used once to link this profile to your Stremio account. We only store a hash.</p>
+      <div class="action-row">
+        <button class="btn-copy" type="button" id="stremioAutoKeyBtn" onclick="launchStremioAuthKeyHelper()">Auto Find AuthKey</button>
+        <button class="btn-copy" type="button" id="stremioPasteKeyBtn" onclick="pasteAuthKeyFromClipboard()">Paste AuthKey From Clipboard</button>
+      </div>
+      <p class="hint">Auto Find opens Stremio account settings and checks clipboard automatically for 2 minutes after you copy the key.</p>
       <div id="stremioLinkStatus" class="status"></div>
     </div>
 
@@ -713,11 +802,16 @@
       <label for="provider">Seedbox Provider</label>
       <select id="provider">
         <option value="custom">Custom / Other</option>
-        <option value="feral">Feral Hosting</option>
-        <option value="ultra">Ultra.cc</option>
         <option value="whatbox">Whatbox</option>
+        <option value="ultra">Ultra.cc</option>
+        <option value="seedhost">SeedHost</option>
+        <option value="feral">Feral Hosting</option>
+        <option value="rapid">RapidSeedbox</option>
+        <option value="bytesized">Bytesized</option>
+        <option value="hbd">HostingByDesign</option>
         <option value="swizzin">Swizzin</option>
       </select>
+      <p class="hint" id="providerPresetInfo">Preset applies path mapping defaults and links to matching runbook steps.</p>
       <label for="fileServerUrl">HTTP File Server URL</label>
       <input type="url" id="fileServerUrl" placeholder="https://username.seedbox.com/files">
       <label for="fileServerAuth">Basic Auth (optional)</label>
@@ -842,14 +936,110 @@
       recommendedPairId: '',
       lastAuthKey: ''
     };
+    let stremioAuthKeyPollTimer = null;
+    let stremioAuthKeyPollUntil = 0;
 
     const providers = {
-      feral: { from: '/media/', to: '/' },
-      ultra: { from: '/home/', to: '/' },
-      whatbox: { from: '/home/', to: '/' },
-      swizzin: { from: '/home/', to: '/' },
-      custom: { from: '', to: '' }
+      custom: {
+        from: '',
+        to: '',
+        fileServerPlaceholder: 'https://username.seedbox.com/files',
+        runbookAnchor: '#other',
+        note: 'Custom profile. Use the exact HTTPS file endpoint from your provider panel.'
+      },
+      whatbox: {
+        from: '/home/',
+        to: '/',
+        fileServerPlaceholder: 'https://<managed-link>.whatbox.ca/files',
+        runbookAnchor: '#whatbox',
+        note: 'Use Whatbox Managed Links HTTPS endpoints for qBit/Prowlarr/files.'
+      },
+      ultra: {
+        from: '/home/',
+        to: '/',
+        fileServerPlaceholder: 'https://<slot>.ultra.cc',
+        runbookAnchor: '#ultra',
+        note: 'Use your Ultra app host and path proxy URL.'
+      },
+      seedhost: {
+        from: '/home/',
+        to: '/',
+        fileServerPlaceholder: 'https://<box>.seedhost.eu',
+        runbookAnchor: '#seedhost',
+        note: 'Shared plans are usually best with Online profile and hosted PVTKRRX.'
+      },
+      feral: {
+        from: '/media/',
+        to: '/',
+        fileServerPlaceholder: 'https://<username>.feralhosting.com',
+        runbookAnchor: '#feral',
+        note: 'Feral typically needs user-space tooling and HTTPS proxy path.'
+      },
+      rapid: {
+        from: '/home/',
+        to: '/',
+        fileServerPlaceholder: 'https://<box>.rapidseedbox.com',
+        runbookAnchor: '#rapid',
+        note: 'Rapid Lean lacks SSH; Premium supports full direct hosting flow.'
+      },
+      bytesized: {
+        from: '/home/',
+        to: '/',
+        fileServerPlaceholder: 'https://<appbox>.bytesized-hosting.com',
+        runbookAnchor: '#bytesized',
+        note: 'Use Online profile first unless Connect prerequisites are in place.'
+      },
+      hbd: {
+        from: '/home/',
+        to: '/',
+        fileServerPlaceholder: 'https://<slot>.hostingby.design',
+        runbookAnchor: '#hbd',
+        note: 'Use your HBD app slot URL and keep HTTPS enabled.'
+      },
+      swizzin: {
+        from: '/home/',
+        to: '/',
+        fileServerPlaceholder: 'https://seedbox.example.com/files',
+        runbookAnchor: '#swizzin',
+        note: 'Swizzin works best when you control root + reverse proxy routing.'
+      }
     };
+
+    function getProviderPreset(providerId) {
+      const key = String(providerId || '').trim().toLowerCase();
+      return providers[key] || providers.custom;
+    }
+
+    function renderProviderPresetInfo(providerId) {
+      const preset = getProviderPreset(providerId);
+      const infoEl = document.getElementById('providerPresetInfo');
+      if (!infoEl) return;
+      infoEl.textContent = '';
+
+      const textNode = document.createTextNode(`Preset loaded: ${preset.note} `);
+      const link = document.createElement('a');
+      link.href = `/runbooks${preset.runbookAnchor || '#other'}`;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'Open matching runbook';
+      infoEl.appendChild(textNode);
+      infoEl.appendChild(link);
+    }
+
+    function applyProviderPreset(providerId, options = {}) {
+      const { applyMapping = true } = options;
+      const preset = getProviderPreset(providerId);
+      if (applyMapping) {
+        document.getElementById('pathFrom').value = preset.from;
+        document.getElementById('pathTo').value = preset.to;
+      }
+
+      const fileServerInput = document.getElementById('fileServerUrl');
+      if (fileServerInput && preset.fileServerPlaceholder) {
+        fileServerInput.placeholder = preset.fileServerPlaceholder;
+      }
+      renderProviderPresetInfo(providerId);
+    }
 
     function normalizeLocalHostname(raw) {
       const label = String(raw || '')
@@ -939,6 +1129,109 @@
         next.stremioUserId = accountLinkState.stremioUserId;
       }
       return next;
+    }
+
+    function extractStremioAuthKeyCandidate(rawValue) {
+      const text = String(rawValue || '').trim().replace(/^['"]|['"]$/g, '');
+      if (!text) return '';
+      if (/^[A-Za-z0-9._-]{16,1024}$/.test(text)) return text;
+      try {
+        const parsed = new URL(text);
+        const queryValue = String(parsed.searchParams.get('authKey') || '').trim();
+        if (/^[A-Za-z0-9._-]{16,1024}$/.test(queryValue)) return queryValue;
+        const hashMatch = String(parsed.hash || '').match(/authKey=([A-Za-z0-9._-]{16,1024})/i);
+        if (hashMatch && hashMatch[1]) return hashMatch[1];
+      } catch (_) {}
+      const inline = text.match(/authKey=([A-Za-z0-9._-]{16,1024})/i);
+      return inline && inline[1] ? inline[1] : '';
+    }
+
+    function stopStremioAuthKeyPolling() {
+      if (stremioAuthKeyPollTimer) {
+        clearInterval(stremioAuthKeyPollTimer);
+        stremioAuthKeyPollTimer = null;
+      }
+      stremioAuthKeyPollUntil = 0;
+      const autoBtn = document.getElementById('stremioAutoKeyBtn');
+      const pasteBtn = document.getElementById('stremioPasteKeyBtn');
+      if (autoBtn) {
+        autoBtn.disabled = false;
+        autoBtn.textContent = 'Auto Find AuthKey';
+      }
+      if (pasteBtn) {
+        pasteBtn.disabled = false;
+      }
+    }
+
+    async function applyDetectedStremioAuthKey(candidate, sourceLabel) {
+      const authKey = extractStremioAuthKeyCandidate(candidate);
+      if (!authKey) return false;
+      const inputEl = document.getElementById('stremioAuthKey');
+      if (inputEl) inputEl.value = authKey;
+      setStremioLinkStatus('info', `AuthKey detected from ${sourceLabel}. Linking account...`);
+      await linkStremioAuthKeyIfProvided(true);
+      stopStremioAuthKeyPolling();
+      return true;
+    }
+
+    async function pasteAuthKeyFromClipboard() {
+      if (!navigator.clipboard || typeof navigator.clipboard.readText !== 'function') {
+        setStremioLinkStatus('err', 'Clipboard read is blocked in this browser. Paste AuthKey manually.');
+        return;
+      }
+      try {
+        const clipboardText = await navigator.clipboard.readText();
+        const applied = await applyDetectedStremioAuthKey(clipboardText, 'clipboard');
+        if (!applied) {
+          setStremioLinkStatus('err', 'Clipboard does not contain a valid Stremio AuthKey yet.');
+        }
+      } catch (_) {
+        setStremioLinkStatus('err', 'Clipboard permission denied. Paste AuthKey manually.');
+      }
+    }
+
+    async function launchStremioAuthKeyHelper() {
+      if (!navigator.clipboard || typeof navigator.clipboard.readText !== 'function') {
+        setStremioLinkStatus('err', 'Auto detect needs clipboard access. Paste AuthKey manually.');
+        return;
+      }
+
+      stopStremioAuthKeyPolling();
+      const autoBtn = document.getElementById('stremioAutoKeyBtn');
+      const pasteBtn = document.getElementById('stremioPasteKeyBtn');
+      if (autoBtn) {
+        autoBtn.disabled = true;
+        autoBtn.textContent = 'Waiting For AuthKey...';
+      }
+      if (pasteBtn) pasteBtn.disabled = true;
+
+      window.open('https://www.strem.io/acc-settings', '_blank', 'noopener,noreferrer');
+      setStremioLinkStatus('info', 'Stremio account page opened. Copy AuthKey there; we will auto-detect it from clipboard for 2 minutes.');
+
+      try {
+        const immediateClipboard = await navigator.clipboard.readText();
+        const immediateApplied = await applyDetectedStremioAuthKey(immediateClipboard, 'clipboard');
+        if (immediateApplied) return;
+      } catch (_) {
+        // Ignore initial clipboard failure and continue polling window.
+      }
+
+      stremioAuthKeyPollUntil = Date.now() + 120000;
+      stremioAuthKeyPollTimer = setInterval(async () => {
+        if (Date.now() >= stremioAuthKeyPollUntil) {
+          stopStremioAuthKeyPolling();
+          setStremioLinkStatus('info', 'Auto detect timed out. Click Auto Find again or paste the AuthKey manually.');
+          return;
+        }
+        try {
+          const clipboardText = await navigator.clipboard.readText();
+          const detected = extractStremioAuthKeyCandidate(clipboardText);
+          if (!detected || detected === stremioLinkSession.lastAuthKey) return;
+          await applyDetectedStremioAuthKey(detected, 'clipboard');
+        } catch (_) {
+          // Keep polling; browser can recover clipboard permission after user gesture.
+        }
+      }, 1500);
     }
 
     async function linkStremioAuthKeyIfProvided(force = false) {
@@ -1140,12 +1433,32 @@
       }
     }
 
-    document.getElementById('provider').addEventListener('change', function() {
-      const p = providers[this.value];
-      if (p) {
-        document.getElementById('pathFrom').value = p.from;
-        document.getElementById('pathTo').value = p.to;
+    function spawnDebridDots() {
+      const layer = document.querySelector('.floating-debrid');
+      if (!layer) return;
+      const hues = [190, 203, 136, 345, 302];
+      const count = window.innerWidth < 720 ? 24 : 44;
+      for (let i = 0; i < count; i += 1) {
+        const dot = document.createElement('span');
+        const size = 1 + Math.random() * 3.4;
+        const x = `${Math.random() * 100}vw`;
+        const y = `${68 + Math.random() * 44}vh`;
+        const dur = `${8 + Math.random() * 12}s`;
+        const delay = `${-Math.random() * 12}s`;
+        const hue = hues[Math.floor(Math.random() * hues.length)];
+        dot.className = 'debrid-dot';
+        dot.style.setProperty('--size', `${size}px`);
+        dot.style.setProperty('--x', x);
+        dot.style.setProperty('--y', y);
+        dot.style.setProperty('--dur', dur);
+        dot.style.setProperty('--delay', delay);
+        dot.style.setProperty('--hue', String(hue));
+        layer.appendChild(dot);
       }
+    }
+
+    document.getElementById('provider').addEventListener('change', function() {
+      applyProviderPreset(this.value, { applyMapping: true });
     });
 
     document.getElementById('jackettUrl').addEventListener('blur', function() {
@@ -1165,9 +1478,12 @@
       }
     });
     setInstallModeHint();
+    applyProviderPreset(document.getElementById('provider').value, { applyMapping: false });
+    spawnDebridDots();
     document.getElementById('localInstall').style.display = 'none';
     document.getElementById('hostedInstall').style.display = 'none';
     maybePrefillFromToken();
+    window.addEventListener('beforeunload', stopStremioAuthKeyPolling);
 
     function startPageFlicker() {
       if (window.innerWidth < 768) return;
@@ -1207,8 +1523,7 @@
       document.getElementById('provider').value = 'custom';
       document.getElementById('fileServerUrl').value = '';
       document.getElementById('fileServerAuth').value = '';
-      document.getElementById('pathFrom').value = '';
-      document.getElementById('pathTo').value = '';
+      applyProviderPreset('custom', { applyMapping: true });
       document.getElementById('autoDeleteWatched').checked = true;
       document.getElementById('watchedDeleteGraceSeconds').value = '300';
     }
@@ -1451,6 +1766,7 @@
         qbitUrl: document.getElementById('qbitUrl').value.replace(/\/+$/, ''),
         qbitUsername: document.getElementById('qbitUsername').value.trim(),
         qbitPassword: document.getElementById('qbitPassword').value,
+        provider: document.getElementById('provider').value,
         fileServerUrl: fileServerUrlInput ? fileServerUrlInput.replace(/\/+$/, '') : '',
         fileServerAuth: document.getElementById('fileServerAuth').value.trim(),
         pathMapping: {
@@ -1485,6 +1801,10 @@
       if (config.qbitUrl) document.getElementById('qbitUrl').value = config.qbitUrl;
       if (config.qbitUsername) document.getElementById('qbitUsername').value = config.qbitUsername;
       if (config.qbitPassword) document.getElementById('qbitPassword').value = config.qbitPassword;
+      const providerId = String(config.provider || '').trim().toLowerCase();
+      if (providerId && providers[providerId]) {
+        document.getElementById('provider').value = providerId;
+      }
       if (config.fileServerUrl) document.getElementById('fileServerUrl').value = config.fileServerUrl;
       if (config.fileServerAuth) document.getElementById('fileServerAuth').value = config.fileServerAuth;
       if (config.pathMapping && typeof config.pathMapping === 'object') {
@@ -1507,6 +1827,7 @@
         setActiveLocalHostname(useConfiguredHostname ? normalizedConfigHost : normalizedDefault);
         setInstallModeHint();
       }
+      applyProviderPreset(document.getElementById('provider').value, { applyMapping: false });
     }
 
     function getConfigTokenFromPath() {
