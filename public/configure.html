@@ -663,6 +663,14 @@
     </div>
 
     <div class="card">
+      <h2>Stremio Account Link</h2>
+      <label for="stremioAuthKey">Stremio AuthKey (optional)</label>
+      <input type="password" id="stremioAuthKey" placeholder="Paste Stremio AuthKey for account linking">
+      <p class="hint">Used once to link this profile to your Stremio account. We only store a hash.</p>
+      <div id="stremioLinkStatus" class="status"></div>
+    </div>
+
+    <div class="card">
       <h2>Auto Setup</h2>
       <p class="hint">One click setup for home use: local defaults plus install links for this PC and phone/TV.</p>
       <button class="btn-test" onclick="autoSetup()">Auto Setup (Home LAN)</button>
@@ -755,22 +763,19 @@
       <div id="localInstall">
         <p class="install-section-title">Step 1 - Install on this PC (PVTKRRX PC Local)</p>
         <div class="url-row">
-          <input type="text" id="httpUrlInput" readonly>
-          <button class="btn-copy" onclick="copyUrl('httpUrlInput', this)">Copy</button>
+          <button class="btn-copy" onclick="copyPrivateLink('localLoopback', this)">Copy PC Local URL</button>
         </div>
         <p class="install-note">Use this only on the same Windows PC that runs PVTKRRX.</p>
 
         <p class="install-section-title" style="margin-top:1rem">Optional network test - LAN hostname</p>
         <div class="url-row">
-          <input type="text" id="lanUrlInput" readonly>
-          <button class="btn-copy" onclick="copyUrl('lanUrlInput', this)">Copy</button>
+          <button class="btn-copy" onclick="copyPrivateLink('localLanHostname', this)">Copy LAN Hostname URL</button>
         </div>
-        <p class="install-note" id="lanInstallNote">Use <code id="lanHostCode">pvtkrrx.local</code> to test LAN reachability from this browser.</p>
+        <p class="install-note" id="lanInstallNote">Use this to test LAN reachability from this browser.</p>
 
         <p class="install-section-title" style="margin-top:1rem">Optional network test - LAN IP fallback</p>
         <div class="url-row">
-          <input type="text" id="httpsUrlInput" readonly>
-          <button class="btn-copy" onclick="copyUrl('httpsUrlInput', this)">Copy</button>
+          <button class="btn-copy" onclick="copyPrivateLink('localLanIp', this)">Copy LAN IP URL</button>
         </div>
         <p class="install-note" id="lanFallbackNote">Use this only if hostname resolution fails.</p>
 
@@ -780,12 +785,10 @@
 
         <p class="install-section-title" style="margin-top:1rem">Step 2 - Install on phone/TV (PVTKRRX LAN Bridge)</p>
         <div class="url-row">
-          <input type="text" id="pairHostedManifestInput" readonly>
-          <button class="btn-copy" onclick="copyUrl('pairHostedManifestInput', this)">Copy</button>
+          <button class="btn-copy" onclick="copyPrivateLink('pairHostedManifest', this)">Copy Hosted Manifest URL</button>
         </div>
         <div class="url-row">
-          <input type="text" id="pairHostedStremioInput" readonly>
-          <button class="btn-copy" onclick="copyUrl('pairHostedStremioInput', this)">Copy</button>
+          <button class="btn-copy" onclick="copyPrivateLink('pairHostedStremio', this)">Copy Hosted Stremio URL</button>
         </div>
         <p class="install-note" id="pairRelayNote">After local save, this URL installs LAN Bridge and silently routes playback to your active home PC.</p>
         <p class="install-note" id="pairStatusNote">LAN Bridge status: waiting for local save.</p>
@@ -808,12 +811,36 @@
     const defaultLanPairRelayUrl = 'https://pvtkrrx.vercel.app';
     let activeLocalHostname = defaultLocalHostname;
     let pairStatusTimer = null;
+    let pairStatusPollCount = 0;
+    let pairStatusOnlineStreak = 0;
+    const pairStatusPollEveryMs = 30000;
+    const pairStatusMaxPolls = 8;
     const lanPair = {
       enabled: true,
       required: true,
       pairId: '',
       pairKey: '',
       relayUrl: defaultLanPairRelayUrl
+    };
+    const privateInstallLinks = {
+      localLoopback: '',
+      localLanHostname: '',
+      localLanIp: '',
+      pairHostedManifest: '',
+      pairHostedStremio: ''
+    };
+    const accountLinkState = {
+      accountUserId: '',
+      accountProvider: '',
+      accountLinkedAt: 0,
+      stremioUserId: ''
+    };
+    const stremioLinkSession = {
+      token: '',
+      userId: '',
+      stremioUserId: '',
+      recommendedPairId: '',
+      lastAuthKey: ''
     };
 
     const providers = {
@@ -838,10 +865,6 @@
 
     function setActiveLocalHostname(raw) {
       activeLocalHostname = normalizeLocalHostname(raw || defaultLocalHostname);
-      const codeEl = document.getElementById('lanHostCode');
-      if (codeEl) {
-        codeEl.textContent = activeLocalHostname;
-      }
       const inputEl = document.getElementById('localHostname');
       if (inputEl) {
         inputEl.value = activeLocalHostname;
@@ -857,13 +880,7 @@
         note.textContent = 'Hostname check unavailable. Use the LAN IP fallback test below.';
         return;
       }
-
-      note.textContent = 'LAN hostname test (';
-      const code = document.createElement('code');
-      code.id = 'lanHostCode';
-      code.textContent = hostname;
-      note.appendChild(code);
-      note.append(').');
+      note.textContent = 'LAN hostname test is available from this browser.';
     }
 
     function normalizeRelayUrl(raw) {
@@ -885,11 +902,124 @@
       el.style.color = forceError ? 'var(--red)' : 'var(--text-muted)';
     }
 
+    function setStremioLinkStatus(type, text) {
+      const el = document.getElementById('stremioLinkStatus');
+      if (!el) return;
+      if (!text) {
+        el.className = 'status';
+        el.textContent = '';
+        return;
+      }
+      el.className = `status ${type || 'info'}`;
+      el.textContent = text;
+    }
+
+    function applyAccountLinkFromConfig(config) {
+      if (!config || typeof config !== 'object') return;
+      accountLinkState.accountUserId = String(config.accountUserId || '').trim();
+      accountLinkState.accountProvider = String(config.accountProvider || '').trim();
+      accountLinkState.accountLinkedAt = Number(config.accountLinkedAt || 0);
+      accountLinkState.stremioUserId = String(config.stremioUserId || '').trim();
+
+      if (accountLinkState.accountUserId) {
+        setStremioLinkStatus('ok', 'Linked account loaded from existing profile token.');
+      } else {
+        setStremioLinkStatus('', '');
+      }
+    }
+
+    function attachAccountLink(config) {
+      const next = { ...(config || {}) };
+      if (accountLinkState.accountUserId) {
+        next.accountUserId = accountLinkState.accountUserId;
+        next.accountProvider = accountLinkState.accountProvider || 'stremio-authkey';
+        next.accountLinkedAt = Number(accountLinkState.accountLinkedAt || Date.now());
+      }
+      if (accountLinkState.stremioUserId) {
+        next.stremioUserId = accountLinkState.stremioUserId;
+      }
+      return next;
+    }
+
+    async function linkStremioAuthKeyIfProvided(force = false) {
+      const inputEl = document.getElementById('stremioAuthKey');
+      const authKey = String(inputEl?.value || '').trim();
+      if (!authKey) return null;
+
+      if (!force && stremioLinkSession.token && stremioLinkSession.lastAuthKey === authKey) {
+        return {
+          token: stremioLinkSession.token,
+          userId: stremioLinkSession.userId,
+          stremioUserId: stremioLinkSession.stremioUserId,
+          recommendedPairId: stremioLinkSession.recommendedPairId
+        };
+      }
+
+      setStremioLinkStatus('info', 'Verifying Stremio AuthKey...');
+      const res = await fetch('/auth/stremio/link-authkey', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ authKey })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.ok || !data?.token || !data?.user?.id) {
+        const message = data?.error || `AuthKey link failed (${res.status})`;
+        setStremioLinkStatus('err', message);
+        throw new Error(message);
+      }
+
+      stremioLinkSession.token = String(data.token || '');
+      stremioLinkSession.userId = String(data.user?.id || '').trim();
+      stremioLinkSession.stremioUserId = String(data.stremio?.userId || '').trim();
+      stremioLinkSession.recommendedPairId = String(data.stremio?.recommendedPairId || '').trim();
+      stremioLinkSession.lastAuthKey = authKey;
+
+      accountLinkState.accountUserId = stremioLinkSession.userId;
+      accountLinkState.accountProvider = 'stremio-authkey';
+      accountLinkState.accountLinkedAt = Date.now();
+      accountLinkState.stremioUserId = stremioLinkSession.stremioUserId;
+
+      setStremioLinkStatus('ok', 'Stremio account linked successfully.');
+      return {
+        token: stremioLinkSession.token,
+        userId: stremioLinkSession.userId,
+        stremioUserId: stremioLinkSession.stremioUserId,
+        recommendedPairId: stremioLinkSession.recommendedPairId
+      };
+    }
+
     function clearLanPairInstallFields() {
-      const manifestInput = document.getElementById('pairHostedManifestInput');
-      const stremioInput = document.getElementById('pairHostedStremioInput');
-      if (manifestInput) manifestInput.value = '';
-      if (stremioInput) stremioInput.value = '';
+      privateInstallLinks.pairHostedManifest = '';
+      privateInstallLinks.pairHostedStremio = '';
+    }
+
+    function setPrivateLink(name, value) {
+      if (!Object.prototype.hasOwnProperty.call(privateInstallLinks, name)) return;
+      privateInstallLinks[name] = String(value || '').trim();
+    }
+
+    async function copyPrivateLink(name, btn) {
+      const value = String(privateInstallLinks[name] || '').trim();
+      if (!value) {
+        const original = btn.textContent;
+        btn.textContent = 'Not Ready';
+        setTimeout(() => { btn.textContent = original; }, 1200);
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(value);
+      } catch (_) {
+        const el = document.createElement('textarea');
+        el.value = value;
+        document.body.appendChild(el);
+        el.focus();
+        el.select();
+        document.execCommand('copy');
+        document.body.removeChild(el);
+      }
+      const original = btn.textContent;
+      btn.textContent = 'Copied!';
+      setTimeout(() => { btn.textContent = original; }, 1200);
     }
 
     function stopLanPairStatusPolling() {
@@ -897,6 +1027,8 @@
         clearInterval(pairStatusTimer);
         pairStatusTimer = null;
       }
+      pairStatusPollCount = 0;
+      pairStatusOnlineStreak = 0;
     }
 
     function setLanPairStateFromConfig(config) {
@@ -929,6 +1061,7 @@
         setPairStatusNote('LAN Bridge status: local config not saved yet.');
         return;
       }
+      pairStatusPollCount += 1;
       const relayBase = normalizeRelayUrl(lanPair.relayUrl);
       try {
         const res = await fetch(`${relayBase}/pair/status`, {
@@ -949,21 +1082,38 @@
         }
         const data = await res.json();
         if (!data || data.online !== true) {
+          pairStatusOnlineStreak = 0;
           setPairStatusNote('LAN Bridge offline - open PVTKRRX desktop on the host PC.', true);
+          if (pairStatusPollCount >= pairStatusMaxPolls) {
+            stopLanPairStatusPolling();
+            setPairStatusNote('LAN Bridge still offline. Status checks paused (save/install to retry).', true);
+          }
           return;
         }
+        pairStatusOnlineStreak += 1;
         const lastSeen = formatRelativeTime(data.updatedAt);
         const suffix = lastSeen ? ` (${lastSeen})` : '';
         setPairStatusNote(`LAN Bridge online${suffix}.`);
+        if (pairStatusOnlineStreak >= 2) {
+          stopLanPairStatusPolling();
+          setPairStatusNote(`LAN Bridge online${suffix}. Status checks paused.`);
+        }
       } catch (_) {
+        pairStatusOnlineStreak = 0;
         setPairStatusNote('LAN Bridge status check failed - relay unreachable.', true);
+        if (pairStatusPollCount >= pairStatusMaxPolls) {
+          stopLanPairStatusPolling();
+          setPairStatusNote('LAN Bridge status check failed repeatedly. Checks paused.', true);
+        }
       }
     }
 
     function startLanPairStatusPolling() {
       stopLanPairStatusPolling();
+      pairStatusPollCount = 0;
+      pairStatusOnlineStreak = 0;
       refreshLanPairStatus();
-      pairStatusTimer = setInterval(refreshLanPairStatus, 30000);
+      pairStatusTimer = setInterval(refreshLanPairStatus, pairStatusPollEveryMs);
     }
 
     function normalizeProwlarrBaseUrl(raw) {
@@ -1120,8 +1270,6 @@
       const lan = info.lan || null;
       const mdnsReachable = await canReachManifest(mdns && mdns.httpManifest);
       const lanReachable = await canReachManifest(lan && lan.httpManifest);
-      const method2Field = document.getElementById('lanUrlInput');
-      const method3Field = document.getElementById('httpsUrlInput');
       const method3Note = document.getElementById('lanFallbackNote');
       const openNote = document.getElementById('openLinkNote');
       // Quick launch must always target loopback on this PC.
@@ -1129,7 +1277,7 @@
       const openManifestUrl = (loopback && loopback.httpManifest) || '';
       const openLink = document.getElementById('stremioLink');
 
-      document.getElementById('httpUrlInput').value = loopback.httpManifest || '';
+      setPrivateLink('localLoopback', loopback.httpManifest || '');
       if (openLink) {
         openLink.href = '#';
         openLink.onclick = async (event) => {
@@ -1141,29 +1289,32 @@
             openLink.textContent = 'Copied!';
             setTimeout(() => { openLink.textContent = original; }, 1500);
           } catch (_) {
-            const input = document.getElementById('httpUrlInput');
-            input.focus();
-            input.select();
+            const el = document.createElement('textarea');
+            el.value = openManifestUrl;
+            document.body.appendChild(el);
+            el.focus();
+            el.select();
             document.execCommand('copy');
+            document.body.removeChild(el);
           }
         };
       }
 
       if (mdns && mdns.httpManifest) {
-        method2Field.value = mdns.httpManifest;
+        setPrivateLink('localLanHostname', mdns.httpManifest);
         setLanInstallNote(mdns.hostname || activeLocalHostname, mdnsReachable);
       } else {
-        method2Field.value = '';
+        setPrivateLink('localLanHostname', '');
         setLanInstallNote(activeLocalHostname, false);
       }
 
       if (lan && lan.httpManifest) {
-        method3Field.value = lan.httpManifest;
+        setPrivateLink('localLanIp', lan.httpManifest);
         method3Note.textContent = lanReachable
           ? 'Direct IP fallback when .local resolution is blocked (reachability/debug).'
           : 'LAN-IP URL detected but currently unreachable from this device.';
       } else {
-        method3Field.value = '';
+        setPrivateLink('localLanIp', '');
         method3Note.textContent = 'No LAN IP detected yet. Use Step 1 on this PC.';
       }
 
@@ -1186,7 +1337,7 @@
       const relayBase = normalizeRelayUrl(lanPair.relayUrl);
       const noteEl = document.getElementById('pairRelayNote');
       if (noteEl) {
-        noteEl.textContent = `LAN Bridge relay: ${relayBase}`;
+        noteEl.textContent = 'LAN Bridge relay configured.';
       }
 
       const payload = {
@@ -1220,11 +1371,8 @@
         const manifestPath = `/${token}/manifest.json${modeQuery}`;
         const hostedManifestUrl = `${relayBase}${manifestPath}`;
         const hostedStremioUrl = `stremio://${relayHost}${manifestPath}`;
-
-        const manifestInput = document.getElementById('pairHostedManifestInput');
-        const stremioInput = document.getElementById('pairHostedStremioInput');
-        if (manifestInput) manifestInput.value = hostedManifestUrl;
-        if (stremioInput) stremioInput.value = hostedStremioUrl;
+        setPrivateLink('pairHostedManifest', hostedManifestUrl);
+        setPrivateLink('pairHostedStremio', hostedStremioUrl);
 
         startLanPairStatusPolling();
       } catch (_) {
@@ -1279,7 +1427,7 @@
       const localHostname = normalizeLocalHostname(localHostnameInput || activeLocalHostname);
       const localHostnameCustom = localHostname !== normalizeLocalHostname(defaultLocalHostname);
       setActiveLocalHostname(localHostname);
-      return {
+      const base = {
         jackettUrl: normalizeProwlarrBaseUrl(document.getElementById('jackettUrl').value),
         jackettApiKey: document.getElementById('jackettApiKey').value.trim(),
         sportsDbApiKey: document.getElementById('sportsDbApiKey').value.trim() || '123',
@@ -1304,11 +1452,13 @@
         lanPairKey: lanPair.pairKey,
         lanPairRelayUrl: normalizeRelayUrl(lanPair.relayUrl)
       };
+      return attachAccountLink(base);
     }
 
     function fillConfig(config) {
       if (!config || typeof config !== 'object') return;
       setLanPairStateFromConfig(config);
+      applyAccountLinkFromConfig(config);
 
       if (config.jackettUrl) document.getElementById('jackettUrl').value = normalizeProwlarrBaseUrl(config.jackettUrl);
       if (config.jackettApiKey) document.getElementById('jackettApiKey').value = config.jackettApiKey;
@@ -1447,20 +1597,8 @@
       }
     }
 
-    function copyUrl(inputId, btn) {
-      const input = document.getElementById(inputId);
-      navigator.clipboard.writeText(input.value).then(() => {
-        const orig = btn.textContent;
-        btn.textContent = 'Copied!';
-        setTimeout(() => { btn.textContent = orig; }, 1500);
-      }).catch(() => {
-        input.select();
-        document.execCommand('copy');
-      });
-    }
-
     async function install() {
-      const config = getConfig();
+      let config = getConfig();
       const installMode = getInstallMode();
       const modeValidationError = validateReachability(config, installMode);
       if (modeValidationError) {
@@ -1475,6 +1613,27 @@
         : 'Preparing Online profile...');
 
       try {
+        const authKey = String(document.getElementById('stremioAuthKey').value || '').trim();
+        if (authKey) {
+          setStatus('installStatus', 'info', 'Linking Stremio account...');
+          const linked = await linkStremioAuthKeyIfProvided();
+          if (linked?.recommendedPairId && installMode === 'local') {
+            lanPair.pairId = linked.recommendedPairId;
+          }
+          config = attachAccountLink({
+            ...config,
+            lanPairId: lanPair.pairId || config.lanPairId
+          });
+        } else {
+          if (accountLinkState.accountUserId) {
+            setStremioLinkStatus('ok', 'Using previously linked account.');
+          }
+        }
+
+        setStatus('installStatus', 'info', installMode === 'local'
+          ? 'Saving Home LAN profile...'
+          : 'Preparing Online profile...');
+
         const host = window.location.host;
 
         if (installMode === 'local') {
@@ -1525,11 +1684,10 @@
           const token = encodeURIComponent(data.token);
           const modeQuery = '?mode=' + encodeURIComponent(installMode);
           const manifestUrl = host + '/' + token + '/manifest.json' + modeQuery;
-          const manifestHttpUrl = window.location.protocol + '//' + manifestUrl;
           const stremioUrl = 'stremio://' + manifestUrl;
 
           document.getElementById('stremioLinkHosted').href = stremioUrl;
-          document.getElementById('hostedUrlDisplay').textContent = manifestHttpUrl;
+          document.getElementById('hostedUrlDisplay').textContent = 'Online profile ready.';
           document.getElementById('localInstall').style.display = 'none';
           document.getElementById('hostedInstall').style.display = 'block';
 

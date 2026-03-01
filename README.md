@@ -40,7 +40,7 @@ See [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for the authoritative curre
 
 ## Quick Start
 
-### Use the Hosted Service (£1/month)
+### Use the Hosted Service (Currently Free)
 
 Visit **[pvtkrrx.vercel.app](https://pvtkrrx.vercel.app)** to configure your addon in 60 seconds.
 
@@ -141,19 +141,38 @@ ENCRYPTION_SECRET=your-secret-here npm start
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | ENCRYPTION_SECRET | Yes | Key for encrypting/decrypting user configs |
+| AUTH_TOKEN_SECRET | Recommended | Key for signing account auth tokens (falls back to ENCRYPTION_SECRET) |
 | KV_REST_API_URL | Recommended | Persist LAN pair heartbeat state on Vercel |
 | KV_REST_API_TOKEN | Recommended | Auth token for KV REST API |
 | PVTKRRX_PAIR_RELAY_URL | Optional | Hosted relay base URL (default https://pvtkrrx.vercel.app) |
-| PVTKRRX_LAN_PAIR_TTL_SECONDS | Optional | Pair record TTL (default 120) |
-| PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP | Optional | Bind hosted pair redirects to heartbeat source network (default true) |
+| PVTKRRX_LAN_PAIR_TTL_SECONDS | Optional | Pair record TTL (default 21600) |
+| PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP | Optional | Bind hosted pair redirects to heartbeat source network (default false) |
 | PVTKRRX_LAN_PAIR_LOCK_HOST | Optional | Reject heartbeat takeover attempts from a different active host IP (default true) |
 | PVTKRRX_LAN_PAIR_RATE_LIMIT_WINDOW_MS | Optional | Pair API rate-limit window in ms (default 60000) |
 | PVTKRRX_LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW | Optional | Max heartbeat calls per window (default 30) |
 | PVTKRRX_LAN_PAIR_STATUS_MAX_PER_WINDOW | Optional | Max status calls per window (default 60) |
 | PVTKRRX_ENCRYPT_MAX_PER_WINDOW | Optional | Max `/encrypt` requests per window (default 30) |
+| PVTKRRX_AUTH_MAX_PER_WINDOW | Optional | Max Stremio AuthKey link requests per window (default 20) |
+| PVTKRRX_STREMIO_API_BASE_URL | Optional | Stremio API base URL for AuthKey verification (default https://api.strem.io) |
+| PVTKRRX_STREMIO_API_TIMEOUT_MS | Optional | Timeout for Stremio AuthKey verification calls (default 10000) |
+| PVTKRRX_FREE_MODE | Optional | Reserved for future billing rollout. Access is currently forced free in server code. |
+| PVTKRRX_REQUIRE_ACTIVE_SUBSCRIPTION | Optional | Reserved for future billing rollout. Currently ignored while free mode is forced. |
+| PVTKRRX_TRIAL_ENABLED | Optional | Allow free trial access before paid subscription is required (default true) |
+| PVTKRRX_TRIAL_DAYS | Optional | Free trial length in days for linked accounts (default 3) |
+| PVTKRRX_TRIAL_REQUIRE_LINKED_ACCOUNT | Optional | Require Stremio account linking to start trial (default true) |
 | PVTKRRX_ALLOWED_WEB_ORIGINS | Optional | Comma-separated trusted browser origins for sensitive API routes |
 | PVTKRRX_STREMIO_LAUNCH_WATCH_ENABLED | Optional | Send immediate pair heartbeat when local Stremio process launches (default true) |
 | PVTKRRX_STREMIO_LAUNCH_POLL_MS | Optional | Poll interval for Stremio process detection in ms (default 10000) |
+
+## Stremio Account Link
+
+Configure page now supports optional Stremio AuthKey linking:
+- POST `/auth/stremio/link-authkey` verifies AuthKey via Stremio `/api/getUser`
+- PVTKRRX stores only a hash of the AuthKey and links config tokens to `accountUserId`
+- deterministic LAN pair id is derived from Stremio user id when linking in local mode
+- GET `/auth/me` returns linked account profile from bearer token
+- addon access is currently free for all users
+- billing/trial env flags are kept for future rollout but are not enforced right now
 
 ## Troubleshooting
 

@@ -20,7 +20,9 @@ const WINDOW_HEIGHT = 416
 const PROVISION_ONLY_ARG = '--pvtkrrx-provision-only'
 const provisionOnlyMode = process.argv.includes(PROVISION_ONLY_ARG)
 let hasRetriedPortRecovery = false
-const LAN_PAIR_HEARTBEAT_MS = Math.max(15000, parseInt(process.env.PVTKRRX_LAN_PAIR_HEARTBEAT_MS || '30000', 10))
+// Desktop publishes its LAN location and then mostly waits; set 0 to disable periodic relay heartbeat.
+const parsedLanPairHeartbeatMs = parseInt(process.env.PVTKRRX_LAN_PAIR_HEARTBEAT_MS || '720000', 10)
+const LAN_PAIR_HEARTBEAT_MS = Number.isFinite(parsedLanPairHeartbeatMs) ? parsedLanPairHeartbeatMs : 720000
 const STREMIO_LAUNCH_WATCH_ENABLED = String(process.env.PVTKRRX_STREMIO_LAUNCH_WATCH_ENABLED || 'true').trim().toLowerCase() !== 'false'
 const STREMIO_LAUNCH_POLL_MS = Math.max(5000, parseInt(process.env.PVTKRRX_STREMIO_LAUNCH_POLL_MS || '10000', 10))
 
@@ -523,9 +525,11 @@ function stopStremioLaunchWatch() {
 function startLanPairHeartbeatLoop() {
   stopLanPairHeartbeatLoop()
   sendLanPairHeartbeat().catch(() => {})
+  if (LAN_PAIR_HEARTBEAT_MS <= 0) return
+  const intervalMs = Math.max(60000, LAN_PAIR_HEARTBEAT_MS)
   lanPairTimer = setInterval(() => {
     sendLanPairHeartbeat().catch(() => {})
-  }, LAN_PAIR_HEARTBEAT_MS)
+  }, intervalMs)
   if (typeof lanPairTimer.unref === 'function') lanPairTimer.unref()
 }
 
