@@ -371,6 +371,7 @@
       display: none;
     }
 
+    .vortex,
     #void-tunnel,
     .floating-debrid,
     .crt-scanlines,
@@ -381,15 +382,56 @@
       pointer-events: none;
     }
 
-    #void-tunnel {
+    .vortex {
       z-index: 0;
+      overflow: hidden;
+    }
+
+    .vortex-layer {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 170vmax;
+      height: 170vmax;
+      transform: translate(-50%, -50%);
+      border-radius: 999px;
+      mix-blend-mode: screen;
+      opacity: 0.16;
+    }
+
+    .vortex-layer.one {
+      background:
+        repeating-radial-gradient(circle at center, rgba(0, 246, 255, 0.55) 0 2px, transparent 2px 16px),
+        conic-gradient(from 0deg, transparent, rgba(0, 246, 255, 0.2), transparent, rgba(255, 0, 212, 0.18), transparent);
+      animation: runbook-vortex-a 22s linear infinite;
+    }
+
+    .vortex-layer.two {
+      background:
+        repeating-radial-gradient(circle at center, rgba(0, 255, 102, 0.4) 0 1px, transparent 1px 14px),
+        conic-gradient(from 120deg, transparent, rgba(255, 0, 51, 0.2), transparent, rgba(0, 204, 255, 0.18), transparent);
+      animation: runbook-vortex-b 34s linear infinite reverse;
+      opacity: 0.14;
+    }
+
+    .vortex-layer.three {
+      background:
+        repeating-radial-gradient(circle at center, rgba(255, 0, 212, 0.4) 0 1px, transparent 1px 13px),
+        conic-gradient(from 220deg, transparent, rgba(0, 255, 102, 0.2), transparent, rgba(0, 168, 255, 0.16), transparent);
+      animation: runbook-vortex-c 52s linear infinite;
+      opacity: 0.12;
+    }
+
+    #void-tunnel {
+      z-index: 1;
       width: 100%;
       height: 100%;
       filter: contrast(1.25) saturate(1.2);
+      opacity: 0;
     }
 
     .floating-debrid {
-      z-index: 1;
+      z-index: 2;
       overflow: hidden;
     }
 
@@ -411,7 +453,7 @@
     }
 
     .crt-scanlines {
-      z-index: 2;
+      z-index: 3;
       background: repeating-linear-gradient(
         to bottom,
         rgba(255, 255, 255, 0.06) 0px,
@@ -425,7 +467,7 @@
     }
 
     .noise-layer {
-      z-index: 3;
+      z-index: 4;
       opacity: 0.08;
       background:
         radial-gradient(circle at 18% 34%, rgba(255, 255, 255, 0.34) 0 0.8px, transparent 0.8px),
@@ -437,7 +479,7 @@
     }
 
     #glitch-flash {
-      z-index: 4;
+      z-index: 5;
       opacity: 0;
       --tear-top: 44%;
       --tear-height: 12%;
@@ -930,6 +972,21 @@
       100% { transform: translate(0, 0); }
     }
 
+    @keyframes runbook-vortex-a {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes runbook-vortex-b {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes runbook-vortex-c {
+      0% { transform: translate(-50%, -50%) rotate(0deg); }
+      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
     @keyframes glitch-burst {
       0% { opacity: 0.05; transform: translateX(0); }
       25% { opacity: 0.3; transform: translateX(-1.5%); }
@@ -1122,6 +1179,11 @@
   </style>
 </head>
 <body>
+  <div class="vortex" aria-hidden="true">
+    <div class="vortex-layer one"></div>
+    <div class="vortex-layer two"></div>
+    <div class="vortex-layer three"></div>
+  </div>
   <canvas id="void-tunnel" aria-hidden="true"></canvas>
   <div class="floating-debrid" aria-hidden="true"></div>
   <div class="crt-scanlines" aria-hidden="true"></div>

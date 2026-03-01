@@ -254,6 +254,21 @@
       cursor: pointer;
     }
 
+    footer {
+      margin-top: 12px;
+      border-top: 1px solid var(--line-soft);
+      padding-top: 10px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #8ca0c8;
+    }
+
     @keyframes spin-a { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
     @keyframes spin-b { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
     @keyframes spin-c { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
@@ -300,6 +315,11 @@
       </div>
       <button class="refresh" id="refreshBtn" type="button">Refresh</button>
     </section>
+
+    <footer>
+      <span>PVTKRRX / Source Available / Operator Controlled</span>
+      <span>Status endpoint remains at `/health?format=json`</span>
+    </footer>
   </main>
 
   <script>
