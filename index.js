@@ -585,6 +585,7 @@ app.use((req, res, next) => {
 const publicDir = path.join(__dirname, 'public')
 const configPage = path.join(publicDir, 'configure.html')
 const runbooksPage = path.join(publicDir, 'runbooks.html')
+const healthPage = path.join(publicDir, 'health.html')
 app.use(express.static(publicDir, {
   maxAge: '1d',
   setHeaders: (res, filePath) => {
@@ -1339,6 +1340,13 @@ app.post('/auto-provision', requireLocalNetworkRoute, async (req, res) => {
 })
 
 app.get('/health', (req, res) => {
+  const accept = String(req.headers.accept || '')
+  const wantsHtml = req.query?.format !== 'json' && accept.includes('text/html')
+  if (wantsHtml) {
+    setPublicCacheHeaders(res, 10, { sMaxAge: 60, staleWhileRevalidate: 60 })
+    return res.sendFile(healthPage)
+  }
+  res.setHeader('Cache-Control', 'no-store')
   res.json({
     ok: true,
     time: new Date().toISOString()
