@@ -36,7 +36,8 @@
     .vortex,
     .particles,
     .scanlines,
-    .noise {
+    .noise,
+    .glitch-flash {
       position: fixed;
       inset: 0;
       pointer-events: none;
@@ -105,6 +106,35 @@
       opacity: 0.05;
       background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84' viewBox='0 0 84 84'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='84' height='84' filter='url(%23n)'/%3E%3C/svg%3E");
       animation: jitter 0.2s steps(2) infinite;
+    }
+
+    .glitch-flash {
+      z-index: 5;
+      opacity: 0;
+      --tear-top: 42%;
+      --tear-height: 12%;
+      background:
+        linear-gradient(
+          to bottom,
+          transparent 0,
+          transparent var(--tear-top),
+          rgba(255, 255, 255, 0.2) var(--tear-top),
+          rgba(255, 255, 255, 0.2) calc(var(--tear-top) + var(--tear-height)),
+          transparent calc(var(--tear-top) + var(--tear-height)),
+          transparent 100%
+        ),
+        repeating-linear-gradient(
+          90deg,
+          rgba(0, 246, 255, 0.18) 0 2px,
+          rgba(255, 0, 212, 0.17) 2px 4px,
+          transparent 4px 8px
+        );
+      mix-blend-mode: screen;
+    }
+
+    body.glitch-burst .glitch-flash {
+      opacity: 1;
+      animation: glitch-burst 0.28s steps(2, end) 1;
     }
 
     .shell {
@@ -189,6 +219,34 @@
         0 0 26px rgba(0, 246, 255, 0.58),
         0 0 42px rgba(255, 0, 212, 0.26);
       margin-bottom: 14px;
+    }
+
+    .glitch-text {
+      position: relative;
+      display: inline-block;
+    }
+
+    .glitch-text::before,
+    .glitch-text::after {
+      content: attr(data-text);
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    .glitch-text::before {
+      color: rgba(0, 246, 255, 0.82);
+      transform: translate(-2px, 0);
+      clip-path: polygon(0 3%, 100% 0, 100% 35%, 0 39%);
+      animation: text-glitch-a 1800ms infinite steps(2, end);
+    }
+
+    .glitch-text::after {
+      color: rgba(255, 49, 95, 0.78);
+      transform: translate(2px, 0);
+      clip-path: polygon(0 63%, 100% 58%, 100% 100%, 0 97%);
+      animation: text-glitch-b 1400ms infinite steps(2, end);
     }
 
     .status-row {
@@ -279,6 +337,24 @@
       16% { opacity: 0.58; }
       100% { transform: translate3d(calc(var(--x) + 18px), calc(var(--y) - 100vh), 0) scale(0.28); opacity: 0; }
     }
+    @keyframes glitch-burst {
+      0% { opacity: 0.05; transform: translateX(0); }
+      25% { opacity: 0.3; transform: translateX(-1.5%); }
+      48% { opacity: 0.32; transform: translateX(1.5%); }
+      100% { opacity: 0; transform: translateX(0); }
+    }
+    @keyframes text-glitch-a {
+      0%, 100% { transform: translate(-2px, 0); }
+      22% { transform: translate(2px, -1px); }
+      23% { transform: translate(-3px, 1px); }
+      80% { transform: translate(1px, 0); }
+    }
+    @keyframes text-glitch-b {
+      0%, 100% { transform: translate(2px, 0); }
+      30% { transform: translate(-2px, 1px); }
+      31% { transform: translate(3px, -1px); }
+      85% { transform: translate(-1px, 0); }
+    }
   </style>
 </head>
 <body>
@@ -290,22 +366,23 @@
   <div class="particles" aria-hidden="true"></div>
   <div class="scanlines" aria-hidden="true"></div>
   <div class="noise" aria-hidden="true"></div>
+  <div class="glitch-flash" aria-hidden="true"></div>
 
   <main class="shell">
     <header class="topbar">
       <div class="brand">
         <span class="brand-dot"></span>
-        <span>PVTKRRX / Health Monitor</span>
+        <span class="glitch-text" data-text="PVTKRRX / Health Monitor">PVTKRRX / Health Monitor</span>
       </div>
       <nav class="nav">
-        <a href="/">Home</a>
-        <a href="/configure">Configure</a>
-        <a href="/runbooks">Runbooks</a>
+        <a class="glitch-text" data-text="Home" href="/">Home</a>
+        <a class="glitch-text" data-text="Configure" href="/configure">Configure</a>
+        <a class="glitch-text" data-text="Runbooks" href="/runbooks">Runbooks</a>
       </nav>
     </header>
 
     <section class="panel">
-      <h1 class="title">Health</h1>
+      <h1 class="title glitch-text" data-text="Health">Health</h1>
       <div class="status-row">
         <div id="healthPill" class="pill"><span class="led"></span><span id="healthText">Checking...</span></div>
       </div>
@@ -350,6 +427,17 @@
       const timeEl = document.getElementById('healthTime');
       const checkedEl = document.getElementById('checkedAt');
       const refreshBtn = document.getElementById('refreshBtn');
+      const glitchOverlay = document.querySelector('.glitch-flash');
+
+      function randomBurst() {
+        if (glitchOverlay) {
+          glitchOverlay.style.setProperty('--tear-top', `${(Math.random() * 82).toFixed(2)}%`);
+          glitchOverlay.style.setProperty('--tear-height', `${(6 + Math.random() * 20).toFixed(2)}%`);
+        }
+        document.body.classList.add('glitch-burst');
+        window.setTimeout(() => document.body.classList.remove('glitch-burst'), 280 + Math.random() * 240);
+        window.setTimeout(randomBurst, 8000 + Math.random() * 12000);
+      }
 
       async function loadHealth() {
         try {
@@ -370,6 +458,7 @@
       refreshBtn.addEventListener('click', loadHealth);
       loadHealth();
       setInterval(loadHealth, 30000);
+      randomBurst();
     }());
   </script>
 </body>
