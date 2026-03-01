@@ -8,6 +8,21 @@
   ],
   "routes": [
     {
+      "src": "/logo.ico",
+      "dest": "https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.ico"
+    },
+    {
+      "src": "/logo.svg",
+      "dest": "https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg"
+    },
+    {
+      "src": "/favicon.ico",
+      "dest": "https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.ico"
+    },
+    {
+      "handle": "filesystem"
+    },
+    {
       "src": "/(.*)",
       "dest": "/index.js"
     }

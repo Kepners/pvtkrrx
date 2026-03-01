@@ -82,15 +82,8 @@ class PairStore {
 
   async _redisSet(key, value, ttlSeconds) {
     try {
-      const url = `${this.redisUrl}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}?EX=${ttlSeconds}`
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.redisToken}`
-        },
-        signal: AbortSignal.timeout(2500)
-      })
-      return res.ok
+      const data = await this._redisCommand(['SET', key, value, 'EX', String(ttlSeconds)])
+      return data.ok
     } catch (_) {
       return false
     }
@@ -98,22 +91,31 @@ class PairStore {
 
   async _redisGet(key) {
     try {
-      const url = `${this.redisUrl}/get/${encodeURIComponent(key)}`
-      const res = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${this.redisToken}`
-        },
-        signal: AbortSignal.timeout(2500)
-      })
-      if (!res.ok) return null
-      const data = await res.json().catch(() => null)
-      if (!data || typeof data !== 'object') return null
+      const data = await this._redisCommand(['GET', key])
+      if (!data.ok) return null
       const value = data.result
       if (typeof value !== 'string') return null
       return value
     } catch (_) {
       return null
     }
+  }
+
+  async _redisCommand(parts) {
+    const res = await fetch(this.redisUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.redisToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(parts),
+      signal: AbortSignal.timeout(2500)
+    })
+    if (!res.ok) return { ok: false, result: null }
+    const data = await res.json().catch(() => null)
+    if (!data || typeof data !== 'object') return { ok: false, result: null }
+    if (data.error) return { ok: false, result: null }
+    return { ok: true, result: data.result }
   }
 
   _fileSet(key, value, ttlSeconds) {
@@ -165,4 +167,3 @@ class PairStore {
 }
 
 module.exports = { PairStore }
-

@@ -7,6 +7,10 @@ const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { parse, matchesEpisode, isLikelyPackedReleaseTitle } = require('../utils/parser')
 const { mapPath } = require('../utils/pathMapper')
 const { buildOnSeedboxStream, buildOnBufferingStream, buildOnTrackerStream, findVideoFile, findEpisodeFile, sortStreams } = require('../utils/streams')
+const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '7000', 10))
+const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '5000', 10))
+const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '20', 10))
+const IS_VERCEL_RUNTIME = Boolean(process.env.VERCEL)
 
 // Build URL for a local file — uses PVTKRRX built-in file server when no external fileServerUrl set
 function canServeFromLocalDisk(savePath, fileName) {
@@ -19,6 +23,13 @@ function canServeFromLocalDisk(savePath, fileName) {
 }
 
 function buildFileUrl(config, configToken, addonUrl, hash, savePath, fileName) {
+  if (IS_VERCEL_RUNTIME) {
+    if (config.fileServerUrl) {
+      return mapPath(savePath, fileName, config.fileServerUrl, config.pathMapping)
+    }
+    return null
+  }
+
   // Prefer built-in serving when the addon can read the file locally.
   // This prevents stale external fileServerUrl values from causing black screens on local installs.
   if (config.fileServerUrl && !canServeFromLocalDisk(savePath, fileName)) {
@@ -26,6 +37,38 @@ function buildFileUrl(config, configToken, addonUrl, hash, savePath, fileName) {
   }
   const info = Buffer.from(JSON.stringify({ h: hash.toLowerCase(), p: fileName })).toString('base64url')
   return `${addonUrl}/${configToken}/file/${info}`
+}
+
+function settleWithTimeout(promise, timeoutMs, fallbackValue) {
+  const timeout = Math.max(500, Number.parseInt(String(timeoutMs || 0), 10) || 0)
+  if (!timeout) {
+    return Promise.resolve(promise)
+      .then(value => ({ value, timedOut: false, error: null }))
+      .catch(error => ({ value: fallbackValue, timedOut: false, error }))
+  }
+
+  return new Promise(resolve => {
+    let done = false
+    const timer = setTimeout(() => {
+      if (done) return
+      done = true
+      resolve({ value: fallbackValue, timedOut: true, error: null })
+    }, timeout)
+
+    Promise.resolve(promise)
+      .then((value) => {
+        if (done) return
+        done = true
+        clearTimeout(timer)
+        resolve({ value, timedOut: false, error: null })
+      })
+      .catch((error) => {
+        if (done) return
+        done = true
+        clearTimeout(timer)
+        resolve({ value: fallbackValue, timedOut: false, error })
+      })
+  })
 }
 
 async function handleStream(config, type, id, addonUrl, configToken) {
@@ -180,19 +223,27 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
   // Cinemeta runs in parallel so it adds zero latency on the happy path.
   // We always need the title to filter out sports content that leaks from non-movie indexers.
   const cinemeta = new CinemetaClient()
-  const [jackettResult, qbitResult, cinemetaResult] = await Promise.allSettled([
-    torznab.searchImdb(imdbId, cats, searchType),
-    qbit.torrents('all'),
-    type === 'series' ? cinemeta.getSeries(imdbId) : cinemeta.getMovie(imdbId)
+  const [jackettResult, qbitResult, cinemetaResult] = await Promise.all([
+    settleWithTimeout(torznab.searchImdb(imdbId, cats, searchType), STREAM_UPSTREAM_TIMEOUT_MS, []),
+    settleWithTimeout(qbit.torrents('all'), STREAM_UPSTREAM_TIMEOUT_MS, []),
+    settleWithTimeout(
+      type === 'series' ? cinemeta.getSeries(imdbId) : cinemeta.getMovie(imdbId),
+      STREAM_UPSTREAM_TIMEOUT_MS,
+      null
+    )
   ])
 
-  let jackettItems = jackettResult.status === 'fulfilled' ? jackettResult.value : []
-  const qbitTorrents = qbitResult.status === 'fulfilled' ? qbitResult.value : []
-  const contentTitle = cinemetaResult.status === 'fulfilled' ? cinemetaResult.value?.name : null
+  let jackettItems = Array.isArray(jackettResult.value) ? jackettResult.value : []
+  const qbitTorrents = Array.isArray(qbitResult.value) ? qbitResult.value : []
+  const contentTitle = cinemetaResult.value?.name || null
 
   console.log(`[stream] IMDB search returned ${jackettItems.length} results, qBit has ${qbitTorrents.length} torrents, title="${contentTitle}"`)
-  if (jackettResult.status === 'rejected') console.error('[stream] Prowlarr IMDB error:', jackettResult.reason?.message)
-  if (qbitResult.status === 'rejected') console.error('[stream] qBit error:', qbitResult.reason?.message)
+  if (jackettResult.timedOut) console.warn(`[stream] Prowlarr IMDB lookup timed out after ${STREAM_UPSTREAM_TIMEOUT_MS}ms`)
+  if (qbitResult.timedOut) console.warn(`[stream] qBit torrent lookup timed out after ${STREAM_UPSTREAM_TIMEOUT_MS}ms`)
+  if (cinemetaResult.timedOut) console.warn(`[stream] Cinemeta lookup timed out after ${STREAM_UPSTREAM_TIMEOUT_MS}ms`)
+  if (jackettResult.error) console.error('[stream] Prowlarr IMDB error:', jackettResult.error?.message)
+  if (qbitResult.error) console.error('[stream] qBit error:', qbitResult.error?.message)
+  if (cinemetaResult.error) console.error('[stream] Cinemeta error:', cinemetaResult.error?.message)
 
   // Apply sports exclusion + title filter to IMDB results immediately.
   // Private trackers often declare type=movie capability but ignore the imdbId, returning their
@@ -220,14 +271,21 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
   // Fallback: title search if IMDB search returned nothing useful after filtering.
   // Use generic type=search — private trackers (HD-Torrents, SpeedCD) only support type=search.
   if (jackettItems.length === 0 && contentTitle) {
-    try {
-      console.log(`[stream] Falling back to title search: "${contentTitle}"`)
-      const fallbackItems = await torznab.search(contentTitle, cats)
-      jackettItems = applyFilters(fallbackItems)
-      console.log(`[stream] Title search returned ${jackettItems.length} results after filtering`)
-    } catch (e) {
-      console.error('[stream] Title fallback error:', e.message)
+    console.log(`[stream] Falling back to title search: "${contentTitle}"`)
+    const fallbackResult = await settleWithTimeout(
+      torznab.search(contentTitle, cats),
+      STREAM_TITLE_FALLBACK_TIMEOUT_MS,
+      []
+    )
+    const fallbackItems = Array.isArray(fallbackResult.value) ? fallbackResult.value : []
+    if (fallbackResult.timedOut) {
+      console.warn(`[stream] Title fallback timed out after ${STREAM_TITLE_FALLBACK_TIMEOUT_MS}ms`)
     }
+    if (fallbackResult.error) {
+      console.error('[stream] Title fallback error:', fallbackResult.error?.message)
+    }
+    jackettItems = applyFilters(fallbackItems)
+    console.log(`[stream] Title search returned ${jackettItems.length} results after filtering`)
   }
 
   // Filter by episode if series
@@ -247,8 +305,12 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
     return qbitMap.has(hash)
   })
 
+  if (filtered.length > STREAM_MAX_CANDIDATES) {
+    console.log(`[stream] Candidate cap applied: ${STREAM_MAX_CANDIDATES}/${filtered.length}`)
+  }
+
   const streams = []
-  for (const item of filtered) {
+  for (const item of filtered.slice(0, STREAM_MAX_CANDIDATES)) {
     // Private trackers don't return infohashes — allow items through if they have a download link
     if (!item.infohash && !item.link) continue
     const parsed = parse(item.title)
@@ -263,6 +325,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
           : findVideoFile(files)
         if (!videoFile?.name) continue
         const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched.save_path, videoFile.name)
+        if (!fileUrl) continue
         const videoProgress = Number(videoFile?.progress || 0)
         if (isCompletedTorrent(matched, videoProgress)) {
           streams.push(buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed))
@@ -309,6 +372,7 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
       if (!videoFile?.name) throw new Error('No playable video in matched torrent')
 
       const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched.save_path, videoFile.name)
+      if (!fileUrl) throw new Error('Hosted mode requires fileServerUrl for on-seedbox streams')
       const item = { title: info.t, size: info.s, seeders: info.d }
       const videoProgress = Number(videoFile?.progress || 0)
       if (isCompletedTorrent(matched, videoProgress)) {

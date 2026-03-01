@@ -1634,8 +1634,6 @@
           ? 'Saving Home LAN profile...'
           : 'Preparing Online profile...');
 
-        const host = window.location.host;
-
         if (installMode === 'local') {
           const saveRes = await fetch('/local-config', {
             method: 'POST',
@@ -1681,13 +1679,16 @@
             return setStatus('installStatus', 'err', data.error);
           }
 
+          const relayBase = normalizeRelayUrl(config.lanPairRelayUrl || lanPair.relayUrl || defaultLanPairRelayUrl);
+          const relayHost = new URL(relayBase).host;
           const token = encodeURIComponent(data.token);
           const modeQuery = '?mode=' + encodeURIComponent(installMode);
-          const manifestUrl = host + '/' + token + '/manifest.json' + modeQuery;
-          const stremioUrl = 'stremio://' + manifestUrl;
+          const manifestPath = '/' + token + '/manifest.json' + modeQuery;
+          const manifestUrl = relayBase + manifestPath;
+          const stremioUrl = 'stremio://' + relayHost + manifestPath;
 
           document.getElementById('stremioLinkHosted').href = stremioUrl;
-          document.getElementById('hostedUrlDisplay').textContent = 'Online profile ready.';
+          document.getElementById('hostedUrlDisplay').textContent = 'Online profile ready on ' + relayHost + '.';
           document.getElementById('localInstall').style.display = 'none';
           document.getElementById('hostedInstall').style.display = 'block';
 

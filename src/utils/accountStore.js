@@ -312,13 +312,8 @@ class AccountStore {
 
   async redisSet(key, value) {
     try {
-      const url = `${this.redisUrl}/set/${encodeURIComponent(key)}/${encodeURIComponent(value)}`
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${this.redisToken}` },
-        signal: AbortSignal.timeout(2500)
-      })
-      return res.ok
+      const data = await this.redisCommand(['SET', key, value])
+      return data.ok
     } catch (_) {
       return false
     }
@@ -326,19 +321,30 @@ class AccountStore {
 
   async redisGet(key) {
     try {
-      const url = `${this.redisUrl}/get/${encodeURIComponent(key)}`
-      const res = await fetch(url, {
-        headers: { Authorization: `Bearer ${this.redisToken}` },
-        signal: AbortSignal.timeout(2500)
-      })
-      if (!res.ok) return null
-      const data = await res.json().catch(() => null)
-      if (!data || typeof data !== 'object') return null
+      const data = await this.redisCommand(['GET', key])
+      if (!data.ok) return null
       if (typeof data.result !== 'string') return null
       return data.result
     } catch (_) {
       return null
     }
+  }
+
+  async redisCommand(parts) {
+    const res = await fetch(this.redisUrl, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.redisToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(parts),
+      signal: AbortSignal.timeout(2500)
+    })
+    if (!res.ok) return { ok: false, result: null }
+    const data = await res.json().catch(() => null)
+    if (!data || typeof data !== 'object') return { ok: false, result: null }
+    if (data.error) return { ok: false, result: null }
+    return { ok: true, result: data.result }
   }
 
   fileSet(key, value) {

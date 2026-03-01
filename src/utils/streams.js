@@ -23,6 +23,29 @@ function uniqueNonEmpty(values) {
   return [...new Set((values || []).filter(Boolean))]
 }
 
+function slugToken(value, maxLen = 48) {
+  const text = String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  if (!text) return ''
+  return text.slice(0, maxLen)
+}
+
+function buildBingeGroup(item, parsed, mode = 'seedbox') {
+  const imdbId = String(item?.imdbId || item?.imdb || '').trim().toLowerCase()
+  const cleanedTitle = String(item?.title || '')
+    .replace(/\bS\d{1,2}E\d{1,3}\b/ig, ' ')
+    .replace(/\b\d{1,2}x\d{1,3}\b/ig, ' ')
+    .replace(/\bSeason[\s._-]*\d{1,2}\b/ig, ' ')
+    .replace(/\bEpisode[\s._-]*\d{1,3}\b/ig, ' ')
+  const titleKey = slugToken(cleanedTitle, 40)
+  const fallback = slugToken(parsed?.quality || 'unknown', 16) || 'unknown'
+  const groupKey = imdbId || titleKey || fallback
+  const prefix = mode === 'buffering' ? 'pvtkrrx-buffering' : 'pvtkrrx'
+  return `${prefix}-${groupKey}`
+}
+
 function formatPeerLabel(seeders, mode) {
   if (mode === 'seedbox') return ''
   const count = Math.max(0, Number(seeders || 0))
@@ -76,7 +99,7 @@ function buildOnSeedboxStream(item, fileUrl, fileName, videoSize, config, parsed
     url: fileUrl,
     behaviorHints: {
       notWebReady: true,
-      bingeGroup: `pvtkrrx-${parsed.quality || 'unknown'}`,
+      bingeGroup: buildBingeGroup(item, parsed, 'seedbox'),
       filename: fileName,
       sourceSeeders: Math.max(0, Number(item.seeders || 0)),
       sourceCodec: String(parsed?.codec || ''),
@@ -106,7 +129,7 @@ function buildOnBufferingStream(item, fileUrl, fileName, videoSize, config, pars
     url: fileUrl,
     behaviorHints: {
       notWebReady: true,
-      bingeGroup: `pvtkrrx-buffering-${parsed.quality || 'unknown'}`,
+      bingeGroup: buildBingeGroup(item, parsed, 'buffering'),
       filename: fileName,
       sourceSeeders: Math.max(0, Number(item.seeders || 0)),
       sourceCodec: String(parsed?.codec || ''),
@@ -184,12 +207,46 @@ function findVideoFile(files, options = {}) {
 
 // Find a specific episode file in a season pack
 function findEpisodeFile(files, season, episode) {
-  const sePat = new RegExp(`S0?${season}E0?${episode}`, 'i')
-  const videoFiles = files.filter(f =>
+  const seasonNum = Number.parseInt(String(season || ''), 10)
+  const episodeNum = Number.parseInt(String(episode || ''), 10)
+  if (!Number.isFinite(seasonNum) || !Number.isFinite(episodeNum)) return null
+
+  const videoFiles = (Array.isArray(files) ? files : []).filter(f =>
     VIDEO_EXTENSIONS.some(ext => String(f.name || '').toLowerCase().endsWith(ext))
   )
-  const match = videoFiles.find(f => sePat.test(String(f.name || '')))
-  return match || findVideoFile(files)
+  if (videoFiles.length === 0) return null
+
+  const seRegex = new RegExp(`\\bS0?${seasonNum}[ ._-]*E0?${episodeNum}\\b`, 'i')
+  const xRegex = new RegExp(`\\b${seasonNum}x0?${episodeNum}\\b`, 'i')
+  const seasonEpisodeRegex = new RegExp(`\\bSeason[ ._-]*${seasonNum}[ ._-]*Episode[ ._-]*${episodeNum}\\b`, 'i')
+  const episodeOnlyRegex = new RegExp(`\\bEpisode[ ._-]*0?${episodeNum}\\b`, 'i')
+
+  let best = null
+  let bestScore = -1
+  for (const file of videoFiles) {
+    const name = String(file?.name || '')
+    const lowerName = name.toLowerCase()
+    let score = -1
+    if (seRegex.test(name)) score = 100
+    else if (xRegex.test(name)) score = 95
+    else if (seasonEpisodeRegex.test(name)) score = 85
+    else if (episodeOnlyRegex.test(name)) score = 30
+    else continue
+
+    if (!isSampleVideoName(lowerName)) score += 5
+    score += Math.min(20, Number(file?.size || 0) / 1e9)
+
+    if (score > bestScore) {
+      best = file
+      bestScore = score
+    }
+  }
+
+  if (best) return best
+
+  // Avoid returning the wrong episode from multi-file season packs.
+  if (videoFiles.length === 1) return videoFiles[0]
+  return null
 }
 
 // Sort: on-seedbox first, then non-zero peers first within each group.

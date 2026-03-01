@@ -7,20 +7,23 @@
   <meta name="description" content="Provider runbooks for PVTKRRX deployment on major seedbox platforms with LAN Bridge, Online profile, and direct-host options.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@500;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #05070d;
-      --surface: #0d1220;
-      --card: #111726;
+      --bg-0: #010203;
+      --bg-1: #080a12;
+      --bg-2: #0d1019;
+      --surface: rgba(4, 8, 18, 0.72);
+      --card: rgba(6, 12, 24, 0.78);
       --line: rgba(0, 246, 255, 0.32);
       --line-soft: rgba(0, 246, 255, 0.17);
       --text: #eaf3ff;
-      --muted: #a5bbd8;
+      --muted: #9eb4d8;
       --green: #00ff66;
       --blue: #00f6ff;
       --red: #ff4d4d;
       --amber: #ffb347;
+      --magenta: #ff00d4;
     }
 
     * {
@@ -31,11 +34,11 @@
 
     body {
       background:
-        radial-gradient(900px 600px at 90% -10%, rgba(0, 246, 255, 0.18), transparent 58%),
-        radial-gradient(700px 450px at -12% 24%, rgba(255, 0, 212, 0.1), transparent 58%),
-        linear-gradient(180deg, #060a12 0%, #0a1220 100%);
+        radial-gradient(1100px 700px at 50% 40%, rgba(0, 168, 255, 0.13), transparent 62%),
+        radial-gradient(900px 560px at 20% 75%, rgba(255, 0, 212, 0.08), transparent 66%),
+        linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 52%, var(--bg-2) 100%);
       color: var(--text);
-      font-family: "Space Grotesk", sans-serif;
+      font-family: "Rajdhani", sans-serif;
       min-height: 100vh;
       overflow-x: hidden;
     }
@@ -46,41 +49,59 @@
       inset: 0;
       pointer-events: none;
       z-index: 10;
-      opacity: 0.2;
-      background-image:
-        linear-gradient(rgba(0, 246, 255, 0.1) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(0, 246, 255, 0.08) 1px, transparent 1px);
-      background-size: 56px 56px;
-      mask-image: radial-gradient(ellipse at center, black 58%, transparent 100%);
+      opacity: 0.1;
+      background:
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.05) 0 1px, transparent 1px 3px),
+        repeating-linear-gradient(90deg, rgba(0, 246, 255, 0.03) 0 1px, transparent 1px 2px);
     }
 
     .shell {
-      width: min(1160px, 94vw);
+      width: min(1200px, 94vw);
       margin: 0 auto;
-      padding: 28px 0 52px;
+      padding: 22px 0 44px;
       position: relative;
       z-index: 20;
     }
 
     .topbar {
       border: 1px solid var(--line-soft);
-      background: linear-gradient(180deg, rgba(16, 24, 41, 0.9), rgba(12, 20, 34, 0.9));
-      border-radius: 12px;
+      background: rgba(6, 9, 16, 0.74);
+      border-radius: 14px;
       padding: 10px 12px;
       margin-bottom: 14px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
       gap: 12px;
-      flex-wrap: wrap;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+        0 0 22px rgba(0, 168, 255, 0.14);
     }
 
     .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--blue);
+      box-shadow: 0 0 12px var(--blue), 0 0 26px rgba(0, 246, 255, 0.75);
+      flex: 0 0 auto;
+    }
+
+    .brand-text {
       font-family: "IBM Plex Mono", monospace;
       font-size: 12px;
-      letter-spacing: 1px;
+      letter-spacing: 1.2px;
       text-transform: uppercase;
-      color: var(--green);
+      color: #d2e4ff;
+      text-shadow: 0 0 8px rgba(0, 168, 255, 0.45);
+      white-space: nowrap;
     }
 
     .nav {
@@ -95,54 +116,74 @@
       font-size: 11px;
       letter-spacing: 1px;
       text-transform: uppercase;
-      color: #aac0db;
-      border: 1px solid rgba(0, 246, 255, 0.22);
+      color: #bfd6ff;
+      border: 1px solid rgba(0, 246, 255, 0.28);
       border-radius: 999px;
       padding: 6px 10px;
+      background: rgba(2, 8, 18, 0.58);
+      transition: all 0.18s ease;
     }
 
     .nav a:hover {
-      color: #e5f2ff;
-      border-color: rgba(0, 255, 102, 0.56);
+      color: #fff;
+      border-color: rgba(255, 0, 212, 0.55);
+      box-shadow: 0 0 0 2px rgba(255, 0, 212, 0.18), 0 0 14px rgba(0, 246, 255, 0.3);
+      transform: translateY(-1px);
     }
 
     .hero {
       border: 1px solid var(--line-soft);
-      background: linear-gradient(160deg, rgba(18, 31, 52, 0.92), rgba(13, 22, 37, 0.92));
-      border-radius: 14px;
-      padding: 24px;
+      background:
+        radial-gradient(700px 360px at 52% 42%, rgba(0, 168, 255, 0.13), transparent 66%),
+        radial-gradient(560px 240px at 45% 55%, rgba(255, 0, 212, 0.08), transparent 60%),
+        var(--card);
+      border-radius: 18px;
+      padding: 30px 24px;
       margin-bottom: 14px;
+      text-align: center;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+        0 0 30px rgba(0, 168, 255, 0.12);
     }
 
     .hero h1 {
-      font-family: "IBM Plex Mono", monospace;
+      font-family: "Orbitron", sans-serif;
       font-size: clamp(24px, 4.6vw, 38px);
-      letter-spacing: 1px;
-      margin-bottom: 8px;
+      letter-spacing: 2px;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      text-shadow:
+        0 0 8px rgba(255, 255, 255, 0.8),
+        0 0 26px rgba(0, 246, 255, 0.52);
     }
 
     .hero p {
-      color: #c5c5c5;
+      color: #c4d5ef;
       line-height: 1.45;
-      margin-bottom: 10px;
-      max-width: 980px;
+      margin: 0 auto 10px;
+      max-width: 900px;
+      font-family: "IBM Plex Mono", monospace;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
     }
 
     .stamp {
       display: inline-block;
-      margin-top: 4px;
+      margin-top: 8px;
       padding: 4px 8px;
-      border: 1px solid rgba(0, 128, 255, 0.4);
-      color: #95bfff;
+      border: 1px solid rgba(255, 0, 212, 0.4);
+      color: #bfd6ff;
       font-family: "IBM Plex Mono", monospace;
       font-size: 11px;
-      letter-spacing: 0.6px;
+      letter-spacing: 1px;
       text-transform: uppercase;
+      border-radius: 999px;
+      background: rgba(8, 12, 24, 0.7);
     }
 
     .panel {
       border: 1px solid var(--line-soft);
-      background: linear-gradient(180deg, rgba(19, 31, 52, 0.9), rgba(14, 23, 39, 0.9));
+      background: var(--surface);
       border-radius: 12px;
       padding: 18px;
       margin-bottom: 12px;
@@ -151,7 +192,7 @@
     .panel h2 {
       font-family: "IBM Plex Mono", monospace;
       font-size: 13px;
-      color: var(--green);
+      color: #93cdf2;
       text-transform: uppercase;
       letter-spacing: 1px;
       margin-bottom: 10px;
@@ -172,19 +213,21 @@
     }
 
     .chip {
-      border: 1px solid #2e2e2e;
+      border: 1px solid rgba(0, 246, 255, 0.22);
       font-family: "IBM Plex Mono", monospace;
       font-size: 11px;
       letter-spacing: 0.5px;
       text-transform: uppercase;
-      color: #b9b9b9;
+      color: #bfd6ff;
       padding: 4px 8px;
       text-decoration: none;
+      border-radius: 999px;
+      background: rgba(2, 8, 18, 0.58);
     }
 
     .chip:hover {
-      border-color: var(--blue);
-      color: #a8ccff;
+      border-color: rgba(255, 0, 212, 0.55);
+      color: #fff;
     }
 
     table {
@@ -194,7 +237,7 @@
     }
 
     th, td {
-      border: 1px solid #262626;
+      border: 1px solid rgba(0, 246, 255, 0.14);
       padding: 10px;
       vertical-align: top;
       text-align: left;
@@ -205,8 +248,8 @@
       font-size: 11px;
       letter-spacing: 0.8px;
       text-transform: uppercase;
-      color: #a8a8a8;
-      background: #101010;
+      color: #93cdf2;
+      background: rgba(8, 14, 28, 0.9);
     }
 
     .ok { color: #80f0a2; }
@@ -218,7 +261,7 @@
       font-size: 14px;
       letter-spacing: 0.8px;
       text-transform: uppercase;
-      color: #d7d7d7;
+      color: #d2e4ff;
       margin-bottom: 8px;
     }
 
@@ -231,11 +274,13 @@
 
     .badge {
       padding: 4px 8px;
-      border: 1px solid #2c2c2c;
+      border: 1px solid rgba(0, 246, 255, 0.22);
       font-family: "IBM Plex Mono", monospace;
       font-size: 11px;
       text-transform: uppercase;
-      color: #bbbbbb;
+      color: #bfd6ff;
+      border-radius: 999px;
+      background: rgba(2, 8, 18, 0.58);
     }
 
     ol {
@@ -249,8 +294,8 @@
     }
 
     pre {
-      background: #0d0d0d;
-      border: 1px solid #222;
+      background: rgba(8, 14, 28, 0.9);
+      border: 1px solid rgba(0, 246, 255, 0.18);
       padding: 10px;
       overflow: auto;
       margin: 8px 0;
@@ -269,7 +314,7 @@
     }
 
     .docs a {
-      color: #98bfff;
+      color: #a8ccff;
       text-decoration: none;
     }
 
@@ -279,8 +324,13 @@
 
     footer {
       margin-top: 16px;
-      font-size: 12px;
-      color: #8f8f8f;
+      border-top: 1px solid rgba(0, 246, 255, 0.18);
+      padding-top: 14px;
+      color: #8ea8cf;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
       display: flex;
       justify-content: space-between;
       flex-wrap: wrap;
@@ -298,7 +348,10 @@
 <body>
   <main class="shell">
     <header class="topbar">
-      <div class="brand">PVTKRRX / Seedbox Runbooks</div>
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <div class="brand-text">PVTKRRX / Seedbox Runbooks</div>
+      </div>
       <nav class="nav">
         <a href="/">Home</a>
         <a href="/configure">Configure</a>

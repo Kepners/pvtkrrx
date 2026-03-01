@@ -16,6 +16,18 @@ const SPORTS_ONLY_INDEXERS = new Set([
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 const cinemeta = new CinemetaClient()
 const cinemetaCache = new Map()
+const prowlarrSearchCache = new Map()
+const prowlarrSearchInFlight = new Map()
+const PROWLARR_SEARCH_CACHE_TTL_MS = Math.max(15000, parseInt(process.env.PVTKRRX_PROWLARR_CACHE_MS || '120000', 10))
+const PROWLARR_SEARCH_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_PROWLARR_SEARCH_TIMEOUT_MS || '7000', 10))
+const PROWLARR_SEARCH_CACHE_MAX_KEYS = Math.max(50, parseInt(process.env.PVTKRRX_PROWLARR_CACHE_MAX_KEYS || '500', 10))
+const SPORTS_CATALOG_CACHE_MAX_AGE = Math.max(
+  120,
+  parseInt(
+    process.env.PVTKRRX_SPORTS_CATALOG_CACHE_MAX_AGE || process.env.PVTKRRX_SPORTS_CACHE_MAX_AGE || '600',
+    10
+  )
+)
 
 function isSportsOnlyIndexer(indexerName) {
   const normalized = String(indexerName || '').trim().toLowerCase()
@@ -81,6 +93,68 @@ async function getCinemetaCached(type, imdbId) {
     expiresAt: now + (meta ? 6 * 60 * 60 * 1000 : 60 * 60 * 1000)
   })
   return meta
+}
+
+function withTimeout(promise, timeoutMs, fallbackValue) {
+  const timeout = Math.max(500, Number.parseInt(String(timeoutMs || 0), 10) || 0)
+  if (!timeout) {
+    return Promise.resolve(promise).catch(() => fallbackValue)
+  }
+
+  return Promise.race([
+    Promise.resolve(promise).catch(() => fallbackValue),
+    new Promise(resolve => setTimeout(() => resolve(fallbackValue), timeout))
+  ])
+}
+
+function cacheKeyForProwlarrSearch(config, query, cats, type = 'search', options = {}) {
+  const apiKey = String(config?.jackettApiKey || '').trim()
+  const apiFingerprint = apiKey ? `${apiKey.slice(0, 4)}:${apiKey.length}` : ''
+  return JSON.stringify({
+    baseUrl: String(config?.jackettUrl || '').trim().toLowerCase(),
+    apiKey: apiFingerprint,
+    query: String(query || ''),
+    cats: String(cats || ''),
+    type: String(type || 'search'),
+    useCategories: Boolean(options?.useCategories)
+  })
+}
+
+function trimProwlarrSearchCache() {
+  while (prowlarrSearchCache.size > PROWLARR_SEARCH_CACHE_MAX_KEYS) {
+    const oldestKey = prowlarrSearchCache.keys().next().value
+    if (!oldestKey) break
+    prowlarrSearchCache.delete(oldestKey)
+  }
+}
+
+async function cachedProwlarrSearch(config, client, query, cats, type = 'search', options = {}) {
+  const key = cacheKeyForProwlarrSearch(config, query, cats, type, options)
+  const now = Date.now()
+  const cached = prowlarrSearchCache.get(key)
+  if (cached && cached.expiresAt > now) return cached.value
+
+  if (prowlarrSearchInFlight.has(key)) return prowlarrSearchInFlight.get(key)
+
+  const fallback = Array.isArray(cached?.value) ? cached.value : []
+  const pending = withTimeout(
+    client.search(query, cats, type, options),
+    PROWLARR_SEARCH_TIMEOUT_MS,
+    fallback
+  ).then((result) => {
+    const value = Array.isArray(result) ? result : fallback
+    prowlarrSearchCache.set(key, {
+      value,
+      expiresAt: Date.now() + PROWLARR_SEARCH_CACHE_TTL_MS
+    })
+    trimProwlarrSearchCache()
+    return value
+  }).finally(() => {
+    prowlarrSearchInFlight.delete(key)
+  })
+
+  prowlarrSearchInFlight.set(key, pending)
+  return pending
 }
 
 async function mapLimit(items, limit, mapper) {
@@ -325,14 +399,22 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
   const mediaType = String(catalogType || 'movie').trim().toLowerCase() || 'movie'
   const query = extra.genre || extra.search || ''
   const limit = getCatalogLimit(config)
-  const strictItems = query
-    ? await torznab.search(query, SPORT_CATS, 'search', { useCategories: true })
-    : await torznab.search('', SPORT_CATS, 'search', { useCategories: true })
+  const strictItems = await cachedProwlarrSearch(
+    config,
+    torznab,
+    query,
+    SPORT_CATS,
+    'search',
+    { useCategories: true }
+  )
   let items = strictItems
   if (items.length < Math.min(80, limit * 2)) {
-    const broadItems = query
-      ? await torznab.search(query, SPORT_CATS)
-      : await torznab.search('', SPORT_CATS)
+    const broadItems = await cachedProwlarrSearch(
+      config,
+      torznab,
+      query,
+      SPORT_CATS
+    )
     const byKey = new Map()
     for (const item of [...strictItems, ...broadItems]) {
       const key = `${String(item?.indexer || '').trim().toLowerCase()}|${String(item?.title || '').trim().toLowerCase()}`
@@ -444,16 +526,14 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
     posterShape: 'landscape'
   }})
 
-  return { metas, cacheMaxAge: 120 }
+  return { metas, cacheMaxAge: SPORTS_CATALOG_CACHE_MAX_AGE }
 }
 
 async function moviesCatalog(config, extra) {
   const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
   const query = String(extra.search || '').trim()
   const limit = getCatalogLimit(config)
-  const items = extra.search
-    ? await torznab.search(extra.search, MOVIE_CATS)
-    : await torznab.search('', MOVIE_CATS)
+  const items = await cachedProwlarrSearch(config, torznab, query, MOVIE_CATS)
   const filtered = items.filter(item =>
     item.imdbId &&
     !isSportsOnlyIndexer(item.indexer) &&
@@ -489,9 +569,7 @@ async function tvCatalog(config, extra) {
   const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
   const query = String(extra.search || '').trim()
   const limit = getCatalogLimit(config)
-  const items = extra.search
-    ? await torznab.search(extra.search, TV_CATS)
-    : await torznab.search('', TV_CATS)
+  const items = await cachedProwlarrSearch(config, torznab, query, TV_CATS)
   const filtered = items.filter(item =>
     !isSportsOnlyIndexer(item.indexer) &&
     (isLikelySeriesRelease(item.title) || Boolean(extra.search)) &&

@@ -18,7 +18,7 @@ const manifest = {
       extra: [
         {
           name: 'genre',
-          options: ['Football', 'F1', 'UFC', 'NBA', 'Cricket', 'Rugby', 'Tennis'],
+          options: ['Football', 'F1', 'UFC', 'NBA', 'Cricket', 'Rugby', 'Tennis', 'Boxing', 'Golf', 'Baseball', 'Cycling', 'Darts', 'Snooker'],
           isRequired: false
         },
         { name: 'search', isRequired: false },

@@ -225,9 +225,10 @@
 
     .hero {
       min-height: 78vh;
-      display: grid;
-      place-items: center;
-      padding: 16px 0 22px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
       position: relative;
       container-type: inline-size;
     }
@@ -235,7 +236,7 @@
     .hero::before {
       content: "";
       position: absolute;
-      inset: 2% 4% 7%;
+      inset: 2% 4%;
       border: 1px solid rgba(0, 246, 255, 0.18);
       border-radius: 18px;
       background:
@@ -248,16 +249,16 @@
     }
 
     .hero-core {
-      width: 100%;
+      width: min(100%, 1080px);
       display: flex;
       flex-direction: column;
       align-items: center;
       text-align: center;
-      padding: 34px 20px;
+      margin: 0 auto;
+      padding: 0 20px;
       position: relative;
       z-index: 1;
       animation: core-flicker 5.2s infinite;
-      max-width: 100%;
     }
 
     .kicker {
@@ -630,7 +631,7 @@
       }
 
       .hero::before {
-        inset: 3% 0 6%;
+        inset: 3% 0;
       }
 
       .logo {

@@ -67,6 +67,7 @@ const TRIAL_ENABLED = String(process.env.PVTKRRX_TRIAL_ENABLED || 'true').trim()
 const TRIAL_DAYS = Math.max(1, Math.min(30, parseInt(process.env.PVTKRRX_TRIAL_DAYS || '3', 10)))
 const TRIAL_REQUIRE_LINKED_ACCOUNT = String(process.env.PVTKRRX_TRIAL_REQUIRE_LINKED_ACCOUNT || 'true').trim().toLowerCase() !== 'false'
 const REQUIRE_ACTIVE_SUBSCRIPTION = false
+const IS_VERCEL_RUNTIME = Boolean(process.env.VERCEL)
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing'])
 const SENSITIVE_WEB_ORIGINS = parseOriginAllowlist(
   process.env.PVTKRRX_ALLOWED_WEB_ORIGINS || 'https://pvtkrrx.vercel.app'
@@ -626,6 +627,13 @@ app.get('/thumb/sports/:info.svg', (req, res) => {
 // Build a URL to serve a local file — uses the built-in /file/ endpoint when no
 // external fileServerUrl is configured (e.g. local qBit setup with no HTTP server).
 function buildFileUrl(config, configToken, baseUrl, hash, savePath, fileName) {
+  if (IS_VERCEL_RUNTIME) {
+    if (config.fileServerUrl) {
+      return mapPath(savePath, fileName, config.fileServerUrl, config.pathMapping)
+    }
+    return null
+  }
+
   // Prefer built-in serving when the addon can access files on local disk.
   // This protects local installs from stale external fileServerUrl values in older config tokens.
   const localPath = path.join(savePath || '', fileName || '')
@@ -1010,13 +1018,18 @@ function getManifest(req) {
     : profile === 'lan'
       ? 'LAN Bridge'
       : 'Online'
+  const defaultLogoUrl = `${getPublicBaseUrl(req)}/logo.ico`
+  // Keep local profile self-contained; hosted/lan profiles can use manifest logo URL.
+  const logoUrl = profile === 'local'
+    ? defaultLogoUrl
+    : String(manifest.logo || defaultLogoUrl)
 
   return {
     ...manifest,
     behaviorHints: { ...(manifest.behaviorHints || {}) },
     id: `com.kepners.pvtkrrx.${idSuffix}`,
     name: `PVTKRRX (${nameLabel})`,
-    logo: `${getPublicBaseUrl(req)}/logo.ico`
+    logo: logoUrl
   }
 }
 
@@ -1897,6 +1910,13 @@ app.post('/:config/qbit/download-path', withConfig, requireLocalQbitControl, asy
 // Used when no external fileServerUrl is configured (e.g. local qBit setup).
 app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('file'), async (req, res) => {
   try {
+    if (IS_VERCEL_RUNTIME && req.params.config !== 'local') {
+      return res.status(403).json({
+        error: 'Built-in file serving is disabled on hosted runtime',
+        detail: 'Use File Server URL or LAN Pair local relay for playback'
+      })
+    }
+
     const tokenShort = String(req.params.config || '').slice(0, 8)
     const { h, p } = JSON.parse(Buffer.from(req.params.info, 'base64url').toString())
     console.log(`[file-route] token=${tokenShort} hash=${String(h || '').slice(0, 8)} file="${p}"`)
@@ -2075,6 +2095,11 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
             existing.torrent.save_path,
             existing.file.name
           )
+          if (!fileUrl) {
+            return res.status(412).json({
+              error: 'Hosted playback requires File Server URL or LAN Pair relay'
+            })
+          }
           console.log(`[playback-route] token=${tokenShort} existing torrent ready -> redirect file`)
           return res.redirect(302, fileUrl)
         }
@@ -2172,6 +2197,11 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
           state.torrent.save_path,
           state.file.name
         )
+        if (!fileUrl) {
+          return res.status(412).json({
+            error: 'Hosted playback requires File Server URL or LAN Pair relay'
+          })
+        }
         console.log(`[playback-route] token=${tokenShort} progressive-ready -> redirect file`)
         return res.redirect(302, fileUrl)
       }
