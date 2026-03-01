@@ -7,7 +7,7 @@
   <meta name="description" content="Provider runbooks for PVTKRRX deployment on major seedbox platforms with LAN Bridge, Online profile, and direct-host options.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@500;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@500;700&family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg-0: #010203;
@@ -344,13 +344,673 @@
       }
     }
   </style>
+  <style>
+    :root {
+      --void-0: #000000;
+      --void-1: #050505;
+      --void-2: #0a0a0a;
+      --cyber-cyan: #00ffff;
+      --cyber-magenta: #ff00ff;
+      --cyber-lime: #00ff44;
+      --cyber-blue: #00ccff;
+      --cyber-red: #ff0033;
+      --cyber-text: #eeffff;
+      --cyber-muted: #bdd7e4;
+    }
+
+    body {
+      background: radial-gradient(circle at 50% 42%, #111 0%, #050505 45%, #000 100%) !important;
+      font-family: "Rajdhani", sans-serif;
+      color: var(--cyber-text);
+      text-shadow: -1px 0 rgba(255, 0, 51, 0.2), 1px 0 rgba(0, 255, 255, 0.2);
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    body::before {
+      display: none;
+    }
+
+    #void-tunnel,
+    .crt-scanlines,
+    .noise-layer,
+    #glitch-flash {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    #void-tunnel {
+      z-index: 0;
+      width: 100%;
+      height: 100%;
+      filter: contrast(1.25) saturate(1.2);
+    }
+
+    .crt-scanlines {
+      z-index: 2;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.06) 0px,
+        rgba(255, 255, 255, 0.06) 1px,
+        transparent 2px,
+        transparent 4px
+      );
+      opacity: 0.16;
+      mix-blend-mode: screen;
+      animation: scanline-move 0.17s linear infinite;
+    }
+
+    .noise-layer {
+      z-index: 3;
+      opacity: 0.08;
+      background:
+        radial-gradient(circle at 18% 34%, rgba(255, 255, 255, 0.34) 0 0.8px, transparent 0.8px),
+        radial-gradient(circle at 76% 19%, rgba(255, 255, 255, 0.26) 0 0.7px, transparent 0.7px),
+        radial-gradient(circle at 67% 81%, rgba(255, 255, 255, 0.2) 0 0.9px, transparent 0.9px),
+        radial-gradient(circle at 31% 73%, rgba(255, 255, 255, 0.2) 0 0.8px, transparent 0.8px);
+      background-size: 3px 3px, 4px 4px, 5px 5px, 6px 6px;
+      animation: noise-shift 0.2s steps(2) infinite;
+    }
+
+    #glitch-flash {
+      z-index: 4;
+      opacity: 0;
+      --tear-top: 44%;
+      --tear-height: 12%;
+      background:
+        linear-gradient(
+          to bottom,
+          transparent 0,
+          transparent var(--tear-top),
+          rgba(255, 255, 255, 0.2) var(--tear-top),
+          rgba(255, 255, 255, 0.2) calc(var(--tear-top) + var(--tear-height)),
+          transparent calc(var(--tear-top) + var(--tear-height)),
+          transparent 100%
+        ),
+        repeating-linear-gradient(
+          90deg,
+          rgba(0, 255, 255, 0.18) 0 2px,
+          rgba(255, 0, 255, 0.17) 2px 4px,
+          transparent 4px 8px
+        );
+      mix-blend-mode: screen;
+    }
+
+    body.glitch-burst #glitch-flash {
+      opacity: 1;
+      animation: glitch-burst 0.28s steps(2, end) 1;
+    }
+
+    .shell {
+      position: relative;
+      z-index: 8;
+      width: min(1240px, 95vw);
+      padding: 1rem 0 3rem;
+    }
+
+    .topbar,
+    .hero,
+    .panel,
+    footer {
+      background: rgba(3, 8, 12, 0.62) !important;
+      border: 1px solid rgba(0, 255, 255, 0.4) !important;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.06),
+        0 0 16px rgba(0, 255, 255, 0.36),
+        0 0 40px rgba(255, 0, 255, 0.26);
+      backdrop-filter: blur(7px);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .topbar::before,
+    .hero::before,
+    .panel::before,
+    footer::before {
+      content: "";
+      position: absolute;
+      inset: -1px;
+      border: 1px solid rgba(0, 204, 255, 0.25);
+      pointer-events: none;
+      animation: border-jitter 5s steps(2, end) infinite;
+    }
+
+    .brand-dot {
+      background: var(--cyber-lime);
+      box-shadow: 0 0 12px var(--cyber-lime), 0 0 26px rgba(0, 255, 68, 0.7);
+    }
+
+    .brand-text {
+      font-family: "Share Tech Mono", monospace;
+      letter-spacing: 0.14em;
+      text-shadow: -1px 0 rgba(255, 0, 51, 0.4), 1px 0 rgba(0, 255, 255, 0.5), 0 0 8px rgba(0, 255, 255, 0.5);
+    }
+
+    .hero {
+      text-align: center;
+      padding: 1.8rem 1.3rem 1.4rem;
+      border-radius: 1.2rem;
+      background:
+        radial-gradient(circle at 55% 37%, rgba(0, 204, 255, 0.18), transparent 44%),
+        radial-gradient(circle at 42% 64%, rgba(255, 0, 255, 0.16), transparent 42%),
+        rgba(3, 8, 12, 0.66) !important;
+    }
+
+    .logo {
+      display: inline-block;
+      position: relative;
+      font-family: "Orbitron", sans-serif;
+      font-size: clamp(3rem, 13vw, 10rem);
+      line-height: 0.95;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      margin-bottom: 0.65rem;
+      color: transparent;
+      background: linear-gradient(
+        180deg,
+        #ffffff 0%,
+        #ebfdff 24%,
+        #7ef7ff 34%,
+        #ffffff 47%,
+        #9db4c8 64%,
+        #f7fbff 100%
+      );
+      -webkit-background-clip: text;
+      background-clip: text;
+      text-shadow:
+        0 0 10px rgba(255, 255, 255, 0.9),
+        0 0 24px rgba(0, 255, 255, 0.62),
+        0 0 52px rgba(255, 0, 255, 0.45);
+      animation: logo-pulse 3s ease-in-out infinite;
+    }
+
+    .hero h1 {
+      margin-bottom: 0;
+    }
+
+    .subtitle {
+      display: inline-block;
+      margin-bottom: 0.72rem;
+      font-family: "Orbitron", sans-serif;
+      font-size: clamp(1.05rem, 3.5vw, 2.2rem);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: #f2ffff;
+      text-shadow: -2px 0 rgba(255, 0, 51, 0.5), 2px 0 rgba(0, 255, 255, 0.6), 0 0 18px rgba(0, 255, 255, 0.4);
+    }
+
+    .hero p {
+      font-family: "Share Tech Mono", monospace !important;
+      font-size: clamp(0.78rem, 2.1vw, 0.96rem);
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #d7e9ef !important;
+      max-width: 910px;
+      margin-bottom: 0.55rem;
+    }
+
+    .stamp {
+      border-color: rgba(255, 0, 255, 0.65) !important;
+      background: rgba(255, 0, 255, 0.14) !important;
+      color: #fff !important;
+      text-shadow: -1px 0 rgba(255, 0, 51, 0.5), 1px 0 rgba(0, 255, 255, 0.6), 0 0 9px rgba(255, 0, 255, 0.4);
+      font-family: "Share Tech Mono", monospace;
+    }
+
+    .glitch-text {
+      display: inline-block;
+      position: relative;
+    }
+
+    .glitch-text::before,
+    .glitch-text::after {
+      content: attr(data-text);
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    .glitch-text::before {
+      color: rgba(0, 255, 255, 0.85);
+      transform: translate(-2px, 0);
+      clip-path: polygon(0 3%, 100% 0, 100% 33%, 0 37%);
+      animation: glitch-a 1.85s steps(2, end) infinite;
+    }
+
+    .glitch-text::after {
+      color: rgba(255, 0, 51, 0.78);
+      transform: translate(2px, 0);
+      clip-path: polygon(0 63%, 100% 58%, 100% 100%, 0 97%);
+      animation: glitch-b 1.4s steps(2, end) infinite;
+    }
+
+    h2,
+    h3 {
+      font-family: "Orbitron", sans-serif !important;
+      text-transform: uppercase;
+      letter-spacing: 0.13em !important;
+      color: #f1ffff !important;
+      text-shadow: -2px 0 rgba(255, 0, 51, 0.52), 2px 0 rgba(0, 255, 255, 0.74), 0 0 18px rgba(0, 255, 255, 0.42);
+      animation: flicker 3.2s steps(2, end) infinite;
+    }
+
+    h2 {
+      font-size: clamp(1rem, 2.8vw, 1.72rem) !important;
+    }
+
+    h3 {
+      font-size: clamp(0.92rem, 2.4vw, 1.26rem) !important;
+    }
+
+    p,
+    li,
+    td {
+      text-shadow: -1px 0 rgba(255, 0, 51, 0.24), 1px 0 rgba(0, 255, 255, 0.24);
+      transition: text-shadow 0.2s ease;
+    }
+
+    .panel:hover p,
+    .panel:hover li,
+    .panel:hover td {
+      text-shadow: -1px 0 rgba(255, 0, 51, 0.42), 1px 0 rgba(0, 255, 255, 0.54), 0 0 10px rgba(0, 255, 255, 0.25);
+    }
+
+    .chips {
+      gap: 0.42rem;
+    }
+
+    .nav a,
+    .chip,
+    .badge {
+      border: 1px solid rgba(0, 255, 255, 0.55) !important;
+      background: rgba(0, 0, 0, 0.62) !important;
+      color: #f2ffff !important;
+      font-family: "Share Tech Mono", monospace !important;
+      letter-spacing: 0.08em !important;
+      text-shadow: 0 0 7px rgba(0, 255, 255, 0.6);
+      overflow: hidden;
+      position: relative;
+    }
+
+    .nav a::after,
+    .chip::after,
+    .badge::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      transform: translateX(-110%);
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+      transition: transform 0.26s ease;
+      pointer-events: none;
+    }
+
+    .nav a:hover::after,
+    .chip:hover::after,
+    .badge:hover::after {
+      transform: translateX(110%);
+    }
+
+    .nav a:hover,
+    .chip:hover,
+    .badge:hover {
+      border-color: rgba(255, 0, 255, 0.78) !important;
+      text-shadow: -2px 0 rgba(255, 0, 51, 0.6), 2px 0 rgba(0, 255, 255, 0.8), 0 0 14px rgba(255, 0, 255, 0.5);
+      animation: hover-glitch 0.16s steps(2, end) infinite;
+    }
+
+    table {
+      border: 1px solid rgba(0, 255, 255, 0.5);
+      box-shadow: 0 0 20px rgba(0, 255, 255, 0.23);
+      background: rgba(0, 0, 0, 0.32);
+    }
+
+    th,
+    td {
+      border: 1px solid rgba(0, 255, 255, 0.26);
+      background: rgba(0, 0, 0, 0.34);
+    }
+
+    th {
+      background: rgba(0, 204, 255, 0.14);
+      color: #efffff;
+      font-family: "Share Tech Mono", monospace !important;
+      letter-spacing: 0.09em !important;
+      text-shadow: 0 0 9px rgba(0, 255, 255, 0.55);
+    }
+
+    tbody tr:hover td {
+      background: rgba(255, 0, 255, 0.1);
+      text-shadow: -1px 0 rgba(255, 0, 51, 0.48), 1px 0 rgba(0, 255, 255, 0.66), 0 0 12px rgba(0, 255, 255, 0.35);
+      animation: row-glitch 0.2s steps(2, end) infinite;
+    }
+
+    .ok {
+      color: #71ffb8 !important;
+      text-shadow: 0 0 10px rgba(0, 255, 68, 0.5);
+    }
+
+    .warn {
+      color: #ffe6a4 !important;
+      text-shadow: 0 0 9px rgba(255, 180, 0, 0.44);
+    }
+
+    .no {
+      color: #ff8da2 !important;
+      text-shadow: 0 0 9px rgba(255, 0, 51, 0.45);
+    }
+
+    ol {
+      margin-left: 1.38rem;
+      margin-bottom: 0.65rem;
+    }
+
+    li {
+      position: relative;
+      margin-bottom: 0.46rem;
+    }
+
+    li::after {
+      content: "";
+      position: absolute;
+      left: -1.02rem;
+      top: 0.63em;
+      width: 6px;
+      height: 6px;
+      background: var(--cyber-cyan);
+      transform: rotate(45deg) translateY(-50%);
+      box-shadow: 0 0 7px var(--cyber-cyan), 0 0 13px rgba(255, 0, 255, 0.35);
+      opacity: 0.84;
+    }
+
+    pre {
+      background:
+        linear-gradient(180deg, rgba(0, 0, 0, 0.94), rgba(0, 0, 0, 0.74)),
+        repeating-linear-gradient(
+          to bottom,
+          rgba(255, 255, 255, 0.04) 0px,
+          rgba(255, 255, 255, 0.04) 1px,
+          transparent 2px,
+          transparent 5px
+        ) !important;
+      border: 1px solid rgba(0, 255, 255, 0.52) !important;
+      box-shadow: inset 0 0 24px rgba(0, 204, 255, 0.15), 0 0 20px rgba(0, 255, 255, 0.24);
+      position: relative;
+    }
+
+    pre::before,
+    pre::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, rgba(255, 0, 255, 0.85), transparent);
+      opacity: 0.45;
+      animation: tear-line 2.9s linear infinite;
+      pointer-events: none;
+    }
+
+    pre::before {
+      top: 16%;
+    }
+
+    pre::after {
+      top: 68%;
+      animation-delay: 1s;
+    }
+
+    code {
+      font-family: "Share Tech Mono", monospace !important;
+      font-size: 0.79rem !important;
+      line-height: 1.48 !important;
+      color: #d9f7ff;
+      text-shadow: 0 0 8px rgba(0, 255, 255, 0.24);
+    }
+
+    .tok-key {
+      color: var(--cyber-magenta);
+      text-shadow: 0 0 8px rgba(255, 0, 255, 0.5);
+    }
+
+    .tok-string {
+      color: var(--cyber-cyan);
+      text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+    }
+
+    .tok-comment {
+      color: var(--cyber-lime);
+      text-shadow: 0 0 8px rgba(0, 255, 68, 0.5);
+    }
+
+    .tok-fn {
+      color: var(--cyber-red);
+      text-shadow: 0 0 8px rgba(255, 0, 51, 0.5);
+    }
+
+    .tok-var {
+      color: var(--cyber-blue);
+      text-shadow: 0 0 8px rgba(0, 204, 255, 0.5);
+    }
+
+    .docs {
+      color: #d6ecff;
+    }
+
+    .docs a {
+      color: #8dfbff !important;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(0, 255, 255, 0.5);
+      text-shadow: 0 0 8px rgba(0, 255, 255, 0.45);
+      transition: color 0.18s ease, border-color 0.18s ease;
+    }
+
+    .docs a:hover {
+      color: #fff !important;
+      border-color: rgba(255, 0, 255, 0.8);
+      text-shadow: -2px 0 rgba(255, 0, 51, 0.55), 2px 0 rgba(0, 255, 255, 0.78), 0 0 14px rgba(255, 0, 255, 0.45);
+      animation: hover-glitch 0.16s steps(2, end) infinite;
+    }
+
+    footer {
+      margin-top: 0.95rem;
+      border-radius: 0.84rem;
+      padding: 0.82rem 0.95rem !important;
+      font-family: "Share Tech Mono", monospace !important;
+      font-size: 0.62rem !important;
+      letter-spacing: 0.11em !important;
+    }
+
+    .relay {
+      color: #fff;
+      text-shadow: -1px 0 rgba(255, 0, 51, 0.5), 1px 0 rgba(0, 255, 255, 0.6), 0 0 12px rgba(255, 0, 255, 0.4);
+    }
+
+    .footer-particles {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      overflow: hidden;
+    }
+
+    .footer-particles span {
+      position: absolute;
+      width: 3px;
+      height: 3px;
+      left: var(--x);
+      bottom: -10%;
+      color: var(--cyber-cyan);
+      background: currentColor;
+      box-shadow: 0 0 8px currentColor;
+      animation: drift var(--dur) linear infinite;
+      animation-delay: var(--delay);
+      opacity: 0.76;
+    }
+
+    body.is-scrolling .panel {
+      animation: scroll-jitter 0.14s steps(2, end) infinite;
+    }
+
+    @keyframes scanline-move {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(4px); }
+    }
+
+    @keyframes noise-shift {
+      0% { transform: translate(0, 0); }
+      25% { transform: translate(-1%, 1%); }
+      50% { transform: translate(1%, -1%); }
+      75% { transform: translate(0.6%, 0.6%); }
+      100% { transform: translate(0, 0); }
+    }
+
+    @keyframes glitch-burst {
+      0% { opacity: 0.05; transform: translateX(0); }
+      25% { opacity: 0.3; transform: translateX(-1.5%); }
+      48% { opacity: 0.32; transform: translateX(1.5%); }
+      100% { opacity: 0; transform: translateX(0); }
+    }
+
+    @keyframes border-jitter {
+      0%, 100% { transform: translate(0); }
+      12% { transform: translate(1px, 0); }
+      13% { transform: translate(-1px, 0); }
+      75% { transform: translate(0, 1px); }
+      76% { transform: translate(0, -1px); }
+    }
+
+    @keyframes glitch-a {
+      0%, 100% { transform: translate(-2px, 0); }
+      20% { transform: translate(2px, -1px); }
+      21% { transform: translate(-3px, 1px); }
+      80% { transform: translate(1px, 0); }
+    }
+
+    @keyframes glitch-b {
+      0%, 100% { transform: translate(2px, 0); }
+      30% { transform: translate(-2px, 1px); }
+      31% { transform: translate(3px, -1px); }
+      85% { transform: translate(-1px, 0); }
+    }
+
+    @keyframes flicker {
+      0%, 100% { opacity: 1; }
+      30% { opacity: 0.94; }
+      31% { opacity: 1; }
+      68% { opacity: 0.92; }
+      69% { opacity: 1; }
+    }
+
+    @keyframes logo-pulse {
+      0%, 100% { filter: brightness(1) saturate(1); }
+      50% { filter: brightness(1.16) saturate(1.2); }
+    }
+
+    @keyframes hover-glitch {
+      0%, 100% { transform: translate(0); }
+      35% { transform: translate(-1px, 0); }
+      36% { transform: translate(1px, 0); }
+      67% { transform: translate(0, -1px); }
+      68% { transform: translate(0, 1px); }
+    }
+
+    @keyframes row-glitch {
+      0%, 100% { transform: translate(0); }
+      50% { transform: translate(-1px, 0); }
+    }
+
+    @keyframes tear-line {
+      0% { transform: translateX(-104%); }
+      100% { transform: translateX(104%); }
+    }
+
+    @keyframes scroll-jitter {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-1px); }
+    }
+
+    @keyframes drift {
+      0% { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
+      20% { opacity: 0.76; }
+      100% { transform: translateY(-210%) translateX(14px) scale(0.3); opacity: 0; }
+    }
+
+    @media (max-width: 980px) {
+      .shell {
+        width: min(1240px, 96vw);
+        padding-top: 0.9rem;
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+
+      .nav {
+        justify-content: flex-start;
+      }
+
+      p,
+      li,
+      td {
+        font-size: 0.95rem;
+      }
+
+      th {
+        font-size: 0.64rem;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .hero {
+        padding: 1.3rem 0.9rem 1.16rem;
+      }
+
+      .panel {
+        padding: 0.9rem 0.8rem;
+      }
+
+      .logo {
+        letter-spacing: 0.1em;
+      }
+
+      .glitch-text::before,
+      .glitch-text::after {
+        opacity: 0.55;
+      }
+
+      #void-tunnel {
+        opacity: 0.62;
+      }
+
+      .noise-layer {
+        opacity: 0.06;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition: none !important;
+      }
+    }
+  </style>
 </head>
 <body>
+  <canvas id="void-tunnel" aria-hidden="true"></canvas>
+  <div class="crt-scanlines" aria-hidden="true"></div>
+  <div class="noise-layer" aria-hidden="true"></div>
+  <div id="glitch-flash" aria-hidden="true"></div>
+
   <main class="shell">
     <header class="topbar">
       <div class="brand">
         <span class="brand-dot"></span>
-        <div class="brand-text">PVTKRRX / Seedbox Runbooks</div>
+        <div class="brand-text glitch-text" data-text="PVTKRRX / Seedbox Runbooks">PVTKRRX / Seedbox Runbooks</div>
       </div>
       <nav class="nav">
         <a href="/">Home</a>
@@ -361,10 +1021,11 @@
     </header>
 
     <section class="hero">
-      <h1>Seedbox Runbooks</h1>
+      <h1 class="logo glitch-text" data-text="PVTKRRX">PVTKRRX</h1>
+      <h2 class="subtitle glitch-text" data-text="Seedbox Runbooks">Seedbox Runbooks</h2>
       <p>This page maps PVTKRRX to major seedbox platforms. It covers current install paths for PC Local, LAN Bridge, Online profile, and direct addon hosting when your provider supports it.</p>
       <p>Use this as the operational checklist before you buy a plan or migrate providers.</p>
-      <div class="stamp">Updated: February 28, 2026</div>
+      <div class="stamp glitch-text" data-text="Updated: February 28, 2026">Updated: February 28, 2026</div>
     </section>
 
     <section class="panel">
@@ -670,10 +1331,212 @@ PORT=7000 ENCRYPTION_SECRET=$(openssl rand -hex 32) node index.js</code></pre>
     </section>
 
     <footer>
-      <span>PVTKRRX runbook matrix for active provider docs.</span>
-      <span>If your provider changed features, update this page before deployment.</span>
+      <div class="footer-particles" aria-hidden="true"></div>
+      <span class="relay glitch-text" data-text="GLITCH RELAY // PVTKRRX runbook matrix for active provider docs.">GLITCH RELAY // PVTKRRX runbook matrix for active provider docs.</span>
+      <span class="glitch-text" data-text="If your provider changed features, update this page before deployment.">If your provider changed features, update this page before deployment.</span>
     </footer>
   </main>
+  <script>
+    (function () {
+      const canvas = document.getElementById("void-tunnel");
+      const ctx = canvas.getContext("2d", { alpha: true });
+      const mobile = window.matchMedia("(max-width: 720px)").matches;
+      const particleCount = mobile ? 95 : 240;
+      const colors = ["#00ffff", "#ff00ff", "#00ff44", "#00ccff", "#ff0033"];
+      const particles = [];
+      let width = 0;
+      let height = 0;
+      let dpr = Math.min(window.devicePixelRatio || 1, 2);
+      let pointerX = 0;
+      let pointerY = 0;
+      let targetX = 0;
+      let targetY = 0;
+
+      const codeKeywords = /\b(ssh|mkdir|cd|git|npm|node|nohup|openssl|bash|wget|tar|rm|if|then|fi|source|app-ports|echo|grep)\b/g;
+      const codeVars = /\b(PORT|ENCRYPTION_SECRET|PATH|HOME)\b/g;
+      const codeFns = /\b(index\.js|pvtkrrx\.log|node-v\d[\w.\-]*)\b/g;
+
+      function randomParticle() {
+        const angle = Math.random() * Math.PI * 2;
+        const radius = 40 + Math.random() * Math.max(width, height) * 0.45;
+        return {
+          angle: angle,
+          radius: radius,
+          z: Math.random() * 1.1 + 0.05,
+          speed: 0.0018 + Math.random() * 0.0044,
+          size: 1 + Math.random() * 3.6,
+          color: colors[(Math.random() * colors.length) | 0]
+        };
+      }
+
+      function resetParticle(p) {
+        const np = randomParticle();
+        p.angle = np.angle;
+        p.radius = np.radius;
+        p.z = 1.2;
+        p.speed = np.speed;
+        p.size = np.size;
+        p.color = np.color;
+      }
+
+      function resize() {
+        width = window.innerWidth;
+        height = window.innerHeight;
+        dpr = Math.min(window.devicePixelRatio || 1, 2);
+        canvas.width = Math.floor(width * dpr);
+        canvas.height = Math.floor(height * dpr);
+        canvas.style.width = width + "px";
+        canvas.style.height = height + "px";
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+
+      function drawParticle(x, y, size, color) {
+        const glow = Math.max(2, size * 1.3);
+        ctx.globalCompositeOperation = "lighter";
+        ctx.fillStyle = "rgba(255, 0, 51, 0.2)";
+        ctx.fillRect(x + 2, y, size, size);
+        ctx.fillStyle = "rgba(0, 255, 255, 0.26)";
+        ctx.fillRect(x - 2, y, size, size);
+        ctx.fillStyle = color;
+        ctx.globalAlpha = 0.34;
+        ctx.fillRect(x, y, size, size);
+        ctx.globalAlpha = 0.16;
+        ctx.fillRect(x - size * 0.16, y - glow * 0.8, Math.max(1, size * 0.2), glow * 1.6);
+        ctx.globalAlpha = 1;
+        ctx.globalCompositeOperation = "source-over";
+      }
+
+      function animate() {
+        pointerX += (targetX - pointerX) * 0.06;
+        pointerY += (targetY - pointerY) * 0.06;
+        ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
+        ctx.fillRect(0, 0, width, height);
+
+        const cx = width * 0.5 + pointerX * 36;
+        const cy = height * 0.5 + pointerY * 28;
+
+        for (let i = 0; i < particles.length; i++) {
+          const p = particles[i];
+          p.z -= p.speed;
+          if (p.z <= 0.02) {
+            resetParticle(p);
+            continue;
+          }
+          const px = Math.cos(p.angle) * p.radius;
+          const py = Math.sin(p.angle) * p.radius;
+          const persp = 1 / p.z;
+          const x = cx + px * persp * 0.55;
+          const y = cy + py * persp * 0.55;
+          const size = Math.min(16, Math.max(1, p.size * persp * 0.25));
+          if (x < -24 || x > width + 24 || y < -24 || y > height + 24) {
+            resetParticle(p);
+            continue;
+          }
+          drawParticle(x, y, size, p.color);
+        }
+        requestAnimationFrame(animate);
+      }
+
+      function randomBurst() {
+        const overlay = document.getElementById("glitch-flash");
+        if (overlay) {
+          overlay.style.setProperty("--tear-top", (Math.random() * 82).toFixed(2) + "%");
+          overlay.style.setProperty("--tear-height", (6 + Math.random() * 20).toFixed(2) + "%");
+        }
+        document.body.classList.add("glitch-burst");
+        window.setTimeout(function () {
+          document.body.classList.remove("glitch-burst");
+        }, 280 + Math.random() * 240);
+        window.setTimeout(randomBurst, 8000 + Math.random() * 12000);
+      }
+
+      function escapeHtml(value) {
+        return value
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      function highlightCode(source) {
+        let out = escapeHtml(source);
+        out = out.replace(/"(?:[^"\\]|\\.)*"/g, "<span class='tok-string'>$&</span>");
+        out = out.replace(codeVars, "<span class='tok-var'>$1</span>");
+        out = out.replace(codeFns, "<span class='tok-fn'>$1</span>");
+        out = out.replace(codeKeywords, "<span class='tok-key'>$1</span>");
+        out = out.replace(/(^|\n)\s*(#.*)/g, "$1<span class='tok-comment'>$2</span>");
+        return out;
+      }
+
+      function applyTextEffects() {
+        const glitchTargets = document.querySelectorAll("h2, h3, .nav a, .chip, .badge");
+        glitchTargets.forEach(function (el) {
+          if (!el.classList.contains("glitch-text")) {
+            el.classList.add("glitch-text");
+          }
+          if (!el.dataset.text) {
+            el.dataset.text = el.textContent.trim();
+          }
+        });
+
+        const codeBlocks = document.querySelectorAll("pre code");
+        codeBlocks.forEach(function (code) {
+          code.innerHTML = highlightCode(code.textContent || "");
+        });
+      }
+
+      function addFooterParticles() {
+        const container = document.querySelector(".footer-particles");
+        if (!container) {
+          return;
+        }
+        const count = mobile ? 10 : 20;
+        for (let i = 0; i < count; i++) {
+          const span = document.createElement("span");
+          span.style.setProperty("--x", (Math.random() * 100).toFixed(2) + "%");
+          span.style.setProperty("--delay", (Math.random() * -12).toFixed(2) + "s");
+          span.style.setProperty("--dur", (6 + Math.random() * 8).toFixed(2) + "s");
+          span.style.color = colors[(Math.random() * colors.length) | 0];
+          container.appendChild(span);
+        }
+      }
+
+      let scrollTimer;
+      window.addEventListener("scroll", function () {
+        document.body.classList.add("is-scrolling");
+        clearTimeout(scrollTimer);
+        scrollTimer = window.setTimeout(function () {
+          document.body.classList.remove("is-scrolling");
+        }, 130);
+      });
+
+      window.addEventListener("mousemove", function (event) {
+        targetX = (event.clientX / width - 0.5) * 2;
+        targetY = (event.clientY / height - 0.5) * 2;
+      });
+
+      window.addEventListener("touchmove", function (event) {
+        const touch = event.touches[0];
+        if (!touch) {
+          return;
+        }
+        targetX = (touch.clientX / width - 0.5) * 2;
+        targetY = (touch.clientY / height - 0.5) * 2;
+      }, { passive: true });
+
+      window.addEventListener("resize", resize);
+
+      resize();
+      while (particles.length < particleCount) {
+        particles.push(randomParticle());
+      }
+      applyTextEffects();
+      addFooterParticles();
+      randomBurst();
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, width, height);
+      animate();
+    }());
+  </script>
 </body>
 </html>
 

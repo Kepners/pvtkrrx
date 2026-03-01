@@ -2,6 +2,10 @@
   "version": 2,
   "builds": [
     {
+      "src": "public/**",
+      "use": "@vercel/static"
+    },
+    {
       "src": "index.js",
       "use": "@vercel/node"
     }
@@ -18,6 +22,22 @@
     {
       "src": "/favicon.ico",
       "dest": "https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.ico"
+    },
+    {
+      "src": "/",
+      "dest": "/public/index.html"
+    },
+    {
+      "src": "/configure",
+      "dest": "/public/configure.html"
+    },
+    {
+      "src": "/runbooks",
+      "dest": "/public/runbooks.html"
+    },
+    {
+      "src": "/seedbox-runbooks",
+      "dest": "/public/runbooks.html"
     },
     {
       "handle": "filesystem"
