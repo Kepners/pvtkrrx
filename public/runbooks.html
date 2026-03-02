@@ -264,7 +264,13 @@
     }
 
     pre {
-      overflow-x: auto;
+      overflow: hidden;
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    pre::-webkit-scrollbar {
+      display: none;
     }
 
     footer {
@@ -641,6 +647,13 @@
     pre::after {
       top: 68%;
       animation-delay: 1s;
+    }
+
+    pre code {
+      display: block;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      word-break: normal;
     }
 
     code {
