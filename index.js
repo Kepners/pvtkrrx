@@ -9,6 +9,7 @@ const Stripe = require('stripe')
 const { addonBuilder, getRouter } = require('stremio-addon-sdk')
 const manifest = require('./src/config/manifest')
 const { encrypt, decrypt } = require('./src/utils/crypto')
+const { encodeFileStateToken, decodeFileStateToken, decodePlaybackStateToken } = require('./src/utils/opaqueState')
 const { handleCatalog } = require('./src/handlers/catalog')
 const { handleStream } = require('./src/handlers/stream')
 const { handleMeta } = require('./src/handlers/meta')
@@ -642,8 +643,12 @@ function buildFileUrl(config, configToken, baseUrl, hash, savePath, fileName) {
   if (config.fileServerUrl && !localFileAvailable) {
     return mapPath(savePath, fileName, config.fileServerUrl, config.pathMapping)
   }
-  const info = Buffer.from(JSON.stringify({ h: hash.toLowerCase(), p: fileName })).toString('base64url')
-  return `${baseUrl}/${configToken}/file/${info}`
+  try {
+    const info = encodeFileStateToken({ h: hash.toLowerCase(), p: fileName })
+    return `${baseUrl}/${configToken}/file/${info}`
+  } catch (_) {
+    return null
+  }
 }
 
 function getPublicBaseUrl(req) {
@@ -1926,7 +1931,14 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
     }
 
     const tokenShort = String(req.params.config || '').slice(0, 8)
-    const { h, p } = JSON.parse(Buffer.from(req.params.info, 'base64url').toString())
+    let state = null
+    try {
+      state = decodeFileStateToken(req.params.info)
+    } catch (_) {
+      return res.status(400).json({ error: 'Invalid file token' })
+    }
+    const h = String(state?.h || '').toLowerCase()
+    const p = String(state?.p || '')
     console.log(`[file-route] token=${tokenShort} hash=${String(h || '').slice(0, 8)} file="${p}"`)
     const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
     const playback = await loadTorrentPlaybackState(qbit, String(h || '').toLowerCase(), p)
@@ -2062,7 +2074,12 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
 app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('playback'), async (req, res) => {
   try {
     const tokenShort = String(req.params.config || '').slice(0, 8)
-    const info = JSON.parse(Buffer.from(req.params.info, 'base64url').toString())
+    let info = null
+    try {
+      info = decodePlaybackStateToken(req.params.info)
+    } catch (_) {
+      return res.status(400).json({ error: 'Invalid playback token' })
+    }
     const trackerHost = extractTrackerHost(info.l)
     let trackedHash = String(info.h || extractInfoHashFromLink(info.l) || '').toLowerCase()
     console.log(`[playback-route] token=${tokenShort} hash=${trackedHash.slice(0, 8)} hasLink=${Boolean(info.l)}`)

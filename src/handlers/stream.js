@@ -7,6 +7,7 @@ const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { parse, matchesEpisode, isLikelyPackedReleaseTitle } = require('../utils/parser')
 const { mapPath } = require('../utils/pathMapper')
 const { buildOnSeedboxStream, buildOnBufferingStream, buildOnTrackerStream, findVideoFile, findEpisodeFile, sortStreams } = require('../utils/streams')
+const { encodeFileStateToken, encodePlaybackStateToken } = require('../utils/opaqueState')
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '7000', 10))
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '5000', 10))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '20', 10))
@@ -35,8 +36,12 @@ function buildFileUrl(config, configToken, addonUrl, hash, savePath, fileName) {
   if (config.fileServerUrl && !canServeFromLocalDisk(savePath, fileName)) {
     return mapPath(savePath, fileName, config.fileServerUrl, config.pathMapping)
   }
-  const info = Buffer.from(JSON.stringify({ h: hash.toLowerCase(), p: fileName })).toString('base64url')
-  return `${addonUrl}/${configToken}/file/${info}`
+  try {
+    const info = encodeFileStateToken({ h: hash.toLowerCase(), p: fileName })
+    return `${addonUrl}/${configToken}/file/${info}`
+  } catch (_) {
+    return null
+  }
 }
 
 function settleWithTimeout(promise, timeoutMs, fallbackValue) {
@@ -338,11 +343,15 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
       }
     } else if (item.link) {
       // On tracker — playback URL (works with or without infohash)
-      const info = Buffer.from(JSON.stringify({
-        h: item.infohash || '',
-        l: item.link
-      })).toString('base64url')
-      streams.push(buildOnTrackerStream(item, `${addonUrl}/${configToken}/playback/${info}`, parsed))
+      try {
+        const info = encodePlaybackStateToken({
+          h: item.infohash || '',
+          l: item.link
+        })
+        streams.push(buildOnTrackerStream(item, `${addonUrl}/${configToken}/playback/${info}`, parsed))
+      } catch (_) {
+        // Skip invalid playback payloads instead of leaking raw tracker URLs.
+      }
     }
   }
 
@@ -387,15 +396,19 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
   }
 
   if (streams.length === 0 && directLink) {
-    const playbackInfo = Buffer.from(JSON.stringify({
-      h: infoHash,
-      l: directLink
-    })).toString('base64url')
-    streams.push(buildOnTrackerStream(
-      { title: info.t, size: info.s, seeders: info.d, indexer: info.i || '' },
-      `${addonUrl}/${configToken}/playback/${playbackInfo}`,
-      parsed
-    ))
+    try {
+      const playbackInfo = encodePlaybackStateToken({
+        h: infoHash,
+        l: directLink
+      })
+      streams.push(buildOnTrackerStream(
+        { title: info.t, size: info.s, seeders: info.d, indexer: info.i || '' },
+        `${addonUrl}/${configToken}/playback/${playbackInfo}`,
+        parsed
+      ))
+    } catch (_) {
+      // Skip invalid playback payloads instead of leaking raw tracker URLs.
+    }
   }
 
   if (streams.length === 0) {
@@ -421,15 +434,19 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
       const ordered = preferSeededResults(deduped, 'custom re-search')
 
       for (const item of ordered) {
-        const playbackInfo = Buffer.from(JSON.stringify({
-          h: item.infohash || '',
-          l: item.link
-        })).toString('base64url')
-        streams.push(buildOnTrackerStream(
-          item,
-          `${addonUrl}/${configToken}/playback/${playbackInfo}`,
-          parse(item.title || info.t)
-        ))
+        try {
+          const playbackInfo = encodePlaybackStateToken({
+            h: item.infohash || '',
+            l: item.link
+          })
+          streams.push(buildOnTrackerStream(
+            item,
+            `${addonUrl}/${configToken}/playback/${playbackInfo}`,
+            parse(item.title || info.t)
+          ))
+        } catch (_) {
+          // Skip invalid playback payloads instead of leaking raw tracker URLs.
+        }
       }
     } catch (e) {
       console.error('[stream] custom re-search failed:', e.message)

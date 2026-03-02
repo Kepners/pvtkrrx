@@ -1,12 +1,14 @@
 {
   "name": "pvtkrrx",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "PVTKRRX — Stream from your private tracker seedbox through Stremio",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
     "smoke:config": "node scripts/smoke-config-flow.js",
+    "smoke:lan-pair": "node scripts/smoke-lan-pair-flow.js",
+    "smoke:stremio-link": "node scripts/smoke-stremio-link.js",
     "desktop:dev": "electron electron/main.js",
     "dist:win": "electron-builder --win nsis portable --publish never"
   },

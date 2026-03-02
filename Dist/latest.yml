@@ -1,8 +1,8 @@
-version: 1.0.0
+version: 1.0.1
 files:
-  - url: PVTKRRX-Setup-1.0.0.exe
-    sha512: bt0QfSAU/QvmDnrJTaWc3dgrBBfPvP62XfMU2vsTDP3/VBWt7atE8qyJWh8WA26i+2S+dw5EJuHjBP6YitvieQ==
-    size: 85335408
-path: PVTKRRX-Setup-1.0.0.exe
-sha512: bt0QfSAU/QvmDnrJTaWc3dgrBBfPvP62XfMU2vsTDP3/VBWt7atE8qyJWh8WA26i+2S+dw5EJuHjBP6YitvieQ==
-releaseDate: '2026-02-27T23:50:39.431Z'
+  - url: PVTKRRX-Setup-1.0.1.exe
+    sha512: ALJDwYBkKlyHoWaaKQzFdT+W2pCU5AemMNIEjwNhCpcK+dkM8p37gvaEzxU0KCNVrD471DJYJVcyd0L3pV+PUw==
+    size: 85485337
+path: PVTKRRX-Setup-1.0.1.exe
+sha512: ALJDwYBkKlyHoWaaKQzFdT+W2pCU5AemMNIEjwNhCpcK+dkM8p37gvaEzxU0KCNVrD471DJYJVcyd0L3pV+PUw==
+releaseDate: '2026-03-02T23:27:31.217Z'

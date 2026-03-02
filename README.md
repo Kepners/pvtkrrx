@@ -103,6 +103,7 @@ Your Seedbox:
 ```
 
 All credentials are AES-256-GCM encrypted and embedded in the addon URL. The server never stores anything.
+Playback/file state links are also issued as opaque encrypted tokens (instead of plain base64 JSON), so tracker endpoints and file hints are not directly readable from stream URLs.
 
 ### Stream Types
 
@@ -124,6 +125,24 @@ This verifies:
 - `/:token/manifest.json` resolves
 - `/:token/configure` resolves
 - Invalid token routes return `400`
+
+LAN pair + TV-hosted redirect smoke check:
+
+```bash
+npm run smoke:lan-pair
+```
+
+This validates:
+- pair heartbeat/status flow
+- hosted (non-loopback) requests 307-redirect to active LAN endpoint
+- required-pair offline fallback behavior
+- opaque playback token format is not plain decodable JSON
+
+Stremio AuthKey linking smoke check (uses a local mock Stremio API):
+
+```bash
+npm run smoke:stremio-link
+```
 
 ## Deployment
 
@@ -164,6 +183,9 @@ ENCRYPTION_SECRET=your-secret-here npm start
 | PVTKRRX_STREAM_MAX_CANDIDATES | Optional | Max stream candidates to process per request (default 20) |
 | PVTKRRX_STREMIO_API_BASE_URL | Optional | Stremio API base URL for AuthKey verification (default https://api.strem.io) |
 | PVTKRRX_STREMIO_API_TIMEOUT_MS | Optional | Timeout for Stremio AuthKey verification calls (default 10000) |
+| PVTKRRX_OPAQUE_STATE_SECRET | Optional | Secret for stream/file opaque state tokens (defaults to `ENCRYPTION_SECRET`) |
+| PVTKRRX_PLAYBACK_STATE_TTL_SECONDS | Optional | TTL for `/playback/:info` opaque tokens in seconds (default 86400) |
+| PVTKRRX_FILE_STATE_TTL_SECONDS | Optional | TTL for `/file/:info` opaque tokens in seconds (default 86400) |
 | PVTKRRX_FREE_MODE | Optional | Reserved for future billing rollout. Access is currently forced free in server code. |
 | PVTKRRX_REQUIRE_ACTIVE_SUBSCRIPTION | Optional | Reserved for future billing rollout. Currently ignored while free mode is forced. |
 | PVTKRRX_TRIAL_ENABLED | Optional | Allow free trial access before paid subscription is required (default true) |

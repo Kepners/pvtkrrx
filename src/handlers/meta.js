@@ -47,6 +47,7 @@ async function handleCustomMeta(config, id, context = {}) {
   const carriedEventDate = String(info.e || '').trim()
   const carriedLeague = String(info.g || '').trim()
   const carriedSportHint = String(info.r || '').trim()
+  const carriedEventId = String(info.v || '').trim()
   const resolvedSportHint = resolveSportHint({
     explicitHint: carriedSportHint,
     title: info.t
@@ -61,7 +62,8 @@ async function handleCustomMeta(config, id, context = {}) {
       sportsArtwork = await sportsDb.getEventArtwork({
         title: info.t,
         publishDate: info.p,
-        sportHint: resolvedSportHint
+        sportHint: resolvedSportHint,
+        eventId: carriedEventId
       })
     } catch (_) {
       sportsArtwork = null

@@ -514,6 +514,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
       e: eventDate,
       g: league,
       r: resolvedSportHint,
+      v: String(sportsArtwork?.eventId || '').trim(),
       a: sportsArtwork?.poster || sportsArtwork?.image || posterUrl || '',
       b: backgroundUrl
     })).toString('base64url'),
