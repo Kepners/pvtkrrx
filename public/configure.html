@@ -755,7 +755,7 @@
         <button class="btn-copy" type="button" id="stremioAutoKeyBtn" onclick="launchStremioAuthKeyHelper()">Auto Find AuthKey</button>
         <button class="btn-copy" type="button" id="stremioPasteKeyBtn" onclick="pasteAuthKeyFromClipboard()">Paste AuthKey From Clipboard</button>
       </div>
-      <p class="hint">Auto Find opens Stremio account settings and checks clipboard automatically for 2 minutes after you copy the key.</p>
+      <p class="hint">Auto Find opens Stremio Web settings and checks clipboard automatically for 2 minutes after you copy the AuthKey.</p>
       <div id="stremioLinkStatus" class="status"></div>
     </div>
 
@@ -1190,6 +1190,23 @@
       }
     }
 
+    function openStremioAuthKeyPage() {
+      const candidates = [
+        'https://web.stremio.com/#/settings',
+        'https://web.stremio.com/#/settings/account',
+        'https://www.strem.io/acc-settings'
+      ];
+      for (const url of candidates) {
+        try {
+          const popup = window.open(url, '_blank', 'noopener');
+          if (popup) {
+            return { opened: true, url };
+          }
+        } catch (_) {}
+      }
+      return { opened: false, url: candidates[0] };
+    }
+
     async function launchStremioAuthKeyHelper() {
       if (!navigator.clipboard || typeof navigator.clipboard.readText !== 'function') {
         setStremioLinkStatus('err', 'Auto detect needs clipboard access. Paste AuthKey manually.');
@@ -1205,8 +1222,12 @@
       }
       if (pasteBtn) pasteBtn.disabled = true;
 
-      window.open('https://www.strem.io/acc-settings', '_blank', 'noopener,noreferrer');
-      setStremioLinkStatus('info', 'Stremio account page opened. Copy AuthKey there; we will auto-detect it from clipboard for 2 minutes.');
+      const launch = openStremioAuthKeyPage();
+      if (launch.opened) {
+        setStremioLinkStatus('info', 'Stremio Web settings opened. Copy AuthKey there; we will auto-detect it from clipboard for 2 minutes.');
+      } else {
+        setStremioLinkStatus('err', 'Popup blocked. Open https://web.stremio.com/#/settings, copy AuthKey, then click Paste AuthKey From Clipboard.');
+      }
 
       try {
         const immediateClipboard = await navigator.clipboard.readText();
