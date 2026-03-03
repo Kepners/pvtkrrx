@@ -1,9 +1,18 @@
 const assert = require('node:assert/strict')
+const crypto = require('node:crypto')
 const http = require('node:http')
 
 process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'local-smoke-secret-12345678901234567890'
 
 const app = require('../index')
+const LINKED_STREMIO_USER_ID = 'stremio_user_abc123'
+
+function derivePairIdFromStremioUserId(stremioUserId) {
+  const userId = String(stremioUserId || '').trim()
+  if (!userId) return ''
+  const digest = crypto.createHash('sha256').update(userId).digest('hex')
+  return `s_${digest.slice(0, 22)}`
+}
 
 async function run() {
   const server = http.createServer(app)
@@ -73,6 +82,32 @@ async function run() {
     const localConfig = await localConfigRes.json()
     assert.equal(localConfig.jackettUrl, sampleConfig.jackettUrl)
     assert.equal(localConfig.qbitUrl, sampleConfig.qbitUrl)
+
+    const expectedLinkedPairId = derivePairIdFromStremioUserId(LINKED_STREMIO_USER_ID)
+    const linkedSaveRes = await fetch(`${base}/local-config`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...sampleConfig,
+        stremioUserId: LINKED_STREMIO_USER_ID,
+        lanPairId: '',
+        lanPairKey: ''
+      })
+    })
+    assert.equal(linkedSaveRes.status, 200, 'POST /local-config should support linked stremio user identity')
+    const linkedSavePayload = await linkedSaveRes.json()
+    assert.equal(linkedSavePayload.ok, true)
+    assert.equal(linkedSavePayload.lanPairId, expectedLinkedPairId, 'linked stremio user should derive deterministic lan pair id')
+    assert.ok(String(linkedSavePayload.lanPairKey || '').length >= 16, 'linked local config should return generated pair key')
+    assert.equal(Boolean(linkedSavePayload.lanPairEnabled), true)
+    assert.equal(Boolean(linkedSavePayload.lanPairRequired), true)
+
+    const linkedLocalConfigRes = await fetch(`${base}/local/config.json`)
+    assert.equal(linkedLocalConfigRes.status, 200)
+    const linkedLocalConfig = await linkedLocalConfigRes.json()
+    assert.equal(String(linkedLocalConfig.stremioUserId || ''), LINKED_STREMIO_USER_ID)
+    assert.equal(String(linkedLocalConfig.lanPairId || ''), expectedLinkedPairId)
+    assert.ok(String(linkedLocalConfig.lanPairKey || '').length >= 16)
 
     const localManifestRes = await fetch(`${base}/local/manifest.json?mode=local`)
     assert.equal(localManifestRes.status, 200, 'GET /local/manifest.json should return 200 after local config save')

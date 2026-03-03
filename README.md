@@ -223,6 +223,14 @@ Configure page now supports optional Stremio AuthKey linking:
 4. Ensure firewall allows inbound TCP `7000/7001` + UDP `5353`
 5. If pair shows offline in configure page, restart desktop app and re-check pair status
 
+### Apple TV does not show addon URL/configure controls
+
+1. Install/configure PVTKRRX from Stremio Web or desktop first (same Stremio account as Apple TV).
+2. Use Method 4 hosted LAN pair URL from `http://localhost:7000/configure`.
+3. Reopen Stremio on Apple TV and let account addon sync complete.
+4. If addon list is stale, sign out/in on Apple TV and relaunch the app.
+5. Treat Apple TV as a synced playback client; do first-time addon setup on web/desktop.
+
 
 ### Install URL protocol rules (important)
 

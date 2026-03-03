@@ -1,6 +1,6 @@
 # Stremio Install Protocol Tracker (Truth Table)
 
-Updated: 2026-02-27
+Updated: 2026-03-03
 
 ## Why this file exists
 We keep this as a single source of truth so we stop repeating failed install patterns.
@@ -34,6 +34,15 @@ Link: https://github.com/Stremio/stremio-addon-client
 - Local/LAN mobile install from raw `192.168.x.x:7000` is not a stable supported path.
 - Browser-to-Stremio deep link (`Open in Stremio`) can also mis-handle localhost port/query on some client versions.
 - Hosted LAN pair mode is now the preferred account-sync path for Android TV/mobile on local networks.
+
+## Apple TV notes (tvOS)
+
+- On some Apple builds, addon management UI is limited and direct addon configure/install controls may be missing in-app.
+- Recommended flow: install/configure addon on Stremio Web or desktop first, then use the same account on Apple TV and allow sync.
+- Treat tvOS as a synced playback client for now; do first-time addon onboarding off-device.
+- Track upstream Apple behavior here:
+  - https://blog.stremio.com/stremio-tech-update-44-meet-stremio-lite/
+  - https://github.com/Stremio/stremio-bugs/issues/1783
 
 ## Supported install modes going forward
 

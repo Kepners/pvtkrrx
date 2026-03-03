@@ -1,8 +1,17 @@
 const assert = require('node:assert/strict')
+const crypto = require('node:crypto')
 const http = require('node:http')
 
 const GOOD_AUTH_KEY = 'good-authkey-1234567890'
 const BAD_AUTH_KEY = 'bad-authkey-1234567890'
+const LINKED_STREMIO_USER_ID = 'stremio_user_abc123'
+
+function derivePairIdFromStremioUserId(stremioUserId) {
+  const userId = String(stremioUserId || '').trim()
+  if (!userId) return ''
+  const digest = crypto.createHash('sha256').update(userId).digest('hex')
+  return `s_${digest.slice(0, 22)}`
+}
 
 function startMockStremioApi() {
   const server = http.createServer((req, res) => {
@@ -79,8 +88,23 @@ async function run() {
     assert.equal(Boolean(linkData?.ok), true)
     assert.ok(String(linkData?.token || '').length > 20)
     assert.ok(String(linkData?.user?.id || '').startsWith('usr_'))
-    assert.equal(String(linkData?.stremio?.userId || ''), 'stremio_user_abc123')
-    assert.ok(String(linkData?.stremio?.recommendedPairId || '').startsWith('s_'))
+    assert.equal(String(linkData?.stremio?.userId || ''), LINKED_STREMIO_USER_ID)
+    const expectedPairId = derivePairIdFromStremioUserId(LINKED_STREMIO_USER_ID)
+    assert.equal(
+      String(linkData?.stremio?.recommendedPairId || ''),
+      expectedPairId,
+      'recommended pair id should be deterministic from stremio user id'
+    )
+
+    const relinkRes = await fetch(`${base}/auth/stremio/link-authkey`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ authKey: GOOD_AUTH_KEY })
+    })
+    assert.equal(relinkRes.status, 200, 're-linking same auth key should stay idempotent')
+    const relinkData = await relinkRes.json()
+    assert.equal(String(relinkData?.stremio?.userId || ''), LINKED_STREMIO_USER_ID)
+    assert.equal(String(relinkData?.stremio?.recommendedPairId || ''), expectedPairId)
 
     const meRes = await fetch(`${base}/auth/me`, {
       headers: { Authorization: `Bearer ${linkData.token}` }
@@ -88,7 +112,7 @@ async function run() {
     assert.equal(meRes.status, 200, 'linked bearer token should authorize /auth/me')
     const meData = await meRes.json()
     assert.equal(Boolean(meData?.ok), true)
-    assert.equal(String(meData?.user?.stremio?.userId || ''), 'stremio_user_abc123')
+    assert.equal(String(meData?.user?.stremio?.userId || ''), LINKED_STREMIO_USER_ID)
     assert.equal(Boolean(meData?.user?.stremio?.linked), true)
 
     console.log('Smoke Stremio AuthKey link flow passed')
