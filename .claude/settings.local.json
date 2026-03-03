@@ -24,7 +24,12 @@
       "Skill(sc:*)",
       "mcp__exa__web_search_exa",
       "Bash(docker compose up -d vercel-mcp)",
-      "Bash(gh repo create topcorner-football --public --description \"TopCorner.football — E-commerce website selling premium football corner targets\")"
+      "Bash(gh repo create topcorner-football --public --description \"TopCorner.football — E-commerce website selling premium football corner targets\")",
+      "Bash(python3 -c \":*)",
+      "Bash(python -m pip list)",
+      "Bash(python -c \"import tkinter; print\\(''tkinter: OK''\\)\")",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":7000\")"
     ],
     "additionalDirectories": [
       "C:\\Users\\kepne\\AppData\\Local\\Temp\\aws-api-mcp\\workdir"

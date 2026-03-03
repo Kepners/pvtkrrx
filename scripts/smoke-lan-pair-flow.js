@@ -162,6 +162,29 @@ async function run() {
     assert.equal(String(offlineCatalog.headers['x-pvtkrrx-lan-pair'] || ''), 'offline')
     assert.deepEqual(offlineCatalog.json, { metas: [], cacheMaxAge: 0 })
 
+    // No heartbeat record for the requested pair should also fail closed.
+    const missingPairConfig = {
+      ...hostedConfig,
+      lanPairId: 'missingpair99'
+    }
+    const encryptMissingRes = await fetch(`${base}/encrypt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(missingPairConfig)
+    })
+    assert.equal(encryptMissingRes.status, 200)
+    const missingPayload = await encryptMissingRes.json()
+    const missingToken = encodeURIComponent(String(missingPayload?.token || ''))
+
+    const missingPairCatalog = await requestWithHostHeader(
+      port,
+      `/${missingToken}/catalog/movie/pvtkrrx-movies.json`,
+      `tv.device.example:${port}`
+    )
+    assert.equal(missingPairCatalog.status, 200, 'missing-heartbeat pair should return offline fallback')
+    assert.equal(String(missingPairCatalog.headers['x-pvtkrrx-lan-pair'] || ''), 'offline')
+    assert.deepEqual(missingPairCatalog.json, { metas: [], cacheMaxAge: 0 })
+
     console.log('Smoke LAN pair + opaque stream token flow passed')
   } finally {
     server.close()

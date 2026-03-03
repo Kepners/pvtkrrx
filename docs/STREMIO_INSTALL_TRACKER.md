@@ -83,7 +83,9 @@ Get-Content "$env:APPDATA\PVTKRRX\runtime\logs\desktop-$(Get-Date -Format yyyy-M
 - `npm run smoke:lan-pair` validates:
   - pair heartbeat success
   - hosted request redirect to active LAN endpoint
-  - required-pair offline fallback semantics (`200` + empty metas + offline marker)
+  - required-pair offline fallback semantics (`200` + empty metas + offline marker):
+    - wrong `lanPairKey` in hosted token
+    - missing heartbeat record for requested `lanPairId`
   - opaque playback token formatting checks
 
 ## Next work items
