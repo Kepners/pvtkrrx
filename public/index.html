@@ -474,6 +474,112 @@
       animation: ticker 18s linear infinite;
     }
 
+    .faq-section {
+      margin-top: 12px;
+      border: 1px solid var(--line-soft);
+      border-radius: 11px;
+      padding: 14px 12px 12px;
+      background:
+        radial-gradient(420px 180px at 8% 0%, rgba(0, 246, 255, 0.08), transparent 70%),
+        rgba(4, 8, 18, 0.72);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+
+    .faq-title {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+      color: #9bdcff;
+      margin-bottom: 4px;
+    }
+
+    .faq-lead {
+      color: #b2c4e5;
+      font-family: "Rajdhani", sans-serif;
+      font-size: 15px;
+      margin-bottom: 10px;
+    }
+
+    .faq-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .faq-item {
+      border: 1px solid rgba(0, 246, 255, 0.2);
+      border-radius: 9px;
+      background: rgba(6, 12, 24, 0.68);
+      overflow: hidden;
+      transition: border-color 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .faq-item[open] {
+      border-color: rgba(0, 246, 255, 0.45);
+      box-shadow: 0 0 16px rgba(0, 168, 255, 0.16);
+    }
+
+    .faq-item summary {
+      list-style: none;
+      cursor: pointer;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.9px;
+      text-transform: uppercase;
+      color: #d6e8ff;
+      padding: 11px 12px;
+      background: rgba(1, 8, 16, 0.5);
+      display: flex;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .faq-item summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .faq-item summary::before {
+      content: "+";
+      color: var(--cyan);
+      font-size: 12px;
+      line-height: 1;
+      text-shadow: 0 0 10px rgba(0, 246, 255, 0.55);
+      flex: 0 0 auto;
+      transition: transform 0.15s ease, color 0.15s ease;
+    }
+
+    .faq-item[open] summary::before {
+      content: "–";
+      color: var(--green);
+      transform: translateY(-1px);
+    }
+
+    .faq-answer {
+      padding: 10px 12px 12px;
+      color: #c8dafa;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .faq-answer code {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      color: #e5f5ff;
+      background: rgba(3, 16, 32, 0.78);
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 246, 255, 0.2);
+    }
+
+    .faq-answer ul {
+      margin-top: 6px;
+      padding-left: 18px;
+    }
+
+    .faq-answer li + li {
+      margin-top: 4px;
+    }
+
     footer {
       margin-top: 12px;
       border-top: 1px solid rgba(0, 246, 255, 0.18);
@@ -736,6 +842,61 @@
     <section class="status-strip">
       <div class="status-track">
         [SPORTS + MOVIES + TV] [PRIVATE TRACKER STACK] [NO DEBRID REQUIRED] [SEQUENTIAL PLAYBACK CONTROL] [SELF-HOSTED FIRST] [LAN ROUTE HEARTBEAT]
+      </div>
+    </section>
+
+    <section class="faq-section" id="faq">
+      <div class="faq-title">FAQ / Home LAN + Stremio Link</div>
+      <p class="faq-lead">Answers for AuthKey, one-click setup, and LAN IP changes.</p>
+      <div class="faq-list">
+        <details class="faq-item" open>
+          <summary>Where do I get the Stremio AuthKey?</summary>
+          <div class="faq-answer">
+            Use <code>Login + Fetch AuthKey</code> first. If manual fallback is needed, open
+            <code>https://web.stremio.com/</code>, sign in, open browser dev tools console, run
+            <code>JSON.parse(localStorage.getItem('profile')).auth.key</code>, then copy the key.
+            Do not use <code>/#/settings/account</code> (that route returns Page not found).
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary>Why does it still say popup blocked?</summary>
+          <div class="faq-answer">
+            Browser shields/extensions can still block scripted <code>window.open</code> calls.
+            Manual fallback always works: open <code>https://web.stremio.com/</code> yourself,
+            copy AuthKey, then click <code>Paste AuthKey From Clipboard</code>.
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary>Does one-click setup install on phone and TV fully automatically?</summary>
+          <div class="faq-answer">
+            Not fully. One-click creates the ready links and LAN pair token, but each phone/TV must
+            install the addon URL in Stremio one time. After that first install, routing is automatic.
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary>If my PC IP changes tomorrow, do phone/TV apps auto-sync?</summary>
+          <div class="faq-answer">
+            Yes, as long as the host PC desktop app/server is running. It sends a LAN heartbeat
+            immediately on startup and then periodically, and hosted LAN links redirect to the latest
+            active endpoint. Reinstall is not required for normal DHCP IP changes.
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary>When auto-sync can fail, and why?</summary>
+          <div class="faq-answer">
+            Auto-sync can fail when:
+            <ul>
+              <li>Desktop app is not running on the host PC (pair goes offline)</li>
+              <li>TV/phone is on a different network than the host PC</li>
+              <li>Firewall/router blocks local relay ports</li>
+              <li>Pair ID/key in config no longer matches active host state</li>
+            </ul>
+          </div>
+        </details>
       </div>
     </section>
 
