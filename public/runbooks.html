@@ -315,7 +315,7 @@
     }
 
     .brand-text {
-      font-family: "Share Tech Mono", monospace;
+      font-family: "IBM Plex Mono", monospace;
       letter-spacing: 0.14em;
       text-shadow: -1px 0 rgba(255, 0, 51, 0.4), 1px 0 rgba(0, 255, 255, 0.5), 0 0 8px rgba(0, 255, 255, 0.5);
     }
@@ -515,7 +515,7 @@
       border: 1px solid rgba(0, 255, 255, 0.55) !important;
       background: rgba(0, 0, 0, 0.62) !important;
       color: #f2ffff !important;
-      font-family: "Share Tech Mono", monospace !important;
+      font-family: "IBM Plex Mono", monospace !important;
       letter-spacing: 0.08em !important;
       text-shadow: 0 0 7px rgba(0, 255, 255, 0.6);
       overflow: hidden;
@@ -1006,6 +1006,7 @@
         <a href="/configure">Configure</a>
         <a href="/runbooks">Runbooks</a>
         <a href="/health">Health</a>
+        <a href="/#faq">FAQ</a>
       </nav>
     </header>
 
@@ -1457,7 +1458,7 @@ PORT=7000 ENCRYPTION_SECRET=$(openssl rand -hex 32) node index.js</code></pre>
       }
 
       function applyTextEffects() {
-        const glitchTargets = document.querySelectorAll("h2, h3, .nav a, .chip, .badge");
+        const glitchTargets = document.querySelectorAll("h2, h3");
         glitchTargets.forEach(function (el) {
           if (!el.classList.contains("glitch-text")) {
             el.classList.add("glitch-text");
