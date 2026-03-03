@@ -78,8 +78,16 @@ explorer "$env:APPDATA\PVTKRRX\runtime\logs"
 Get-Content "$env:APPDATA\PVTKRRX\runtime\logs\desktop-$(Get-Date -Format yyyy-MM-dd).log" -Tail 200
 ```
 
+## Automated coverage (2026-03-03)
+
+- `npm run smoke:lan-pair` validates:
+  - pair heartbeat success
+  - hosted request redirect to active LAN endpoint
+  - required-pair offline fallback semantics (`200` + empty metas + offline marker)
+  - opaque playback token formatting checks
+
 ## Next work items
 
 1. Validate Method 4 end-to-end on Android TV + Android mobile with Stremio account sync.
-2. Verify offline behavior when desktop app is closed (pair status + addon response clarity).
+2. Validate Apple TV sync flow (install on web/desktop first, confirm account addon sync on tvOS client).
 3. Keep this file updated after each install test.
