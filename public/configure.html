@@ -748,15 +748,26 @@
 
     <div class="card">
       <h2>Stremio Account Link</h2>
+      <label for="stremioEmail">Stremio Email (for one-click AuthKey fetch)</label>
+      <div class="row">
+        <div>
+          <input type="email" id="stremioEmail" placeholder="you@example.com" autocomplete="username">
+        </div>
+        <div>
+          <input type="password" id="stremioPassword" placeholder="Stremio password" autocomplete="current-password">
+        </div>
+      </div>
+      <p class="hint">Auto Find will login to Stremio API and fetch AuthKey directly when email/password are provided. Social/Facebook login is not supported by this method.</p>
       <label for="stremioAuthKey">Stremio AuthKey (optional)</label>
       <input type="password" id="stremioAuthKey" placeholder="Paste Stremio AuthKey for account linking">
       <p class="hint">Used once to link this profile to your Stremio account. We only store a hash.</p>
       <div class="action-row">
+        <button class="btn-copy" type="button" id="stremioLoginKeyBtn" onclick="fetchStremioAuthKeyViaLogin(this)">Login + Fetch AuthKey</button>
         <button class="btn-copy" type="button" id="stremioAutoKeyBtn" onclick="launchStremioAuthKeyHelper()">Auto Find AuthKey</button>
         <button class="btn-copy" type="button" id="stremioPasteKeyBtn" onclick="pasteAuthKeyFromClipboard()">Paste AuthKey From Clipboard</button>
         <button class="btn-copy" type="button" id="stremioSnippetBtn" onclick="copyStremioAuthSnippet(this)">Copy Console Snippet</button>
       </div>
-      <p class="hint">Auto Find opens Stremio Web and checks clipboard for 2 minutes. In browser console run <code>JSON.parse(localStorage.getItem('profile')).auth.key</code>, then copy the output AuthKey.</p>
+      <p class="hint">Fallback mode: Auto Find opens Stremio Web and checks clipboard for 2 minutes. In browser console run <code>JSON.parse(localStorage.getItem('profile')).auth.key</code>, then copy the output AuthKey.</p>
       <div id="stremioLinkStatus" class="status"></div>
     </div>
 
@@ -1191,6 +1202,91 @@
       }
     }
 
+    function getStremioLoginCredentials() {
+      const email = String(document.getElementById('stremioEmail')?.value || '').trim();
+      const password = String(document.getElementById('stremioPassword')?.value || '');
+      return { email, password };
+    }
+
+    function setStremioAuthButtonsBusy(isBusy, busyButton, busyLabel) {
+      const buttons = [
+        document.getElementById('stremioLoginKeyBtn'),
+        document.getElementById('stremioAutoKeyBtn'),
+        document.getElementById('stremioPasteKeyBtn'),
+        document.getElementById('stremioSnippetBtn')
+      ].filter(Boolean);
+      for (const btn of buttons) {
+        btn.disabled = Boolean(isBusy);
+      }
+      if (busyButton && typeof busyButton.textContent === 'string') {
+        busyButton.textContent = isBusy ? String(busyLabel || 'Working...') : busyButton.dataset.defaultText || busyButton.textContent;
+      }
+    }
+
+    async function fetchStremioAuthKeyViaLogin(triggerBtn) {
+      const { email, password } = getStremioLoginCredentials();
+      if (!email || !password) {
+        setStremioLinkStatus('err', 'Enter Stremio email and password first, then click Login + Fetch AuthKey.');
+        return false;
+      }
+
+      const loginBtn = document.getElementById('stremioLoginKeyBtn');
+      const activeBtn = triggerBtn || loginBtn;
+      if (activeBtn && typeof activeBtn.textContent === 'string') {
+        activeBtn.dataset.defaultText = activeBtn.textContent;
+      }
+      setStremioAuthButtonsBusy(true, activeBtn, 'Logging In...');
+      setStremioLinkStatus('info', 'Logging into Stremio API and fetching AuthKey...');
+
+      try {
+        const res = await fetch('https://api.strem.io/api/login', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json'
+          },
+          body: JSON.stringify({
+            authKey: null,
+            email,
+            password
+          })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (data && typeof data === 'object' && data.error) {
+          const apiError = data.error;
+          const message = typeof apiError === 'string'
+            ? apiError
+            : String(apiError.message || apiError.error || '').trim();
+          throw new Error(message || 'Stremio login was rejected');
+        }
+        if (!res.ok) {
+          const detail = String(data?.error || data?.result?.error || '').trim();
+          const suffix = detail ? `: ${detail}` : '';
+          throw new Error(`Stremio login failed (${res.status})${suffix}`);
+        }
+
+        const rawKey = data?.result?.authKey || data?.result?.auth?.key || data?.authKey || '';
+        const authKey = extractStremioAuthKeyCandidate(rawKey);
+        if (!authKey) throw new Error('Stremio login succeeded but no AuthKey was returned.');
+
+        const authKeyEl = document.getElementById('stremioAuthKey');
+        if (authKeyEl) authKeyEl.value = authKey;
+
+        const passwordEl = document.getElementById('stremioPassword');
+        if (passwordEl) passwordEl.value = '';
+
+        setStremioLinkStatus('info', 'AuthKey fetched. Linking account...');
+        await linkStremioAuthKeyIfProvided(true);
+        return true;
+      } catch (err) {
+        const message = String(err?.message || 'Stremio login failed');
+        setStremioLinkStatus('err', `${message}. If your account uses social login, use manual AuthKey copy instead.`);
+        return false;
+      } finally {
+        setStremioAuthButtonsBusy(false, activeBtn);
+      }
+    }
+
     function getStremioAuthKeySnippet() {
       return "JSON.parse(localStorage.getItem('profile')).auth.key";
     }
@@ -1227,14 +1323,21 @@
     }
 
     async function launchStremioAuthKeyHelper() {
+      const autoBtn = document.getElementById('stremioAutoKeyBtn');
+      const pasteBtn = document.getElementById('stremioPasteKeyBtn');
+      const { email, password } = getStremioLoginCredentials();
+
+      if (email && password) {
+        await fetchStremioAuthKeyViaLogin(autoBtn);
+        return;
+      }
+
       if (!navigator.clipboard || typeof navigator.clipboard.readText !== 'function') {
         setStremioLinkStatus('err', 'Auto detect needs clipboard access. Paste AuthKey manually.');
         return;
       }
 
       stopStremioAuthKeyPolling();
-      const autoBtn = document.getElementById('stremioAutoKeyBtn');
-      const pasteBtn = document.getElementById('stremioPasteKeyBtn');
       if (autoBtn) {
         autoBtn.disabled = true;
         autoBtn.textContent = 'Waiting For AuthKey...';
