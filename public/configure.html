@@ -1116,12 +1116,69 @@
       el.textContent = text;
     }
 
+    function isLikelyDerivedLanPairId(value) {
+      return /^s_[a-f0-9]{22}$/i.test(String(value || '').trim());
+    }
+
+    async function deriveRecommendedPairIdFromStremioUserId(stremioUserId) {
+      const userId = String(stremioUserId || '').trim();
+      if (!userId || !window.crypto || !window.crypto.subtle || typeof TextEncoder === 'undefined') return '';
+      const bytes = new TextEncoder().encode(userId);
+      const digest = await window.crypto.subtle.digest('SHA-256', bytes);
+      const hex = Array.from(new Uint8Array(digest))
+        .map((n) => n.toString(16).padStart(2, '0'))
+        .join('');
+      return `s_${hex.slice(0, 22)}`;
+    }
+
+    async function ensureRecommendedLanPairId() {
+      if (stremioLinkSession.recommendedPairId) return stremioLinkSession.recommendedPairId;
+      const stremioUserId = String(accountLinkState.stremioUserId || '').trim();
+      if (!stremioUserId) return '';
+      const derived = await deriveRecommendedPairIdFromStremioUserId(stremioUserId).catch(() => '');
+      if (derived) stremioLinkSession.recommendedPairId = derived;
+      return stremioLinkSession.recommendedPairId;
+    }
+
+    function applyRecommendedLanPairId() {
+      const pairId = String(stremioLinkSession.recommendedPairId || '').trim();
+      if (!pairId) return false;
+      lanPair.pairId = pairId;
+      return true;
+    }
+
     function applyAccountLinkFromConfig(config) {
       if (!config || typeof config !== 'object') return;
-      accountLinkState.accountUserId = String(config.accountUserId || '').trim();
-      accountLinkState.accountProvider = String(config.accountProvider || '').trim();
-      accountLinkState.accountLinkedAt = Number(config.accountLinkedAt || 0);
-      accountLinkState.stremioUserId = String(config.stremioUserId || '').trim();
+      const hasOwn = (key) => Object.prototype.hasOwnProperty.call(config, key);
+
+      if (hasOwn('accountUserId')) {
+        accountLinkState.accountUserId = String(config.accountUserId || '').trim();
+      }
+      if (hasOwn('accountProvider')) {
+        accountLinkState.accountProvider = String(config.accountProvider || '').trim();
+      }
+      if (hasOwn('accountLinkedAt')) {
+        accountLinkState.accountLinkedAt = Number(config.accountLinkedAt || 0);
+      }
+      if (hasOwn('stremioUserId')) {
+        accountLinkState.stremioUserId = String(config.stremioUserId || '').trim();
+        stremioLinkSession.stremioUserId = accountLinkState.stremioUserId;
+      }
+
+      const hintedPairId = String(config.lanPairId || '').trim();
+      if (isLikelyDerivedLanPairId(hintedPairId)) {
+        stremioLinkSession.recommendedPairId = hintedPairId;
+      }
+
+      // When we already have a linked Stremio user, derive the stable LAN pair ID
+      // in the background so phone/TV links can follow the same account identity.
+      if (!stremioLinkSession.recommendedPairId && accountLinkState.stremioUserId) {
+        ensureRecommendedLanPairId()
+          .then(() => { applyRecommendedLanPairId(); })
+          .catch(() => {});
+      } else {
+        applyRecommendedLanPairId();
+      }
 
       if (accountLinkState.accountUserId) {
         setStremioLinkStatus('ok', 'Linked account loaded from existing profile token.');
@@ -1414,6 +1471,7 @@
       accountLinkState.accountProvider = 'stremio-authkey';
       accountLinkState.accountLinkedAt = Date.now();
       accountLinkState.stremioUserId = stremioLinkSession.stremioUserId;
+      applyRecommendedLanPairId();
 
       setStremioLinkStatus('ok', 'Stremio account linked successfully.');
       return {
@@ -1858,16 +1916,31 @@
       setStatus('autoStatus', 'info', 'Auto-provisioning Prowlarr + qBittorrent...');
       applyLocalDefaults();
       try {
+        const authKey = String(document.getElementById('stremioAuthKey')?.value || '').trim();
+        const { email, password } = getStremioLoginCredentials();
+        if (email && password) {
+          await fetchStremioAuthKeyViaLogin(document.getElementById('stremioLoginKeyBtn'));
+        } else if (authKey) {
+          await linkStremioAuthKeyIfProvided();
+        }
+
+        await ensureRecommendedLanPairId();
+        applyRecommendedLanPairId();
+
+        const provisionPayload = {
+          installIfMissing: true,
+          startIfStopped: true,
+          configureQbitLocalNoAuth: true,
+          openFirewall: true,
+          localHostname: activeLocalHostname,
+          ...attachAccountLink({})
+        };
+        if (lanPair.pairId) provisionPayload.lanPairId = lanPair.pairId;
+
         const res = await fetch('/auto-provision', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            installIfMissing: true,
-            startIfStopped: true,
-            configureQbitLocalNoAuth: true,
-            openFirewall: true,
-            localHostname: activeLocalHostname
-          })
+          body: JSON.stringify(provisionPayload)
         });
         const data = await res.json();
         if (data && data.config) fillConfig(data.config);
@@ -2107,6 +2180,8 @@
           });
         } else {
           if (accountLinkState.accountUserId) {
+            await ensureRecommendedLanPairId();
+            applyRecommendedLanPairId();
             setStremioLinkStatus('ok', 'Using previously linked account.');
           }
         }

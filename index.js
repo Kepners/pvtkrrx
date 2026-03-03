@@ -397,7 +397,8 @@ function buildLanPairEndpoints(port, httpsPort) {
 }
 
 function ensureLanPairConfig(config = {}, options = {}) {
-  const pairId = sanitizePairId(config.lanPairId) || makePairId()
+  const recommendedPairId = derivePairIdFromStremioUserId(config?.stremioUserId || '')
+  const pairId = sanitizePairId(config.lanPairId) || recommendedPairId || makePairId()
   const pairKey = sanitizePairKey(config.lanPairKey) || makePairKey()
   const relayUrl = normalizeRelayUrl(config.lanPairRelayUrl || options.lanPairRelayUrl)
   const pairEnabled = parseBooleanLoose(config.lanPairEnabled, options.defaultEnabled !== false)
@@ -1307,6 +1308,11 @@ app.post('/auto-provision', requireLocalNetworkRoute, async (req, res) => {
     const options = req.body || {}
     const localHostname = normalizeLocalHostname(options.localHostname || DEFAULT_LOCAL_HOSTNAME)
     const localHostnameCustom = localHostname !== DEFAULT_LOCAL_HOSTNAME
+    const accountUserId = String(options.accountUserId || '').trim()
+    const accountProvider = String(options.accountProvider || '').trim()
+    const accountLinkedAt = Number(options.accountLinkedAt || 0)
+    const stremioUserId = normalizeStremioUserId(options.stremioUserId || '')
+    const hintedPairId = sanitizePairId(options.lanPairId || '')
     const result = await autoProvisionWindows({
       ...options,
       localHostname
@@ -1314,6 +1320,11 @@ app.post('/auto-provision', requireLocalNetworkRoute, async (req, res) => {
     const provisionedConfig = result.config
       ? ensureLanPairConfig({
         ...result.config,
+        ...(accountUserId ? { accountUserId } : {}),
+        ...(accountProvider ? { accountProvider } : {}),
+        ...(accountLinkedAt > 0 ? { accountLinkedAt } : {}),
+        ...(stremioUserId ? { stremioUserId } : {}),
+        ...(hintedPairId ? { lanPairId: hintedPairId } : {}),
         localHostname,
         localHostnameCustom
       }, {
