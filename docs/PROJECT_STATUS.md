@@ -1,6 +1,6 @@
 # PVTKRRX Project Status
 
-Updated: 2026-02-27
+Updated: 2026-03-03
 
 ## Current Stage
 
@@ -8,7 +8,8 @@ PVTKRRX is in **post-MVP hardening and multi-device LAN pairing**.
 
 - Core addon flow (catalog, stream, playback, local config, encryption, desktop wrapper) is complete and shipping.
 - Local desktop usage is stable via `http://127.0.0.1:7000/local/manifest.json?mode=local`.
-- New LAN pair relay flow for Android TV/mobile account-sync has now been implemented in code.
+- LAN pair relay flow for Android TV/mobile account-sync is implemented and covered by smoke checks.
+- Stremio AuthKey linking flow is implemented and smoke-tested with a local API mock.
 
 ## What Is Implemented
 
@@ -32,13 +33,13 @@ PVTKRRX is in **post-MVP hardening and multi-device LAN pairing**.
    - sensitive routes (`/encrypt`, `/pair/*`) use strict browser-origin allowlists
    - local admin routes (`/local-config`, `/auto-provision`, `/network-info`, local qBit control) are local-network/loopback guarded
 
-## Active Worktree Items
+## Latest Automated Verification (2026-03-03)
 
-- Sports hint/artwork tuning remains in-progress and uncommitted:
-  - `src/clients/prowlarr.js`
-  - `src/clients/sportsdb.js`
-  - `src/handlers/catalog.js`
-  - `src/utils/sportsRules.js`
+1. `npm run smoke:config` - PASS
+2. `npm run smoke:lan-pair` - PASS
+3. `npm run smoke:stremio-link` - PASS
+
+These checks validate configure/encrypt/install routes, LAN pair heartbeat/status + hosted redirect behavior, and Stremio AuthKey account-link flow.
 
 ## Required Vercel Configuration For LAN Pair Relay
 
@@ -47,7 +48,7 @@ Use these on the hosted deployment:
 1. `ENCRYPTION_SECRET` (existing required secret).
 2. `KV_REST_API_URL` and `KV_REST_API_TOKEN` (recommended) to persist pair heartbeat state across serverless invocations.
 3. Optional: `PVTKRRX_PAIR_RELAY_URL` (defaults to `https://pvtkrrx.vercel.app`).
-4. Optional: `PVTKRRX_LAN_PAIR_TTL_SECONDS` (default `120`).
+4. Optional: `PVTKRRX_LAN_PAIR_TTL_SECONDS` (default `21600`, minimum enforced `300`).
 5. Optional security tuning:
    - `PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP` (default `true`)
    - `PVTKRRX_LAN_PAIR_LOCK_HOST` (default `true`)
@@ -66,3 +67,4 @@ Without KV, pair state falls back to in-memory state and may be unreliable on co
 3. Install Method 4 URL in Stremio account on Android TV/phone.
 4. Confirm opening Stremio on LAN devices resolves catalogs/streams via silent relay redirect.
 5. Confirm offline behavior when desktop app stops (pair status shows offline and addon routes fail gracefully).
+6. Validate Apple TV sync path (install on web/desktop first, then account-sync on tvOS client).
