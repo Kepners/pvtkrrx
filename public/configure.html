@@ -754,8 +754,9 @@
       <div class="action-row">
         <button class="btn-copy" type="button" id="stremioAutoKeyBtn" onclick="launchStremioAuthKeyHelper()">Auto Find AuthKey</button>
         <button class="btn-copy" type="button" id="stremioPasteKeyBtn" onclick="pasteAuthKeyFromClipboard()">Paste AuthKey From Clipboard</button>
+        <button class="btn-copy" type="button" id="stremioSnippetBtn" onclick="copyStremioAuthSnippet(this)">Copy Console Snippet</button>
       </div>
-      <p class="hint">Auto Find opens Stremio Web settings and checks clipboard automatically for 2 minutes after you copy the AuthKey.</p>
+      <p class="hint">Auto Find opens Stremio Web and checks clipboard for 2 minutes. In browser console run <code>JSON.parse(localStorage.getItem('profile')).auth.key</code>, then copy the output AuthKey.</p>
       <div id="stremioLinkStatus" class="status"></div>
     </div>
 
@@ -1190,8 +1191,27 @@
       }
     }
 
+    function getStremioAuthKeySnippet() {
+      return "JSON.parse(localStorage.getItem('profile')).auth.key";
+    }
+
+    async function copyStremioAuthSnippet(btn) {
+      const snippet = getStremioAuthKeySnippet();
+      try {
+        await navigator.clipboard.writeText(snippet);
+        if (btn && typeof btn.textContent === 'string') {
+          const original = btn.textContent;
+          btn.textContent = 'Snippet Copied!';
+          setTimeout(() => { btn.textContent = original; }, 1400);
+        }
+        setStremioLinkStatus('info', 'Console snippet copied. Paste it into Stremio Web dev console, run it, then copy the AuthKey output.');
+      } catch (_) {
+        setStremioLinkStatus('err', `Clipboard write blocked. Manually run: ${snippet}`);
+      }
+    }
+
     function openStremioAuthKeyPage() {
-      const url = 'https://web.stremio.com/#/settings';
+      const url = 'https://web.stremio.com/';
       try {
         // Do not use "noopener" in the feature string here because some browsers
         // return null even when the tab opens, which causes false popup-blocked UI.
@@ -1223,9 +1243,9 @@
 
       const launch = openStremioAuthKeyPage();
       if (launch.opened) {
-        setStremioLinkStatus('info', 'Stremio Web settings opened. Go to Authentication, copy AuthKey, and we will auto-detect it from clipboard for 2 minutes.');
+        setStremioLinkStatus('info', `Stremio Web opened. Sign in, open browser console, run ${getStremioAuthKeySnippet()}, copy output, and we will auto-detect it from clipboard for 2 minutes.`);
       } else {
-        setStremioLinkStatus('err', 'Could not open Stremio Web automatically. Open https://web.stremio.com/#/settings -> Authentication, copy AuthKey, then click Paste AuthKey From Clipboard.');
+        setStremioLinkStatus('err', `Could not open Stremio Web automatically. Open https://web.stremio.com/, run ${getStremioAuthKeySnippet()} in dev console, copy output, then click Paste AuthKey From Clipboard.`);
       }
 
       try {
