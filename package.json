@@ -1,6 +1,6 @@
 {
   "name": "pvtkrrx",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "PVTKRRX — Stream from your private tracker seedbox through Stremio",
   "main": "index.js",
   "scripts": {
@@ -10,7 +10,7 @@
     "smoke:lan-pair": "node scripts/smoke-lan-pair-flow.js",
     "smoke:stremio-link": "node scripts/smoke-stremio-link.js",
     "desktop:dev": "electron electron/main.js",
-    "dist:win": "electron-builder --win nsis portable --publish never"
+    "dist:win": "node scripts/prepare-dist.js && electron-builder --win nsis portable --publish never && node scripts/archive-dist.js"
   },
   "repository": {
     "type": "git",
@@ -46,7 +46,7 @@
     "appId": "com.kepners.pvtkrrx",
     "productName": "PVTKRRX",
     "directories": {
-      "output": "Dist"
+      "output": "dist"
     },
     "files": [
       "index.js",
@@ -70,6 +70,7 @@
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "allowElevation": true,
+      "include": "build/installer.nsh",
       "runAfterFinish": true,
       "installerIcon": "electron/assets/logo.ico",
       "uninstallerIcon": "electron/assets/logo.ico",

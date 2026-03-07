@@ -1,4 +1,4 @@
-﻿{
+{
     "folders":  [
                     {
                         "path":  "."
@@ -18,7 +18,11 @@
                                                            "sideBar.foreground":  "#407076",
                                                            "editor.background":  "#F8F7FF"
                                                        },
-                     "window.title":  "pvtkrrx - ${activeEditorShort}"
+                    "window.title": "pvtkrrx - ${activeEditorShort}",
+                    "workbench.editor.autoLockGroups": {
+                        "chatgpt.conversationEditor": true
+                    },
+                    "workbench.editor.alwaysShowEditorActions": true
                  },
     "extensions":  {
                        "recommendations":  [

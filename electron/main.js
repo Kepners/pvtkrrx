@@ -4,7 +4,7 @@ const { spawn } = require('child_process')
 const { app, BrowserWindow, ipcMain, shell, clipboard } = require('electron')
 const pkg = require('../package.json')
 const { deriveDefaultLocalHostname, normalizeLocalHostname } = require('../src/utils/lanAlias')
-const { autoProvisionWindows } = require('../src/utils/provision')
+const { autoProvisionWindows, ensureWindowsLanAccess } = require('../src/utils/provision')
 
 if (!process.env.PVTKRRX_RUNTIME_DIR) {
   const appData = process.env.APPDATA || path.join(process.env.USERPROFILE || process.cwd(), 'AppData', 'Roaming')
@@ -18,7 +18,9 @@ const appIconPath = path.join(__dirname, 'assets', 'logo.ico')
 const WINDOW_WIDTH = 740
 const WINDOW_HEIGHT = 416
 const PROVISION_ONLY_ARG = '--pvtkrrx-provision-only'
+const NETWORK_ACCESS_ONLY_ARG = '--pvtkrrx-network-access-only'
 const provisionOnlyMode = process.argv.includes(PROVISION_ONLY_ARG)
+const networkAccessOnlyMode = process.argv.includes(NETWORK_ACCESS_ONLY_ARG)
 let hasRetriedPortRecovery = false
 // Desktop publishes its LAN location and then mostly waits; set 0 to disable periodic relay heartbeat.
 const parsedLanPairHeartbeatMs = parseInt(process.env.PVTKRRX_LAN_PAIR_HEARTBEAT_MS || '720000', 10)
@@ -141,6 +143,25 @@ async function runProvisionOnlyMode() {
   }
 }
 
+async function runNetworkAccessOnlyMode() {
+  try {
+    const result = await ensureWindowsLanAccess({
+      openFirewall: true,
+      ensureBonjour: true,
+      installBonjourIfMissing: false,
+      startIfStopped: true
+    })
+    console.log('[desktop-network] message:', result?.message || 'ok')
+    if (Array.isArray(result?.notes)) {
+      for (const n of result.notes) console.log('[desktop-network] note:', n)
+    }
+    return Boolean(result?.firewallOk)
+  } catch (err) {
+    console.error('[desktop-network] failed:', err.message)
+    return false
+  }
+}
+
 async function runElevatedProvisionPass() {
   if (process.platform !== 'win32') return false
   if (!app.isPackaged) return false
@@ -222,7 +243,7 @@ function setupBoundedLogging() {
 setupBoundedLogging()
 
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
-if (!gotSingleInstanceLock && !provisionOnlyMode) {
+if (!gotSingleInstanceLock && !provisionOnlyMode && !networkAccessOnlyMode) {
   app.quit()
 }
 
@@ -544,7 +565,7 @@ function pushStatus() {
 
   const js = `
     if (window.popupAPI) {
-      window.popupAPI.setVersion(${JSON.stringify(pkg.version || '1.0.0')});
+      window.popupAPI.setVersion(${JSON.stringify(pkg.version || '0.0.0')});
       window.popupAPI.setStatus(${running ? 'true' : 'false'}, ${Number(port) || 7000});
     }
   `
@@ -704,6 +725,13 @@ app.on('second-instance', () => {
 app.whenReady().then(async () => {
   if (provisionOnlyMode) {
     const ok = await runProvisionOnlyMode()
+    if (!ok) process.exitCode = 1
+    app.quit()
+    return
+  }
+
+  if (networkAccessOnlyMode) {
+    const ok = await runNetworkAccessOnlyMode()
     if (!ok) process.exitCode = 1
     app.quit()
     return

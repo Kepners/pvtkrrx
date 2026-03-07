@@ -1,4 +1,4 @@
-const TIMEOUT_MS = 5000
+const TIMEOUT_MS = Math.max(5000, parseInt(process.env.PVTKRRX_QBIT_TIMEOUT_MS || '12000', 10))
 
 class QBitClient {
   constructor(url, username, password) {

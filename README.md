@@ -64,7 +64,9 @@ Use **Auto Setup Local / LAN** on the configure page to prefill local defaults a
 Auto Setup also attempts to:
 - install/start Prowlarr and qBittorrent (Windows, via winget + service/process start)
 - disable qBittorrent localhost auth for zero-config local API access
-- open Windows Firewall ports `7000/7001` for LAN devices
+- open Windows Firewall ports `7000/7001` and UDP `5353` for LAN devices
+
+Windows desktop install/startup now also re-checks those LAN firewall rules automatically on each boot.
 
 ## Requirements
 
@@ -177,6 +179,7 @@ ENCRYPTION_SECRET=your-secret-here npm start
 | PVTKRRX_PROWLARR_CACHE_MS | Optional | Catalog search cache TTL in ms (default 120000) |
 | PVTKRRX_PROWLARR_SEARCH_TIMEOUT_MS | Optional | Timeout for catalog Prowlarr search calls in ms (default 7000) |
 | PVTKRRX_PROWLARR_CACHE_MAX_KEYS | Optional | Max in-memory cached catalog search keys (default 500) |
+| PVTKRRX_QBIT_TIMEOUT_MS | Optional | Timeout for qBittorrent API calls in ms (default 12000) |
 | PVTKRRX_SPORTS_CATALOG_CACHE_MAX_AGE | Optional | Sports catalog response cache max-age seconds (default 600) |
 | PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS | Optional | Timeout for stream route upstream calls (Prowlarr/qBit/Cinemeta), default 7000 |
 | PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS | Optional | Timeout for stream title-fallback Prowlarr call, default 5000 |
@@ -220,7 +223,7 @@ Configure page now supports optional Stremio AuthKey linking:
 1. In local mode, use **Method 4 - Mobile/TV via Hosted LAN Pair** from configure page
 2. Ensure the desktop app is running on the host PC (heartbeat keeps pair active silently)
 3. Ensure TV/phone and PC are on the same network
-4. Ensure firewall allows inbound TCP `7000/7001` + UDP `5353`
+4. Desktop app should auto-ensure inbound TCP `7000/7001` + UDP `5353` on install/startup; if Windows still blocks it, run the installed app once as Administrator
 5. If pair shows offline in configure page, restart desktop app and re-check pair status
 
 ### Apple TV does not show addon URL/configure controls

@@ -15,7 +15,7 @@ const { handleStream } = require('./src/handlers/stream')
 const { handleMeta } = require('./src/handlers/meta')
 const { ProwlarrClient } = require('./src/clients/prowlarr')
 const { QBitClient } = require('./src/clients/qbittorrent')
-const { autoProvisionWindows } = require('./src/utils/provision')
+const { autoProvisionWindows, ensureWindowsLanAccess } = require('./src/utils/provision')
 const { getLanIpv4Addresses, normalizeLocalHostname, startLanAlias } = require('./src/utils/lanAlias')
 const { decodeSportsThumbToken, renderSportsThumbSvg } = require('./src/utils/sportsThumb')
 const { mapPath } = require('./src/utils/pathMapper')
@@ -140,6 +140,7 @@ const accountStore = new AccountStore({
   filePath: process.env.PVTKRRX_ACCOUNT_STORE_FILE || path.join(runtimeDir, 'accounts-store.json')
 })
 const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null
+let bootLanAccessPromise = null
 
 function loadLocalConfigFile() {
   try {
@@ -188,6 +189,43 @@ function normalizeBaseUrl(input) {
   const value = String(input || '').trim().replace(/\/+$/, '')
   if (!value) return ''
   return value
+}
+
+async function ensureBootLanAccess(logger = console) {
+  if (process.platform !== 'win32' || IS_VERCEL_RUNTIME) return null
+  if (bootLanAccessPromise) return bootLanAccessPromise
+
+  bootLanAccessPromise = (async () => {
+    try {
+      const result = await ensureWindowsLanAccess({
+        openFirewall: true,
+        ensureBonjour: true,
+        installBonjourIfMissing: false,
+        startIfStopped: true
+      })
+
+      if (result?.firewallOk) {
+        logger.log('[startup-network] Windows Firewall verified for TCP 7000/7001 and UDP 5353')
+      } else {
+        logger.warn('[startup-network] Firewall verification failed; run PVTKRRX as Administrator once to repair LAN access')
+      }
+
+      if (result?.mdnsReady) {
+        logger.log('[startup-network] mDNS responder ready')
+      } else if (result?.bonjour?.installed) {
+        logger.warn('[startup-network] Bonjour service detected but not running')
+      } else {
+        logger.warn('[startup-network] Bonjour/mDNS service not detected; .local discovery may be limited')
+      }
+
+      return result
+    } catch (err) {
+      logger.warn('[startup-network] LAN access check failed:', err.message)
+      return null
+    }
+  })()
+
+  return bootLanAccessPromise
 }
 
 function normalizeRelayUrl(input) {
@@ -656,6 +694,26 @@ function getPublicBaseUrl(req) {
   const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim()
   const protocol = forwardedProto || req.protocol || 'http'
   return `${protocol}://${req.get('host')}`
+}
+
+function getConfigIssues(config, options = {}) {
+  const safeConfig = config && typeof config === 'object' ? config : {}
+  const issues = []
+  const requestBaseUrl = normalizeBaseUrl(options.requestBaseUrl || '')
+  const requestOrigin = normalizeOrigin(requestBaseUrl)
+  const relayOrigin = normalizeOrigin(String(safeConfig.lanPairRelayUrl || '').trim())
+  const usingHostedProfile = safeConfig.lanPairEnabled === false
+  const missingFileServerUrl = !String(safeConfig.fileServerUrl || '').trim()
+  const relayTargetsDifferentOrigin = Boolean(requestOrigin && relayOrigin && relayOrigin !== requestOrigin)
+
+  if (usingHostedProfile && missingFileServerUrl && (IS_VERCEL_RUNTIME || relayTargetsDifferentOrigin)) {
+    issues.push({
+      code: 'HOSTED_FILE_SERVER_REQUIRED',
+      message: 'Hosted profile needs an HTTPS File Server URL for completed-file playback. Add your seedbox file server URL or use a direct-host/LAN profile.'
+    })
+  }
+
+  return issues
 }
 
 function isLoopbackHost(req) {
@@ -1262,6 +1320,17 @@ app.post('/encrypt', (req, res) => {
     return res.status(400).json({ error: 'Invalid config payload' })
   }
 
+  const issues = getConfigIssues(req.body, {
+    requestBaseUrl: getPublicBaseUrl(req)
+  })
+  if (issues.length > 0) {
+    return res.status(400).json({
+      error: issues[0].message,
+      issueCode: issues[0].code,
+      notifyUser: true
+    })
+  }
+
   try {
     const token = encrypt(req.body, secret)
     res.json({ token })
@@ -1678,6 +1747,7 @@ app.post('/test-connection', async (req, res) => {
 // ─── withConfig middleware ──────────────────────────────────
 function withConfig(req, res, next) {
   req.localConfigMissing = false
+  req.configIssues = []
   if (req.params.config === 'local') {
     const localConfig = loadLocalConfigFile()
     if (!localConfig) {
@@ -1700,6 +1770,9 @@ function withConfig(req, res, next) {
       saveLocalConfigFile(normalizedLocal)
     }
     req.config = normalizedLocal
+    req.configIssues = getConfigIssues(req.config, {
+      requestBaseUrl: getPublicBaseUrl(req)
+    })
     return next()
   }
 
@@ -1708,6 +1781,9 @@ function withConfig(req, res, next) {
 
   try {
     req.config = decrypt(req.params.config, secret)
+    req.configIssues = getConfigIssues(req.config, {
+      requestBaseUrl: getPublicBaseUrl(req)
+    })
     next()
   } catch (err) {
     res.status(400).json({ error: 'Invalid config token' })
@@ -1848,6 +1924,10 @@ app.get('/:config/manifest.json', withConfig, (req, res) => {
   // For /local without saved credentials, keep configurationRequired=true
   // so Stremio can install and then guide user to Configure instead of failing fetch.
   if (m.behaviorHints) m.behaviorHints.configurationRequired = Boolean(req.localConfigMissing)
+  if (req.configIssues.length > 0) {
+    if (m.behaviorHints) m.behaviorHints.configurationRequired = true
+    m.description = req.configIssues[0].message
+  }
   applyHostedRouteCacheHeaders(req, res, 60, { sMaxAge: 300, staleWhileRevalidate: 900 })
   res.json(m)
 })
@@ -2282,11 +2362,16 @@ app.use(getRouter(addonInterface))
 function startLocalServers(options = {}) {
   const exitOnHttpError = options.exitOnHttpError !== false
   const enableLanAlias = options.enableLanAlias !== false
+  const ensureLanAccessOnBoot = options.ensureLanAccessOnBoot !== false
   const logger = options.logger || console
   const port = parseInt(process.env.PORT || '7000', 10)
   const httpsPort = parseInt(process.env.HTTPS_PORT || '7001', 10)
   const mdnsHost = getMdnsHost()
   let lanAlias = null
+
+  if (ensureLanAccessOnBoot) {
+    ensureBootLanAccess(logger).catch(() => {})
+  }
 
   // HTTP
   const httpServer = http.createServer(app)

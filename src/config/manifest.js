@@ -1,6 +1,8 @@
+const pkg = require('../../package.json')
+
 const manifest = {
   id: 'com.kepners.pvtkrrx',
-  version: '1.0.0',
+  version: pkg.version || '0.0.0',
   name: 'PVTKRRX',
   description: 'Stream from your private tracker seedbox through Stremio — sports, movies, TV, and your library.',
   logo: 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.ico',

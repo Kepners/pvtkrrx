@@ -25,7 +25,7 @@
 ```json
 {
   "name": "pvtkrrx",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Private tracker seedbox addon for Stremio",
   "main": "index.js",
   "type": "commonjs",

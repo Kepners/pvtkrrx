@@ -141,9 +141,19 @@ function normalizePathList(list) {
 
 function runPowerShell(script, timeoutMs = 180000) {
   return new Promise((resolve) => {
-    const child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
-      windowsHide: true
-    })
+    let child
+    try {
+      child = spawn('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
+        windowsHide: true
+      })
+    } catch (err) {
+      resolve({
+        code: 1,
+        stdout: '',
+        stderr: String(err?.message || err || 'Failed to launch PowerShell')
+      })
+      return
+    }
 
     let stdout = ''
     let stderr = ''
@@ -158,6 +168,13 @@ function runPowerShell(script, timeoutMs = 180000) {
 
     child.stdout.on('data', d => { stdout += d.toString() })
     child.stderr.on('data', d => { stderr += d.toString() })
+    child.on('error', (err) => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      const message = String(err?.message || err || 'Failed to launch PowerShell')
+      resolve({ code: 1, stdout, stderr: `${stderr}\n${message}`.trim() })
+    })
     child.on('close', (code) => {
       if (done) return
       done = true
@@ -219,6 +236,43 @@ async function ensureFirewallRules(notes) {
   }
   notes.push('Firewall rule update failed (run installer/app as Administrator for LAN access)')
   return false
+}
+
+async function ensureWindowsLanAccess(options = {}) {
+  const notes = Array.isArray(options.notes) ? options.notes : []
+
+  if (process.platform !== 'win32') {
+    return {
+      ok: false,
+      message: 'Windows LAN access automation only supports Windows.',
+      firewallOk: false,
+      mdnsReady: false,
+      bonjour: null,
+      notes
+    }
+  }
+
+  const openFirewall = options.openFirewall !== false
+  const ensureBonjour = options.ensureBonjour !== false
+  const installBonjourIfMissing = options.installBonjourIfMissing === true
+  const startIfStopped = options.startIfStopped !== false
+
+  const firewallOk = openFirewall ? await ensureFirewallRules(notes) : true
+  const bonjour = ensureBonjour
+    ? await ensureBonjourMdns(installBonjourIfMissing, startIfStopped, notes)
+    : null
+  const mdnsReady = ensureBonjour ? Boolean(bonjour?.running) : true
+
+  return {
+    ok: firewallOk,
+    message: firewallOk
+      ? 'Windows LAN access checks completed.'
+      : 'Windows LAN access checks completed with firewall gaps.',
+    firewallOk,
+    mdnsReady,
+    bonjour,
+    notes
+  }
 }
 
 async function ensureBonjourMdns(installIfMissing, startIfStopped, notes) {
@@ -507,8 +561,14 @@ async function autoProvisionWindows(options = {}) {
 
   const prowlarr = await ensureProwlarrRunning(installIfMissing, startIfStopped, notes)
   const qbit = await ensureQbitRunning(installIfMissing, startIfStopped, configureQbitLocalNoAuth, notes)
-  const bonjour = await ensureBonjourMdns(installIfMissing, startIfStopped, notes)
-  if (openFirewall) await ensureFirewallRules(notes)
+  const lanAccess = await ensureWindowsLanAccess({
+    notes,
+    openFirewall,
+    ensureBonjour: true,
+    installBonjourIfMissing: installIfMissing,
+    startIfStopped
+  })
+  const bonjour = lanAccess.bonjour
 
   const config = {
     jackettUrl: prowlarr.url,
@@ -542,5 +602,6 @@ async function autoProvisionWindows(options = {}) {
 }
 
 module.exports = {
-  autoProvisionWindows
+  autoProvisionWindows,
+  ensureWindowsLanAccess
 }

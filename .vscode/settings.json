@@ -1,30 +1,24 @@
 {
   "claude.mcpServers": {
     "playwright": {
-      "command": "npx",
-      "args": ["-y", "@playwright/mcp@latest"]
+      "type": "http",
+      "url": "http://127.0.0.1:3121/mcp"
     },
     "ref": {
-      "command": "npx",
-      "args": ["-y", "ref-tools-mcp@latest"],
-      "env": {
-        "REF_API_KEY": "ref-854695ee43c6c91a5392"
-      }
+      "type": "http",
+      "url": "http://127.0.0.1:3104/mcp"
     },
     "duckduckgo-search": {
-      "command": "C:/Users/kepne/.local/bin/uvx.exe",
-      "args": ["mcp-server-duckduckgo-search"]
+      "type": "http",
+      "url": "http://127.0.0.1:3120/mcp"
     },
     "sequential-thinking": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-sequential-thinking"]
+      "type": "http",
+      "url": "http://127.0.0.1:3105/mcp"
     },
     "memory": {
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-memory"],
-      "env": {
-        "MEMORY_FILE_PATH": "c:/Users/kepne/OneDrive/Documents/GitHub/pvtkrrx/project-memory.json"
-      }
+      "type": "http",
+      "url": "http://127.0.0.1:3109/mcp"
     }
   },
   "workbench.colorCustomizations": {

@@ -16,7 +16,7 @@ PVTKRRX is in **post-MVP hardening and multi-device LAN pairing**.
 1. Local + hosted install modes with stable local config.
 2. Built-in file serving + progressive playback buffering.
 3. Sports catalog and artwork enrichment.
-4. Electron desktop packaging (`Dist/PVTKRRX Setup 1.0.0.exe`, portable build).
+4. Electron desktop packaging (`dist/` current release artifacts + `dist/releases/<version>/` archives).
 5. LAN pair relay plumbing:
    - `POST /pair/heartbeat`
    - `POST /pair/status`

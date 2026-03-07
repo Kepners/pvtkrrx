@@ -17,7 +17,8 @@ website/
 # Local runtime state (logs + secrets)
 .runtime/
 
-# Electron unpacked build output (very large; installers are in Dist/*.exe)
-Dist/win-unpacked/
+# Electron build output (installers remain in dist/, archives in dist/releases/)
+dist/win-unpacked/
+dist/releases/*/win-unpacked/
 
 .vercel

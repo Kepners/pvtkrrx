@@ -400,6 +400,115 @@
       border-bottom: 1px solid rgba(0, 246, 255, 0.14);
     }
 
+    .section-lead {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.68rem;
+      color: var(--text-dim);
+      margin-bottom: 0.9rem;
+      line-height: 1.5;
+      letter-spacing: 0.5px;
+    }
+
+    .hidden-select {
+      display: none;
+    }
+
+    .mode-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.8rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .mode-option {
+      width: 100%;
+      min-height: 136px;
+      padding: 0.9rem;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 246, 255, 0.22);
+      background: linear-gradient(180deg, rgba(8, 18, 34, 0.9), rgba(9, 15, 28, 0.82));
+      color: var(--text);
+      text-align: left;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+      align-items: flex-start;
+      justify-content: flex-start;
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+
+    .mode-option:hover {
+      transform: translateY(-1px);
+      border-color: rgba(255, 0, 212, 0.45);
+      box-shadow: 0 0 0 3px rgba(255, 0, 212, 0.12);
+    }
+
+    .mode-option.active {
+      border-color: rgba(0, 255, 102, 0.62);
+      box-shadow: 0 0 0 3px var(--accent-2-soft), 0 16px 28px -22px rgba(0, 255, 102, 0.5);
+      background: linear-gradient(180deg, rgba(10, 22, 34, 0.98), rgba(8, 18, 28, 0.92));
+    }
+
+    .mode-kicker {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--accent);
+    }
+
+    .mode-title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.92rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #f1f7ff;
+    }
+
+    .mode-copy {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.66rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
+    .service-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .service-tab {
+      width: auto;
+      padding: 0.62rem 0.95rem;
+      border-radius: 999px;
+      background: rgba(0, 246, 255, 0.08);
+      color: #bfd6ff;
+      border: 1px solid rgba(0, 246, 255, 0.22);
+      box-shadow: none;
+    }
+
+    .service-tab:hover {
+      border-color: rgba(255, 0, 212, 0.42);
+      box-shadow: 0 0 0 3px rgba(255, 0, 212, 0.12);
+    }
+
+    .service-tab.active {
+      background: linear-gradient(135deg, rgba(0, 246, 255, 0.22), rgba(0, 255, 102, 0.18));
+      color: #f1fbff;
+      border-color: rgba(0, 255, 102, 0.58);
+      box-shadow: 0 0 0 3px var(--accent-2-soft);
+    }
+
+    .service-card {
+      display: none;
+    }
+
+    .service-card.active {
+      display: block;
+    }
+
     label {
       display: block;
       font-family: 'IBM Plex Mono', monospace;
@@ -580,6 +689,45 @@
       margin-top: 1rem;
     }
 
+    .install-target-panel {
+      display: none;
+    }
+
+    .install-target-panel.active {
+      display: block;
+    }
+
+    .install-debug {
+      margin-top: 0.9rem;
+      border: 1px solid rgba(0, 246, 255, 0.16);
+      border-radius: 12px;
+      background: rgba(5, 12, 24, 0.52);
+      padding: 0.8rem 0.85rem;
+    }
+
+    .install-debug[open] {
+      border-color: rgba(0, 255, 102, 0.32);
+      box-shadow: inset 0 0 0 1px rgba(0, 255, 102, 0.06);
+    }
+
+    .install-debug summary {
+      list-style: none;
+      cursor: pointer;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.66rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #c8ddff;
+    }
+
+    .install-debug summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .install-debug-content {
+      padding-top: 0.85rem;
+    }
+
     .install-link a {
       display: inline-block;
       background: linear-gradient(135deg, var(--accent), #9cd8ff);
@@ -710,8 +858,11 @@
       body { padding: 1rem 0.75rem; }
       .card { padding: 1.2rem; }
       h1 { font-size: 1.6rem; letter-spacing: 2px; }
+      .mode-grid { grid-template-columns: 1fr; }
       .row { flex-direction: column; gap: 0; }
       .url-row { flex-direction: column; align-items: stretch; }
+      .service-tabs { flex-direction: column; }
+      .service-tab { width: 100%; }
       .btn-copy { width: 100%; }
     }
   </style>
@@ -752,13 +903,33 @@
     </div>
 
     <div class="card">
-      <h2>Addon Profile</h2>
-      <label for="installMode">Choose where this addon will run</label>
-      <select id="installMode">
-        <option value="local">PC + Home LAN (Recommended)</option>
-        <option value="hosted">Cloud / Remote Seedbox (Online)</option>
-      </select>
-      <p class="hint" id="installModeHint">Recommended for home setup. Installs PC Local on this machine and LAN Bridge on phone/TV.</p>
+      <h2>Install Target</h2>
+      <p class="section-lead">Choose the viewing path first. The configurator will only show the install action that matches that target.</p>
+      <div class="mode-grid" id="installTargetSwitcher">
+        <button type="button" class="mode-option active" data-install-target="pc" onclick="setInstallTarget('pc')">
+          <span class="mode-kicker">Same machine</span>
+          <span class="mode-title">This PC</span>
+          <span class="mode-copy">Install the addon on the same Windows machine that runs the local PVTKRRX desktop/server.</span>
+        </button>
+        <button type="button" class="mode-option" data-install-target="lan" onclick="setInstallTarget('lan')">
+          <span class="mode-kicker">Home network</span>
+          <span class="mode-title">Phone / TV On LAN</span>
+          <span class="mode-copy">Install the LAN Bridge for mobile, Android TV, or Apple TV while the host PC stays online.</span>
+        </button>
+        <button type="button" class="mode-option" data-install-target="seedbox" onclick="setInstallTarget('seedbox')">
+          <span class="mode-kicker">Public endpoints</span>
+          <span class="mode-title">Remote Seedbox</span>
+          <span class="mode-copy">Use the hosted profile only when Prowlarr, qBittorrent, and file serving are reachable over public URLs.</span>
+        </button>
+      </div>
+      <div class="hidden-select">
+        <label for="installMode">Internal profile mode</label>
+        <select id="installMode">
+          <option value="local">PC + Home LAN</option>
+          <option value="hosted">Cloud / Remote Seedbox</option>
+        </select>
+      </div>
+      <p class="hint" id="installModeHint">This PC target selected. You will only see the local desktop install action.</p>
     </div>
 
     <div class="card">
@@ -772,7 +943,7 @@
           <input type="password" id="stremioPassword" placeholder="Stremio password" autocomplete="current-password">
         </div>
       </div>
-      <p class="hint">Auto Find will login to Stremio API and fetch AuthKey directly when email/password are provided. Social/Facebook login is not supported by this method.</p>
+      <p class="hint"><strong>Login + Fetch AuthKey</strong> uses the Stremio API with email/password. <strong>Auto Find AuthKey</strong> uses your existing Stremio Web browser session and clipboard helper.</p>
       <label for="stremioAuthKey">Stremio AuthKey (optional)</label>
       <input type="password" id="stremioAuthKey" placeholder="Paste Stremio AuthKey for account linking">
       <p class="hint">Used once to link this profile to your Stremio account. We only store a hash.</p>
@@ -782,11 +953,11 @@
         <button class="btn-copy" type="button" id="stremioPasteKeyBtn" onclick="pasteAuthKeyFromClipboard()">Paste AuthKey From Clipboard</button>
         <button class="btn-copy" type="button" id="stremioSnippetBtn" onclick="copyStremioAuthSnippet(this)">Copy Console Snippet</button>
       </div>
-      <p class="hint">Fallback mode: Auto Find opens Stremio Web and checks clipboard for 2 minutes. In browser console run <code>JSON.parse(localStorage.getItem('profile')).auth.key</code>, then copy the output AuthKey.</p>
+      <p class="hint">Fallback mode: Auto Find opens Stremio Web and checks clipboard for 2 minutes. In browser console run the copied snippet, then copy the returned AuthKey.</p>
       <div id="stremioLinkStatus" class="status"></div>
     </div>
 
-    <div class="card">
+    <div class="card" id="autoSetupCard">
       <h2>Auto Setup</h2>
       <p class="hint">One click setup for home use: local defaults plus install links for this PC and phone/TV.</p>
       <button class="btn-test" onclick="autoSetup()">Auto Setup (Home LAN)</button>
@@ -795,6 +966,18 @@
     </div>
 
     <div class="card">
+      <h2>Connection Details</h2>
+      <p class="section-lead">Service settings stay tucked behind tabs so you only see the part you are editing.</p>
+      <div class="service-tabs">
+        <button type="button" class="service-tab active" data-service-tab="prowlarr" onclick="setActiveServiceTab('prowlarr')">Prowlarr</button>
+        <button type="button" class="service-tab" data-service-tab="qbit" onclick="setActiveServiceTab('qbit')">qBittorrent</button>
+        <button type="button" class="service-tab" data-service-tab="files" onclick="setActiveServiceTab('files')">File Server</button>
+        <button type="button" class="service-tab" data-service-tab="options" onclick="setActiveServiceTab('options')">Options</button>
+      </div>
+      <p class="hint" id="serviceTabHint">Prowlarr settings are open.</p>
+    </div>
+
+    <div class="card service-card active" id="serviceCard-prowlarr">
       <h2>Prowlarr</h2>
       <label for="jackettUrl">Prowlarr Base URL - <code>http://localhost:9696</code></label>
       <input type="url" id="jackettUrl" placeholder="http://localhost:9696">
@@ -808,7 +991,7 @@
       <p class="hint">Used for sports posters only. Cached to avoid repeated API calls on each catalog request.</p>
     </div>
 
-    <div class="card">
+    <div class="card service-card" id="serviceCard-qbit">
       <h2>qBittorrent</h2>
       <label for="qbitUrl">WebUI URL</label>
       <input type="url" id="qbitUrl" placeholder="https://qbit.example.com:8080">
@@ -824,7 +1007,7 @@
       </div>
     </div>
 
-    <div class="card">
+    <div class="card service-card" id="serviceCard-files">
       <h2>File Server</h2>
       <label for="provider">Seedbox Provider</label>
       <select id="provider">
@@ -857,7 +1040,7 @@
       <p class="hint">Maps qBit save path to file server URL path</p>
     </div>
 
-    <div class="card">
+    <div class="card service-card" id="serviceCard-options">
       <h2>Options</h2>
       <label for="maxResults">Max Results Per Search</label>
       <input type="number" id="maxResults" value="50" min="10" max="200">
@@ -880,46 +1063,49 @@
     <button class="btn-install" onclick="install()">Install in Stremio</button>
 
     <div id="installLink" class="install-link">
-      <!-- Local mode: PC Local + LAN Bridge -->
       <div id="localInstall">
-        <p class="install-section-title">Step 1 - Install on this PC (PVTKRRX PC Local)</p>
-        <div class="url-row">
-          <button class="btn-copy" onclick="copyPrivateLink('localLoopback', this)">Copy PC Local URL</button>
+        <div id="installPanelPc" class="install-target-panel active">
+          <p class="install-section-title">Install On This PC</p>
+          <div class="url-row">
+            <button class="btn-copy" id="copyLocalInstallBtn" onclick="copyPrivateLink('localLoopback', this)">Copy Stremio Addon URL</button>
+          </div>
+          <p class="install-note" id="openLinkNote">Paste this into Stremio -> Addons -> + Add Addon URL on the same Windows PC that runs PVTKRRX.</p>
         </div>
-        <p class="install-note">Use this only on the same Windows PC that runs PVTKRRX.</p>
 
-        <p class="install-section-title" style="margin-top:1rem">Optional network test - LAN hostname</p>
-        <div class="url-row">
-          <button class="btn-copy" onclick="copyPrivateLink('localLanHostname', this)">Copy LAN Hostname URL</button>
-        </div>
-        <p class="install-note" id="lanInstallNote">Use this to test LAN reachability from this browser.</p>
+        <div id="installPanelLan" class="install-target-panel">
+          <p class="install-section-title">Install On Phone / TV</p>
+          <div class="url-row">
+            <button class="btn-copy" onclick="copyPrivateLink('pairHostedManifest', this)">Copy Hosted Manifest URL</button>
+          </div>
+          <div class="url-row">
+            <button class="btn-copy" onclick="copyPrivateLink('pairHostedStremio', this)">Copy Hosted Stremio URL</button>
+          </div>
+          <p class="install-note" id="pairRelayNote">Use this for mobile, Android TV, or Apple TV on the same LAN as the host PC.</p>
+          <p class="install-note">Apple TV note: if tvOS does not show Add Addon URL/configure controls, install this once from Stremio Web or desktop while logged into the same account, then reopen Apple TV to sync.</p>
+          <p class="install-note" id="pairStatusNote">LAN Bridge status: waiting for local save.</p>
 
-        <p class="install-section-title" style="margin-top:1rem">Optional network test - LAN IP fallback</p>
-        <div class="url-row">
-          <button class="btn-copy" onclick="copyPrivateLink('localLanIp', this)">Copy LAN IP URL</button>
-        </div>
-        <p class="install-note" id="lanFallbackNote">Use this only if hostname resolution fails.</p>
+          <details class="install-debug">
+            <summary>Debug LAN checks</summary>
+            <div class="install-debug-content">
+              <p class="install-section-title">LAN Hostname Test</p>
+              <div class="url-row">
+                <button class="btn-copy" onclick="copyPrivateLink('localLanHostname', this)">Copy LAN Hostname URL</button>
+              </div>
+              <p class="install-note" id="lanInstallNote">Use this to test LAN reachability from this browser.</p>
 
-        <p class="install-section-title" style="margin-top:1rem">Quick copy (This PC)</p>
-        <a id="stremioLink" href="#" style="display:inline-block;margin-top:0.5rem;color:var(--blue);font-family:'IBM Plex Mono',monospace;font-size:0.8rem">Copy local Addon URL</a>
-        <p class="install-note" id="openLinkNote">Copy and paste into Stremio -> Addons -> + Add Addon URL (desktop/web flow).</p>
-
-        <p class="install-section-title" style="margin-top:1rem">Step 2 - Install on phone/TV (PVTKRRX LAN Bridge)</p>
-        <div class="url-row">
-          <button class="btn-copy" onclick="copyPrivateLink('pairHostedManifest', this)">Copy Hosted Manifest URL</button>
+              <p class="install-section-title" style="margin-top:1rem">LAN IP Fallback Test</p>
+              <div class="url-row">
+                <button class="btn-copy" onclick="copyPrivateLink('localLanIp', this)">Copy LAN IP URL</button>
+              </div>
+              <p class="install-note" id="lanFallbackNote">Use this only if hostname resolution fails.</p>
+            </div>
+          </details>
         </div>
-        <div class="url-row">
-          <button class="btn-copy" onclick="copyPrivateLink('pairHostedStremio', this)">Copy Hosted Stremio URL</button>
-        </div>
-        <p class="install-note" id="pairRelayNote">After local save, this URL installs LAN Bridge and silently routes playback to your active home PC.</p>
-        <p class="install-note">Apple TV note: if tvOS does not show Add Addon URL/configure controls, install this URL once from Stremio Web or desktop while logged into the same account, then reopen Stremio on Apple TV to sync.</p>
-        <p class="install-note" id="pairStatusNote">LAN Bridge status: waiting for local save.</p>
       </div>
-      <!-- Hosted mode: just the stremio:// link -->
       <div id="hostedInstall" style="text-align:center">
         <a id="stremioLinkHosted" href="#">Install PVTKRRX (Online)</a>
         <p class="install-note" style="margin-top:0.5rem" id="hostedUrlDisplay"></p>
-        <p class="install-note" style="margin-top:0.5rem">Use this only when Prowlarr and qBittorrent are publicly reachable.</p>
+        <p class="install-note" style="margin-top:0.5rem">Use this only when Prowlarr and qBittorrent are publicly reachable. If you are using the hosted relay, also set an HTTPS File Server URL for completed-file playback.</p>
       </div>
     </div>
 
@@ -932,6 +1118,8 @@
     const defaultLocalHostname = 'pvtkrrx.local';
     const defaultLanPairRelayUrl = 'https://pvtkrrx.vercel.app';
     let activeLocalHostname = defaultLocalHostname;
+    let activeInstallTarget = 'pc';
+    let activeServiceTab = 'prowlarr';
     let pairStatusTimer = null;
     let pairStatusPollCount = 0;
     let pairStatusOnlineStreak = 0;
@@ -1101,16 +1289,52 @@
       note.textContent = 'LAN hostname test is available from this browser.';
     }
 
-    function normalizeRelayUrl(raw) {
-      const text = String(raw || '').trim().replace(/\/+$/, '');
-      if (!text) return defaultLanPairRelayUrl;
+    function isPrivateInstallHost(hostname) {
+      if (!hostname) return false;
+      const host = String(hostname || '').toLowerCase();
+      if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
+      if (host.endsWith('.local')) return true;
+      if (!host.includes('.')) return true;
+      if (host.startsWith('10.')) return true;
+      if (host.startsWith('192.168.')) return true;
+      const m = host.match(/^172\.(\d+)\./);
+      if (m) {
+        const second = parseInt(m[1], 10);
+        if (second >= 16 && second <= 31) return true;
+      }
+      return false;
+    }
+
+    function getCurrentPublicOrigin() {
       try {
-        const url = new URL(text);
-        if (url.protocol !== 'http:' && url.protocol !== 'https:') return defaultLanPairRelayUrl;
+        const url = new URL(window.location.href);
+        if (url.protocol !== 'https:') return '';
+        if (isPrivateInstallHost(url.hostname)) return '';
         return `${url.protocol}//${url.host}`;
       } catch (_) {
-        return defaultLanPairRelayUrl;
+        return '';
       }
+    }
+
+    function resolveDefaultRelayBaseUrl() {
+      return getCurrentPublicOrigin() || defaultLanPairRelayUrl;
+    }
+
+    function normalizeRelayUrl(raw) {
+      const fallback = resolveDefaultRelayBaseUrl();
+      const text = String(raw || '').trim().replace(/\/+$/, '');
+      if (!text) return fallback;
+      try {
+        const url = new URL(text);
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') return fallback;
+        return `${url.protocol}//${url.host}`;
+      } catch (_) {
+        return fallback;
+      }
+    }
+
+    if (lanPair.relayUrl === defaultLanPairRelayUrl) {
+      lanPair.relayUrl = resolveDefaultRelayBaseUrl();
     }
 
     function setPairStatusNote(text, forceError = false) {
@@ -1231,6 +1455,44 @@
       return inline && inline[1] ? inline[1] : '';
     }
 
+    function findStremioAuthKeyInData(value, seen = new Set()) {
+      const direct = extractStremioAuthKeyCandidate(value);
+      if (direct) return direct;
+      if (!value || typeof value !== 'object') return '';
+      if (seen.has(value)) return '';
+      seen.add(value);
+
+      const preferredPaths = [
+        value.authKey,
+        value.auth_key,
+        value.key,
+        value.token,
+        value.auth && value.auth.key,
+        value.result && value.result.authKey,
+        value.result && value.result.auth_key,
+        value.result && value.result.key,
+        value.result && value.result.token,
+        value.result && value.result.auth && value.result.auth.key,
+        value.user && value.user.authKey,
+        value.user && value.user.auth && value.user.auth.key,
+        value.result && value.result.user && value.result.user.authKey,
+        value.result && value.result.user && value.result.user.auth && value.result.user.auth.key
+      ];
+
+      for (const candidate of preferredPaths) {
+        const key = extractStremioAuthKeyCandidate(candidate);
+        if (key) return key;
+      }
+
+      const entries = Array.isArray(value) ? value : Object.values(value);
+      for (const entry of entries) {
+        const key = findStremioAuthKeyInData(entry, seen);
+        if (key) return key;
+      }
+
+      return '';
+    }
+
     function stopStremioAuthKeyPolling() {
       if (stremioAuthKeyPollTimer) {
         clearInterval(stremioAuthKeyPollTimer);
@@ -1338,9 +1600,8 @@
           throw new Error(`Stremio login failed (${res.status})${suffix}`);
         }
 
-        const rawKey = data?.result?.authKey || data?.result?.auth?.key || data?.authKey || '';
-        const authKey = extractStremioAuthKeyCandidate(rawKey);
-        if (!authKey) throw new Error('Stremio login succeeded but no AuthKey was returned.');
+        const authKey = findStremioAuthKeyInData(data);
+        if (!authKey) throw new Error('Stremio login succeeded but did not expose an AuthKey in the response');
 
         const authKeyEl = document.getElementById('stremioAuthKey');
         if (authKeyEl) authKeyEl.value = authKey;
@@ -1353,7 +1614,7 @@
         return true;
       } catch (err) {
         const message = String(err?.message || 'Stremio login failed');
-        setStremioLinkStatus('err', `${message}. If your account uses social login, use manual AuthKey copy instead.`);
+        setStremioLinkStatus('err', `${message}. Use Auto Find AuthKey if your browser session is already logged into Stremio Web.`);
         return false;
       } finally {
         setStremioAuthButtonsBusy(false, activeBtn);
@@ -1361,7 +1622,7 @@
     }
 
     function getStremioAuthKeySnippet() {
-      return "JSON.parse(localStorage.getItem('profile')).auth.key";
+      return `(function(){const isKey=(v)=>typeof v==='string'&&/^[A-Za-z0-9._-]{16,1024}$/.test(v);const walk=(v,s=new Set())=>{if(!v||typeof v!=='object'||s.has(v))return'';s.add(v);const direct=[v.authKey,v.auth_key,v.key,v.token,v.auth&&v.auth.key];for(const item of direct){if(isKey(item))return item;}const values=Array.isArray(v)?v:Object.values(v);for(const item of values){if(isKey(item))return item;const nested=walk(item,s);if(nested)return nested;}return'';};const keys=['profile'];for(let i=0;i<localStorage.length;i++){const name=localStorage.key(i);if(name&&!keys.includes(name))keys.push(name);}for(const name of keys){const raw=localStorage.getItem(name);if(!raw)continue;if(isKey(raw))return raw;const inline=String(raw).match(/authKey=([A-Za-z0-9._-]{16,1024})/i);if(inline&&inline[1])return inline[1];try{const found=walk(JSON.parse(raw));if(found)return found;}catch(_){}}return'';})()`;
     }
 
     async function copyStremioAuthSnippet(btn) {
@@ -1398,12 +1659,6 @@
     async function launchStremioAuthKeyHelper() {
       const autoBtn = document.getElementById('stremioAutoKeyBtn');
       const pasteBtn = document.getElementById('stremioPasteKeyBtn');
-      const { email, password } = getStremioLoginCredentials();
-
-      if (email && password) {
-        await fetchStremioAuthKeyViaLogin(autoBtn);
-        return;
-      }
 
       if (!navigator.clipboard || typeof navigator.clipboard.readText !== 'function') {
         setStremioLinkStatus('err', 'Auto detect needs clipboard access. Paste AuthKey manually.');
@@ -1548,7 +1803,7 @@
       if (config.lanPairId) lanPair.pairId = String(config.lanPairId).trim();
       if (config.lanPairKey) lanPair.pairKey = String(config.lanPairKey).trim();
       if (config.lanPairRelayUrl) lanPair.relayUrl = normalizeRelayUrl(config.lanPairRelayUrl);
-      if (!lanPair.relayUrl) lanPair.relayUrl = defaultLanPairRelayUrl;
+      if (!lanPair.relayUrl) lanPair.relayUrl = resolveDefaultRelayBaseUrl();
     }
 
     function formatRelativeTime(timestamp) {
@@ -1636,17 +1891,100 @@
         .replace(/\/+$/, '');
     }
 
+    function getInstallTarget() {
+      return activeInstallTarget;
+    }
+
+    function getDerivedInstallMode(target = getInstallTarget()) {
+      return target === 'seedbox' ? 'hosted' : 'local';
+    }
+
+    function setActiveServiceTab(name) {
+      const next = ['prowlarr', 'qbit', 'files', 'options'].includes(name) ? name : 'prowlarr';
+      activeServiceTab = next;
+      document.querySelectorAll('[data-service-tab]').forEach((button) => {
+        button.classList.toggle('active', button.dataset.serviceTab === next);
+      });
+      document.querySelectorAll('.service-card').forEach((card) => {
+        card.classList.toggle('active', card.id === `serviceCard-${next}`);
+      });
+
+      const hint = document.getElementById('serviceTabHint');
+      if (!hint) return;
+      if (next === 'prowlarr') {
+        hint.textContent = 'Prowlarr settings are open.';
+      } else if (next === 'qbit') {
+        hint.textContent = 'qBittorrent settings are open.';
+      } else if (next === 'files') {
+        hint.textContent = 'File server and path mapping settings are open.';
+      } else {
+        hint.textContent = 'General addon options are open.';
+      }
+    }
+
+    function syncInstallTargetUi() {
+      const target = getInstallTarget();
+      const mode = getDerivedInstallMode(target);
+      const installLinkVisible = document.getElementById('installLink').style.display === 'block';
+      document.getElementById('installMode').value = mode;
+
+      document.querySelectorAll('[data-install-target]').forEach((button) => {
+        button.classList.toggle('active', button.dataset.installTarget === target);
+      });
+
+      const autoSetupCard = document.getElementById('autoSetupCard');
+      if (autoSetupCard) {
+        autoSetupCard.style.display = target === 'seedbox' ? 'none' : 'block';
+      }
+
+      const localInstall = document.getElementById('localInstall');
+      const hostedInstall = document.getElementById('hostedInstall');
+      const pcPanel = document.getElementById('installPanelPc');
+      const lanPanel = document.getElementById('installPanelLan');
+      if (pcPanel) pcPanel.classList.toggle('active', target === 'pc');
+      if (lanPanel) lanPanel.classList.toggle('active', target === 'lan');
+
+      if (installLinkVisible) {
+        if (target === 'seedbox') {
+          if (localInstall) localInstall.style.display = 'none';
+          if (hostedInstall) hostedInstall.style.display = 'block';
+          stopLanPairStatusPolling();
+        } else {
+          if (localInstall) localInstall.style.display = 'block';
+          if (hostedInstall) hostedInstall.style.display = 'none';
+          if (target === 'lan') {
+            startLanPairStatusPolling();
+          } else {
+            stopLanPairStatusPolling();
+          }
+        }
+      }
+
+      if (target === 'seedbox' && activeServiceTab === 'options') return;
+      if (target === 'seedbox' && activeServiceTab === 'prowlarr') {
+        setActiveServiceTab('files');
+      }
+    }
+
+    function setInstallTarget(target) {
+      activeInstallTarget = ['pc', 'lan', 'seedbox'].includes(target) ? target : 'pc';
+      syncInstallTargetUi();
+      setInstallModeHint();
+    }
+
     function getInstallMode() {
-      return document.getElementById('installMode').value;
+      return getDerivedInstallMode();
     }
 
     function setInstallModeHint() {
-      const mode = getInstallMode();
+      const target = getInstallTarget();
       const hint = document.getElementById('installModeHint');
-      if (mode === 'local') {
-        hint.textContent = 'Recommended for home setup. Install PC Local on this machine and LAN Bridge on phone/TV.';
+      if (target === 'pc') {
+        hint.textContent = 'This PC target selected. You will only see the local desktop install action.';
+      } else if (target === 'lan') {
+        hint.textContent = 'Phone / TV on LAN selected. You will only see the LAN Bridge install links and status.';
       } else {
-        hint.textContent = 'Use only when Prowlarr and qBittorrent are publicly reachable. This installs the Online profile.';
+        hint.textContent = 'Remote Seedbox selected. You will only see the Online profile install action.';
       }
     }
 
@@ -1687,14 +2025,11 @@
     });
 
     document.getElementById('installMode').addEventListener('change', function() {
-      setInstallModeHint();
-      if (getInstallMode() !== 'local') {
-        stopLanPairStatusPolling();
-      } else if (document.getElementById('installLink').style.display === 'block') {
-        startLanPairStatusPolling();
-      }
+      const nextTarget = this.value === 'hosted' ? 'seedbox' : getInstallTarget();
+      setInstallTarget(nextTarget);
     });
-    setInstallModeHint();
+    setActiveServiceTab(activeServiceTab);
+    setInstallTarget(activeInstallTarget);
     applyProviderPreset(document.getElementById('provider').value, { applyMapping: false });
     spawnDebridDots();
     document.getElementById('localInstall').style.display = 'none';
@@ -1724,7 +2059,7 @@
       setActiveLocalHostname(defaultLocalHostname);
       lanPair.enabled = true;
       lanPair.required = true;
-      if (!lanPair.relayUrl) lanPair.relayUrl = defaultLanPairRelayUrl;
+      if (!lanPair.relayUrl) lanPair.relayUrl = resolveDefaultRelayBaseUrl();
       if (!document.getElementById('jackettUrl').value.trim()) {
         document.getElementById('jackettUrl').value = 'http://localhost:9696';
       }
@@ -1820,32 +2155,11 @@
       const lanReachable = await canReachManifest(lan && lan.httpManifest);
       const method3Note = document.getElementById('lanFallbackNote');
       const openNote = document.getElementById('openLinkNote');
-      // Quick launch must always target loopback on this PC.
-      // LAN/mDNS links can be rewritten by Stremio/Chromium in some flows.
-      const openManifestUrl = (loopback && loopback.httpManifest) || '';
-      const openLink = document.getElementById('stremioLink');
+      const primaryCopyBtn = document.getElementById('copyLocalInstallBtn');
 
       setPrivateLink('localLoopback', loopback.httpManifest || '');
-      if (openLink) {
-        openLink.href = '#';
-        openLink.onclick = async (event) => {
-          event.preventDefault();
-          if (!openManifestUrl) return;
-          try {
-            await navigator.clipboard.writeText(openManifestUrl);
-            const original = openLink.textContent;
-            openLink.textContent = 'Copied!';
-            setTimeout(() => { openLink.textContent = original; }, 1500);
-          } catch (_) {
-            const el = document.createElement('textarea');
-            el.value = openManifestUrl;
-            document.body.appendChild(el);
-            el.focus();
-            el.select();
-            document.execCommand('copy');
-            document.body.removeChild(el);
-          }
-        };
+      if (primaryCopyBtn) {
+        primaryCopyBtn.disabled = !loopback?.httpManifest;
       }
 
       if (mdns && mdns.httpManifest) {
@@ -1867,7 +2181,7 @@
       }
 
       if (openNote) {
-        openNote.textContent = 'Click to copy localhost URL. Paste it in Stremio Addons -> + Add Addon URL. For phone/TV, use hosted HTTPS install mode.';
+        openNote.textContent = 'Copy this localhost URL and paste it in Stremio -> Addons -> + Add Addon URL on this same Windows PC.';
       }
     }
 
@@ -1970,11 +2284,14 @@
         await buildLanPairInstallLinks(getConfig());
 
         document.getElementById('installLink').style.display = 'block';
-        document.getElementById('localInstall').style.display = 'block';
-        document.getElementById('hostedInstall').style.display = 'none';
+        syncInstallTargetUi();
 
         if (data && data.ok) {
-          setStatus('autoStatus', 'ok', 'Auto setup complete. Click Install, then use Step 1 for this PC and Step 2 for phone/TV.');
+          const target = getInstallTarget();
+          const message = target === 'lan'
+            ? 'Auto setup complete. Click Install, then use the Phone / TV on LAN panel.'
+            : 'Auto setup complete. Click Install, then use the This PC panel.';
+          setStatus('autoStatus', 'ok', message);
         } else {
           const note = Array.isArray(data?.notes) && data.notes.length ? data.notes[0] : (data?.message || 'Provisioning incomplete');
           setStatus('autoStatus', 'err', 'Auto setup incomplete: ' + note);
@@ -2021,6 +2338,9 @@
 
     function fillConfig(config) {
       if (!config || typeof config !== 'object') return;
+      if (config.lanPairEnabled === false) {
+        setInstallTarget('seedbox');
+      }
       setLanPairStateFromConfig(config);
       applyAccountLinkFromConfig(config);
 
@@ -2119,6 +2439,13 @@
         } catch (e) {
           return `${label} is not a valid URL`;
         }
+      }
+
+      const relayBase = normalizeRelayUrl(config.lanPairRelayUrl || lanPair.relayUrl || '');
+      const publicCurrentOrigin = getCurrentPublicOrigin();
+      const usingExternalHostedRelay = !publicCurrentOrigin || relayBase !== publicCurrentOrigin;
+      if (usingExternalHostedRelay && !config.fileServerUrl) {
+        return 'Online profile on the hosted relay needs an HTTPS File Server URL for completed-file playback. Add your seedbox file server URL or self-host PVTKRRX directly on the seedbox.';
       }
 
       return null;
@@ -2225,12 +2552,17 @@
           const net = await getNetworkInfo();
           await fillLocalInstallLinks(net);
           await buildLanPairInstallLinks(getConfig());
-          document.getElementById('localInstall').style.display = 'block';
-          document.getElementById('hostedInstall').style.display = 'none';
 
           document.getElementById('installLink').style.display = 'block';
-          setStatus('installStatus', 'ok',
-            'Saved. Step 1 installs PC Local on this machine. Step 2 installs LAN Bridge on phone/TV.');
+          syncInstallTargetUi();
+          const target = getInstallTarget();
+          setStatus(
+            'installStatus',
+            'ok',
+            target === 'lan'
+              ? 'Saved. Phone / TV on LAN install links are ready.'
+              : 'Saved. This PC install URL is ready.'
+          );
         } else {
           stopLanPairStatusPolling();
           clearLanPairInstallFields();
@@ -2251,7 +2583,7 @@
             return setStatus('installStatus', 'err', data.error);
           }
 
-          const relayBase = normalizeRelayUrl(config.lanPairRelayUrl || lanPair.relayUrl || defaultLanPairRelayUrl);
+          const relayBase = normalizeRelayUrl(config.lanPairRelayUrl || lanPair.relayUrl || resolveDefaultRelayBaseUrl());
           const relayHost = new URL(relayBase).host;
           const token = encodeURIComponent(data.token);
           const modeQuery = '?mode=' + encodeURIComponent(installMode);
@@ -2261,10 +2593,9 @@
 
           document.getElementById('stremioLinkHosted').href = stremioUrl;
           document.getElementById('hostedUrlDisplay').textContent = 'Online profile ready on ' + relayHost + '.';
-          document.getElementById('localInstall').style.display = 'none';
-          document.getElementById('hostedInstall').style.display = 'block';
 
           document.getElementById('installLink').style.display = 'block';
+          syncInstallTargetUi();
           setStatus('installStatus', 'ok', 'Online profile ready - click below to install in Stremio');
         }
       } catch (err) {

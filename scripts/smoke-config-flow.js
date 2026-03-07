@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict')
 const crypto = require('node:crypto')
 const http = require('node:http')
+const { encrypt } = require('../src/utils/crypto')
 
 process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'local-smoke-secret-12345678901234567890'
 
@@ -124,6 +125,34 @@ async function run() {
     const encryptPayload = await encryptRes.json()
     assert.equal(typeof encryptPayload.token, 'string', 'encrypt should return a token')
     assert.ok(encryptPayload.token.length > 20, 'token should look non-trivial')
+
+    const hostedMissingFileServerRes = await fetch(`${base}/encrypt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...sampleConfig,
+        lanPairEnabled: false,
+        lanPairRequired: false,
+        lanPairRelayUrl: 'https://pvtkrrx.vercel.app'
+      })
+    })
+    assert.equal(hostedMissingFileServerRes.status, 400, 'hosted relay config without file server should be rejected')
+    const hostedMissingFileServerPayload = await hostedMissingFileServerRes.json()
+    assert.equal(hostedMissingFileServerPayload.notifyUser, true)
+    assert.equal(hostedMissingFileServerPayload.issueCode, 'HOSTED_FILE_SERVER_REQUIRED')
+    assert.match(hostedMissingFileServerPayload.error, /File Server URL/i)
+
+    const legacyHostedToken = encodeURIComponent(encrypt({
+      ...sampleConfig,
+      lanPairEnabled: false,
+      lanPairRequired: false,
+      lanPairRelayUrl: 'https://pvtkrrx.vercel.app'
+    }, process.env.ENCRYPTION_SECRET))
+    const legacyHostedManifestRes = await fetch(`${base}/${legacyHostedToken}/manifest.json?mode=hosted`)
+    assert.equal(legacyHostedManifestRes.status, 200, 'legacy hosted token manifest should still resolve')
+    const legacyHostedManifest = await legacyHostedManifestRes.json()
+    assert.equal(legacyHostedManifest.behaviorHints?.configurationRequired, true)
+    assert.match(String(legacyHostedManifest.description || ''), /File Server URL/i)
 
     const token = encodeURIComponent(encryptPayload.token)
     const installLink = `stremio://${host}/${token}/manifest.json`
