@@ -603,9 +603,25 @@ function requireLocalQbitControl(req, res, next) {
 app.use((req, res, next) => {
   const sensitiveCorsRoute = isSensitiveCorsRoute(req)
   const sensitiveOriginAllowed = !sensitiveCorsRoute || isAllowedSensitiveOrigin(req)
-  const requestOrigin = normalizeOrigin(String(req.headers.origin || ''))
+  const rawOrigin = String(req.headers.origin || '').trim()
+  const requestOrigin = normalizeOrigin(rawOrigin)
+  const responseOrigin = rawOrigin === 'null' ? 'null' : (requestOrigin || rawOrigin)
 
-  if (sensitiveCorsRoute) {
+  if (rawOrigin) {
+    if (sensitiveCorsRoute) {
+      if (responseOrigin && sensitiveOriginAllowed) {
+        res.setHeader('Access-Control-Allow-Origin', responseOrigin)
+        res.setHeader('Vary', 'Origin')
+      }
+    } else {
+      if (responseOrigin) {
+        res.setHeader('Access-Control-Allow-Origin', responseOrigin)
+        res.setHeader('Vary', 'Origin')
+      } else {
+        res.setHeader('Access-Control-Allow-Origin', '*')
+      }
+    }
+  } else if (sensitiveCorsRoute) {
     if (requestOrigin && sensitiveOriginAllowed) {
       res.setHeader('Access-Control-Allow-Origin', requestOrigin)
       res.setHeader('Vary', 'Origin')
@@ -614,7 +630,7 @@ app.use((req, res, next) => {
     res.setHeader('Access-Control-Allow-Origin', '*')
   }
 
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, OPTIONS')
   const requestedHeaders = String(req.headers['access-control-request-headers'] || '').trim()
   const defaultHeaders = [
     'Content-Type',
