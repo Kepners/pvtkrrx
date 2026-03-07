@@ -39,10 +39,11 @@ async function run() {
     const configureRes = await fetch(`${base}/configure`)
     assert.equal(configureRes.status, 200, 'GET /configure should return 200')
     const configureHtml = await configureRes.text()
-    assert.match(configureHtml, /Install in Stremio/, 'configure page should render install action')
+    assert.match(configureHtml, /<h2>Install<\/h2>/, 'configure page should render install section')
+    assert.match(configureHtml, /id="installActionBtn"/, 'configure page should render install action button')
     assert.match(configureHtml, /testConnection\(\)/, 'configure page should expose test connection action')
     assert.match(configureHtml, /Auto Setup \(Home LAN\)/, 'configure page should render auto setup action')
-    assert.match(configureHtml, /Seedbox Runbooks/, 'configure page should link to seedbox runbooks')
+    assert.match(configureHtml, /href="\/runbooks"/, 'configure page should link to runbooks')
 
     const runbooksRes = await fetch(`${base}/runbooks`)
     assert.equal(runbooksRes.status, 200, 'GET /runbooks should return 200')

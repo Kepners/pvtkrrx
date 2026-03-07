@@ -327,34 +327,6 @@
       text-transform: uppercase;
     }
 
-    .header-links {
-      margin-top: 0.75rem;
-      display: flex;
-      justify-content: center;
-      gap: 0.45rem;
-      flex-wrap: wrap;
-    }
-
-    .header-link {
-      display: inline-block;
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: 0.66rem;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      text-decoration: none;
-      color: var(--text-dim);
-      border: 1px solid rgba(0, 246, 255, 0.28);
-      border-radius: 999px;
-      padding: 0.38rem 0.62rem;
-      transition: border-color 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
-    }
-
-    .header-link:hover {
-      color: var(--text);
-      border-color: rgba(0, 255, 102, 0.58);
-      box-shadow: 0 0 0 3px var(--accent-2-soft);
-    }
-
     .card {
       background: linear-gradient(180deg, rgba(19, 31, 52, 0.9), rgba(16, 26, 44, 0.88));
       border: 1px solid var(--border);
@@ -507,6 +479,13 @@
 
     .service-card.active {
       display: block;
+      margin-top: 0.9rem;
+      padding-top: 0.9rem;
+      border-top: 1px solid rgba(0, 246, 255, 0.14);
+    }
+
+    .mode-hidden {
+      display: none !important;
     }
 
     label {
@@ -895,11 +874,6 @@
     <div class="logo-header">
       <h1>PVTKRRX</h1>
       <p class="subtitle">Connect your private tracker seedbox to Stremio</p>
-      <div class="header-links">
-        <a class="header-link" href="/">Home</a>
-        <a class="header-link" href="/runbooks">Seedbox Runbooks</a>
-        <a class="header-link" href="/#faq">FAQ</a>
-      </div>
     </div>
 
     <div class="card">
@@ -929,183 +903,195 @@
           <option value="hosted">Cloud / Remote Seedbox</option>
         </select>
       </div>
-      <p class="hint" id="installModeHint">This PC target selected. You will only see the local desktop install action.</p>
+      <p class="hint" id="installModeHint">This PC target selected. You only see the same-machine install path, and no account-link card is shown.</p>
     </div>
 
-    <div class="card">
-      <h2>Stremio Account Link</h2>
-      <label for="stremioEmail">Stremio Email (for one-click AuthKey fetch)</label>
-      <div class="row">
-        <div>
-          <input type="email" id="stremioEmail" placeholder="you@example.com" autocomplete="username">
+    <div class="card mode-hidden" id="accountLinkCard">
+      <h2>Optional Account Link</h2>
+      <p class="section-lead">Only open this when you want same-account device sync on LAN, such as Apple TV. Same-PC install does not need it.</p>
+      <details class="install-debug" id="accountLinkDetails">
+        <summary>Open Stremio account tools</summary>
+        <div class="install-debug-content">
+          <label for="stremioEmail">Stremio Email (for one-click AuthKey fetch)</label>
+          <div class="row">
+            <div>
+              <input type="email" id="stremioEmail" placeholder="you@example.com" autocomplete="username">
+            </div>
+            <div>
+              <input type="password" id="stremioPassword" placeholder="Stremio password" autocomplete="current-password">
+            </div>
+          </div>
+          <p class="hint"><strong>Login + Fetch AuthKey</strong> uses the Stremio API with email/password. <strong>Auto Find AuthKey</strong> uses your existing Stremio Web browser session and clipboard helper.</p>
+          <label for="stremioAuthKey">Stremio AuthKey (optional)</label>
+          <input type="password" id="stremioAuthKey" placeholder="Paste Stremio AuthKey for account linking">
+          <p class="hint">Used once to link this profile to your Stremio account. We only store a hash.</p>
+          <div class="action-row">
+            <button class="btn-copy" type="button" id="stremioLoginKeyBtn" onclick="fetchStremioAuthKeyViaLogin(this)">Login + Fetch AuthKey</button>
+            <button class="btn-copy" type="button" id="stremioAutoKeyBtn" onclick="launchStremioAuthKeyHelper()">Auto Find AuthKey</button>
+            <button class="btn-copy" type="button" id="stremioPasteKeyBtn" onclick="pasteAuthKeyFromClipboard()">Paste AuthKey From Clipboard</button>
+            <button class="btn-copy" type="button" id="stremioSnippetBtn" onclick="copyStremioAuthSnippet(this)">Copy Console Snippet</button>
+          </div>
+          <p class="hint">Fallback mode: Auto Find opens Stremio Web and checks clipboard for 2 minutes. In browser console run the copied snippet, then copy the returned AuthKey.</p>
+          <div id="stremioLinkStatus" class="status"></div>
         </div>
-        <div>
-          <input type="password" id="stremioPassword" placeholder="Stremio password" autocomplete="current-password">
-        </div>
-      </div>
-      <p class="hint"><strong>Login + Fetch AuthKey</strong> uses the Stremio API with email/password. <strong>Auto Find AuthKey</strong> uses your existing Stremio Web browser session and clipboard helper.</p>
-      <label for="stremioAuthKey">Stremio AuthKey (optional)</label>
-      <input type="password" id="stremioAuthKey" placeholder="Paste Stremio AuthKey for account linking">
-      <p class="hint">Used once to link this profile to your Stremio account. We only store a hash.</p>
-      <div class="action-row">
-        <button class="btn-copy" type="button" id="stremioLoginKeyBtn" onclick="fetchStremioAuthKeyViaLogin(this)">Login + Fetch AuthKey</button>
-        <button class="btn-copy" type="button" id="stremioAutoKeyBtn" onclick="launchStremioAuthKeyHelper()">Auto Find AuthKey</button>
-        <button class="btn-copy" type="button" id="stremioPasteKeyBtn" onclick="pasteAuthKeyFromClipboard()">Paste AuthKey From Clipboard</button>
-        <button class="btn-copy" type="button" id="stremioSnippetBtn" onclick="copyStremioAuthSnippet(this)">Copy Console Snippet</button>
-      </div>
-      <p class="hint">Fallback mode: Auto Find opens Stremio Web and checks clipboard for 2 minutes. In browser console run the copied snippet, then copy the returned AuthKey.</p>
-      <div id="stremioLinkStatus" class="status"></div>
+      </details>
     </div>
 
-    <div class="card" id="autoSetupCard">
+    <div class="card mode-hidden" id="autoSetupCard">
       <h2>Auto Setup</h2>
-      <p class="hint">One click setup for home use: local defaults plus install links for this PC and phone/TV.</p>
+      <p class="hint">One click setup for home LAN only: local defaults plus install links for this PC and phone/TV.</p>
       <button class="btn-test" onclick="autoSetup()">Auto Setup (Home LAN)</button>
       <div id="autoStatus" class="status"></div>
       <p class="hint">Uses built-in file serving. Works with NAS storage if the PC can read qBit save paths.</p>
     </div>
 
-    <div class="card">
+    <div class="card" id="connectionCard">
       <h2>Connection Details</h2>
-      <p class="section-lead">Service settings stay tucked behind tabs so you only see the part you are editing.</p>
+      <p class="section-lead" id="connectionSectionLead">Home mode uses built-in local file serving. Open the service tab you want to edit.</p>
       <div class="service-tabs">
-        <button type="button" class="service-tab active" data-service-tab="prowlarr" onclick="setActiveServiceTab('prowlarr')">Prowlarr</button>
-        <button type="button" class="service-tab" data-service-tab="qbit" onclick="setActiveServiceTab('qbit')">qBittorrent</button>
-        <button type="button" class="service-tab" data-service-tab="files" onclick="setActiveServiceTab('files')">File Server</button>
-        <button type="button" class="service-tab" data-service-tab="options" onclick="setActiveServiceTab('options')">Options</button>
+        <button type="button" class="service-tab active" data-service-tab="prowlarr" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('prowlarr')">Prowlarr</button>
+        <button type="button" class="service-tab" data-service-tab="qbit" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('qbit')">qBittorrent</button>
+        <button type="button" class="service-tab mode-hidden" data-service-tab="files" data-service-visible="seedbox" onclick="setActiveServiceTab('files')">File Server</button>
+        <button type="button" class="service-tab" data-service-tab="options" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('options')">Options</button>
       </div>
       <p class="hint" id="serviceTabHint">Prowlarr settings are open.</p>
-    </div>
 
-    <div class="card service-card active" id="serviceCard-prowlarr">
-      <h2>Prowlarr</h2>
-      <label for="jackettUrl">Prowlarr Base URL - <code>http://localhost:9696</code></label>
-      <input type="url" id="jackettUrl" placeholder="http://localhost:9696">
-      <p class="hint">Paste the base URL only. Legacy Torznab/API URLs are auto-normalized.</p>
-      <label for="jackettApiKey">API Key</label>
-      <input type="text" id="jackettApiKey" placeholder="Your Prowlarr API key">
-      <label for="sportsDbApiKey">TheSportsDB API Key (optional)</label>
-      <input type="text" id="sportsDbApiKey" value="123" placeholder="123">
-      <label for="sportsDbCacheHours">TheSportsDB Cache (hours)</label>
-      <input type="number" id="sportsDbCacheHours" value="24" min="1" max="168">
-      <p class="hint">Used for sports posters only. Cached to avoid repeated API calls on each catalog request.</p>
-    </div>
+      <div class="service-card active" id="serviceCard-prowlarr" data-service-visible="pc lan seedbox">
+        <h2>Prowlarr</h2>
+        <label for="jackettUrl">Prowlarr Base URL - <code>http://localhost:9696</code></label>
+        <input type="url" id="jackettUrl" placeholder="http://localhost:9696">
+        <p class="hint">Paste the base URL only. Legacy Torznab/API URLs are auto-normalized.</p>
+        <label for="jackettApiKey">API Key</label>
+        <input type="text" id="jackettApiKey" placeholder="Your Prowlarr API key">
+        <label for="sportsDbApiKey">TheSportsDB API Key (optional)</label>
+        <input type="text" id="sportsDbApiKey" value="123" placeholder="123">
+        <label for="sportsDbCacheHours">TheSportsDB Cache (hours)</label>
+        <input type="number" id="sportsDbCacheHours" value="24" min="1" max="168">
+        <p class="hint">Used for sports posters only. Cached to avoid repeated API calls on each catalog request.</p>
+      </div>
 
-    <div class="card service-card" id="serviceCard-qbit">
-      <h2>qBittorrent</h2>
-      <label for="qbitUrl">WebUI URL</label>
-      <input type="url" id="qbitUrl" placeholder="https://qbit.example.com:8080">
-      <div class="row">
-        <div>
-          <label for="qbitUsername">Username</label>
-          <input type="text" id="qbitUsername" placeholder="admin">
+      <div class="service-card" id="serviceCard-qbit" data-service-visible="pc lan seedbox">
+        <h2>qBittorrent</h2>
+        <label for="qbitUrl">WebUI URL</label>
+        <input type="url" id="qbitUrl" placeholder="https://qbit.example.com:8080">
+        <div class="row">
+          <div>
+            <label for="qbitUsername">Username</label>
+            <input type="text" id="qbitUsername" placeholder="admin">
+          </div>
+          <div>
+            <label for="qbitPassword">Password</label>
+            <input type="password" id="qbitPassword" placeholder="password">
+          </div>
         </div>
-        <div>
-          <label for="qbitPassword">Password</label>
-          <input type="password" id="qbitPassword" placeholder="password">
+      </div>
+
+      <div class="service-card mode-hidden" id="serviceCard-files" data-service-visible="seedbox">
+        <h2>File Server</h2>
+        <label for="provider">Seedbox Provider</label>
+        <select id="provider">
+          <option value="custom">Custom / Other</option>
+          <option value="whatbox">Whatbox</option>
+          <option value="ultra">Ultra.cc</option>
+          <option value="seedhost">SeedHost</option>
+          <option value="feral">Feral Hosting</option>
+          <option value="rapid">RapidSeedbox</option>
+          <option value="bytesized">Bytesized</option>
+          <option value="hbd">HostingByDesign</option>
+          <option value="swizzin">Swizzin</option>
+        </select>
+        <p class="hint" id="providerPresetInfo">Preset applies path mapping defaults and links to matching runbook steps.</p>
+        <label for="fileServerUrl">HTTP File Server URL</label>
+        <input type="url" id="fileServerUrl" placeholder="https://username.seedbox.com/files">
+        <label for="fileServerAuth">Basic Auth (optional)</label>
+        <input type="text" id="fileServerAuth" placeholder="user:password">
+        <p class="hint">Leave empty if no authentication required</p>
+        <div class="row">
+          <div>
+            <label for="pathFrom">Path Mapping: From</label>
+            <input type="text" id="pathFrom" placeholder="/downloads/">
+          </div>
+          <div>
+            <label for="pathTo">Path Mapping: To</label>
+            <input type="text" id="pathTo" placeholder="/files/">
+          </div>
         </div>
+        <p class="hint">Maps qBit save path to file server URL path</p>
+      </div>
+
+      <div class="service-card" id="serviceCard-options" data-service-visible="pc lan seedbox">
+        <h2>Options</h2>
+        <label for="maxResults">Max Results Per Search</label>
+        <input type="number" id="maxResults" value="50" min="10" max="200">
+        <div id="localHostnameBlock">
+          <label for="localHostname">Local Hostname (.local alias)</label>
+          <input type="text" id="localHostname" value="pvtkrrx.local" placeholder="pvtkrrx.local">
+          <p class="hint">Used by TV/phone on LAN. Keep this stable so clients do not need reinstall.</p>
+        </div>
+        <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.9rem;">
+          <input type="checkbox" id="autoDeleteWatched" checked style="width:auto;transform:scale(1.15);">
+          Auto-delete torrent + files after watched threshold
+        </label>
+        <label for="watchedDeleteGraceSeconds">Delete Grace Period (seconds)</label>
+        <input type="number" id="watchedDeleteGraceSeconds" value="300" min="0" max="86400">
+        <p class="hint">Uses near-end playback detection because Stremio does not emit direct watched callbacks to addons.</p>
       </div>
     </div>
 
-    <div class="card service-card" id="serviceCard-files">
-      <h2>File Server</h2>
-      <label for="provider">Seedbox Provider</label>
-      <select id="provider">
-        <option value="custom">Custom / Other</option>
-        <option value="whatbox">Whatbox</option>
-        <option value="ultra">Ultra.cc</option>
-        <option value="seedhost">SeedHost</option>
-        <option value="feral">Feral Hosting</option>
-        <option value="rapid">RapidSeedbox</option>
-        <option value="bytesized">Bytesized</option>
-        <option value="hbd">HostingByDesign</option>
-        <option value="swizzin">Swizzin</option>
-      </select>
-      <p class="hint" id="providerPresetInfo">Preset applies path mapping defaults and links to matching runbook steps.</p>
-      <label for="fileServerUrl">HTTP File Server URL</label>
-      <input type="url" id="fileServerUrl" placeholder="https://username.seedbox.com/files">
-      <label for="fileServerAuth">Basic Auth (optional)</label>
-      <input type="text" id="fileServerAuth" placeholder="user:password">
-      <p class="hint">Leave empty if no authentication required</p>
-      <div class="row">
-        <div>
-          <label for="pathFrom">Path Mapping: From</label>
-          <input type="text" id="pathFrom" placeholder="/downloads/">
-        </div>
-        <div>
-          <label for="pathTo">Path Mapping: To</label>
-          <input type="text" id="pathTo" placeholder="/files/">
-        </div>
-      </div>
-      <p class="hint">Maps qBit save path to file server URL path</p>
-    </div>
+    <div class="card" id="installActionsCard">
+      <h2>Install</h2>
+      <p class="section-lead" id="installActionLead">Test the selected profile, save it, then copy the matching install link.</p>
+      <div id="testStatus" class="status"></div>
+      <button class="btn-test" onclick="testConnection()">Test Connection</button>
 
-    <div class="card service-card" id="serviceCard-options">
-      <h2>Options</h2>
-      <label for="maxResults">Max Results Per Search</label>
-      <input type="number" id="maxResults" value="50" min="10" max="200">
-      <label for="localHostname">Local Hostname (.local alias)</label>
-      <input type="text" id="localHostname" value="pvtkrrx.local" placeholder="pvtkrrx.local">
-      <p class="hint">Used by TV/phone on LAN. Keep this stable so clients do not need reinstall.</p>
-      <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.9rem;">
-        <input type="checkbox" id="autoDeleteWatched" checked style="width:auto;transform:scale(1.15);">
-        Auto-delete torrent + files after watched threshold
-      </label>
-      <label for="watchedDeleteGraceSeconds">Delete Grace Period (seconds)</label>
-      <input type="number" id="watchedDeleteGraceSeconds" value="300" min="0" max="86400">
-      <p class="hint">Uses near-end playback detection because Stremio does not emit direct watched callbacks to addons.</p>
-    </div>
+      <div id="installStatus" class="status"></div>
+      <button class="btn-install" id="installActionBtn" onclick="install()">Prepare This PC Install</button>
 
-    <div id="testStatus" class="status"></div>
-    <button class="btn-test" onclick="testConnection()">Test Connection</button>
-
-    <div id="installStatus" class="status"></div>
-    <button class="btn-install" onclick="install()">Install in Stremio</button>
-
-    <div id="installLink" class="install-link">
-      <div id="localInstall">
-        <div id="installPanelPc" class="install-target-panel active">
-          <p class="install-section-title">Install On This PC</p>
-          <div class="url-row">
-            <button class="btn-copy" id="copyLocalInstallBtn" onclick="copyPrivateLink('localLoopback', this)">Copy Stremio Addon URL</button>
-          </div>
-          <p class="install-note" id="openLinkNote">Paste this into Stremio -> Addons -> + Add Addon URL on the same Windows PC that runs PVTKRRX.</p>
-        </div>
-
-        <div id="installPanelLan" class="install-target-panel">
-          <p class="install-section-title">Install On Phone / TV</p>
-          <div class="url-row">
-            <button class="btn-copy" onclick="copyPrivateLink('pairHostedManifest', this)">Copy Hosted Manifest URL</button>
-          </div>
-          <div class="url-row">
-            <button class="btn-copy" onclick="copyPrivateLink('pairHostedStremio', this)">Copy Hosted Stremio URL</button>
-          </div>
-          <p class="install-note" id="pairRelayNote">Use this for mobile, Android TV, or Apple TV on the same LAN as the host PC.</p>
-          <p class="install-note">Apple TV note: if tvOS does not show Add Addon URL/configure controls, install this once from Stremio Web or desktop while logged into the same account, then reopen Apple TV to sync.</p>
-          <p class="install-note" id="pairStatusNote">LAN Bridge status: waiting for local save.</p>
-
-          <details class="install-debug">
-            <summary>Debug LAN checks</summary>
-            <div class="install-debug-content">
-              <p class="install-section-title">LAN Hostname Test</p>
-              <div class="url-row">
-                <button class="btn-copy" onclick="copyPrivateLink('localLanHostname', this)">Copy LAN Hostname URL</button>
-              </div>
-              <p class="install-note" id="lanInstallNote">Use this to test LAN reachability from this browser.</p>
-
-              <p class="install-section-title" style="margin-top:1rem">LAN IP Fallback Test</p>
-              <div class="url-row">
-                <button class="btn-copy" onclick="copyPrivateLink('localLanIp', this)">Copy LAN IP URL</button>
-              </div>
-              <p class="install-note" id="lanFallbackNote">Use this only if hostname resolution fails.</p>
+      <div id="installLink" class="install-link">
+        <div id="localInstall">
+          <div id="installPanelPc" class="install-target-panel active">
+            <p class="install-section-title">Install On This PC</p>
+            <div class="url-row">
+              <button class="btn-copy" id="copyLocalInstallBtn" onclick="copyPrivateLink('localLoopback', this)">Copy Stremio Addon URL</button>
             </div>
-          </details>
+            <p class="install-note" id="openLinkNote">Paste this into Stremio -> Addons -> + Add Addon URL on the same Windows PC that runs PVTKRRX.</p>
+          </div>
+
+          <div id="installPanelLan" class="install-target-panel">
+            <p class="install-section-title">Install On Phone / TV</p>
+            <div class="url-row">
+              <button class="btn-copy" onclick="copyPrivateLink('pairHostedManifest', this)">Copy Hosted Manifest URL</button>
+            </div>
+            <div class="url-row">
+              <button class="btn-copy" onclick="copyPrivateLink('pairHostedStremio', this)">Copy Hosted Stremio URL</button>
+            </div>
+            <p class="install-note" id="pairRelayNote">Use this for mobile, Android TV, or Apple TV on the same LAN as the host PC.</p>
+            <p class="install-note">Apple TV note: if tvOS does not show Add Addon URL/configure controls, install this once from Stremio Web or desktop while logged into the same account, then reopen Apple TV to sync.</p>
+            <p class="install-note" id="pairStatusNote">LAN Bridge status: waiting for local save.</p>
+
+            <details class="install-debug">
+              <summary>Debug LAN checks</summary>
+              <div class="install-debug-content">
+                <p class="install-section-title">LAN Hostname Test</p>
+                <div class="url-row">
+                  <button class="btn-copy" onclick="copyPrivateLink('localLanHostname', this)">Copy LAN Hostname URL</button>
+                </div>
+                <p class="install-note" id="lanInstallNote">Use this to test LAN reachability from this browser.</p>
+
+                <p class="install-section-title" style="margin-top:1rem">LAN IP Fallback Test</p>
+                <div class="url-row">
+                  <button class="btn-copy" onclick="copyPrivateLink('localLanIp', this)">Copy LAN IP URL</button>
+                </div>
+                <p class="install-note" id="lanFallbackNote">Use this only if hostname resolution fails.</p>
+              </div>
+            </details>
+          </div>
         </div>
-      </div>
-      <div id="hostedInstall" style="text-align:center">
-        <a id="stremioLinkHosted" href="#">Install PVTKRRX (Online)</a>
-        <p class="install-note" style="margin-top:0.5rem" id="hostedUrlDisplay"></p>
-        <p class="install-note" style="margin-top:0.5rem">Use this only when Prowlarr and qBittorrent are publicly reachable. If you are using the hosted relay, also set an HTTPS File Server URL for completed-file playback.</p>
+        <div id="hostedInstall" style="text-align:center">
+          <a id="stremioLinkHosted" href="#">Install PVTKRRX (Online)</a>
+          <p class="install-note" style="margin-top:0.5rem" id="hostedUrlDisplay"></p>
+          <p class="install-note" style="margin-top:0.5rem">Use this only when Prowlarr and qBittorrent are publicly reachable. If you are using the hosted relay, also set an HTTPS File Server URL for completed-file playback.</p>
+        </div>
       </div>
     </div>
 
@@ -1899,14 +1885,33 @@
       return target === 'seedbox' ? 'hosted' : 'local';
     }
 
+    function targetAllows(element, target = getInstallTarget()) {
+      if (!element) return false;
+      const raw = element.dataset.serviceVisible;
+      if (!raw) return true;
+      return raw.split(/\s+/).includes(target);
+    }
+
+    function getAllowedServiceTabs(target = getInstallTarget()) {
+      return ['prowlarr', 'qbit', 'files', 'options'].filter((name) => {
+        const button = document.querySelector(`[data-service-tab="${name}"]`);
+        return targetAllows(button, target);
+      });
+    }
+
     function setActiveServiceTab(name) {
-      const next = ['prowlarr', 'qbit', 'files', 'options'].includes(name) ? name : 'prowlarr';
+      const allowedTabs = getAllowedServiceTabs();
+      const next = allowedTabs.includes(name) ? name : (allowedTabs[0] || 'prowlarr');
       activeServiceTab = next;
       document.querySelectorAll('[data-service-tab]').forEach((button) => {
-        button.classList.toggle('active', button.dataset.serviceTab === next);
+        const allowed = targetAllows(button);
+        button.classList.toggle('mode-hidden', !allowed);
+        button.classList.toggle('active', allowed && button.dataset.serviceTab === next);
       });
       document.querySelectorAll('.service-card').forEach((card) => {
-        card.classList.toggle('active', card.id === `serviceCard-${next}`);
+        const allowed = targetAllows(card);
+        card.classList.toggle('mode-hidden', !allowed);
+        card.classList.toggle('active', allowed && card.id === `serviceCard-${next}`);
       });
 
       const hint = document.getElementById('serviceTabHint');
@@ -1934,7 +1939,39 @@
 
       const autoSetupCard = document.getElementById('autoSetupCard');
       if (autoSetupCard) {
-        autoSetupCard.style.display = target === 'seedbox' ? 'none' : 'block';
+        autoSetupCard.classList.toggle('mode-hidden', target !== 'lan');
+      }
+
+      const accountLinkCard = document.getElementById('accountLinkCard');
+      if (accountLinkCard) {
+        const showAccountTools = target === 'lan';
+        accountLinkCard.classList.toggle('mode-hidden', !showAccountTools);
+        if (!showAccountTools) {
+          const details = document.getElementById('accountLinkDetails');
+          if (details) details.open = false;
+        }
+      }
+
+      const localHostnameBlock = document.getElementById('localHostnameBlock');
+      if (localHostnameBlock) {
+        localHostnameBlock.classList.toggle('mode-hidden', target === 'seedbox');
+      }
+
+      const installActionLead = document.getElementById('installActionLead');
+      const installActionBtn = document.getElementById('installActionBtn');
+      const connectionSectionLead = document.getElementById('connectionSectionLead');
+      if (target === 'pc') {
+        if (installActionLead) installActionLead.textContent = 'Test the local desktop profile, save it, then copy the same-PC Stremio addon URL.';
+        if (installActionBtn) installActionBtn.textContent = 'Prepare This PC Install';
+        if (connectionSectionLead) connectionSectionLead.textContent = 'Home mode uses built-in local file serving. Open the service tab you want to edit.';
+      } else if (target === 'lan') {
+        if (installActionLead) installActionLead.textContent = 'Test the home LAN profile, save it, then copy the hosted bridge link for phone, TV, or Apple TV.';
+        if (installActionBtn) installActionBtn.textContent = 'Prepare Phone / TV Install';
+        if (connectionSectionLead) connectionSectionLead.textContent = 'Home LAN mode uses built-in local file serving. Account link stays optional and only matters for same-account device sync.';
+      } else {
+        if (installActionLead) installActionLead.textContent = 'Test the public profile, save it, then install the hosted online addon in Stremio.';
+        if (installActionBtn) installActionBtn.textContent = 'Prepare Online Install';
+        if (connectionSectionLead) connectionSectionLead.textContent = 'Remote seedbox mode expects public qBittorrent, Prowlarr, and file server URLs. The File Server tab only appears here.';
       }
 
       const localInstall = document.getElementById('localInstall');
@@ -1960,10 +1997,7 @@
         }
       }
 
-      if (target === 'seedbox' && activeServiceTab === 'options') return;
-      if (target === 'seedbox' && activeServiceTab === 'prowlarr') {
-        setActiveServiceTab('files');
-      }
+      setActiveServiceTab(activeServiceTab);
     }
 
     function setInstallTarget(target) {
@@ -1980,11 +2014,11 @@
       const target = getInstallTarget();
       const hint = document.getElementById('installModeHint');
       if (target === 'pc') {
-        hint.textContent = 'This PC target selected. You will only see the local desktop install action.';
+        hint.textContent = 'This PC target selected. You only see the same-machine install path, and no account-link card is shown.';
       } else if (target === 'lan') {
-        hint.textContent = 'Phone / TV on LAN selected. You will only see the LAN Bridge install links and status.';
+        hint.textContent = 'Phone / TV on LAN selected. You only see LAN bridge actions, plus the optional account-link tools for Apple TV style sync.';
       } else {
-        hint.textContent = 'Remote Seedbox selected. You will only see the Online profile install action.';
+        hint.textContent = 'Remote Seedbox selected. You only see the online install path, and the File Server tab unlocks because public playback URLs are required.';
       }
     }
 
