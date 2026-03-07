@@ -222,6 +222,10 @@
     }
 
     .topbar-nav a {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
       text-decoration: none;
       border: 1px solid rgba(0, 246, 255, 0.28);
       border-radius: 999px;
@@ -499,9 +503,10 @@
       letter-spacing: 0.9px;
     }
 
-    input, select {
+    input, select, textarea {
       width: 100%;
       padding: 0.65rem 0.8rem;
+      min-height: 52px;
       border: 1px solid rgba(0, 246, 255, 0.2);
       border-radius: 9px;
       font-family: 'IBM Plex Mono', monospace;
@@ -512,14 +517,21 @@
       transition: border-color 0.2s, box-shadow 0.2s;
     }
 
-    input::placeholder {
+    input::placeholder,
+    textarea::placeholder {
       color: var(--text-muted);
     }
 
-    input:focus, select:focus {
+    input:focus, select:focus, textarea:focus {
       outline: none;
       border-color: rgba(0, 255, 102, 0.62);
       box-shadow: 0 0 0 3px var(--accent-2-soft);
+    }
+
+    textarea {
+      min-height: 142px;
+      resize: vertical;
+      line-height: 1.45;
     }
 
     select {
@@ -585,6 +597,7 @@
     button {
       width: 100%;
       padding: 0.75rem;
+      min-height: 52px;
       border: 1px solid rgba(0, 246, 255, 0.28);
       border-radius: 10px;
       font-family: 'IBM Plex Mono', monospace;
@@ -692,6 +705,9 @@
     .install-debug summary {
       list-style: none;
       cursor: pointer;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
       font-family: 'IBM Plex Mono', monospace;
       font-size: 0.66rem;
       text-transform: uppercase;
@@ -732,6 +748,27 @@
       align-items: center;
       gap: 0.5rem;
       margin-bottom: 0.6rem;
+    }
+
+    a,
+    button,
+    input,
+    select,
+    textarea,
+    summary {
+      scroll-margin-top: 24px;
+      touch-action: manipulation;
+    }
+
+    a:focus-visible,
+    button:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible,
+    summary:focus-visible {
+      outline: none;
+      border-color: rgba(0, 255, 102, 0.85);
+      box-shadow: 0 0 0 4px rgba(0, 255, 102, 0.16), 0 0 0 1px rgba(0, 255, 102, 0.7);
     }
 
     .url-row input[type="text"] {
@@ -843,6 +880,16 @@
       .service-tabs { flex-direction: column; }
       .service-tab { width: 100%; }
       .btn-copy { width: 100%; }
+      .action-row { flex-direction: column; }
+      .action-row .btn-copy { width: 100%; min-width: 0; }
+    }
+
+    @media (hover: none), (pointer: coarse) {
+      body { padding: 1.25rem 0.9rem 2rem; }
+      .topbar { padding: 12px; }
+      .service-tabs { gap: 0.75rem; }
+      .action-row { flex-direction: column; }
+      .action-row .btn-copy { width: 100%; min-width: 0; }
     }
   </style>
 </head>
@@ -951,6 +998,7 @@
       <div class="service-tabs">
         <button type="button" class="service-tab active" data-service-tab="prowlarr" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('prowlarr')">Prowlarr</button>
         <button type="button" class="service-tab" data-service-tab="qbit" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('qbit')">qBittorrent</button>
+        <button type="button" class="service-tab" data-service-tab="storage" data-service-visible="pc lan" onclick="setActiveServiceTab('storage')">Storage</button>
         <button type="button" class="service-tab mode-hidden" data-service-tab="files" data-service-visible="seedbox" onclick="setActiveServiceTab('files')">File Server</button>
         <button type="button" class="service-tab" data-service-tab="options" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('options')">Options</button>
       </div>
@@ -984,6 +1032,14 @@
             <input type="password" id="qbitPassword" placeholder="password">
           </div>
         </div>
+      </div>
+
+      <div class="service-card" id="serviceCard-storage" data-service-visible="pc lan">
+        <h2>Local Storage</h2>
+        <label for="additionalStorageRoots">Fallback Storage Roots</label>
+        <textarea id="additionalStorageRoots" placeholder="Z:\Media&#10;\\NAS\TV&#10;D:\Archive"></textarea>
+        <p class="hint">One path per line. PVTKRRX will try qBittorrent's save path first, then these extra local or mounted network locations if the file was moved after download.</p>
+        <p class="hint">Use paths the Windows host PC can already read directly, including mapped drives, NAS shares, and extra HDD folders.</p>
       </div>
 
       <div class="service-card mode-hidden" id="serviceCard-files" data-service-visible="seedbox">
@@ -1893,7 +1949,7 @@
     }
 
     function getAllowedServiceTabs(target = getInstallTarget()) {
-      return ['prowlarr', 'qbit', 'files', 'options'].filter((name) => {
+      return ['prowlarr', 'qbit', 'storage', 'files', 'options'].filter((name) => {
         const button = document.querySelector(`[data-service-tab="${name}"]`);
         return targetAllows(button, target);
       });
@@ -1920,6 +1976,8 @@
         hint.textContent = 'Prowlarr settings are open.';
       } else if (next === 'qbit') {
         hint.textContent = 'qBittorrent settings are open.';
+      } else if (next === 'storage') {
+        hint.textContent = 'Fallback local storage roots are open.';
       } else if (next === 'files') {
         hint.textContent = 'File server and path mapping settings are open.';
       } else {
@@ -1963,11 +2021,11 @@
       if (target === 'pc') {
         if (installActionLead) installActionLead.textContent = 'Test the local desktop profile, save it, then copy the same-PC Stremio addon URL.';
         if (installActionBtn) installActionBtn.textContent = 'Prepare This PC Install';
-        if (connectionSectionLead) connectionSectionLead.textContent = 'Home mode uses built-in local file serving. Open the service tab you want to edit.';
+        if (connectionSectionLead) connectionSectionLead.textContent = 'Home mode uses built-in local file serving. Use the Storage tab if completed files may live on NAS shares or extra drives.';
       } else if (target === 'lan') {
         if (installActionLead) installActionLead.textContent = 'Test the home LAN profile, save it, then copy the hosted bridge link for phone, TV, or Apple TV.';
         if (installActionBtn) installActionBtn.textContent = 'Prepare Phone / TV Install';
-        if (connectionSectionLead) connectionSectionLead.textContent = 'Home LAN mode uses built-in local file serving. Account link stays optional and only matters for same-account device sync.';
+        if (connectionSectionLead) connectionSectionLead.textContent = 'Home LAN mode uses built-in local file serving. Storage roots can point at NAS shares or extra HDD folders the Windows host can already read.';
       } else {
         if (installActionLead) installActionLead.textContent = 'Test the public profile, save it, then install the hosted online addon in Stremio.';
         if (installActionBtn) installActionBtn.textContent = 'Prepare Online Install';
@@ -2061,6 +2119,14 @@
     document.getElementById('installMode').addEventListener('change', function() {
       const nextTarget = this.value === 'hosted' ? 'seedbox' : getInstallTarget();
       setInstallTarget(nextTarget);
+    });
+    document.addEventListener('focusin', (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      if (!target.matches('a, button, input, select, textarea, summary')) return;
+      window.requestAnimationFrame(() => {
+        target.scrollIntoView({ block: 'center', inline: 'nearest', behavior: 'smooth' });
+      });
     });
     setActiveServiceTab(activeServiceTab);
     setInstallTarget(activeInstallTarget);
@@ -2335,6 +2401,14 @@
       }
     }
 
+    function parseStorageRootsInput() {
+      return document.getElementById('additionalStorageRoots').value
+        .split(/\r?\n/g)
+        .map(value => value.trim())
+        .filter(Boolean)
+        .filter((value, index, list) => list.indexOf(value) === index);
+    }
+
     function getConfig() {
       const fileServerUrlInput = document.getElementById('fileServerUrl').value.trim();
       const localHostnameInput = document.getElementById('localHostname').value.trim();
@@ -2356,6 +2430,7 @@
           from: document.getElementById('pathFrom').value,
           to: document.getElementById('pathTo').value
         },
+        additionalStorageRoots: parseStorageRootsInput(),
         maxResults: parseInt(document.getElementById('maxResults').value, 10) || 50,
         autoDeleteWatched: document.getElementById('autoDeleteWatched').checked,
         watchedDeleteGraceSeconds: Math.max(0, parseInt(document.getElementById('watchedDeleteGraceSeconds').value, 10) || 0),
@@ -2397,6 +2472,9 @@
         if (config.pathMapping.from) document.getElementById('pathFrom').value = config.pathMapping.from;
         if (config.pathMapping.to) document.getElementById('pathTo').value = config.pathMapping.to;
       }
+      document.getElementById('additionalStorageRoots').value = Array.isArray(config.additionalStorageRoots)
+        ? config.additionalStorageRoots.join('\n')
+        : '';
       if (typeof config.maxResults === 'number' && Number.isFinite(config.maxResults)) {
         document.getElementById('maxResults').value = String(config.maxResults);
       }

@@ -1,11 +1,11 @@
 const fs = require('fs')
-const path = require('path')
 const { ProwlarrClient } = require('../clients/prowlarr')
 const { QBitClient } = require('../clients/qbittorrent')
 const { CinemetaClient } = require('../clients/cinemeta')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { parse, matchesEpisode, isLikelyPackedReleaseTitle } = require('../utils/parser')
 const { mapPath } = require('../utils/pathMapper')
+const { findExistingLocalFilePath } = require('../utils/localStorageRoots')
 const { buildOnSeedboxStream, buildOnBufferingStream, buildOnTrackerStream, findVideoFile, findEpisodeFile, sortStreams } = require('../utils/streams')
 const { encodeFileStateToken, encodePlaybackStateToken } = require('../utils/opaqueState')
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '7000', 10))
@@ -14,27 +14,28 @@ const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MA
 const IS_VERCEL_RUNTIME = Boolean(process.env.VERCEL)
 
 // Build URL for a local file — uses PVTKRRX built-in file server when no external fileServerUrl set
-function canServeFromLocalDisk(savePath, fileName) {
-  if (!savePath || !fileName) return false
+function canServeFromLocalDisk(config, torrent, fileName) {
+  if (!fileName) return false
   try {
-    return fs.existsSync(path.join(savePath, fileName))
+    const localPath = findExistingLocalFilePath(torrent, fileName, config.additionalStorageRoots)
+    return Boolean(localPath && fs.existsSync(localPath))
   } catch (_) {
     return false
   }
 }
 
-function buildFileUrl(config, configToken, addonUrl, hash, savePath, fileName) {
+function buildFileUrl(config, configToken, addonUrl, hash, torrent, fileName) {
   if (IS_VERCEL_RUNTIME) {
     if (config.fileServerUrl) {
-      return mapPath(savePath, fileName, config.fileServerUrl, config.pathMapping)
+      return mapPath(torrent?.save_path || torrent?.download_path || '', fileName, config.fileServerUrl, config.pathMapping)
     }
     return null
   }
 
   // Prefer built-in serving when the addon can read the file locally.
   // This prevents stale external fileServerUrl values from causing black screens on local installs.
-  if (config.fileServerUrl && !canServeFromLocalDisk(savePath, fileName)) {
-    return mapPath(savePath, fileName, config.fileServerUrl, config.pathMapping)
+  if (config.fileServerUrl && !canServeFromLocalDisk(config, torrent, fileName)) {
+    return mapPath(torrent?.save_path || torrent?.download_path || '', fileName, config.fileServerUrl, config.pathMapping)
   }
   try {
     const info = encodeFileStateToken({ h: hash.toLowerCase(), p: fileName })
@@ -329,7 +330,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
           ? findEpisodeFile(files, season, episode)
           : findVideoFile(files)
         if (!videoFile?.name) continue
-        const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched.save_path, videoFile.name)
+        const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched, videoFile.name)
         if (!fileUrl) continue
         const videoProgress = Number(videoFile?.progress || 0)
         if (isCompletedTorrent(matched, videoProgress)) {
@@ -380,7 +381,7 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
       const videoFile = findVideoFile(files)
       if (!videoFile?.name) throw new Error('No playable video in matched torrent')
 
-      const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched.save_path, videoFile.name)
+      const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched, videoFile.name)
       if (!fileUrl) throw new Error('Hosted mode requires fileServerUrl for on-seedbox streams')
       const item = { title: info.t, size: info.s, seeders: info.d }
       const videoProgress = Number(videoFile?.progress || 0)

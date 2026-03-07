@@ -1,6 +1,6 @@
 {
   "name": "pvtkrrx",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "PVTKRRX — Stream from your private tracker seedbox through Stremio",
   "main": "index.js",
   "scripts": {

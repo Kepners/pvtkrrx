@@ -33,6 +33,7 @@ async function run() {
       fileServerUrl: '',
       fileServerAuth: '',
       pathMapping: { from: '/', to: '/' },
+      additionalStorageRoots: ['Z:\\Media', '\\\\NAS\\TV'],
       maxResults: 50
     }
 
@@ -84,6 +85,7 @@ async function run() {
     const localConfig = await localConfigRes.json()
     assert.equal(localConfig.jackettUrl, sampleConfig.jackettUrl)
     assert.equal(localConfig.qbitUrl, sampleConfig.qbitUrl)
+    assert.deepEqual(localConfig.additionalStorageRoots, sampleConfig.additionalStorageRoots)
 
     const expectedLinkedPairId = derivePairIdFromStremioUserId(LINKED_STREMIO_USER_ID)
     const linkedSaveRes = await fetch(`${base}/local-config`, {
@@ -110,6 +112,7 @@ async function run() {
     assert.equal(String(linkedLocalConfig.stremioUserId || ''), LINKED_STREMIO_USER_ID)
     assert.equal(String(linkedLocalConfig.lanPairId || ''), expectedLinkedPairId)
     assert.ok(String(linkedLocalConfig.lanPairKey || '').length >= 16)
+    assert.deepEqual(linkedLocalConfig.additionalStorageRoots, sampleConfig.additionalStorageRoots)
 
     const localManifestRes = await fetch(`${base}/local/manifest.json?mode=local`)
     assert.equal(localManifestRes.status, 200, 'GET /local/manifest.json should return 200 after local config save')

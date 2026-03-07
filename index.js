@@ -20,6 +20,10 @@ const { getLanIpv4Addresses, normalizeLocalHostname, startLanAlias } = require('
 const { decodeSportsThumbToken, renderSportsThumbSvg } = require('./src/utils/sportsThumb')
 const { mapPath } = require('./src/utils/pathMapper')
 const { findVideoFile, hasPackedArchiveFiles, isSampleVideoName } = require('./src/utils/streams')
+const {
+  normalizeLocalStorageRoots,
+  findExistingLocalFilePath
+} = require('./src/utils/localStorageRoots')
 const { PairStore } = require('./src/utils/pairStore')
 const {
   AccountStore,
@@ -439,8 +443,10 @@ function ensureLanPairConfig(config = {}, options = {}) {
   const pairId = sanitizePairId(config.lanPairId) || recommendedPairId || makePairId()
   const pairKey = sanitizePairKey(config.lanPairKey) || makePairKey()
   const relayUrl = normalizeRelayUrl(config.lanPairRelayUrl || options.lanPairRelayUrl)
-  const pairEnabled = parseBooleanLoose(config.lanPairEnabled, options.defaultEnabled !== false)
-  const pairRequired = parseBooleanLoose(config.lanPairRequired, options.defaultRequired === true)
+  const pairEnabledFallback = typeof options.defaultEnabled === 'boolean' ? options.defaultEnabled : false
+  const pairRequiredFallback = typeof options.defaultRequired === 'boolean' ? options.defaultRequired : false
+  const pairEnabled = parseBooleanLoose(config.lanPairEnabled, pairEnabledFallback)
+  const pairRequired = parseBooleanLoose(config.lanPairRequired, pairRequiredFallback)
 
   return {
     ...config,
@@ -450,6 +456,26 @@ function ensureLanPairConfig(config = {}, options = {}) {
     lanPairKey: pairKey,
     lanPairRelayUrl: relayUrl
   }
+}
+
+function normalizeAddonConfig(config = {}, options = {}) {
+  const normalized = {
+    ...config,
+    additionalStorageRoots: normalizeLocalStorageRoots(config.additionalStorageRoots)
+  }
+  const shouldNormalizeLanPair = (
+    typeof options.defaultEnabled === 'boolean' ||
+    typeof options.defaultRequired === 'boolean' ||
+    typeof normalized.lanPairEnabled === 'boolean' ||
+    typeof normalized.lanPairRequired === 'boolean' ||
+    Boolean(normalized.lanPairId) ||
+    Boolean(normalized.lanPairKey) ||
+    Boolean(normalized.lanPairRelayUrl) ||
+    Boolean(normalized.stremioUserId)
+  )
+  return shouldNormalizeLanPair
+    ? ensureLanPairConfig(normalized, options)
+    : normalized
 }
 
 function chooseLanPairEndpoint(state) {
@@ -667,20 +693,20 @@ app.get('/thumb/sports/:info.svg', (req, res) => {
 
 // Build a URL to serve a local file — uses the built-in /file/ endpoint when no
 // external fileServerUrl is configured (e.g. local qBit setup with no HTTP server).
-function buildFileUrl(config, configToken, baseUrl, hash, savePath, fileName) {
+function buildFileUrl(config, configToken, baseUrl, hash, torrent, fileName) {
   if (IS_VERCEL_RUNTIME) {
     if (config.fileServerUrl) {
-      return mapPath(savePath, fileName, config.fileServerUrl, config.pathMapping)
+      return mapPath(torrent?.save_path || torrent?.download_path || '', fileName, config.fileServerUrl, config.pathMapping)
     }
     return null
   }
 
   // Prefer built-in serving when the addon can access files on local disk.
   // This protects local installs from stale external fileServerUrl values in older config tokens.
-  const localPath = path.join(savePath || '', fileName || '')
-  const localFileAvailable = Boolean(savePath && fileName && fs.existsSync(localPath))
+  const localFilePath = findExistingLocalFilePath(torrent, fileName, config.additionalStorageRoots)
+  const localFileAvailable = Boolean(localFilePath && fs.existsSync(localFilePath))
   if (config.fileServerUrl && !localFileAvailable) {
-    return mapPath(savePath, fileName, config.fileServerUrl, config.pathMapping)
+    return mapPath(torrent?.save_path || torrent?.download_path || '', fileName, config.fileServerUrl, config.pathMapping)
   }
   try {
     const info = encodeFileStateToken({ h: hash.toLowerCase(), p: fileName })
@@ -1157,33 +1183,8 @@ function findTorrentFileByPath(files, relPath) {
   return files.find(f => path.basename(normalizeTorrentPath(f.name).toLowerCase()) === targetBase) || null
 }
 
-function resolveTorrentFilePath(torrent, relPath) {
-  const normalized = normalizeTorrentPath(relPath)
-  const candidates = []
-
-  if (torrent?.save_path && normalized) candidates.push(path.join(torrent.save_path, normalized))
-  if (torrent?.download_path && normalized) candidates.push(path.join(torrent.download_path, normalized))
-
-  if (torrent?.content_path) {
-    const contentPath = String(torrent.content_path)
-    candidates.push(contentPath)
-    try {
-      if (fs.existsSync(contentPath) && fs.statSync(contentPath).isDirectory() && normalized) {
-        candidates.push(path.join(contentPath, normalized))
-      }
-    } catch (_) {}
-    if (normalized && contentPath.toLowerCase().endsWith(`\\${normalized.toLowerCase().replace(/\//g, '\\')}`)) {
-      candidates.push(contentPath)
-    }
-  }
-
-  for (const candidate of candidates) {
-    try {
-      if (candidate && fs.existsSync(candidate)) return candidate
-    } catch (_) {}
-  }
-
-  return candidates[0] || ''
+function resolveTorrentFilePath(torrent, relPath, additionalStorageRoots = []) {
+  return findExistingLocalFilePath(torrent, relPath, additionalStorageRoots)
 }
 
 function getReadableBytes(fileEntry, torrent, diskBytes) {
@@ -1255,7 +1256,7 @@ async function primeTorrentForStreaming(qbit, torrent, videoFile, allFiles = nul
   }
 }
 
-async function loadTorrentPlaybackState(qbit, hash, targetPath) {
+async function loadTorrentPlaybackState(qbit, hash, targetPath, additionalStorageRoots = []) {
   if (!hash) return null
   const list = await qbit.torrentsByHashes(hash, 'all')
   const torrent = Array.isArray(list) && list.length ? list[0] : null
@@ -1289,7 +1290,7 @@ async function loadTorrentPlaybackState(qbit, hash, targetPath) {
     chosenFile = targetFile
   }
 
-  const resolvedFilePath = resolveTorrentFilePath(torrent, chosenFile?.name || targetPath)
+  const resolvedFilePath = resolveTorrentFilePath(torrent, chosenFile?.name || targetPath, additionalStorageRoots)
   const fileExists = Boolean(resolvedFilePath && fs.existsSync(resolvedFilePath))
   const diskSize = fileExists ? fs.statSync(resolvedFilePath).size : 0
   const readableBytes = getReadableBytes(chosenFile, torrent, diskSize)
@@ -1320,7 +1321,8 @@ app.post('/encrypt', (req, res) => {
     return res.status(400).json({ error: 'Invalid config payload' })
   }
 
-  const issues = getConfigIssues(req.body, {
+  const normalizedConfig = normalizeAddonConfig(req.body)
+  const issues = getConfigIssues(normalizedConfig, {
     requestBaseUrl: getPublicBaseUrl(req)
   })
   if (issues.length > 0) {
@@ -1332,7 +1334,7 @@ app.post('/encrypt', (req, res) => {
   }
 
   try {
-    const token = encrypt(req.body, secret)
+    const token = encrypt(normalizedConfig, secret)
     res.json({ token })
   } catch (err) {
     res.status(400).json({ error: 'Encryption failed' })
@@ -1349,7 +1351,7 @@ app.post('/local-config', requireLocalNetworkRoute, (req, res) => {
   try {
     const localHostname = normalizeLocalHostname(cfg.localHostname || DEFAULT_LOCAL_HOSTNAME)
     const localHostnameCustom = localHostname !== DEFAULT_LOCAL_HOSTNAME
-    const saved = ensureLanPairConfig({
+    const saved = normalizeAddonConfig({
       ...cfg,
       localHostname,
       localHostnameCustom
@@ -1387,7 +1389,7 @@ app.post('/auto-provision', requireLocalNetworkRoute, async (req, res) => {
       localHostname
     })
     const provisionedConfig = result.config
-      ? ensureLanPairConfig({
+      ? normalizeAddonConfig({
         ...result.config,
         ...(accountUserId ? { accountUserId } : {}),
         ...(accountProvider ? { accountProvider } : {}),
@@ -1756,17 +1758,11 @@ function withConfig(req, res, next) {
       req.config = {}
       return next()
     }
-    const normalizedLocal = ensureLanPairConfig(localConfig, {
+    const normalizedLocal = normalizeAddonConfig(localConfig, {
       defaultEnabled: true,
       defaultRequired: true
     })
-    if (
-      normalizedLocal.lanPairId !== localConfig.lanPairId ||
-      normalizedLocal.lanPairKey !== localConfig.lanPairKey ||
-      normalizedLocal.lanPairEnabled !== localConfig.lanPairEnabled ||
-      normalizedLocal.lanPairRequired !== localConfig.lanPairRequired ||
-      normalizedLocal.lanPairRelayUrl !== localConfig.lanPairRelayUrl
-    ) {
+    if (JSON.stringify(normalizedLocal) !== JSON.stringify(localConfig)) {
       saveLocalConfigFile(normalizedLocal)
     }
     req.config = normalizedLocal
@@ -1780,7 +1776,7 @@ function withConfig(req, res, next) {
   if (!secret) return res.status(500).json({ error: 'ENCRYPTION_SECRET not configured' })
 
   try {
-    req.config = decrypt(req.params.config, secret)
+    req.config = normalizeAddonConfig(decrypt(req.params.config, secret))
     req.configIssues = getConfigIssues(req.config, {
       requestBaseUrl: getPublicBaseUrl(req)
     })
@@ -2032,7 +2028,7 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
     const p = String(state?.p || '')
     console.log(`[file-route] token=${tokenShort} hash=${String(h || '').slice(0, 8)} file="${p}"`)
     const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
-    const playback = await loadTorrentPlaybackState(qbit, String(h || '').toLowerCase(), p)
+    const playback = await loadTorrentPlaybackState(qbit, String(h || '').toLowerCase(), p, req.config.additionalStorageRoots)
     if (!playback?.torrent) {
       console.warn(`[file-route] torrent not found hash=${String(h || '').slice(0, 8)}`)
       return res.status(404).json({ error: 'Torrent not found' })
@@ -2096,7 +2092,7 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
           const waitUntil = Date.now() + STREAM_RANGE_WAIT_TIMEOUT_MS
           while (Date.now() < waitUntil && start >= maxReadable) {
             await sleep(STREAM_RANGE_WAIT_INTERVAL_MS)
-            const refreshed = await loadTorrentPlaybackState(qbit, torrentHash, file?.name || p)
+            const refreshed = await loadTorrentPlaybackState(qbit, torrentHash, file?.name || p, req.config.additionalStorageRoots)
             if (!refreshed?.torrent || !refreshed?.file) break
             fileSize = Math.max(0, Number(refreshed.file?.size || refreshed.diskSize || fileSize))
             readableBytes = Number(refreshed.readableBytes || readableBytes)
@@ -2187,7 +2183,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
 
     // If we can identify the torrent hash, check whether it's already playable.
     if (trackedHash) {
-      const existing = await loadTorrentPlaybackState(qbit, trackedHash)
+      const existing = await loadTorrentPlaybackState(qbit, trackedHash, '', req.config.additionalStorageRoots)
       if (existing?.torrent) {
         if (!primedTorrent || (!primedFile && existing.file)) {
           await primeTorrentForStreaming(qbit, existing.torrent, existing.file, existing.files)
@@ -2208,7 +2204,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
             req.params.config,
             getPublicBaseUrl(req),
             existing.torrent.hash,
-            existing.torrent.save_path,
+            existing.torrent,
             existing.file.name
           )
           if (!fileUrl) {
@@ -2274,7 +2270,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
         }
       }
 
-      const state = await loadTorrentPlaybackState(qbit, trackedHash)
+      const state = await loadTorrentPlaybackState(qbit, trackedHash, '', req.config.additionalStorageRoots)
       if (!state?.torrent) {
         trackedHash = ''
         continue
@@ -2310,7 +2306,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
           req.params.config,
           getPublicBaseUrl(req),
           state.torrent.hash,
-          state.torrent.save_path,
+          state.torrent,
           state.file.name
         )
         if (!fileUrl) {

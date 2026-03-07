@@ -581,6 +581,7 @@ async function autoProvisionWindows(options = {}) {
     fileServerUrl: '',
     fileServerAuth: '',
     pathMapping: { from: '', to: '' },
+    additionalStorageRoots: [],
     maxResults: 50,
     autoDeleteWatched: true,
     watchedDeleteGraceSeconds: 300,
