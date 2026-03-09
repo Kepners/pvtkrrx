@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PVTKRRX - Glitch Relay</title>
-  <meta name="description" content="PVTKRRX routes Stremio through your private tracker stack with PC Local, LAN Bridge, and Online profiles.">
+  <title>PVTKRRX - Three Routes</title>
+  <meta name="description" content="PVTKRRX separates Stremio into three explicit routes: PC Gateway, LAN Bridge, and Remote Seedbox.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@500;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -426,6 +426,72 @@
       box-shadow: 0 0 16px rgba(0, 168, 255, 0.24);
     }
 
+    .route-grid {
+      margin-top: 12px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .route-card {
+      border: 1px solid var(--line-soft);
+      border-radius: 11px;
+      padding: 14px 12px 12px;
+      background:
+        radial-gradient(360px 180px at 0% 0%, rgba(0, 246, 255, 0.08), transparent 68%),
+        rgba(4, 8, 18, 0.74);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+      transition: all 0.18s ease;
+    }
+
+    .route-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(0, 246, 255, 0.42);
+      box-shadow: 0 0 16px rgba(0, 168, 255, 0.18);
+    }
+
+    .route-kicker {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 10px;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+      color: #8ce1ff;
+      margin-bottom: 6px;
+    }
+
+    .route-name {
+      font-family: "Orbitron", sans-serif;
+      font-size: 20px;
+      letter-spacing: 1px;
+      color: #f4f8ff;
+      margin-bottom: 8px;
+    }
+
+    .route-copy {
+      color: #c8dafa;
+      font-size: 14px;
+      line-height: 1.45;
+      min-height: 64px;
+    }
+
+    .route-list {
+      margin: 10px 0 12px;
+      padding-left: 18px;
+      color: #9bb2db;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .route-list li + li {
+      margin-top: 4px;
+    }
+
+    .route-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
     .meta-title {
       font-family: "IBM Plex Mono", monospace;
       text-transform: uppercase;
@@ -720,6 +786,10 @@
         grid-template-columns: 1fr;
       }
 
+      .route-grid {
+        grid-template-columns: 1fr;
+      }
+
       .hero {
         min-height: 70vh;
       }
@@ -811,22 +881,67 @@
         </div>
         <div class="logo-grid"></div>
         <p class="tagline">
-          PC LOCAL + LAN BRIDGE + ONLINE PROFILE.
-          YOUR TRACKERS. YOUR STACK. NO MIDDLEMAN.
+          THREE EXPLICIT ROUTES.
+          PC LOCAL, LAN BRIDGE, REMOTE SEEDBOX.
         </p>
         <div class="cta-row">
-          <a class="btn btn-primary" href="/configure">Get Started</a>
+          <a class="btn btn-primary" href="/configure?target=pc">PC Gateway</a>
+          <a class="btn btn-secondary" href="/configure?target=lan">LAN Bridge</a>
+          <a class="btn btn-secondary" href="/configure?target=seedbox">Remote Seedbox</a>
           <a class="btn btn-secondary" href="/runbooks">Seedbox Runbooks</a>
-          <a class="btn btn-secondary" href="/local/install">Local Installer</a>
         </div>
       </div>
     </section>
 
+    <section class="route-grid">
+      <article class="route-card">
+        <div class="route-kicker">Desktop only</div>
+        <div class="route-name">PC Gateway</div>
+        <p class="route-copy">Optional helper route on the same Windows machine that runs the PVTKRRX desktop server.</p>
+        <ul class="route-list">
+          <li>Loopback install only</li>
+          <li>No heartbeat</li>
+          <li>Helper only, not the main browse addon</li>
+        </ul>
+        <div class="route-actions">
+          <a class="btn btn-primary" href="/local/install">Open PC Gateway Helper</a>
+        </div>
+      </article>
+
+      <article class="route-card">
+        <div class="route-kicker">Home network sync</div>
+        <div class="route-name">LAN Bridge</div>
+        <p class="route-copy">Use this for mobile, web, Android TV, or Apple TV on the same LAN as the host PC.</p>
+        <ul class="route-list">
+          <li>Hosted LAN install URL</li>
+          <li>Heartbeat updates IP changes</li>
+          <li>Single browsable content addon on home devices</li>
+        </ul>
+        <div class="route-actions">
+          <a class="btn btn-primary" href="/configure?target=lan">Open LAN Bridge Setup</a>
+        </div>
+      </article>
+
+      <article class="route-card">
+        <div class="route-kicker">Public HTTPS endpoints</div>
+        <div class="route-name">Remote Seedbox</div>
+        <p class="route-copy">Use this when qBittorrent, Prowlarr, and file serving are intentionally public and authenticated.</p>
+        <ul class="route-list">
+          <li>Hosted remote profile</li>
+          <li>Works away from home</li>
+          <li>Needs public playback URLs</li>
+        </ul>
+        <div class="route-actions">
+          <a class="btn btn-primary" href="/configure?target=seedbox">Open Remote Seedbox Setup</a>
+        </div>
+      </article>
+    </section>
+
     <section class="meta-grid">
       <article class="meta-card">
-        <div class="meta-title">Profile Mesh</div>
-        <div class="meta-value">Local / LAN / Online</div>
-        <div class="meta-caption">Switch by install target</div>
+        <div class="meta-title">Route Split</div>
+        <div class="meta-value">PC / LAN / Seedbox</div>
+        <div class="meta-caption">Three explicit install products</div>
       </article>
       <article class="meta-card">
         <div class="meta-title">Relay Endpoint</div>
@@ -847,10 +962,19 @@
     </section>
 
     <section class="faq-section" id="faq">
-      <div class="faq-title">FAQ / Home LAN + Stremio Link</div>
-      <p class="faq-lead">Answers for AuthKey, one-click setup, and LAN IP changes.</p>
+      <div class="faq-title">FAQ / Route Selection + Sync</div>
+      <p class="faq-lead">Answers for picking the right route, account sync, and LAN behavior.</p>
       <div class="faq-list">
         <details class="faq-item" open>
+          <summary>Do I need three different apps?</summary>
+          <div class="faq-answer">
+            No. PVTKRRX is one runtime with three separate routes inside it:
+            <code>PC Gateway</code>, <code>LAN Bridge</code>, and <code>Remote Seedbox</code>.
+            The important rule is to install the route that matches the playback location.
+          </div>
+        </details>
+
+        <details class="faq-item">
           <summary>Where do I get the Stremio AuthKey?</summary>
           <div class="faq-answer">
             Use <code>Login + Fetch AuthKey</code> first. If manual fallback is needed, open
@@ -872,8 +996,9 @@
         <details class="faq-item">
           <summary>Does one-click setup install on phone and TV fully automatically?</summary>
           <div class="faq-answer">
-            Not fully. One-click creates the ready links and LAN pair token, but each phone/TV must
-            install the addon URL in Stremio one time. After that first install, routing is automatic.
+            Not fully. LAN Bridge auto-setup creates the correct hosted route and pair token, but each
+            phone/TV still needs the addon installed once in Stremio. After that first install, routing
+            is automatic while the host PC stays online.
           </div>
         </details>
 

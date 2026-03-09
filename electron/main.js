@@ -1,7 +1,7 @@
 const fs = require('fs')
 const path = require('path')
 const { spawn } = require('child_process')
-const { app, BrowserWindow, ipcMain, shell, clipboard } = require('electron')
+const { app, BrowserWindow, ipcMain, shell, clipboard, screen } = require('electron')
 const pkg = require('../package.json')
 const { deriveDefaultLocalHostname, normalizeLocalHostname } = require('../src/utils/lanAlias')
 const { autoProvisionWindows, ensureWindowsLanAccess } = require('../src/utils/provision')
@@ -15,8 +15,9 @@ const runtimeDir = process.env.PVTKRRX_RUNTIME_DIR
 const logsDir = path.join(runtimeDir, 'logs')
 const localConfigPath = path.join(runtimeDir, 'local-config.json')
 const appIconPath = path.join(__dirname, 'assets', 'logo.ico')
-const WINDOW_WIDTH = 740
-const WINDOW_HEIGHT = 416
+const WINDOW_WIDTH = 920
+const WINDOW_HEIGHT = 560
+const WINDOW_MARGIN = 28
 const PROVISION_ONLY_ARG = '--pvtkrrx-provision-only'
 const NETWORK_ACCESS_ONLY_ARG = '--pvtkrrx-network-access-only'
 const provisionOnlyMode = process.argv.includes(PROVISION_ONLY_ARG)
@@ -252,6 +253,7 @@ const addon = require('../index')
 let mainWindow = null
 let splashWindow = null
 let httpServer = null
+let addonServerState = null
 let port = parseInt(process.env.PORT || '7000', 10)
 let running = false
 let ownsServer = false
@@ -261,8 +263,17 @@ let stremioLaunchWatchTimer = null
 let stremioWasRunning = false
 let stremioLaunchWatchFailureCount = 0
 
+function getLocalInstallUrls() {
+  const httpsPort = parseInt(process.env.HTTPS_PORT || '7001', 10)
+  return {
+    httpManifest: `http://127.0.0.1:${port}/local/manifest.json?mode=local`,
+    httpsManifest: `https://127.0.0.1:${httpsPort}/local/manifest.json?mode=local`,
+    stremio: `stremio://127.0.0.1:${httpsPort}/local/manifest.json?mode=local`
+  }
+}
+
 function getLocalInstallManifestUrl() {
-  return `http://127.0.0.1:${port}/local/manifest.json?mode=local`
+  return getLocalInstallUrls().httpManifest
 }
 
 function isLikelyOwnServerProcess(proc) {
@@ -591,18 +602,51 @@ function createSplashWindow() {
   splashWindow.loadFile(path.join(__dirname, 'splash.html'))
 }
 
+function fitMainWindowToContent(size = {}) {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+
+  const bounds = mainWindow.getBounds()
+  const display = screen.getDisplayMatching(bounds)
+  const workArea = display?.workArea || { x: 0, y: 0, width: WINDOW_WIDTH, height: WINDOW_HEIGHT }
+  const maxWidth = Math.max(WINDOW_WIDTH, workArea.width - WINDOW_MARGIN)
+  const maxHeight = Math.max(WINDOW_HEIGHT, workArea.height - WINDOW_MARGIN)
+  const requestedWidth = Math.ceil(Number(size?.width) || bounds.width || WINDOW_WIDTH)
+  const requestedHeight = Math.ceil(Number(size?.height) || bounds.height || WINDOW_HEIGHT)
+  const nextWidth = Math.max(WINDOW_WIDTH, Math.min(maxWidth, requestedWidth))
+  const nextHeight = Math.max(WINDOW_HEIGHT, Math.min(maxHeight, requestedHeight))
+
+  if (Math.abs(bounds.width - nextWidth) < 4 && Math.abs(bounds.height - nextHeight) < 4) return
+
+  const centerX = bounds.x + Math.round(bounds.width / 2)
+  const centerY = bounds.y + Math.round(bounds.height / 2)
+  const minX = workArea.x
+  const minY = workArea.y
+  const maxX = workArea.x + workArea.width - nextWidth
+  const maxY = workArea.y + workArea.height - nextHeight
+  const nextX = Math.min(Math.max(centerX - Math.round(nextWidth / 2), minX), Math.max(minX, maxX))
+  const nextY = Math.min(Math.max(centerY - Math.round(nextHeight / 2), minY), Math.max(minY, maxY))
+
+  mainWindow.setBounds({
+    x: nextX,
+    y: nextY,
+    width: nextWidth,
+    height: nextHeight
+  }, true)
+}
+
 function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: WINDOW_WIDTH,
     height: WINDOW_HEIGHT,
-    resizable: false,
-    maximizable: false,
+    resizable: true,
+    maximizable: true,
     minimizable: true,
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
     icon: appIconPath,
     show: false,
+    useContentSize: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -613,6 +657,7 @@ function createMainWindow() {
   mainWindow.loadFile(path.join(__dirname, 'popup.html'))
   mainWindow.webContents.on('did-finish-load', () => {
     pushStatus()
+    setTimeout(() => fitMainWindowToContent({ width: WINDOW_WIDTH, height: 660 }), 60)
   })
 }
 
@@ -627,6 +672,7 @@ function startAddonServer() {
     logger: console
   })
 
+  addonServerState = result
   httpServer = result.httpServer
   port = result.port
   running = false
@@ -713,6 +759,21 @@ function stopAddonServer() {
   } catch (_) {
     // ignore shutdown errors
   }
+  try {
+    const httpsServer = addonServerState?.httpsServer
+    if (httpsServer) httpsServer.close()
+    if (!httpsServer && addonServerState?.httpsReady) {
+      addonServerState.httpsReady.then(server => {
+        try {
+          if (server) server.close()
+        } catch (_) {}
+      }).catch(() => {})
+    }
+  } catch (_) {
+    // ignore shutdown errors
+  }
+  addonServerState = null
+  httpServer = null
 }
 
 app.on('second-instance', () => {
@@ -746,13 +807,23 @@ app.whenReady().then(async () => {
   startAddonServer()
   createMainWindow()
 
-  await waitForServerReady(port, 20000)
-  await bootstrapAutoProvision()
+  try {
+    await waitForServerReady(port, 20000)
+  } catch (err) {
+    console.warn('[desktop] server startup wait failed:', err.message)
+  }
   running = await isServerReachable(port)
   pushStatus()
+  showMainAndCloseSplash()
   startLanPairHeartbeatLoop()
   startStremioLaunchWatch()
-  showMainAndCloseSplash()
+
+  bootstrapAutoProvision().then(async () => {
+    running = await isServerReachable(port)
+    pushStatus()
+  }).catch(err => {
+    console.warn('[desktop] bootstrap auto-provision failed:', err.message)
+  })
 })
 
 app.on('window-all-closed', () => {
@@ -769,8 +840,20 @@ ipcMain.handle('open-configure', async () => {
   await shell.openExternal(`http://127.0.0.1:${port}/configure`)
 })
 
+ipcMain.handle('open-configure-lan', async () => {
+  await shell.openExternal(`http://127.0.0.1:${port}/configure?target=lan`)
+})
+
+ipcMain.handle('open-configure-seedbox', async () => {
+  await shell.openExternal(`http://127.0.0.1:${port}/configure?target=seedbox`)
+})
+
 ipcMain.handle('get-local-install-url', async () => {
   return getLocalInstallManifestUrl()
+})
+
+ipcMain.handle('get-local-install-urls', async () => {
+  return getLocalInstallUrls()
 })
 
 ipcMain.handle('copy-local-install-url', async () => {
@@ -787,6 +870,10 @@ ipcMain.handle('open-prowlarr', async () => {
 ipcMain.handle('open-qbit', async () => {
   const urls = await getServiceUrls()
   await shell.openExternal(urls.qbitUrl)
+})
+
+ipcMain.on('fit-popup-window', (_event, size) => {
+  fitMainWindowToContent(size)
 })
 
 ipcMain.handle('get-download-path', async () => {

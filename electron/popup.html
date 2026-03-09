@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -27,17 +27,20 @@
       width: 100%;
       height: 100%;
       position: relative;
-      background: rgba(10, 10, 10, 0.93);
+      background:
+        radial-gradient(circle at top right, rgba(0, 128, 255, 0.18), transparent 32%),
+        radial-gradient(circle at bottom left, rgba(0, 255, 65, 0.08), transparent 30%),
+        rgba(10, 10, 10, 0.94);
       backdrop-filter: blur(24px);
       -webkit-backdrop-filter: blur(24px);
       border: 1px solid rgba(0, 255, 65, 0.16);
-      border-radius: 12px;
+      border-radius: 14px;
       overflow: hidden;
       box-shadow:
-        0 10px 34px rgba(0, 0, 0, 0.62),
+        0 14px 40px rgba(0, 0, 0, 0.64),
         0 0 1px rgba(0, 255, 65, 0.3),
         inset 0 1px 0 rgba(255, 255, 255, 0.04);
-      animation: fadeIn 0.2s ease-out;
+      animation: fadeIn 0.22s ease-out;
     }
 
     @keyframes fadeIn {
@@ -80,7 +83,7 @@
     .content {
       height: calc(100% - 20px);
       display: grid;
-      grid-template-columns: 280px 1fr;
+      grid-template-columns: 252px 1fr;
       gap: 10px;
       padding: 10px;
       position: relative;
@@ -89,7 +92,7 @@
 
     .panel {
       border: 1px solid rgba(0, 255, 65, 0.08);
-      border-radius: 10px;
+      border-radius: 12px;
       background: rgba(0, 0, 0, 0.22);
       box-shadow: 0 0 12px rgba(0, 255, 65, 0.08);
       min-height: 0;
@@ -97,9 +100,17 @@
 
     .left {
       display: grid;
-      grid-template-rows: auto auto auto auto auto;
+      grid-template-rows: auto auto auto auto 1fr auto;
       gap: 8px;
-      padding: 10px;
+      padding: 12px;
+    }
+
+    .right {
+      padding: 12px;
+      display: grid;
+      grid-template-rows: auto 1fr;
+      gap: 10px;
+      min-height: 0;
     }
 
     .brand {
@@ -108,12 +119,12 @@
       align-items: center;
       justify-content: center;
       gap: 6px;
-      padding: 6px 6px 2px;
+      padding: 4px 6px 2px;
     }
 
     .logo-container {
-      width: 76px;
-      height: 76px;
+      width: 78px;
+      height: 78px;
       filter: drop-shadow(0 0 14px rgba(0, 128, 255, 0.26));
     }
 
@@ -142,14 +153,14 @@
     }
 
     .app-name::before {
-      color: #FF0040;
+      color: #ff0040;
       opacity: 0.5;
       z-index: -1;
       animation: glitch-r 3s infinite;
     }
 
     .app-name::after {
-      color: #0080FF;
+      color: #0080ff;
       opacity: 0.5;
       z-index: -2;
       animation: glitch-b 3s infinite;
@@ -178,7 +189,7 @@
       align-items: center;
       gap: 9px;
       padding: 10px 12px;
-      border-radius: 8px;
+      border-radius: 10px;
       border: 1px solid rgba(0, 255, 65, 0.16);
       background: rgba(0, 255, 65, 0.05);
       box-shadow: 0 0 12px rgba(0, 255, 65, 0.11);
@@ -188,14 +199,14 @@
       width: 8px;
       height: 8px;
       border-radius: 50%;
-      background: #00FF41;
+      background: #00ff41;
       box-shadow: 0 0 8px rgba(0, 255, 65, 0.6);
       animation: pulse 2s ease-in-out infinite;
       flex-shrink: 0;
     }
 
     .status-dot.stopped {
-      background: #FF0040;
+      background: #ff0040;
       box-shadow: 0 0 8px rgba(255, 0, 64, 0.6);
       animation: none;
     }
@@ -208,14 +219,14 @@
     .status-label {
       font-size: 12px;
       font-weight: 600;
-      color: #00FF41;
+      color: #00ff41;
       letter-spacing: 1px;
       text-transform: uppercase;
       text-shadow: 0 0 8px rgba(0, 255, 65, 0.35);
     }
 
     .status-label.stopped {
-      color: #FF0040;
+      color: #ff0040;
     }
 
     .status-port {
@@ -228,27 +239,42 @@
       color: #8ab0bb;
     }
 
+    .section-label {
+      font-size: 10px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #6f99a8;
+      padding: 0 2px;
+    }
+
     .quick-links {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 6px;
     }
 
-    .icon-btn {
+    .icon-btn,
+    .btn {
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 6px;
-      padding: 8px;
-      border-radius: 8px;
-      border: 1px solid rgba(255, 255, 255, 0.08);
-      background: rgba(255, 255, 255, 0.03);
-      color: #8ab0bb;
+      border-radius: 10px;
       font-family: 'JetBrains Mono', monospace;
       font-size: 11px;
       font-weight: 600;
+      letter-spacing: 0.9px;
+      text-transform: uppercase;
       cursor: pointer;
       transition: all 0.2s ease;
+      -webkit-app-region: no-drag;
+    }
+
+    .icon-btn {
+      padding: 9px 8px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+      color: #8ab0bb;
       box-shadow: 0 0 8px rgba(138, 176, 187, 0.08);
     }
 
@@ -259,75 +285,67 @@
     }
 
     .icon-btn:hover {
-      color: #00FF41;
+      color: #00ff41;
       border-color: rgba(0, 255, 65, 0.35);
       background: rgba(0, 255, 65, 0.06);
       box-shadow: 0 0 14px rgba(0, 255, 65, 0.18);
     }
 
-    .actions {
+    .shell-actions {
       display: grid;
-      grid-template-columns: 1fr;
       gap: 6px;
     }
 
     .btn {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 9px 12px;
-      border: none;
-      border-radius: 8px;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      cursor: pointer;
-      transition: all 0.2s ease;
-      -webkit-app-region: no-drag;
+      min-height: 42px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+      color: #bfd6ff;
+      box-shadow: 0 0 10px rgba(138, 176, 187, 0.08);
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 14px rgba(138, 176, 187, 0.16);
     }
 
     .btn-configure {
       background: linear-gradient(135deg, rgba(0, 128, 255, 0.16), rgba(64, 112, 118, 0.2));
-      color: #0080FF;
-      border: 1px solid rgba(0, 128, 255, 0.25);
+      color: #0080ff;
+      border-color: rgba(0, 128, 255, 0.25);
       box-shadow: 0 0 12px rgba(0, 128, 255, 0.16);
     }
 
     .btn-configure:hover {
       background: linear-gradient(135deg, rgba(0, 128, 255, 0.26), rgba(64, 112, 118, 0.34));
       border-color: rgba(0, 128, 255, 0.5);
-      box-shadow: 0 0 18px rgba(0, 128, 255, 0.28);
       color: #cfe9ff;
-    }
-
-    .btn-copy-url {
-      background: linear-gradient(135deg, rgba(0, 255, 65, 0.14), rgba(0, 255, 65, 0.07));
-      color: #00FF41;
-      border: 1px solid rgba(0, 255, 65, 0.25);
-      box-shadow: 0 0 12px rgba(0, 255, 65, 0.16);
-    }
-
-    .btn-copy-url:hover {
-      background: linear-gradient(135deg, rgba(0, 255, 65, 0.24), rgba(0, 255, 65, 0.12));
-      border-color: rgba(0, 255, 65, 0.45);
-      box-shadow: 0 0 18px rgba(0, 255, 65, 0.28);
-      color: #d5ffe2;
+      box-shadow: 0 0 18px rgba(0, 128, 255, 0.28);
     }
 
     .btn-quit {
       background: rgba(255, 0, 64, 0.06);
       color: #8b8b8b;
-      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-color: rgba(255, 255, 255, 0.06);
       box-shadow: 0 0 10px rgba(255, 0, 64, 0.08);
     }
 
     .btn-quit:hover {
       background: rgba(255, 0, 64, 0.12);
-      color: #FF0040;
+      color: #ff0040;
       border-color: rgba(255, 0, 64, 0.22);
       box-shadow: 0 0 14px rgba(255, 0, 64, 0.2);
+    }
+
+    .sidebar-note {
+      font-size: 10px;
+      line-height: 1.5;
+      color: #7f949b;
+      border: 1px solid rgba(0, 255, 65, 0.08);
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.2);
+      padding: 10px;
     }
 
     .credit {
@@ -340,14 +358,6 @@
       margin-top: 2px;
     }
 
-    .install-copy-note {
-      text-align: center;
-      font-size: 9px;
-      min-height: 14px;
-      color: #6f6f6f;
-      letter-spacing: 0.5px;
-    }
-
     .credit .brand {
       display: block;
       color: #8ab0bb;
@@ -357,24 +367,168 @@
       text-shadow: 0 0 8px rgba(138, 176, 187, 0.22);
     }
 
-    .right {
-      padding: 10px;
-      display: flex;
-      min-height: 0;
-    }
-
+    .route-panel,
     .path-card {
-      width: 100%;
-      height: 100%;
-      border-radius: 10px;
+      border-radius: 12px;
       border: 1px solid rgba(0, 255, 65, 0.08);
       background: rgba(0, 0, 0, 0.35);
       box-shadow: 0 0 14px rgba(0, 255, 65, 0.08);
+      min-height: 0;
+    }
+
+    .route-panel {
+      padding: 12px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .panel-heading {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .panel-title {
+      font-size: 11px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #8ab0bb;
+    }
+
+    .panel-subtitle {
+      font-size: 10px;
+      line-height: 1.45;
+      color: #6f6f6f;
+      text-align: right;
+      max-width: 280px;
+    }
+
+    .route-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .route-card {
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: linear-gradient(180deg, rgba(12, 17, 24, 0.95), rgba(6, 10, 16, 0.88));
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+      min-height: 0;
+    }
+
+    .route-card.local {
+      border-color: rgba(0, 255, 65, 0.18);
+      box-shadow: inset 0 0 0 1px rgba(0, 255, 65, 0.05);
+    }
+
+    .route-card.lan {
+      border-color: rgba(0, 128, 255, 0.22);
+      box-shadow: inset 0 0 0 1px rgba(0, 128, 255, 0.05);
+    }
+
+    .route-card.seedbox {
+      border-color: rgba(255, 0, 64, 0.18);
+      box-shadow: inset 0 0 0 1px rgba(255, 0, 64, 0.04);
+    }
+
+    .route-kicker {
+      font-size: 9px;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+      color: #6f99a8;
+    }
+
+    .route-name {
+      font-size: 14px;
+      letter-spacing: 0.8px;
+      color: #f4f7ff;
+    }
+
+    .route-copy {
+      font-size: 10px;
+      line-height: 1.5;
+      color: #a2b4bb;
+      min-height: 60px;
+    }
+
+    .route-points {
+      display: grid;
+      gap: 4px;
+      font-size: 10px;
+      line-height: 1.45;
+      color: #87989d;
+    }
+
+    .route-points span::before {
+      content: '>';
+      color: #00ff41;
+      margin-right: 6px;
+    }
+
+    .route-card.seedbox .route-points span::before {
+      color: #ff6a8a;
+    }
+
+    .route-card.lan .route-points span::before {
+      color: #65bcff;
+    }
+
+    .route-action {
+      min-height: 38px;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 255, 65, 0.22);
+      background: rgba(0, 255, 65, 0.1);
+      color: #d6ffe4;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .route-action:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 16px rgba(0, 255, 65, 0.18);
+    }
+
+    .route-card.lan .route-action {
+      border-color: rgba(0, 128, 255, 0.24);
+      background: rgba(0, 128, 255, 0.12);
+      color: #d8efff;
+    }
+
+    .route-card.lan .route-action:hover {
+      box-shadow: 0 0 16px rgba(0, 128, 255, 0.18);
+    }
+
+    .route-card.seedbox .route-action {
+      border-color: rgba(255, 0, 64, 0.24);
+      background: rgba(255, 0, 64, 0.08);
+      color: #ffd7e1;
+    }
+
+    .route-card.seedbox .route-action:hover {
+      box-shadow: 0 0 16px rgba(255, 0, 64, 0.16);
+    }
+
+    .route-status {
+      min-height: 18px;
+      font-size: 10px;
+      color: #7f949b;
+    }
+
+    .path-card {
       padding: 12px;
       display: grid;
       grid-template-rows: auto auto auto auto auto auto;
       gap: 8px;
-      min-height: 0;
+      overflow: hidden;
     }
 
     .path-title {
@@ -388,9 +542,9 @@
     .path-current {
       font-size: 12px;
       color: #c8d7db;
-      line-height: 1.35;
-      min-height: 36px;
-      max-height: 54px;
+      line-height: 1.45;
+      min-height: 42px;
+      max-height: 62px;
       overflow: auto;
       word-break: break-all;
       padding-right: 2px;
@@ -398,7 +552,7 @@
 
     .path-input {
       width: 100%;
-      border-radius: 7px;
+      border-radius: 8px;
       border: 1px solid rgba(255, 255, 255, 0.1);
       background: rgba(0, 0, 0, 0.45);
       color: #e0e0e0;
@@ -414,10 +568,10 @@
     }
 
     .path-btn {
-      border-radius: 7px;
+      border-radius: 8px;
       border: 1px solid rgba(0, 128, 255, 0.25);
       background: rgba(0, 128, 255, 0.12);
-      color: #0080FF;
+      color: #0080ff;
       font-family: 'JetBrains Mono', monospace;
       font-size: 11px;
       letter-spacing: 0.8px;
@@ -462,7 +616,7 @@
     <div class="drag-bar"></div>
 
     <div class="content">
-      <div class="panel left">
+      <aside class="panel left">
         <div class="brand">
           <div class="logo-container">
             <img src="./assets/logo.ico" alt="PVTKRRX logo">
@@ -477,6 +631,7 @@
           <span class="status-port" id="statusPort">port <span>7000</span></span>
         </div>
 
+        <div class="section-label">Host Services</div>
         <div class="quick-links">
           <button class="icon-btn" onclick="openProwlarr()" title="Open Prowlarr">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3v9a3 3 0 0 1-3 3h-5.2l-3.6 3.2a1 1 0 0 1-1.7-.7V18H6a3 3 0 0 1-3-3V6zm4 2h10v2H7V8zm0 4h7v2H7v-2z"/></svg>
@@ -488,22 +643,72 @@
           </button>
         </div>
 
-        <div class="actions">
-          <button class="btn btn-copy-url" id="btnCopyInstall" onclick="copyLocalInstallUrl()">Copy Addon URL</button>
-          <button class="btn btn-configure" id="btnConfigure" onclick="openConfigure()">Open Configure</button>
-          <button class="btn btn-quit" id="btnQuit" onclick="quitApp()">Quit</button>
+        <div class="section-label">Server Shell</div>
+        <div class="shell-actions">
+          <button class="btn btn-configure" onclick="openConfigure()">Open Full Configure</button>
+          <button class="btn btn-quit" onclick="quitApp()">Quit</button>
         </div>
-        <div class="install-copy-note" id="installCopyNote"></div>
+
+        <div class="sidebar-note">
+          One runtime. Three separate Stremio routes. LAN Bridge should be the single browsable content addon. The Windows-side route is just a host helper.
+        </div>
 
         <div class="credit">
           <span class="brand">PVTKRRX</span>
           (c) 2026 PVTKRRX | Technology by ChoppedOnions.xyz
         </div>
-      </div>
+      </aside>
 
-      <div class="panel right">
+      <section class="panel right">
+        <div class="route-panel">
+          <div class="panel-heading">
+            <div class="panel-title">Stremio Routes</div>
+            <div class="panel-subtitle">Pick the route that matches playback. LAN Bridge is the content addon for movies, TV, sports, and library. The Windows-side route is only a helper.</div>
+          </div>
+
+          <div class="route-grid">
+            <article class="route-card local">
+              <div class="route-kicker">Desktop only</div>
+              <div class="route-name">PC Gateway</div>
+              <div class="route-copy">Optional helper route on the same Windows machine as the PVTKRRX server. Not the main browse addon.</div>
+              <div class="route-points">
+                <span>No account sync</span>
+                <span>No heartbeat</span>
+                <span>Helper only</span>
+              </div>
+              <button class="route-action" onclick="copyLocalInstallUrl()">Copy PC Gateway URL</button>
+            </article>
+
+            <article class="route-card lan">
+              <div class="route-kicker">Home network sync</div>
+              <div class="route-name">LAN Bridge</div>
+              <div class="route-copy">Phone, tablet, Android TV, Apple TV, or web on the same LAN as this host PC.</div>
+              <div class="route-points">
+                <span>Hosted install URL</span>
+                <span>LAN heartbeat routing</span>
+                <span>Optional account sync</span>
+              </div>
+              <button class="route-action" onclick="openLanInstall()">Open LAN Bridge Setup</button>
+            </article>
+
+            <article class="route-card seedbox">
+              <div class="route-kicker">Public HTTPS endpoints</div>
+              <div class="route-name">Remote Seedbox</div>
+              <div class="route-copy">Public qBit, Prowlarr, and file serving for away-from-home playback.</div>
+              <div class="route-points">
+                <span>Hosted remote profile</span>
+                <span>Works beyond the LAN</span>
+                <span>Needs public playback URLs</span>
+              </div>
+              <button class="route-action" onclick="openSeedboxInstall()">Open Seedbox Setup</button>
+            </article>
+          </div>
+
+          <div class="route-status" id="installCopyNote"></div>
+        </div>
+
         <div class="path-card">
-          <div class="path-title">qBittorrent Download Path</div>
+          <div class="path-title">Host Download Path</div>
           <div class="path-current" id="currentPath">Loading...</div>
           <input class="path-input" id="pathInput" placeholder="C:\\Downloads\\Media">
           <div class="path-buttons">
@@ -516,7 +721,7 @@
           </div>
           <div class="path-note" id="pathNote"></div>
         </div>
-      </div>
+      </section>
     </div>
   </div>
 
@@ -526,6 +731,22 @@
         window.electronAPI.openConfigure();
       } else {
         window.open('/configure', '_blank');
+      }
+    }
+
+    function openLanInstall() {
+      if (window.electronAPI && window.electronAPI.openConfigureLan) {
+        window.electronAPI.openConfigureLan();
+      } else {
+        window.open('/configure?target=lan', '_blank');
+      }
+    }
+
+    function openSeedboxInstall() {
+      if (window.electronAPI && window.electronAPI.openConfigureSeedbox) {
+        window.electronAPI.openConfigureSeedbox();
+      } else {
+        window.open('/configure?target=seedbox', '_blank');
       }
     }
 
@@ -564,32 +785,58 @@
         label.textContent = 'Stopped';
         portEl.style.display = 'none';
       }
+      requestPopupFit();
     }
 
     function setVersion(version) {
       document.querySelector('.version').textContent = 'v' + version;
+      requestPopupFit();
     }
 
     function setPathNote(text, isError = false) {
       const el = document.getElementById('pathNote');
       el.textContent = text || '';
-      el.style.color = isError ? '#FF6A8A' : '#6f6f6f';
+      el.style.color = isError ? '#ff6a8a' : '#6f6f6f';
+      requestPopupFit();
     }
 
     function setInstallCopyNote(text, isError = false) {
       const el = document.getElementById('installCopyNote');
       if (!el) return;
       el.textContent = text || '';
-      el.style.color = isError ? '#FF6A8A' : '#6f6f6f';
+      el.style.color = isError ? '#ff6a8a' : '#7f949b';
+      requestPopupFit();
+    }
+
+    let fitPopupTimer = null;
+    function requestPopupFit() {
+      if (!window.electronAPI || !window.electronAPI.fitPopupWindow) return;
+      if (fitPopupTimer) clearTimeout(fitPopupTimer);
+      fitPopupTimer = setTimeout(() => {
+        const windowEl = document.querySelector('.window');
+        const doc = document.documentElement;
+        const body = document.body;
+        const width = Math.max(
+          Math.ceil(windowEl ? windowEl.scrollWidth : 0),
+          Math.ceil(doc ? doc.scrollWidth : 0),
+          Math.ceil(body ? body.scrollWidth : 0)
+        ) + 4;
+        const height = Math.max(
+          Math.ceil(windowEl ? windowEl.scrollHeight : 0),
+          Math.ceil(doc ? doc.scrollHeight : 0),
+          Math.ceil(body ? body.scrollHeight : 0)
+        ) + 4;
+        window.electronAPI.fitPopupWindow({ width, height });
+      }, 40);
     }
 
     async function copyLocalInstallUrl() {
       try {
         if (!window.electronAPI || !window.electronAPI.copyLocalInstallUrl) throw new Error('Desktop bridge not available');
         const url = await window.electronAPI.copyLocalInstallUrl();
-        setInstallCopyNote('Copied localhost addon URL. Paste in Stremio Addons -> + Add Addon URL');
-        setPathNote('Addon URL copied');
         if (!url) throw new Error('No URL returned');
+        setInstallCopyNote('Copied PC Gateway helper URL. Use LAN Bridge as the single content addon for desktop, web, mobile, and TV.');
+        setPathNote('PC Gateway URL copied');
       } catch (err) {
         setInstallCopyNote(err.message || 'Failed to copy addon URL', true);
       }
@@ -618,7 +865,7 @@
       try {
         if (!window.electronAPI) throw new Error('Desktop bridge not available');
         const data = await window.electronAPI.setDownloadPath(value);
-        const savePath = data?.savePath || value;
+        const savePath = data && data.savePath ? data.savePath : value;
         document.getElementById('currentPath').textContent = savePath;
         input.value = savePath;
         setPathNote('Download path updated');
@@ -646,6 +893,16 @@
     document.addEventListener('DOMContentLoaded', () => {
       refreshDownloadPath();
       setInterval(refreshDownloadPath, 15000);
+      requestPopupFit();
+      window.addEventListener('resize', requestPopupFit);
+      if (typeof ResizeObserver !== 'undefined') {
+        const observer = new ResizeObserver(() => requestPopupFit());
+        const root = document.querySelector('.window');
+        if (root) observer.observe(root);
+      }
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => requestPopupFit()).catch(() => {});
+      }
     });
 
     window.popupAPI = { setStatus, setVersion };

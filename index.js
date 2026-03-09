@@ -63,9 +63,11 @@ const STRIPE_DEFAULT_PRICE_ID = String(process.env.STRIPE_DEFAULT_PRICE_ID || ''
 const STRIPE_SUCCESS_URL = String(process.env.STRIPE_SUCCESS_URL || '').trim()
 const STRIPE_CANCEL_URL = String(process.env.STRIPE_CANCEL_URL || '').trim()
 const STRIPE_PORTAL_RETURN_URL = String(process.env.STRIPE_PORTAL_RETURN_URL || '').trim()
-const AUTH_TOKEN_SECRET = String(process.env.AUTH_TOKEN_SECRET || process.env.ENCRYPTION_SECRET || '').trim()
 const STREMIO_API_BASE_URL = normalizeBaseUrl(process.env.PVTKRRX_STREMIO_API_BASE_URL || 'https://api.strem.io')
 const STREMIO_API_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREMIO_API_TIMEOUT_MS || '10000', 10))
+const STREMIO_AUTH_KEY_REGEX = /^[A-Za-z0-9._~+/=-]{16,1024}$/
+const STREMIO_AUTH_KEY_CAPTURE_PATTERN = '[A-Za-z0-9._~+/=-]{16,1024}'
+const STREMIO_AUTH_SCAN_DIRS_OVERRIDE = String(process.env.PVTKRRX_STREMIO_AUTH_SCAN_DIRS || '').trim()
 // Temporary commercial mode: keep addon free for all users.
 const FREE_MODE = true
 const TRIAL_ENABLED = String(process.env.PVTKRRX_TRIAL_ENABLED || 'true').trim().toLowerCase() !== 'false'
@@ -145,6 +147,7 @@ const accountStore = new AccountStore({
 })
 const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null
 let bootLanAccessPromise = null
+let localProviderWarmupPromise = null
 
 function loadLocalConfigFile() {
   try {
@@ -185,7 +188,8 @@ function buildLocalModeUrls(hostname, port, httpsPort) {
   return {
     httpManifest: `http://${hostname}:${port}/local/manifest.json${modeQuery}`,
     httpsManifest: `https://${hostname}:${httpsPort}/local/manifest.json${modeQuery}`,
-    stremio: `stremio://${hostname}:${port}/local/manifest.json${modeQuery}`
+    stremio: `stremio://${hostname}:${port}/local/manifest.json${modeQuery}`,
+    stremioHttps: `stremio://${hostname}:${httpsPort}/local/manifest.json${modeQuery}`
   }
 }
 
@@ -251,6 +255,10 @@ function parseBooleanLoose(value, fallback = false) {
   return parseBoolean(value)
 }
 
+function getAuthTokenSecret() {
+  return String(process.env.AUTH_TOKEN_SECRET || process.env.ENCRYPTION_SECRET || '').trim()
+}
+
 function sanitizePairId(value) {
   const id = String(value || '').trim().toLowerCase()
   if (!id) return ''
@@ -280,8 +288,7 @@ function hashPairKey(value) {
 function sanitizeStremioAuthKey(value) {
   const key = String(value || '').trim()
   if (!key) return ''
-  if (key.length < 16 || key.length > 1024) return ''
-  if (!/^[A-Za-z0-9._-]+$/.test(key)) return ''
+  if (!STREMIO_AUTH_KEY_REGEX.test(key)) return ''
   return key
 }
 
@@ -290,6 +297,229 @@ function derivePairIdFromStremioUserId(stremioUserId) {
   if (!userId) return ''
   const digest = crypto.createHash('sha256').update(userId).digest('hex')
   return `s_${digest.slice(0, 22)}`
+}
+
+function parsePathList(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return []
+  return raw
+    .split(new RegExp(`[${path.delimiter === ';' ? ';' : ':'}\\n\\r]+`, 'g'))
+    .map(entry => String(entry || '').trim())
+    .filter(Boolean)
+}
+
+function extractStremioAuthKeysFromBlob(blob) {
+  const raw = String(blob || '')
+  if (!raw) return []
+  const normalized = raw.replace(/\x00/g, '')
+  const compact = normalized.replace(/[\x01-\x08\x0B\x0C\x0E-\x1F]+/g, '')
+  if (!compact.includes('stremio.com') && !compact.includes('strem.io')) return []
+
+  const matches = []
+  const seen = new Set()
+  const pushCandidate = (value) => {
+    const key = sanitizeStremioAuthKey(value)
+    if (!key || seen.has(key)) return
+    seen.add(key)
+    matches.push(key)
+  }
+
+  pushCandidate(compact)
+
+  for (const regex of [
+    new RegExp(`authKey=(${STREMIO_AUTH_KEY_CAPTURE_PATTERN})`, 'ig'),
+    new RegExp(`"authKey"\\s*[:=]\\s*"(${STREMIO_AUTH_KEY_CAPTURE_PATTERN})"`, 'ig'),
+    new RegExp(`"auth_key"\\s*[:=]\\s*"(${STREMIO_AUTH_KEY_CAPTURE_PATTERN})"`, 'ig'),
+    new RegExp(`"auth"\\s*[:=]\\s*\\{[^{}]{0,400}"key"\\s*[:=]\\s*"(${STREMIO_AUTH_KEY_CAPTURE_PATTERN})"`, 'igs')
+  ]) {
+    let match = null
+    while ((match = regex.exec(compact))) {
+      pushCandidate(match[1])
+    }
+  }
+
+  return matches
+}
+
+function getStremioAuthScanSources() {
+  const explicitDirs = parsePathList(STREMIO_AUTH_SCAN_DIRS_OVERRIDE)
+  if (explicitDirs.length) {
+    return explicitDirs.map(dir => ({
+      label: 'Override',
+      profile: 'Override',
+      levelDbDir: dir
+    }))
+  }
+
+  const localAppData = String(process.env.LOCALAPPDATA || '').trim()
+  if (!localAppData) return []
+
+  const sources = []
+  const seenDirs = new Set()
+  const pushSource = (label, profile, levelDbDir) => {
+    const dir = String(levelDbDir || '').trim()
+    if (!dir || seenDirs.has(dir)) return
+    if (!fs.existsSync(dir)) return
+    seenDirs.add(dir)
+    sources.push({ label, profile, levelDbDir: dir })
+  }
+
+  pushSource(
+    'Stremio Desktop',
+    'Default',
+    path.join(localAppData, 'Programs', 'Stremio', 'stremio-shell-ng.exe.WebView2', 'EBWebView', 'Default', 'Local Storage', 'leveldb')
+  )
+
+  const browserRoots = [
+    {
+      label: 'Brave',
+      root: path.join(localAppData, 'BraveSoftware', 'Brave-Browser', 'User Data')
+    },
+    {
+      label: 'Chrome',
+      root: path.join(localAppData, 'Google', 'Chrome', 'User Data')
+    },
+    {
+      label: 'Edge',
+      root: path.join(localAppData, 'Microsoft', 'Edge', 'User Data')
+    }
+  ]
+
+  for (const browser of browserRoots) {
+    if (!fs.existsSync(browser.root)) continue
+    let entries = []
+    try {
+      entries = fs.readdirSync(browser.root, { withFileTypes: true })
+    } catch (_) {
+      continue
+    }
+    entries
+      .filter(entry => entry.isDirectory() && /^(Default|Profile \d+)$/i.test(entry.name))
+      .sort((a, b) => {
+        if (a.name === 'Default') return -1
+        if (b.name === 'Default') return 1
+        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
+      })
+      .slice(0, 6)
+      .forEach((entry) => {
+        pushSource(
+          browser.label,
+          entry.name,
+          path.join(browser.root, entry.name, 'Local Storage', 'leveldb')
+        )
+      })
+  }
+
+  return sources
+}
+
+function discoverLocalStremioAuthKeyCandidates() {
+  const candidates = []
+  const seenKeys = new Set()
+  const filesPerSourceLimit = 16
+
+  for (const source of getStremioAuthScanSources()) {
+    let entries = []
+    try {
+      entries = fs.readdirSync(source.levelDbDir, { withFileTypes: true })
+    } catch (_) {
+      continue
+    }
+
+    const files = entries
+      .filter(entry => entry.isFile() && (/\.ldb$/i.test(entry.name) || /\.log$/i.test(entry.name) || /^MANIFEST-/i.test(entry.name)))
+      .map((entry) => {
+        const filePath = path.join(source.levelDbDir, entry.name)
+        try {
+          const stat = fs.statSync(filePath)
+          return {
+            name: entry.name,
+            filePath,
+            mtimeMs: Number(stat.mtimeMs || 0),
+            size: Number(stat.size || 0)
+          }
+        } catch (_) {
+          return null
+        }
+      })
+      .filter(Boolean)
+      .sort((a, b) => (b.mtimeMs - a.mtimeMs) || (b.size - a.size) || a.name.localeCompare(b.name))
+      .slice(0, filesPerSourceLimit)
+
+    for (const file of files) {
+      let blob = ''
+      try {
+        blob = fs.readFileSync(file.filePath).toString('latin1')
+      } catch (_) {
+        continue
+      }
+
+      const matches = extractStremioAuthKeysFromBlob(blob)
+      for (const authKey of matches) {
+        if (seenKeys.has(authKey)) continue
+        seenKeys.add(authKey)
+        candidates.push({
+          authKey,
+          sourceLabel: source.profile && source.profile !== 'Default'
+            ? `${source.label} (${source.profile})`
+            : source.label,
+          sourceType: source.label,
+          profile: source.profile,
+          filePath: file.filePath,
+          updatedAt: file.mtimeMs
+        })
+      }
+    }
+  }
+
+  return candidates.sort((a, b) => (b.updatedAt - a.updatedAt) || a.sourceLabel.localeCompare(b.sourceLabel))
+}
+
+function getLocalStremioDesktopInstallCandidates() {
+  const localAppData = String(process.env.LOCALAPPDATA || '').trim()
+  if (!localAppData) return []
+
+  const seen = new Set()
+  return [
+    path.join(localAppData, 'Programs', 'Stremio', 'stremio.exe'),
+    path.join(localAppData, 'Programs', 'Stremio', 'Stremio.exe'),
+    path.join(localAppData, 'Programs', 'Stremio', 'stremio-shell-ng.exe')
+  ].filter((candidate) => {
+    const filePath = String(candidate || '').trim()
+    if (!filePath || seen.has(filePath)) return false
+    seen.add(filePath)
+    return true
+  })
+}
+
+function getLocalStremioDesktopStatus() {
+  const installCandidates = getLocalStremioDesktopInstallCandidates()
+  const installPaths = installCandidates.filter(candidate => fs.existsSync(candidate))
+  const authSources = getStremioAuthScanSources()
+  const desktopStorageDetected = authSources.some(source => source.label === 'Stremio Desktop')
+  const sessionCandidates = discoverLocalStremioAuthKeyCandidates()
+
+  return {
+    installed: installPaths.length > 0 || desktopStorageDetected,
+    installPath: installPaths[0] || '',
+    desktopStorageDetected,
+    signedInSessionFound: sessionCandidates.length > 0,
+    signedInSourceLabel: sessionCandidates[0]?.sourceLabel || '',
+    signedInSessionCount: sessionCandidates.length,
+    authTokenReady: authSecretAvailable(),
+    downloadUrl: 'https://www.stremio.com/downloads'
+  }
+}
+
+function isSameHostRequest(req) {
+  const clientIp = getClientIp(req)
+  if (!clientIp) return false
+  if (clientIp === '127.0.0.1' || clientIp === '::1') return true
+  try {
+    return getLanIpv4Addresses().includes(clientIp)
+  } catch (_) {
+    return false
+  }
 }
 
 async function fetchStremioUserByAuthKey(authKey) {
@@ -321,6 +551,67 @@ async function fetchStremioUserByAuthKey(authKey) {
   return {
     stremioUserId,
     email: isValidEmail(email) ? email : ''
+  }
+}
+
+function createHttpError(statusCode, message, detail = '') {
+  const err = new Error(message)
+  err.statusCode = statusCode
+  if (detail) err.detail = detail
+  return err
+}
+
+async function createLinkedStremioAuthSession(authKey, authSecret) {
+  const safeAuthKey = sanitizeStremioAuthKey(authKey)
+  if (!safeAuthKey) {
+    throw createHttpError(400, 'Invalid Stremio AuthKey')
+  }
+
+  const stremioUser = await fetchStremioUserByAuthKey(safeAuthKey)
+  if (!stremioUser || !stremioUser.stremioUserId) {
+    throw createHttpError(401, 'Stremio AuthKey verification failed')
+  }
+
+  const authKeyHash = hashStremioAuthKey(safeAuthKey)
+  let user = await accountStore.getUserByStremioUserId(stremioUser.stremioUserId)
+  if (!user) {
+    user = await accountStore.createOrLinkStremioUser({
+      stremioUserId: stremioUser.stremioUserId,
+      email: stremioUser.email,
+      authKeyHash
+    })
+  } else {
+    const next = {
+      ...user,
+      stremio: {
+        ...(user.stremio && typeof user.stremio === 'object' ? user.stremio : {}),
+        userId: stremioUser.stremioUserId,
+        authKeyHash,
+        linkedAt: Number(user?.stremio?.linkedAt || Date.now()),
+        lastVerifiedAt: Date.now()
+      }
+    }
+    if (stremioUser.email && isValidEmail(stremioUser.email)) {
+      next.email = stremioUser.email
+    }
+    user = await accountStore.saveUser(next)
+  }
+
+  const recommendedPairId = derivePairIdFromStremioUserId(stremioUser.stremioUserId)
+  const token = createAuthToken({
+    sub: user.id,
+    provider: 'stremio-authkey',
+    stremioUserId: stremioUser.stremioUserId
+  }, authSecret, AUTH_TOKEN_TTL_SECONDS)
+
+  return {
+    ok: true,
+    token,
+    user: publicUserModel(user),
+    stremio: {
+      userId: stremioUser.stremioUserId,
+      recommendedPairId
+    }
   }
 }
 
@@ -775,7 +1066,7 @@ function parseBoolean(value) {
 }
 
 function authSecretAvailable() {
-  return Boolean(AUTH_TOKEN_SECRET)
+  return Boolean(getAuthTokenSecret())
 }
 
 function stripeBillingAvailable() {
@@ -955,9 +1246,10 @@ async function requireAuthUser(req, res, next) {
   if (!authSecretAvailable()) {
     return res.status(500).json({ error: 'AUTH_TOKEN_SECRET not configured' })
   }
+  const authSecret = getAuthTokenSecret()
   const token = parseBearerToken(req.headers.authorization || '')
   if (!token) return res.status(401).json({ error: 'Missing bearer token' })
-  const payload = verifyAuthToken(token, AUTH_TOKEN_SECRET)
+  const payload = verifyAuthToken(token, authSecret)
   if (!payload) return res.status(401).json({ error: 'Invalid or expired token' })
   const userId = String(payload.sub || '').trim()
   if (!userId) return res.status(401).json({ error: 'Invalid token subject' })
@@ -1121,23 +1413,100 @@ function getManifest(req) {
 
   const idSuffix = profile
   const nameLabel = profile === 'local'
-    ? 'PC Local'
+    ? 'PC Gateway'
     : profile === 'lan'
       ? 'LAN Bridge'
-      : 'Online'
+      : 'Remote Seedbox'
   const defaultLogoUrl = `${getPublicBaseUrl(req)}/logo.ico`
   // Keep local profile self-contained; hosted/lan profiles can use manifest logo URL.
   const logoUrl = profile === 'local'
     ? defaultLogoUrl
     : String(manifest.logo || defaultLogoUrl)
 
-  return {
+  const nextManifest = {
     ...manifest,
     behaviorHints: { ...(manifest.behaviorHints || {}) },
     id: `com.kepners.pvtkrrx.${idSuffix}`,
     name: `PVTKRRX (${nameLabel})`,
     logo: logoUrl
   }
+
+  if (profile === 'local') {
+    return {
+      ...nextManifest,
+      description: 'Host helper for the Windows PC running PVTKRRX. Install LAN Bridge as the single browsable addon for movies, TV, sports, and library.',
+      resources: ['catalog'],
+      types: [],
+      catalogs: []
+    }
+  }
+
+  return nextManifest
+}
+
+async function warmLocalProviders(config, logger = console, reason = 'boot') {
+  const snapshot = config && typeof config === 'object' ? { ...config } : null
+  if (!snapshot) {
+    logger.log(`[startup-warm] skipped (${reason}): no local config`)
+    return null
+  }
+
+  const qbitUrl = String(snapshot.qbitUrl || '').trim()
+  const jackettUrl = String(snapshot.jackettUrl || '').trim()
+  const jackettApiKey = String(snapshot.jackettApiKey || '').trim()
+  if (!qbitUrl && (!jackettUrl || !jackettApiKey)) {
+    logger.log(`[startup-warm] skipped (${reason}): qBittorrent/Prowlarr not configured`)
+    return null
+  }
+
+  logger.log(`[startup-warm] starting (${reason})`)
+  const tasks = []
+
+  if (qbitUrl) {
+    tasks.push((async () => {
+      const qbit = new QBitClient(qbitUrl, snapshot.qbitUsername, snapshot.qbitPassword)
+      const torrents = await qbit.torrents('all')
+      const total = Array.isArray(torrents) ? torrents.length : 0
+      const completed = Array.isArray(torrents)
+        ? torrents.filter(t => Number(t?.progress || 0) >= 0.999).length
+        : 0
+      const active = Math.max(0, total - completed)
+      logger.log(`[startup-warm] qBittorrent ready (${total} torrents, ${completed} completed, ${active} active)`)
+      return { service: 'qbit', total, completed, active }
+    })().catch((err) => {
+      logger.warn(`[startup-warm] qBittorrent warm-up failed: ${err.message}`)
+      return { service: 'qbit', error: err.message }
+    }))
+  }
+
+  if (jackettUrl && jackettApiKey) {
+    tasks.push((async () => {
+      const prowlarr = new ProwlarrClient(jackettUrl, jackettApiKey)
+      const indexers = await prowlarr.caps()
+      const count = Array.isArray(indexers) ? indexers.length : 0
+      logger.log(`[startup-warm] Prowlarr ready (${count} indexers)`)
+      return { service: 'prowlarr', count }
+    })().catch((err) => {
+      logger.warn(`[startup-warm] Prowlarr warm-up failed: ${err.message}`)
+      return { service: 'prowlarr', error: err.message }
+    }))
+  }
+
+  return Promise.all(tasks)
+}
+
+function scheduleLocalProviderWarmup(config = loadLocalConfigFile(), logger = console, reason = 'boot') {
+  const snapshot = config && typeof config === 'object' ? { ...config } : null
+  if (!snapshot) return Promise.resolve(null)
+  if (localProviderWarmupPromise) return localProviderWarmupPromise
+
+  localProviderWarmupPromise = warmLocalProviders(snapshot, logger, reason)
+    .catch(() => null)
+    .finally(() => {
+      localProviderWarmupPromise = null
+    })
+
+  return localProviderWarmupPromise
 }
 
 function sleep(ms) {
@@ -1376,6 +1745,7 @@ app.post('/local-config', requireLocalNetworkRoute, (req, res) => {
       defaultRequired: true
     })
     saveLocalConfigFile(saved)
+    scheduleLocalProviderWarmup(saved, console, 'local-config-save').catch(() => {})
     res.json({
       ok: true,
       localHostname,
@@ -1422,6 +1792,7 @@ app.post('/auto-provision', requireLocalNetworkRoute, async (req, res) => {
 
     if (result.config && result.config.qbitUrl) {
       saveLocalConfigFile(provisionedConfig)
+      scheduleLocalProviderWarmup(provisionedConfig, console, 'auto-provision').catch(() => {})
     }
     res.json({
       ...result,
@@ -1456,10 +1827,99 @@ app.get('/health', (req, res) => {
   })
 })
 
+app.get('/auth/stremio/local-status', (req, res) => {
+  if (!isSameHostRequest(req)) {
+    return res.status(403).json({ error: 'Open configure on the Windows host PC to check local Stremio status.' })
+  }
+
+  try {
+    res.setHeader('Cache-Control', 'no-store')
+    res.json({
+      ok: true,
+      ...getLocalStremioDesktopStatus()
+    })
+  } catch (err) {
+    res.status(500).json({
+      error: 'Failed to inspect local Stremio status',
+      detail: err.message
+    })
+  }
+})
+
+app.post('/auth/stremio/auto-link-local', async (req, res) => {
+  if (!authSecretAvailable()) {
+    return res.status(500).json({ error: 'AUTH_TOKEN_SECRET not configured' })
+  }
+  if (!isSameHostRequest(req)) {
+    return res.status(403).json({ error: 'Auto detect only works from this PC. Open configure on the Windows host and try again.' })
+  }
+
+  const authSecret = getAuthTokenSecret()
+
+  try {
+    const clientIp = getClientIp(req)
+    const limit = consumeLanPairRateLimit(
+      'auth-stremio-auto-link',
+      clientIp || 'unknown',
+      AUTH_MAX_PER_WINDOW
+    )
+    if (!limit.allowed) {
+      res.setHeader('Retry-After', String(limit.retryAfterSeconds))
+      return res.status(429).json({ error: 'too many requests' })
+    }
+
+    const candidates = discoverLocalStremioAuthKeyCandidates()
+    if (!candidates.length) {
+      return res.status(404).json({
+        error: 'No signed-in Stremio session found on this PC',
+        detail: 'Open Stremio Desktop or sign in at web.stremio.com in Brave, Chrome, or Edge, then try again.'
+      })
+    }
+
+    let lastVerificationError = null
+    for (const candidate of candidates) {
+      try {
+        const payload = await createLinkedStremioAuthSession(candidate.authKey, authSecret)
+        return res.json({
+          ...payload,
+          detected: {
+            method: 'local-storage',
+            sourceLabel: candidate.sourceLabel
+          }
+        })
+      } catch (err) {
+        if (Number(err?.statusCode || 0) === 401) {
+          lastVerificationError = err
+          continue
+        }
+        throw err
+      }
+    }
+
+    if (lastVerificationError) {
+      return res.status(401).json({
+        error: 'Signed-in Stremio session was found, but the stored AuthKey is no longer valid',
+        detail: 'Open Stremio Desktop or web.stremio.com, refresh the login, then try Auto Find again.'
+      })
+    }
+
+    return res.status(404).json({
+      error: 'No valid Stremio AuthKey found on this PC',
+      detail: 'Open Stremio Desktop or sign in at web.stremio.com, then try again.'
+    })
+  } catch (err) {
+    const statusCode = Number(err?.statusCode || 0) || 500
+    const payload = { error: statusCode === 500 ? 'Local Stremio auto-link failed' : err.message }
+    if (err?.detail) payload.detail = err.detail
+    res.status(statusCode).json(payload)
+  }
+})
+
 app.post('/auth/stremio/link-authkey', async (req, res) => {
   if (!authSecretAvailable()) {
     return res.status(500).json({ error: 'AUTH_TOKEN_SECRET not configured' })
   }
+  const authSecret = getAuthTokenSecret()
 
   try {
     const clientIp = getClientIp(req)
@@ -1473,57 +1933,13 @@ app.post('/auth/stremio/link-authkey', async (req, res) => {
       return res.status(429).json({ error: 'too many requests' })
     }
 
-    const authKey = sanitizeStremioAuthKey(req.body?.authKey)
-    if (!authKey) return res.status(400).json({ error: 'Invalid Stremio AuthKey' })
-
-    const stremioUser = await fetchStremioUserByAuthKey(authKey)
-    if (!stremioUser || !stremioUser.stremioUserId) {
-      return res.status(401).json({ error: 'Stremio AuthKey verification failed' })
-    }
-
-    const authKeyHash = hashStremioAuthKey(authKey)
-    let user = await accountStore.getUserByStremioUserId(stremioUser.stremioUserId)
-    if (!user) {
-      user = await accountStore.createOrLinkStremioUser({
-        stremioUserId: stremioUser.stremioUserId,
-        email: stremioUser.email,
-        authKeyHash
-      })
-    } else {
-      const next = {
-        ...user,
-        stremio: {
-          ...(user.stremio && typeof user.stremio === 'object' ? user.stremio : {}),
-          userId: stremioUser.stremioUserId,
-          authKeyHash,
-          linkedAt: Number(user?.stremio?.linkedAt || Date.now()),
-          lastVerifiedAt: Date.now()
-        }
-      }
-      if (stremioUser.email && isValidEmail(stremioUser.email)) {
-        next.email = stremioUser.email
-      }
-      user = await accountStore.saveUser(next)
-    }
-
-    const recommendedPairId = derivePairIdFromStremioUserId(stremioUser.stremioUserId)
-    const token = createAuthToken({
-      sub: user.id,
-      provider: 'stremio-authkey',
-      stremioUserId: stremioUser.stremioUserId
-    }, AUTH_TOKEN_SECRET, AUTH_TOKEN_TTL_SECONDS)
-
-    res.json({
-      ok: true,
-      token,
-      user: publicUserModel(user),
-      stremio: {
-        userId: stremioUser.stremioUserId,
-        recommendedPairId
-      }
-    })
+    const payload = await createLinkedStremioAuthSession(req.body?.authKey, authSecret)
+    res.json(payload)
   } catch (err) {
-    res.status(500).json({ error: 'Stremio link failed', detail: err.message })
+    const statusCode = Number(err?.statusCode || 0) || 500
+    const payload = { error: statusCode === 500 ? 'Stremio link failed' : err.message }
+    if (err?.detail) payload.detail = err.detail
+    res.status(statusCode).json(payload)
   }
 })
 
@@ -1685,6 +2101,9 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
   const fallbackHost = sanitizeHostForUrl(getMdnsHost())
   const host = requestedHost || headerHost || fallbackHost || '127.0.0.1'
   const lanDebugManifest = `http://${host}:${port}/local/manifest.json?mode=local`
+  const pcConfigureUrl = `http://127.0.0.1:${port}/configure?target=pc`
+  const lanConfigureUrl = `http://127.0.0.1:${port}/configure?target=lan`
+  const seedboxConfigureUrl = `http://127.0.0.1:${port}/configure?target=seedbox`
 
   res.setHeader('Cache-Control', 'no-store')
   res.setHeader('Content-Type', 'text/html; charset=utf-8')
@@ -1693,30 +2112,88 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>PVTKRRX Local Install</title>
+  <title>PVTKRRX Install Routes</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 24px; background: #101018; color: #e8e8ff; }
-    .card { max-width: 720px; padding: 16px; border: 1px solid #2a2a3a; border-radius: 10px; background: #151526; }
-    button.btn { display: inline-block; margin-top: 10px; padding: 10px 14px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; }
+    .shell { max-width: 1040px; margin: 0 auto; }
+    .card { padding: 18px; border: 1px solid #2a2a3a; border-radius: 12px; background: #151526; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18); }
+    .lead { max-width: 760px; line-height: 1.55; color: #c9d4f8; }
+    .route-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+    .route-card { padding: 16px; border: 1px solid #2d3958; border-radius: 10px; background: linear-gradient(180deg, #131c2b, #101725); }
+    .route-card h3 { margin: 0 0 6px; font-size: 18px; }
+    .route-kicker { font-size: 11px; text-transform: uppercase; letter-spacing: 1.3px; color: #7dd3fc; margin-bottom: 10px; }
+    .route-copy { min-height: 64px; line-height: 1.5; color: #d9e2ff; }
+    .route-list { margin: 12px 0; padding-left: 18px; color: #b9c5e8; line-height: 1.45; }
+    .route-list li + li { margin-top: 5px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+    button.btn, a.btn { display: inline-block; padding: 10px 14px; background: #3b82f6; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 14px; text-decoration: none; }
+    a.btn.secondary, button.btn.secondary { background: #1d2738; color: #d4def7; border: 1px solid #32415f; }
     code { display: block; margin-top: 10px; padding: 10px; background: #0c0c15; border-radius: 6px; word-break: break-all; }
     p { line-height: 1.45; }
+    .route-note { margin-top: 10px; color: #99acd9; font-size: 13px; }
+    @media (max-width: 900px) { .route-grid { grid-template-columns: 1fr; } }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h2>PVTKRRX Local Install</h2>
-    <p>Use this on the same Windows PC that runs PVTKRRX. Click once to copy the correct URL.</p>
-    <button class="btn" id="copyBtn" type="button">Copy local Addon URL</button>
-    <p>Paste into Stremio: <code>Addons -> + Add Addon URL</code></p>
-    <code id="manifestCode">${loopbackManifest}</code>
-    <p>LAN debug URL (not recommended for install):</p>
-    <code>${lanDebugManifest}</code>
-    <p>For phone/TV installs, use hosted HTTPS mode from the configure page.</p>
+  <div class="shell">
+    <div class="card">
+      <h2>PVTKRRX Install Routes</h2>
+      <p class="lead">PVTKRRX is one runtime with three separate Stremio routes. LAN Bridge is the single browsable addon for movies, TV, sports, and library. The Windows-side route is now just a host gateway/helper.</p>
+      <div class="route-grid">
+        <section class="route-card">
+          <div class="route-kicker">Same Windows machine</div>
+          <h3>PC Gateway</h3>
+          <p class="route-copy">Optional helper route for the Windows PC that runs the local PVTKRRX server. It should not create the main browse catalogs.</p>
+          <ul class="route-list">
+            <li>Uses loopback only</li>
+            <li>No heartbeat or account sync</li>
+            <li>Host helper only, not the main content addon</li>
+          </ul>
+          <div class="actions">
+            <button class="btn" id="copyHttpBtn" type="button">Copy PC Gateway URL</button>
+            <a class="btn secondary" href="${pcConfigureUrl}">Open PC Gateway Setup</a>
+          </div>
+          <code id="manifestCode">${loopbackManifest}</code>
+          <p class="route-note">Use this only when you want host-side loopback/debug. Install LAN Bridge for the actual movies, TV, sports, and library catalogs.</p>
+          <code>${lanDebugManifest}</code>
+        </section>
+
+        <section class="route-card">
+          <div class="route-kicker">Home network sync</div>
+          <h3>LAN Bridge</h3>
+          <p class="route-copy">Use this for phone, tablet, Android TV, Apple TV, or Stremio Web on the same LAN as the host PC.</p>
+          <ul class="route-list">
+            <li>Hosted install URL with LAN heartbeat</li>
+            <li>Optional Stremio account sync</li>
+            <li>Host PC must stay online</li>
+          </ul>
+          <div class="actions">
+            <a class="btn" href="${lanConfigureUrl}">Open LAN Bridge Setup</a>
+          </div>
+          <p class="route-note">This is the route that should sync across your Stremio account on home devices and remain the only visible PVTKRRX content addon.</p>
+        </section>
+
+        <section class="route-card">
+          <div class="route-kicker">Public HTTPS endpoints</div>
+          <h3>Remote Seedbox</h3>
+          <p class="route-copy">Use this when Prowlarr, qBittorrent, and file serving are reachable over public authenticated URLs.</p>
+          <ul class="route-list">
+            <li>Hosted remote profile</li>
+            <li>Works away from home LAN</li>
+            <li>Requires public HTTPS playback path</li>
+          </ul>
+          <div class="actions">
+            <a class="btn" href="${seedboxConfigureUrl}">Open Remote Seedbox Setup</a>
+          </div>
+          <p class="route-note">This is the right route for seedbox-first playback, not the LAN Bridge.</p>
+        </section>
+      </div>
+    </div>
   </div>
   <script>
-    const btn = document.getElementById('copyBtn')
-    const text = document.getElementById('manifestCode').textContent.trim()
-    btn.addEventListener('click', async () => {
+    async function copyCode(codeId, btnId) {
+      const btn = document.getElementById(btnId)
+      const text = document.getElementById(codeId).textContent.trim()
       try {
         await navigator.clipboard.writeText(text)
         const prev = btn.textContent
@@ -1724,7 +2201,7 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
         setTimeout(() => { btn.textContent = prev }, 1400)
       } catch (_) {
         const range = document.createRange()
-        const code = document.getElementById('manifestCode')
+        const code = document.getElementById(codeId)
         range.selectNodeContents(code)
         const sel = window.getSelection()
         sel.removeAllRanges()
@@ -1732,7 +2209,8 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
         try { document.execCommand('copy') } catch (_) {}
         sel.removeAllRanges()
       }
-    })
+    }
+    document.getElementById('copyHttpBtn').addEventListener('click', () => copyCode('manifestCode', 'copyHttpBtn'))
   </script>
 </body>
 </html>`)
@@ -2376,22 +2854,40 @@ function startLocalServers(options = {}) {
   const enableLanAlias = options.enableLanAlias !== false
   const ensureLanAccessOnBoot = options.ensureLanAccessOnBoot !== false
   const logger = options.logger || console
-  const port = parseInt(process.env.PORT || '7000', 10)
-  const httpsPort = parseInt(process.env.HTTPS_PORT || '7001', 10)
+  const port = Number.isFinite(options.port) ? options.port : parseInt(process.env.PORT || '7000', 10)
+  const httpsPort = Number.isFinite(options.httpsPort) ? options.httpsPort : parseInt(process.env.HTTPS_PORT || '7001', 10)
   const mdnsHost = getMdnsHost()
   let lanAlias = null
+  const state = {
+    httpServer: null,
+    httpsServer: null,
+    httpsReady: Promise.resolve(null),
+    port,
+    httpsPort,
+    lanAlias: null
+  }
 
   if (ensureLanAccessOnBoot) {
     ensureBootLanAccess(logger).catch(() => {})
   }
 
+  const bootConfig = loadLocalConfigFile()
+  if (bootConfig) {
+    const warmTimer = setTimeout(() => {
+      scheduleLocalProviderWarmup(bootConfig, logger, 'server-boot').catch(() => {})
+    }, 900)
+    if (typeof warmTimer.unref === 'function') warmTimer.unref()
+  }
+
   // HTTP
   const httpServer = http.createServer(app)
+  state.httpServer = httpServer
   httpServer.listen(port, () => {
     logger.log(`PVTKRRX HTTP  → http://localhost:${port}`)
     logger.log(`Configure:      http://localhost:${port}/configure`)
     if (enableLanAlias && !lanAlias) {
       lanAlias = startLanAlias({ hostname: mdnsHost, port, logger })
+      state.lanAlias = lanAlias
       if (lanAlias?.enabled) {
         logger.log(`PVTKRRX mDNS  → http://${lanAlias.hostname}:${port}/local/manifest.json?mode=local`)
       } else {
@@ -2410,21 +2906,54 @@ function startLocalServers(options = {}) {
   })
 
   // HTTPS (self-signed — must be trusted in OS/browser first)
-  try {
-    const attrs = [{ name: 'commonName', value: '127.0.0.1' }]
-    const pems = selfsigned.generate(attrs, { days: 365, algorithm: 'sha256' })
-    const httpsServer = https.createServer({ key: pems.private, cert: pems.cert }, app)
-    httpsServer.listen(httpsPort, () => {
+  state.httpsReady = (async () => {
+    try {
+      const attrs = [{ name: 'commonName', value: 'localhost' }]
+      const pems = await selfsigned.generate(attrs, {
+        days: 365,
+        algorithm: 'sha256',
+        keySize: 2048,
+        extensions: [
+          { name: 'basicConstraints', cA: false, critical: true },
+          { name: 'keyUsage', digitalSignature: true, keyEncipherment: true, critical: true },
+          { name: 'extKeyUsage', serverAuth: true, clientAuth: true },
+          {
+            name: 'subjectAltName',
+            altNames: [
+              { type: 2, value: 'localhost' },
+              { type: 7, ip: '127.0.0.1' },
+              { type: 7, ip: '::1' }
+            ]
+          }
+        ]
+      })
+      const httpsServer = https.createServer({ key: pems.private, cert: pems.cert }, app)
+      state.httpsServer = httpsServer
+      await new Promise((resolve, reject) => {
+        const onListening = () => {
+          httpsServer.off('error', onError)
+          resolve()
+        }
+        const onError = (err) => {
+          httpsServer.off('listening', onListening)
+          reject(err)
+        }
+        httpsServer.once('listening', onListening)
+        httpsServer.once('error', onError)
+        httpsServer.listen(httpsPort)
+      })
       logger.log(`PVTKRRX HTTPS → https://localhost:${httpsPort} (self-signed — trust cert in browser first)`)
-    })
-    httpsServer.on('error', (err) => {
-      logger.warn(`HTTPS server failed to start on port ${httpsPort}:`, err.message)
-    })
-  } catch (err) {
-    logger.warn('HTTPS server skipped:', err.message)
-  }
+      httpsServer.on('error', (err) => {
+        logger.warn(`HTTPS server error on port ${httpsPort}:`, err.message)
+      })
+      return httpsServer
+    } catch (err) {
+      logger.warn('HTTPS server skipped:', err.message)
+      return null
+    }
+  })()
 
-  return { httpServer, port, httpsPort, lanAlias }
+  return state
 }
 
 if (require.main === module) {

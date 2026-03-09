@@ -9,12 +9,12 @@ const manifest = {
   resources: [
     'catalog',
     'meta',
-    { name: 'stream', types: ['movie', 'series', 'tv'] }
+    { name: 'stream', types: ['movie', 'series', 'tv', 'sports'] }
   ],
-  types: ['movie', 'series', 'tv'],
+  types: ['movie', 'series', 'tv', 'sports'],
   catalogs: [
     {
-      type: 'movie',
+      type: 'sports',
       id: 'pvtkrrx-sports',
       name: 'Sports',
       extra: [
