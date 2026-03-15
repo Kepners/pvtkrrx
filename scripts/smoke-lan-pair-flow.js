@@ -73,6 +73,7 @@ async function run() {
     const pairId = 'pairtest01'
     const pairKey = 'ABCDEFGHIJKLMNOPQRSTUVWX'
     const endpointBaseUrl = `http://10.10.10.42:${port}`
+    const mdnsBaseUrl = `http://pvtkrrx.local:${port}`
 
     const heartbeatRes = await fetch(`${base}/pair/heartbeat`, {
       method: 'POST',
@@ -82,7 +83,10 @@ async function run() {
         pairKey,
         localHostname: 'pvtkrrx.local',
         relayUrl: base,
-        endpoints: [{ baseUrl: endpointBaseUrl, source: 'lan-ip' }]
+        endpoints: [
+          { baseUrl: mdnsBaseUrl, source: 'mdns' },
+          { baseUrl: endpointBaseUrl, source: 'lan-ip' }
+        ]
       })
     })
     assert.equal(heartbeatRes.status, 200, 'pair heartbeat should succeed')

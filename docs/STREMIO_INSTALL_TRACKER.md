@@ -88,7 +88,7 @@ See also: `docs/ROUTE_FRAMEWORK.md`
 - Manual AuthKey fields, console snippet fallback, raw hosted URLs, and LAN diagnostics are now pushed into fallback/manual sections instead of leading the page.
 - Local runtime now exposes `/auth/stremio/local-status` so the configure page can show plain installed/session-ready checks instead of only descriptive text.
 - Desktop popup now reports its content size back to Electron so the shell can grow to fit instead of clipping the bottom behind scrollbars.
-- LAN Bridge now prefers the stable `pvtkrrx.local` endpoint over the raw LAN IP when hosted heartbeat redirects are chosen.
+- LAN Bridge now prefers the live LAN IP for hosted heartbeat redirects, with `pvtkrrx.local` kept as a fallback/discovery alias when available.
 - Quick Setup now highlights only the next required action with a glow/pulse, locks later-step buttons until earlier checks are complete, and labels the final action as `Install Or Refresh` because stale installed LAN Bridge URLs in Stremio can keep pointing at old routes.
 - `Copy PC Local URL` is explicitly marked as host-only and not part of the LAN Bridge install path.
 

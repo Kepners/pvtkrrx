@@ -774,17 +774,21 @@ function chooseLanPairEndpoint(state) {
   if (!endpoints.length) return null
   const score = (entry) => {
     let points = 0
-    if (entry.source === 'mdns') points += 40
-    if (entry.source === 'lan-ip') points += 25
-    if (entry.source === 'loopback') points += 1
+    if (entry.source === 'lan-ip') points += 60
+    if (entry.source === 'mdns') points += 20
+    if (entry.source === 'loopback') points -= 100
     try {
       const host = new URL(entry.baseUrl).hostname
-      if (host.endsWith('.local')) points += 20
-      if (isPrivateIpv4(host) && host !== '127.0.0.1') points += 8
+      if (isPrivateIpv4(host) && host !== '127.0.0.1') points += 20
+      if (host.endsWith('.local')) points += 5
+      if (host === '127.0.0.1' || host === 'localhost') points -= 100
     } catch (_) {}
     return points
   }
-  return [...endpoints].sort((a, b) => score(b) - score(a))[0]
+  return endpoints
+    .map((entry, index) => ({ entry, index }))
+    .sort((a, b) => score(b.entry) - score(a.entry) || a.index - b.index)[0]
+    ?.entry || null
 }
 
 function buildLanRedirectUrl(req, baseUrl) {
