@@ -54,6 +54,7 @@ const LAN_PAIR_RATE_LIMIT_WINDOW_MS = Math.max(1000, parseInt(process.env.PVTKRR
 const LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW || '30', 10))
 const LAN_PAIR_STATUS_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_LAN_PAIR_STATUS_MAX_PER_WINDOW || '60', 10))
 const ENCRYPT_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_ENCRYPT_MAX_PER_WINDOW || '30', 10))
+const TEST_CONNECTION_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_TEST_CONNECTION_MAX_PER_WINDOW || '20', 10))
 const AUTH_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_AUTH_MAX_PER_WINDOW || '20', 10))
 const BILLING_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_BILLING_MAX_PER_WINDOW || '30', 10))
 const AUTH_TOKEN_TTL_SECONDS = Math.max(900, parseInt(process.env.PVTKRRX_AUTH_TOKEN_TTL_SECONDS || '2592000', 10))
@@ -676,11 +677,44 @@ function isPrivateIpv4(hostname) {
   return false
 }
 
+function isPrivateIpv6(hostname) {
+  const host = String(hostname || '').trim().toLowerCase()
+  if (!host) return false
+  if (host === '::1' || host === '0:0:0:0:0:0:0:1') return true
+  if (!/^[0-9a-f:]+$/.test(host)) return false
+  return (
+    host.startsWith('fc') ||
+    host.startsWith('fd') ||
+    host.startsWith('fe80:')
+  )
+}
+
 function isLikelyLanHost(hostname) {
   const host = String(hostname || '').trim().toLowerCase()
   if (!host) return false
   if (host.endsWith('.local')) return true
-  return isPrivateIpv4(host)
+  return isPrivateIpv4(host) || isPrivateIpv6(host)
+}
+
+function isBlockedPrivateTargetHost(hostname) {
+  const host = String(hostname || '').trim().toLowerCase()
+  if (!host) return false
+  if (host === '0.0.0.0' || host === 'host.docker.internal') return true
+  if (host.endsWith('.localhost') || host.endsWith('.local')) return true
+  if (host.startsWith('169.254.')) return true
+  return isPrivateIpv4(host) || isPrivateIpv6(host)
+}
+
+function parseHttpUrlCandidate(input) {
+  const raw = String(input || '').trim()
+  if (!raw) return null
+  try {
+    const parsed = new URL(raw)
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null
+    return parsed
+  } catch (_) {
+    return null
+  }
 }
 
 function sanitizeLanBaseUrl(input) {
@@ -854,16 +888,15 @@ function isSensitiveCorsRoute(req) {
   const pathName = String(req.path || '')
   return (
     pathName === '/encrypt' ||
+    pathName === '/test-connection' ||
     pathName.startsWith('/pair/') ||
     pathName.startsWith('/auth/') ||
     pathName.startsWith('/billing/')
   )
 }
 
-function isAllowedSensitiveOrigin(req) {
-  const rawOrigin = String(req.headers.origin || '').trim()
-  if (!rawOrigin) return true
-  const origin = normalizeOrigin(rawOrigin)
+function isAllowedSensitiveOriginValue(req, rawValue) {
+  const origin = normalizeOrigin(rawValue)
   if (!origin) return false
 
   const currentOrigin = normalizeOrigin(getPublicBaseUrl(req))
@@ -875,6 +908,22 @@ function isAllowedSensitiveOrigin(req) {
     if (host === '::1') return true
     if (isLikelyLanHost(host)) return true
   } catch (_) {}
+  return false
+}
+
+function isAllowedSensitiveOrigin(req) {
+  const rawOrigin = String(req.headers.origin || '').trim()
+  if (!rawOrigin) return true
+  return isAllowedSensitiveOriginValue(req, rawOrigin)
+}
+
+function isTrustedSensitiveBrowserRequest(req) {
+  const rawOrigin = String(req.headers.origin || '').trim()
+  if (rawOrigin && isAllowedSensitiveOriginValue(req, rawOrigin)) return true
+
+  const rawReferer = String(req.headers.referer || '').trim()
+  if (rawReferer && isAllowedSensitiveOriginValue(req, rawReferer)) return true
+
   return false
 }
 
@@ -1772,7 +1821,10 @@ app.post('/auto-provision', requireLocalNetworkRoute, async (req, res) => {
     const stremioUserId = normalizeStremioUserId(options.stremioUserId || '')
     const hintedPairId = sanitizePairId(options.lanPairId || '')
     const result = await autoProvisionWindows({
-      ...options,
+      installIfMissing: options.installIfMissing,
+      startIfStopped: options.startIfStopped,
+      configureQbitLocalNoAuth: options.configureQbitLocalNoAuth,
+      openFirewall: options.openFirewall,
       localHostname
     })
     const provisionedConfig = result.config
@@ -2222,23 +2274,66 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
 
 // ─── POST /test-connection — validate credentials ──────────
 app.post('/test-connection', async (req, res) => {
-  const { jackettUrl, jackettApiKey, qbitUrl, qbitUsername, qbitPassword } = req.body
-  const results = { jackett: false, qbit: false }
-
-  try {
-    const prowlarr = new ProwlarrClient(jackettUrl, jackettApiKey)
-    await prowlarr.caps()
-    results.jackett = true
-  } catch (err) {
-    results.jackettError = err.message
+  const clientIp = getClientIp(req)
+  const limit = consumeLanPairRateLimit(
+    'test-connection',
+    clientIp || 'unknown',
+    TEST_CONNECTION_MAX_PER_WINDOW
+  )
+  if (!limit.allowed) {
+    res.setHeader('Retry-After', String(limit.retryAfterSeconds))
+    return res.status(429).json({ error: 'too many requests' })
   }
 
-  try {
-    const qbit = new QBitClient(qbitUrl, qbitUsername, qbitPassword)
-    await qbit.preferences()
-    results.qbit = true
-  } catch (err) {
-    results.qbitError = err.message
+  const payload = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+    ? req.body
+    : {}
+  const { jackettUrl, jackettApiKey, qbitUrl, qbitUsername, qbitPassword } = payload
+  const parsedJackettUrl = parseHttpUrlCandidate(jackettUrl)
+  const parsedQbitUrl = parseHttpUrlCandidate(qbitUrl)
+  const trustedLocalCaller = isSameHostRequest(req) || isLocalNetworkRequest(req)
+
+  if (!trustedLocalCaller && !isTrustedSensitiveBrowserRequest(req)) {
+    return res.status(403).json({
+      error: 'Hosted connection tests must be started from the PVTKRRX configure page'
+    })
+  }
+
+  if (!trustedLocalCaller) {
+    for (const target of [parsedJackettUrl, parsedQbitUrl]) {
+      if (!target) continue
+      if (isBlockedPrivateTargetHost(target.hostname)) {
+        return res.status(403).json({
+          error: 'Hosted connection tests cannot probe loopback, LAN, or .local targets'
+        })
+      }
+    }
+  }
+
+  const results = { jackett: false, qbit: false }
+
+  if (!parsedJackettUrl || !String(jackettApiKey || '').trim()) {
+    results.jackettError = 'Prowlarr URL and API key are required'
+  } else {
+    try {
+      const prowlarr = new ProwlarrClient(parsedJackettUrl.toString(), jackettApiKey)
+      await prowlarr.caps()
+      results.jackett = true
+    } catch (err) {
+      results.jackettError = err.message
+    }
+  }
+
+  if (!parsedQbitUrl) {
+    results.qbitError = 'qBittorrent URL is required'
+  } else {
+    try {
+      const qbit = new QBitClient(parsedQbitUrl.toString(), qbitUsername, qbitPassword)
+      await qbit.preferences()
+      results.qbit = true
+    } catch (err) {
+      results.qbitError = err.message
+    }
   }
 
   res.json(results)
@@ -2658,6 +2753,13 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
 // ─── Playback endpoint — Comet pattern ──────────────────────
 app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('playback'), async (req, res) => {
   try {
+    if (IS_VERCEL_RUNTIME && req.params.config !== 'local') {
+      return res.status(403).json({
+        error: 'Built-in playback buffering is disabled on hosted runtime',
+        detail: 'Use File Server URL or LAN Pair local relay for playback'
+      })
+    }
+
     const tokenShort = String(req.params.config || '').slice(0, 8)
     let info = null
     try {

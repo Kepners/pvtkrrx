@@ -1,9 +1,13 @@
-# Client Drivers - PVTKRRX
+# Historical Client Drivers - PVTKRRX
 
-> **Meeting Date:** February 8, 2026
-> **MD Present:** Yes — Mr Gurr attended, issued 5 binding directives
-> **Attendees:** Glen (PM), Colin (CTO), Peter (Production), Stewart (Commercial), Jason & Jasmine (Sales), Mr Gurr (MD), Auditor
-> **Meeting Type:** Native Agent Team — real inter-specialist messaging
+> **Status:** Historical meeting record from February 8, 2026
+> **Current live specification:** [SPEC.md](SPEC.md)
+> **Current live design:** [CURRENT_DESIGN.md](CURRENT_DESIGN.md)
+
+## How To Use This File
+
+This file captures original motivations, directives, and planning assumptions.
+Use it for project history, not as the live description of the current route and runtime design.
 
 ---
 

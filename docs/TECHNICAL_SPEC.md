@@ -1,8 +1,14 @@
-# Technical Specification - PVTKRRX
+# Historical Technical Specification - PVTKRRX
 
-> **Version:** 1.0
-> **Date:** February 8, 2026
-> **Author:** Colin (CTO)
+> **Status:** Historical planning record from February 8, 2026
+> **Current live design:** [CURRENT_DESIGN.md](CURRENT_DESIGN.md)
+> **Current route model:** [ROUTE_FRAMEWORK.md](ROUTE_FRAMEWORK.md)
+> **Current install behavior:** [STREMIO_INSTALL_TRACKER.md](STREMIO_INSTALL_TRACKER.md)
+
+## How To Use This File
+
+Use this document as a record of the original technical plan and early assumptions.
+Do not treat it as the authoritative source for the live runtime, dependency list, storage model, or route behavior.
 
 ---
 

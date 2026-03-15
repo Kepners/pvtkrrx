@@ -5,14 +5,10 @@ const { SportsDbClient } = require('../clients/sportsdb')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { cleanTitle, isLikelyPackedReleaseTitle } = require('../utils/parser')
 const { resolveSportHint, isSportsNoiseTitle, isLikelySportsEventTitle } = require('../utils/sportsRules')
+const { isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { formatSize } = require('../utils/streams')
 const { makeSportsThumbUrl } = require('../utils/sportsThumb')
 
-const SPORTS_ONLY_INDEXERS = new Set([
-  'sportscult',
-  'beyondhd-sports',
-  'tvvault-sports'
-])
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 const cinemeta = new CinemetaClient()
 const cinemetaCache = new Map()
@@ -28,12 +24,6 @@ const SPORTS_CATALOG_CACHE_MAX_AGE = Math.max(
     10
   )
 )
-
-function isSportsOnlyIndexer(indexerName) {
-  const normalized = String(indexerName || '').trim().toLowerCase()
-  if (SPORTS_ONLY_INDEXERS.has(normalized)) return true
-  return normalized.includes('sportscult')
-}
 
 function isLikelySeriesRelease(title) {
   const value = String(title || '')

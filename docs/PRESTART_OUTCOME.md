@@ -1,9 +1,13 @@
-# Prestart Meeting Outcome - PVTKRRX
+# Historical Prestart Outcome - PVTKRRX
 
-> **Date:** February 8, 2026
-> **Chair:** Mr Gurr (Managing Director)
-> **Attendees:** Glen (PM), Colin (CTO), Peter (Production), Stewart (Commercial), Auditor
-> **Decision:** APPROVED — Proceed to Build
+> **Status:** Historical meeting record from February 8, 2026
+> **Current live design:** [CURRENT_DESIGN.md](CURRENT_DESIGN.md)
+> **Current live specification:** [SPEC.md](SPEC.md)
+
+## How To Use This File
+
+This file records the pre-build approval meeting and original go/no-go decisions.
+It is not meant to describe the current runtime in production.
 
 ---
 

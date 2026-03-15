@@ -1,8 +1,14 @@
-# Production Specification - PVTKRRX
+# Historical Production Specification - PVTKRRX
 
-> **Version:** 1.0
-> **Date:** February 8, 2026
-> **Author:** Peter (Production)
+> **Status:** Historical planning record from February 8, 2026
+> **Current live design:** [CURRENT_DESIGN.md](CURRENT_DESIGN.md)
+> **Current architecture:** [ARCHITECTURE.md](../ARCHITECTURE.md)
+> **Current status:** [PROJECT_STATUS.md](PROJECT_STATUS.md)
+
+## How To Use This File
+
+Use this document as the original production/build plan.
+Do not use it as the live source for the current dependency list, packaging layout, or install flow.
 
 ---
 

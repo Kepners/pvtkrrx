@@ -11,7 +11,7 @@ PVTKRRX is in **post-MVP hardening and multi-device LAN pairing**.
 - `PC Local` is a real same-PC addon via `http://127.0.0.1:7000/local/manifest.json?mode=local`.
 - LAN pair relay flow for Android TV/mobile account-sync is implemented and covered by smoke checks.
 - Stremio AuthKey linking flow is implemented and smoke-tested with a local API mock.
-- The route architecture is now documented in `docs/ROUTE_FRAMEWORK.md`.
+- The live architecture is documented in `docs/CURRENT_DESIGN.md` and `docs/ROUTE_FRAMEWORK.md`.
 
 ## What Is Implemented
 
@@ -31,21 +31,24 @@ PVTKRRX is in **post-MVP hardening and multi-device LAN pairing**.
    - configure UI Method 4 hosted LAN-pair install URL generation
 7. LAN pair privacy hardening:
    - `/pair/status` now requires both `pairId` and `pairKey`
-   - status responses no longer expose LAN endpoint metadata
+   - status responses expose only the selected LAN endpoint metadata, and only to callers that prove `pairId` + `pairKey`
    - hosted fallback responses avoid exposing resolver reason details
    - heartbeat/status endpoints are rate limited
-   - optional public-IP binding blocks pair reuse from other networks by default (`PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP=true`)
+   - optional public-IP binding can block pair reuse from other networks when enabled (`PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP=true`)
    - heartbeat host-lock can reject active-session takeover from a different source IP (`PVTKRRX_LAN_PAIR_LOCK_HOST=true`)
-   - sensitive routes (`/encrypt`, `/pair/*`) use strict browser-origin allowlists
+   - sensitive routes (`/encrypt`, `/pair/*`, `/test-connection`, auth, billing) use strict browser-origin allowlists
+   - hosted `/test-connection` is rate limited and refuses loopback/LAN/.local targets; local/loopback configure can still validate local endpoints
    - local admin routes (`/local-config`, `/auto-provision`, `/network-info`, local qBit control) are local-network/loopback guarded
+   - hosted `/file` and `/playback` fail fast on Vercel instead of waiting for local-only playback paths
 
 ## Latest Automated Verification (2026-03-15)
 
 1. `npm run smoke:config` - PASS
-2. `npm run smoke:lan-pair` - PASS
-3. `npm run smoke:stremio-link` - PASS
+2. `npm run smoke:guards` - PASS
+3. `npm run smoke:lan-pair` - PASS
+4. `npm run smoke:stremio-link` - PASS
 
-These checks validate the current `PC Local` install/profile routes, configure/encrypt/install behavior, LAN pair heartbeat/status + hosted redirect behavior, and Stremio AuthKey account-link flow.
+These checks validate the current `PC Local` install/profile routes, configure/encrypt/install behavior, hosted runtime guard behavior, `/test-connection` hardening, LAN pair heartbeat/status + hosted redirect behavior, and Stremio AuthKey account-link flow.
 
 ## Required Vercel Configuration For LAN Pair Relay
 
@@ -56,12 +59,13 @@ Use these on the hosted deployment:
 3. Optional: `PVTKRRX_PAIR_RELAY_URL` (defaults to `https://pvtkrrx.vercel.app`).
 4. Optional: `PVTKRRX_LAN_PAIR_TTL_SECONDS` (default `21600`, minimum enforced `300`).
 5. Optional security tuning:
-   - `PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP` (default `true`)
+   - `PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP` (default `false`)
    - `PVTKRRX_LAN_PAIR_LOCK_HOST` (default `true`)
    - `PVTKRRX_LAN_PAIR_RATE_LIMIT_WINDOW_MS` (default `60000`)
    - `PVTKRRX_LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW` (default `30`)
    - `PVTKRRX_LAN_PAIR_STATUS_MAX_PER_WINDOW` (default `60`)
    - `PVTKRRX_ENCRYPT_MAX_PER_WINDOW` (default `30`)
+   - `PVTKRRX_TEST_CONNECTION_MAX_PER_WINDOW` (default `20`)
    - `PVTKRRX_ALLOWED_WEB_ORIGINS` (browser allowlist, defaults to hosted production origin)
 
 Without KV, pair state falls back to in-memory state and may be unreliable on cold starts.

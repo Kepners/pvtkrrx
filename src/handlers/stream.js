@@ -6,6 +6,7 @@ const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { parse, matchesEpisode, isLikelyPackedReleaseTitle } = require('../utils/parser')
 const { mapPath } = require('../utils/pathMapper')
 const { findExistingLocalFilePath } = require('../utils/localStorageRoots')
+const { isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { buildOnSeedboxStream, buildOnBufferingStream, buildOnTrackerStream, findVideoFile, findEpisodeFile, sortStreams } = require('../utils/streams')
 const { encodeFileStateToken, encodePlaybackStateToken } = require('../utils/opaqueState')
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '7000', 10))
@@ -91,19 +92,6 @@ async function handleStream(config, type, id, addonUrl, configToken) {
   } catch (err) {
     return { streams: [] }
   }
-}
-
-// Indexers that only carry sports content — never relevant for movie/TV IMDB searches.
-const SPORTS_ONLY_INDEXERS = new Set([
-  'sportscult',
-  'beyondhd-sports',
-  'tvvault-sports'
-])
-
-function isSportsOnlyIndexer(indexerName) {
-  const normalized = String(indexerName || '').trim().toLowerCase()
-  if (SPORTS_ONLY_INDEXERS.has(normalized)) return true
-  return normalized.includes('sportscult')
 }
 
 function normalizeForMatch(value) {

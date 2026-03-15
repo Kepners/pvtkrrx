@@ -1,9 +1,13 @@
-# Implementation Programme - PVTKRRX
+# Historical Implementation Programme - PVTKRRX
 
-> **Version:** 1.0
-> **Date:** February 8, 2026
-> **Author:** Peter (Production)
-> **Status:** APPROVED — Prestart Meeting February 8, 2026
+> **Status:** Historical planning record approved on February 8, 2026
+> **Current live design:** [CURRENT_DESIGN.md](CURRENT_DESIGN.md)
+> **Current project status:** [PROJECT_STATUS.md](PROJECT_STATUS.md)
+
+## How To Use This File
+
+This is the original build programme and task ordering from prestart.
+Keep it as project history; do not treat it as the live implementation map for the current codebase.
 
 ---
 

@@ -7,6 +7,8 @@ Updated: 2026-03-15
 This file is the canonical definition of the current PVTKRRX setup model.
 One runtime. Three install routes. Use the route that matches where playback happens.
 
+For the broader runtime and storage model, see `docs/CURRENT_DESIGN.md`.
+
 ## Route Summary
 
 | Route | Use it for | Install path | Playback path | Key constraint |

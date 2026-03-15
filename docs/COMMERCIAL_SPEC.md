@@ -1,8 +1,13 @@
-# Commercial Specification - PVTKRRX
+# Historical Commercial Specification - PVTKRRX
 
-> **Version:** 1.0
-> **Date:** February 8, 2026
-> **Author:** Stewart (Commercial)
+> **Status:** Historical planning record from February 8, 2026
+> **Current live specification:** [SPEC.md](SPEC.md)
+> **Current project status:** [PROJECT_STATUS.md](PROJECT_STATUS.md)
+
+## How To Use This File
+
+This document records the original commercial assumptions and rollout estimates.
+It is not the live source for the current dependency count, packaging scope, or operating posture.
 
 ---
 

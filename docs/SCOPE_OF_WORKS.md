@@ -1,8 +1,13 @@
-# Scope of Works - PVTKRRX
+# Historical Scope of Works - PVTKRRX
 
-> **Version:** 1.0
-> **Date:** February 8, 2026
-> **Status:** DRAFT — Pending Client Approval
+> **Status:** Historical planning record from February 8, 2026
+> **Current live scope:** [SPEC.md](SPEC.md)
+> **Current live design:** [CURRENT_DESIGN.md](CURRENT_DESIGN.md)
+
+## How To Use This File
+
+This file captures the original delivery plan and phase assumptions.
+It is not the current statement of scope for the live route model or shipped feature set.
 
 ---
 

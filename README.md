@@ -1,6 +1,6 @@
 # PVTKRRX
 
-**Connect your private tracker seedbox to Stremio. No debrid. No hosting. Your hardware, your trackers.**
+**Connect your private tracker seedbox to Stremio. No debrid. No third-party media host. Your hardware, your trackers.**
 
 ## What This Does
 
@@ -11,6 +11,8 @@ PVTKRRX is a Stremio addon that bridges your existing seedbox infrastructure int
 
 The addon handles: search → download → stream. PVTKRRX has a **built-in file server** so you can stream completed downloads directly — no external HTTP server required.
 
+Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS endpoints. If you want to validate loopback or LAN-only service URLs such as `http://127.0.0.1:9696`, use the local configure page on the Windows host runtime instead of the hosted site.
+
 ## Key Features
 
 - **Sports** — Browse and search private tracker sports content (EPL, F1, UFC) directly in Stremio
@@ -18,7 +20,7 @@ The addon handles: search → download → stream. PVTKRRX has a **built-in file
 - **Movies & TV** — IMDb-matched content from your private trackers
 - **Seedbox Library** — Browse everything already downloaded on your seedbox
 - **Smart filtering** — Sports indexers never contaminate movie/TV searches
-- **Zero data stored** — All config AES-256-GCM encrypted in the addon URL
+- **Hosted tokens stay encrypted** — Hosted configs are AES-256-GCM encrypted in addon URLs; local installs save config only on the host PC runtime
 - **No debrid needed** — Your seedbox IS the streaming server
 - **Free hosting** — Runs on Vercel Hobby tier ($0/month)
 
@@ -30,7 +32,7 @@ PVTKRRX is one runtime with three install routes:
 - **LAN Bridge** — Home-network route for your phone, TV, web, and Apple TV on the same Stremio account. Installs from the hosted LAN-pair URL and redirects back to the active host PC when paired.
 - **Remote Seedbox** — Public HTTPS route for away-from-home or seedbox-first playback. Requires public qBittorrent, Prowlarr, and file serving endpoints.
 
-See [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) for the canonical route model and [docs/STREMIO_INSTALL_TRACKER.md](docs/STREMIO_INSTALL_TRACKER.md) for current client install behavior.
+See [docs/CURRENT_DESIGN.md](docs/CURRENT_DESIGN.md) for the canonical current design, [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) for the route model, and [docs/STREMIO_INSTALL_TRACKER.md](docs/STREMIO_INSTALL_TRACKER.md) for current client install behavior.
 
 ## What's Working
 
@@ -46,7 +48,19 @@ See [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) for the canonical route m
 
 ## Current Project Status
 
-See [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for the authoritative current stage, active worktree items, and deployment checklist. See [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) for the current install/playback architecture.
+See [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for the authoritative current stage, active worktree items, and deployment checklist. See [docs/CURRENT_DESIGN.md](docs/CURRENT_DESIGN.md) for the live architecture and [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) for route-specific install/playback rules.
+
+## Documentation Guide
+
+Use these files as the live documentation set:
+
+- [docs/CURRENT_DESIGN.md](docs/CURRENT_DESIGN.md) — canonical current behavior
+- [ARCHITECTURE.md](ARCHITECTURE.md) — component/runtime structure
+- [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) — route selection and install rules
+- [docs/STREMIO_INSTALL_TRACKER.md](docs/STREMIO_INSTALL_TRACKER.md) — verified Stremio client truth table
+- [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) — current verification and deployment status
+
+The February 2026 planning docs under `docs/` are kept as project history and are now marked as historical where they no longer describe the live runtime.
 
 ## Quick Start
 
@@ -106,17 +120,23 @@ That's it. PVTKRRX has a **built-in file server** and will stream files directly
 ## How It Works
 
 ```
-Your Stremio App (any device)
-        ↓ HTTPS
-PVTKRRX (Vercel serverless, stateless)
-        ↓ decrypts your config from the addon URL
-Your Seedbox:
-   ├── Prowlarr  → searches your private trackers
-   └── qBittorrent → manages downloads + streams files
+Your Stremio App
+        ↓
+PVTKRRX route selected in configure
+   ├── PC Local      → local runtime on the Windows host
+   ├── LAN Bridge    → hosted relay resolves active LAN host, then redirects
+   └── Remote Seedbox → hosted route with public playback endpoints
+
+Back-end services used by the chosen route:
+   ├── Prowlarr / Torznab-compatible search
+   ├── qBittorrent WebUI
+   ├── Optional external file server
+   └── Optional TheSportsDB artwork enrichment
 ```
 
-All credentials are AES-256-GCM encrypted and embedded in the addon URL. The server never stores anything.
+Hosted configs are AES-256-GCM encrypted into addon tokens. Local installs save their working config inside the Windows runtime folder, and hosted relay/account state can be persisted in KV-backed storage when enabled.
 Playback/file state links are also issued as opaque encrypted tokens (instead of plain base64 JSON), so tracker endpoints and file hints are not directly readable from stream URLs.
+Hosted relay routes do not proxy video bytes, and hosted `/file` or `/playback` requests fail fast when playback still depends on the local runtime.
 
 ### Stream Types
 
@@ -139,6 +159,18 @@ This verifies:
 - local `PC Local` manifest/profile routes resolve
 - `/:token/configure` resolves
 - Invalid token routes return `400`
+
+Hosted runtime/security guard smoke check:
+
+```bash
+npm run smoke:guards
+```
+
+This validates:
+- hosted `/playback` fails fast on Vercel instead of waiting for local buffering
+- remote direct `/test-connection` calls are rejected
+- hosted `/test-connection` refuses loopback/LAN targets
+- local configure can still test loopback targets
 
 LAN pair + TV-hosted redirect smoke check:
 
@@ -187,6 +219,7 @@ ENCRYPTION_SECRET=your-secret-here npm start
 | PVTKRRX_LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW | Optional | Max heartbeat calls per window (default 30) |
 | PVTKRRX_LAN_PAIR_STATUS_MAX_PER_WINDOW | Optional | Max status calls per window (default 60) |
 | PVTKRRX_ENCRYPT_MAX_PER_WINDOW | Optional | Max `/encrypt` requests per window (default 30) |
+| PVTKRRX_TEST_CONNECTION_MAX_PER_WINDOW | Optional | Max `/test-connection` requests per window (default 20) |
 | PVTKRRX_AUTH_MAX_PER_WINDOW | Optional | Max Stremio AuthKey link requests per window (default 20) |
 | PVTKRRX_PROWLARR_CACHE_MS | Optional | Catalog search cache TTL in ms (default 120000) |
 | PVTKRRX_PROWLARR_SEARCH_TIMEOUT_MS | Optional | Timeout for catalog Prowlarr search calls in ms (default 7000) |

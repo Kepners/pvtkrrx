@@ -1,75 +1,81 @@
-# PVTKRRX - Specification
+# PVTKRRX Specification
 
-> **Status:** Approved — Concept Meeting Complete
-> **Date:** February 8, 2026
-> **Full spec source:** `C:\Users\kepne\projects\L - PVTKRRX\SPEC.MD`
+> **Status:** Live product specification
+> **Updated:** 2026-03-15
 
-## Overview
+## Product Statement
 
-PVTKRRX is a Stremio addon that connects users' private tracker seedbox infrastructure to Stremio for streaming. It's a pure API matchmaker — zero content proxying, fully stateless, free to host.
+PVTKRRX connects private tracker and seedbox infrastructure to Stremio without using debrid and without turning the hosted relay into a video proxy.
 
-## Goals
+## Current Product Goals
 
-- [x] Sports catalog (category 5060) — unique differentiator, #1 priority
-- [x] Movies & TV via IMDb matching through Jackett/Prowlarr
-- [x] Seedbox Library browsing (qBittorrent completed downloads)
-- [x] AES-256-GCM encrypted config in addon URL
-- [x] Zero operational cost (Vercel Hobby tier)
-- [x] Prowlarr support via shared Torznab protocol
+- Provide a real same-PC Stremio addon route for the Windows host running PVTKRRX.
+- Provide a same-account home-device route that can bridge hosted addon installs back to the active LAN host.
+- Provide a hosted route for public HTTPS seedbox playback.
+- Surface sports, movies, TV, and library content in one addon family.
+- Keep tracker/file hints protected by encrypted config tokens and opaque playback state tokens.
 
-## User Stories
+## Required Route Model
 
-- As a private tracker user, I want to browse sports content from my trackers in Stremio
-- As a seedbox owner, I want to stream already-downloaded content directly from my seedbox
-- As a user, I want to search for movies/TV and have them automatically download to my seedbox
-- As a user, I want to configure my seedbox details once and have them securely encrypted
+1. `PC Local`
+   - install on `127.0.0.1`
+   - use local `/file` and `/playback`
+   - same-host only
+2. `LAN Bridge`
+   - install from hosted manifest token
+   - use pair heartbeat plus hosted redirect
+   - same Stremio account across devices
+3. `Remote Seedbox`
+   - install from hosted manifest token
+   - use public HTTPS playback endpoints
+   - no LAN heartbeat dependency
 
-## Technical Requirements
+## Functional Scope
 
-- **Framework:** stremio-addon-sdk + Express (clockrr pattern)
-- **Hosting:** Vercel Hobby tier (serverless)
-- **Language:** JavaScript/Node.js (CommonJS)
-- **Dependencies:** stremio-addon-sdk, express, fast-xml-parser (3 total)
-- **Encryption:** AES-256-GCM with SHA-256 key derivation
-- **Entry Point:** Single index.js with Express + SDK router
+1. Configure page with route-aware install actions.
+2. Local config save for host-PC runtime.
+3. Hosted token encryption for non-local installs.
+4. Sports catalog with TheSportsDB enrichment and cached artwork.
+5. Movie and TV stream resolution using Prowlarr/Torznab-compatible search plus Cinemeta metadata assistance.
+6. Seedbox library browsing from qBittorrent state.
+7. Built-in `/file` serving with range support when the host can read the file locally.
+8. `/playback` queue-and-wait behavior for tracker content not yet ready.
+9. LAN pair heartbeat/status flow for hosted home-device routing.
+10. Optional Stremio AuthKey account linking and account-scoped access state.
+11. Windows desktop packaging for the local runtime.
+12. Route-aware connection testing: hosted configure may test public HTTP/HTTPS service endpoints, while local configure may test loopback/LAN endpoints on the host.
 
-## MVP Features (v1)
+## Non-Goals
 
-1. Configuration page with provider presets and connection testing
-2. Sports catalog with browse, search, and genre filters
-3. Movies catalog with IMDb matching via Cinemeta + Jackett
-4. TV catalog with season/episode resolution
-5. Seedbox Library catalog (qBittorrent completed downloads)
-6. Stream resolution with on-seedbox detection
-7. Torrent name parsing for rich stream descriptions
-8. AES-256-GCM encrypted config tokens
-9. Vercel deployment with single env var
+- Raw `192.168.x.x` addon install as the primary supported Stremio path.
+- Hosted relay proxying video bytes.
+- A standalone `.pvtk` file format.
+- Multiple independent seedbox profiles inside a single addon install.
 
-## Future Features (v2+)
+## Operational Requirements
 
-- TheSportsDB metadata enrichment for sports content
-- Subtitle detection (.srt files)
-- Multiple seedbox support
-- Tracker health dashboard
-- Smart quality preferences
-- Ratio protection warnings
+- Hosted manifests must be HTTPS.
+- Same-PC local install must remain available through `http://127.0.0.1:7000/local/manifest.json?mode=local`.
+- Hosted LAN Bridge requests must resolve to the best active LAN endpoint, preferring live LAN IP over `.local`.
+- Local playback should prefer the built-in file server when the runtime can read the completed file.
+- Hosted `/file` and `/playback` must fail fast instead of waiting on serverless runtime for local-only playback paths.
+- Hosted connection-test routes must be rate limited and reject loopback/LAN/private targets.
 
-## Design Requirements
-
-- Config page: Dark theme matching Stremio aesthetic
-- Stream names: Emoji-based status (⚡ On Seedbox, 📥 Available, ⏳ Downloading)
-- Provider presets: Feral, Whatbox, Ultra.cc, Seedhost, RapidSeedbox, etc.
-
-## Concept Meeting Documents
+## Canonical Companion Docs
 
 | Document | Purpose |
 |----------|---------|
-| [CLIENT_DRIVERS.md](CLIENT_DRIVERS.md) | Client motivations, decisions, MD directives |
-| [SCOPE_OF_WORKS.md](SCOPE_OF_WORKS.md) | Deliverables, timeline, acceptance criteria |
-| [TECHNICAL_SPEC.md](TECHNICAL_SPEC.md) | Architecture, APIs, security, performance |
-| [COMMERCIAL_SPEC.md](COMMERCIAL_SPEC.md) | Costs, scale projections, efficiency |
-| [PRODUCTION_SPEC.md](PRODUCTION_SPEC.md) | Build order, file structure, deployment |
+| [CURRENT_DESIGN.md](CURRENT_DESIGN.md) | Canonical current behavior |
+| [ROUTE_FRAMEWORK.md](ROUTE_FRAMEWORK.md) | Route selection rules |
+| [STREMIO_INSTALL_TRACKER.md](STREMIO_INSTALL_TRACKER.md) | Verified Stremio client install behavior |
+| [PROJECT_STATUS.md](PROJECT_STATUS.md) | Current delivery and verification status |
 
----
+## Historical Planning Docs
 
-*Updated: February 8, 2026 — Concept Meeting Output*
+The February 2026 planning records are kept for context:
+
+- [CLIENT_DRIVERS.md](CLIENT_DRIVERS.md)
+- [SCOPE_OF_WORKS.md](SCOPE_OF_WORKS.md)
+- [TECHNICAL_SPEC.md](TECHNICAL_SPEC.md)
+- [COMMERCIAL_SPEC.md](COMMERCIAL_SPEC.md)
+- [PRODUCTION_SPEC.md](PRODUCTION_SPEC.md)

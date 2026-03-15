@@ -3323,7 +3323,11 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(config)
         });
-        const data = await res.json();
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok || data.error) {
+          return setStatus('testStatus', 'err', data.error || 'Connection test failed');
+        }
 
         if (data.jackett && data.qbit) {
           setStatus('testStatus', 'ok', 'Both connections successful!');
