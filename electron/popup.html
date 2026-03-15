@@ -650,7 +650,7 @@
         </div>
 
         <div class="sidebar-note">
-          One runtime. Three separate Stremio routes. LAN Bridge should be the single browsable content addon. The Windows-side route is just a host helper.
+          One runtime. Three separate Stremio routes. PC Local is a real same-PC addon on this Windows machine, and LAN Bridge is the home-device route for phone, TV, and web.
         </div>
 
         <div class="credit">
@@ -663,20 +663,20 @@
         <div class="route-panel">
           <div class="panel-heading">
             <div class="panel-title">Stremio Routes</div>
-            <div class="panel-subtitle">Pick the route that matches playback. LAN Bridge is the content addon for movies, TV, sports, and library. The Windows-side route is only a helper.</div>
+            <div class="panel-subtitle">Pick the route that matches playback. PC Local is the real addon for this Windows machine. LAN Bridge is the route for your other home devices.</div>
           </div>
 
           <div class="route-grid">
             <article class="route-card local">
               <div class="route-kicker">Desktop only</div>
-              <div class="route-name">PC Gateway</div>
-              <div class="route-copy">Optional helper route on the same Windows machine as the PVTKRRX server. Not the main browse addon.</div>
+              <div class="route-name">PC Local</div>
+              <div class="route-copy">Real addon route for the same Windows machine as the PVTKRRX server.</div>
               <div class="route-points">
                 <span>No account sync</span>
                 <span>No heartbeat</span>
-                <span>Helper only</span>
+                <span>Same-PC browsing and playback</span>
               </div>
-              <button class="route-action" onclick="copyLocalInstallUrl()">Copy PC Gateway URL</button>
+              <button class="route-action" onclick="copyLocalInstallUrl()">Copy PC Local URL</button>
             </article>
 
             <article class="route-card lan">
@@ -809,24 +809,23 @@
     }
 
     let fitPopupTimer = null;
+    let lastRequestedPopupHeight = 0;
     function requestPopupFit() {
       if (!window.electronAPI || !window.electronAPI.fitPopupWindow) return;
       if (fitPopupTimer) clearTimeout(fitPopupTimer);
       fitPopupTimer = setTimeout(() => {
-        const windowEl = document.querySelector('.window');
-        const doc = document.documentElement;
+        const content = document.querySelector('.content');
+        const dragBar = document.querySelector('.drag-bar');
         const body = document.body;
-        const width = Math.max(
-          Math.ceil(windowEl ? windowEl.scrollWidth : 0),
-          Math.ceil(doc ? doc.scrollWidth : 0),
-          Math.ceil(body ? body.scrollWidth : 0)
-        ) + 4;
-        const height = Math.max(
-          Math.ceil(windowEl ? windowEl.scrollHeight : 0),
-          Math.ceil(doc ? doc.scrollHeight : 0),
-          Math.ceil(body ? body.scrollHeight : 0)
-        ) + 4;
-        window.electronAPI.fitPopupWindow({ width, height });
+        const height = Math.ceil(
+          Math.max(
+            content ? content.scrollHeight : 0,
+            body ? body.scrollHeight : 0
+          ) + (dragBar ? dragBar.offsetHeight : 20) + 8
+        );
+        if (Math.abs(height - lastRequestedPopupHeight) < 6) return;
+        lastRequestedPopupHeight = height;
+        window.electronAPI.fitPopupWindow({ height, lockWidth: true });
       }, 40);
     }
 
@@ -835,8 +834,8 @@
         if (!window.electronAPI || !window.electronAPI.copyLocalInstallUrl) throw new Error('Desktop bridge not available');
         const url = await window.electronAPI.copyLocalInstallUrl();
         if (!url) throw new Error('No URL returned');
-        setInstallCopyNote('Copied PC Gateway helper URL. Use LAN Bridge as the single content addon for desktop, web, mobile, and TV.');
-        setPathNote('PC Gateway URL copied');
+        setInstallCopyNote('Copied PC Local addon URL. Install this in Stremio Desktop on this same Windows PC when you want PVTKRRX to appear as a real local addon source.');
+        setPathNote('PC Local URL copied');
       } catch (err) {
         setInstallCopyNote(err.message || 'Failed to copy addon URL', true);
       }
@@ -894,12 +893,6 @@
       refreshDownloadPath();
       setInterval(refreshDownloadPath, 15000);
       requestPopupFit();
-      window.addEventListener('resize', requestPopupFit);
-      if (typeof ResizeObserver !== 'undefined') {
-        const observer = new ResizeObserver(() => requestPopupFit());
-        const root = document.querySelector('.window');
-        if (root) observer.observe(root);
-      }
       if (document.fonts && document.fonts.ready) {
         document.fonts.ready.then(() => requestPopupFit()).catch(() => {});
       }

@@ -774,13 +774,13 @@ function chooseLanPairEndpoint(state) {
   if (!endpoints.length) return null
   const score = (entry) => {
     let points = 0
-    if (entry.source === 'lan-ip') points += 30
-    if (entry.source === 'mdns') points += 20
+    if (entry.source === 'mdns') points += 40
+    if (entry.source === 'lan-ip') points += 25
     if (entry.source === 'loopback') points += 1
     try {
       const host = new URL(entry.baseUrl).hostname
-      if (isPrivateIpv4(host) && host !== '127.0.0.1') points += 10
-      if (host.endsWith('.local')) points += 5
+      if (host.endsWith('.local')) points += 20
+      if (isPrivateIpv4(host) && host !== '127.0.0.1') points += 8
     } catch (_) {}
     return points
   }
@@ -1413,7 +1413,7 @@ function getManifest(req) {
 
   const idSuffix = profile
   const nameLabel = profile === 'local'
-    ? 'PC Gateway'
+    ? 'PC Local'
     : profile === 'lan'
       ? 'LAN Bridge'
       : 'Remote Seedbox'
@@ -1434,10 +1434,7 @@ function getManifest(req) {
   if (profile === 'local') {
     return {
       ...nextManifest,
-      description: 'Host helper for the Windows PC running PVTKRRX. Install LAN Bridge as the single browsable addon for movies, TV, sports, and library.',
-      resources: ['catalog'],
-      types: [],
-      catalogs: []
+      description: 'Local addon for the same Windows PC running PVTKRRX. Browse movies, TV, sports, and library, and stream directly from the local server.'
     }
   }
 
@@ -2083,7 +2080,10 @@ app.post('/pair/status', async (req, res) => {
       ok: true,
       online: Boolean(preferred),
       updatedAt: Number(state.updatedAt || 0),
-      expiresAt: Number(state.expiresAt || 0)
+      expiresAt: Number(state.expiresAt || 0),
+      endpointBaseUrl: String(preferred?.baseUrl || ''),
+      endpointSource: String(preferred?.source || ''),
+      localHostname: String(state.localHostname || '')
     })
   } catch (err) {
     res.status(500).json({ ok: false, error: 'status failed', detail: err.message })
@@ -2138,23 +2138,23 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
   <div class="shell">
     <div class="card">
       <h2>PVTKRRX Install Routes</h2>
-      <p class="lead">PVTKRRX is one runtime with three separate Stremio routes. LAN Bridge is the single browsable addon for movies, TV, sports, and library. The Windows-side route is now just a host gateway/helper.</p>
+      <p class="lead">PVTKRRX is one runtime with three separate Stremio routes. PC Local is now a real same-PC addon for browsing and playback on this Windows machine. LAN Bridge remains the route for your other home devices.</p>
       <div class="route-grid">
         <section class="route-card">
           <div class="route-kicker">Same Windows machine</div>
-          <h3>PC Gateway</h3>
-          <p class="route-copy">Optional helper route for the Windows PC that runs the local PVTKRRX server. It should not create the main browse catalogs.</p>
+          <h3>PC Local</h3>
+          <p class="route-copy">Use this on the same Windows machine that runs the local PVTKRRX server. It now exposes the real movies, TV, sports, and library catalogs on this PC.</p>
           <ul class="route-list">
             <li>Uses loopback only</li>
             <li>No heartbeat or account sync</li>
-            <li>Host helper only, not the main content addon</li>
+            <li>Direct same-PC browsing and playback</li>
           </ul>
           <div class="actions">
-            <button class="btn" id="copyHttpBtn" type="button">Copy PC Gateway URL</button>
-            <a class="btn secondary" href="${pcConfigureUrl}">Open PC Gateway Setup</a>
+            <button class="btn" id="copyHttpBtn" type="button">Copy PC Local URL</button>
+            <a class="btn secondary" href="${pcConfigureUrl}">Open PC Local Setup</a>
           </div>
           <code id="manifestCode">${loopbackManifest}</code>
-          <p class="route-note">Use this only when you want host-side loopback/debug. Install LAN Bridge for the actual movies, TV, sports, and library catalogs.</p>
+          <p class="route-note">Install this in Stremio Desktop on this same Windows PC when you want PVTKRRX to appear as a real local addon source.</p>
           <code>${lanDebugManifest}</code>
         </section>
 
@@ -2170,7 +2170,7 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
           <div class="actions">
             <a class="btn" href="${lanConfigureUrl}">Open LAN Bridge Setup</a>
           </div>
-          <p class="route-note">This is the route that should sync across your Stremio account on home devices and remain the only visible PVTKRRX content addon.</p>
+          <p class="route-note">This is the route that should sync across your Stremio account on phone, TV, web, and Apple TV while the host PC stays online.</p>
         </section>
 
         <section class="route-card">

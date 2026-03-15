@@ -608,11 +608,13 @@ function fitMainWindowToContent(size = {}) {
   const bounds = mainWindow.getBounds()
   const display = screen.getDisplayMatching(bounds)
   const workArea = display?.workArea || { x: 0, y: 0, width: WINDOW_WIDTH, height: WINDOW_HEIGHT }
-  const maxWidth = Math.max(WINDOW_WIDTH, workArea.width - WINDOW_MARGIN)
   const maxHeight = Math.max(WINDOW_HEIGHT, workArea.height - WINDOW_MARGIN)
-  const requestedWidth = Math.ceil(Number(size?.width) || bounds.width || WINDOW_WIDTH)
+  const lockWidth = size?.lockWidth !== false
+  const requestedWidth = lockWidth
+    ? WINDOW_WIDTH
+    : Math.ceil(Number(size?.width) || bounds.width || WINDOW_WIDTH)
   const requestedHeight = Math.ceil(Number(size?.height) || bounds.height || WINDOW_HEIGHT)
-  const nextWidth = Math.max(WINDOW_WIDTH, Math.min(maxWidth, requestedWidth))
+  const nextWidth = Math.max(WINDOW_WIDTH, Math.min(workArea.width - WINDOW_MARGIN, requestedWidth))
   const nextHeight = Math.max(WINDOW_HEIGHT, Math.min(maxHeight, requestedHeight))
 
   if (Math.abs(bounds.width - nextWidth) < 4 && Math.abs(bounds.height - nextHeight) < 4) return

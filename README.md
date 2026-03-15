@@ -22,6 +22,16 @@ The addon handles: search → download → stream. PVTKRRX has a **built-in file
 - **No debrid needed** — Your seedbox IS the streaming server
 - **Free hosting** — Runs on Vercel Hobby tier ($0/month)
 
+## Route Framework
+
+PVTKRRX is one runtime with three install routes:
+
+- **PC Local** — Real same-PC addon for the Windows host running PVTKRRX. Installs from the copied `127.0.0.1` URL and exposes movies, TV, sports, and library on that machine.
+- **LAN Bridge** — Home-network route for your phone, TV, web, and Apple TV on the same Stremio account. Installs from the hosted LAN-pair URL and redirects back to the active host PC when paired.
+- **Remote Seedbox** — Public HTTPS route for away-from-home or seedbox-first playback. Requires public qBittorrent, Prowlarr, and file serving endpoints.
+
+See [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) for the canonical route model and [docs/STREMIO_INSTALL_TRACKER.md](docs/STREMIO_INSTALL_TRACKER.md) for current client install behavior.
+
 ## What's Working
 
 | Feature | Status |
@@ -36,7 +46,7 @@ The addon handles: search → download → stream. PVTKRRX has a **built-in file
 
 ## Current Project Status
 
-See [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for the authoritative current stage, active worktree items, and deployment checklist.
+See [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for the authoritative current stage, active worktree items, and deployment checklist. See [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) for the current install/playback architecture.
 
 ## Quick Start
 
@@ -57,9 +67,10 @@ npm start
 
 Then open `http://localhost:7000/configure` to enter your seedbox details.
 
-Use **Auto Setup Local / LAN** on the configure page to prefill local defaults and generate install links for:
-- this PC (`127.0.0.1`)
-- Android TV / phone on the same network (Method 4 hosted LAN pair URL)
+Use the configure page to prepare the route you actually want to use:
+- **PC Local** for this Windows host (`127.0.0.1`)
+- **LAN Bridge** for Android TV / phone / web on the same network and Stremio account
+- **Remote Seedbox** when your playback endpoints are public over HTTPS
 
 Auto Setup also attempts to:
 - install/start Prowlarr and qBittorrent (Windows, via winget + service/process start)
@@ -125,6 +136,7 @@ This verifies:
 - `/configure` loads
 - `POST /encrypt` returns a token
 - `/:token/manifest.json` resolves
+- local `PC Local` manifest/profile routes resolve
 - `/:token/configure` resolves
 - Invalid token routes return `400`
 
@@ -246,6 +258,7 @@ Practical result:
 
 Track current verified behavior in:
 - `docs/STREMIO_INSTALL_TRACKER.md`
+- `docs/ROUTE_FRAMEWORK.md`
 
 ### PVTKRRX not appearing in stream dropdown
 

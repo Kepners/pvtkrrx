@@ -1,29 +1,35 @@
 # PVTKRRX Project Status
 
-Updated: 2026-03-03
+Updated: 2026-03-15
 
 ## Current Stage
 
 PVTKRRX is in **post-MVP hardening and multi-device LAN pairing**.
 
 - Core addon flow (catalog, stream, playback, local config, encryption, desktop wrapper) is complete and shipping.
-- Local desktop usage is stable via `http://127.0.0.1:7000/local/manifest.json?mode=local`.
+- Current route model is `PC Local`, `LAN Bridge`, and `Remote Seedbox`.
+- `PC Local` is a real same-PC addon via `http://127.0.0.1:7000/local/manifest.json?mode=local`.
 - LAN pair relay flow for Android TV/mobile account-sync is implemented and covered by smoke checks.
 - Stremio AuthKey linking flow is implemented and smoke-tested with a local API mock.
+- The route architecture is now documented in `docs/ROUTE_FRAMEWORK.md`.
 
 ## What Is Implemented
 
 1. Local + hosted install modes with stable local config.
-2. Built-in file serving + progressive playback buffering.
-3. Sports catalog and artwork enrichment.
-4. Electron desktop packaging (`dist/` current release artifacts + `dist/releases/<version>/` archives).
-5. LAN pair relay plumbing:
+2. Three explicit install routes:
+   - `PC Local` for the host Windows machine
+   - `LAN Bridge` for same-account home-device sync
+   - `Remote Seedbox` for public HTTPS playback
+3. Built-in file serving + progressive playback buffering.
+4. Sports catalog and artwork enrichment.
+5. Electron desktop packaging (`dist/` current release artifacts + `dist/releases/<version>/` archives).
+6. LAN pair relay plumbing:
    - `POST /pair/heartbeat`
    - `POST /pair/status`
    - hosted route redirect to active LAN endpoint when pair is online
    - desktop background heartbeat loop + Stremio launch pulse
    - configure UI Method 4 hosted LAN-pair install URL generation
-6. LAN pair privacy hardening:
+7. LAN pair privacy hardening:
    - `/pair/status` now requires both `pairId` and `pairKey`
    - status responses no longer expose LAN endpoint metadata
    - hosted fallback responses avoid exposing resolver reason details
@@ -33,13 +39,13 @@ PVTKRRX is in **post-MVP hardening and multi-device LAN pairing**.
    - sensitive routes (`/encrypt`, `/pair/*`) use strict browser-origin allowlists
    - local admin routes (`/local-config`, `/auto-provision`, `/network-info`, local qBit control) are local-network/loopback guarded
 
-## Latest Automated Verification (2026-03-03)
+## Latest Automated Verification (2026-03-15)
 
 1. `npm run smoke:config` - PASS
 2. `npm run smoke:lan-pair` - PASS
 3. `npm run smoke:stremio-link` - PASS
 
-These checks validate configure/encrypt/install routes, LAN pair heartbeat/status + hosted redirect behavior, and Stremio AuthKey account-link flow.
+These checks validate the current `PC Local` install/profile routes, configure/encrypt/install behavior, LAN pair heartbeat/status + hosted redirect behavior, and Stremio AuthKey account-link flow.
 
 ## Required Vercel Configuration For LAN Pair Relay
 

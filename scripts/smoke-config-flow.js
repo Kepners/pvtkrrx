@@ -108,7 +108,7 @@ async function run() {
     assert.match(configureHtml, /<h2>LAN Bridge Quick Setup<\/h2>/, 'configure page should render LAN quick setup section')
     assert.match(configureHtml, /<h2>Manual \/ Fallback Install<\/h2>/, 'configure page should render manual install fallback section')
     assert.match(configureHtml, /id="installActionBtn"/, 'configure page should render install action button')
-    assert.match(configureHtml, /Copy PC Gateway URL/, 'configure page should render same-PC gateway helper action')
+    assert.match(configureHtml, /Copy PC Local URL/, 'configure page should render same-PC local install action')
     assert.match(configureHtml, /testConnection\(\)/, 'configure page should expose test connection action')
     assert.match(configureHtml, /Auto Setup \(Home LAN\)/, 'configure page should render auto setup action')
     assert.match(configureHtml, /id="quickInstallLanBtn"/, 'configure page should render quick install button')
@@ -143,7 +143,7 @@ async function run() {
     const localInstallRes = await fetch(`${base}/local/install`)
     assert.equal(localInstallRes.status, 200, 'GET /local/install should return 200')
     const localInstallHtml = await localInstallRes.text()
-    assert.match(localInstallHtml, /Copy PC Gateway URL/, 'local install helper should expose same-PC gateway copy action')
+    assert.match(localInstallHtml, /Copy PC Local URL/, 'local install helper should expose same-PC local copy action')
     assert.doesNotMatch(localInstallHtml, /Open In Stremio/, 'local install helper should not expose unreliable Stremio deep link action')
 
     const autoProvisionRes = await fetch(`${base}/auto-provision`, {
@@ -227,10 +227,10 @@ async function run() {
     assert.equal(localManifestRes.status, 200, 'GET /local/manifest.json should return 200 after local config save')
     const localManifest = await localManifestRes.json()
     assert.equal(localManifest.id, 'com.kepners.pvtkrrx.local')
-    assert.equal(localManifest.name, 'PVTKRRX (PC Gateway)')
+    assert.equal(localManifest.name, 'PVTKRRX (PC Local)')
     assert.equal(localManifest.behaviorHints?.configurationRequired, false)
-    assert.deepEqual(localManifest.types, [], 'local manifest should be a gateway helper with no top-level browse types')
-    assert.deepEqual(localManifest.catalogs, [], 'local manifest should not expose duplicate browse catalogs')
+    assert.ok(Array.isArray(localManifest.types) && localManifest.types.includes('sports'), 'local manifest should expose sports as a top-level type')
+    assert.ok(Array.isArray(localManifest.catalogs) && localManifest.catalogs.some((catalog) => catalog?.id === 'pvtkrrx-sports' && catalog?.type === 'sports'), 'local manifest should expose the sports catalog')
 
     const localSportsCatalogRes = await fetch(`${base}/local/catalog/sports/pvtkrrx-sports.json?mode=local`)
     assert.equal(localSportsCatalogRes.status, 200, 'GET /local/catalog/sports/pvtkrrx-sports.json should return 200')

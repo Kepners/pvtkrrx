@@ -118,5 +118,21 @@ npm start
 
 ---
 
+---
+
+## Git & Deploy Workflow
+
+**Branch:** `main` (single branch — dev and deploy are the same)
+
+```bash
+git add <files>
+git commit -m "🔥 feat/fix: description"
+git push origin main
+```
+
+Never push to a different branch expecting the live site to update.
+
+---
+
 *Created: February 8, 2026*
 

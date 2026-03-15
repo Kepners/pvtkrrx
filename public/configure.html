@@ -746,6 +746,27 @@
       background: linear-gradient(180deg, rgba(8, 18, 34, 0.74), rgba(9, 15, 28, 0.68));
       padding: 0.95rem;
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+      transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, opacity 0.2s ease;
+    }
+
+    .quick-step.current {
+      border-color: rgba(0, 246, 255, 0.42);
+      box-shadow:
+        inset 0 0 0 1px rgba(0, 246, 255, 0.12),
+        0 0 0 3px rgba(0, 246, 255, 0.08),
+        0 14px 28px -24px rgba(0, 246, 255, 0.45);
+      transform: translateY(-1px);
+    }
+
+    .quick-step.complete {
+      border-color: rgba(0, 255, 102, 0.28);
+      box-shadow:
+        inset 0 0 0 1px rgba(0, 255, 102, 0.08),
+        0 10px 22px -22px rgba(0, 255, 102, 0.38);
+    }
+
+    .quick-step.locked {
+      opacity: 0.82;
     }
 
     .quick-step-head {
@@ -813,6 +834,23 @@
       display: flex;
       gap: 0.6rem;
       flex-wrap: wrap;
+    }
+
+    @keyframes guided-pulse {
+      0%, 100% {
+        transform: translateY(0) scale(1);
+        box-shadow: 0 0 0 0 rgba(0, 246, 255, 0);
+      }
+      50% {
+        transform: translateY(-1px) scale(1.01);
+        box-shadow: 0 0 0 4px rgba(0, 246, 255, 0.12), 0 0 22px rgba(0, 246, 255, 0.2);
+      }
+    }
+
+    .step-cta {
+      border-color: rgba(0, 246, 255, 0.55) !important;
+      box-shadow: 0 0 0 3px rgba(0, 246, 255, 0.12), 0 0 20px rgba(0, 246, 255, 0.22);
+      animation: guided-pulse 1.7s ease-in-out infinite;
     }
 
     .quick-step-actions .btn-copy,
@@ -1149,16 +1187,16 @@
 
     <div class="card">
       <h2>Install Target</h2>
-      <p class="section-lead">Pick where you want to watch. For most home setups, choose LAN Bridge. It is the single PVTKRRX addon for movies, TV, sports, and library across desktop, web, phone, and TV.</p>
+      <p class="section-lead">Pick where you want to watch. PC Local is the real addon for this Windows machine. LAN Bridge is the home-network route for your phone, TV, web, and Apple TV.</p>
       <div class="mode-grid" id="installTargetSwitcher">
         <button type="button" class="mode-option" data-install-target="pc" onclick="setInstallTarget('pc')">
           <span class="mode-kicker">Desktop only</span>
-          <span class="mode-title">PC Gateway</span>
-          <span class="mode-copy">Optional helper only for the same Windows machine that runs the local PVTKRRX server.</span>
+          <span class="mode-title">PC Local</span>
+          <span class="mode-copy">Real same-PC addon for the Windows machine that runs the local PVTKRRX server.</span>
           <div class="summary-points">
             <span>Loopback URL only</span>
             <span>No account sync</span>
-            <span>Not the main browse addon</span>
+            <span>Direct same-PC browsing and playback</span>
           </div>
         </button>
         <button type="button" class="mode-option active" data-install-target="lan" onclick="setInstallTarget('lan')">
@@ -1185,7 +1223,7 @@
       <div class="hidden-select">
         <label for="installMode">Internal profile mode</label>
         <select id="installMode">
-          <option value="local">PC Gateway + LAN Bridge</option>
+          <option value="local">PC Local + LAN Bridge</option>
           <option value="hosted">Remote Seedbox</option>
         </select>
       </div>
@@ -1194,9 +1232,9 @@
 
     <div class="card mode-hidden" id="accountLinkCard">
       <h2>LAN Bridge Quick Setup</h2>
-      <p class="section-lead">This is the simple flow. When all three steps are green, click Install LAN Bridge In Stremio.</p>
+      <p class="section-lead" id="quickSetupLead">Follow the glow. Only the next required button pulses. When all three steps are green, click Install Or Refresh LAN Bridge In Stremio.</p>
       <div class="quick-setup-grid">
-        <section class="quick-step">
+        <section class="quick-step" id="quickStepStremioDesktop">
           <div class="quick-step-head">
             <div>
               <span class="quick-step-index">Step 1</span>
@@ -1206,12 +1244,12 @@
           </div>
           <p class="quick-step-copy" id="stremioDesktopMeta">Checking whether Stremio Desktop is installed on this Windows host.</p>
           <div class="quick-step-actions">
-            <button class="btn-copy" type="button" onclick="refreshLocalStremioStatus()">Check Again</button>
+            <button class="btn-copy" type="button" id="stremioCheckBtn" onclick="refreshLocalStremioStatus()">Check Again</button>
             <a class="secondary-link" id="stremioDesktopDownloadLink" href="https://www.stremio.com/downloads" target="_blank" rel="noopener">Download Stremio</a>
           </div>
         </section>
 
-        <section class="quick-step">
+        <section class="quick-step" id="quickStepAuthLink">
           <div class="quick-step-head">
             <div>
               <span class="quick-step-index">Step 2</span>
@@ -1222,29 +1260,29 @@
           <p class="quick-step-copy" id="authLinkMeta">Checking whether the signed-in Stremio session on this PC can be reused for LAN Bridge sync.</p>
           <div class="quick-step-actions">
             <button class="btn-copy" type="button" id="stremioQuickAutoBtn" onclick="launchStremioAuthKeyHelper(this)">Auto Find AuthKey</button>
-            <button class="btn-copy" type="button" onclick="openManualAccountTools()">Open Manual Account Tools</button>
+            <button class="btn-copy" type="button" id="stremioManualToolsBtn" onclick="openManualAccountTools()">Open Advanced Fallback Tools</button>
           </div>
         </section>
 
-        <section class="quick-step">
+        <section class="quick-step" id="quickStepInstall">
           <div class="quick-step-head">
             <div>
               <span class="quick-step-index">Step 3</span>
-              <div class="quick-step-title">Install The Addon In Stremio</div>
+              <div class="quick-step-title">Install Or Refresh The Addon In Stremio</div>
             </div>
             <span class="quick-step-badge" id="lanInstallBadge">Waiting</span>
           </div>
-          <p class="quick-step-copy" id="lanInstallMeta">Run Auto Setup once. When this step turns ready, click Install LAN Bridge In Stremio.</p>
+          <p class="quick-step-copy" id="lanInstallMeta">Run Auto Setup once. When this step turns ready, click Install Or Refresh LAN Bridge In Stremio.</p>
           <div class="quick-step-actions">
-            <button class="btn-test" type="button" onclick="autoSetup()">Auto Setup (Home LAN)</button>
-            <button class="btn-install" type="button" id="quickInstallLanBtn" onclick="triggerLanInstall()" disabled>Install LAN Bridge In Stremio</button>
+            <button class="btn-test" type="button" id="lanAutoSetupBtn" onclick="autoSetup()">Auto Setup (Home LAN)</button>
+            <button class="btn-install" type="button" id="quickInstallLanBtn" onclick="triggerLanInstall()" disabled>Install Or Refresh LAN Bridge In Stremio</button>
           </div>
-          <p class="quick-step-note" id="quickSetupHint">Auto Setup also checks Prowlarr, qBittorrent, local storage, and the signed-in Stremio session on this PC.</p>
+          <p class="quick-step-note" id="quickSetupHint">Auto Setup also checks Prowlarr, qBittorrent, local storage, and the signed-in Stremio session on this PC. If Stremio already has an older LAN Bridge URL, clicking Install again refreshes it.</p>
         </section>
       </div>
       <div id="autoStatus" class="status"></div>
       <details class="install-debug" id="accountLinkDetails">
-        <summary>Open manual sign-in and AuthKey fallback tools</summary>
+        <summary>Open advanced sign-in and AuthKey fallback tools</summary>
         <div class="install-debug-content">
           <label for="stremioEmail">Stremio Email (for one-click AuthKey fetch)</label>
           <div class="row">
@@ -1386,11 +1424,11 @@
       <div id="installLink" class="install-link">
         <div id="localInstall">
           <div id="installPanelPc" class="install-target-panel active">
-            <p class="install-section-title">PC Gateway Helper</p>
+            <p class="install-section-title">PC Local</p>
             <div class="url-row">
-              <button class="btn-copy" id="copyLocalInstallBtn" onclick="copyPrivateLink('localLoopback', this)">Copy PC Gateway URL</button>
+              <button class="btn-copy" id="copyLocalInstallBtn" onclick="copyPrivateLink('localLoopback', this)">Copy PC Local URL</button>
             </div>
-            <p class="install-note" id="openLinkNote">Optional host-side helper for this same Windows PC. Install LAN Bridge as the single movies, TV, sports, and library addon for actual browsing across devices.</p>
+            <p class="install-note" id="openLinkNote">Install this in Stremio Desktop on this same Windows PC when you want PVTKRRX to appear as a real local addon source for movies, TV, sports, and library.</p>
           </div>
 
           <div id="installPanelLan" class="install-target-panel">
@@ -1728,6 +1766,22 @@
       window.location.href = link.href;
     }
 
+    function setQuickStepState(stepId, state) {
+      const el = document.getElementById(stepId);
+      if (!el) return;
+      el.classList.remove('current', 'complete', 'locked');
+      if (state) el.classList.add(state);
+    }
+
+    function setGuidedButtonState(elementId, active, disabled) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      el.classList.toggle('step-cta', Boolean(active));
+      if (typeof disabled === 'boolean' && 'disabled' in el) {
+        el.disabled = disabled;
+      }
+    }
+
     function updateQuickSetupStatus() {
       const target = getInstallTarget();
       const quickCard = document.getElementById('accountLinkCard');
@@ -1739,9 +1793,15 @@
       }
 
       const quickAutoBtn = document.getElementById('stremioQuickAutoBtn');
+      const checkBtn = document.getElementById('stremioCheckBtn');
+      const manualToolsBtn = document.getElementById('stremioManualToolsBtn');
+      const autoSetupBtn = document.getElementById('lanAutoSetupBtn');
       const quickInstallBtn = document.getElementById('quickInstallLanBtn');
+      const quickLead = document.getElementById('quickSetupLead');
       const lanInstallReady = Boolean(privateInstallLinks.pairHostedStremio);
       const pairStatusText = String(document.getElementById('pairStatusNote')?.textContent || '').trim();
+      const step1Ready = canQueryLocalRuntime() && localStremioStatus.installed;
+      const step2Ready = step1Ready && Boolean(accountLinkState.accountUserId);
 
       if (!canQueryLocalRuntime()) {
         setQuickStepBadge('stremioDesktopBadge', 'error', 'Host PC Only');
@@ -1784,22 +1844,63 @@
       }
 
       if (quickAutoBtn) {
-        quickAutoBtn.disabled = !canQueryLocalRuntime();
+        quickAutoBtn.disabled = !step1Ready;
       }
 
       if (lanInstallReady) {
         setQuickStepBadge('lanInstallBadge', 'ready', 'Ready');
-        document.getElementById('lanInstallMeta').textContent = pairStatusText || 'LAN Bridge is prepared. Click Install LAN Bridge In Stremio now.';
+        document.getElementById('lanInstallMeta').textContent = pairStatusText || 'LAN Bridge is prepared. Click Install Or Refresh LAN Bridge In Stremio now.';
       } else if (!canQueryLocalRuntime()) {
         setQuickStepBadge('lanInstallBadge', 'error', 'Host PC Only');
         document.getElementById('lanInstallMeta').textContent = 'Run this on the Windows host PC so PVTKRRX can prepare the hosted LAN Bridge URL for Stremio.';
       } else {
         setQuickStepBadge('lanInstallBadge', 'checking', 'Waiting');
-        document.getElementById('lanInstallMeta').textContent = 'Run Auto Setup once. PVTKRRX will check services, reuse the signed-in Stremio account if possible, then make the Install button ready.';
+        document.getElementById('lanInstallMeta').textContent = 'Run Auto Setup once after the secure account link is ready. PVTKRRX will check services, reuse the signed-in Stremio account, and then make the Install button ready.';
+      }
+
+      if (checkBtn) {
+        checkBtn.disabled = !canQueryLocalRuntime();
+      }
+
+      if (manualToolsBtn) {
+        manualToolsBtn.disabled = !step1Ready;
+      }
+
+      if (autoSetupBtn) {
+        autoSetupBtn.disabled = !step2Ready;
       }
 
       if (quickInstallBtn) {
         quickInstallBtn.disabled = !lanInstallReady;
+      }
+
+      setQuickStepState('quickStepStremioDesktop', !step1Ready ? 'current' : 'complete');
+      setQuickStepState('quickStepAuthLink', !step1Ready ? 'locked' : (step2Ready ? 'complete' : 'current'));
+      setQuickStepState('quickStepInstall', !step2Ready ? 'locked' : (lanInstallReady ? 'complete' : 'current'));
+
+      setGuidedButtonState('stremioCheckBtn', false, !canQueryLocalRuntime());
+      setGuidedButtonState('stremioDesktopDownloadLink', false, false);
+      setGuidedButtonState('stremioQuickAutoBtn', false, !step1Ready);
+      setGuidedButtonState('lanAutoSetupBtn', false, !step2Ready);
+      setGuidedButtonState('quickInstallLanBtn', false, !lanInstallReady);
+
+      if (!step1Ready) {
+        if (!localStremioStatus.installed) {
+          setGuidedButtonState('stremioDesktopDownloadLink', true, false);
+          if (quickLead) quickLead.textContent = 'Step 1 first. Install Stremio Desktop on this Windows PC, then come back and click Check Again.';
+        } else {
+          setGuidedButtonState('stremioCheckBtn', true, !canQueryLocalRuntime());
+          if (quickLead) quickLead.textContent = 'Step 1 first. Let PVTKRRX confirm Stremio Desktop on this Windows PC.';
+        }
+      } else if (!step2Ready) {
+        setGuidedButtonState('stremioQuickAutoBtn', true, false);
+        if (quickLead) quickLead.textContent = 'Step 2 next. Click Auto Find AuthKey so the server can secure the Stremio account link from this PC.';
+      } else if (!lanInstallReady) {
+        setGuidedButtonState('lanAutoSetupBtn', true, false);
+        if (quickLead) quickLead.textContent = 'Step 3 next. Click Auto Setup once so PVTKRRX checks Prowlarr, qBittorrent, storage, and the LAN Bridge install URL.';
+      } else {
+        setGuidedButtonState('quickInstallLanBtn', true, false);
+        if (quickLead) quickLead.textContent = 'All three steps are green. Click Install Or Refresh LAN Bridge In Stremio now.';
       }
     }
 
@@ -2447,10 +2548,15 @@
         pairStatusOnlineStreak += 1;
         const lastSeen = formatRelativeTime(data.updatedAt);
         const suffix = lastSeen ? ` (${lastSeen})` : '';
-        setPairStatusNote(`LAN Bridge online${suffix}.`);
+        let endpointText = '';
+        try {
+          const endpointBaseUrl = String(data.endpointBaseUrl || '').trim();
+          if (endpointBaseUrl) endpointText = ` via ${new URL(endpointBaseUrl).host}`;
+        } catch (_) {}
+        setPairStatusNote(`LAN Bridge online${endpointText}${suffix}.`);
         if (pairStatusOnlineStreak >= 2) {
           stopLanPairStatusPolling();
-          setPairStatusNote(`LAN Bridge online${suffix}. Status checks paused.`);
+          setPairStatusNote(`LAN Bridge online${endpointText}${suffix}. Status checks paused.`);
         }
       } catch (_) {
         pairStatusOnlineStreak = 0;
@@ -2511,13 +2617,13 @@
 
       if (relayNote) {
         relayNote.textContent = linked
-          ? `Linked Stremio account detected${sourceText}. The hosted LAN Bridge is ready to be installed once in Stremio, then your phone and TV can sync it.`
+          ? `Linked Stremio account detected${sourceText}. The hosted LAN Bridge is ready to install or refresh once in Stremio, then your phone and TV can sync it.`
           : 'Use the manual hosted URL only if the Quick Setup install button above is not enough.';
       }
 
       if (syncNote) {
         syncNote.textContent = linked
-          ? 'LAN Bridge is the synced addon for your same-account home devices. PC Gateway stays a helper only.'
+          ? 'LAN Bridge is the synced addon for your same-account home devices. If Stremio still shows empty content, uninstall the older LAN Bridge entry and use Install Or Refresh again.'
           : 'No Stremio account is linked yet. Auto Find AuthKey is the normal home-device step if you want the addon to sync instead of opening the hosted URL on each device.';
       }
 
@@ -2529,7 +2635,7 @@
 
       if (quickSetupHint) {
         quickSetupHint.textContent = linked
-          ? `The server has already checked the Stremio account${sourceText}. Run Auto Setup if the install button is not ready yet, then install LAN Bridge once in Stremio.`
+          ? `The server has already checked the Stremio account${sourceText}. Run Auto Setup if the install button is not ready yet, then install or refresh LAN Bridge once in Stremio.`
           : 'Auto Setup checks Prowlarr, qBittorrent, local storage, and the signed-in Stremio session on this PC. Manual tools stay below as fallback only.';
       }
 
@@ -2609,8 +2715,8 @@
       const installActionBtn = document.getElementById('installActionBtn');
       const connectionSectionLead = document.getElementById('connectionSectionLead');
       if (target === 'pc') {
-        if (installActionLead) installActionLead.textContent = 'Use these manual tools to prepare the optional PC Gateway helper on this Windows machine. LAN Bridge should remain the single content addon for browsing movies, TV, sports, and library.';
-        if (installActionBtn) installActionBtn.textContent = 'Prepare PC Gateway';
+        if (installActionLead) installActionLead.textContent = 'Use these manual tools to prepare the real PC Local addon on this Windows machine. LAN Bridge is still the route for your other home devices.';
+        if (installActionBtn) installActionBtn.textContent = 'Prepare PC Local';
         if (connectionSectionLead) connectionSectionLead.textContent = 'Home mode uses built-in local file serving. Use the Storage tab if completed files may live on NAS shares or extra drives.';
       } else if (target === 'lan') {
         if (installActionLead) installActionLead.textContent = 'Only use these manual tools if Quick Setup above did not finish cleanly or you need the raw LAN Bridge URLs for troubleshooting.';
@@ -2667,7 +2773,7 @@
       const target = getInstallTarget();
       const hint = document.getElementById('installModeHint');
       if (target === 'pc') {
-        hint.textContent = 'PC Gateway selected. This route only works on this Windows host and should stay a helper route. LAN Bridge is the content addon that should sync and browse on home devices.';
+        hint.textContent = 'PC Local selected. This route works on this Windows host and installs a real same-PC addon for browsing and playback. LAN Bridge is the route for your other home devices.';
       } else if (target === 'lan') {
         hint.textContent = 'LAN Bridge selected. This is the normal home setup. The app checks Stremio on this Windows PC, reuses the signed-in Stremio account when possible, then prepares the addon install for your home devices.';
       } else {
@@ -2890,7 +2996,7 @@
       }
 
       if (openNote) {
-        openNote.textContent = 'Optional helper for this Windows host only. Install LAN Bridge for the actual PVTKRRX browsing experience on desktop, web, phone, TV, and Apple TV.';
+        openNote.textContent = 'Use the PC Local URL on this Windows host when you want PVTKRRX to show up as a real local addon source in Stremio Desktop. Use LAN Bridge for your phone, TV, web, and Apple TV.';
       }
     }
 
@@ -2949,8 +3055,8 @@
           'stremioLinkLan',
           hostedStremioUrl,
           accountLinkState.accountUserId
-            ? 'Install LAN Bridge In Stremio (Sync Account)'
-            : 'Install LAN Bridge In Stremio'
+            ? 'Install Or Refresh LAN Bridge In Stremio (Sync Account)'
+            : 'Install Or Refresh LAN Bridge In Stremio'
         );
 
         startLanPairStatusPolling();
@@ -3011,9 +3117,9 @@
           const target = getInstallTarget();
           const message = target === 'lan'
             ? (linkedDuringSetup
-              ? 'Auto setup complete. The server checked your Stremio account and LAN Bridge is ready to install in Stremio.'
-              : 'Auto setup complete. LAN Bridge is ready. If the account step is not green yet, use Auto Find AuthKey once and then install the addon in Stremio.')
-            : 'Auto setup complete. PC Gateway is ready on this Windows host, while LAN Bridge remains the main content addon.';
+              ? 'Auto setup complete. The server checked your Stremio account and LAN Bridge is ready to install or refresh in Stremio.'
+              : 'Auto setup complete. LAN Bridge is ready. If the account step is not green yet, use Auto Find AuthKey once and then install or refresh the addon in Stremio.')
+            : 'Auto setup complete. PC Local is ready on this Windows host, and LAN Bridge remains ready for your other home devices.';
           setStatus('autoStatus', 'ok', message);
         } else {
           const note = Array.isArray(data?.notes) && data.notes.length ? data.notes[0] : (data?.message || 'Provisioning incomplete');
@@ -3169,7 +3275,7 @@
         try {
           const u = new URL(value);
           if (isPrivateHostname(u.hostname)) {
-            return `${label} uses ${u.hostname}. Remote Seedbox needs public URLs. Use PC Gateway or LAN Bridge instead.`;
+            return `${label} uses ${u.hostname}. Remote Seedbox needs public URLs. Use PC Local or LAN Bridge instead.`;
           }
         } catch (e) {
           return `${label} is not a valid URL`;
@@ -3299,9 +3405,9 @@
             'ok',
             target === 'lan'
               ? (accountLinkState.accountUserId
-                  ? 'Saved. LAN Bridge is ready. Install it once in Stremio and let your linked home devices sync.'
-                  : 'Saved. LAN Bridge is prepared. If the account step is not green yet, run Auto Find AuthKey once before installing it in Stremio.')
-              : 'Saved. PC Gateway helper URL is ready. LAN Bridge should stay the main content addon.'
+                  ? 'Saved. LAN Bridge is ready. Install or refresh it once in Stremio and let your linked home devices sync.'
+                  : 'Saved. LAN Bridge is prepared. If the account step is not green yet, run Auto Find AuthKey once before installing or refreshing it in Stremio.')
+              : 'Saved. PC Local URL is ready for Stremio Desktop on this Windows host. LAN Bridge remains the route for your other home devices.'
           );
         } else {
           stopLanPairStatusPolling();

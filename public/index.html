@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PVTKRRX - Three Routes</title>
-  <meta name="description" content="PVTKRRX separates Stremio into three explicit routes: PC Gateway, LAN Bridge, and Remote Seedbox.">
+  <meta name="description" content="PVTKRRX separates Stremio into three explicit routes: PC Local, LAN Bridge, and Remote Seedbox.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@500;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -885,7 +885,7 @@
           PC LOCAL, LAN BRIDGE, REMOTE SEEDBOX.
         </p>
         <div class="cta-row">
-          <a class="btn btn-primary" href="/configure?target=pc">PC Gateway</a>
+          <a class="btn btn-primary" href="/configure?target=pc">PC Local</a>
           <a class="btn btn-secondary" href="/configure?target=lan">LAN Bridge</a>
           <a class="btn btn-secondary" href="/configure?target=seedbox">Remote Seedbox</a>
           <a class="btn btn-secondary" href="/runbooks">Seedbox Runbooks</a>
@@ -896,15 +896,15 @@
     <section class="route-grid">
       <article class="route-card">
         <div class="route-kicker">Desktop only</div>
-        <div class="route-name">PC Gateway</div>
-        <p class="route-copy">Optional helper route on the same Windows machine that runs the PVTKRRX desktop server.</p>
+        <div class="route-name">PC Local</div>
+        <p class="route-copy">Real same-PC addon route on the Windows machine that runs the PVTKRRX desktop server.</p>
         <ul class="route-list">
           <li>Loopback install only</li>
           <li>No heartbeat</li>
           <li>Helper only, not the main browse addon</li>
         </ul>
         <div class="route-actions">
-          <a class="btn btn-primary" href="/local/install">Open PC Gateway Helper</a>
+          <a class="btn btn-primary" href="/local/install">Open PC Local Setup</a>
         </div>
       </article>
 
@@ -969,7 +969,7 @@
           <summary>Do I need three different apps?</summary>
           <div class="faq-answer">
             No. PVTKRRX is one runtime with three separate routes inside it:
-            <code>PC Gateway</code>, <code>LAN Bridge</code>, and <code>Remote Seedbox</code>.
+            <code>PC Local</code>, <code>LAN Bridge</code>, and <code>Remote Seedbox</code>.
             The important rule is to install the route that matches the playback location.
           </div>
         </details>
