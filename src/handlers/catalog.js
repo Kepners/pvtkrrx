@@ -8,6 +8,8 @@ const { resolveSportHint, isSportsNoiseTitle, isLikelySportsEventTitle } = requi
 const { isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { formatSize } = require('../utils/streams')
 const { makeSportsThumbUrl } = require('../utils/sportsThumb')
+const { parseSportsTitle } = require('../utils/sportsTitleParser')
+const { mapLeague } = require('../utils/leagueMap')
 
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 const cinemeta = new CinemetaClient()
@@ -45,6 +47,23 @@ function imdbPoster(imdbId, size = 'medium') {
 
 function placeholderPoster() {
   return BRAND_POSTER
+}
+
+function normalizeSportsKeyPart(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '')
+}
+
+function sportHintFromLeagueCode(value) {
+  const code = normalizeSportsKeyPart(value)
+  if (!code) return ''
+  if (code === 'nba') return 'basketball'
+  if (code === 'nfl') return 'american-football'
+  if (code === 'ufc') return 'mma'
+  if (code === 'f1') return 'motorsport'
+  if (mapLeague(value)) return 'football'
+  return ''
 }
 
 function extractYear(value) {
@@ -287,7 +306,11 @@ function dedupeByImdbBest(items, query = '') {
   return [...bestById.values()].sort((a, b) => compareItems(a, b, query))
 }
 
-function normalizeSportsEventTitle(title) {
+function normalizeSportsEventTitle(title, parsedSportsEvent = null) {
+  if (parsedSportsEvent?.homeTeam && parsedSportsEvent?.awayTeam) {
+    return `${parsedSportsEvent.homeTeam} vs ${parsedSportsEvent.awayTeam}`.trim()
+  }
+
   return cleanTitle(title)
     .replace(/\butd\b/gi, 'united')
     .replace(/\b\d{3,4}p\d*\b/gi, ' ')
@@ -297,7 +320,21 @@ function normalizeSportsEventTitle(title) {
     .trim()
 }
 
-function sportsEventKey(title) {
+function sportsEventKey(input) {
+  const parsedSportsEvent = input && typeof input === 'object'
+    ? (input.parsedSportsEvent || parseSportsTitle(input.title || ''))
+    : parseSportsTitle(input)
+
+  if (parsedSportsEvent?.league && parsedSportsEvent?.date && parsedSportsEvent?.homeTeam && parsedSportsEvent?.awayTeam) {
+    return [
+      normalizeSportsKeyPart(parsedSportsEvent.league),
+      String(parsedSportsEvent.date || '').slice(0, 10),
+      normalizeSportsKeyPart(parsedSportsEvent.homeTeam),
+      normalizeSportsKeyPart(parsedSportsEvent.awayTeam)
+    ].filter(Boolean).join('-')
+  }
+
+  const title = typeof input === 'string' ? input : input?.title
   const stop = new Set(['vs', 'v', 'at', 'fps', 'hotspur', 'super', 'sunday'])
   const tokens = normalizeSportsEventTitle(title)
     .toLowerCase()
@@ -320,17 +357,38 @@ function getSportsVariantTag(title) {
 function groupSportsItems(items, query = '') {
   const groups = new Map()
   for (const item of items || []) {
-    const display = normalizeSportsEventTitle(item.title) || cleanTitle(item.title) || String(item.title || '').trim()
+    const parsedSportsEvent = item?.parsedSportsEvent || parseSportsTitle(item?.title || '')
+    const display = normalizeSportsEventTitle(item.title, parsedSportsEvent) || cleanTitle(item.title) || String(item.title || '').trim()
     if (!display) continue
-    const baseKey = sportsEventKey(item.title)
-    const key = `${baseKey}|${getSportsVariantTag(item.title)}`
+    const baseKey = sportsEventKey({ title: item.title, parsedSportsEvent })
+    const key = parsedSportsEvent?.league && parsedSportsEvent?.date && parsedSportsEvent?.homeTeam && parsedSportsEvent?.awayTeam
+      ? baseKey
+      : `${baseKey}|${getSportsVariantTag(item.title)}`
     const current = groups.get(key)
     if (!current) {
-      groups.set(key, { display, baseKey, best: item, count: 1 })
+      groups.set(key, {
+        display,
+        baseKey,
+        best: item,
+        count: 1,
+        parsedSportsEvent,
+        mappedLeague: mapLeague(parsedSportsEvent?.league || '') || ''
+      })
       continue
     }
     current.count += 1
-    if (compareItems(item, current.best, query) < 0) current.best = item
+    if (!current.parsedSportsEvent && parsedSportsEvent) {
+      current.parsedSportsEvent = parsedSportsEvent
+      current.mappedLeague = mapLeague(parsedSportsEvent?.league || '') || current.mappedLeague
+    }
+    if (compareItems(item, current.best, query) < 0) {
+      current.best = item
+      current.display = display || current.display
+      if (parsedSportsEvent) {
+        current.parsedSportsEvent = parsedSportsEvent
+        current.mappedLeague = mapLeague(parsedSportsEvent?.league || '') || current.mappedLeague
+      }
+    }
   }
   return [...groups.values()].sort((a, b) => compareItems(a.best, b.best, query))
 }
@@ -415,14 +473,19 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
   }
 
   const requestedSportHint = resolveSportHint({ explicitHint: extra.genre })
-  const normalizedItems = items.map(item => ({
-    ...item,
-    sportHint: resolveSportHint({
-      explicitHint: item?.sportHint,
-      categoryHint: requestedSportHint,
-      title: item?.title
-    })
-  }))
+  const normalizedItems = items.map(item => {
+    const parsedSportsEvent = parseSportsTitle(item?.title || '')
+    return {
+      ...item,
+      parsedSportsEvent,
+      mappedLeague: mapLeague(parsedSportsEvent?.league || '') || '',
+      sportHint: resolveSportHint({
+        explicitHint: item?.sportHint,
+        categoryHint: sportHintFromLeagueCode(parsedSportsEvent?.league || '') || requestedSportHint,
+        title: item?.title
+      })
+    }
+  })
 
   const strictFiltered = normalizedItems.filter(item =>
     (isSportsOnlyIndexer(item.indexer) || Boolean(item.sportHint)) &&
@@ -441,39 +504,41 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
 
   const skip = parseInt(extra.skip || '0', 10)
   const pageGroups = grouped.slice(skip, skip + limit)
-  const sportsDbLookupLimit = Math.min(pageGroups.length, 10)
   const artworkByBaseKey = new Map()
   const metas = await mapLimit(pageGroups, 6, async (group, index) => {
     const item = group.best
-    const displayTitle = group.display || cleanTitle(item.title) || item.title
+    const parsedSportsEvent = group.parsedSportsEvent || item.parsedSportsEvent || parseSportsTitle(item.title || '')
+    const mappedLeague = group.mappedLeague || item.mappedLeague || mapLeague(parsedSportsEvent?.league || '') || ''
+    const displayTitle = group.display || normalizeSportsEventTitle(item.title, parsedSportsEvent) || cleanTitle(item.title) || item.title
     const resolvedSportHint = resolveSportHint({
-      explicitHint: item?.sportHint,
+      explicitHint: parsedSportsEvent ? (sportHintFromLeagueCode(parsedSportsEvent.league) || item?.sportHint) : item?.sportHint,
       categoryHint: requestedSportHint,
-      title: displayTitle
+      title: item?.title || displayTitle
     })
     let sportsArtwork = artworkByBaseKey.get(group.baseKey) || null
-    if (index < sportsDbLookupLimit) {
-      try {
-        if (!sportsArtwork) {
-          sportsArtwork = await sportsDb.getEventArtwork({
-            title: displayTitle,
-            publishDate: item.pubDate,
-            sportHint: resolvedSportHint
-          })
-        }
-        if (!sportsArtwork) {
-          sportsArtwork = await sportsDb.getEventArtwork({ ...item, sportHint: resolvedSportHint })
-        }
-      } catch (_) {
-        // keep fallback flow below
+    try {
+      if (!sportsArtwork) {
+        sportsArtwork = await sportsDb.getEventArtwork({
+          ...item,
+          title: item.title,
+          publishDate: item.pubDate || item.publishDate || '',
+          sportHint: resolvedSportHint,
+          league: parsedSportsEvent?.league || mappedLeague,
+          date: parsedSportsEvent?.date || '',
+          homeTeam: parsedSportsEvent?.homeTeam || '',
+          awayTeam: parsedSportsEvent?.awayTeam || '',
+          quality: parsedSportsEvent?.quality || ''
+        })
       }
-      if (sportsArtwork && group.baseKey) {
-        artworkByBaseKey.set(group.baseKey, sportsArtwork)
-      }
+    } catch (_) {
+      // keep fallback flow below
+    }
+    if (sportsArtwork && group.baseKey) {
+      artworkByBaseKey.set(group.baseKey, sportsArtwork)
     }
 
-    const eventDate = String(sportsArtwork?.eventDate || '').trim()
-    const league = String(sportsArtwork?.league || '').trim()
+    const eventDate = String(sportsArtwork?.eventDate || parsedSportsEvent?.date || '').trim()
+    const league = String(sportsArtwork?.league || mappedLeague || parsedSportsEvent?.league || '').trim()
     const descriptionParts = [
       `${item.seeders} seeders`,
       formatSize(item.size),
@@ -493,7 +558,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
       y: mediaType,
       k: 'sports',
       n: displayTitle,
-      t: displayTitle,
+      t: item.title || displayTitle,
       h: '',
       l: '',
       i: item.indexer,
@@ -504,6 +569,9 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
       e: eventDate,
       g: league,
       r: resolvedSportHint,
+      u: parsedSportsEvent?.league || '',
+      o: parsedSportsEvent?.homeTeam || '',
+      w: parsedSportsEvent?.awayTeam || '',
       v: String(sportsArtwork?.eventId || '').trim(),
       a: sportsArtwork?.poster || sportsArtwork?.image || posterUrl || '',
       b: backgroundUrl

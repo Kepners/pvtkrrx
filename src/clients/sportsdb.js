@@ -2,22 +2,27 @@ const fs = require('fs')
 const path = require('path')
 const { cleanTitle } = require('../utils/parser')
 const { detectSport, stripSportTerms } = require('../utils/sportClassifier')
+const { parseSportsTitle } = require('../utils/sportsTitleParser')
+const { mapLeague } = require('../utils/leagueMap')
 
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json'
 const DEFAULT_API_KEY = '123'
 const DEFAULT_TIMEOUT_MS = 8000
-const DEFAULT_HIT_CACHE_HOURS = 24
-const DEFAULT_MISS_CACHE_MINUTES = 30
 const PERSIST_FILE_NAME = 'sportsdb-poster-cache.json'
 const PERSIST_MAX_ENTRIES = 5000
-const CACHE_KEY_VERSION = 'v2'
+const CACHE_KEY_VERSION = 'v3'
 const RATE_LIMIT_COOLDOWN_MS = 10 * 60 * 1000
+const DEFAULT_ARTWORK_CACHE_HOURS = 24
+const DEFAULT_MISS_CACHE_HOURS = 6
+const STRUCTURED_EVENT_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const LEAGUE_ASSET_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000
 
 const cache = new Map()
 const inFlight = new Map()
 const leagueCache = new Map()
 const teamCache = new Map()
 const eventCache = new Map()
+const eventInFlight = new Map()
 const endpointCache = new Map()
 const endpointInFlight = new Map()
 const leaguesBySportCache = new Map()
@@ -89,6 +94,21 @@ function persistResolvedPoster(key, value, expiresAt) {
   schedulePersistFlush()
 }
 
+function getCachedValue(store, key) {
+  const hit = store.get(key)
+  if (!hit) return undefined
+  if (!Number.isFinite(hit.expiresAt) || hit.expiresAt <= Date.now()) {
+    store.delete(key)
+    return undefined
+  }
+  return hit.value
+}
+
+function setCachedValue(store, key, value, ttlMs) {
+  store.set(key, { value, expiresAt: Date.now() + ttlMs })
+  return value
+}
+
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
 }
@@ -103,6 +123,26 @@ function applyTeamAliases(value) {
     text = text.replace(alias.re, alias.value)
   }
   return normalizeSpace(text)
+}
+
+function normalizeTeamName(value) {
+  return normalizeToken(applyTeamAliases(String(value || '').replace(/[._]+/g, ' ')))
+}
+
+function normalizeLeagueName(value) {
+  const mapped = mapLeague(value)
+  return normalizeToken(mapped || value)
+}
+
+function sportKeyFromLeagueCode(value) {
+  const code = normalizeToken(value).replace(/\s+/g, '')
+  if (!code) return ''
+  if (['nba'].includes(code)) return 'basketball'
+  if (['nfl'].includes(code)) return 'american-football'
+  if (['ufc'].includes(code)) return 'mma'
+  if (['f1'].includes(code)) return 'motorsport'
+  if (mapLeague(value)) return 'football'
+  return ''
 }
 
 function sportsDbNameForSportKey(sportKey) {
@@ -150,6 +190,31 @@ function normalizeTitle(value) {
   const withAliases = applyTeamAliases(cleaned)
   const stripped = stripSportTerms(withAliases)
   return normalizeSpace(stripped || cleaned)
+}
+
+function parseIsoDate(value) {
+  const match = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (
+    !Number.isFinite(date.getTime()) ||
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) {
+    return null
+  }
+  return date
+}
+
+function dateDistanceDays(a, b) {
+  const left = parseIsoDate(a)
+  const right = parseIsoDate(b)
+  if (!left || !right) return Number.POSITIVE_INFINITY
+  return Math.abs(Math.round((left.getTime() - right.getTime()) / (24 * 60 * 60 * 1000)))
 }
 
 function capitalizeWords(value) {
@@ -471,8 +536,41 @@ function pickTeamImage(team) {
   return ''
 }
 
-function cacheKey(apiKey, title, publishDate, eventId = '', sportHint = '') {
-  return `${CACHE_KEY_VERSION}|${String(apiKey || '').trim().toLowerCase()}|${String(eventId || '').trim().toLowerCase()}|${normalizeToken(title)}|${String(publishDate || '').slice(0, 10)}|${normalizeToken(sportHint)}`
+function buildStructuredEventData(item) {
+  const explicitLeague = normalizeSpace(item?.league || item?.leagueCode || '')
+  const explicitDate = extractDateHint(item?.date || item?.eventDate || '', item?.publishDate || item?.pubDate || '')
+  const explicitHomeTeam = normalizeSpace(item?.homeTeam || '')
+  const explicitAwayTeam = normalizeSpace(item?.awayTeam || '')
+  if (explicitLeague && explicitDate && explicitHomeTeam && explicitAwayTeam) {
+    return {
+      league: explicitLeague,
+      date: explicitDate,
+      homeTeam: explicitHomeTeam,
+      awayTeam: explicitAwayTeam,
+      quality: normalizeSpace(item?.quality || ''),
+      raw: String(item?.title || '').trim()
+    }
+  }
+
+  return parseSportsTitle(item?.title || '')
+}
+
+function structuredFingerprint(event) {
+  if (!event) return ''
+  return [
+    normalizeLeagueName(event.league),
+    String(event.date || '').slice(0, 10),
+    normalizeTeamName(event.homeTeam),
+    normalizeTeamName(event.awayTeam)
+  ].join('|')
+}
+
+function structuredLookupCacheKey(apiKey, event) {
+  return `${CACHE_KEY_VERSION}|structured|${String(apiKey || '').trim().toLowerCase()}|${structuredFingerprint(event)}`
+}
+
+function cacheKey(apiKey, title, publishDate, eventId = '', sportHint = '', structuredEvent = null) {
+  return `${CACHE_KEY_VERSION}|${String(apiKey || '').trim().toLowerCase()}|${String(eventId || '').trim().toLowerCase()}|${normalizeToken(title)}|${String(publishDate || '').slice(0, 10)}|${normalizeToken(sportHint)}|${structuredFingerprint(structuredEvent)}`
 }
 
 function scoreLeague(league, title, titleSport) {
@@ -518,13 +616,64 @@ function toLeagueFallbackValue(leagueFallback, dateHint, sportHint) {
   }
 }
 
+function getLeagueMatchScore(expectedLeague, actualLeague) {
+  const expected = normalizeLeagueName(expectedLeague)
+  const actual = normalizeLeagueName(actualLeague)
+  if (!expected || !actual) return 0
+  if (expected === actual) return 20
+  if (expected.includes(actual) || actual.includes(expected)) return 12
+  return 0
+}
+
+function teamNameMatches(expected, actual) {
+  const expectedName = normalizeTeamName(expected)
+  const actualName = normalizeTeamName(actual)
+  if (!expectedName || !actualName) return false
+  return actualName === expectedName || actualName.includes(expectedName) || expectedName.includes(actualName)
+}
+
+function getStructuredTeamMatchScore(event, homeTeam, awayTeam) {
+  const eventHome = String(event?.strHomeTeam || '').trim()
+  const eventAway = String(event?.strAwayTeam || '').trim()
+  if (!eventHome || !eventAway) return 0
+
+  const orderedHome = teamNameMatches(homeTeam, eventHome)
+  const orderedAway = teamNameMatches(awayTeam, eventAway)
+  if (orderedHome && orderedAway) return 100
+
+  const swappedHome = teamNameMatches(homeTeam, eventAway)
+  const swappedAway = teamNameMatches(awayTeam, eventHome)
+  if (swappedHome && swappedAway) return 90
+
+  const hits = [orderedHome, orderedAway, swappedHome, swappedAway].filter(Boolean).length
+  if (hits >= 2) return 70
+  if (hits === 1) return 25
+  return 0
+}
+
+function buildArtworkValue(event, image, backgroundImage, source = 'thesportsdb') {
+  if (!event || !image) return null
+  return {
+    image,
+    poster: image,
+    backgroundImage: backgroundImage || image,
+    eventId: String(event.idEvent || ''),
+    eventName: String(event.strEvent || '').trim(),
+    eventDate: String(event.dateEvent || '').trim(),
+    sport: String(event.strSport || '').trim(),
+    league: String(event.strLeague || '').trim(),
+    source
+  }
+}
+
 class SportsDbClient {
   constructor(apiKey, options = {}) {
     this.apiKey = String(apiKey || process.env.SPORTSDB_API_KEY || DEFAULT_API_KEY).trim() || DEFAULT_API_KEY
-    const cacheHours = Math.max(1, Math.min(168, toNumber(options.cacheHours, DEFAULT_HIT_CACHE_HOURS)))
-    const missCacheMinutes = Math.max(5, Math.min(720, toNumber(options.missCacheMinutes, DEFAULT_MISS_CACHE_MINUTES)))
-    this.hitTtlMs = cacheHours * 60 * 60 * 1000
-    this.missTtlMs = missCacheMinutes * 60 * 1000
+    const cacheHours = Math.max(1, Math.min(24, toNumber(options.cacheHours, DEFAULT_ARTWORK_CACHE_HOURS)))
+    this.artworkHitTtlMs = cacheHours * 60 * 60 * 1000
+    this.missTtlMs = DEFAULT_MISS_CACHE_HOURS * 60 * 60 * 1000
+    this.structuredEventTtlMs = STRUCTURED_EVENT_CACHE_TTL_MS
+    this.leagueAssetTtlMs = LEAGUE_ASSET_CACHE_TTL_MS
     this.timeoutMs = Math.max(3000, Math.min(20000, toNumber(options.timeoutMs, DEFAULT_TIMEOUT_MS)))
   }
 
@@ -540,9 +689,8 @@ class SportsDbClient {
     if ([...query.keys()].length === 0) return []
 
     const url = `${BASE_URL}/${encodeURIComponent(this.apiKey)}/${endpoint}?${query.toString()}`
-    const now = Date.now()
-    const hit = endpointCache.get(url)
-    if (hit && hit.expiresAt > now) return hit.value
+    const hit = getCachedValue(endpointCache, url)
+    if (hit !== undefined) return hit
 
     const ongoing = endpointInFlight.get(url)
     if (ongoing) return ongoing
@@ -559,14 +707,14 @@ class SportsDbClient {
           rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
         }
         if (!res.ok) {
-          endpointCache.set(url, { value: [], expiresAt: Date.now() + this.missTtlMs })
+          setCachedValue(endpointCache, url, [], this.missTtlMs)
           return []
         }
         const raw = await res.text()
         const trimmed = String(raw || '').trim()
         if (trimmed.startsWith('<')) {
           rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
-          endpointCache.set(url, { value: [], expiresAt: Date.now() + this.missTtlMs })
+          setCachedValue(endpointCache, url, [], this.missTtlMs)
           return []
         }
 
@@ -575,17 +723,15 @@ class SportsDbClient {
           data = trimmed ? JSON.parse(trimmed) : null
         } catch (_) {
           rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
-          endpointCache.set(url, { value: [], expiresAt: Date.now() + this.missTtlMs })
+          setCachedValue(endpointCache, url, [], this.missTtlMs)
           return []
         }
         const list = toEventList(data)
-        const ttlMs = list.length > 0
-          ? Math.min(this.hitTtlMs, 6 * 60 * 60 * 1000)
-          : this.missTtlMs
-        endpointCache.set(url, { value: list, expiresAt: Date.now() + ttlMs })
+        const ttlMs = list.length > 0 ? this.artworkHitTtlMs : this.missTtlMs
+        setCachedValue(endpointCache, url, list, ttlMs)
         return list
       } catch (_) {
-        endpointCache.set(url, { value: [], expiresAt: Date.now() + this.missTtlMs })
+        setCachedValue(endpointCache, url, [], this.missTtlMs)
         return []
       } finally {
         endpointInFlight.delete(url)
@@ -630,18 +776,22 @@ class SportsDbClient {
   async _lookupLeague(idLeague) {
     const key = String(idLeague || '').trim()
     if (!key) return null
-    const hit = leagueCache.get(key)
-    if (hit) return hit
+    const hit = getCachedValue(leagueCache, key)
+    if (hit !== undefined) return hit || null
 
     try {
       const url = `${BASE_URL}/${encodeURIComponent(this.apiKey)}/lookupleague.php?id=${encodeURIComponent(key)}`
       const res = await fetch(url, { signal: AbortSignal.timeout(this.timeoutMs) })
-      if (!res.ok) return null
+      if (!res.ok) {
+        setCachedValue(leagueCache, key, null, this.missTtlMs)
+        return null
+      }
       const data = await res.json()
       const league = Array.isArray(data?.leagues) ? data.leagues[0] : null
-      if (league) leagueCache.set(key, league)
+      setCachedValue(leagueCache, key, league || null, league ? this.leagueAssetTtlMs : this.missTtlMs)
       return league || null
     } catch (_) {
+      setCachedValue(leagueCache, key, null, this.missTtlMs)
       return null
     }
   }
@@ -649,18 +799,22 @@ class SportsDbClient {
   async _lookupTeam(idTeam) {
     const key = String(idTeam || '').trim()
     if (!key) return null
-    const hit = teamCache.get(key)
-    if (hit) return hit
+    const hit = getCachedValue(teamCache, key)
+    if (hit !== undefined) return hit || null
 
     try {
       const url = `${BASE_URL}/${encodeURIComponent(this.apiKey)}/lookupteam.php?id=${encodeURIComponent(key)}`
       const res = await fetch(url, { signal: AbortSignal.timeout(this.timeoutMs) })
-      if (!res.ok) return null
+      if (!res.ok) {
+        setCachedValue(teamCache, key, null, this.missTtlMs)
+        return null
+      }
       const data = await res.json()
       const team = Array.isArray(data?.teams) ? data.teams[0] : null
-      if (team) teamCache.set(key, team)
+      setCachedValue(teamCache, key, team || null, team ? this.leagueAssetTtlMs : this.missTtlMs)
       return team || null
     } catch (_) {
+      setCachedValue(teamCache, key, null, this.missTtlMs)
       return null
     }
   }
@@ -671,9 +825,8 @@ class SportsDbClient {
     if (Date.now() < rateLimitedUntil) return []
 
     const key = normalizeToken(sport)
-    const now = Date.now()
-    const hit = leaguesBySportCache.get(key)
-    if (hit && hit.expiresAt > now) return hit.value
+    const hit = getCachedValue(leaguesBySportCache, key)
+    if (hit !== undefined) return hit
 
     try {
       const url = `${BASE_URL}/${encodeURIComponent(this.apiKey)}/search_all_leagues.php?s=${encodeURIComponent(sport)}`
@@ -682,14 +835,14 @@ class SportsDbClient {
         rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
       }
       if (!res.ok) {
-        leaguesBySportCache.set(key, { value: [], expiresAt: Date.now() + this.missTtlMs })
+        setCachedValue(leaguesBySportCache, key, [], this.missTtlMs)
         return []
       }
       const raw = await res.text()
       const trimmed = String(raw || '').trim()
       if (trimmed.startsWith('<')) {
         rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
-        leaguesBySportCache.set(key, { value: [], expiresAt: Date.now() + this.missTtlMs })
+        setCachedValue(leaguesBySportCache, key, [], this.missTtlMs)
         return []
       }
 
@@ -698,27 +851,27 @@ class SportsDbClient {
         data = trimmed ? JSON.parse(trimmed) : null
       } catch (_) {
         rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
-        leaguesBySportCache.set(key, { value: [], expiresAt: Date.now() + this.missTtlMs })
+        setCachedValue(leaguesBySportCache, key, [], this.missTtlMs)
         return []
       }
       const leagues = Array.isArray(data?.countries) ? data.countries : []
-      const ttlMs = leagues.length > 0 ? Math.min(this.hitTtlMs, 24 * 60 * 60 * 1000) : this.missTtlMs
-      leaguesBySportCache.set(key, { value: leagues, expiresAt: Date.now() + ttlMs })
+      const ttlMs = leagues.length > 0 ? this.leagueAssetTtlMs : this.missTtlMs
+      setCachedValue(leaguesBySportCache, key, leagues, ttlMs)
       return leagues
     } catch (_) {
-      leaguesBySportCache.set(key, { value: [], expiresAt: Date.now() + this.missTtlMs })
+      setCachedValue(leaguesBySportCache, key, [], this.missTtlMs)
       return []
     }
   }
 
-  async _resolveLeagueArtworkFromTitle(title, titleSport) {
+  async _resolveLeagueArtworkFromTitle(title, titleSport, leagueHint = '') {
     const sportName = sportsDbNameForSportKey(titleSport)
     if (!sportName) return null
     const leagues = await this._fetchLeaguesBySport(sportName)
     if (!Array.isArray(leagues) || leagues.length === 0) return null
 
     const ranked = leagues
-      .map(league => ({ league, score: scoreLeague(league, title, sportName) }))
+      .map(league => ({ league, score: scoreLeague(league, leagueHint || title, sportName) }))
       .sort((a, b) => b.score - a.score)
 
     const best = ranked[0]?.league
@@ -758,16 +911,79 @@ class SportsDbClient {
     return image || ''
   }
 
+  async findEventByStructuredData(input = {}) {
+    const structuredEvent = buildStructuredEventData(input)
+    if (!structuredEvent) return null
+
+    const key = structuredLookupCacheKey(this.apiKey, structuredEvent)
+    const hit = getCachedValue(eventCache, key)
+    if (hit !== undefined) return hit || null
+
+    const ongoing = eventInFlight.get(key)
+    if (ongoing) return ongoing
+
+    const pending = (async () => {
+      try {
+        const query = `${capitalizeWords(structuredEvent.homeTeam)} vs ${capitalizeWords(structuredEvent.awayTeam)}`
+        const candidates = await this._fetchList('searchevents.php', { e: query })
+        if (!Array.isArray(candidates) || candidates.length === 0) {
+          setCachedValue(eventCache, key, null, this.missTtlMs)
+          return null
+        }
+
+        const ranked = candidates
+          .map(event => {
+            const teamScore = getStructuredTeamMatchScore(event, structuredEvent.homeTeam, structuredEvent.awayTeam)
+            const dateDistance = dateDistanceDays(structuredEvent.date, event?.dateEvent)
+            const dateScore = Number.isFinite(dateDistance)
+              ? (dateDistance === 0 ? 30 : dateDistance === 1 ? 20 : -100)
+              : -100
+            const leagueScore = getLeagueMatchScore(structuredEvent.league, event?.strLeague)
+            return {
+              event,
+              score: teamScore + dateScore + leagueScore,
+              teamScore,
+              dateDistance,
+              leagueScore
+            }
+          })
+          .filter(entry => entry.teamScore >= 70 && entry.dateDistance <= 1)
+          .sort((a, b) => b.score - a.score)
+
+        const best = ranked[0]?.event || null
+        setCachedValue(eventCache, key, best, best ? this.structuredEventTtlMs : this.missTtlMs)
+        return best
+      } catch (_) {
+        setCachedValue(eventCache, key, null, this.missTtlMs)
+        return null
+      } finally {
+        eventInFlight.delete(key)
+      }
+    })()
+
+    eventInFlight.set(key, pending)
+    return pending
+  }
+
   async getEventArtwork(item) {
     hydratePersistentCache()
 
     const title = String(item?.title || '').trim()
     const publishDate = String(item?.publishDate || item?.pubDate || '').trim()
-    const itemSportHint = String(item?.sportHint || item?.sport || '').trim().toLowerCase()
+    const structuredEvent = buildStructuredEventData(item)
+    const structuredSportHint = structuredEvent ? sportKeyFromLeagueCode(structuredEvent.league) : ''
+    const itemSportHint = String(item?.sportHint || item?.sport || structuredSportHint).trim().toLowerCase()
     const titleSport = itemSportHint || detectSport(title)
-    if (!title) return null
+    if (!title && !structuredEvent) return null
 
-    const key = cacheKey(this.apiKey, title, publishDate, '', titleSport)
+    const key = cacheKey(
+      this.apiKey,
+      title,
+      publishDate,
+      String(item?.eventId || '').trim(),
+      titleSport,
+      structuredEvent
+    )
     const now = Date.now()
     const hit = cache.get(key)
     if (hit && hit.expiresAt > now) return hit.value
@@ -777,11 +993,37 @@ class SportsDbClient {
 
     const pending = (async () => {
       try {
-        const dateHint = extractDateHint(title, publishDate)
-        const sportHint = sportsDbNameForSportKey(titleSport)
+        const dateHint = structuredEvent?.date || extractDateHint(title, publishDate)
+        const mappedLeague = mapLeague(structuredEvent?.league || '') || String(structuredEvent?.league || '').trim()
+        const sportHint = sportsDbNameForSportKey(titleSport || structuredSportHint)
         const queries = buildCandidateQueries(title)
-        if (queries.length === 0 && !(dateHint && sportHint)) {
+        if (queries.length === 0 && !(structuredEvent || (dateHint && sportHint))) {
           cache.set(key, { value: null, expiresAt: now + this.missTtlMs })
+          return null
+        }
+
+        if (structuredEvent) {
+          const structuredMatch = await this.findEventByStructuredData(structuredEvent)
+          const structuredImage = await this._resolveFallbackImage(structuredMatch, 'poster')
+          const structuredBackground = await this._resolveFallbackImage(structuredMatch, 'background') || structuredImage
+          const structuredValue = buildArtworkValue(structuredMatch, structuredImage, structuredBackground, 'thesportsdb-structured')
+          if (structuredValue) {
+            const expiresAt = Date.now() + this.artworkHitTtlMs
+            cache.set(key, { value: structuredValue, expiresAt })
+            persistResolvedPoster(key, structuredValue, expiresAt)
+            return structuredValue
+          }
+
+          const leagueFallback = await this._resolveLeagueArtworkFromTitle(title, titleSport || structuredSportHint, mappedLeague)
+          const leagueValue = toLeagueFallbackValue(leagueFallback, dateHint, sportHint)
+          if (leagueValue) {
+            const expiresAt = Date.now() + this.artworkHitTtlMs
+            cache.set(key, { value: leagueValue, expiresAt })
+            persistResolvedPoster(key, leagueValue, expiresAt)
+            return leagueValue
+          }
+
+          cache.set(key, { value: null, expiresAt: Date.now() + this.missTtlMs })
           return null
         }
 
@@ -808,10 +1050,10 @@ class SportsDbClient {
         }
 
         if (byId.size === 0) {
-          const leagueFallback = await this._resolveLeagueArtworkFromTitle(title, titleSport)
+          const leagueFallback = await this._resolveLeagueArtworkFromTitle(title, titleSport || structuredSportHint, mappedLeague)
           const leagueValue = toLeagueFallbackValue(leagueFallback, dateHint, sportHint)
           if (leagueValue) {
-            const expiresAt = Date.now() + this.hitTtlMs
+            const expiresAt = Date.now() + this.artworkHitTtlMs
             cache.set(key, { value: leagueValue, expiresAt })
             persistResolvedPoster(key, leagueValue, expiresAt)
             return leagueValue
@@ -836,10 +1078,10 @@ class SportsDbClient {
         const image = await this._resolveFallbackImage(best, 'poster')
         const backgroundImage = await this._resolveFallbackImage(best, 'background') || image
         if (!best || !image) {
-          const leagueFallback = await this._resolveLeagueArtworkFromTitle(title, titleSport)
+          const leagueFallback = await this._resolveLeagueArtworkFromTitle(title, titleSport || structuredSportHint, mappedLeague)
           const leagueValue = toLeagueFallbackValue(leagueFallback, dateHint, sportHint)
           if (leagueValue) {
-            const expiresAt = Date.now() + this.hitTtlMs
+            const expiresAt = Date.now() + this.artworkHitTtlMs
             cache.set(key, { value: leagueValue, expiresAt })
             persistResolvedPoster(key, leagueValue, expiresAt)
             return leagueValue
@@ -848,18 +1090,8 @@ class SportsDbClient {
           return null
         }
 
-        const value = {
-          image,
-          poster: image,
-          backgroundImage,
-          eventId: String(best.idEvent || ''),
-          eventName: String(best.strEvent || '').trim(),
-          eventDate: String(best.dateEvent || '').trim(),
-          sport: String(best.strSport || '').trim(),
-          league: String(best.strLeague || '').trim(),
-          source: 'thesportsdb'
-        }
-        const expiresAt = Date.now() + this.hitTtlMs
+        const value = buildArtworkValue(best, image, backgroundImage, 'thesportsdb')
+        const expiresAt = Date.now() + this.artworkHitTtlMs
         cache.set(key, { value, expiresAt })
         persistResolvedPoster(key, value, expiresAt)
         return value

@@ -46,6 +46,9 @@ async function handleCustomMeta(config, id, context = {}) {
   const carriedBackground = String(info.b || '').trim()
   const carriedEventDate = String(info.e || '').trim()
   const carriedLeague = String(info.g || '').trim()
+  const carriedLeagueCode = String(info.u || '').trim()
+  const carriedHomeTeam = String(info.o || '').trim()
+  const carriedAwayTeam = String(info.w || '').trim()
   const carriedSportHint = String(info.r || '').trim()
   const carriedEventId = String(info.v || '').trim()
   const resolvedSportHint = resolveSportHint({
@@ -63,7 +66,11 @@ async function handleCustomMeta(config, id, context = {}) {
         title: info.t,
         publishDate: info.p,
         sportHint: resolvedSportHint,
-        eventId: carriedEventId
+        eventId: carriedEventId,
+        league: carriedLeagueCode || carriedLeague,
+        date: carriedEventDate,
+        homeTeam: carriedHomeTeam,
+        awayTeam: carriedAwayTeam
       })
     } catch (_) {
       sportsArtwork = null

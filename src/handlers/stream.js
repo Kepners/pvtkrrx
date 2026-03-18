@@ -3,12 +3,13 @@ const { ProwlarrClient } = require('../clients/prowlarr')
 const { QBitClient } = require('../clients/qbittorrent')
 const { CinemetaClient } = require('../clients/cinemeta')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
-const { parse, matchesEpisode, isLikelyPackedReleaseTitle } = require('../utils/parser')
+const { parse, matchesEpisode, isLikelyPackedReleaseTitle, cleanTitle } = require('../utils/parser')
 const { mapPath } = require('../utils/pathMapper')
 const { findExistingLocalFilePath } = require('../utils/localStorageRoots')
 const { isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { buildOnSeedboxStream, buildOnBufferingStream, buildOnTrackerStream, findVideoFile, findEpisodeFile, sortStreams } = require('../utils/streams')
 const { encodeFileStateToken, encodePlaybackStateToken } = require('../utils/opaqueState')
+const { parseSportsTitle } = require('../utils/sportsTitleParser')
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '7000', 10))
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '5000', 10))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '20', 10))
@@ -96,6 +97,209 @@ async function handleStream(config, type, id, addonUrl, configToken) {
 
 function normalizeForMatch(value) {
   return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+}
+
+function normalizeSportsTeamName(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/\butd\b/g, 'united')
+    .replace(/\bspurs\b/g, 'tottenham hotspur')
+    .replace(/\bnewc\b/g, 'newcastle')
+    .replace(/\bwolves\b/g, 'wolverhampton')
+    .replace(/[._-]+/g, ' ')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function titleCaseWords(value) {
+  return String(value || '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(word => word[0].toUpperCase() + word.slice(1).toLowerCase())
+    .join(' ')
+}
+
+function extractSportsDate(value, fallbackValue = '') {
+  const sources = [String(value || ''), String(fallbackValue || '')]
+  for (const source of sources) {
+    const compact = source.match(/\b((?:19|20)\d{2})(\d{2})(\d{2})\b/)
+    if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`
+
+    const iso = source.match(/\b((?:19|20)\d{2})[.\-_\s](\d{2})[.\-_\s](\d{2})\b/)
+    if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`
+
+    const plain = source.match(/\b((?:19|20)\d{2}-\d{2}-\d{2})\b/)
+    if (plain) return plain[1]
+  }
+  return ''
+}
+
+function parseIsoDate(value) {
+  const match = String(value || '').match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return null
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3])))
+  return Number.isFinite(date.getTime()) ? date : null
+}
+
+function sportsDateDistanceDays(a, b) {
+  const left = parseIsoDate(a)
+  const right = parseIsoDate(b)
+  if (!left || !right) return Number.POSITIVE_INFINITY
+  return Math.abs(Math.round((left.getTime() - right.getTime()) / (24 * 60 * 60 * 1000)))
+}
+
+function cleanupLooseTeamSide(value, side = 'left') {
+  const noise = new Set([
+    'epl', 'premier', 'league', 'laliga', 'la', 'liga', 'serie', 'bundesliga', 'ligue', 'champions',
+    'europa', 'uefa', 'nba', 'nfl', 'ufc', 'formula', 'grand', 'prix', 'f1', 'match', 'sports',
+    'sport', 'live', 'full', 'replay', 'highlights', 'extended', 'main', 'card', 'prelims', 'early'
+  ])
+  let tokens = normalizeSportsTeamName(value)
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter(token => !noise.has(token))
+    .filter(token => !/^(19|20)\d{2}$/.test(token))
+    .filter(token => !/^\d{1,2}$/.test(token))
+
+  if (side === 'left' && tokens.length > 4) tokens = tokens.slice(-4)
+  if (side === 'right' && tokens.length > 4) tokens = tokens.slice(0, 4)
+  return titleCaseWords(tokens.join(' '))
+}
+
+function parseLooseSportsEventTitle(title, fallbackDate = '') {
+  const raw = String(title || '').trim()
+  if (!raw) return null
+
+  const structured = parseSportsTitle(raw)
+  if (structured) return structured
+
+  const cleaned = cleanTitle(raw)
+    .replace(/[._]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const match = cleaned.match(/(.+?)\b(?:vs\.?|v|@)\b(.+)/i)
+  if (!match) return null
+
+  const date = extractSportsDate(raw, fallbackDate)
+  const homeTeam = cleanupLooseTeamSide(match[1], 'left')
+  const awayTeam = cleanupLooseTeamSide(match[2], 'right')
+  if (!date || !homeTeam || !awayTeam) return null
+
+  return {
+    date,
+    homeTeam,
+    awayTeam,
+    raw
+  }
+}
+
+function sportsTeamNamesMatch(expected, actual) {
+  const left = normalizeSportsTeamName(expected)
+  const right = normalizeSportsTeamName(actual)
+  if (!left || !right) return false
+  return left === right || left.includes(right) || right.includes(left)
+}
+
+function sportsTeamMatchCount(targetEvent, candidateEvent) {
+  const checks = [
+    sportsTeamNamesMatch(targetEvent?.homeTeam, candidateEvent?.homeTeam),
+    sportsTeamNamesMatch(targetEvent?.homeTeam, candidateEvent?.awayTeam),
+    sportsTeamNamesMatch(targetEvent?.awayTeam, candidateEvent?.homeTeam),
+    sportsTeamNamesMatch(targetEvent?.awayTeam, candidateEvent?.awayTeam)
+  ]
+  return checks.filter(Boolean).length
+}
+
+function buildStructuredSportsTarget(info = {}) {
+  const explicitDate = extractSportsDate(info.e, info.p)
+  const explicitHomeTeam = String(info.o || '').trim()
+  const explicitAwayTeam = String(info.w || '').trim()
+  if (explicitDate && explicitHomeTeam && explicitAwayTeam) {
+    return {
+      league: String(info.u || info.g || '').trim(),
+      date: explicitDate,
+      homeTeam: explicitHomeTeam,
+      awayTeam: explicitAwayTeam,
+      raw: String(info.t || '').trim()
+    }
+  }
+
+  return parseSportsTitle(info.t || '') || parseLooseSportsEventTitle(info.t || '', info.p || '')
+}
+
+function sourceItemKey(item = {}) {
+  return String(item.infohash || item.link || item.h || item.l || '')
+    .trim()
+    .toLowerCase()
+}
+
+async function buildSupplementalSportsStreams({ info, torznab, addonUrl, configToken, seenKeys }) {
+  const targetEvent = buildStructuredSportsTarget(info)
+  if (!targetEvent?.date || !targetEvent?.homeTeam || !targetEvent?.awayTeam) return []
+
+  const searchQuery = `${targetEvent.homeTeam} vs ${targetEvent.awayTeam}`
+  const searchResult = await settleWithTimeout(
+    torznab.search(searchQuery, SPORT_CATS),
+    STREAM_TITLE_FALLBACK_TIMEOUT_MS,
+    []
+  )
+  const items = Array.isArray(searchResult.value) ? searchResult.value : []
+  if (searchResult.timedOut) {
+    console.warn(`[stream] Supplemental sports search timed out after ${STREAM_TITLE_FALLBACK_TIMEOUT_MS}ms`)
+  }
+  if (searchResult.error) {
+    console.error('[stream] Supplemental sports search error:', searchResult.error?.message)
+  }
+
+  const ranked = items
+    .filter(item => !isSportsOnlyIndexer(item.indexer))
+    .filter(item => !isLikelyPackedReleaseTitle(item.title))
+    .filter(item => Boolean(item?.link || item?.infohash))
+    .map(item => {
+      const parsedEvent = parseLooseSportsEventTitle(item.title, item.pubDate)
+      if (!parsedEvent) return null
+
+      const dateDistance = sportsDateDistanceDays(targetEvent.date, parsedEvent.date)
+      const teamHits = sportsTeamMatchCount(targetEvent, parsedEvent)
+      if (dateDistance > 1 || teamHits < 1) return null
+
+      return {
+        item,
+        score: (teamHits * 100000000) + ((dateDistance === 0 ? 2 : 1) * 10000000) + scoreCandidate(item)
+      }
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.score - a.score)
+
+  const deduped = []
+  for (const entry of ranked) {
+    const key = sourceItemKey(entry.item)
+    if (!key || seenKeys.has(key)) continue
+    seenKeys.add(key)
+    deduped.push(entry.item)
+    if (deduped.length >= 20) break
+  }
+
+  const ordered = preferSeededResults(deduped, 'supplemental sports streams')
+  const streams = []
+  for (const item of ordered) {
+    try {
+      const playbackInfo = encodePlaybackStateToken({
+        h: item.infohash || '',
+        l: item.link
+      })
+      streams.push(buildOnTrackerStream(
+        item,
+        `${addonUrl}/${configToken}/playback/${playbackInfo}`,
+        parse(item.title || searchQuery)
+      ))
+    } catch (_) {
+      // Skip invalid playback payloads instead of leaking raw tracker URLs.
+    }
+  }
+
+  return streams
 }
 
 function scoreCandidate(item) {
@@ -352,11 +556,15 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
   const info = JSON.parse(Buffer.from(encoded, 'base64url').toString())
   const infoHash = String(info.h || '').toLowerCase()
   const directLink = String(info.l || '')
+  const seenSourceKeys = new Set()
+  if (infoHash) seenSourceKeys.add(infoHash)
+  if (directLink) seenSourceKeys.add(directLink.toLowerCase())
 
   const qbit = new QBitClient(config.qbitUrl, config.qbitUsername, config.qbitPassword)
   const torrents = await qbit.torrents('all')
   let matched = infoHash ? torrents.find(t => t.hash.toLowerCase() === infoHash) : null
   if (!matched) matched = findTorrentByTitle(torrents, info.t)
+  if (matched?.hash) seenSourceKeys.add(String(matched.hash).toLowerCase())
 
   const parsed = parse(info.t)
   const streams = []
@@ -400,6 +608,22 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
     }
   }
 
+  try {
+    const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
+    const supplementalStreams = await buildSupplementalSportsStreams({
+      info,
+      torznab,
+      addonUrl,
+      configToken,
+      seenKeys: seenSourceKeys
+    })
+    if (supplementalStreams.length > 0) {
+      streams.push(...supplementalStreams)
+    }
+  } catch (e) {
+    console.error('[stream] supplemental sports search failed:', e.message)
+  }
+
   if (streams.length === 0) {
     try {
       const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
@@ -415,8 +639,9 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
       const deduped = []
       for (const item of filtered.sort((a, b) => scoreCandidate(b) - scoreCandidate(a))) {
         const key = String(item.infohash || item.link || '').toLowerCase()
-        if (!key || seen.has(key)) continue
+        if (!key || seen.has(key) || seenSourceKeys.has(key)) continue
         seen.add(key)
+        seenSourceKeys.add(key)
         deduped.push(item)
         if (deduped.length >= 20) break
       }
