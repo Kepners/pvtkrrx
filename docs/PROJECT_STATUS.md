@@ -1,10 +1,10 @@
 # PVTKRRX Project Status
 
-Updated: 2026-03-15
+Updated: 2026-03-18
 
 ## Current Stage
 
-PVTKRRX is in **post-MVP hardening and multi-device LAN pairing**.
+PVTKRRX is at **v1.1.6** — structured sports enrichment is implemented and smoke-tested.
 
 - Core addon flow (catalog, stream, playback, local config, encryption, desktop wrapper) is complete and shipping.
 - Current route model is `PC Local`, `LAN Bridge`, and `Remote Seedbox`.
@@ -21,7 +21,12 @@ PVTKRRX is in **post-MVP hardening and multi-device LAN pairing**.
    - `LAN Bridge` for same-account home-device sync
    - `Remote Seedbox` for public HTTPS playback
 3. Built-in file serving + progressive playback buffering.
-4. Sports catalog and artwork enrichment.
+4. Sports catalog and structured artwork enrichment.
+   - `src/clients/sportsdb.js` — SportsDB structured event lookup with persistent disk cache, in-flight deduplication, rate-limit back-off, league and team asset caching, and team name aliases (e.g. `Spurs → Tottenham Hotspur`).
+   - `src/utils/sportsTitleParser.js` — Parse torrent titles into structured `{ homeTeam, awayTeam, date, league }` objects for reliable event matching.
+   - `src/utils/leagueMap.js` — Normalize league codes (e.g. `epl → English Premier League`) for catalog display and API lookup.
+   - `src/handlers/catalog.js`, `src/handlers/stream.js`, `src/handlers/meta.js` — All three handlers updated to consume structured sports data.
+   - `scripts/smoke-sports-structured.js` — Order-agnostic event dedup smoke test (`npm run smoke:sports`).
 5. Electron desktop packaging (`dist/` current release artifacts + `dist/releases/<version>/` archives).
 6. LAN pair relay plumbing:
    - `POST /pair/heartbeat`
@@ -41,14 +46,15 @@ PVTKRRX is in **post-MVP hardening and multi-device LAN pairing**.
    - local admin routes (`/local-config`, `/auto-provision`, `/network-info`, local qBit control) are local-network/loopback guarded
    - hosted `/file` and `/playback` fail fast on Vercel instead of waiting for local-only playback paths
 
-## Latest Automated Verification (2026-03-15)
+## Latest Automated Verification (2026-03-18)
 
 1. `npm run smoke:config` - PASS
 2. `npm run smoke:guards` - PASS
 3. `npm run smoke:lan-pair` - PASS
 4. `npm run smoke:stremio-link` - PASS
+5. `npm run smoke:sports` - PASS (structured event dedup, order-agnostic)
 
-These checks validate the current `PC Local` install/profile routes, configure/encrypt/install behavior, hosted runtime guard behavior, `/test-connection` hardening, LAN pair heartbeat/status + hosted redirect behavior, and Stremio AuthKey account-link flow.
+These checks validate the current `PC Local` install/profile routes, configure/encrypt/install behavior, hosted runtime guard behavior, `/test-connection` hardening, LAN pair heartbeat/status + hosted redirect behavior, Stremio AuthKey account-link flow, and the structured sports enrichment pipeline.
 
 ## Required Vercel Configuration For LAN Pair Relay
 
