@@ -326,11 +326,14 @@ function sportsEventKey(input) {
     : parseSportsTitle(input)
 
   if (parsedSportsEvent?.league && parsedSportsEvent?.date && parsedSportsEvent?.homeTeam && parsedSportsEvent?.awayTeam) {
+    const teams = [
+      normalizeSportsKeyPart(parsedSportsEvent.homeTeam),
+      normalizeSportsKeyPart(parsedSportsEvent.awayTeam)
+    ].filter(Boolean).sort()
     return [
       normalizeSportsKeyPart(parsedSportsEvent.league),
       String(parsedSportsEvent.date || '').slice(0, 10),
-      normalizeSportsKeyPart(parsedSportsEvent.homeTeam),
-      normalizeSportsKeyPart(parsedSportsEvent.awayTeam)
+      ...teams
     ].filter(Boolean).join('-')
   }
 

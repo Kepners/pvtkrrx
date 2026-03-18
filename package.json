@@ -10,6 +10,7 @@
     "smoke:guards": "node scripts/smoke-runtime-guards.js",
     "smoke:lan-pair": "node scripts/smoke-lan-pair-flow.js",
     "smoke:stremio-link": "node scripts/smoke-stremio-link.js",
+    "smoke:sports": "node scripts/smoke-sports-structured.js",
     "desktop:dev": "electron electron/main.js",
     "dist:win": "node scripts/prepare-dist.js && electron-builder --win nsis portable --publish never && node scripts/archive-dist.js"
   },
