@@ -870,9 +870,15 @@ class SportsDbClient {
     const leagues = await this._fetchLeaguesBySport(sportName)
     if (!Array.isArray(leagues) || leagues.length === 0) return null
 
-    const ranked = leagues
+    let ranked = leagues
       .map(league => ({ league, score: scoreLeague(league, leagueHint || title, sportName) }))
       .sort((a, b) => b.score - a.score)
+
+    if (leagueHint) {
+      const strictLeagueMatches = ranked.filter(entry => getLeagueMatchScore(leagueHint, entry.league?.strLeague) > 0)
+      if (strictLeagueMatches.length === 0) return null
+      ranked = strictLeagueMatches
+    }
 
     const best = ranked[0]?.league
     if (!best) return null
@@ -947,7 +953,10 @@ class SportsDbClient {
               leagueScore
             }
           })
-          .filter(entry => entry.teamScore >= 70 && entry.dateDistance <= 1)
+          .filter(entry => {
+            const requiresLeagueMatch = Boolean(normalizeLeagueName(structuredEvent.league))
+            return entry.teamScore >= 70 && entry.dateDistance <= 1 && (!requiresLeagueMatch || entry.leagueScore > 0)
+          })
           .sort((a, b) => b.score - a.score)
 
         const best = ranked[0]?.event || null
@@ -1013,18 +1022,6 @@ class SportsDbClient {
             persistResolvedPoster(key, structuredValue, expiresAt)
             return structuredValue
           }
-
-          const leagueFallback = await this._resolveLeagueArtworkFromTitle(title, titleSport || structuredSportHint, mappedLeague)
-          const leagueValue = toLeagueFallbackValue(leagueFallback, dateHint, sportHint)
-          if (leagueValue) {
-            const expiresAt = Date.now() + this.artworkHitTtlMs
-            cache.set(key, { value: leagueValue, expiresAt })
-            persistResolvedPoster(key, leagueValue, expiresAt)
-            return leagueValue
-          }
-
-          cache.set(key, { value: null, expiresAt: Date.now() + this.missTtlMs })
-          return null
         }
 
         const byId = new Map()
