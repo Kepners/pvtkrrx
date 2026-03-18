@@ -19,5 +19,4 @@
 - 4-day timeline confirmed realistic
 
 ## Next Actions
-1. Build starts — follow PROGRAMME.md Phase 0 → 4
-2. Mock dev, real seedbox testing in Phase 4
+None — build completed through all phases. Product is at v1.1.6 in post-MVP hardening stage.

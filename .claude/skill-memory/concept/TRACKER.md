@@ -31,14 +31,13 @@
 - Sports catalog = #1 priority
 - Prowlarr via shared Torznab protocol
 - Source Available license
-- 3 deps total: sdk, express, fast-xml-parser
+- Now 6 deps: sdk, express, fast-xml-parser, multicast-dns, selfsigned, stripe
 - Stream status via name/description fields + cacheMaxAge
 
 ## Next Actions
-1. Client reviews and approves SCOPE_OF_WORKS.md
-2. Run /ccc:prestart or /ccc:pm to begin implementation
+None — concept phase complete. Build proceeded through prestart → MVP → post-MVP hardening (v1.1.6).
 
 ## Notes
 - Client corrected team twice: (1) use SDK not raw Express, (2) understand Stremio behavior before proposing polling
-- Full spec lives at C:\Users\kepne\projects\L - PVTKRRX\SPEC.MD (3166 lines)
+- Full spec now lives at `docs/SPEC.md` in the repo (originally from C:\Users\kepne\projects\L - PVTKRRX\SPEC.MD)
 - Clockrr reference project at C:\Users\kepne\OneDrive\Documents\GitHub\clockrr\

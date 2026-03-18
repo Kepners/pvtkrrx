@@ -39,23 +39,39 @@
 ---
 
 ## Project Overview
-**PVTKRRX** - A Stremio addon
+**PVTKRRX** — Stream from your private tracker seedbox through Stremio
 
 | Item | Value |
 |------|-------|
 | Type | Stremio Addon |
+| Version | 1.1.6 |
 | Repo | github.com/Kepners/pvtkrrx |
-| Hosting | Local / Beamup |
-| Framework | Stremio Addon SDK |
+| Hosting | Vercel Hobby (hosted relay) + Local Windows runtime |
+| Framework | stremio-addon-sdk + Express v5 hybrid |
+| License | Source Available |
+
+### Install Routes
+1. **PC Local** — same-PC addon via `127.0.0.1:7000`
+2. **LAN Bridge** — hosted manifest + desktop heartbeat → 307 redirect to LAN
+3. **Remote Seedbox** — hosted manifest + public HTTPS playback endpoints
 
 ---
 
 ## Key Documentation
+
+### Canonical (live truth)
 | Doc | Purpose |
 |-----|---------|
-| [docs/SPEC.md](docs/SPEC.md) | Project specification |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | System design |
-| [README.md](README.md) | Installation & usage |
+| [docs/CURRENT_DESIGN.md](docs/CURRENT_DESIGN.md) | Canonical current behavior (wins over all other docs) |
+| [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) | Three install routes definition |
+| [docs/STREMIO_INSTALL_TRACKER.md](docs/STREMIO_INSTALL_TRACKER.md) | Verified Stremio client behavior truth table |
+| [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) | Current stage and deployment checklist |
+| [ARCHITECTURE.md](ARCHITECTURE.md) | Component and runtime structure |
+| [README.md](README.md) | User-facing setup guide |
+| [docs/SPEC.md](docs/SPEC.md) | Live product specification |
+
+### Historical (archival context only)
+`docs/CLIENT_DRIVERS.md`, `SCOPE_OF_WORKS.md`, `TECHNICAL_SPEC.md`, `COMMERCIAL_SPEC.md`, `PRODUCTION_SPEC.md`, `PROGRAMME.md`, `PRESTART_OUTCOME.md`
 
 ---
 
@@ -74,11 +90,24 @@
 
 ## Development
 
-### Local Testing
+### Local Runtime
 ```bash
-npm start
-# Server: http://localhost:7000
-# Manifest: http://localhost:7000/manifest.json
+npm start          # HTTP :7000, HTTPS :7001 (self-signed)
+npm run dev        # Same with --watch
+npm run desktop:dev  # Electron wrapper
+```
+
+### Smoke Tests
+```bash
+npm run smoke:config       # Config encryption, token routes, install paths
+npm run smoke:guards       # Hosted security rules, fail-fast behavior
+npm run smoke:lan-pair     # LAN pair heartbeat, hosted redirect, opaque tokens
+npm run smoke:stremio-link # Stremio AuthKey verification (local mock API)
+```
+
+### Electron Build
+```bash
+npm run dist:win   # NSIS installer + portable → dist/
 ```
 
 ---
@@ -118,8 +147,6 @@ npm start
 
 ---
 
----
-
 ## Git & Deploy Workflow
 
 **Branch:** `main` (single branch — dev and deploy are the same)
@@ -134,5 +161,5 @@ Never push to a different branch expecting the live site to update.
 
 ---
 
-*Created: February 8, 2026*
+*Created: February 8, 2026 | Updated: March 17, 2026*
 
