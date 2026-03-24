@@ -22,7 +22,7 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 - **Smart filtering** — Sports indexers never contaminate movie/TV searches
 - **Hosted tokens stay encrypted** — Hosted configs are AES-256-GCM encrypted in addon URLs; local installs save config only on the host PC runtime
 - **No debrid needed** — Your seedbox IS the streaming server
-- **Free hosting** — Runs on Vercel Hobby tier ($0/month)
+- **Free hosted option** — Canonical hosted setup is available at `https://www.pvtkrrx.cc`
 
 ## Route Framework
 
@@ -142,7 +142,7 @@ Hosted relay routes do not proxy video bytes, and hosted `/file` or `/playback` 
 
 **⚡ On Seedbox** — File is already downloaded. Plays immediately.
 
-**📥 Available** — File is on a private tracker. PC Local and LAN Bridge can use local `/playback` queue-and-buffer behavior. Hosted Vercel Remote Seedbox does not expose dead tracker `/playback` links and is effectively ready-file playback unless you run a playback-capable self-hosted runtime.
+**📥 Available** — File is on a private tracker. PC Local and LAN Bridge can use local `/playback` queue-and-buffer behavior. Hosted Remote Seedbox does not expose dead tracker `/playback` links and is effectively ready-file playback unless you run a playback-capable self-hosted runtime.
 
 **[INFO] Remote notice** — Hosted Remote Seedbox can append an explanation row when direct queue-and-buffer is hidden to protect your file-server login or when qBittorrent has not exposed enough live file info for a safe buffer URL yet.
 
@@ -169,7 +169,7 @@ npm run smoke:guards
 ```
 
 This validates:
-- hosted `/playback` fails fast on Vercel instead of waiting for local buffering
+- hosted `/playback` fails fast instead of waiting for local buffering
 - hosted remote stream responses suppress dead tracker `/playback` flows
 - remote direct `/test-connection` calls are rejected
 - hosted `/test-connection` refuses loopback/LAN targets
@@ -196,7 +196,7 @@ npm run smoke:pipeline
 ```
 
 This validates:
-- hosted Vercel `Remote Seedbox` suppresses dead tracker `/playback` streams at stream emission time
+- hosted `Remote Seedbox` suppresses dead tracker `/playback` streams at stream emission time
 - remote tracker/download flows are suppressed when `fileServerAuth` would be lost on redirect
 - remote buffering URLs are suppressed unless the current file path is provable from live torrent state
 - local playback-capable routes still emit the expected `/playback` and `/file` flows
@@ -221,11 +221,10 @@ npm run smoke:stremio-link
 
 ## Deployment
 
-### Vercel (Recommended)
-```bash
-npx vercel --prod
-# Set ENCRYPTION_SECRET in Vercel dashboard
-```
+### Hosted Production
+
+Use the canonical hosted base: `https://www.pvtkrrx.cc`.
+Production updates are deployed from the synced GitHub branch and must preserve the active `ENCRYPTION_SECRET`.
 
 ### Self-Host
 ```bash
@@ -238,7 +237,7 @@ ENCRYPTION_SECRET=your-secret-here npm start
 |----------|----------|---------|
 | ENCRYPTION_SECRET | Yes | Key for encrypting/decrypting user configs |
 | AUTH_TOKEN_SECRET | Recommended | Key for signing account auth tokens (falls back to ENCRYPTION_SECRET) |
-| KV_REST_API_URL | Recommended | Persist LAN pair heartbeat state on Vercel |
+| KV_REST_API_URL | Recommended | Persist LAN pair heartbeat state for the hosted relay across restarts/redeploys |
 | KV_REST_API_TOKEN | Recommended | Auth token for KV REST API |
 | PVTKRRX_PAIR_RELAY_URL | Optional | Hosted relay base URL (default https://www.pvtkrrx.cc) |
 | PVTKRRX_LAN_PAIR_TTL_SECONDS | Optional | Pair record TTL (default 21600) |

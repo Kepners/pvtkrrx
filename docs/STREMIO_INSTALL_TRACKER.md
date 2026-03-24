@@ -27,7 +27,7 @@ Link: https://github.com/Stremio/stremio-addon-client
 | `stremio://192.168.50.48:7000/local/manifest.json?mode=local` | FAIL | Ends up as `https://192.168.50.48:7000/...` and fails |
 | `https://192.168.50.48:7000/local/manifest.json?mode=local` | FAIL | Server on 7000 is HTTP, not TLS |
 | Browser test: `http://192.168.50.48:7000/local/manifest.json?mode=local` | PASS | Confirms server + firewall path is OK |
-| `https://pvtkrrx.vercel.app/{token}/manifest.json?mode=hosted` with LAN pair enabled | PASS* | Requires active desktop heartbeat + hosted pair relay config |
+| `https://www.pvtkrrx.cc/{token}/manifest.json?mode=hosted` with LAN pair enabled | PASS* | Requires active desktop heartbeat + hosted pair relay config |
 
 ## Conclusion
 - LAN HTTP endpoint is reachable.
@@ -62,7 +62,7 @@ Link: https://github.com/Stremio/stremio-addon-client
 3. Hosted public mode:
    - `Remote Seedbox`
    - Use HTTPS-hosted manifest URL with public ready-file playback endpoints.
-   - Treat hosted Vercel Remote Seedbox as ready-file-first unless playback is self-hosted elsewhere.
+   - Treat hosted Remote Seedbox as ready-file-first unless playback is self-hosted elsewhere.
 
 See also: `docs/ROUTE_FRAMEWORK.md`
 

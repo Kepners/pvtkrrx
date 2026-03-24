@@ -2463,7 +2463,7 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
         <section class="route-card">
           <div class="route-kicker">Public HTTPS endpoints</div>
           <h3>Remote Seedbox</h3>
-          <p class="route-copy">Use this when Prowlarr, qBittorrent, and file serving are reachable over public authenticated URLs. On Vercel this is not a generic tracker-buffering route: it is ready-file / public-playback only unless you self-host playback support.</p>
+          <p class="route-copy">Use this when Prowlarr, qBittorrent, and file serving are reachable over public authenticated URLs. On the hosted site this is not a generic tracker-buffering route: it is ready-file / public-playback only unless you self-host playback support.</p>
           <ul class="route-list">
             <li>Not a generic tracker-buffering route</li>
             <li>Works away from home LAN</li>

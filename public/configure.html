@@ -1253,10 +1253,10 @@
         <button type="button" class="mode-option" data-install-target="seedbox" onclick="setInstallTarget('seedbox')">
           <span class="mode-kicker">Public endpoints</span>
           <span class="mode-title">Remote Seedbox</span>
-          <span class="mode-copy">Use the hosted remote profile only when Prowlarr, qBittorrent, and file serving are reachable over public URLs. On Vercel this is not a generic tracker-buffering path: it is effectively ready-file / public-playback only unless you self-host PVTKRRX on a runtime that can truly serve playback. Auth-protected file-server playback still needs real-device validation because client auth handling can vary.</span>
+          <span class="mode-copy">Use the hosted remote profile only when Prowlarr, qBittorrent, and file serving are reachable over public URLs. On the hosted site this is not a generic tracker-buffering path: it is effectively ready-file / public-playback only unless you self-host PVTKRRX on a runtime that can truly serve playback. Auth-protected file-server playback still needs real-device validation because client auth handling can vary.</span>
           <div class="summary-points">
             <span>Public HTTPS ready-file path required</span>
-            <span>Hosted Vercel fails closed on local-only playback</span>
+            <span>Hosted site fails closed on local-only playback</span>
             <span>Away-from-home playback route</span>
           </div>
         </button>
@@ -1535,7 +1535,7 @@
           <a id="stremioLinkHosted" class="is-disabled" href="#" aria-disabled="true">Install PVTKRRX (Remote Seedbox)</a>
           <p class="install-note" style="margin-top:0.5rem" id="hostedUrlDisplay"></p>
           <p class="install-note" style="margin-top:0.5rem">Use this on PC, phone, TV, or Apple TV only when Prowlarr, qBittorrent, and file serving are publicly reachable over HTTPS.</p>
-          <p class="install-note" style="margin-top:0.5rem">Hosted Remote Seedbox is ready-file-first on Vercel. Extra notice rows can appear when a file-server login cannot be forwarded safely or qBittorrent has not exposed enough live file info for a safe buffer URL yet. Auth-protected playback still depends on real client support for the emitted auth behavior.</p>
+          <p class="install-note" style="margin-top:0.5rem">Hosted Remote Seedbox is ready-file-first on the hosted site. Extra notice rows can appear when a file-server login cannot be forwarded safely or qBittorrent has not exposed enough live file info for a safe buffer URL yet. Auth-protected playback still depends on real client support for the emitted auth behavior.</p>
         </div>
       </div>
     </div>

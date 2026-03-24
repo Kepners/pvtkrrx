@@ -1,6 +1,6 @@
 # PVTKRRX Architecture
 
-Updated: 2026-03-15
+Updated: 2026-03-24
 
 ## Canonical Sources
 
@@ -24,7 +24,7 @@ Stremio client
    |                                         - /network-info
    |                                         - qBit/Prowlarr access
    |
-   +-- LAN Bridge / Remote Seedbox ----------> Hosted relay (Vercel)
+   +-- LAN Bridge / Remote Seedbox ----------> Hosted relay (www.pvtkrrx.cc)
                                              - hosted manifests/config tokens
                                              - pair heartbeat/status
                                              - Stremio account link
@@ -80,7 +80,7 @@ Stremio client
 2. Completed local files prefer `/file/:info`.
 3. Not-ready content uses `/playback/:info` only on playback-capable runtimes such as PC Local, LAN Bridge after local redirect, or self-hosted installs that actually serve `/playback`.
 4. External `fileServerUrl` is optional and mainly used when the local runtime cannot read the file directly.
-5. Hosted Vercel runtime must fail fast rather than buffering or serving local-only playback, and hosted Remote Seedbox responses must suppress dead tracker `/playback` streams.
+5. Hosted runtime must fail fast rather than buffering or serving local-only playback, and hosted Remote Seedbox responses must suppress dead tracker `/playback` streams.
 
 ### Sports And Library
 

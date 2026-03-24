@@ -12,7 +12,7 @@ PVTKRRX is at **v1.1.6** — structured sports enrichment and the current securi
 - LAN pair relay flow for Android TV/mobile account-sync is implemented and covered by smoke checks.
 - Stremio AuthKey linking flow is implemented and smoke-tested with a local API mock.
 - The live architecture is documented in `docs/CURRENT_DESIGN.md` and `docs/ROUTE_FRAMEWORK.md`.
-- Implementation currently looks aligned with the live `PC Local` / `LAN Bridge` / `Remote Seedbox` design, but hosted auth/public playback behavior still needs proof on real clients and a real Vercel deploy.
+- Implementation currently looks aligned with the live `PC Local` / `LAN Bridge` / `Remote Seedbox` design, but hosted auth/public playback behavior still needs proof on real clients and a real hosted deployment.
 - Status shorthand: implementation hardened, wording aligned, smoke locked, awaiting real client verification.
 - That remaining client pass matters because sports is a custom top-level Stremio type, sports/library items use internal `pvtkrrx:` ids, and PVTKRRX must own how those rows render on real Stremio clients instead of assuming Cinemeta or generic client behavior will smooth it over.
 
@@ -29,7 +29,7 @@ PVTKRRX is at **v1.1.6** — structured sports enrichment and the current securi
 ### PARTIAL
 
 - End-device acceptance is not yet fully proven.
-- Pending live validation still includes Android TV/mobile Method 4 pickup, Apple TV same-account sync, one real public `Remote Seedbox` ready-file playback path, one auth-protected external file-server playback path, and KV-backed Vercel cold-start persistence.
+- Pending live validation still includes Android TV/mobile Method 4 pickup, Apple TV same-account sync, one real public `Remote Seedbox` ready-file playback path, one auth-protected external file-server playback path, and KV-backed hosted pair-state persistence across restarts/redeploys.
 - Hosted `LAN Bridge` production reliability still depends on live heartbeat plus KV-backed pair state.
 - Real-client rendering of notice-only stream rows still needs proof so info rows do not bury playable streams or mislead users on different Stremio clients.
 - Non-Windows `./.runtime` fallback remains a minor dev-path consistency risk.
@@ -70,14 +70,14 @@ PVTKRRX is at **v1.1.6** — structured sports enrichment and the current securi
    - sensitive routes (`/encrypt`, `/pair/*`, `/test-connection`, auth, billing) use strict browser-origin allowlists
    - hosted `/test-connection` is rate limited and refuses loopback/LAN/.local targets; local/loopback configure can still validate local endpoints
    - local admin routes (`/local-config`, `/auto-provision`, `/network-info`, local qBit control) are local-network/loopback guarded
-   - hosted `/file` and `/playback` fail fast on Vercel instead of waiting for local-only playback paths
+   - hosted `/file` and `/playback` fail fast instead of waiting for local-only playback paths
 8. Additional security hardening:
    - browser-driven helper POST routes enforce CSRF tokens in addition to origin checks
    - config readback and server-side logging redact stored secrets, private URLs, local file paths, and auth identifiers
    - legacy plain base64 playback/file tokens are rejected in favor of opaque encrypted state
    - secure JSON storage reads legacy plaintext for migration only, writes encrypted state, and fails closed if no at-rest secret is configured
 9. Configure/install wording now matches the live hosted route contract:
-   - hosted `Remote Seedbox` is explicitly not presented as a generic tracker-buffering path on Vercel
+   - hosted `Remote Seedbox` is explicitly not presented as a generic tracker-buffering path on the hosted site
    - hosted remote copy now states it is effectively ready-file / public-playback only unless the runtime can truly serve playback
    - auth-protected external file-server playback is flagged as needing real-device validation
 
@@ -93,7 +93,7 @@ PVTKRRX is at **v1.1.6** — structured sports enrichment and the current securi
 
 These checks validate the current `PC Local` install/profile routes, configure/encrypt/install behavior, hosted runtime guard behavior, route-capability stream suppression, `/test-connection` hardening, LAN pair heartbeat/status + hosted redirect behavior, Stremio AuthKey account-link flow, the security-hardening regression set, and the structured sports enrichment pipeline.
 
-They do not replace the remaining real-device acceptance proof for Android TV/mobile/desktop playback behavior, public remote seedbox playback, auth-protected external file-server playback, or KV-backed LAN-pair behavior on an actual Vercel deployment.
+They do not replace the remaining real-device acceptance proof for Android TV/mobile/desktop playback behavior, public remote seedbox playback, auth-protected external file-server playback, or KV-backed LAN-pair behavior on an actual hosted deployment.
 
 Note: the `/auth/me` billing-field part of `smoke:security` is currently checked against the public user model shape rather than a full authenticated end-to-end response.
 
@@ -126,7 +126,7 @@ Use these on the hosted deployment:
    - `PVTKRRX_TEST_CONNECTION_MAX_PER_WINDOW` (default `20`)
    - `PVTKRRX_ALLOWED_WEB_ORIGINS` (browser allowlist, defaults to hosted production origin)
 
-Without KV, pair state falls back to in-memory state and may be unreliable on cold starts.
+Without KV, pair state falls back to in-memory state and may reset on restarts or redeploys.
 
 ## Release Candidate Gate
 
@@ -138,7 +138,7 @@ Call this release-candidate ready only if all seven live checks pass:
 4. Android TV/mobile pick up the installed addon on the same account.
 5. Apple TV syncs after desktop/web install.
 6. `Remote Seedbox` plays one real public HTTPS ready-file.
-7. Vercel pair state survives cold starts with KV enabled.
+7. Hosted pair state survives restarts/redeploys with KV enabled.
 
 ## Still Blocking Full Production Pass
 
@@ -146,7 +146,7 @@ Call this release-candidate ready only if all seven live checks pass:
 - Apple TV synced-addon behavior is not yet proven reliable on a live client path.
 - Hosted `Remote Seedbox` playback is not yet proven with a real public ready-file.
 - Auth-protected external file-server playback still needs a real-client validation pass, ideally on a client path that may drop headers.
-- KV-backed Vercel pair-state persistence is not yet proven across cold starts.
+- KV-backed hosted pair-state persistence is not yet proven across restarts/redeploys.
 - Notice-only stream rows still need real-client validation:
   - `[INFO] Ready Files Only`
   - `[INFO] Direct Buffer Hidden`
