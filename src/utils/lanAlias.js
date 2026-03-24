@@ -121,9 +121,15 @@ function startLanAlias(options = {}) {
 
   function stop() {
     clearInterval(timer)
-    try { mdns.removeListener('query', onQuery) } catch (_) {}
-    try { mdns.removeListener('error', onError) } catch (_) {}
-    try { mdns.destroy() } catch (_) {}
+    try { mdns.removeListener('query', onQuery) } catch (err) {
+      logger.warn('[mdns] Failed to remove query listener:', err.message)
+    }
+    try { mdns.removeListener('error', onError) } catch (err) {
+      logger.warn('[mdns] Failed to remove error listener:', err.message)
+    }
+    try { mdns.destroy() } catch (err) {
+      logger.warn('[mdns] Failed to destroy socket:', err.message)
+    }
   }
 
   return {

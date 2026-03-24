@@ -101,8 +101,11 @@ npm run desktop:dev  # Electron wrapper
 ```bash
 npm run smoke:config       # Config encryption, token routes, install paths
 npm run smoke:guards       # Hosted security rules, fail-fast behavior
+npm run smoke:pipeline     # Route-capability stream emission and redirect suppression
 npm run smoke:lan-pair     # LAN pair heartbeat, hosted redirect, opaque tokens
 npm run smoke:stremio-link # Stremio AuthKey verification (local mock API)
+npm run smoke:security     # Hardening regressions: CSRF, redaction, opaque tokens, secure JSON
+npm run smoke:sports       # Structured sports enrichment dedup
 ```
 
 ### Electron Build

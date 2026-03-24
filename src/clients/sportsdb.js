@@ -4,6 +4,7 @@ const { cleanTitle } = require('../utils/parser')
 const { detectSport, stripSportTerms } = require('../utils/sportClassifier')
 const { parseSportsTitle } = require('../utils/sportsTitleParser')
 const { mapLeague } = require('../utils/leagueMap')
+const { resolveRuntimeDir } = require('../utils/runtimeDir')
 
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json'
 const DEFAULT_API_KEY = '123'
@@ -40,10 +41,7 @@ const TEAM_ALIASES = [
 ]
 
 function getRuntimeDir() {
-  const configured = String(process.env.PVTKRRX_RUNTIME_DIR || '').trim()
-  if (configured) return configured
-  const appData = process.env.APPDATA || path.join(process.env.USERPROFILE || process.cwd(), 'AppData', 'Roaming')
-  return path.join(appData, 'PVTKRRX', 'runtime')
+  return resolveRuntimeDir()
 }
 
 function getPersistentCachePath() {
@@ -60,8 +58,8 @@ function schedulePersistFlush() {
       .sort((a, b) => b.expiresAt - a.expiresAt)
       .slice(0, PERSIST_MAX_ENTRIES)
     fs.writeFileSync(filePath, JSON.stringify({ version: 1, entries }), 'utf8')
-  } catch (_) {
-    // ignore cache persistence failures
+  } catch (err) {
+    console.warn('[sportsdb] Cache persistence flush failed:', err.message)
   }
 }
 
@@ -83,8 +81,8 @@ function hydratePersistentCache() {
       persistentStore.set(key, { value, expiresAt })
       cache.set(key, { value, expiresAt })
     }
-  } catch (_) {
-    // ignore corrupt cache file
+  } catch (err) {
+    console.warn('[sportsdb] Cache hydration failed (corrupt file?):', err.message)
   }
 }
 
@@ -1105,4 +1103,4 @@ class SportsDbClient {
   }
 }
 
-module.exports = { SportsDbClient }
+module.exports = { SportsDbClient, normalizeTeamName }

@@ -1,6 +1,7 @@
 # PVTKRRX — Build Summary
 
 **Status**: Historical snapshot from initial MVP build (Feb 2026).
+Hosted `/playback` notes in this file describe the original MVP plan, not the current hosted `Remote Seedbox` behavior.
 For current stage and active work, see `docs/PROJECT_STATUS.md`.
 
 ---
@@ -25,13 +26,13 @@ For current stage and active work, see `docs/PROJECT_STATUS.md`.
 #### Phase 2: Utilities & Handlers (6 files)
 - ✅ `src/utils/parser.js` — Torrent name parsing (quality, codec, audio, HDR, episodes)
 - ✅ `src/utils/pathMapper.js` — Seedbox path → HTTP URL mapping
-- ✅ `src/utils/streams.js` — Stream builders (on-seedbox with proxyHeaders, on-tracker with Comet)
+- ✅ `src/utils/streams.js` — Stream builders (on-seedbox with proxyHeaders, on-tracker with the original Comet-plan flow)
 - ✅ `src/handlers/catalog.js` — Sports (genre filtering), Movies, TV, Library catalogs
 - ✅ `src/handlers/stream.js` — Parallel Jackett + qBit search, episode matching for series
 - ✅ `src/handlers/meta.js` — Custom ID decoder + Cinemeta proxy
 
 #### Phase 3: Integration (2 files)
-- ✅ `index.js` — Express + SDK hybrid with withConfig middleware, Comet playback, POST /encrypt, POST /test-connection
+- ✅ `index.js` — Express + SDK hybrid with withConfig middleware, original Comet-plan playback handling, POST /encrypt, POST /test-connection
 - ✅ `public/configure.html` — Self-contained config page with provider presets and connection testing
 
 #### Documentation (3 files)
@@ -113,7 +114,7 @@ User → Stremio → https://pvtkrrx.vercel.app/{token}/catalog/tv/pvtkrrx-sport
                   { metas: [...], cacheMaxAge: 120 }
 ```
 
-### Comet Playback Flow
+### Historical Comet Playback Flow
 ```
 User clicks stream → Stremio requests /playback/{info}
                          ↓
@@ -225,7 +226,7 @@ pvtkrrx/
 4. **Login-per-request qBit** — Unavoidable on serverless, optimized with SID caching per invocation
 5. **Sports catalog #1 priority** (MD directive) — Genre filtering, custom IDs, landscape posters
 6. **Prowlarr via Torznab** — Unified protocol for all indexers
-7. **Comet playback pattern** — Poll qBit, 302 redirect when ready
+7. **Historical Comet playback pattern** — Poll qBit, 302 redirect when ready
 8. **proxyHeaders for Basic Auth** — Credentials in headers, never in URL
 9. **Server-side POST /encrypt** — ENCRYPTION_SECRET never touches browser (Colin's security fix)
 10. **Defensive handlers** — Return empty on errors, never throw (MD's prestart directive)

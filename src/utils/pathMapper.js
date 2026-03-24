@@ -16,6 +16,28 @@ function joinUrlPath(baseUrl, relativePath) {
   return encodedRelative ? `${base}/${encodedRelative}` : base
 }
 
+function normalizeFsPath(value) {
+  return String(value || '')
+    .replace(/\\/g, '/')
+    .replace(/\/+/g, '/')
+    .replace(/\/+$/, '')
+}
+
+function mapAbsolutePath(filePath, fileServerUrl, pathMapping) {
+  const { from, to } = pathMapping || {}
+  const normalizedFilePath = normalizeFsPath(filePath)
+  const normalizedFrom = normalizeFsPath(from)
+  const toPath = String(to || '').replace(/\\/g, '/').replace(/^\/+|\/+$/g, '')
+
+  if (!normalizedFilePath || !normalizedFrom) return null
+  if (normalizedFilePath !== normalizedFrom && !normalizedFilePath.startsWith(normalizedFrom + '/')) {
+    return null
+  }
+
+  const relative = normalizedFilePath.slice(normalizedFrom.length).replace(/^\/+/, '')
+  return joinUrlPath(fileServerUrl, [toPath, relative].filter(Boolean).join('/'))
+}
+
 function mapPath(savePath, fileName, fileServerUrl, pathMapping) {
   const { from, to } = pathMapping || {}
 
@@ -35,4 +57,4 @@ function mapPath(savePath, fileName, fileServerUrl, pathMapping) {
   return joinUrlPath(fileServerUrl, [toPath, normalizedFileName].filter(Boolean).join('/'))
 }
 
-module.exports = { mapPath }
+module.exports = { mapPath, mapAbsolutePath }

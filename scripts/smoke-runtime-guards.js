@@ -5,12 +5,18 @@ const os = require('node:os')
 const path = require('node:path')
 
 process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'local-smoke-secret-12345678901234567890'
-process.env.VERCEL = '1'
-process.env.PVTKRRX_RUNTIME_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-runtime-guards-'))
 
+const { isBlockedPrivateTargetHost } = require('../public/route-parity')
 const { encrypt } = require('../src/utils/crypto')
 const { encodePlaybackStateToken } = require('../src/utils/opaqueState')
-const app = require('../index')
+
+function loadApp(vercelEnabled) {
+  if (vercelEnabled) process.env.VERCEL = '1'
+  else delete process.env.VERCEL
+  process.env.PVTKRRX_RUNTIME_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-runtime-guards-'))
+  delete require.cache[require.resolve('../index')]
+  return require('../index')
+}
 
 function request(port, method, reqPath, body = null, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -49,12 +55,48 @@ function request(port, method, reqPath, body = null, headers = {}) {
   })
 }
 
+function readCsrf(setCookieHeader) {
+  const raw = Array.isArray(setCookieHeader) ? setCookieHeader.join('; ') : String(setCookieHeader || '')
+  const match = raw.match(/pvtkrrx_csrf=([^;]+)/)
+  assert.ok(match, 'configure response should set CSRF cookie')
+  return {
+    cookie: `pvtkrrx_csrf=${match[1]}`,
+    token: decodeURIComponent(match[1])
+  }
+}
+
 async function run() {
-  const server = http.createServer(app)
-  await new Promise(resolve => server.listen(0, resolve))
+  const blockedHosts = [
+    'localhost',
+    '127.0.0.1',
+    '::1',
+    'printer.local',
+    'foo.localhost',
+    '10.0.0.5',
+    '192.168.1.50',
+    '172.20.8.9',
+    '169.254.10.2',
+    'host.docker.internal',
+    '0.0.0.0',
+    'fd12::abcd',
+    'fe80::abcd',
+    '127.0.0.1.nip.io',
+    '127-0-0-1.sslip.io',
+    'app.lvh.me',
+    'app.localtest.me'
+  ]
+  for (const host of blockedHosts) {
+    assert.equal(isBlockedPrivateTargetHost(host), true, `${host} should be blocked`)
+  }
+  for (const host of ['example.com', 'seedbox.example', '8.8.8.8']) {
+    assert.equal(isBlockedPrivateTargetHost(host), false, `${host} should remain public`)
+  }
+
+  const hostedServer = http.createServer(loadApp(true))
+  await new Promise(resolve => hostedServer.listen(0, resolve))
 
   try {
-    const port = server.address().port
+    const port = hostedServer.address().port
     const hostedConfig = {
       jackettUrl: 'https://seedbox.example',
       jackettApiKey: 'dummy-key',
@@ -87,7 +129,87 @@ async function run() {
     assert.equal(hostedPlayback.status, 403, 'hosted /playback should fail fast on Vercel runtime')
     assert.match(String(hostedPlayback.json?.error || ''), /disabled on hosted runtime/i)
 
-    const remoteNoOrigin = await request(
+    const hostedConfigure = await request(
+      port,
+      'GET',
+      '/configure',
+      null,
+      {
+        Host: 'pvtkrrx.vercel.app',
+        'X-Forwarded-For': '203.0.113.10'
+      }
+    )
+    assert.equal(hostedConfigure.status, 200, 'hosted configure page should return 200')
+    const hostedCsrf = readCsrf(hostedConfigure.headers['set-cookie'])
+
+    const hostedLinkAuthKey = await request(
+      port,
+      'POST',
+      '/auth/stremio/link-authkey',
+      { authKey: 'bad' },
+      {
+        Cookie: hostedCsrf.cookie,
+        Host: 'pvtkrrx.vercel.app',
+        Origin: 'https://pvtkrrx.vercel.app',
+        Referer: 'https://pvtkrrx.vercel.app/configure',
+        'X-PVTKRRX-CSRF': hostedCsrf.token,
+        'X-Forwarded-For': '203.0.113.10'
+      }
+    )
+    assert.equal(hostedLinkAuthKey.status, 400, 'hosted AuthKey link should stay available behind CSRF/origin gates')
+    assert.equal(String(hostedLinkAuthKey.json?.error || ''), 'Invalid Stremio AuthKey')
+
+    const evilOriginLinkAuthKey = await request(
+      port,
+      'POST',
+      '/auth/stremio/link-authkey',
+      { authKey: 'bad' },
+      {
+        Cookie: hostedCsrf.cookie,
+        Host: 'pvtkrrx.vercel.app',
+        Origin: 'https://evil.example',
+        Referer: 'https://evil.example/pvtkrrx',
+        'X-PVTKRRX-CSRF': hostedCsrf.token,
+        'X-Forwarded-For': '203.0.113.10'
+      }
+    )
+    assert.equal(evilOriginLinkAuthKey.status, 403, 'disallowed origins should not reach AuthKey link validation even with a CSRF token')
+
+    const hostedAutoLinkLocal = await request(
+      port,
+      'POST',
+      '/auth/stremio/auto-link-local',
+      {},
+      {
+        Cookie: hostedCsrf.cookie,
+        Host: 'pvtkrrx.vercel.app',
+        Origin: 'https://pvtkrrx.vercel.app',
+        Referer: 'https://pvtkrrx.vercel.app/configure',
+        'X-PVTKRRX-CSRF': hostedCsrf.token,
+        'X-Forwarded-For': '203.0.113.10'
+      }
+    )
+    assert.equal(hostedAutoLinkLocal.status, 403, 'hosted auto-link should stay same-host only even with valid CSRF')
+    assert.match(String(hostedAutoLinkLocal.json?.error || ''), /this PC|host/i)
+
+    const hostedLanToken = await request(
+      port,
+      'POST',
+      '/local/lan-token',
+      {},
+      {
+        Cookie: hostedCsrf.cookie,
+        Host: 'pvtkrrx.vercel.app',
+        Origin: 'https://pvtkrrx.vercel.app',
+        Referer: 'https://pvtkrrx.vercel.app/configure',
+        'X-PVTKRRX-CSRF': hostedCsrf.token,
+        'X-Forwarded-For': '203.0.113.10'
+      }
+    )
+    assert.equal(hostedLanToken.status, 403, 'hosted LAN token helper should stay same-host only even with valid CSRF')
+    assert.match(String(hostedLanToken.json?.error || ''), /Windows host PC/i)
+
+    const spoofedOriginOnly = await request(
       port,
       'POST',
       '/test-connection',
@@ -100,10 +222,13 @@ async function run() {
       },
       {
         Host: 'pvtkrrx.vercel.app',
+        Origin: 'https://pvtkrrx.vercel.app',
+        Referer: 'https://pvtkrrx.vercel.app/configure',
         'X-Forwarded-For': '203.0.113.10'
       }
     )
-    assert.equal(remoteNoOrigin.status, 403, 'remote direct test-connection call should be rejected')
+    assert.equal(spoofedOriginOnly.status, 403, 'spoofed Origin/Referer alone must not unlock hosted test-connection')
+    assert.match(String(spoofedOriginOnly.json?.error || ''), /csrf/i)
 
     const remotePrivateTarget = await request(
       port,
@@ -117,14 +242,109 @@ async function run() {
         qbitPassword: 'demo'
       },
       {
+        Cookie: hostedCsrf.cookie,
         Host: 'pvtkrrx.vercel.app',
         Origin: 'https://pvtkrrx.vercel.app',
         Referer: 'https://pvtkrrx.vercel.app/configure',
+        'X-PVTKRRX-CSRF': hostedCsrf.token,
         'X-Forwarded-For': '203.0.113.10'
       }
     )
     assert.equal(remotePrivateTarget.status, 403, 'hosted test-connection should block LAN/loopback targets')
-    assert.match(String(remotePrivateTarget.json?.error || ''), /cannot probe loopback, lan, or \.local targets/i)
+    assert.match(String(remotePrivateTarget.json?.error || ''), /cannot probe loopback, lan, or private-resolution targets/i)
+
+    const remoteNipIoTarget = await request(
+      port,
+      'POST',
+      '/test-connection',
+      {
+        jackettUrl: 'http://127.0.0.1.nip.io:9696',
+        jackettApiKey: 'dummy-key',
+        qbitUrl: 'http://192.168.1.55.nip.io:8080',
+        qbitUsername: 'demo',
+        qbitPassword: 'demo'
+      },
+      {
+        Cookie: hostedCsrf.cookie,
+        Host: 'pvtkrrx.vercel.app',
+        Origin: 'https://pvtkrrx.vercel.app',
+        Referer: 'https://pvtkrrx.vercel.app/configure',
+        'X-PVTKRRX-CSRF': hostedCsrf.token,
+        'X-Forwarded-For': '203.0.113.10'
+      }
+    )
+    assert.equal(remoteNipIoTarget.status, 403, 'nip.io private-resolution targets should be blocked')
+    assert.match(String(remoteNipIoTarget.json?.error || ''), /cannot probe loopback, lan, or private-resolution targets/i)
+
+    const remoteLocalSuffixTarget = await request(
+      port,
+      'POST',
+      '/test-connection',
+      {
+        jackettUrl: 'http://printer.local:9696',
+        jackettApiKey: 'dummy-key',
+        qbitUrl: 'http://host.docker.internal:8080',
+        qbitUsername: 'demo',
+        qbitPassword: 'demo'
+      },
+      {
+        Cookie: hostedCsrf.cookie,
+        Host: 'pvtkrrx.vercel.app',
+        Origin: 'https://pvtkrrx.vercel.app',
+        Referer: 'https://pvtkrrx.vercel.app/configure',
+        'X-PVTKRRX-CSRF': hostedCsrf.token,
+        'X-Forwarded-For': '203.0.113.10'
+      }
+    )
+    assert.equal(remoteLocalSuffixTarget.status, 403, 'hosted test-connection should block .local and host.docker.internal targets')
+    assert.match(String(remoteLocalSuffixTarget.json?.error || ''), /cannot probe loopback, lan, or private-resolution targets/i)
+
+    const remoteIpv6Target = await request(
+      port,
+      'POST',
+      '/test-connection',
+      {
+        jackettUrl: 'http://[fe80::1]:9696',
+        jackettApiKey: 'dummy-key',
+        qbitUrl: 'https://example.org',
+        qbitUsername: 'demo',
+        qbitPassword: 'demo'
+      },
+      {
+        Cookie: hostedCsrf.cookie,
+        Host: 'pvtkrrx.vercel.app',
+        Origin: 'https://pvtkrrx.vercel.app',
+        Referer: 'https://pvtkrrx.vercel.app/configure',
+        'X-PVTKRRX-CSRF': hostedCsrf.token,
+        'X-Forwarded-For': '203.0.113.10'
+      }
+    )
+    assert.equal(remoteIpv6Target.status, 403, 'hosted test-connection should block private IPv6 targets')
+    assert.match(String(remoteIpv6Target.json?.error || ''), /cannot probe loopback, lan, or private-resolution targets/i)
+
+    const spoofedLocalConfig = await request(
+      port,
+      'POST',
+      '/local-config',
+      { qbitUrl: 'http://127.0.0.1:8080' },
+      {
+        Host: 'pvtkrrx.vercel.app',
+        'X-Forwarded-For': '127.0.0.1'
+      }
+    )
+    assert.equal(spoofedLocalConfig.status, 403, 'spoofed X-Forwarded-For must not unlock /local-config')
+
+    const spoofedNetworkInfo = await request(
+      port,
+      'GET',
+      '/network-info',
+      null,
+      {
+        Host: '192.168.1.1:7000',
+        'X-Real-IP': '192.168.1.50'
+      }
+    )
+    assert.equal(spoofedNetworkInfo.status, 403, 'spoofed Host must not unlock /network-info')
 
     const remotePublicTarget = await request(
       port,
@@ -138,18 +358,32 @@ async function run() {
         qbitPassword: 'demo'
       },
       {
+        Cookie: hostedCsrf.cookie,
         Host: 'pvtkrrx.vercel.app',
         Origin: 'https://pvtkrrx.vercel.app',
         Referer: 'https://pvtkrrx.vercel.app/configure',
+        'X-PVTKRRX-CSRF': hostedCsrf.token,
         'X-Forwarded-For': '203.0.113.10'
       }
     )
     assert.equal(remotePublicTarget.status, 200, 'hosted configure test should still accept public targets')
     assert.equal(typeof remotePublicTarget.json?.jackett, 'boolean')
     assert.equal(typeof remotePublicTarget.json?.qbit, 'boolean')
+  } finally {
+    await new Promise(resolve => hostedServer.close(resolve))
+  }
+
+  const localServer = http.createServer(loadApp(false))
+  await new Promise(resolve => localServer.listen(0, resolve))
+
+  try {
+    const localPort = localServer.address().port
+    const localConfigure = await request(localPort, 'GET', '/configure')
+    assert.equal(localConfigure.status, 200, 'local configure page should return 200')
+    const localCsrf = readCsrf(localConfigure.headers['set-cookie'])
 
     const localPrivateTarget = await request(
-      port,
+      localPort,
       'POST',
       '/test-connection',
       {
@@ -160,14 +394,42 @@ async function run() {
         qbitPassword: 'demo'
       },
       {
-        Host: `127.0.0.1:${port}`
+        Cookie: localCsrf.cookie,
+        Host: `127.0.0.1:${localPort}`,
+        'X-PVTKRRX-CSRF': localCsrf.token
       }
     )
     assert.equal(localPrivateTarget.status, 200, 'local configure should still be able to test loopback targets')
 
+    const publicOriginNetworkInfo = await request(
+      localPort,
+      'GET',
+      '/network-info',
+      null,
+      {
+        Host: `127.0.0.1:${localPort}`,
+        Origin: 'https://evil.example'
+      }
+    )
+    assert.equal(publicOriginNetworkInfo.status, 403, 'public-origin /network-info should fail on local runtime')
+
+    const publicOriginLocalConfig = await request(
+      localPort,
+      'POST',
+      '/local-config',
+      { qbitUrl: 'http://127.0.0.1:8080' },
+      {
+        Cookie: localCsrf.cookie,
+        Host: `127.0.0.1:${localPort}`,
+        Origin: 'https://evil.example',
+        'X-PVTKRRX-CSRF': localCsrf.token
+      }
+    )
+    assert.equal(publicOriginLocalConfig.status, 403, 'public-origin /local-config should fail on local runtime')
+
     console.log('Smoke runtime guards passed')
   } finally {
-    await new Promise(resolve => server.close(resolve))
+    await new Promise(resolve => localServer.close(resolve))
   }
 }
 

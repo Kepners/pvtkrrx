@@ -55,7 +55,7 @@ Stremio client
 |---|---|---|---|
 | `PC Local` | Local manifest on `127.0.0.1` | Local runtime only | The host Windows PC |
 | `LAN Bridge` | Hosted manifest with `lanPair*` fields | Hosted relay + live desktop heartbeat | Same-account home devices |
-| `Remote Seedbox` | Hosted manifest with public playback config | Hosted relay + public playback endpoints | Away-from-home / public route |
+| `Remote Seedbox` | Hosted manifest with public playback config | Hosted relay + public ready-file playback endpoints | Away-from-home / public route |
 
 ## Main Flows
 
@@ -78,9 +78,9 @@ Stremio client
 
 1. Stream handler resolves content from Prowlarr/Torznab-compatible search plus qBittorrent state.
 2. Completed local files prefer `/file/:info`.
-3. Not-ready content uses `/playback/:info` to queue or resume the torrent and wait for playable progress.
+3. Not-ready content uses `/playback/:info` only on playback-capable runtimes such as PC Local, LAN Bridge after local redirect, or self-hosted installs that actually serve `/playback`.
 4. External `fileServerUrl` is optional and mainly used when the local runtime cannot read the file directly.
-5. Hosted runtime must fail fast rather than buffering or serving local-only playback on Vercel.
+5. Hosted Vercel runtime must fail fast rather than buffering or serving local-only playback, and hosted Remote Seedbox responses must suppress dead tracker `/playback` streams.
 
 ### Sports And Library
 

@@ -10,6 +10,7 @@ const { formatSize } = require('../utils/streams')
 const { makeSportsThumbUrl } = require('../utils/sportsThumb')
 const { parseSportsTitle } = require('../utils/sportsTitleParser')
 const { mapLeague } = require('../utils/leagueMap')
+const { normalizeImdbId } = require('../utils/normalizeImdbId')
 
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 const cinemeta = new CinemetaClient()
@@ -71,12 +72,7 @@ function extractYear(value) {
   return m ? m[0] : ''
 }
 
-function normalizeImdbId(value) {
-  const raw = String(value || '').trim()
-  const m = raw.match(/^tt(\d{5,10})$/i)
-  if (!m) return ''
-  return `tt${m[1].padStart(7, '0')}`
-}
+
 
 function cacheKey(type, imdbId) {
   return `${type}:${String(imdbId || '').trim()}`
@@ -360,7 +356,9 @@ function getSportsVariantTag(title) {
 function groupSportsItems(items, query = '') {
   const groups = new Map()
   for (const item of items || []) {
-    const parsedSportsEvent = item?.parsedSportsEvent || parseSportsTitle(item?.title || '')
+    // Reuse pre-computed parsedSportsEvent and mappedLeague from normalization step
+    const parsedSportsEvent = item?.parsedSportsEvent || null
+    const itemMappedLeague = item?.mappedLeague || ''
     const display = normalizeSportsEventTitle(item.title, parsedSportsEvent) || cleanTitle(item.title) || String(item.title || '').trim()
     if (!display) continue
     const baseKey = sportsEventKey({ title: item.title, parsedSportsEvent })
@@ -375,21 +373,21 @@ function groupSportsItems(items, query = '') {
         best: item,
         count: 1,
         parsedSportsEvent,
-        mappedLeague: mapLeague(parsedSportsEvent?.league || '') || ''
+        mappedLeague: itemMappedLeague
       })
       continue
     }
     current.count += 1
     if (!current.parsedSportsEvent && parsedSportsEvent) {
       current.parsedSportsEvent = parsedSportsEvent
-      current.mappedLeague = mapLeague(parsedSportsEvent?.league || '') || current.mappedLeague
+      current.mappedLeague = itemMappedLeague || current.mappedLeague
     }
     if (compareItems(item, current.best, query) < 0) {
       current.best = item
       current.display = display || current.display
       if (parsedSportsEvent) {
         current.parsedSportsEvent = parsedSportsEvent
-        current.mappedLeague = mapLeague(parsedSportsEvent?.league || '') || current.mappedLeague
+        current.mappedLeague = itemMappedLeague || current.mappedLeague
       }
     }
   }
@@ -510,8 +508,8 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
   const artworkByBaseKey = new Map()
   const metas = await mapLimit(pageGroups, 6, async (group, index) => {
     const item = group.best
-    const parsedSportsEvent = group.parsedSportsEvent || item.parsedSportsEvent || parseSportsTitle(item.title || '')
-    const mappedLeague = group.mappedLeague || item.mappedLeague || mapLeague(parsedSportsEvent?.league || '') || ''
+    const parsedSportsEvent = group.parsedSportsEvent || item.parsedSportsEvent || null
+    const mappedLeague = group.mappedLeague || item.mappedLeague || ''
     const displayTitle = group.display || normalizeSportsEventTitle(item.title, parsedSportsEvent) || cleanTitle(item.title) || item.title
     const resolvedSportHint = resolveSportHint({
       explicitHint: parsedSportsEvent ? (sportHintFromLeagueCode(parsedSportsEvent.league) || item?.sportHint) : item?.sportHint,
@@ -780,4 +778,4 @@ async function libraryCatalog(config, extra) {
   return { metas, cacheMaxAge: 300 }
 }
 
-module.exports = { handleCatalog, parseExtra }
+module.exports = { handleCatalog }

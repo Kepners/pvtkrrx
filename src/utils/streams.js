@@ -23,6 +23,12 @@ function uniqueNonEmpty(values) {
   return [...new Set((values || []).filter(Boolean))]
 }
 
+function withExtraDescription(baseText, extraLines = []) {
+  const extras = uniqueNonEmpty(extraLines)
+  if (!extras.length) return baseText
+  return uniqueNonEmpty([baseText, ...extras]).join('\n')
+}
+
 function slugToken(value, maxLen = 48) {
   const text = String(value || '')
     .toLowerCase()
@@ -74,8 +80,8 @@ function buildDescription(item, parsed, mode, progressPercent = null) {
     parsed.audio ? `🔊 ${parsed.audio}` : ''
   ]).join(' • ')
 
-  let modeLabel = 'Auto-buffer'
-  if (mode === 'seedbox') modeLabel = 'Local ready'
+  let modeLabel = 'Queue and buffer'
+  if (mode === 'seedbox') modeLabel = 'Ready file'
   else if (mode === 'buffering') modeLabel = `Buffering ${Number.isFinite(progressPercent) ? progressPercent : 0}%`
 
   const peerLabel = formatPeerLabel(item.seeders, mode)
@@ -166,6 +172,55 @@ function buildOnTrackerStream(item, playbackUrl, parsed) {
       sourceQuality: String(parsed?.quality || ''),
       sourceSize: Math.max(0, Number(item?.size || 0)),
       sourceMode: 'tracker'
+    }
+  }
+}
+
+function buildInfoStream(code, helpUrl, count = 1) {
+  const total = Math.max(1, Number(count || 0))
+  let name = '[INFO] PVTKRRX'
+  let description = 'Playback note'
+  const noun = total === 1 ? 'option' : 'options'
+  const verb = total === 1 ? 'was' : 'were'
+
+  if (code === 'hosted-ready-only') {
+    name = '[INFO] Ready Files Only'
+    description = withExtraDescription(
+      'This hosted Remote Seedbox route only shows files that are already ready to play.',
+      [
+        `${total} download ${noun} ${verb} hidden because this hosted route cannot queue and buffer downloads.`,
+        'Use PC Local, LAN Bridge, or self-hosted playback if you want queue-and-buffer streams.'
+      ]
+    )
+  } else if (code === 'auth-suppressed') {
+    name = '[INFO] Direct Buffer Hidden'
+    description = withExtraDescription(
+      'Direct queue-and-buffer is hidden here to protect your file-server login.',
+      [
+        `${total} download ${noun} ${verb} hidden because this hosted route cannot safely forward your file-server login during playback redirects.`,
+        'Ready files can still play. Remove file-server auth or self-host playback if you want queue-and-buffer.'
+      ]
+    )
+  } else if (code === 'buffering-path-unproven') {
+    name = '[INFO] Buffer URL Not Ready'
+    description = withExtraDescription(
+      'Not enough live file info is available yet for a safe buffer URL.',
+      [
+        `${total} buffering ${noun} ${verb} hidden until qBittorrent exposes the current file path for the file being downloaded.`,
+        'Wait for more progress, or use PC Local, LAN Bridge, or self-hosted playback for local queue-and-buffer.'
+      ]
+    )
+  }
+
+  return {
+    name,
+    description,
+    externalUrl: helpUrl,
+    behaviorHints: {
+      sourceMode: 'notice',
+      sourceNoticeCode: String(code || ''),
+      sourceSeeders: 0,
+      sourceSize: 0
     }
   }
 }
@@ -278,6 +333,7 @@ function sortStreams(streams) {
     if (mode === 'seedbox') return 0
     if (mode === 'buffering') return 1
     if (mode === 'tracker') return 2
+    if (mode === 'notice') return 3
     if (stream.name.includes('\u26A1')) return 0
     if (stream.name.includes('\u23F3')) return 1
     return 2
@@ -331,6 +387,7 @@ module.exports = {
   buildOnSeedboxStream,
   buildOnBufferingStream,
   buildOnTrackerStream,
+  buildInfoStream,
   isSampleVideoName,
   hasPackedArchiveFiles,
   findVideoFile,

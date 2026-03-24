@@ -1,10 +1,17 @@
 const assert = require('node:assert/strict')
 const crypto = require('node:crypto')
+const fs = require('node:fs')
 const http = require('node:http')
+const os = require('node:os')
+const path = require('node:path')
+const { AccountStore } = require('../src/utils/accountStore')
+const { verifyAuthToken } = require('../src/utils/authToken')
 
 const GOOD_AUTH_KEY = 'good-authkey-1234567890'
 const BAD_AUTH_KEY = 'bad-authkey-1234567890'
 const LINKED_STREMIO_USER_ID = 'stremio_user_abc123'
+const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-stremio-link-'))
+const accountStorePath = path.join(runtimeDir, 'accounts-store.json')
 
 function derivePairIdFromStremioUserId(stremioUserId) {
   const userId = String(stremioUserId || '').trim()
@@ -54,6 +61,24 @@ function startMockStremioApi() {
   })
 }
 
+function readCsrf(setCookieHeader) {
+  const raw = Array.isArray(setCookieHeader) ? setCookieHeader.join('; ') : String(setCookieHeader || '')
+  const match = raw.match(/pvtkrrx_csrf=([^;]+)/)
+  assert.ok(match, 'configure response should set CSRF cookie')
+  return {
+    cookie: `pvtkrrx_csrf=${match[1]}`,
+    token: decodeURIComponent(match[1])
+  }
+}
+
+function withCsrf(csrf, headers = {}) {
+  return {
+    ...headers,
+    Cookie: csrf.cookie,
+    'X-PVTKRRX-CSRF': csrf.token
+  }
+}
+
 async function run() {
   const mockServer = await startMockStremioApi()
   const mockPort = mockServer.address().port
@@ -62,32 +87,45 @@ async function run() {
   process.env.AUTH_TOKEN_SECRET = process.env.AUTH_TOKEN_SECRET || 'local-auth-secret-12345678901234567890'
   process.env.PVTKRRX_STREMIO_API_BASE_URL = `http://127.0.0.1:${mockPort}`
   process.env.PVTKRRX_STREMIO_API_TIMEOUT_MS = '5000'
+  process.env.PVTKRRX_RUNTIME_DIR = runtimeDir
 
-  const app = require('../index')
-  const server = http.createServer(app)
+  const accountStore = new AccountStore({ filePath: accountStorePath })
+  let app = require('../index')
+  let server = http.createServer(app)
   await new Promise(resolve => server.listen(0, resolve))
 
   try {
-    const port = server.address().port
-    const base = `http://127.0.0.1:${port}`
+    let base = `http://127.0.0.1:${server.address().port}`
+    const configureRes = await fetch(`${base}/configure`)
+    assert.equal(configureRes.status, 200, 'GET /configure should return 200')
+    const csrf = readCsrf(configureRes.headers.get('set-cookie'))
+
+    const missingCsrfRes = await fetch(`${base}/auth/stremio/link-authkey`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ authKey: GOOD_AUTH_KEY })
+    })
+    assert.equal(missingCsrfRes.status, 403, 'stremio auth-link should reject missing CSRF token')
+    const missingCsrfPayload = await missingCsrfRes.json().catch(() => ({}))
+    assert.match(String(missingCsrfPayload.error || ''), /csrf/i)
 
     const badRes = await fetch(`${base}/auth/stremio/link-authkey`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: withCsrf(csrf, { 'Content-Type': 'application/json' }),
       body: JSON.stringify({ authKey: BAD_AUTH_KEY })
     })
     assert.equal(badRes.status, 401, 'invalid stremio auth key should be rejected')
 
     const linkRes = await fetch(`${base}/auth/stremio/link-authkey`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: withCsrf(csrf, { 'Content-Type': 'application/json' }),
       body: JSON.stringify({ authKey: GOOD_AUTH_KEY })
     })
     assert.equal(linkRes.status, 200, 'valid stremio auth key should link successfully')
     const linkData = await linkRes.json()
     assert.equal(Boolean(linkData?.ok), true)
     assert.ok(String(linkData?.token || '').length > 20)
-    assert.ok(String(linkData?.user?.id || '').startsWith('usr_'))
+    assert.equal(linkData?.user, undefined, 'link response should omit internal user details')
     assert.equal(String(linkData?.stremio?.userId || ''), LINKED_STREMIO_USER_ID)
     const expectedPairId = derivePairIdFromStremioUserId(LINKED_STREMIO_USER_ID)
     assert.equal(
@@ -96,15 +134,72 @@ async function run() {
       'recommended pair id should be deterministic from stremio user id'
     )
 
+    let rawTokenText = ''
+    let parsedToken = null
+    try {
+      rawTokenText = Buffer.from(String(linkData.token || ''), 'base64url').toString('utf8')
+      parsedToken = JSON.parse(rawTokenText)
+    } catch (_) {
+      parsedToken = null
+    }
+    assert.equal(parsedToken, null, 'auth token should not be readable as plain JSON')
+    assert.ok(!rawTokenText.includes(LINKED_STREMIO_USER_ID), 'auth token should not expose stremio user id')
+    assert.ok(!rawTokenText.includes('linked-user@example.com'), 'auth token should not expose linked email')
+    const verifiedToken = verifyAuthToken(linkData.token, process.env.AUTH_TOKEN_SECRET)
+    assert.ok(verifiedToken, 'auth token should verify with AUTH_TOKEN_SECRET')
+    assert.deepEqual(
+      Object.keys(verifiedToken).sort(),
+      ['exp', 'iat', 'sub'],
+      'auth token payload should stay limited to opaque bearer metadata'
+    )
+
+    const legacyReadableBearer = Buffer.from(JSON.stringify({
+      sub: String(verifiedToken?.sub || ''),
+      iat: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + 3600
+    })).toString('base64url')
+    assert.equal(
+      verifyAuthToken(legacyReadableBearer, process.env.AUTH_TOKEN_SECRET),
+      null,
+      'plain readable base64-JSON bearer tokens should no longer verify'
+    )
+
     const relinkRes = await fetch(`${base}/auth/stremio/link-authkey`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: withCsrf(csrf, { 'Content-Type': 'application/json' }),
       body: JSON.stringify({ authKey: GOOD_AUTH_KEY })
     })
     assert.equal(relinkRes.status, 200, 're-linking same auth key should stay idempotent')
     const relinkData = await relinkRes.json()
     assert.equal(String(relinkData?.stremio?.userId || ''), LINKED_STREMIO_USER_ID)
     assert.equal(String(relinkData?.stremio?.recommendedPairId || ''), expectedPairId)
+
+    const linkedUser = await accountStore.getUserByStremioUserId(LINKED_STREMIO_USER_ID)
+    assert.ok(linkedUser?.id, 'linked account should be persisted')
+    assert.equal(
+      String(verifiedToken?.sub || ''),
+      String(linkedUser.id || ''),
+      'auth token subject should map only to the internal linked account id'
+    )
+    await accountStore.saveUser({
+      ...linkedUser,
+      billing: {
+        ...(linkedUser.billing && typeof linkedUser.billing === 'object' ? linkedUser.billing : {}),
+        status: 'active',
+        customerId: 'cus_hidden',
+        subscriptionId: 'sub_hidden',
+        priceId: 'price_hidden',
+        currentPeriodEndMs: Date.now() + 86400000,
+        cancelAtPeriodEnd: false
+      }
+    })
+
+    await new Promise(resolve => server.close(resolve))
+    delete require.cache[require.resolve('../index')]
+    app = require('../index')
+    server = http.createServer(app)
+    await new Promise(resolve => server.listen(0, resolve))
+    base = `http://127.0.0.1:${server.address().port}`
 
     const meRes = await fetch(`${base}/auth/me`, {
       headers: { Authorization: `Bearer ${linkData.token}` }
@@ -114,11 +209,30 @@ async function run() {
     assert.equal(Boolean(meData?.ok), true)
     assert.equal(String(meData?.user?.stremio?.userId || ''), LINKED_STREMIO_USER_ID)
     assert.equal(Boolean(meData?.user?.stremio?.linked), true)
+    assert.equal(meData?.user?.id, undefined, '/auth/me should omit internal user id')
+    assert.equal(meData?.user?.email, undefined, '/auth/me should omit account email')
+    assert.equal(meData?.user?.billing?.customerId, undefined, '/auth/me should omit stripe customer id')
+    assert.equal(meData?.user?.billing?.subscriptionId, undefined, '/auth/me should omit stripe subscription id')
+    assert.equal(meData?.user?.billing?.priceId, undefined, '/auth/me should omit stripe price id')
+
+    const legacyMeRes = await fetch(`${base}/auth/me`, {
+      headers: { Authorization: `Bearer ${legacyReadableBearer}` }
+    })
+    assert.equal(legacyMeRes.status, 401, 'legacy readable bearer contents should be rejected by /auth/me')
+
+    const accountStoreRaw = fs.readFileSync(accountStorePath, 'utf8')
+    assert.ok(accountStoreRaw.includes('__pvtkrrxSecure'), 'account store should use secure-json wrapper')
+    assert.ok(!accountStoreRaw.includes(LINKED_STREMIO_USER_ID), 'account store file should not contain plaintext stremio user id')
+    assert.ok(!accountStoreRaw.includes('linked-user@example.com'), 'account store file should not contain plaintext linked email')
+    assert.ok(!accountStoreRaw.includes(GOOD_AUTH_KEY), 'account store file should not contain plaintext AuthKey material')
 
     console.log('Smoke Stremio AuthKey link flow passed')
   } finally {
-    server.close()
+    await new Promise(resolve => server.close(resolve))
     mockServer.close()
+    try {
+      fs.rmSync(runtimeDir, { recursive: true, force: true })
+    } catch (_) {}
   }
 }
 

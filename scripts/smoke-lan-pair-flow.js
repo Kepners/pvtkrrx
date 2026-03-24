@@ -1,10 +1,34 @@
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
 const http = require('node:http')
+const os = require('node:os')
+const path = require('node:path')
 
 process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'local-smoke-secret-12345678901234567890'
+const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-lan-pair-'))
+process.env.PVTKRRX_RUNTIME_DIR = runtimeDir
 
 const app = require('../index')
 const { encodePlaybackStateToken, decodePlaybackStateToken } = require('../src/utils/opaqueState')
+const pairStorePath = path.join(runtimeDir, 'lan-pair-store.json')
+
+function readCsrf(setCookieHeader) {
+  const raw = Array.isArray(setCookieHeader) ? setCookieHeader.join('; ') : String(setCookieHeader || '')
+  const match = raw.match(/pvtkrrx_csrf=([^;]+)/)
+  assert.ok(match, 'configure response should set CSRF cookie')
+  return {
+    cookie: `pvtkrrx_csrf=${match[1]}`,
+    token: decodeURIComponent(match[1])
+  }
+}
+
+function withCsrf(csrf, headers = {}) {
+  return {
+    ...headers,
+    Cookie: csrf.cookie,
+    'X-PVTKRRX-CSRF': csrf.token
+  }
+}
 
 function requestWithHostHeader(port, path, hostHeader) {
   return new Promise((resolve, reject) => {
@@ -47,6 +71,9 @@ async function run() {
   try {
     const port = server.address().port
     const base = `http://127.0.0.1:${port}`
+    const configureRes = await fetch(`${base}/configure`)
+    assert.equal(configureRes.status, 200, 'GET /configure should return 200')
+    const csrf = readCsrf(configureRes.headers.get('set-cookie'))
 
     // Opaque state should not be readable as plain JSON even if someone base64-decodes it.
     const plainPlayback = {
@@ -72,6 +99,7 @@ async function run() {
 
     const pairId = 'pairtest01'
     const pairKey = 'ABCDEFGHIJKLMNOPQRSTUVWX'
+    const ownerId = 'pairownerABCDEFGHIJKLMNOP'
     const endpointBaseUrl = `http://10.10.10.42:${port}`
     const mdnsBaseUrl = `http://pvtkrrx.local:${port}`
 
@@ -81,6 +109,7 @@ async function run() {
       body: JSON.stringify({
         pairId,
         pairKey,
+        ownerId,
         localHostname: 'pvtkrrx.local',
         relayUrl: base,
         endpoints: [
@@ -94,6 +123,22 @@ async function run() {
     assert.equal(Boolean(heartbeatPayload?.ok), true)
     assert.equal(Boolean(heartbeatPayload?.online), true)
 
+    const takeoverRes = await fetch(`${base}/pair/heartbeat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pairId,
+        pairKey,
+        ownerId: 'differentOwnerABCDEFGHIJKL',
+        localHostname: 'other.local',
+        relayUrl: base,
+        endpoints: [
+          { baseUrl: `http://10.10.10.88:${port}`, source: 'lan-ip' }
+        ]
+      })
+    })
+    assert.equal(takeoverRes.status, 409, 'alternate-host heartbeat should be rejected')
+
     const statusRes = await fetch(`${base}/pair/status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -102,6 +147,9 @@ async function run() {
     assert.equal(statusRes.status, 200, 'pair status should return 200')
     const statusPayload = await statusRes.json()
     assert.equal(Boolean(statusPayload?.online), true, 'pair should be online')
+    assert.equal(statusPayload?.endpointBaseUrl, undefined, 'pair status should not expose endpointBaseUrl')
+    assert.equal(statusPayload?.endpointSource, undefined, 'pair status should not expose endpointSource')
+    assert.equal(statusPayload?.localHostname, undefined, 'pair status should not expose localHostname')
 
     const hostedConfig = {
       jackettUrl: 'http://seedbox.example:9696',
@@ -189,9 +237,42 @@ async function run() {
     assert.equal(String(missingPairCatalog.headers['x-pvtkrrx-lan-pair'] || ''), 'offline')
     assert.deepEqual(missingPairCatalog.json, { metas: [], cacheMaxAge: 0 })
 
+    const localConfigRes = await fetch(`${base}/local-config`, {
+      method: 'POST',
+      headers: withCsrf(csrf, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        jackettUrl: 'http://127.0.0.1:9696',
+        jackettApiKey: 'local-key',
+        qbitUrl: 'http://127.0.0.1:8080',
+        qbitUsername: 'admin',
+        qbitPassword: 'secret'
+      })
+    })
+    assert.equal(localConfigRes.status, 200, 'local config save should succeed for legacy token checks')
+
+    const legacyPayload = Buffer.from(JSON.stringify({
+      h: '0123456789abcdef0123456789abcdef01234567',
+      l: 'magnet:?xt=urn:btih:0123456789abcdef0123456789abcdef01234567',
+      p: 'C:\\Media\\Movie.mkv'
+    })).toString('base64url')
+
+    const legacyPlaybackRes = await fetch(`${base}/local/playback/${legacyPayload}`)
+    assert.equal(legacyPlaybackRes.status, 400, 'legacy plain base64 playback token should be rejected')
+
+    const legacyFileRes = await fetch(`${base}/local/file/${legacyPayload}`)
+    assert.equal(legacyFileRes.status, 400, 'legacy plain base64 file token should be rejected')
+
+    const pairStoreRaw = fs.readFileSync(pairStorePath, 'utf8')
+    assert.ok(pairStoreRaw.includes('__pvtkrrxSecure'), 'pair store should use secure-json wrapper')
+    assert.ok(!pairStoreRaw.includes(pairKey), 'pair store should not contain plaintext pair key')
+    assert.ok(!pairStoreRaw.includes(endpointBaseUrl), 'pair store should not contain plaintext endpoint URLs')
+
     console.log('Smoke LAN pair + opaque stream token flow passed')
   } finally {
     server.close()
+    try {
+      fs.rmSync(runtimeDir, { recursive: true, force: true })
+    } catch (_) {}
   }
 }
 

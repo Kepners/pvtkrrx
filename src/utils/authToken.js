@@ -1,11 +1,4 @@
-const crypto = require('crypto')
-
-function sign(value, secret) {
-  return crypto
-    .createHmac('sha256', String(secret || ''))
-    .update(String(value || ''))
-    .digest('base64url')
-}
+const { encrypt, decrypt } = require('./crypto')
 
 function parseBearerToken(headerValue) {
   const value = String(headerValue || '').trim()
@@ -18,32 +11,19 @@ function parseBearerToken(headerValue) {
 function createAuthToken(payload, secret, ttlSeconds = 2592000) {
   const ttl = Math.max(300, Number.parseInt(String(ttlSeconds || 2592000), 10) || 2592000)
   const now = Math.floor(Date.now() / 1000)
-  const body = {
+  return encrypt({
     ...payload,
     iat: now,
     exp: now + ttl
-  }
-  const encoded = Buffer.from(JSON.stringify(body)).toString('base64url')
-  const sig = sign(encoded, secret)
-  return `${encoded}.${sig}`
+  }, secret)
 }
 
 function verifyAuthToken(token, secret) {
   const raw = String(token || '').trim()
   if (!raw) return null
-  const dot = raw.lastIndexOf('.')
-  if (dot <= 0 || dot >= raw.length - 1) return null
-
-  const encoded = raw.slice(0, dot)
-  const receivedSig = raw.slice(dot + 1)
-  const expectedSig = sign(encoded, secret)
-  const a = Buffer.from(receivedSig, 'utf8')
-  const b = Buffer.from(expectedSig, 'utf8')
-  if (a.length !== b.length) return null
-  if (!crypto.timingSafeEqual(a, b)) return null
 
   try {
-    const payload = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'))
+    const payload = decrypt(raw, secret)
     if (!payload || typeof payload !== 'object') return null
     const now = Math.floor(Date.now() / 1000)
     const exp = Number(payload.exp || 0)
@@ -59,4 +39,3 @@ module.exports = {
   verifyAuthToken,
   parseBearerToken
 }
-

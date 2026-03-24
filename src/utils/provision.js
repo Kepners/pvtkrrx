@@ -94,7 +94,10 @@ async function getProwlarrHints() {
   `
   const r = await runPowerShell(script, 120000)
   if (r.code !== 0) return null
-  try { return JSON.parse(String(r.stdout || '{}')) } catch (_) { return null }
+  try { return JSON.parse(String(r.stdout || '{}')) } catch (err) {
+    console.warn('[provision] Failed to parse Prowlarr hints JSON:', err.message)
+    return null
+  }
 }
 
 async function getQbitHints() {
@@ -125,7 +128,10 @@ async function getQbitHints() {
   `
   const r = await runPowerShell(script, 120000)
   if (r.code !== 0) return null
-  try { return JSON.parse(String(r.stdout || '{}')) } catch (_) { return null }
+  try { return JSON.parse(String(r.stdout || '{}')) } catch (err) {
+    console.warn('[provision] Failed to parse qBit hints JSON:', err.message)
+    return null
+  }
 }
 
 function normalizePathList(list) {

@@ -67,6 +67,7 @@ User's Seedbox:
 - **Options Considered:** (A) External URL polling hack, (B) Status in stream name/description only, (C) Comet playback endpoint pattern
 - **Chosen:** C — Comet playback endpoint pattern
 - **Rationale:** Stream handler returns a URL pointing to our own `/playback` endpoint (not the direct file URL). When Stremio clicks it, the playback endpoint triggers qBit download if needed, polls for completion within the request lifetime, then 302 redirects to the seedbox file URL. User sees a loading spinner → playback starts. This is the industry-standard pattern used by Comet, comet-uncached, and debrid addons. Stremio follows 302 redirects on `url` fields natively.
+- **Historical note:** This early hosted-runtime assumption is no longer the live hosted design. Current hosted `Remote Seedbox` on Vercel is ready-file-first and must not be read as generally queueing and buffering tracker content.
 
 ### Decision 6: Sports ID Encoding (Security Fix)
 - **Options Considered:** (A) Spec's original encoding with download URL, (B) Stripped encoding without API key
@@ -146,7 +147,7 @@ Add:        POST {url}/api/v2/torrents/add       (urls={magnetOrUrl})
 }
 ```
 
-### Stremio Stream Object — Available on Tracker (Comet pattern)
+### Stremio Stream Object — Available on Tracker (Historical Comet pattern)
 ```javascript
 {
   name: "📥 1080p BluRay",
@@ -160,6 +161,8 @@ Add:        POST {url}/api/v2/torrents/add       (urls={magnetOrUrl})
   }
 }
 ```
+
+Historical note: this example reflects the original hosted-playback plan only. The live hosted Vercel `Remote Seedbox` route is ready-file-first and does not generally emit hosted tracker `/playback` URLs.
 
 ### Cache Strategy
 ```javascript

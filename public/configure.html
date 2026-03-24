@@ -734,6 +734,26 @@
       margin-top: 1rem;
     }
 
+    .install-primary {
+      margin-bottom: 0.95rem;
+      padding: 0.95rem;
+      border: 1px solid rgba(0, 246, 255, 0.18);
+      border-radius: 12px;
+      background: linear-gradient(180deg, rgba(8, 18, 34, 0.74), rgba(9, 15, 28, 0.68));
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+
+    .install-primary input[type="text"] {
+      flex: 1;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.68rem;
+      padding: 0.6rem 0.7rem;
+      background: var(--input-bg);
+      border: 1px solid rgba(0, 246, 255, 0.2);
+      color: #c5d9f1;
+      margin-bottom: 0;
+    }
+
     .quick-setup-grid {
       display: grid;
       gap: 0.8rem;
@@ -910,6 +930,27 @@
       line-height: 1.45;
       color: var(--text-muted);
       margin-top: 0.2rem;
+    }
+
+    .quick-addon-url {
+      margin-top: 0.8rem;
+      padding-top: 0.8rem;
+      border-top: 1px solid rgba(0, 246, 255, 0.12);
+    }
+
+    .quick-addon-url .url-row {
+      margin-bottom: 0;
+    }
+
+    .quick-addon-url input[type="text"] {
+      flex: 1;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.68rem;
+      padding: 0.55rem 0.65rem;
+      background: var(--input-bg);
+      border: 1px solid rgba(0, 246, 255, 0.2);
+      color: #c5d9f1;
+      margin-bottom: 0;
     }
 
     .install-target-panel {
@@ -1212,11 +1253,11 @@
         <button type="button" class="mode-option" data-install-target="seedbox" onclick="setInstallTarget('seedbox')">
           <span class="mode-kicker">Public endpoints</span>
           <span class="mode-title">Remote Seedbox</span>
-          <span class="mode-copy">Use the hosted remote profile only when Prowlarr, qBittorrent, and file serving are reachable over public URLs.</span>
+          <span class="mode-copy">Use the hosted remote profile only when Prowlarr, qBittorrent, and file serving are reachable over public URLs. On Vercel this is not a generic tracker-buffering path: it is effectively ready-file / public-playback only unless you self-host PVTKRRX on a runtime that can truly serve playback. Auth-protected file-server playback still needs real-device validation because client auth handling can vary.</span>
           <div class="summary-points">
-            <span>Public HTTPS playback path required</span>
-            <span>Hosted remote profile</span>
-            <span>Works beyond the home LAN</span>
+            <span>Public HTTPS ready-file path required</span>
+            <span>Hosted Vercel fails closed on local-only playback</span>
+            <span>Away-from-home playback route</span>
           </div>
         </button>
       </div>
@@ -1276,6 +1317,14 @@
           <div class="quick-step-actions">
             <button class="btn-test" type="button" id="lanAutoSetupBtn" onclick="autoSetup()">Auto Setup (Home LAN)</button>
             <button class="btn-install" type="button" id="quickInstallLanBtn" onclick="triggerLanInstall()" disabled>Install Or Refresh LAN Bridge In Stremio</button>
+          </div>
+          <div class="quick-addon-url">
+            <div class="install-section-title">Paste This URL Into Stremio</div>
+            <div class="url-row">
+              <input type="text" id="quickAddonUrlValue" readonly placeholder="Run Auto Setup first to generate the LAN Bridge addon URL">
+              <button class="btn-copy" type="button" id="quickCopyAddonUrlBtn" onclick="copyCurrentAddonUrl(this)">Copy Addon URL</button>
+            </div>
+            <p class="quick-step-note" id="quickAddonUrlNote">If Stremio shows an Add Addon URL box, paste the HTTPS LAN Bridge URL here.</p>
           </div>
           <p class="quick-step-note" id="quickSetupHint">Auto Setup also checks Prowlarr, qBittorrent, local storage, and the signed-in Stremio session on this PC. If Stremio already has an older LAN Bridge URL, clicking Install again refreshes it.</p>
         </section>
@@ -1379,7 +1428,8 @@
         <input type="url" id="fileServerUrl" placeholder="https://username.seedbox.com/files">
         <label for="fileServerAuth">Basic Auth (optional)</label>
         <input type="text" id="fileServerAuth" placeholder="user:password">
-        <p class="hint">Leave empty if no authentication required</p>
+        <p class="hint">Leave empty if no authentication required.</p>
+        <p class="hint">Hosted Remote Seedbox can still emit ready-file links with Basic Auth, but playback only works on clients that honor the emitted auth behavior. Direct queue-and-buffer rows stay hidden when that login cannot be forwarded safely during playback. Validate auth-protected playback on your real devices.</p>
         <div class="row">
           <div>
             <label for="pathFrom">Path Mapping: From</label>
@@ -1390,7 +1440,8 @@
             <input type="text" id="pathTo" placeholder="/files/">
           </div>
         </div>
-        <p class="hint">Maps qBit save path to file server URL path</p>
+        <p class="hint">Maps qBit save path to file server URL path.</p>
+        <p class="hint">Remote buffering only appears when qBittorrent exposes a provable current file path and the runtime can actually serve that in-progress file.</p>
       </div>
 
       <div class="service-card" id="serviceCard-options" data-service-visible="pc lan seedbox">
@@ -1413,18 +1464,28 @@
     </div>
 
     <div class="card" id="installActionsCard">
-      <h2>Manual / Fallback Install</h2>
-      <p class="section-lead" id="installActionLead">Use this section only if Quick Setup above did not finish cleanly or you need the raw URLs for manual troubleshooting.</p>
+      <h2>Addon URL</h2>
+      <p class="section-lead" id="installActionLead">Generate one addon URL for the selected route. If Stremio asks for an addon URL, paste the URL shown here.</p>
       <div id="testStatus" class="status"></div>
       <button class="btn-test" onclick="testConnection()">Test Connection</button>
 
       <div id="installStatus" class="status"></div>
-      <button class="btn-install" id="installActionBtn" onclick="install()">Prepare This PC Install</button>
+      <button class="btn-install" id="installActionBtn" onclick="install()">Save And Generate Addon URL</button>
 
       <div id="installLink" class="install-link">
+        <div class="install-primary">
+          <p class="install-section-title" id="addonUrlTitle">Addon URL For Stremio</p>
+          <p class="install-note" id="addonUrlLead">If Stremio asks for an addon URL, paste this exact URL.</p>
+          <div class="url-row">
+            <input type="text" id="addonUrlDisplay" readonly placeholder="Click the button above to generate the addon URL for the selected route.">
+            <button class="btn-copy" id="copyAddonUrlBtn" onclick="copyCurrentAddonUrl(this)">Copy Addon URL</button>
+          </div>
+          <p class="install-note" id="addonUrlHint">PC Local uses the loopback URL on this Windows machine. LAN Bridge and Remote Seedbox use hosted HTTPS manifest URLs.</p>
+        </div>
+
         <div id="localInstall">
           <div id="installPanelPc" class="install-target-panel active">
-            <p class="install-section-title">PC Local</p>
+            <p class="install-section-title">PC Local Notes</p>
             <div class="url-row">
               <button class="btn-copy" id="copyLocalInstallBtn" onclick="copyPrivateLink('localLoopback', this)">Copy PC Local URL</button>
             </div>
@@ -1432,14 +1493,14 @@
           </div>
 
           <div id="installPanelLan" class="install-target-panel">
-            <p class="install-section-title">LAN Bridge Manual URLs</p>
+            <p class="install-section-title">LAN Bridge Troubleshooting</p>
             <a id="stremioLinkLan" class="is-disabled" href="#" aria-disabled="true">Install LAN Bridge In Stremio</a>
-            <p class="install-note" id="pairRelayNote">Use this only if you need the manual hosted install route.</p>
-            <p class="install-note" id="pairSyncNote">The normal flow is Auto Setup above, then Install LAN Bridge In Stremio once the step turns ready.</p>
+            <p class="install-note" id="pairRelayNote">Use Open In Stremio here only if you need the deep link. The HTTPS addon URL above is the plain value to paste manually.</p>
+            <p class="install-note" id="pairSyncNote">The normal flow is Auto Setup above, then either Open In Stremio or paste the HTTPS addon URL shown above.</p>
             <p class="install-note" id="pairStatusNote">LAN Bridge status: waiting for local save.</p>
 
             <details class="install-debug">
-              <summary>Show manual URLs and LAN diagnostics</summary>
+              <summary>Show raw URLs and LAN diagnostics</summary>
               <div class="install-debug-content">
                 <div class="url-row">
                   <button class="btn-copy" onclick="copyPrivateLink('pairHostedManifest', this)">Copy Hosted Manifest URL</button>
@@ -1464,7 +1525,7 @@
           </div>
         </div>
         <div id="hostedInstall" style="text-align:center">
-          <p class="install-section-title">Remote Seedbox Installer</p>
+          <p class="install-section-title">Remote Seedbox Details</p>
           <div class="url-row">
             <button class="btn-copy" onclick="copyPrivateLink('hostedManifest', this)">Copy Remote Seedbox Manifest URL</button>
           </div>
@@ -1474,6 +1535,7 @@
           <a id="stremioLinkHosted" class="is-disabled" href="#" aria-disabled="true">Install PVTKRRX (Remote Seedbox)</a>
           <p class="install-note" style="margin-top:0.5rem" id="hostedUrlDisplay"></p>
           <p class="install-note" style="margin-top:0.5rem">Use this on PC, phone, TV, or Apple TV only when Prowlarr, qBittorrent, and file serving are publicly reachable over HTTPS.</p>
+          <p class="install-note" style="margin-top:0.5rem">Hosted Remote Seedbox is ready-file-first on Vercel. Extra notice rows can appear when a file-server login cannot be forwarded safely or qBittorrent has not exposed enough live file info for a safe buffer URL yet. Auth-protected playback still depends on real client support for the emitted auth behavior.</p>
         </div>
       </div>
     </div>
@@ -1483,7 +1545,9 @@
     </footer>
   </div>
 
+  <script src="/route-parity.js"></script>
   <script>
+    const routeParity = window.PVTKRRXRouteParity;
     const defaultLocalHostname = 'pvtkrrx.local';
     const defaultLanPairRelayUrl = 'https://pvtkrrx.vercel.app';
     let activeLocalHostname = defaultLocalHostname;
@@ -1536,8 +1600,84 @@
       downloadUrl: 'https://www.stremio.com/downloads',
       error: ''
     };
+    const savedSecretState = {
+      jackettApiKey: false,
+      qbitUsername: false,
+      qbitPassword: false,
+      fileServerAuth: false,
+      lanPairKey: false
+    };
+    const secretFieldDirty = {
+      jackettApiKey: false,
+      qbitUsername: false,
+      qbitPassword: false,
+      fileServerAuth: false
+    };
     let stremioAuthKeyPollTimer = null;
     let stremioAuthKeyPollUntil = 0;
+
+    function hasLinkedAccount() {
+      return Boolean(accountLinkState.stremioUserId || accountLinkState.accountUserId);
+    }
+
+    function getCookieValue(name) {
+      const target = `${name}=`;
+      return document.cookie
+        .split(';')
+        .map(part => part.trim())
+        .find(part => part.startsWith(target))
+        ?.slice(target.length) || '';
+    }
+
+    function buildJsonHeaders() {
+      const headers = { 'Content-Type': 'application/json' };
+      const csrf = getCookieValue('pvtkrrx_csrf');
+      if (csrf) headers['X-PVTKRRX-CSRF'] = decodeURIComponent(csrf);
+      return headers;
+    }
+
+    function resetSecretFieldDirty() {
+      Object.keys(secretFieldDirty).forEach((key) => {
+        secretFieldDirty[key] = false;
+      });
+    }
+
+    function updateSavedSecretState(flags = {}) {
+      Object.keys(savedSecretState).forEach((key) => {
+        savedSecretState[key] = Boolean(flags && flags[key]);
+      });
+      const placeholders = {
+        jackettApiKey: 'Saved securely on this host. Leave blank to keep.',
+        qbitUsername: 'Saved securely on this host. Leave blank to keep.',
+        qbitPassword: 'Saved securely on this host. Leave blank to keep.',
+        fileServerAuth: 'Saved securely on this host. Leave blank to keep.'
+      };
+      Object.entries(placeholders).forEach(([field, placeholder]) => {
+        const el = document.getElementById(field);
+        if (!el) return;
+        el.placeholder = savedSecretState[field] ? placeholder : '';
+      });
+      resetSecretFieldDirty();
+    }
+
+    function markSecretFieldDirty(field) {
+      if (Object.prototype.hasOwnProperty.call(secretFieldDirty, field)) {
+        secretFieldDirty[field] = true;
+      }
+    }
+
+    function getRetainedSecretFields() {
+      return {
+        jackettApiKey: savedSecretState.jackettApiKey && !secretFieldDirty.jackettApiKey && !String(document.getElementById('jackettApiKey').value || '').trim(),
+        qbitUsername: savedSecretState.qbitUsername && !secretFieldDirty.qbitUsername && !String(document.getElementById('qbitUsername').value || '').trim(),
+        qbitPassword: savedSecretState.qbitPassword && !secretFieldDirty.qbitPassword && !String(document.getElementById('qbitPassword').value || '').trim(),
+        fileServerAuth: savedSecretState.fileServerAuth && !secretFieldDirty.fileServerAuth && !String(document.getElementById('fileServerAuth').value || '').trim()
+      };
+    }
+
+    function hasAvailableSecret(field, value) {
+      return Boolean(String(value || '').trim() || getRetainedSecretFields()[field]);
+    }
 
     const providers = {
       custom: {
@@ -1801,7 +1941,7 @@
       const lanInstallReady = Boolean(privateInstallLinks.pairHostedStremio);
       const pairStatusText = String(document.getElementById('pairStatusNote')?.textContent || '').trim();
       const step1Ready = canQueryLocalRuntime() && localStremioStatus.installed;
-      const step2Ready = step1Ready && Boolean(accountLinkState.accountUserId);
+      const step2Ready = step1Ready && hasLinkedAccount();
 
       if (!canQueryLocalRuntime()) {
         setQuickStepBadge('stremioDesktopBadge', 'error', 'Host PC Only');
@@ -1822,7 +1962,7 @@
         document.getElementById('stremioDesktopMeta').textContent = 'Stremio Desktop was not detected on this PC. Install it first so PVTKRRX can finish the home-device setup cleanly.';
       }
 
-      if (accountLinkState.accountUserId) {
+      if (hasLinkedAccount()) {
         const sourceText = stremioLinkSession.sourceLabel ? ` via ${stremioLinkSession.sourceLabel}` : '';
         setQuickStepBadge('authLinkBadge', 'ready', 'Ready');
         document.getElementById('authLinkMeta').textContent = `The server checked the Stremio account link${sourceText} and is ready to install the addon for secured same-account access.`;
@@ -1849,7 +1989,7 @@
 
       if (lanInstallReady) {
         setQuickStepBadge('lanInstallBadge', 'ready', 'Ready');
-        document.getElementById('lanInstallMeta').textContent = pairStatusText || 'LAN Bridge is prepared. Click Install Or Refresh LAN Bridge In Stremio now.';
+        document.getElementById('lanInstallMeta').textContent = pairStatusText || 'LAN Bridge is prepared. Open it in Stremio now, or copy the HTTPS addon URL below if Stremio asks for a URL.';
       } else if (!canQueryLocalRuntime()) {
         setQuickStepBadge('lanInstallBadge', 'error', 'Host PC Only');
         document.getElementById('lanInstallMeta').textContent = 'Run this on the Windows host PC so PVTKRRX can prepare the hosted LAN Bridge URL for Stremio.';
@@ -1900,7 +2040,7 @@
         if (quickLead) quickLead.textContent = 'Step 3 next. Click Auto Setup once so PVTKRRX checks Prowlarr, qBittorrent, storage, and the LAN Bridge install URL.';
       } else {
         setGuidedButtonState('quickInstallLanBtn', true, false);
-        if (quickLead) quickLead.textContent = 'All three steps are green. Click Install Or Refresh LAN Bridge In Stremio now.';
+        if (quickLead) quickLead.textContent = 'All three steps are green. Open LAN Bridge in Stremio now, or paste the HTTPS addon URL shown below if Stremio asks for it.';
       }
     }
 
@@ -1947,12 +2087,12 @@
     }
 
     function applyStremioLinkResponse(data, options = {}) {
-      if (!data?.ok || !data?.token || !data?.user?.id) {
+      if (!data?.ok || !data?.token || !data?.stremio?.userId) {
         throw new Error(options.errorMessage || 'Stremio link failed');
       }
 
       stremioLinkSession.token = String(data.token || '');
-      stremioLinkSession.userId = String(data.user?.id || '').trim();
+      stremioLinkSession.userId = '';
       stremioLinkSession.stremioUserId = String(data.stremio?.userId || '').trim();
       stremioLinkSession.recommendedPairId = String(data.stremio?.recommendedPairId || '').trim();
       stremioLinkSession.sourceLabel = String(data.detected?.sourceLabel || options.sourceLabel || '').trim();
@@ -1960,7 +2100,7 @@
         stremioLinkSession.lastAuthKey = String(options.authKey || '').trim();
       }
 
-      accountLinkState.accountUserId = stremioLinkSession.userId;
+      accountLinkState.accountUserId = '';
       accountLinkState.accountProvider = 'stremio-authkey';
       accountLinkState.accountLinkedAt = Date.now();
       accountLinkState.stremioUserId = stremioLinkSession.stremioUserId;
@@ -1975,7 +2115,6 @@
 
       return {
         token: stremioLinkSession.token,
-        userId: stremioLinkSession.userId,
         stremioUserId: stremioLinkSession.stremioUserId,
         recommendedPairId: stremioLinkSession.recommendedPairId
       };
@@ -2016,9 +2155,6 @@
       if (!config || typeof config !== 'object') return;
       const hasOwn = (key) => Object.prototype.hasOwnProperty.call(config, key);
 
-      if (hasOwn('accountUserId')) {
-        accountLinkState.accountUserId = String(config.accountUserId || '').trim();
-      }
       if (hasOwn('accountProvider')) {
         accountLinkState.accountProvider = String(config.accountProvider || '').trim();
       }
@@ -2045,7 +2181,7 @@
         applyRecommendedLanPairId();
       }
 
-      if (accountLinkState.accountUserId) {
+      if (hasLinkedAccount()) {
         setStremioLinkStatus('ok', 'Linked account loaded from existing profile token.');
       } else {
         setStremioLinkStatus('', '');
@@ -2055,8 +2191,7 @@
 
     function attachAccountLink(config) {
       const next = { ...(config || {}) };
-      if (accountLinkState.accountUserId) {
-        next.accountUserId = accountLinkState.accountUserId;
+      if (hasLinkedAccount()) {
         next.accountProvider = accountLinkState.accountProvider || 'stremio-authkey';
         next.accountLinkedAt = Number(accountLinkState.accountLinkedAt || Date.now());
       }
@@ -2271,10 +2406,10 @@
       try {
         const res = await fetch('/auth/stremio/auto-link-local', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' }
+          headers: buildJsonHeaders()
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || !data?.ok || !data?.token || !data?.user?.id) {
+        if (!res.ok || !data?.ok || !data?.token || !data?.stremio?.userId) {
           const message = String(data?.error || `Auto detect failed (${res.status})`).trim();
           const detail = String(data?.detail || '').trim();
           return {
@@ -2309,7 +2444,7 @@
 
     async function maybeAutoDetectStremioSession() {
       const inputValue = String(document.getElementById('stremioAuthKey')?.value || '').trim();
-      if (accountLinkState.accountUserId || stremioLinkSession.autoDetectAttempted || inputValue) return null;
+      if (hasLinkedAccount() || stremioLinkSession.autoDetectAttempted || inputValue) return null;
       stremioLinkSession.autoDetectAttempted = true;
       return autoLinkStremioFromLocalSession({ silent: true });
     }
@@ -2417,7 +2552,6 @@
       if (!force && stremioLinkSession.token && stremioLinkSession.lastAuthKey === authKey) {
         return {
           token: stremioLinkSession.token,
-          userId: stremioLinkSession.userId,
           stremioUserId: stremioLinkSession.stremioUserId,
           recommendedPairId: stremioLinkSession.recommendedPairId
         };
@@ -2426,11 +2560,11 @@
       setStremioLinkStatus('info', 'Verifying Stremio AuthKey...');
       const res = await fetch('/auth/stremio/link-authkey', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: buildJsonHeaders(),
         body: JSON.stringify({ authKey })
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || !data?.ok || !data?.token || !data?.user?.id) {
+      if (!res.ok || !data?.ok || !data?.token || !data?.stremio?.userId) {
         const message = data?.error || `AuthKey link failed (${res.status})`;
         setStremioLinkStatus('err', message);
         throw new Error(message);
@@ -2441,40 +2575,127 @@
       });
     }
 
-    function clearLanPairInstallFields() {
-      privateInstallLinks.pairHostedManifest = '';
-      privateInstallLinks.pairHostedStremio = '';
-      setInstallAnchorState('stremioLinkLan', '', 'Install LAN Bridge In Stremio');
-      updateQuickSetupStatus();
+    function getCurrentAddonUrl(target = getInstallTarget()) {
+      if (target === 'pc') return String(privateInstallLinks.localLoopback || '').trim();
+      if (target === 'lan') return String(privateInstallLinks.pairHostedManifest || '').trim();
+      if (target === 'seedbox') return String(privateInstallLinks.hostedManifest || '').trim();
+      return '';
     }
 
-    function setPrivateLink(name, value) {
-      if (!Object.prototype.hasOwnProperty.call(privateInstallLinks, name)) return;
-      privateInstallLinks[name] = String(value || '').trim();
+    function getCurrentAddonUiCopy(target = getInstallTarget()) {
+      if (target === 'pc') {
+        return {
+          title: 'PC Local Addon URL',
+          lead: 'Paste this URL into Stremio Desktop on this same Windows PC.',
+          hint: 'This is the real same-PC addon route. Paste the loopback URL manually into Stremio Desktop on this machine.',
+          placeholder: 'Click Save And Generate to create the PC Local addon URL.'
+        };
+      }
+      if (target === 'seedbox') {
+        return {
+          title: 'Remote Seedbox Addon URL',
+          lead: 'Paste this HTTPS URL into Stremio on the device you want to use remotely.',
+          hint: 'Remote Seedbox uses the hosted HTTPS manifest URL. Use this only when your public playback endpoints are ready.',
+          placeholder: 'Click Generate to create the Remote Seedbox addon URL.'
+        };
+      }
+      return {
+        title: 'LAN Bridge Addon URL',
+        lead: 'If Stremio asks for an addon URL, paste this HTTPS URL.',
+        hint: 'LAN Bridge is the normal home-device route. This HTTPS manifest URL is the one plain value to paste into Stremio manually.',
+        placeholder: 'Run Auto Setup or Save And Generate to create the LAN Bridge addon URL.'
+      };
     }
 
-    async function copyPrivateLink(name, btn) {
-      const value = String(privateInstallLinks[name] || '').trim();
-      if (!value) {
-        const original = btn.textContent;
-        btn.textContent = 'Not Ready';
-        setTimeout(() => { btn.textContent = original; }, 1200);
+    function setTemporaryButtonText(btn, text) {
+      if (!btn || typeof btn.textContent !== 'string') return;
+      const original = btn.dataset.defaultText || btn.textContent;
+      if (!btn.dataset.defaultText) btn.dataset.defaultText = original;
+      btn.textContent = text;
+      setTimeout(() => {
+        btn.textContent = btn.dataset.defaultText || original;
+      }, 1200);
+    }
+
+    async function copyTextValue(value, btn) {
+      const text = String(value || '').trim();
+      if (!text) {
+        setTemporaryButtonText(btn, 'Not Ready');
         return;
       }
       try {
-        await navigator.clipboard.writeText(value);
+        await navigator.clipboard.writeText(text);
       } catch (_) {
         const el = document.createElement('textarea');
-        el.value = value;
+        el.value = text;
         document.body.appendChild(el);
         el.focus();
         el.select();
         document.execCommand('copy');
         document.body.removeChild(el);
       }
-      const original = btn.textContent;
-      btn.textContent = 'Copied!';
-      setTimeout(() => { btn.textContent = original; }, 1200);
+      setTemporaryButtonText(btn, 'Copied!');
+    }
+
+    function updateAddonUrlUi() {
+      const target = getInstallTarget();
+      const value = getCurrentAddonUrl(target);
+      const copy = getCurrentAddonUiCopy(target);
+
+      const addonTitle = document.getElementById('addonUrlTitle');
+      const addonLead = document.getElementById('addonUrlLead');
+      const addonDisplay = document.getElementById('addonUrlDisplay');
+      const addonHint = document.getElementById('addonUrlHint');
+      const addonCopyBtn = document.getElementById('copyAddonUrlBtn');
+
+      if (addonTitle) addonTitle.textContent = copy.title;
+      if (addonLead) addonLead.textContent = copy.lead;
+      if (addonHint) addonHint.textContent = copy.hint;
+      if (addonDisplay) {
+        addonDisplay.value = value;
+        addonDisplay.placeholder = copy.placeholder;
+      }
+      if (addonCopyBtn) addonCopyBtn.disabled = !value;
+
+      const quickAddonValue = document.getElementById('quickAddonUrlValue');
+      const quickAddonNote = document.getElementById('quickAddonUrlNote');
+      const quickAddonCopyBtn = document.getElementById('quickCopyAddonUrlBtn');
+      if (quickAddonValue) {
+        quickAddonValue.value = target === 'lan' ? value : '';
+        quickAddonValue.placeholder = 'Run Auto Setup first to generate the LAN Bridge addon URL';
+      }
+      if (quickAddonCopyBtn) {
+        quickAddonCopyBtn.disabled = !(target === 'lan' && value);
+      }
+      if (quickAddonNote) {
+        quickAddonNote.textContent = target === 'lan'
+          ? (value
+              ? 'If Stremio shows an Add Addon URL box, paste the HTTPS LAN Bridge URL above.'
+              : 'Run Auto Setup first to generate the HTTPS LAN Bridge URL.')
+          : 'LAN Bridge is the home-device route when you want one addon across your home network.';
+      }
+    }
+
+    async function copyCurrentAddonUrl(btn) {
+      await copyTextValue(getCurrentAddonUrl(), btn);
+    }
+
+    function clearLanPairInstallFields() {
+      privateInstallLinks.pairHostedManifest = '';
+      privateInstallLinks.pairHostedStremio = '';
+      setInstallAnchorState('stremioLinkLan', '', 'Install LAN Bridge In Stremio');
+      updateAddonUrlUi();
+      updateQuickSetupStatus();
+    }
+
+    function setPrivateLink(name, value) {
+      if (!Object.prototype.hasOwnProperty.call(privateInstallLinks, name)) return;
+      privateInstallLinks[name] = String(value || '').trim();
+      updateAddonUrlUi();
+    }
+
+    async function copyPrivateLink(name, btn) {
+      await copyTextValue(privateInstallLinks[name], btn);
     }
 
     function stopLanPairStatusPolling() {
@@ -2512,21 +2733,22 @@
     }
 
     async function refreshLanPairStatus() {
-      if (!lanPair.enabled || !lanPair.pairId || !lanPair.pairKey) {
+      if (!lanPair.enabled || !lanPair.pairId) {
         setPairStatusNote('LAN Bridge status: local config not saved yet.');
         return;
       }
       pairStatusPollCount += 1;
-      const relayBase = normalizeRelayUrl(lanPair.relayUrl);
       try {
-        const res = await fetch(`${relayBase}/pair/status`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            pairId: lanPair.pairId,
-            pairKey: lanPair.pairKey
-          })
-        });
+        const res = canQueryLocalRuntime()
+          ? await fetch('/local/pair-status', { cache: 'no-store' })
+          : await fetch(`${normalizeRelayUrl(lanPair.relayUrl)}/pair/status`, {
+              method: 'POST',
+              headers: buildJsonHeaders(),
+              body: JSON.stringify({
+                pairId: lanPair.pairId,
+                pairKey: lanPair.pairKey
+              })
+            });
         if (!res.ok) {
           if (res.status === 429) {
             setPairStatusNote('LAN Bridge status temporarily rate-limited. Retrying shortly.', true);
@@ -2548,11 +2770,7 @@
         pairStatusOnlineStreak += 1;
         const lastSeen = formatRelativeTime(data.updatedAt);
         const suffix = lastSeen ? ` (${lastSeen})` : '';
-        let endpointText = '';
-        try {
-          const endpointBaseUrl = String(data.endpointBaseUrl || '').trim();
-          if (endpointBaseUrl) endpointText = ` via ${new URL(endpointBaseUrl).host}`;
-        } catch (_) {}
+        const endpointText = data.endpointSource ? ` via ${String(data.endpointSource).trim()}` : '';
         setPairStatusNote(`LAN Bridge online${endpointText}${suffix}.`);
         if (pairStatusOnlineStreak >= 2) {
           stopLanPairStatusPolling();
@@ -2611,20 +2829,20 @@
       const syncNote = document.getElementById('pairSyncNote');
       const accountSyncModeHint = document.getElementById('accountSyncModeHint');
       const quickSetupHint = document.getElementById('quickSetupHint');
-      const linked = Boolean(accountLinkState.accountUserId);
+      const linked = hasLinkedAccount();
       const sourceLabel = String(stremioLinkSession.sourceLabel || '').trim();
       const sourceText = sourceLabel ? ` via ${sourceLabel}` : '';
 
       if (relayNote) {
         relayNote.textContent = linked
-          ? `Linked Stremio account detected${sourceText}. The hosted LAN Bridge is ready to install or refresh once in Stremio, then your phone and TV can sync it.`
-          : 'Use the manual hosted URL only if the Quick Setup install button above is not enough.';
+          ? `Linked Stremio account detected${sourceText}. The LAN Bridge addon URL is ready. Open it in Stremio or paste the HTTPS URL above if Stremio asks for a URL.`
+          : 'Use the HTTPS LAN Bridge addon URL above if you need to paste it manually into Stremio.';
       }
 
       if (syncNote) {
         syncNote.textContent = linked
-          ? 'LAN Bridge is the synced addon for your same-account home devices. If Stremio still shows empty content, uninstall the older LAN Bridge entry and use Install Or Refresh again.'
-          : 'No Stremio account is linked yet. Auto Find AuthKey is the normal home-device step if you want the addon to sync instead of opening the hosted URL on each device.';
+          ? 'LAN Bridge is the synced addon for your same-account home devices. If content still looks stale, remove the older LAN Bridge entry and install again.'
+          : 'No Stremio account is linked yet. Auto Find AuthKey is still the normal home-device step if you want this addon to sync to your other devices.';
       }
 
       if (accountSyncModeHint) {
@@ -2715,17 +2933,17 @@
       const installActionBtn = document.getElementById('installActionBtn');
       const connectionSectionLead = document.getElementById('connectionSectionLead');
       if (target === 'pc') {
-        if (installActionLead) installActionLead.textContent = 'Use these manual tools to prepare the real PC Local addon on this Windows machine. LAN Bridge is still the route for your other home devices.';
-        if (installActionBtn) installActionBtn.textContent = 'Prepare PC Local';
+        if (installActionLead) installActionLead.textContent = 'Generate the PC Local addon URL for this Windows machine. Paste that loopback URL into Stremio Desktop here.';
+        if (installActionBtn) installActionBtn.textContent = 'Save And Generate PC Local URL';
         if (connectionSectionLead) connectionSectionLead.textContent = 'Home mode uses built-in local file serving. Use the Storage tab if completed files may live on NAS shares or extra drives.';
       } else if (target === 'lan') {
-        if (installActionLead) installActionLead.textContent = 'Only use these manual tools if Quick Setup above did not finish cleanly or you need the raw LAN Bridge URLs for troubleshooting.';
-        if (installActionBtn) installActionBtn.textContent = 'Prepare LAN Bridge';
+        if (installActionLead) installActionLead.textContent = 'Generate one LAN Bridge addon URL. If Stremio asks for an addon URL, paste the HTTPS URL shown here.';
+        if (installActionBtn) installActionBtn.textContent = 'Save And Generate LAN Bridge URL';
         if (connectionSectionLead) connectionSectionLead.textContent = 'Home LAN mode uses built-in local file serving. Storage roots can point at NAS shares or extra HDD folders the Windows host can already read.';
       } else {
-        if (installActionLead) installActionLead.textContent = 'Use these tools to prepare the hosted Remote Seedbox addon. This route expects public HTTPS playback endpoints and is separate from LAN Bridge.';
-        if (installActionBtn) installActionBtn.textContent = 'Prepare Remote Seedbox';
-        if (connectionSectionLead) connectionSectionLead.textContent = 'Remote Seedbox mode expects public qBittorrent, Prowlarr, and file server URLs. The File Server tab only appears here.';
+        if (installActionLead) installActionLead.textContent = 'Generate the Remote Seedbox addon URL for Stremio. This route is separate from LAN Bridge and uses the hosted HTTPS manifest.';
+        if (installActionBtn) installActionBtn.textContent = 'Generate Remote Seedbox URL';
+        if (connectionSectionLead) connectionSectionLead.textContent = 'Remote Seedbox mode expects public qBittorrent, Prowlarr, and file server URLs. Hosted installs focus on ready files, and auth-protected external file-server playback still needs validation on the real Stremio clients you use.';
       }
 
       const localInstall = document.getElementById('localInstall');
@@ -2750,6 +2968,8 @@
           }
         }
       }
+
+      updateAddonUrlUi();
 
       setActiveServiceTab(activeServiceTab);
       if (target === 'lan') {
@@ -2777,7 +2997,7 @@
       } else if (target === 'lan') {
         hint.textContent = 'LAN Bridge selected. This is the normal home setup. The app checks Stremio on this Windows PC, reuses the signed-in Stremio account when possible, then prepares the addon install for your home devices.';
       } else {
-        hint.textContent = 'Remote Seedbox selected. You only see the remote hosted install path, and the File Server tab unlocks because public playback URLs are required.';
+        hint.textContent = 'Remote Seedbox selected. Hosted playback is effectively ready-file-first here. Direct queue-and-buffer only appears when the runtime can safely serve it, and auth-protected file-server playback still needs real-device proof.';
       }
     }
 
@@ -2811,6 +3031,18 @@
 
     document.getElementById('jackettUrl').addEventListener('blur', function() {
       this.value = normalizeProwlarrBaseUrl(this.value);
+    });
+    document.getElementById('jackettApiKey').addEventListener('input', function() {
+      markSecretFieldDirty('jackettApiKey');
+    });
+    document.getElementById('qbitUsername').addEventListener('input', function() {
+      markSecretFieldDirty('qbitUsername');
+    });
+    document.getElementById('qbitPassword').addEventListener('input', function() {
+      markSecretFieldDirty('qbitPassword');
+    });
+    document.getElementById('fileServerAuth').addEventListener('input', function() {
+      markSecretFieldDirty('fileServerAuth');
     });
     document.getElementById('localHostname').addEventListener('blur', function() {
       setActiveLocalHostname(this.value);
@@ -2893,23 +3125,13 @@
     function fallbackNetworkInfo() {
       const port = parseInt(window.location.port || '7000', 10);
       const httpsPort = port + 1;
-      const modeQuery = '?mode=local';
       const mdnsHost = activeLocalHostname;
+      const loopback = routeParity.buildLocalModeUrls('127.0.0.1', port, httpsPort);
+      const mdns = routeParity.buildLocalModeUrls(mdnsHost, port, httpsPort);
       return {
         localHostname: mdnsHost,
-        loopback: {
-          httpManifest: `http://127.0.0.1:${port}/local/manifest.json${modeQuery}`,
-          httpsManifest: `https://127.0.0.1:${httpsPort}/local/manifest.json${modeQuery}`,
-          stremio: `stremio://127.0.0.1:${port}/local/manifest.json${modeQuery}`,
-          stremioHttps: `stremio://127.0.0.1:${httpsPort}/local/manifest.json${modeQuery}`
-        },
-        mdns: {
-          hostname: mdnsHost,
-          httpManifest: `http://${mdnsHost}:${port}/local/manifest.json${modeQuery}`,
-          httpsManifest: `https://${mdnsHost}:${httpsPort}/local/manifest.json${modeQuery}`,
-          stremio: `stremio://${mdnsHost}:${port}/local/manifest.json${modeQuery}`,
-          stremioHttps: `stremio://${mdnsHost}:${httpsPort}/local/manifest.json${modeQuery}`
-        },
+        loopback,
+        mdns: { hostname: mdnsHost, ...mdns },
         lan: null,
         lanCandidates: []
       };
@@ -3006,8 +3228,8 @@
         setPairStatusNote('Pairing disabled in local config.');
         return;
       }
-      if (!lanPair.pairId || !lanPair.pairKey) {
-        setPairStatusNote('LAN Bridge status: local pair keys missing.', true);
+      if (!lanPair.pairId) {
+        setPairStatusNote('LAN Bridge status: local pair identity missing.', true);
         return;
       }
 
@@ -3018,21 +3240,25 @@
       }
       updateLanBridgeInstallMessaging();
 
-      const payload = {
-        ...config,
-        lanPairEnabled: true,
-        lanPairRequired: true,
-        lanPairId: lanPair.pairId,
-        lanPairKey: lanPair.pairKey,
-        lanPairRelayUrl: relayBase
-      };
-
       try {
-        const res = await fetch(`${relayBase}/encrypt`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
+        const res = canQueryLocalRuntime()
+          ? await fetch('/local/lan-token', {
+              method: 'POST',
+              headers: buildJsonHeaders(),
+              body: JSON.stringify({ pairId: lanPair.pairId })
+            })
+          : await fetch(`${relayBase}/encrypt`, {
+              method: 'POST',
+              headers: buildJsonHeaders(),
+              body: JSON.stringify({
+                ...config,
+                lanPairEnabled: true,
+                lanPairRequired: true,
+                lanPairId: lanPair.pairId,
+                lanPairKey: lanPair.pairKey,
+                lanPairRelayUrl: relayBase
+              })
+            });
         if (!res.ok) {
           setPairStatusNote(`LAN Bridge token failed (${res.status}).`, true);
           return;
@@ -3054,7 +3280,7 @@
         setInstallAnchorState(
           'stremioLinkLan',
           hostedStremioUrl,
-          accountLinkState.accountUserId
+          hasLinkedAccount()
             ? 'Install Or Refresh LAN Bridge In Stremio (Sync Account)'
             : 'Install Or Refresh LAN Bridge In Stremio'
         );
@@ -3071,15 +3297,15 @@
       try {
         const authKey = String(document.getElementById('stremioAuthKey')?.value || '').trim();
         const { email, password } = getStremioLoginCredentials();
-        let linkedDuringSetup = Boolean(accountLinkState.accountUserId);
+        let linkedDuringSetup = hasLinkedAccount();
         if (email && password) {
           await fetchStremioAuthKeyViaLogin(document.getElementById('stremioLoginKeyBtn'));
         } else if (authKey) {
           await linkStremioAuthKeyIfProvided();
-        } else if (!accountLinkState.accountUserId) {
+        } else if (!hasLinkedAccount()) {
           await autoLinkStremioFromLocalSession({ silent: true });
         }
-        linkedDuringSetup = Boolean(accountLinkState.accountUserId);
+        linkedDuringSetup = hasLinkedAccount();
 
         await ensureRecommendedLanPairId();
         applyRecommendedLanPairId();
@@ -3096,7 +3322,7 @@
 
         const res = await fetch('/auto-provision', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: buildJsonHeaders(),
           body: JSON.stringify(provisionPayload)
         });
         const data = await res.json();
@@ -3143,6 +3369,7 @@
       const localHostnameInput = document.getElementById('localHostname').value.trim();
       const localHostname = normalizeLocalHostname(localHostnameInput || activeLocalHostname);
       const localHostnameCustom = localHostname !== normalizeLocalHostname(defaultLocalHostname);
+      const retainSecretFields = getRetainedSecretFields();
       setActiveLocalHostname(localHostname);
       const base = {
         jackettUrl: normalizeProwlarrBaseUrl(document.getElementById('jackettUrl').value),
@@ -3171,6 +3398,9 @@
         lanPairKey: lanPair.pairKey,
         lanPairRelayUrl: normalizeRelayUrl(lanPair.relayUrl)
       };
+      base.retainSecretFields = retainSecretFields;
+      const sourceConfigToken = getConfigTokenFromPath();
+      if (sourceConfigToken) base.sourceConfigToken = sourceConfigToken;
       return attachAccountLink(base);
     }
 
@@ -3181,22 +3411,19 @@
       }
       setLanPairStateFromConfig(config);
       applyAccountLinkFromConfig(config);
+      updateSavedSecretState(config.savedSecrets || {});
 
       if (config.jackettUrl) document.getElementById('jackettUrl').value = normalizeProwlarrBaseUrl(config.jackettUrl);
-      if (config.jackettApiKey) document.getElementById('jackettApiKey').value = config.jackettApiKey;
       if (config.sportsDbApiKey) document.getElementById('sportsDbApiKey').value = config.sportsDbApiKey;
       if (typeof config.sportsDbCacheHours === 'number' && Number.isFinite(config.sportsDbCacheHours)) {
         document.getElementById('sportsDbCacheHours').value = String(config.sportsDbCacheHours);
       }
       if (config.qbitUrl) document.getElementById('qbitUrl').value = config.qbitUrl;
-      if (config.qbitUsername) document.getElementById('qbitUsername').value = config.qbitUsername;
-      if (config.qbitPassword) document.getElementById('qbitPassword').value = config.qbitPassword;
       const providerId = String(config.provider || '').trim().toLowerCase();
       if (providerId && providers[providerId]) {
         document.getElementById('provider').value = providerId;
       }
       if (config.fileServerUrl) document.getElementById('fileServerUrl').value = config.fileServerUrl;
-      if (config.fileServerAuth) document.getElementById('fileServerAuth').value = config.fileServerAuth;
       if (config.pathMapping && typeof config.pathMapping === 'object') {
         if (config.pathMapping.from) document.getElementById('pathFrom').value = config.pathMapping.from;
         if (config.pathMapping.to) document.getElementById('pathTo').value = config.pathMapping.to;
@@ -3238,7 +3465,7 @@
         if (!res.ok) return;
         const data = await res.json();
         fillConfig(data);
-        if (!token && lanPair.pairId && lanPair.pairKey) {
+        if (!token && lanPair.pairId) {
           startLanPairStatusPolling();
         }
       } catch (err) {
@@ -3247,17 +3474,7 @@
     }
 
     function isPrivateHostname(hostname) {
-      if (!hostname) return false;
-      const host = hostname.toLowerCase();
-      if (host === 'localhost' || host === '127.0.0.1' || host === '::1') return true;
-      if (host.startsWith('10.')) return true;
-      if (host.startsWith('192.168.')) return true;
-      const m = host.match(/^172\.(\d+)\./);
-      if (m) {
-        const second = parseInt(m[1], 10);
-        if (second >= 16 && second <= 31) return true;
-      }
-      return false;
+      return routeParity.isBlockedPrivateTargetHost(hostname);
     }
 
     function validateReachability(config, installMode) {
@@ -3286,7 +3503,7 @@
       const publicCurrentOrigin = getCurrentPublicOrigin();
       const usingExternalHostedRelay = !publicCurrentOrigin || relayBase !== publicCurrentOrigin;
       if (usingExternalHostedRelay && !config.fileServerUrl) {
-        return 'Remote Seedbox on the hosted relay needs an HTTPS File Server URL for completed-file playback. Add your seedbox file server URL or self-host PVTKRRX directly on the seedbox.';
+        return 'Remote Seedbox on the hosted relay needs an HTTPS File Server URL for completed-file playback. Hosted relay playback is effectively ready-file / public-playback only here, so add your seedbox file server URL or self-host PVTKRRX directly on the seedbox.';
       }
 
       return null;
@@ -3308,7 +3525,7 @@
       if (modeValidationError) {
         return setStatus('testStatus', 'err', modeValidationError);
       }
-      if (!config.jackettUrl || !config.jackettApiKey) {
+      if (!config.jackettUrl || !hasAvailableSecret('jackettApiKey', config.jackettApiKey)) {
         return setStatus('testStatus', 'err', 'Prowlarr URL and API key are required');
       }
       if (!config.qbitUrl) {
@@ -3320,7 +3537,7 @@
       try {
         const res = await fetch('/test-connection', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: buildJsonHeaders(),
           body: JSON.stringify(config)
         });
         const data = await res.json().catch(() => ({}));
@@ -3349,12 +3566,13 @@
       if (modeValidationError) {
         return setStatus('installStatus', 'err', modeValidationError);
       }
-      if (!config.jackettUrl || !config.jackettApiKey || !config.qbitUrl) {
+      if (!config.jackettUrl || !hasAvailableSecret('jackettApiKey', config.jackettApiKey) || !config.qbitUrl) {
         return setStatus('installStatus', 'err', 'Please fill in all required fields');
       }
 
+      const installTarget = getInstallTarget();
       setStatus('installStatus', 'info', installMode === 'local'
-        ? 'Saving Home LAN profile...'
+        ? (installTarget === 'pc' ? 'Saving PC Local profile...' : 'Saving LAN Bridge profile...')
         : 'Preparing Remote Seedbox...');
 
       try {
@@ -3370,7 +3588,7 @@
             lanPairId: lanPair.pairId || config.lanPairId
           });
         } else {
-          if (accountLinkState.accountUserId) {
+          if (hasLinkedAccount()) {
             await ensureRecommendedLanPairId();
             applyRecommendedLanPairId();
             setStremioLinkStatus('ok', 'Using previously linked account.');
@@ -3378,13 +3596,13 @@
         }
 
         setStatus('installStatus', 'info', installMode === 'local'
-          ? 'Saving Home LAN profile...'
+          ? (installTarget === 'pc' ? 'Saving PC Local profile...' : 'Saving LAN Bridge profile...')
           : 'Preparing Remote Seedbox...');
 
         if (installMode === 'local') {
           const saveRes = await fetch('/local-config', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: buildJsonHeaders(),
             body: JSON.stringify(config)
           });
           const saveData = await saveRes.json();
@@ -3392,6 +3610,7 @@
             return setStatus('installStatus', 'err', saveData.error || 'Failed to save local config');
           }
           setLanPairStateFromConfig(saveData);
+          updateSavedSecretState(saveData.savedSecrets || {});
           if (saveData.localHostname) {
             setActiveLocalHostname(saveData.localHostname);
             setInstallModeHint();
@@ -3408,7 +3627,7 @@
             'installStatus',
             'ok',
             target === 'lan'
-              ? (accountLinkState.accountUserId
+              ? (hasLinkedAccount()
                   ? 'Saved. LAN Bridge is ready. Install or refresh it once in Stremio and let your linked home devices sync.'
                   : 'Saved. LAN Bridge is prepared. If the account step is not green yet, run Auto Find AuthKey once before installing or refreshing it in Stremio.')
               : 'Saved. PC Local URL is ready for Stremio Desktop on this Windows host. LAN Bridge remains the route for your other home devices.'
@@ -3417,14 +3636,10 @@
           stopLanPairStatusPolling();
           clearLanPairInstallFields();
           setPairStatusNote('LAN Bridge status: idle (Remote Seedbox selected).');
-          const hostedPayload = {
-            ...config,
-            lanPairEnabled: false,
-            lanPairRequired: false
-          };
+          const hostedPayload = routeParity.stripRemoteSeedboxLanFields(config, { keepRelayUrl: true });
           const res = await fetch('/encrypt', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: buildJsonHeaders(),
             body: JSON.stringify(hostedPayload)
           });
           const data = await res.json();
@@ -3448,7 +3663,7 @@
 
           document.getElementById('installLink').style.display = 'block';
           syncInstallTargetUi();
-          setStatus('installStatus', 'ok', 'Remote Seedbox route ready - install this hosted URL on any Stremio device.');
+          setStatus('installStatus', 'ok', 'Remote Seedbox route ready. Hosted playback is effectively ready-file-first here, and auth-protected file-server playback still needs real-device validation.');
         }
       } catch (err) {
         setStatus('installStatus', 'err', 'Install failed: ' + err.message);

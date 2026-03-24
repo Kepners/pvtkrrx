@@ -901,7 +901,7 @@
         <ul class="route-list">
           <li>Loopback install only</li>
           <li>No heartbeat</li>
-          <li>Helper only, not the main browse addon</li>
+          <li>Full browse addon on this host PC</li>
         </ul>
         <div class="route-actions">
           <a class="btn btn-primary" href="/local/install">Open PC Local Setup</a>
@@ -925,9 +925,9 @@
       <article class="route-card">
         <div class="route-kicker">Public HTTPS endpoints</div>
         <div class="route-name">Remote Seedbox</div>
-        <p class="route-copy">Use this when qBittorrent, Prowlarr, and file serving are intentionally public and authenticated.</p>
+        <p class="route-copy">Use this when qBittorrent, Prowlarr, and file serving are intentionally public and authenticated. On Vercel this is not a generic tracker-buffering route: it is ready-file / public-playback only unless you self-host playback support.</p>
         <ul class="route-list">
-          <li>Hosted remote profile</li>
+          <li>Not a generic tracker-buffering route</li>
           <li>Works away from home</li>
           <li>Needs public playback URLs</li>
         </ul>
@@ -946,7 +946,7 @@
       <article class="meta-card">
         <div class="meta-title">Relay Endpoint</div>
         <div class="meta-value">pvtkrrx.vercel.app</div>
-        <div class="meta-caption">Hosted handshake channel</div>
+        <div class="meta-caption">Current hosted base</div>
       </article>
       <article class="meta-card">
         <div class="meta-title">Desktop Runtime</div>

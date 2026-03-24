@@ -3,14 +3,8 @@ const { SportsDbClient } = require('../clients/sportsdb')
 const { formatSize } = require('../utils/streams')
 const { makeSportsThumbUrl } = require('../utils/sportsThumb')
 const { resolveSportHint } = require('../utils/sportsRules')
+const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
-
-function normalizeImdbId(value) {
-  const raw = String(value || '').trim()
-  const m = raw.match(/^tt(\d{5,10})$/i)
-  if (!m) return raw
-  return `tt${m[1].padStart(7, '0')}`
-}
 
 async function handleMeta(config, type, id, context = {}) {
   try {

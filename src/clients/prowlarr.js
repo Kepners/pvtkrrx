@@ -2,6 +2,7 @@ const TIMEOUT_MS = 20000
 const INDEXER_CATEGORY_TTL_MS = 6 * 60 * 60 * 1000
 const { sportHintFromCategory } = require('../utils/sportsCategoryHint')
 const { resolveSportHint } = require('../utils/sportsRules')
+const { normalizeImdbId } = require('../utils/normalizeImdbId')
 
 function normalizeProwlarrBaseUrl(input) {
   let url = String(input || '').trim()
@@ -19,16 +20,6 @@ function normalizeProwlarrBaseUrl(input) {
     .replace(/\/+$/, '')
 
   return url
-}
-
-function normalizeImdbId(value) {
-  const raw = String(value ?? '').trim()
-  if (!raw || raw === '0') return ''
-
-  const canonical = (digits) => `tt${String(digits).padStart(7, '0')}`
-  if (/^tt\d{5,10}$/i.test(raw)) return canonical(raw.replace(/^tt/i, ''))
-  if (/^\d{5,10}$/.test(raw)) return canonical(raw)
-  return ''
 }
 
 class ProwlarrClient {

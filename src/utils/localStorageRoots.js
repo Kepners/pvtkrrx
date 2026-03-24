@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const { redactSensitiveText } = require('./logRedaction')
 
 function normalizeTorrentPath(relPath) {
   return String(relPath || '').replace(/[\\/]+/g, '/').replace(/^\/+/, '')
@@ -11,7 +12,9 @@ function sanitizeStorageRoot(value) {
   input = input.replace(/^['"]+|['"]+$/g, '')
   try {
     input = path.normalize(input)
-  } catch (_) {}
+  } catch (err) {
+    console.warn('[storage] Path normalization failed:', redactSensitiveText(err.message))
+  }
 
   while (input.length > 3 && /[\\/]$/.test(input)) {
     input = input.slice(0, -1)
@@ -71,7 +74,9 @@ function buildLocalFileCandidates(torrent, relPath, additionalStorageRoots = [])
       if (fs.existsSync(contentPath) && fs.statSync(contentPath).isDirectory() && normalizedFsPath) {
         pushUniqueCandidate(candidates, seen, path.join(contentPath, normalizedFsPath))
       }
-    } catch (_) {}
+    } catch (err) {
+      console.warn('[storage] Content path check failed:', redactSensitiveText(err.message))
+    }
     if (normalized && contentPath.toLowerCase().endsWith(`\\${normalized.toLowerCase().replace(/\//g, '\\')}`)) {
       pushUniqueCandidate(candidates, seen, contentPath)
     }
@@ -97,13 +102,23 @@ function findExistingLocalFilePath(torrent, relPath, additionalStorageRoots = []
   for (const candidate of candidates) {
     try {
       if (candidate && fs.existsSync(candidate)) return candidate
-    } catch (_) {}
+    } catch (err) {
+      console.warn('[storage] File existence check failed:', redactSensitiveText(err.message))
+    }
   }
   return candidates[0] || ''
 }
 
 function hasAccessibleLocalFile(torrent, relPath, additionalStorageRoots = []) {
-  return Boolean(findExistingLocalFilePath(torrent, relPath, additionalStorageRoots))
+  const candidates = buildLocalFileCandidates(torrent, relPath, additionalStorageRoots)
+  for (const candidate of candidates) {
+    try {
+      if (candidate && fs.existsSync(candidate)) return true
+    } catch (err) {
+      console.warn('[storage] File existence check failed:', redactSensitiveText(err.message))
+    }
+  }
+  return false
 }
 
 module.exports = {

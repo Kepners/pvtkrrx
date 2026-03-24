@@ -1,17 +1,22 @@
 const fs = require('fs')
 const path = require('path')
+const crypto = require('crypto')
 const { spawn } = require('child_process')
 const { app, BrowserWindow, ipcMain, shell, clipboard, screen } = require('electron')
 const pkg = require('../package.json')
 const { deriveDefaultLocalHostname, normalizeLocalHostname } = require('../src/utils/lanAlias')
+const { buildLocalModeUrls } = require('../src/utils/localInstallUrls')
 const { autoProvisionWindows, ensureWindowsLanAccess } = require('../src/utils/provision')
+const { normalizeRelayUrl } = require('../src/utils/relayUrl')
+const { resolveRuntimeDir } = require('../src/utils/runtimeDir')
+const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJsonFile')
+const { redactSensitiveArgs, redactSensitiveText } = require('../src/utils/logRedaction')
 
 if (!process.env.PVTKRRX_RUNTIME_DIR) {
-  const appData = process.env.APPDATA || path.join(process.env.USERPROFILE || process.cwd(), 'AppData', 'Roaming')
-  process.env.PVTKRRX_RUNTIME_DIR = path.join(appData, 'PVTKRRX', 'runtime')
+  process.env.PVTKRRX_RUNTIME_DIR = resolveRuntimeDir()
 }
 
-const runtimeDir = process.env.PVTKRRX_RUNTIME_DIR
+const runtimeDir = resolveRuntimeDir()
 const logsDir = path.join(runtimeDir, 'logs')
 const localConfigPath = path.join(runtimeDir, 'local-config.json')
 const appIconPath = path.join(__dirname, 'assets', 'logo.ico')
@@ -31,10 +36,7 @@ const STREMIO_LAUNCH_POLL_MS = Math.max(5000, parseInt(process.env.PVTKRRX_STREM
 
 function readPersistedLocalHostname() {
   try {
-    if (!fs.existsSync(localConfigPath)) return ''
-    const raw = fs.readFileSync(localConfigPath, 'utf8')
-    if (!raw.trim()) return ''
-    const parsed = JSON.parse(raw)
+    const parsed = loadSecureJsonFile(localConfigPath, { defaultValue: null })
     return String(parsed?.localHostname || '').trim()
   } catch (_) {
     return ''
@@ -45,7 +47,6 @@ function resolveLocalHostname() {
   return normalizeLocalHostname(
     readPersistedLocalHostname() ||
     process.env.PVTKRRX_LOCAL_HOSTNAME ||
-    process.env.COMPUTERNAME ||
     deriveDefaultLocalHostname()
   )
 }
@@ -54,12 +55,24 @@ process.env.PVTKRRX_LOCAL_HOSTNAME = resolveLocalHostname()
 
 function saveLocalConfig(config) {
   try {
-    fs.mkdirSync(runtimeDir, { recursive: true })
-    fs.writeFileSync(localConfigPath, JSON.stringify(config), 'utf8')
+    saveSecureJsonFile(localConfigPath, config)
     return true
   } catch (_) {
     return false
   }
+}
+
+function ensureLocalLanPairOwner(config) {
+  const next = config && typeof config === 'object' ? { ...config } : null
+  if (!next || next.lanPairEnabled === false) return next
+  const pairId = String(next.lanPairId || '').trim()
+  const pairKey = String(next.lanPairKey || '').trim()
+  if (!pairId || !pairKey) return next
+  const ownerId = String(next.lanPairOwnerId || '').trim()
+  if (ownerId) return next
+  next.lanPairOwnerId = crypto.randomBytes(24).toString('base64url')
+  saveLocalConfig(next)
+  return next
 }
 
 function getProvisionPayload() {
@@ -210,7 +223,9 @@ function setupBoundedLogging() {
     for (let i = 0; i < files.length; i++) {
       const f = files[i]
       if (i >= 6 || f.mtimeMs < cutoff) {
-        try { fs.unlinkSync(f.full) } catch (_) {}
+        try { fs.unlinkSync(f.full) } catch (err) {
+          console.warn('[desktop] Failed to clean old log:', f.name, err.message)
+        }
       }
     }
 
@@ -228,14 +243,16 @@ function setupBoundedLogging() {
     }
 
     function write(level, args) {
-      const line = `[${new Date().toISOString()}] [${level}] ${args.map(stringify).join(' ')}\n`
+      const safeArgs = redactSensitiveArgs(args)
+      const line = `[${new Date().toISOString()}] [${level}] ${safeArgs.map(stringify).join(' ')}\n`
       try { fs.appendFileSync(currentLog, line, 'utf8') } catch (_) {}
+      return safeArgs
     }
 
-    console.log = (...args) => { write('LOG', args); old.log(...args) }
-    console.info = (...args) => { write('INFO', args); old.info(...args) }
-    console.warn = (...args) => { write('WARN', args); old.warn(...args) }
-    console.error = (...args) => { write('ERROR', args); old.error(...args) }
+    console.log = (...args) => { old.log(...write('LOG', args)) }
+    console.info = (...args) => { old.info(...write('INFO', args)) }
+    console.warn = (...args) => { old.warn(...write('WARN', args)) }
+    console.error = (...args) => { old.error(...write('ERROR', args)) }
   } catch (_) {
     // keep default console behavior if logger setup fails
   }
@@ -265,11 +282,7 @@ let stremioLaunchWatchFailureCount = 0
 
 function getLocalInstallUrls() {
   const httpsPort = parseInt(process.env.HTTPS_PORT || '7001', 10)
-  return {
-    httpManifest: `http://127.0.0.1:${port}/local/manifest.json?mode=local`,
-    httpsManifest: `https://127.0.0.1:${httpsPort}/local/manifest.json?mode=local`,
-    stremio: `stremio://127.0.0.1:${httpsPort}/local/manifest.json?mode=local`
-  }
+  return buildLocalModeUrls('127.0.0.1', port, httpsPort)
 }
 
 function getLocalInstallManifestUrl() {
@@ -384,7 +397,7 @@ async function waitForServerReady(checkPort = port, timeoutMs = 20000) {
 
 async function getLocalConfig() {
   try {
-    return await fetchJson(`http://127.0.0.1:${port}/local/config.json`)
+    return ensureLocalLanPairOwner(loadSecureJsonFile(localConfigPath, { defaultValue: null }))
   } catch (_) {
     return null
   }
@@ -395,18 +408,6 @@ async function getServiceUrls() {
   return {
     prowlarrUrl: cfg?.jackettUrl || 'http://127.0.0.1:9696',
     qbitUrl: cfg?.qbitUrl || 'http://127.0.0.1:8080'
-  }
-}
-
-function normalizeRelayUrl(raw) {
-  const text = String(raw || '').trim().replace(/\/+$/, '')
-  if (!text) return ''
-  try {
-    const url = new URL(text)
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return ''
-    return `${url.protocol}//${url.host}`
-  } catch (_) {
-    return ''
   }
 }
 
@@ -456,6 +457,7 @@ async function buildLanPairHeartbeatPayload() {
     body: {
       pairId,
       pairKey,
+      ownerId: String(cfg.lanPairOwnerId || '').trim(),
       localHostname: String(cfg.localHostname || '').trim(),
       relayUrl,
       appVersion: String(pkg.version || ''),
@@ -491,7 +493,7 @@ async function sendLanPairHeartbeat() {
   } catch (err) {
     lanPairFailureCount += 1
     if (lanPairFailureCount >= 3) {
-      console.warn('[desktop] lan pair heartbeat error:', err.message)
+      console.warn('[desktop] lan pair heartbeat error:', redactSensitiveText(err.message))
     }
   }
 }
@@ -522,7 +524,9 @@ async function pulseLanPairOnStremioLaunch() {
     stremioWasRunning = runningNow
 
     if (launched) {
-      sendLanPairHeartbeat().catch(() => {})
+      sendLanPairHeartbeat().catch(err => {
+        console.warn('[desktop] Stremio-launch heartbeat failed:', err.message)
+      })
     }
 
     if (stremioLaunchWatchFailureCount >= 3) {
@@ -541,9 +545,15 @@ function startStremioLaunchWatch() {
   stopStremioLaunchWatch()
   if (!STREMIO_LAUNCH_WATCH_ENABLED) return
   if (process.platform !== 'win32') return
-  pulseLanPairOnStremioLaunch().catch(() => {})
+  pulseLanPairOnStremioLaunch().catch(err => {
+    console.warn('[desktop] Initial Stremio launch pulse failed:', err.message)
+  })
   stremioLaunchWatchTimer = setInterval(() => {
-    pulseLanPairOnStremioLaunch().catch(() => {})
+    pulseLanPairOnStremioLaunch().catch(err => {
+      if (stremioLaunchWatchFailureCount < 3) {
+        console.warn('[desktop] Stremio launch watch pulse failed:', err.message)
+      }
+    })
   }, STREMIO_LAUNCH_POLL_MS)
   if (typeof stremioLaunchWatchTimer.unref === 'function') stremioLaunchWatchTimer.unref()
 }
@@ -556,11 +566,18 @@ function stopStremioLaunchWatch() {
 
 function startLanPairHeartbeatLoop() {
   stopLanPairHeartbeatLoop()
-  sendLanPairHeartbeat().catch(() => {})
+  sendLanPairHeartbeat().catch(err => {
+    console.warn('[desktop] Initial heartbeat failed:', err.message)
+  })
   if (LAN_PAIR_HEARTBEAT_MS <= 0) return
   const intervalMs = Math.max(60000, LAN_PAIR_HEARTBEAT_MS)
   lanPairTimer = setInterval(() => {
-    sendLanPairHeartbeat().catch(() => {})
+    sendLanPairHeartbeat().catch(err => {
+      lanPairFailureCount = (lanPairFailureCount || 0) + 1
+      if (lanPairFailureCount <= 3) {
+        console.warn('[desktop] Heartbeat failed:', err.message)
+      }
+    })
   }, intervalMs)
   if (typeof lanPairTimer.unref === 'function') lanPairTimer.unref()
 }
@@ -580,7 +597,9 @@ function pushStatus() {
       window.popupAPI.setStatus(${running ? 'true' : 'false'}, ${Number(port) || 7000});
     }
   `
-  mainWindow.webContents.executeJavaScript(js).catch(() => {})
+  mainWindow.webContents.executeJavaScript(js).catch(err => {
+    console.warn('[desktop] UI status push failed:', err.message)
+  })
 }
 
 function createSplashWindow() {
@@ -768,8 +787,12 @@ function stopAddonServer() {
       addonServerState.httpsReady.then(server => {
         try {
           if (server) server.close()
-        } catch (_) {}
-      }).catch(() => {})
+        } catch (err) {
+          console.warn('[desktop] HTTPS server close failed:', err.message)
+        }
+      }).catch(err => {
+        console.warn('[desktop] HTTPS server shutdown failed:', err.message)
+      })
     }
   } catch (_) {
     // ignore shutdown errors

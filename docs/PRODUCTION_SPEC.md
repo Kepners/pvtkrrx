@@ -4,6 +4,7 @@
 > **Current live design:** [CURRENT_DESIGN.md](CURRENT_DESIGN.md)
 > **Current architecture:** [ARCHITECTURE.md](../ARCHITECTURE.md)
 > **Current status:** [PROJECT_STATUS.md](PROJECT_STATUS.md)
+> **Important:** Any examples below that show hosted `/playback` queue-and-buffer behavior are historical planning notes, not the live hosted Remote Seedbox behavior.
 
 ## How To Use This File
 
@@ -259,7 +260,7 @@ Based on Colin's Stremio behavior research. This is the industry-standard patter
 }
 ```
 
-### Content Available on Tracker (Comet pattern)
+### Content Available on Tracker (Historical Comet pattern)
 ```javascript
 {
   name: "📥 1080p BluRay",
@@ -272,7 +273,9 @@ Based on Colin's Stremio behavior research. This is the industry-standard patter
 }
 ```
 
-### Playback Endpoint Flow
+Historical note: the snippet above describes the original MVP plan. The live hosted Vercel `Remote Seedbox` route is now ready-file-first and does not generally expose hosted tracker `/playback` buffering.
+
+### Historical Playback Endpoint Flow
 ```
 1. Stremio sends GET to /playback/{info}
 2. Addon checks qBit: already downloaded?

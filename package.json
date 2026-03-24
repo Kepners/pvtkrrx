@@ -6,10 +6,13 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
+    "smoke:parity": "node scripts/smoke-parity-helpers.js",
     "smoke:config": "node scripts/smoke-config-flow.js",
     "smoke:guards": "node scripts/smoke-runtime-guards.js",
     "smoke:lan-pair": "node scripts/smoke-lan-pair-flow.js",
+    "smoke:pipeline": "node scripts/smoke-stream-pipeline.js",
     "smoke:stremio-link": "node scripts/smoke-stremio-link.js",
+    "smoke:security": "node scripts/smoke-security.js",
     "smoke:sports": "node scripts/smoke-sports-structured.js",
     "desktop:dev": "electron electron/main.js",
     "dist:win": "node scripts/prepare-dist.js && electron-builder --win nsis portable --publish never && node scripts/archive-dist.js"

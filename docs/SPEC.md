@@ -27,7 +27,7 @@ PVTKRRX connects private tracker and seedbox infrastructure to Stremio without u
    - same Stremio account across devices
 3. `Remote Seedbox`
    - install from hosted manifest token
-   - use public HTTPS playback endpoints
+   - use public HTTPS ready-file playback endpoints
    - no LAN heartbeat dependency
 
 ## Functional Scope
@@ -39,7 +39,7 @@ PVTKRRX connects private tracker and seedbox infrastructure to Stremio without u
 5. Movie and TV stream resolution using Prowlarr/Torznab-compatible search plus Cinemeta metadata assistance.
 6. Seedbox library browsing from qBittorrent state.
 7. Built-in `/file` serving with range support when the host can read the file locally.
-8. `/playback` queue-and-wait behavior for tracker content not yet ready.
+8. `/playback` queue-and-wait behavior for tracker content not yet ready on playback-capable runtimes.
 9. LAN pair heartbeat/status flow for hosted home-device routing.
 10. Optional Stremio AuthKey account linking and account-scoped access state.
 11. Windows desktop packaging for the local runtime.
@@ -59,6 +59,9 @@ PVTKRRX connects private tracker and seedbox infrastructure to Stremio without u
 - Hosted LAN Bridge requests must resolve to the best active LAN endpoint, preferring live LAN IP over `.local`.
 - Local playback should prefer the built-in file server when the runtime can read the completed file.
 - Hosted `/file` and `/playback` must fail fast instead of waiting on serverless runtime for local-only playback paths.
+- Hosted Remote Seedbox on Vercel must not emit tracker `/playback` streams that depend on that disabled hosted route.
+- Remote tracker flows that would lose required external file-server auth must be suppressed.
+- Remote buffering URLs must only be emitted when the current file path is provable from live torrent state.
 - Hosted connection-test routes must be rate limited and reject loopback/LAN/private targets.
 
 ## Canonical Companion Docs

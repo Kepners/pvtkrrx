@@ -1,6 +1,6 @@
 # Stremio Install Protocol Tracker (Truth Table)
 
-Updated: 2026-03-15
+Updated: 2026-03-22
 
 ## Why this file exists
 We keep this as a single source of truth so we stop repeating failed install patterns.
@@ -61,7 +61,8 @@ Link: https://github.com/Stremio/stremio-addon-client
    - Pair status responses are metadata-minimized (no LAN endpoint list).
 3. Hosted public mode:
    - `Remote Seedbox`
-   - Use HTTPS-hosted manifest URL with public playback endpoints.
+   - Use HTTPS-hosted manifest URL with public ready-file playback endpoints.
+   - Treat hosted Vercel Remote Seedbox as ready-file-first unless playback is self-hosted elsewhere.
 
 See also: `docs/ROUTE_FRAMEWORK.md`
 
@@ -108,7 +109,7 @@ explorer "$env:APPDATA\PVTKRRX\runtime\logs"
 Get-Content "$env:APPDATA\PVTKRRX\runtime\logs\desktop-$(Get-Date -Format yyyy-MM-dd).log" -Tail 200
 ```
 
-## Automated coverage (2026-03-15)
+## Automated coverage (2026-03-22)
 
 - `npm run smoke:config` validates:
   - current `PC Local` UI copy and local install helper
@@ -124,9 +125,49 @@ Get-Content "$env:APPDATA\PVTKRRX\runtime\logs\desktop-$(Get-Date -Format yyyy-M
 - `npm run smoke:stremio-link` validates:
   - Stremio AuthKey verification against a local mock API
   - linked account token issuance and `/auth/me`
+- `npm run smoke:security` validates adjacent install/config hardening:
+  - config readback redaction for hosted and local config flows
+  - hosted/local route-guard regression checks around browser helper routes
+  - opaque playback token rejection plus secure JSON migration/write behavior
+
+## Remaining sign-off blocker (2026-03-22)
+
+Automated coverage now proves the wording shape and guard behavior for the hosted notice rows, but it does not prove how Stremio renders and orders those rows on real devices.
+
+That client pass is still required because:
+- sports is a custom top-level Stremio type
+- sports and library items use internal `pvtkrrx:` ids
+- the addon must fully own presentation of its own rows instead of assuming Cinemeta or generic client behavior will rescue rough edges
+
+Real-client sign-off checklist:
+
+1. Desktop Stremio on the host PC with `PC Local`
+   - confirm the three notice rows render with the exact labels:
+   - `[INFO] Ready Files Only`
+   - `[INFO] Direct Buffer Hidden`
+   - `[INFO] Buffer URL Not Ready`
+   - check for truncation, duplication, and misleading ordering.
+2. `LAN Bridge` from a second same-account device on the same LAN
+   - verify the same notice wording still reads correctly after hosted-to-LAN redirect behavior.
+3. `Remote Seedbox` on a true hosted/public route
+   - verify notice rows appear only for the intended cases:
+   - ready-file only
+   - auth-unsafe direct buffer suppressed
+   - buffer URL unavailable because current path proof is missing
+4. One good stream beside one notice-only case
+   - confirm Stremio does not visually bury the playable option under warning rows.
+5. At least one TV/mobile client family in addition to desktop
+   - Stremio install and presentation behavior varies enough by client family that this must be checked on a real non-desktop client before sign-off.
+
+Until that matrix is complete, the addon should be treated as:
+- implementation hardened
+- wording aligned
+- smoke locked
+- awaiting real client verification
 
 ## Next work items
 
-1. Validate Method 4 end-to-end on Android TV + Android mobile with Stremio account sync.
-2. Validate Apple TV sync flow (install on web/desktop first, confirm account addon sync on tvOS client).
-3. Keep this file updated after each install test.
+1. Run the real-client sign-off checklist above and record exact pass/fail notes per client.
+2. Validate Method 4 end-to-end on Android TV + Android mobile with Stremio account sync.
+3. Validate Apple TV sync flow (install on web/desktop first, confirm account addon sync on tvOS client).
+4. Keep this file updated after each install test.

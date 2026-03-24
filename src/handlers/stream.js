@@ -1,49 +1,61 @@
-const fs = require('fs')
 const { ProwlarrClient } = require('../clients/prowlarr')
 const { QBitClient } = require('../clients/qbittorrent')
 const { CinemetaClient } = require('../clients/cinemeta')
+const { normalizeTeamName } = require('../clients/sportsdb')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { parse, matchesEpisode, isLikelyPackedReleaseTitle, cleanTitle } = require('../utils/parser')
-const { mapPath } = require('../utils/pathMapper')
-const { findExistingLocalFilePath } = require('../utils/localStorageRoots')
 const { isSportsOnlyIndexer } = require('../utils/sportsIndexers')
-const { buildOnSeedboxStream, buildOnBufferingStream, buildOnTrackerStream, findVideoFile, findEpisodeFile, sortStreams } = require('../utils/streams')
-const { encodeFileStateToken, encodePlaybackStateToken } = require('../utils/opaqueState')
+const { buildOnSeedboxStream, buildOnBufferingStream, buildOnTrackerStream, buildInfoStream, findVideoFile, findEpisodeFile, sortStreams } = require('../utils/streams')
+const { encodePlaybackStateToken } = require('../utils/opaqueState')
 const { parseSportsTitle } = require('../utils/sportsTitleParser')
+const { buildPlaybackFileUrl, canEmitTrackerPlayback, getTrackerPlaybackRestriction } = require('../utils/fileServing')
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '7000', 10))
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '5000', 10))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '20', 10))
-const IS_VERCEL_RUNTIME = Boolean(process.env.VERCEL)
 
-// Build URL for a local file — uses PVTKRRX built-in file server when no external fileServerUrl set
-function canServeFromLocalDisk(config, torrent, fileName) {
-  if (!fileName) return false
-  try {
-    const localPath = findExistingLocalFilePath(torrent, fileName, config.additionalStorageRoots)
-    return Boolean(localPath && fs.existsSync(localPath))
-  } catch (_) {
-    return false
+// Module-level constant Sets — avoid recreating on every call
+const TITLE_RELEVANT_STOPWORDS = new Set(['the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or'])
+const LOOSE_TEAM_NOISE = new Set([
+  'epl', 'premier', 'league', 'laliga', 'la', 'liga', 'serie', 'bundesliga', 'ligue', 'champions',
+  'europa', 'uefa', 'nba', 'nfl', 'ufc', 'formula', 'grand', 'prix', 'f1', 'match', 'sports',
+  'sport', 'live', 'full', 'replay', 'highlights', 'extended', 'main', 'card', 'prelims', 'early'
+])
+
+function buildFileUrl(config, configToken, addonUrl, hash, torrent, fileName, options = {}) {
+  return buildPlaybackFileUrl(config, configToken, addonUrl, hash, torrent, fileName, options)
+}
+
+function buildConfigureHelpUrl(addonUrl, target = 'seedbox') {
+  const base = String(addonUrl || '').replace(/\/+$/, '')
+  return `${base}/configure?target=${encodeURIComponent(target)}`
+}
+
+function createNoticeCounts() {
+  return {
+    hostedReadyOnly: 0,
+    authSuppressed: 0,
+    bufferingPathUnproven: 0
   }
 }
 
-function buildFileUrl(config, configToken, addonUrl, hash, torrent, fileName) {
-  if (IS_VERCEL_RUNTIME) {
-    if (config.fileServerUrl) {
-      return mapPath(torrent?.save_path || torrent?.download_path || '', fileName, config.fileServerUrl, config.pathMapping)
-    }
-    return null
-  }
+function recordTrackerRestrictionNotice(noticeCounts, restriction) {
+  if (!noticeCounts) return
+  if (restriction === 'hosted-runtime') noticeCounts.hostedReadyOnly += 1
+  else if (restriction === 'file-server-auth') noticeCounts.authSuppressed += 1
+}
 
-  // Prefer built-in serving when the addon can read the file locally.
-  // This prevents stale external fileServerUrl values from causing black screens on local installs.
-  if (config.fileServerUrl && !canServeFromLocalDisk(config, torrent, fileName)) {
-    return mapPath(torrent?.save_path || torrent?.download_path || '', fileName, config.fileServerUrl, config.pathMapping)
+function appendNoticeStreams(streams, noticeCounts, addonUrl) {
+  if (!noticeCounts) return
+
+  const helpUrl = buildConfigureHelpUrl(addonUrl, 'seedbox')
+  if (noticeCounts.hostedReadyOnly > 0) {
+    streams.push(buildInfoStream('hosted-ready-only', helpUrl, noticeCounts.hostedReadyOnly))
   }
-  try {
-    const info = encodeFileStateToken({ h: hash.toLowerCase(), p: fileName })
-    return `${addonUrl}/${configToken}/file/${info}`
-  } catch (_) {
-    return null
+  if (noticeCounts.authSuppressed > 0) {
+    streams.push(buildInfoStream('auth-suppressed', helpUrl, noticeCounts.authSuppressed))
+  }
+  if (noticeCounts.bufferingPathUnproven > 0) {
+    streams.push(buildInfoStream('buffering-path-unproven', helpUrl, noticeCounts.bufferingPathUnproven))
   }
 }
 
@@ -99,18 +111,9 @@ function normalizeForMatch(value) {
   return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 }
 
-function normalizeSportsTeamName(value) {
-  return String(value || '')
-    .toLowerCase()
-    .replace(/\butd\b/g, 'united')
-    .replace(/\bspurs\b/g, 'tottenham hotspur')
-    .replace(/\bnewc\b/g, 'newcastle')
-    .replace(/\bwolves\b/g, 'wolverhampton')
-    .replace(/[._-]+/g, ' ')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
+// Team name normalization is now shared via sportsdb.js normalizeTeamName()
+// which includes a richer alias table (Manchester United variants, etc.)
+const normalizeSportsTeamName = normalizeTeamName
 
 function titleCaseWords(value) {
   return String(value || '')
@@ -150,15 +153,10 @@ function sportsDateDistanceDays(a, b) {
 }
 
 function cleanupLooseTeamSide(value, side = 'left') {
-  const noise = new Set([
-    'epl', 'premier', 'league', 'laliga', 'la', 'liga', 'serie', 'bundesliga', 'ligue', 'champions',
-    'europa', 'uefa', 'nba', 'nfl', 'ufc', 'formula', 'grand', 'prix', 'f1', 'match', 'sports',
-    'sport', 'live', 'full', 'replay', 'highlights', 'extended', 'main', 'card', 'prelims', 'early'
-  ])
   let tokens = normalizeSportsTeamName(value)
     .split(/\s+/)
     .filter(Boolean)
-    .filter(token => !noise.has(token))
+    .filter(token => !LOOSE_TEAM_NOISE.has(token))
     .filter(token => !/^(19|20)\d{2}$/.test(token))
     .filter(token => !/^\d{1,2}$/.test(token))
 
@@ -234,7 +232,9 @@ function sourceItemKey(item = {}) {
     .toLowerCase()
 }
 
-async function buildSupplementalSportsStreams({ info, torznab, addonUrl, configToken, seenKeys }) {
+async function buildSupplementalSportsStreams({ info, torznab, addonUrl, configToken, config, seenKeys }) {
+  if (!canEmitTrackerPlayback(config, configToken)) return []
+
   const targetEvent = buildStructuredSportsTarget(info)
   if (!targetEvent?.date || !targetEvent?.homeTeam || !targetEvent?.awayTeam) return []
 
@@ -384,8 +384,7 @@ function findTorrentByTitle(torrents, targetTitle) {
 // Keep only results where the significant words from the query appear in the result title.
 // Prevents sports indexers returning F1/Olympics results when searching for a movie.
 function titleRelevant(resultTitle, queryTitle) {
-  const stopwords = new Set(['the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or'])
-  const clean = s => s.toLowerCase().replace(/[^\w\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !stopwords.has(w))
+  const clean = s => s.toLowerCase().replace(/[^\w\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !TITLE_RELEVANT_STOPWORDS.has(w))
   const queryWords = clean(queryTitle)
   if (queryWords.length === 0) return true
   const resultLower = resultTitle.toLowerCase()
@@ -402,6 +401,9 @@ function isCompletedTorrent(torrent, fileProgress = null) {
 async function handleImdbStream(config, type, id, addonUrl, configToken) {
   const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
   const qbit = new QBitClient(config.qbitUrl, config.qbitUsername, config.qbitPassword)
+  const trackerPlaybackRestriction = getTrackerPlaybackRestriction(config, configToken)
+  const trackerPlaybackEnabled = !trackerPlaybackRestriction
+  const noticeCounts = createNoticeCounts()
 
   // Parse series ID: tt1234567:1:5 → { imdbId, season, episode }
   let imdbId = id, season = null, episode = null
@@ -522,9 +524,18 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
           ? findEpisodeFile(files, season, episode)
           : findVideoFile(files)
         if (!videoFile?.name) continue
-        const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched, videoFile.name)
-        if (!fileUrl) continue
         const videoProgress = Number(videoFile?.progress || 0)
+        const requireCurrentPathProof = !isCompletedTorrent(matched, videoProgress)
+        const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched, videoFile.name, {
+          multipleFiles: files.length > 1,
+          requireCurrentPathProof
+        })
+        if (!fileUrl) {
+          if (requireCurrentPathProof && config?.fileServerUrl) {
+            noticeCounts.bufferingPathUnproven += 1
+          }
+          continue
+        }
         if (isCompletedTorrent(matched, videoProgress)) {
           streams.push(buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed))
         } else {
@@ -535,19 +546,24 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
         // File listing failed, skip this stream
       }
     } else if (item.link) {
-      // On tracker — playback URL (works with or without infohash)
-      try {
-        const info = encodePlaybackStateToken({
-          h: item.infohash || '',
-          l: item.link
-        })
-        streams.push(buildOnTrackerStream(item, `${addonUrl}/${configToken}/playback/${info}`, parsed))
-      } catch (_) {
-        // Skip invalid playback payloads instead of leaking raw tracker URLs.
+      if (trackerPlaybackEnabled) {
+        // On tracker — playback URL (works with or without infohash)
+        try {
+          const info = encodePlaybackStateToken({
+            h: item.infohash || '',
+            l: item.link
+          })
+          streams.push(buildOnTrackerStream(item, `${addonUrl}/${configToken}/playback/${info}`, parsed))
+        } catch (_) {
+          // Skip invalid playback payloads instead of leaking raw tracker URLs.
+        }
+      } else {
+        recordTrackerRestrictionNotice(noticeCounts, trackerPlaybackRestriction)
       }
     }
   }
 
+  appendNoticeStreams(streams, noticeCounts, addonUrl)
   return { streams: sortStreams(streams), cacheMaxAge: 0 }
 }
 
@@ -560,7 +576,11 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
   if (infoHash) seenSourceKeys.add(infoHash)
   if (directLink) seenSourceKeys.add(directLink.toLowerCase())
 
+  const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
   const qbit = new QBitClient(config.qbitUrl, config.qbitUsername, config.qbitPassword)
+  const trackerPlaybackRestriction = getTrackerPlaybackRestriction(config, configToken)
+  const trackerPlaybackEnabled = !trackerPlaybackRestriction
+  const noticeCounts = createNoticeCounts()
   const torrents = await qbit.torrents('all')
   let matched = infoHash ? torrents.find(t => t.hash.toLowerCase() === infoHash) : null
   if (!matched) matched = findTorrentByTitle(torrents, info.t)
@@ -577,10 +597,19 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
       const videoFile = findVideoFile(files)
       if (!videoFile?.name) throw new Error('No playable video in matched torrent')
 
-      const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched, videoFile.name)
-      if (!fileUrl) throw new Error('Hosted mode requires fileServerUrl for on-seedbox streams')
-      const item = { title: info.t, size: info.s, seeders: info.d }
       const videoProgress = Number(videoFile?.progress || 0)
+      const requireCurrentPathProof = !isCompletedTorrent(matched, videoProgress)
+      const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched, videoFile.name, {
+        multipleFiles: files.length > 1,
+        requireCurrentPathProof
+      })
+      if (!fileUrl) {
+        if (requireCurrentPathProof && config?.fileServerUrl) {
+          noticeCounts.bufferingPathUnproven += 1
+        }
+        throw new Error('Hosted mode requires a provable playback path for on-seedbox streams')
+      }
+      const item = { title: info.t, size: info.s, seeders: info.d }
       if (isCompletedTorrent(matched, videoProgress)) {
         streams.push(buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed))
       } else {
@@ -593,28 +622,32 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
   }
 
   if (streams.length === 0 && directLink) {
-    try {
-      const playbackInfo = encodePlaybackStateToken({
-        h: infoHash,
-        l: directLink
-      })
-      streams.push(buildOnTrackerStream(
-        { title: info.t, size: info.s, seeders: info.d, indexer: info.i || '' },
-        `${addonUrl}/${configToken}/playback/${playbackInfo}`,
-        parsed
-      ))
-    } catch (_) {
-      // Skip invalid playback payloads instead of leaking raw tracker URLs.
+    if (trackerPlaybackEnabled) {
+      try {
+        const playbackInfo = encodePlaybackStateToken({
+          h: infoHash,
+          l: directLink
+        })
+        streams.push(buildOnTrackerStream(
+          { title: info.t, size: info.s, seeders: info.d, indexer: info.i || '' },
+          `${addonUrl}/${configToken}/playback/${playbackInfo}`,
+          parsed
+        ))
+      } catch (_) {
+        // Skip invalid playback payloads instead of leaking raw tracker URLs.
+      }
+    } else {
+      recordTrackerRestrictionNotice(noticeCounts, trackerPlaybackRestriction)
     }
   }
 
   try {
-    const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
     const supplementalStreams = await buildSupplementalSportsStreams({
       info,
       torznab,
       addonUrl,
       configToken,
+      config,
       seenKeys: seenSourceKeys
     })
     if (supplementalStreams.length > 0) {
@@ -626,7 +659,6 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
 
   if (streams.length === 0) {
     try {
-      const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
       const results = await torznab.search(info.t, SPORT_CATS)
       let filtered = results.filter(r => {
         if (!r?.link) return false
@@ -648,6 +680,10 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
       const ordered = preferSeededResults(deduped, 'custom re-search')
 
       for (const item of ordered) {
+        if (!trackerPlaybackEnabled) {
+          recordTrackerRestrictionNotice(noticeCounts, trackerPlaybackRestriction)
+          break
+        }
         try {
           const playbackInfo = encodePlaybackStateToken({
             h: item.infohash || '',
@@ -667,6 +703,7 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
     }
   }
 
+  appendNoticeStreams(streams, noticeCounts, addonUrl)
   return { streams: sortStreams(streams), cacheMaxAge: 0 }
 }
 

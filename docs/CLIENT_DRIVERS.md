@@ -84,7 +84,7 @@ Mr Gurr (Managing Director) issued 5 binding directives:
 | Prowlarr in v1 | Colin, Peter | Yes — same Torznab protocol, rename JackettClient → TorznabClient | Glen |
 | In-memory cache on serverless | Peter, Colin | Useless on Vercel (cold starts kill cache). Accept stateless. | Peter |
 | qBit auth strategy | Peter, Stewart | Login-per-request (unavoidable on serverless) | Peter |
-| Download polling approach | Colin, Peter, Client | Comet playback pattern — stream URL points to /playback endpoint, triggers qBit download, polls, 302 redirects to file. User sees loading spinner → playback. | Colin |
+| Download polling approach | Colin, Peter, Client | Historical plan only: Comet playback pattern — stream URL points to /playback endpoint, triggers qBit download, polls, 302 redirects to file. Superseded on hosted Vercel Remote Seedbox by ready-file-first fail-fast behavior. | Colin |
 | File server auth | Colin | Use proxyHeaders behaviorHint for Basic Auth — credentials never in URL | Colin |
 | Config middleware | Colin, Peter | withConfig Express middleware — decrypt once, pass req.config to all handlers | Colin |
 | Timeout budget | Colin, Stewart | Jackett 7s + &timeout=6 param, qBit 5s, Cinemeta 3s — fits 10s Hobby tier | Colin |

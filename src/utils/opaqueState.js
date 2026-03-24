@@ -52,16 +52,6 @@ function normalizeFilePath(value) {
   return raw
 }
 
-function parseLegacyBase64JsonToken(token) {
-  try {
-    const raw = Buffer.from(String(token || ''), 'base64url').toString('utf8')
-    const parsed = JSON.parse(raw)
-    if (!parsed || typeof parsed !== 'object') return null
-    return parsed
-  } catch (_) {
-    return null
-  }
-}
 
 function encodeOpaqueToken(type, payload, ttlSeconds) {
   const secret = resolveOpaqueSecret()
@@ -131,23 +121,11 @@ function encodeFileStateToken(input) {
 }
 
 function decodePlaybackStateToken(token) {
-  try {
-    return sanitizePlaybackPayload(decodeOpaqueToken(token, 'playback'))
-  } catch (_) {
-    const legacy = parseLegacyBase64JsonToken(token)
-    if (!legacy) throw new Error('Invalid playback token')
-    return sanitizePlaybackPayload(legacy)
-  }
+  return sanitizePlaybackPayload(decodeOpaqueToken(token, 'playback'))
 }
 
 function decodeFileStateToken(token) {
-  try {
-    return sanitizeFilePayload(decodeOpaqueToken(token, 'file'))
-  } catch (_) {
-    const legacy = parseLegacyBase64JsonToken(token)
-    if (!legacy) throw new Error('Invalid file token')
-    return sanitizeFilePayload(legacy)
-  }
+  return sanitizeFilePayload(decodeOpaqueToken(token, 'file'))
 }
 
 module.exports = {

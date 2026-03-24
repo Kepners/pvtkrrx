@@ -1,4 +1,5 @@
 const fs = require('fs')
+const { loadSecureJsonFile, saveSecureJsonFile } = require('./secureJsonFile')
 
 function normalizeBaseUrl(input) {
   const text = String(input || '').trim().replace(/\/+$/, '')
@@ -120,19 +121,15 @@ class PairStore {
 
   _fileSet(key, value, ttlSeconds) {
     try {
-      let store = {}
-      if (fs.existsSync(this.filePath)) {
-        const raw = fs.readFileSync(this.filePath, 'utf8')
-        store = raw.trim() ? JSON.parse(raw) : {}
-      }
+      let store = fs.existsSync(this.filePath)
+        ? loadSecureJsonFile(this.filePath, { defaultValue: {} })
+        : {}
       if (!store || typeof store !== 'object') store = {}
       store[key] = {
         value,
         expiresAt: Date.now() + ttlSeconds * 1000
       }
-      const dir = this.filePath.replace(/[\\/][^\\/]+$/, '')
-      if (dir && !fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
-      fs.writeFileSync(this.filePath, JSON.stringify(store), 'utf8')
+      saveSecureJsonFile(this.filePath, store)
       return true
     } catch (_) {
       return false
@@ -142,8 +139,7 @@ class PairStore {
   _fileGet(key) {
     try {
       if (!fs.existsSync(this.filePath)) return null
-      const raw = fs.readFileSync(this.filePath, 'utf8')
-      const store = raw.trim() ? JSON.parse(raw) : {}
+      const store = loadSecureJsonFile(this.filePath, { defaultValue: {} })
       if (!store || typeof store !== 'object') return null
 
       const now = Date.now()
@@ -155,7 +151,7 @@ class PairStore {
           touched = true
         }
       }
-      if (touched) fs.writeFileSync(this.filePath, JSON.stringify(store), 'utf8')
+      if (touched) saveSecureJsonFile(this.filePath, store)
 
       const hit = store[key]
       if (!hit || typeof hit.value !== 'string') return null

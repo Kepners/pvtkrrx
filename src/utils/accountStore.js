@@ -1,5 +1,6 @@
 const fs = require('fs')
 const crypto = require('crypto')
+const { loadSecureJsonFile, saveSecureJsonFile } = require('./secureJsonFile')
 
 function normalizeBaseUrl(input) {
   const text = String(input || '').trim().replace(/\/+$/, '')
@@ -372,16 +373,13 @@ class AccountStore {
 
   fileLoad() {
     if (!this.filePath || !fs.existsSync(this.filePath)) return {}
-    const raw = fs.readFileSync(this.filePath, 'utf8')
-    const parsed = raw.trim() ? JSON.parse(raw) : {}
+    const parsed = loadSecureJsonFile(this.filePath, { defaultValue: {} })
     if (!parsed || typeof parsed !== 'object') return {}
     return parsed
   }
 
   fileSave(store) {
-    const dir = this.filePath.replace(/[\\/][^\\/]+$/, '')
-    if (dir && !fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
-    fs.writeFileSync(this.filePath, JSON.stringify(store), 'utf8')
+    saveSecureJsonFile(this.filePath, store)
   }
 }
 

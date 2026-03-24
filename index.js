@@ -1,15 +1,16 @@
 const fs = require('fs')
 const http = require('http')
 const https = require('https')
+const dns = require('dns').promises
+const net = require('net')
 const path = require('path')
 const crypto = require('crypto')
 const selfsigned = require('selfsigned')
 const express = require('express')
 const Stripe = require('stripe')
-const { addonBuilder, getRouter } = require('stremio-addon-sdk')
 const manifest = require('./src/config/manifest')
 const { encrypt, decrypt } = require('./src/utils/crypto')
-const { encodeFileStateToken, decodeFileStateToken, decodePlaybackStateToken } = require('./src/utils/opaqueState')
+const { decodeFileStateToken, decodePlaybackStateToken } = require('./src/utils/opaqueState')
 const { handleCatalog } = require('./src/handlers/catalog')
 const { handleStream } = require('./src/handlers/stream')
 const { handleMeta } = require('./src/handlers/meta')
@@ -17,13 +18,15 @@ const { ProwlarrClient } = require('./src/clients/prowlarr')
 const { QBitClient } = require('./src/clients/qbittorrent')
 const { autoProvisionWindows, ensureWindowsLanAccess } = require('./src/utils/provision')
 const { getLanIpv4Addresses, normalizeLocalHostname, startLanAlias } = require('./src/utils/lanAlias')
+const { buildLocalModeUrls } = require('./src/utils/localInstallUrls')
+const { isBlockedPrivateTargetHost, isPrivateIpv4, isPrivateIpv6 } = require('./src/utils/privateTargetHosts')
+const { normalizeRelayUrl } = require('./src/utils/relayUrl')
+const { stripRemoteSeedboxLanFields } = require('./src/utils/remoteSeedboxConfig')
+const { resolveRuntimeDir } = require('./src/utils/runtimeDir')
 const { decodeSportsThumbToken, renderSportsThumbSvg } = require('./src/utils/sportsThumb')
-const { mapPath } = require('./src/utils/pathMapper')
 const { findVideoFile, hasPackedArchiveFiles, isSampleVideoName } = require('./src/utils/streams')
-const {
-  normalizeLocalStorageRoots,
-  findExistingLocalFilePath
-} = require('./src/utils/localStorageRoots')
+const { buildPlaybackFileUrl } = require('./src/utils/fileServing')
+const { normalizeLocalStorageRoots } = require('./src/utils/localStorageRoots')
 const { PairStore } = require('./src/utils/pairStore')
 const {
   AccountStore,
@@ -32,6 +35,12 @@ const {
   hashStremioAuthKey
 } = require('./src/utils/accountStore')
 const { createAuthToken, verifyAuthToken, parseBearerToken } = require('./src/utils/authToken')
+const { loadSecureJsonFile, saveSecureJsonFile } = require('./src/utils/secureJsonFile')
+const {
+  redactSensitiveText,
+  createRedactingLogger,
+  installConsoleRedaction
+} = require('./src/utils/logRedaction')
 
 const STREAM_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_WAIT_TIMEOUT_MS || '90000', 10)
 const STREAM_WAIT_INTERVAL_MS = parseInt(process.env.STREAM_WAIT_INTERVAL_MS || '2000', 10)
@@ -80,6 +89,13 @@ const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing'])
 const SENSITIVE_WEB_ORIGINS = parseOriginAllowlist(
   process.env.PVTKRRX_ALLOWED_WEB_ORIGINS || 'https://pvtkrrx.vercel.app'
 )
+const CSRF_COOKIE_NAME = 'pvtkrrx_csrf'
+const SECRET_CONFIG_FIELDS = Object.freeze([
+  'jackettApiKey',
+  'qbitUsername',
+  'qbitPassword',
+  'fileServerAuth'
+])
 const watchedDeleteTimers = new Map()
 const watchedDeleteInFlight = new Set()
 const lanPairRateBuckets = new Map()
@@ -124,6 +140,8 @@ function loadLocalEnv() {
 }
 
 loadLocalEnv()
+// Keep Node/server console output on the same redaction policy Electron already uses.
+installConsoleRedaction(console)
 
 if (!process.env.ENCRYPTION_SECRET && process.env.NODE_ENV !== 'production') {
   process.env.ENCRYPTION_SECRET = 'pvtkrrx-local-dev-secret-change-me'
@@ -131,6 +149,7 @@ if (!process.env.ENCRYPTION_SECRET && process.env.NODE_ENV !== 'production') {
 }
 
 const app = express()
+app.set('trust proxy', false)
 app.use(express.json({
   limit: '1mb',
   verify: (req, _res, buf) => {
@@ -138,7 +157,7 @@ app.use(express.json({
   }
 }))
 
-const runtimeDir = process.env.PVTKRRX_RUNTIME_DIR || path.join(__dirname, '.runtime')
+const runtimeDir = resolveRuntimeDir()
 const localConfigPath = path.join(runtimeDir, 'local-config.json')
 const lanPairStore = new PairStore({
   filePath: process.env.PVTKRRX_PAIR_STORE_FILE || path.join(runtimeDir, 'lan-pair-store.json')
@@ -152,10 +171,7 @@ let localProviderWarmupPromise = null
 
 function loadLocalConfigFile() {
   try {
-    if (!fs.existsSync(localConfigPath)) return null
-    const raw = fs.readFileSync(localConfigPath, 'utf8')
-    if (!raw.trim()) return null
-    const parsed = JSON.parse(raw)
+    const parsed = loadSecureJsonFile(localConfigPath, { defaultValue: null })
     if (!parsed || typeof parsed !== 'object') return null
     return parsed
   } catch (_) {
@@ -164,8 +180,7 @@ function loadLocalConfigFile() {
 }
 
 function saveLocalConfigFile(config) {
-  fs.mkdirSync(runtimeDir, { recursive: true })
-  fs.writeFileSync(localConfigPath, JSON.stringify(config), 'utf8')
+  saveSecureJsonFile(localConfigPath, config)
 }
 
 function detectLanAddresses() {
@@ -184,16 +199,6 @@ function getMdnsHost() {
   return DEFAULT_LOCAL_HOSTNAME
 }
 
-function buildLocalModeUrls(hostname, port, httpsPort) {
-  const modeQuery = '?mode=local'
-  return {
-    httpManifest: `http://${hostname}:${port}/local/manifest.json${modeQuery}`,
-    httpsManifest: `https://${hostname}:${httpsPort}/local/manifest.json${modeQuery}`,
-    stremio: `stremio://${hostname}:${port}/local/manifest.json${modeQuery}`,
-    stremioHttps: `stremio://${hostname}:${httpsPort}/local/manifest.json${modeQuery}`
-  }
-}
-
 function normalizeBaseUrl(input) {
   const value = String(input || '').trim().replace(/\/+$/, '')
   if (!value) return ''
@@ -201,6 +206,7 @@ function normalizeBaseUrl(input) {
 }
 
 async function ensureBootLanAccess(logger = console) {
+  const safeLogger = createRedactingLogger(logger)
   if (process.platform !== 'win32' || IS_VERCEL_RUNTIME) return null
   if (bootLanAccessPromise) return bootLanAccessPromise
 
@@ -214,40 +220,27 @@ async function ensureBootLanAccess(logger = console) {
       })
 
       if (result?.firewallOk) {
-        logger.log('[startup-network] Windows Firewall verified for TCP 7000/7001 and UDP 5353')
+        safeLogger.log('[startup-network] Windows Firewall verified for TCP 7000/7001 and UDP 5353')
       } else {
-        logger.warn('[startup-network] Firewall verification failed; run PVTKRRX as Administrator once to repair LAN access')
+        safeLogger.warn('[startup-network] Firewall verification failed; run PVTKRRX as Administrator once to repair LAN access')
       }
 
       if (result?.mdnsReady) {
-        logger.log('[startup-network] mDNS responder ready')
+        safeLogger.log('[startup-network] mDNS responder ready')
       } else if (result?.bonjour?.installed) {
-        logger.warn('[startup-network] Bonjour service detected but not running')
+        safeLogger.warn('[startup-network] Bonjour service detected but not running')
       } else {
-        logger.warn('[startup-network] Bonjour/mDNS service not detected; .local discovery may be limited')
+        safeLogger.warn('[startup-network] Bonjour/mDNS service not detected; .local discovery may be limited')
       }
 
       return result
     } catch (err) {
-      logger.warn('[startup-network] LAN access check failed:', err.message)
+      safeLogger.warn('[startup-network] LAN access check failed:', err.message)
       return null
     }
   })()
 
   return bootLanAccessPromise
-}
-
-function normalizeRelayUrl(input) {
-  const fallback = normalizeBaseUrl(process.env.PVTKRRX_PAIR_RELAY_URL || 'https://pvtkrrx.vercel.app')
-  const raw = normalizeBaseUrl(input)
-  if (!raw) return fallback
-  try {
-    const parsed = new URL(raw)
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return fallback
-    return normalizeBaseUrl(parsed.origin)
-  } catch (_) {
-    return fallback
-  }
 }
 
 function parseBooleanLoose(value, fallback = false) {
@@ -257,7 +250,12 @@ function parseBooleanLoose(value, fallback = false) {
 }
 
 function getAuthTokenSecret() {
-  return String(process.env.AUTH_TOKEN_SECRET || process.env.ENCRYPTION_SECRET || '').trim()
+  const explicit = String(process.env.AUTH_TOKEN_SECRET || '').trim()
+  if (explicit) return explicit
+
+  const fallback = String(process.env.ENCRYPTION_SECRET || '').trim()
+  if (!fallback) return ''
+  return crypto.createHash('sha256').update(`pvtkrrx-auth-token:${fallback}`).digest('base64url')
 }
 
 function sanitizePairId(value) {
@@ -279,6 +277,17 @@ function sanitizePairKey(value) {
 }
 
 function makePairKey() {
+  return crypto.randomBytes(24).toString('base64url')
+}
+
+function sanitizePairOwnerId(value) {
+  const ownerId = String(value || '').trim()
+  if (!ownerId) return ''
+  if (!/^[A-Za-z0-9_-]{16,256}$/.test(ownerId)) return ''
+  return ownerId
+}
+
+function makePairOwnerId() {
   return crypto.randomBytes(24).toString('base64url')
 }
 
@@ -512,17 +521,6 @@ function getLocalStremioDesktopStatus() {
   }
 }
 
-function isSameHostRequest(req) {
-  const clientIp = getClientIp(req)
-  if (!clientIp) return false
-  if (clientIp === '127.0.0.1' || clientIp === '::1') return true
-  try {
-    return getLanIpv4Addresses().includes(clientIp)
-  } catch (_) {
-    return false
-  }
-}
-
 async function fetchStremioUserByAuthKey(authKey) {
   const key = sanitizeStremioAuthKey(authKey)
   if (!key) return null
@@ -600,16 +598,14 @@ async function createLinkedStremioAuthSession(authKey, authSecret) {
 
   const recommendedPairId = derivePairIdFromStremioUserId(stremioUser.stremioUserId)
   const token = createAuthToken({
-    sub: user.id,
-    provider: 'stremio-authkey',
-    stremioUserId: stremioUser.stremioUserId
+    sub: user.id
   }, authSecret, AUTH_TOKEN_TTL_SECONDS)
 
   return {
     ok: true,
     token,
-    user: publicUserModel(user),
     stremio: {
+      linked: true,
       userId: stremioUser.stremioUserId,
       recommendedPairId
     }
@@ -619,18 +615,34 @@ async function createLinkedStremioAuthSession(authKey, authSecret) {
 function normalizeClientIp(value) {
   let ip = String(value || '').trim()
   if (!ip) return ''
-  if (ip.includes(',')) ip = ip.split(',')[0].trim()
   if (ip.startsWith('::ffff:')) ip = ip.slice(7)
   const zoneIndex = ip.indexOf('%')
   if (zoneIndex !== -1) ip = ip.slice(0, zoneIndex)
   return ip.replace(/[^a-fA-F0-9:.]/g, '').toLowerCase()
 }
 
+function getSocketIp(req) {
+  return normalizeClientIp(String(req.socket?.remoteAddress || req.connection?.remoteAddress || ''))
+}
+
+function isLoopbackIp(ip) {
+  return ip === '127.0.0.1' || ip === '::1' || ip === '0:0:0:0:0:0:0:1'
+}
+
 function getClientIp(req) {
-  const forwarded = normalizeClientIp(String(req.headers['x-forwarded-for'] || ''))
-  const realIp = normalizeClientIp(String(req.headers['x-real-ip'] || ''))
-  const remote = normalizeClientIp(String(req.socket?.remoteAddress || req.ip || ''))
-  return forwarded || realIp || remote
+  return getSocketIp(req)
+}
+
+function isSameHostRequest(req) {
+  if (IS_VERCEL_RUNTIME) return false
+  const clientIp = getSocketIp(req)
+  if (!clientIp) return false
+  if (isLoopbackIp(clientIp)) return true
+  try {
+    return getLanIpv4Addresses().includes(clientIp)
+  } catch (_) {
+    return false
+  }
 }
 
 function hashClientIp(req) {
@@ -663,32 +675,6 @@ function consumeLanPairRateLimit(scope, key, maxPerWindow) {
   }
 }
 
-function isPrivateIpv4(hostname) {
-  const host = String(hostname || '').trim().toLowerCase()
-  if (!host) return false
-  if (host === 'localhost' || host === '127.0.0.1') return true
-  if (host.startsWith('10.')) return true
-  if (host.startsWith('192.168.')) return true
-  const parts = host.split('.')
-  if (parts.length === 4 && parts.every(p => /^\d+$/.test(p))) {
-    const second = Number.parseInt(parts[1], 10)
-    if (parts[0] === '172' && second >= 16 && second <= 31) return true
-  }
-  return false
-}
-
-function isPrivateIpv6(hostname) {
-  const host = String(hostname || '').trim().toLowerCase()
-  if (!host) return false
-  if (host === '::1' || host === '0:0:0:0:0:0:0:1') return true
-  if (!/^[0-9a-f:]+$/.test(host)) return false
-  return (
-    host.startsWith('fc') ||
-    host.startsWith('fd') ||
-    host.startsWith('fe80:')
-  )
-}
-
 function isLikelyLanHost(hostname) {
   const host = String(hostname || '').trim().toLowerCase()
   if (!host) return false
@@ -696,13 +682,35 @@ function isLikelyLanHost(hostname) {
   return isPrivateIpv4(host) || isPrivateIpv6(host)
 }
 
-function isBlockedPrivateTargetHost(hostname) {
-  const host = String(hostname || '').trim().toLowerCase()
-  if (!host) return false
-  if (host === '0.0.0.0' || host === 'host.docker.internal') return true
-  if (host.endsWith('.localhost') || host.endsWith('.local')) return true
-  if (host.startsWith('169.254.')) return true
-  return isPrivateIpv4(host) || isPrivateIpv6(host)
+async function resolveTargetAddresses(parsedUrl) {
+  const host = String(parsedUrl?.hostname || '').trim()
+  if (!host) return []
+  if (net.isIP(host)) return [normalizeClientIp(host)].filter(Boolean)
+
+  const results = await dns.lookup(host, { all: true, verbatim: true })
+  return results
+    .map(entry => normalizeClientIp(entry?.address || ''))
+    .filter(Boolean)
+}
+
+async function validateHostedConnectionTarget(parsedUrl) {
+  if (!parsedUrl) return null
+  if (isBlockedPrivateTargetHost(parsedUrl.hostname)) {
+    throw createHttpError(403, 'Hosted connection tests cannot probe loopback, LAN, or private-resolution targets')
+  }
+
+  let addresses = []
+  try {
+    addresses = await resolveTargetAddresses(parsedUrl)
+  } catch (_) {
+    throw createHttpError(403, 'Hosted connection tests require resolvable public targets')
+  }
+  if (!addresses.length) {
+    throw createHttpError(403, 'Hosted connection tests require resolvable public targets')
+  }
+  if (addresses.some(address => isBlockedPrivateTargetHost(address))) {
+    throw createHttpError(403, 'Hosted connection tests cannot probe loopback, LAN, or private-resolution targets')
+  }
 }
 
 function parseHttpUrlCandidate(input) {
@@ -767,6 +775,9 @@ function ensureLanPairConfig(config = {}, options = {}) {
   const recommendedPairId = derivePairIdFromStremioUserId(config?.stremioUserId || '')
   const pairId = sanitizePairId(config.lanPairId) || recommendedPairId || makePairId()
   const pairKey = sanitizePairKey(config.lanPairKey) || makePairKey()
+  const pairOwnerId = options.includeLocalSecrets === true
+    ? (sanitizePairOwnerId(config.lanPairOwnerId) || makePairOwnerId())
+    : sanitizePairOwnerId(config.lanPairOwnerId)
   const relayUrl = normalizeRelayUrl(config.lanPairRelayUrl || options.lanPairRelayUrl)
   const pairEnabledFallback = typeof options.defaultEnabled === 'boolean' ? options.defaultEnabled : false
   const pairRequiredFallback = typeof options.defaultRequired === 'boolean' ? options.defaultRequired : false
@@ -779,6 +790,7 @@ function ensureLanPairConfig(config = {}, options = {}) {
     lanPairRequired: pairRequired,
     lanPairId: pairId,
     lanPairKey: pairKey,
+    ...(pairOwnerId ? { lanPairOwnerId: pairOwnerId } : {}),
     lanPairRelayUrl: relayUrl
   }
 }
@@ -787,6 +799,16 @@ function normalizeAddonConfig(config = {}, options = {}) {
   const normalized = {
     ...config,
     additionalStorageRoots: normalizeLocalStorageRoots(config.additionalStorageRoots)
+  }
+  const lanPairExplicitlyDisabled = normalized.lanPairEnabled === false || normalized.lanPairRequired === false
+  if (lanPairExplicitlyDisabled && options.defaultEnabled !== true) {
+    return stripRemoteSeedboxLanFields({
+      ...normalized,
+      lanPairEnabled: false,
+      lanPairRequired: false
+    }, {
+      keepRelayUrl: true
+    })
   }
   const shouldNormalizeLanPair = (
     typeof options.defaultEnabled === 'boolean' ||
@@ -801,6 +823,103 @@ function normalizeAddonConfig(config = {}, options = {}) {
   return shouldNormalizeLanPair
     ? ensureLanPairConfig(normalized, options)
     : normalized
+}
+
+function normalizeRetainedSecretFields(value) {
+  const out = {}
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return out
+  for (const field of SECRET_CONFIG_FIELDS) {
+    out[field] = value[field] === true
+  }
+  return out
+}
+
+function stripEphemeralConfigFields(config = {}) {
+  const next = { ...(config && typeof config === 'object' ? config : {}) }
+  delete next.sourceConfigToken
+  delete next.savedSecrets
+  delete next.retainSecretFields
+  return next
+}
+
+function mergeRetainedSecrets(config = {}, existingConfig = null) {
+  const next = stripEphemeralConfigFields(config)
+  const existing = existingConfig && typeof existingConfig === 'object' ? existingConfig : null
+  if (!existing) return next
+
+  const retain = normalizeRetainedSecretFields(config?.retainSecretFields)
+  for (const field of SECRET_CONFIG_FIELDS) {
+    if (retain[field] && !String(next[field] || '').trim() && String(existing[field] || '').trim()) {
+      next[field] = existing[field]
+    }
+  }
+
+  if (!sanitizePairKey(next.lanPairKey) && sanitizePairKey(existing.lanPairKey)) {
+    next.lanPairKey = existing.lanPairKey
+  }
+  if (!sanitizePairOwnerId(next.lanPairOwnerId) && sanitizePairOwnerId(existing.lanPairOwnerId)) {
+    next.lanPairOwnerId = existing.lanPairOwnerId
+  }
+
+  return next
+}
+
+function loadConfigFromSourceToken(sourceToken) {
+  const token = String(sourceToken || '').trim()
+  if (!token) return null
+  const secret = String(process.env.ENCRYPTION_SECRET || '').trim()
+  if (!secret) return null
+  try {
+    return normalizeAddonConfig(decrypt(token, secret))
+  } catch (_) {
+    return null
+  }
+}
+
+async function hydrateAccountLinkForConfig(config = {}) {
+  const next = { ...(config && typeof config === 'object' ? config : {}) }
+  if (String(next.accountUserId || '').trim()) return next
+
+  const stremioUserId = normalizeStremioUserId(next.stremioUserId || '')
+  if (!stremioUserId) return next
+
+  const user = await accountStore.getUserByStremioUserId(stremioUserId)
+  if (!user) return next
+
+  next.accountUserId = String(user.id || '').trim()
+  next.accountProvider = String(next.accountProvider || user.authProvider || 'stremio-authkey').trim()
+  next.accountLinkedAt = Number(next.accountLinkedAt || user?.stremio?.linkedAt || Date.now())
+  return next
+}
+
+function buildConfigReadback(config = {}) {
+  const safe = config && typeof config === 'object' ? { ...config } : {}
+  const savedSecrets = {
+    jackettApiKey: Boolean(String(safe.jackettApiKey || '').trim()),
+    qbitUsername: Boolean(String(safe.qbitUsername || '').trim()),
+    qbitPassword: Boolean(String(safe.qbitPassword || '').trim()),
+    fileServerAuth: Boolean(String(safe.fileServerAuth || '').trim()),
+    lanPairKey: Boolean(String(safe.lanPairKey || '').trim())
+  }
+
+  for (const field of SECRET_CONFIG_FIELDS) delete safe[field]
+  delete safe.accountUserId
+  delete safe.lanPairKey
+  delete safe.lanPairOwnerId
+  delete safe.sourceConfigToken
+  delete safe.retainSecretFields
+
+  return {
+    ...safe,
+    savedSecrets
+  }
+}
+
+function resolveExistingConfigForBody(body = {}, options = {}) {
+  const preferLocal = options.preferLocal === true
+  const localConfig = preferLocal ? loadLocalConfigFile() : null
+  const tokenConfig = loadConfigFromSourceToken(body?.sourceConfigToken)
+  return localConfig || tokenConfig || (preferLocal ? tokenConfig : null)
 }
 
 function chooseLanPairEndpoint(state) {
@@ -878,10 +997,13 @@ function requestHostname(req) {
 }
 
 function isLocalNetworkRequest(req) {
-  const host = requestHostname(req)
-  if (!host) return false
-  if (host === '::1') return true
-  return isLikelyLanHost(host)
+  if (IS_VERCEL_RUNTIME) return false
+  const clientIp = getSocketIp(req)
+  return Boolean(clientIp) && (isLoopbackIp(clientIp) || isLikelyLanHost(clientIp))
+}
+
+function isConfigReadbackPath(pathName) {
+  return /^\/[^/]+\/config\.json$/i.test(String(pathName || ''))
 }
 
 function isSensitiveCorsRoute(req) {
@@ -889,6 +1011,13 @@ function isSensitiveCorsRoute(req) {
   return (
     pathName === '/encrypt' ||
     pathName === '/test-connection' ||
+    pathName === '/local-config' ||
+    pathName === '/auto-provision' ||
+    pathName === '/network-info' ||
+    pathName === '/local/lan-token' ||
+    pathName === '/local/pair-status' ||
+    /\/qbit\//i.test(pathName) ||
+    isConfigReadbackPath(pathName) ||
     pathName.startsWith('/pair/') ||
     pathName.startsWith('/auth/') ||
     pathName.startsWith('/billing/')
@@ -917,29 +1046,67 @@ function isAllowedSensitiveOrigin(req) {
   return isAllowedSensitiveOriginValue(req, rawOrigin)
 }
 
-function isTrustedSensitiveBrowserRequest(req) {
-  const rawOrigin = String(req.headers.origin || '').trim()
-  if (rawOrigin && isAllowedSensitiveOriginValue(req, rawOrigin)) return true
+function parseRequestCookies(req) {
+  const out = {}
+  const raw = String(req.headers.cookie || '').trim()
+  if (!raw) return out
+  for (const part of raw.split(';')) {
+    const idx = part.indexOf('=')
+    if (idx <= 0) continue
+    const key = part.slice(0, idx).trim()
+    const value = part.slice(idx + 1).trim()
+    if (!key) continue
+    out[key] = decodeURIComponent(value)
+  }
+  return out
+}
 
-  const rawReferer = String(req.headers.referer || '').trim()
-  if (rawReferer && isAllowedSensitiveOriginValue(req, rawReferer)) return true
+function timingSafeEqualText(a, b) {
+  const left = Buffer.from(String(a || ''), 'utf8')
+  const right = Buffer.from(String(b || ''), 'utf8')
+  if (left.length !== right.length || left.length === 0) return false
+  return crypto.timingSafeEqual(left, right)
+}
 
-  return false
+function ensureCsrfCookie(req, res) {
+  const cookies = parseRequestCookies(req)
+  const existing = String(cookies[CSRF_COOKIE_NAME] || '').trim()
+  if (/^[A-Za-z0-9_-]{24,256}$/.test(existing)) return existing
+
+  const token = crypto.randomBytes(24).toString('base64url')
+  const parts = [
+    `${CSRF_COOKIE_NAME}=${encodeURIComponent(token)}`,
+    'Path=/',
+    'SameSite=Strict',
+    'Max-Age=86400'
+  ]
+  const proto = String(req.headers['x-forwarded-proto'] || req.protocol || '').toLowerCase()
+  if (proto.includes('https')) parts.push('Secure')
+  res.append('Set-Cookie', parts.join('; '))
+  return token
+}
+
+function requireCsrfToken(req, res, next) {
+  const cookies = parseRequestCookies(req)
+  const cookieToken = String(cookies[CSRF_COOKIE_NAME] || '').trim()
+  const headerToken = String(req.headers['x-pvtkrrx-csrf'] || '').trim()
+  if (cookieToken && headerToken && timingSafeEqualText(cookieToken, headerToken)) return next()
+  return res.status(403).json({ error: 'CSRF validation failed' })
 }
 
 function requireLocalNetworkRoute(req, res, next) {
-  if (isLocalNetworkRequest(req)) return next()
-  return res.status(403).json({ error: 'Local network route only' })
+  if (isSameHostRequest(req)) return next()
+  return res.status(403).json({ error: 'Open configure on the Windows host PC.' })
 }
 
-function requireLoopbackLocalConfig(req, res, next) {
+function requireLocalConfigReadback(req, res, next) {
   if (req.params.config !== 'local') return next()
-  if (isLoopbackHost(req)) return next()
-  return res.status(403).json({ error: 'Local config route requires loopback host' })
+  if (isSameHostRequest(req)) return next()
+  return res.status(403).json({ error: 'Local config prefill is only available on the Windows host PC.' })
 }
 
 function requireLocalQbitControl(req, res, next) {
-  if (req.params.config === 'local' && isLoopbackHost(req)) return next()
+  if (req.params.config === 'local' && isSameHostRequest(req)) return next()
   return res.status(403).json({ error: 'qBittorrent control route is local-only' })
 }
 
@@ -1024,10 +1191,12 @@ app.use(express.static(publicDir, {
   }
 }))
 app.get('/configure', (req, res) => {
+  ensureCsrfCookie(req, res)
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
   res.sendFile(configPage)
 })
 app.get('/:config/configure', (req, res) => {
+  ensureCsrfCookie(req, res)
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
   res.sendFile(configPage)
 })
@@ -1050,31 +1219,6 @@ app.get('/thumb/sports/:info.svg', (req, res) => {
     res.status(400).send('invalid thumbnail payload')
   }
 })
-
-// Build a URL to serve a local file — uses the built-in /file/ endpoint when no
-// external fileServerUrl is configured (e.g. local qBit setup with no HTTP server).
-function buildFileUrl(config, configToken, baseUrl, hash, torrent, fileName) {
-  if (IS_VERCEL_RUNTIME) {
-    if (config.fileServerUrl) {
-      return mapPath(torrent?.save_path || torrent?.download_path || '', fileName, config.fileServerUrl, config.pathMapping)
-    }
-    return null
-  }
-
-  // Prefer built-in serving when the addon can access files on local disk.
-  // This protects local installs from stale external fileServerUrl values in older config tokens.
-  const localFilePath = findExistingLocalFilePath(torrent, fileName, config.additionalStorageRoots)
-  const localFileAvailable = Boolean(localFilePath && fs.existsSync(localFilePath))
-  if (config.fileServerUrl && !localFileAvailable) {
-    return mapPath(torrent?.save_path || torrent?.download_path || '', fileName, config.fileServerUrl, config.pathMapping)
-  }
-  try {
-    const info = encodeFileStateToken({ h: hash.toLowerCase(), p: fileName })
-    return `${baseUrl}/${configToken}/file/${info}`
-  } catch (_) {
-    return null
-  }
-}
 
 function getPublicBaseUrl(req) {
   const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim()
@@ -1108,7 +1252,7 @@ function isLoopbackHost(req) {
 }
 
 function getInstallMode(req) {
-  const mode = String(req.query.mode || req.query.node || '').toLowerCase()
+  const mode = String(req.query.mode || '').toLowerCase()
   if (mode === 'local' || mode === 'hosted') return mode
   return isLoopbackHost(req) ? 'local' : 'hosted'
 }
@@ -1224,8 +1368,6 @@ function publicUserModel(user) {
   const stremio = user.stremio && typeof user.stremio === 'object' ? user.stremio : {}
   const trial = getUserTrialState(user)
   return {
-    id: String(user.id || ''),
-    email: String(user.email || ''),
     stremio: {
       linked: Boolean(stremio.userId),
       userId: String(stremio.userId || ''),
@@ -1245,14 +1387,9 @@ function publicUserModel(user) {
     billing: {
       status: String(billing.status || 'inactive'),
       active: isUserSubscriptionActive(user),
-      customerId: String(billing.customerId || ''),
-      subscriptionId: String(billing.subscriptionId || ''),
-      priceId: String(billing.priceId || ''),
       currentPeriodEndMs: Number(billing.currentPeriodEndMs || 0),
       cancelAtPeriodEnd: Boolean(billing.cancelAtPeriodEnd)
-    },
-    createdAt: Number(user.createdAt || 0),
-    updatedAt: Number(user.updatedAt || 0)
+    }
   }
 }
 
@@ -1495,9 +1632,10 @@ function getManifest(req) {
 }
 
 async function warmLocalProviders(config, logger = console, reason = 'boot') {
+  const safeLogger = createRedactingLogger(logger)
   const snapshot = config && typeof config === 'object' ? { ...config } : null
   if (!snapshot) {
-    logger.log(`[startup-warm] skipped (${reason}): no local config`)
+    safeLogger.log(`[startup-warm] skipped (${reason}): no local config`)
     return null
   }
 
@@ -1505,11 +1643,11 @@ async function warmLocalProviders(config, logger = console, reason = 'boot') {
   const jackettUrl = String(snapshot.jackettUrl || '').trim()
   const jackettApiKey = String(snapshot.jackettApiKey || '').trim()
   if (!qbitUrl && (!jackettUrl || !jackettApiKey)) {
-    logger.log(`[startup-warm] skipped (${reason}): qBittorrent/Prowlarr not configured`)
+    safeLogger.log(`[startup-warm] skipped (${reason}): qBittorrent/Prowlarr not configured`)
     return null
   }
 
-  logger.log(`[startup-warm] starting (${reason})`)
+  safeLogger.log(`[startup-warm] starting (${reason})`)
   const tasks = []
 
   if (qbitUrl) {
@@ -1521,10 +1659,10 @@ async function warmLocalProviders(config, logger = console, reason = 'boot') {
         ? torrents.filter(t => Number(t?.progress || 0) >= 0.999).length
         : 0
       const active = Math.max(0, total - completed)
-      logger.log(`[startup-warm] qBittorrent ready (${total} torrents, ${completed} completed, ${active} active)`)
+      safeLogger.log(`[startup-warm] qBittorrent ready (${total} torrents, ${completed} completed, ${active} active)`)
       return { service: 'qbit', total, completed, active }
     })().catch((err) => {
-      logger.warn(`[startup-warm] qBittorrent warm-up failed: ${err.message}`)
+      safeLogger.warn(`[startup-warm] qBittorrent warm-up failed: ${err.message}`)
       return { service: 'qbit', error: err.message }
     }))
   }
@@ -1534,10 +1672,10 @@ async function warmLocalProviders(config, logger = console, reason = 'boot') {
       const prowlarr = new ProwlarrClient(jackettUrl, jackettApiKey)
       const indexers = await prowlarr.caps()
       const count = Array.isArray(indexers) ? indexers.length : 0
-      logger.log(`[startup-warm] Prowlarr ready (${count} indexers)`)
+      safeLogger.log(`[startup-warm] Prowlarr ready (${count} indexers)`)
       return { service: 'prowlarr', count }
     })().catch((err) => {
-      logger.warn(`[startup-warm] Prowlarr warm-up failed: ${err.message}`)
+      safeLogger.warn(`[startup-warm] Prowlarr warm-up failed: ${err.message}`)
       return { service: 'prowlarr', error: err.message }
     }))
   }
@@ -1743,7 +1881,7 @@ async function loadTorrentPlaybackState(qbit, hash, targetPath, additionalStorag
 }
 
 // ─── POST /encrypt — server-side config encryption ─────────
-app.post('/encrypt', (req, res) => {
+app.post('/encrypt', async (req, res) => {
   const secret = process.env.ENCRYPTION_SECRET
   if (!secret) return res.status(500).json({ error: 'ENCRYPTION_SECRET not configured' })
   const clientIp = getClientIp(req)
@@ -1756,7 +1894,9 @@ app.post('/encrypt', (req, res) => {
     return res.status(400).json({ error: 'Invalid config payload' })
   }
 
-  const normalizedConfig = normalizeAddonConfig(req.body)
+  const existingConfig = resolveExistingConfigForBody(req.body)
+  const mergedConfig = mergeRetainedSecrets(req.body, existingConfig)
+  const normalizedConfig = await hydrateAccountLinkForConfig(normalizeAddonConfig(mergedConfig))
   const issues = getConfigIssues(normalizedConfig, {
     requestBaseUrl: getPublicBaseUrl(req)
   })
@@ -1769,7 +1909,10 @@ app.post('/encrypt', (req, res) => {
   }
 
   try {
-    const token = encrypt(normalizedConfig, secret)
+    const tokenPayload = normalizedConfig.lanPairEnabled === false
+      ? stripRemoteSeedboxLanFields(normalizedConfig)
+      : normalizedConfig
+    const token = encrypt(tokenPayload, secret)
     res.json({ token })
   } catch (err) {
     res.status(400).json({ error: 'Encryption failed' })
@@ -1777,33 +1920,34 @@ app.post('/encrypt', (req, res) => {
 })
 
 // Save local-mode config to disk so Stremio can use a stable /local manifest URL.
-app.post('/local-config', requireLocalNetworkRoute, (req, res) => {
+app.post('/local-config', requireLocalNetworkRoute, async (req, res) => {
   const cfg = req.body || {}
   if (!cfg.qbitUrl) {
     return res.status(400).json({ error: 'qBit URL is required for local config' })
   }
 
   try {
+    const existingConfig = resolveExistingConfigForBody(cfg, { preferLocal: true })
+    const mergedConfig = mergeRetainedSecrets(cfg, existingConfig)
     const localHostname = normalizeLocalHostname(cfg.localHostname || DEFAULT_LOCAL_HOSTNAME)
     const localHostnameCustom = localHostname !== DEFAULT_LOCAL_HOSTNAME
-    const saved = normalizeAddonConfig({
-      ...cfg,
+    const saved = await hydrateAccountLinkForConfig(normalizeAddonConfig({
+      ...mergedConfig,
       localHostname,
       localHostnameCustom
     }, {
       defaultEnabled: true,
-      defaultRequired: true
-    })
+      defaultRequired: true,
+      includeLocalSecrets: true
+    }))
     saveLocalConfigFile(saved)
-    scheduleLocalProviderWarmup(saved, console, 'local-config-save').catch(() => {})
+    scheduleLocalProviderWarmup(saved, console, 'local-config-save').catch(err => {
+      console.warn('[config-save] Provider warmup failed:', err.message)
+    })
     res.json({
       ok: true,
-      localHostname,
-      lanPairId: saved.lanPairId,
-      lanPairKey: saved.lanPairKey,
-      lanPairEnabled: saved.lanPairEnabled,
-      lanPairRequired: saved.lanPairRequired,
-      lanPairRelayUrl: saved.lanPairRelayUrl
+      ...buildConfigReadback(saved),
+      localHostname
     })
   } catch (err) {
     res.status(500).json({ error: 'Failed to save local config' })
@@ -1839,24 +1983,31 @@ app.post('/auto-provision', requireLocalNetworkRoute, async (req, res) => {
         localHostnameCustom
       }, {
         defaultEnabled: true,
-        defaultRequired: true
+        defaultRequired: true,
+        includeLocalSecrets: true
       })
+      : null
+    const hydratedProvisionedConfig = provisionedConfig
+      ? await hydrateAccountLinkForConfig(provisionedConfig)
       : null
 
     if (result.config && result.config.qbitUrl) {
-      saveLocalConfigFile(provisionedConfig)
-      scheduleLocalProviderWarmup(provisionedConfig, console, 'auto-provision').catch(() => {})
+      saveLocalConfigFile(hydratedProvisionedConfig)
+      scheduleLocalProviderWarmup(hydratedProvisionedConfig, console, 'auto-provision').catch(err => {
+        console.warn('[auto-provision] Provider warmup failed:', err.message)
+      })
     }
     res.json({
       ...result,
-      config: provisionedConfig || result.config,
-      lanPair: provisionedConfig
+      config: hydratedProvisionedConfig
+        ? buildConfigReadback(hydratedProvisionedConfig)
+        : (result.config ? buildConfigReadback(result.config) : null),
+      lanPair: hydratedProvisionedConfig
         ? {
-            lanPairId: provisionedConfig.lanPairId,
-            lanPairKey: provisionedConfig.lanPairKey,
-            lanPairEnabled: provisionedConfig.lanPairEnabled,
-            lanPairRequired: provisionedConfig.lanPairRequired,
-            lanPairRelayUrl: provisionedConfig.lanPairRelayUrl
+            lanPairId: hydratedProvisionedConfig.lanPairId,
+            lanPairEnabled: hydratedProvisionedConfig.lanPairEnabled,
+            lanPairRequired: hydratedProvisionedConfig.lanPairRequired,
+            lanPairRelayUrl: hydratedProvisionedConfig.lanPairRelayUrl
           }
         : null,
       localHostname
@@ -1899,7 +2050,9 @@ app.get('/auth/stremio/local-status', (req, res) => {
   }
 })
 
-app.post('/auth/stremio/auto-link-local', async (req, res) => {
+// Browser-triggered local account-link helpers read local session material from this machine,
+// so keep both the same-host socket/IP gate and the configure page's double-submit CSRF flow.
+app.post('/auth/stremio/auto-link-local', requireCsrfToken, async (req, res) => {
   if (!authSecretAvailable()) {
     return res.status(500).json({ error: 'AUTH_TOKEN_SECRET not configured' })
   }
@@ -1968,7 +2121,10 @@ app.post('/auth/stremio/auto-link-local', async (req, res) => {
   }
 })
 
-app.post('/auth/stremio/link-authkey', async (req, res) => {
+// Manual AuthKey link is intentionally not same-host-only: the caller supplies the AuthKey
+// directly, and sensitive-origin allowlisting plus double-submit CSRF is enough to protect it
+// without breaking supported hosted configure flows.
+app.post('/auth/stremio/link-authkey', requireCsrfToken, async (req, res) => {
   if (!authSecretAvailable()) {
     return res.status(500).json({ error: 'AUTH_TOKEN_SECRET not configured' })
   }
@@ -2034,16 +2190,82 @@ app.get('/network-info', requireLocalNetworkRoute, (req, res) => {
   })
 })
 
+// LAN token minting derives a local install token from saved local secrets, so keep it
+// same-host-only in addition to the configure page's double-submit CSRF requirement.
+app.post('/local/lan-token', requireLocalNetworkRoute, requireCsrfToken, async (req, res) => {
+  const secret = String(process.env.ENCRYPTION_SECRET || '').trim()
+  if (!secret) return res.status(500).json({ error: 'ENCRYPTION_SECRET not configured' })
+
+  const localConfig = loadLocalConfigFile()
+  if (!localConfig) return res.status(404).json({ error: 'Local config not saved yet' })
+
+  try {
+    const normalized = await hydrateAccountLinkForConfig(normalizeAddonConfig(localConfig, {
+      defaultEnabled: true,
+      defaultRequired: true,
+      includeLocalSecrets: true
+    }))
+    const pairId = sanitizePairId(normalized.lanPairId)
+    const pairKey = sanitizePairKey(normalized.lanPairKey)
+    if (!pairId || !pairKey || normalized.lanPairEnabled === false) {
+      return res.status(400).json({ error: 'LAN Bridge is not configured yet' })
+    }
+
+    const token = encrypt(normalized, secret)
+    res.setHeader('Cache-Control', 'no-store')
+    res.json({
+      ok: true,
+      token,
+      lanPairId: pairId,
+      lanPairRelayUrl: normalizeRelayUrl(normalized.lanPairRelayUrl || '')
+    })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to build LAN token', detail: err.message })
+  }
+})
+
+app.get('/local/pair-status', requireLocalNetworkRoute, async (req, res) => {
+  const localConfig = loadLocalConfigFile()
+  if (!localConfig) {
+    return res.status(404).json({ ok: false, error: 'Local config not saved yet' })
+  }
+
+  const pairId = sanitizePairId(localConfig.lanPairId)
+  const pairKey = sanitizePairKey(localConfig.lanPairKey)
+  if (!pairId || !pairKey || localConfig.lanPairEnabled === false) {
+    return res.json({ ok: true, online: false })
+  }
+
+  try {
+    const state = await lanPairStore.get(pairId)
+    if (!state || hashPairKey(pairKey) !== String(state.keyHash || '')) {
+      return res.json({ ok: true, online: false })
+    }
+    const preferred = chooseLanPairEndpoint(state)
+    res.setHeader('Cache-Control', 'no-store')
+    res.json({
+      ok: true,
+      online: Boolean(preferred),
+      updatedAt: Number(state.updatedAt || 0),
+      expiresAt: Number(state.expiresAt || 0),
+      endpointSource: String(preferred?.source || '')
+    })
+  } catch (err) {
+    res.status(500).json({ ok: false, error: 'status failed', detail: err.message })
+  }
+})
+
 app.post('/pair/heartbeat', async (req, res) => {
   try {
     const pairId = sanitizePairId(req.body?.pairId)
     const pairKey = sanitizePairKey(req.body?.pairKey)
+    const ownerId = sanitizePairOwnerId(req.body?.ownerId)
     const localHostname = normalizeLocalHostname(req.body?.localHostname || DEFAULT_LOCAL_HOSTNAME)
     const relayUrl = normalizeRelayUrl(req.body?.relayUrl || '')
     const endpoints = normalizePairEndpoints(req.body?.endpoints || [])
 
-    if (!pairId || !pairKey) {
-      return res.status(400).json({ ok: false, error: 'pairId and pairKey are required' })
+    if (!pairId || !pairKey || !ownerId) {
+      return res.status(400).json({ ok: false, error: 'pairId, pairKey, and ownerId are required' })
     }
     if (!endpoints.length) {
       return res.status(400).json({ ok: false, error: 'At least one valid LAN endpoint is required' })
@@ -2060,11 +2282,18 @@ app.post('/pair/heartbeat', async (req, res) => {
     }
 
     const incomingKeyHash = hashPairKey(pairKey)
+    const incomingOwnerHash = hashPairKey(ownerId)
     const incomingIpHash = LAN_PAIR_BIND_PUBLIC_IP ? hashClientIp(req) : ''
     const existingState = await lanPairStore.get(pairId)
     if (existingState) {
       if (incomingKeyHash !== String(existingState.keyHash || '')) {
         return res.status(403).json({ ok: false, error: 'invalid pair key' })
+      }
+      if (LAN_PAIR_LOCK_HOST) {
+        const existingOwnerHash = String(existingState.ownerHash || '')
+        if (existingOwnerHash && existingOwnerHash !== incomingOwnerHash) {
+          return res.status(409).json({ ok: false, error: 'pair owner mismatch' })
+        }
       }
       if (LAN_PAIR_BIND_PUBLIC_IP && LAN_PAIR_LOCK_HOST) {
         const existingIpHash = String(existingState.clientIpHash || '')
@@ -2078,6 +2307,7 @@ app.post('/pair/heartbeat', async (req, res) => {
     const state = {
       pairId,
       keyHash: incomingKeyHash,
+      ownerHash: incomingOwnerHash,
       clientIpHash: incomingIpHash,
       endpoints,
       localHostname,
@@ -2136,10 +2366,7 @@ app.post('/pair/status', async (req, res) => {
       ok: true,
       online: Boolean(preferred),
       updatedAt: Number(state.updatedAt || 0),
-      expiresAt: Number(state.expiresAt || 0),
-      endpointBaseUrl: String(preferred?.baseUrl || ''),
-      endpointSource: String(preferred?.source || ''),
-      localHostname: String(state.localHostname || '')
+      expiresAt: Number(state.expiresAt || 0)
     })
   } catch (err) {
     res.status(500).json({ ok: false, error: 'status failed', detail: err.message })
@@ -2151,12 +2378,14 @@ app.post('/pair/status', async (req, res) => {
 // http://127.0.0.1:7000/local/install
 app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
   const port = parseInt(process.env.PORT || '7000', 10)
-  const loopbackManifest = `http://127.0.0.1:${port}/local/manifest.json?mode=local`
+  const httpsPort = parseInt(process.env.HTTPS_PORT || '7001', 10)
+  const loopbackUrls = buildLocalModeUrls('127.0.0.1', port, httpsPort)
   const requestedHost = sanitizeHostForUrl(req.query.host)
   const headerHost = sanitizeHostForUrl(String(req.get('host') || '').split(':')[0])
   const fallbackHost = sanitizeHostForUrl(getMdnsHost())
   const host = requestedHost || headerHost || fallbackHost || '127.0.0.1'
   const lanDebugManifest = `http://${host}:${port}/local/manifest.json?mode=local`
+  const showLanDebugManifest = host !== '127.0.0.1' && host !== 'localhost'
   const pcConfigureUrl = `http://127.0.0.1:${port}/configure?target=pc`
   const lanConfigureUrl = `http://127.0.0.1:${port}/configure?target=lan`
   const seedboxConfigureUrl = `http://127.0.0.1:${port}/configure?target=seedbox`
@@ -2209,9 +2438,11 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
             <button class="btn" id="copyHttpBtn" type="button">Copy PC Local URL</button>
             <a class="btn secondary" href="${pcConfigureUrl}">Open PC Local Setup</a>
           </div>
-          <code id="manifestCode">${loopbackManifest}</code>
+          <code id="manifestCode">${loopbackUrls.httpManifest}</code>
           <p class="route-note">Install this in Stremio Desktop on this same Windows PC when you want PVTKRRX to appear as a real local addon source.</p>
-          <code>${lanDebugManifest}</code>
+          ${showLanDebugManifest
+            ? `<p class="route-note">Debug-only raw LAN URL. This is not the supported same-PC install path.</p><code>${lanDebugManifest}</code>`
+            : ''}
         </section>
 
         <section class="route-card">
@@ -2232,16 +2463,16 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
         <section class="route-card">
           <div class="route-kicker">Public HTTPS endpoints</div>
           <h3>Remote Seedbox</h3>
-          <p class="route-copy">Use this when Prowlarr, qBittorrent, and file serving are reachable over public authenticated URLs.</p>
+          <p class="route-copy">Use this when Prowlarr, qBittorrent, and file serving are reachable over public authenticated URLs. On Vercel this is not a generic tracker-buffering route: it is ready-file / public-playback only unless you self-host playback support.</p>
           <ul class="route-list">
-            <li>Hosted remote profile</li>
+            <li>Not a generic tracker-buffering route</li>
             <li>Works away from home LAN</li>
             <li>Requires public HTTPS playback path</li>
           </ul>
           <div class="actions">
             <a class="btn" href="${seedboxConfigureUrl}">Open Remote Seedbox Setup</a>
           </div>
-          <p class="route-note">This is the right route for seedbox-first playback, not the LAN Bridge.</p>
+          <p class="route-note">This is the right route for seedbox-first playback, not the LAN Bridge. On the hosted relay it is intentionally ready-file / public-playback only and fails closed when the path cannot actually be served.</p>
         </section>
       </div>
     </div>
@@ -2273,7 +2504,7 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
 })
 
 // ─── POST /test-connection — validate credentials ──────────
-app.post('/test-connection', async (req, res) => {
+app.post('/test-connection', requireCsrfToken, async (req, res) => {
   const clientIp = getClientIp(req)
   const limit = consumeLanPairRateLimit(
     'test-connection',
@@ -2288,26 +2519,22 @@ app.post('/test-connection', async (req, res) => {
   const payload = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
     ? req.body
     : {}
-  const { jackettUrl, jackettApiKey, qbitUrl, qbitUsername, qbitPassword } = payload
+  const existingConfig = resolveExistingConfigForBody(payload, { preferLocal: isSameHostRequest(req) })
+  const mergedPayload = mergeRetainedSecrets(payload, existingConfig)
+  const { jackettUrl, jackettApiKey, qbitUrl, qbitUsername, qbitPassword } = mergedPayload
   const parsedJackettUrl = parseHttpUrlCandidate(jackettUrl)
   const parsedQbitUrl = parseHttpUrlCandidate(qbitUrl)
-  const trustedLocalCaller = isSameHostRequest(req) || isLocalNetworkRequest(req)
+  const trustedLocalCaller = isSameHostRequest(req)
 
-  if (!trustedLocalCaller && !isTrustedSensitiveBrowserRequest(req)) {
-    return res.status(403).json({
-      error: 'Hosted connection tests must be started from the PVTKRRX configure page'
-    })
-  }
-
-  if (!trustedLocalCaller) {
-    for (const target of [parsedJackettUrl, parsedQbitUrl]) {
-      if (!target) continue
-      if (isBlockedPrivateTargetHost(target.hostname)) {
-        return res.status(403).json({
-          error: 'Hosted connection tests cannot probe loopback, LAN, or .local targets'
-        })
+  try {
+    if (!trustedLocalCaller) {
+      for (const target of [parsedJackettUrl, parsedQbitUrl]) {
+        await validateHostedConnectionTarget(target)
       }
     }
+  } catch (err) {
+    const statusCode = Number(err?.statusCode || 0) || 403
+    return res.status(statusCode).json({ error: err.message })
   }
 
   const results = { jackett: false, qbit: false }
@@ -2353,7 +2580,8 @@ function withConfig(req, res, next) {
     }
     const normalizedLocal = normalizeAddonConfig(localConfig, {
       defaultEnabled: true,
-      defaultRequired: true
+      defaultRequired: true,
+      includeLocalSecrets: true
     })
     if (JSON.stringify(normalizedLocal) !== JSON.stringify(localConfig)) {
       saveLocalConfigFile(normalizedLocal)
@@ -2455,11 +2683,6 @@ function lanPairOfflineResponse(req, res, routeKind) {
   res.setHeader('Cache-Control', 'no-store')
   res.setHeader('X-PVTKRRX-LAN-Pair', 'offline')
 
-  if (routeKind === 'manifest') {
-    const m = getManifest(req)
-    if (m.behaviorHints) m.behaviorHints.configurationRequired = true
-    return res.json(m)
-  }
   if (routeKind === 'catalog') return res.json({ metas: [], cacheMaxAge: 0 })
   if (routeKind === 'stream') return res.json({ streams: [], cacheMaxAge: 0 })
   if (routeKind === 'meta') return res.json({ meta: null })
@@ -2521,14 +2744,14 @@ app.get('/:config/manifest.json', withConfig, (req, res) => {
   res.json(m)
 })
 
-app.get('/:config/config.json', withConfig, requireLoopbackLocalConfig, (req, res) => {
+app.get('/:config/config.json', withConfig, requireLocalConfigReadback, (req, res) => {
   res.setHeader('Cache-Control', 'no-store')
-  res.json(req.config)
+  res.json(buildConfigReadback(req.config))
 })
 
 app.get('/manifest.json', (req, res) => {
   setPublicCacheHeaders(res, 60, { sMaxAge: 300, staleWhileRevalidate: 900 })
-  res.json(getManifest(req))
+  res.json(manifest.createBootstrapManifest(getPublicBaseUrl(req)))
 })
 
 app.get('/:config/catalog/:type/:id.json', withConfig, requireConfigSubscription, maybeLanPairRedirect('catalog'), async (req, res) => {
@@ -2551,10 +2774,9 @@ app.get('/:config/catalog/:type/:id/:extra.json', withConfig, requireConfigSubsc
 
 app.get('/:config/stream/:type/:id.json', withConfig, requireConfigSubscription, maybeLanPairRedirect('stream'), async (req, res) => {
   const addonUrl = getPublicBaseUrl(req)
-  const tokenShort = String(req.params.config || '').slice(0, 8)
-  console.log(`[stream-route] token=${tokenShort} type=${req.params.type} id=${req.params.id}`)
+  console.log(`[stream-route] type=${req.params.type} id=${req.params.id}`)
   const result = await handleStream(req.config, req.params.type, req.params.id, addonUrl, req.params.config)
-  console.log(`[stream-route] token=${tokenShort} streams=${Array.isArray(result?.streams) ? result.streams.length : 0}`)
+  console.log(`[stream-route] streams=${Array.isArray(result?.streams) ? result.streams.length : 0}`)
   const ttl = parseCacheSeconds(result?.cacheMaxAge, 20, 5, 120)
   applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: ttl, staleWhileRevalidate: Math.min(ttl * 3, 300) })
   res.json(result)
@@ -2610,7 +2832,6 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
       })
     }
 
-    const tokenShort = String(req.params.config || '').slice(0, 8)
     let state = null
     try {
       state = decodeFileStateToken(req.params.info)
@@ -2619,7 +2840,7 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
     }
     const h = String(state?.h || '').toLowerCase()
     const p = String(state?.p || '')
-    console.log(`[file-route] token=${tokenShort} hash=${String(h || '').slice(0, 8)} file="${p}"`)
+    console.log(`[file-route] hash=${String(h || '').slice(0, 8)} hasPath=${Boolean(p)}`)
     const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
     const playback = await loadTorrentPlaybackState(qbit, String(h || '').toLowerCase(), p, req.config.additionalStorageRoots)
     if (!playback?.torrent) {
@@ -2637,7 +2858,7 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
     }
     await primeTorrentForStreaming(qbit, torrent, file, files)
     if (!playback.fileExists || !resolvedFilePath) {
-      console.warn(`[file-route] file not found on disk path="${resolvedFilePath || 'n/a'}"`)
+      console.warn('[file-route] file not found on disk')
       return res.status(425).json({
         error: 'Buffering torrent metadata',
         progress: Number(file?.progress || torrent.progress || 0)
@@ -2745,7 +2966,7 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
       }
     }
   } catch (err) {
-    console.error('[file] Error:', err.message)
+    console.error('[file] Error:', redactSensitiveText(err.message))
     if (!res.headersSent) res.status(500).json({ error: 'File serve failed' })
   }
 })
@@ -2760,7 +2981,6 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
       })
     }
 
-    const tokenShort = String(req.params.config || '').slice(0, 8)
     let info = null
     try {
       info = decodePlaybackStateToken(req.params.info)
@@ -2769,7 +2989,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
     }
     const trackerHost = extractTrackerHost(info.l)
     let trackedHash = String(info.h || extractInfoHashFromLink(info.l) || '').toLowerCase()
-    console.log(`[playback-route] token=${tokenShort} hash=${trackedHash.slice(0, 8)} hasLink=${Boolean(info.l)}`)
+    console.log(`[playback-route] hash=${trackedHash.slice(0, 8)} hasLink=${Boolean(info.l)}`)
     const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
     const waitDeadline = Date.now() + STREAM_WAIT_TIMEOUT_MS
     let primedTorrent = false
@@ -2799,20 +3019,25 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
         }
         hasTorrent = true
         if ((existing.ready || Number(existing.torrent.progress || 0) >= 0.999) && existing.file?.name) {
-          const fileUrl = buildFileUrl(
+          const fileUrl = buildPlaybackFileUrl(
             req.config,
             req.params.config,
             getPublicBaseUrl(req),
             existing.torrent.hash,
             existing.torrent,
-            existing.file.name
+            existing.file.name,
+            {
+              multipleFiles: existing.files.length > 1,
+              currentFilePath: existing.fileExists ? existing.resolvedFilePath : '',
+              requireCurrentPathProof: !isCompletedTorrent(existing.torrent, Number(existing.file?.progress || 0))
+            }
           )
           if (!fileUrl) {
             return res.status(412).json({
               error: 'Hosted playback requires File Server URL or LAN Pair relay'
             })
           }
-          console.log(`[playback-route] token=${tokenShort} existing torrent ready -> redirect file`)
+          console.log('[playback-route] existing torrent ready -> redirect file')
           return res.redirect(302, fileUrl)
         }
         lastProgress = Number(existing.file?.progress || existing.torrent.progress || 0)
@@ -2827,7 +3052,9 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
       try {
         const current = await qbit.torrents('all')
         knownHashesBeforeAdd = new Set((current || []).map(t => String(t.hash || '').toLowerCase()))
-      } catch (_) {}
+      } catch (err) {
+        console.warn('[playback-route] Hash snapshot failed — torrent detection may be unreliable:', redactSensitiveText(err.message))
+      }
     }
 
     if (!hasTorrent && !info.l) {
@@ -2851,7 +3078,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
         }
       } catch (addErr) {
         // qBit may reject duplicate/stale URLs; continue probing torrent list.
-        console.warn(`[playback-route] add rejected: ${addErr.message}`)
+        console.warn(`[playback-route] add rejected: ${redactSensitiveText(addErr.message)}`)
       }
     }
 
@@ -2901,20 +3128,25 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
       maxSeedersSeen = Math.max(maxSeedersSeen, Number(state.torrent?.num_seeds || 0))
       maxPeersSeen = Math.max(maxPeersSeen, Number(state.torrent?.num_leechs || 0))
       if ((state.ready || Number(state.torrent.progress || 0) >= 0.999) && state.file?.name) {
-        const fileUrl = buildFileUrl(
+        const fileUrl = buildPlaybackFileUrl(
           req.config,
           req.params.config,
           getPublicBaseUrl(req),
           state.torrent.hash,
           state.torrent,
-          state.file.name
+          state.file.name,
+          {
+            multipleFiles: state.files.length > 1,
+            currentFilePath: state.fileExists ? state.resolvedFilePath : '',
+            requireCurrentPathProof: !isCompletedTorrent(state.torrent, Number(state.file?.progress || 0))
+          }
         )
         if (!fileUrl) {
           return res.status(412).json({
             error: 'Hosted playback requires File Server URL or LAN Pair relay'
           })
         }
-        console.log(`[playback-route] token=${tokenShort} progressive-ready -> redirect file`)
+        console.log('[playback-route] progressive-ready -> redirect file')
         return res.redirect(302, fileUrl)
       }
     }
@@ -2922,7 +3154,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
     // Still buffering.
     const stalledNoPieces = lastProgress <= 0.001 && maxAvailability < 0.01
     console.warn(
-      `[playback-route] token=${tokenShort} timeout waiting for buffer hash=${trackedHash.slice(0, 8)} ` +
+      `[playback-route] timeout waiting for buffer hash=${trackedHash.slice(0, 8)} ` +
       `progress=${Math.round(lastProgress * 100)}% availability=${maxAvailability.toFixed(3)} ` +
       `seeders=${maxSeedersSeen} peers=${maxPeersSeen}`
     )
@@ -2937,29 +3169,17 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
       retryAfterSeconds: 4
     })
   } catch (err) {
-    console.error('[playback-route] Error:', err.message)
+    console.error('[playback-route] Error:', redactSensitiveText(err.message))
     res.status(500).json({ error: 'Playback failed' })
   }
 })
-
-// ─── SDK router (fallback — serves /manifest.json at root) ──
-const builder = new addonBuilder({
-  ...manifest,
-  id: 'com.kepners.pvtkrrx.hosted',
-  name: 'PVTKRRX (Hosted)'
-})
-builder.defineCatalogHandler(async () => ({ metas: [] }))
-builder.defineStreamHandler(async () => ({ streams: [] }))
-builder.defineMetaHandler(async () => ({ meta: null }))
-const addonInterface = builder.getInterface()
-app.use(getRouter(addonInterface))
 
 // ─── Local dev server ───────────────────────────────────────
 function startLocalServers(options = {}) {
   const exitOnHttpError = options.exitOnHttpError !== false
   const enableLanAlias = options.enableLanAlias !== false
   const ensureLanAccessOnBoot = options.ensureLanAccessOnBoot !== false
-  const logger = options.logger || console
+  const logger = createRedactingLogger(options.logger || console)
   const port = Number.isFinite(options.port) ? options.port : parseInt(process.env.PORT || '7000', 10)
   const httpsPort = Number.isFinite(options.httpsPort) ? options.httpsPort : parseInt(process.env.HTTPS_PORT || '7001', 10)
   const mdnsHost = getMdnsHost()
@@ -2974,13 +3194,17 @@ function startLocalServers(options = {}) {
   }
 
   if (ensureLanAccessOnBoot) {
-    ensureBootLanAccess(logger).catch(() => {})
+    ensureBootLanAccess(logger).catch(err => {
+      logger.warn('[boot] LAN access setup failed:', err.message)
+    })
   }
 
   const bootConfig = loadLocalConfigFile()
   if (bootConfig) {
     const warmTimer = setTimeout(() => {
-      scheduleLocalProviderWarmup(bootConfig, logger, 'server-boot').catch(() => {})
+      scheduleLocalProviderWarmup(bootConfig, logger, 'server-boot').catch(err => {
+        logger.warn('[boot] Provider warmup failed:', err.message)
+      })
     }, 900)
     if (typeof warmTimer.unref === 'function') warmTimer.unref()
   }
@@ -3008,7 +3232,9 @@ function startLocalServers(options = {}) {
   httpServer.on('close', () => {
     try {
       if (lanAlias && typeof lanAlias.stop === 'function') lanAlias.stop()
-    } catch (_) {}
+    } catch (err) {
+      logger.warn('[server] mDNS alias cleanup failed:', err.message)
+    }
   })
 
   // HTTPS (self-signed — must be trusted in OS/browser first)

@@ -9,7 +9,7 @@ PVTKRRX is a Stremio addon that bridges your existing seedbox infrastructure int
 - **Prowlarr URL + API key** — searches your private trackers
 - **qBittorrent WebUI URL** — manages downloads and streams your library
 
-The addon handles: search → download → stream. PVTKRRX has a **built-in file server** so you can stream completed downloads directly — no external HTTP server required.
+The addon handles: search → download → stream. PVTKRRX has a **built-in file server** for playback-capable local routes, while hosted `Remote Seedbox` expects public ready-file playback endpoints.
 
 Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS endpoints. If you want to validate loopback or LAN-only service URLs such as `http://127.0.0.1:9696`, use the local configure page on the Windows host runtime instead of the hosted site.
 
@@ -30,7 +30,7 @@ PVTKRRX is one runtime with three install routes:
 
 - **PC Local** — Real same-PC addon for the Windows host running PVTKRRX. Installs from the copied `127.0.0.1` URL and exposes movies, TV, sports, and library on that machine.
 - **LAN Bridge** — Home-network route for your phone, TV, web, and Apple TV on the same Stremio account. Installs from the hosted LAN-pair URL and redirects back to the active host PC when paired.
-- **Remote Seedbox** — Public HTTPS route for away-from-home or seedbox-first playback. Requires public qBittorrent, Prowlarr, and file serving endpoints.
+- **Remote Seedbox** — Public HTTPS route for away-from-home or seedbox-first playback. Requires public qBittorrent, Prowlarr, and file serving endpoints, and is ready-file-first on the hosted relay unless you self-host playback support.
 
 See [docs/CURRENT_DESIGN.md](docs/CURRENT_DESIGN.md) for the canonical current design, [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) for the route model, and [docs/STREMIO_INSTALL_TRACKER.md](docs/STREMIO_INSTALL_TRACKER.md) for current client install behavior.
 
@@ -42,7 +42,7 @@ See [docs/CURRENT_DESIGN.md](docs/CURRENT_DESIGN.md) for the canonical current d
 | Movie/TV streams from private trackers | Working |
 | Sports contamination filter | Working (SportsCult excluded from movie searches) |
 | Already-downloaded files | Working (built-in file server with Range support) |
-| On-tracker download + play | Working (Comet pattern: queue then redirect) |
+| On-tracker download + play | Working on playback-capable routes (PC Local, LAN Bridge via local redirect, or self-hosted runtime) |
 | Local + Hosted install modes | Working |
 | Hosted LAN pair mode (Android TV/mobile) | Implemented (requires relay config) |
 
@@ -99,9 +99,9 @@ Your seedbox needs:
 1. **Prowlarr** with private trackers configured (or Jackett — same config page)
 2. **qBittorrent** with WebUI enabled
 
-That's it. PVTKRRX has a **built-in file server** and will stream files directly from qBittorrent's download directory. No nginx, no caddy, no ruTorrent file server needed.
+That is enough for `PC Local` and `LAN Bridge`, where the local runtime can read files directly from qBittorrent's download directory with the built-in file server.
 
-> **Optional:** If you already have an HTTP file server on your seedbox (nginx, caddy, Synology, etc.) you can configure the "File Server URL" field to use it instead. Leave it blank to use the built-in server.
+> `Remote Seedbox` is different: the hosted route needs a public HTTPS file-serving path for completed-file playback. Leave `File Server URL` blank only for local playback-capable routes or self-hosted runtimes that can actually serve `/file` and `/playback`.
 
 ## Configuration Fields
 
@@ -114,7 +114,7 @@ That's it. PVTKRRX has a **built-in file server** and will stream files directly
 | qBittorrent URL | Yes | e.g. `http://seedbox.example.com:8080` |
 | qBittorrent Username | Yes | qBit WebUI credentials |
 | qBittorrent Password | Yes | qBit WebUI credentials |
-| File Server URL | No | External HTTP server URL. **Leave blank** to use built-in server |
+| File Server URL | No | External HTTP server URL. Leave blank only for local playback-capable routes or self-hosted runtimes that can serve files directly |
 | Path Mapping | No | Only if using external file server with different paths |
 
 ## How It Works
@@ -125,7 +125,7 @@ Your Stremio App
 PVTKRRX route selected in configure
    ├── PC Local      → local runtime on the Windows host
    ├── LAN Bridge    → hosted relay resolves active LAN host, then redirects
-   └── Remote Seedbox → hosted route with public playback endpoints
+   └── Remote Seedbox → hosted route with public ready-file playback endpoints
 
 Back-end services used by the chosen route:
    ├── Prowlarr / Torznab-compatible search
@@ -142,7 +142,9 @@ Hosted relay routes do not proxy video bytes, and hosted `/file` or `/playback` 
 
 **⚡ On Seedbox** — File is already downloaded. Plays immediately.
 
-**📥 Available** — File is on a private tracker. Click to trigger download. PVTKRRX polls qBittorrent and redirects to the file once it's done.
+**📥 Available** — File is on a private tracker. PC Local and LAN Bridge can use local `/playback` queue-and-buffer behavior. Hosted Vercel Remote Seedbox does not expose dead tracker `/playback` links and is effectively ready-file playback unless you run a playback-capable self-hosted runtime.
+
+**[INFO] Remote notice** — Hosted Remote Seedbox can append an explanation row when direct queue-and-buffer is hidden to protect your file-server login or when qBittorrent has not exposed enough live file info for a safe buffer URL yet.
 
 ## Verify Stremio Config Flow
 
@@ -168,9 +170,36 @@ npm run smoke:guards
 
 This validates:
 - hosted `/playback` fails fast on Vercel instead of waiting for local buffering
+- hosted remote stream responses suppress dead tracker `/playback` flows
 - remote direct `/test-connection` calls are rejected
 - hosted `/test-connection` refuses loopback/LAN targets
 - local configure can still test loopback targets
+
+Security hardening regression smoke check:
+
+```bash
+npm run smoke:security
+```
+
+This validates:
+- config readback and server-side logs redact stored secrets, URLs, paths, and auth identifiers
+- spoofed `Host` / `X-Forwarded-For` headers do not unlock local-only routes
+- hosted `/test-connection` blocks rebinding-style `nip.io` / `lvh.me` targets
+- `/pair/status` omits private endpoint metadata, and the auth-user surface stays off billing internals (the auth-model shape check is code-reviewed rather than a full authenticated round-trip)
+- legacy plain playback/file tokens are rejected
+- secure JSON storage stays read-legacy/write-secure and fails closed on writes without a configured secret
+
+Route-capability stream pipeline smoke check:
+
+```bash
+npm run smoke:pipeline
+```
+
+This validates:
+- hosted Vercel `Remote Seedbox` suppresses dead tracker `/playback` streams at stream emission time
+- remote tracker/download flows are suppressed when `fileServerAuth` would be lost on redirect
+- remote buffering URLs are suppressed unless the current file path is provable from live torrent state
+- local playback-capable routes still emit the expected `/playback` and `/file` flows
 
 LAN pair + TV-hosted redirect smoke check:
 
