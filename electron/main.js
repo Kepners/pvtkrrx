@@ -23,6 +23,7 @@ const appIconPath = path.join(__dirname, 'assets', 'logo.ico')
 const WINDOW_WIDTH = 920
 const WINDOW_HEIGHT = 560
 const WINDOW_MARGIN = 28
+let lastSetBounds = null
 const PROVISION_ONLY_ARG = '--pvtkrrx-provision-only'
 const NETWORK_ACCESS_ONLY_ARG = '--pvtkrrx-network-access-only'
 const provisionOnlyMode = process.argv.includes(PROVISION_ONLY_ARG)
@@ -636,7 +637,9 @@ function fitMainWindowToContent(size = {}) {
   const nextWidth = Math.max(WINDOW_WIDTH, Math.min(workArea.width - WINDOW_MARGIN, requestedWidth))
   const nextHeight = Math.max(WINDOW_HEIGHT, Math.min(maxHeight, requestedHeight))
 
-  if (Math.abs(bounds.width - nextWidth) < 4 && Math.abs(bounds.height - nextHeight) < 4) return
+  // Compare against last-set bounds to prevent creep from OS rounding / DPI drift
+  const ref = lastSetBounds || bounds
+  if (Math.abs(ref.width - nextWidth) < 4 && Math.abs(ref.height - nextHeight) < 4) return
 
   const centerX = bounds.x + Math.round(bounds.width / 2)
   const centerY = bounds.y + Math.round(bounds.height / 2)
@@ -647,12 +650,9 @@ function fitMainWindowToContent(size = {}) {
   const nextX = Math.min(Math.max(centerX - Math.round(nextWidth / 2), minX), Math.max(minX, maxX))
   const nextY = Math.min(Math.max(centerY - Math.round(nextHeight / 2), minY), Math.max(minY, maxY))
 
-  mainWindow.setBounds({
-    x: nextX,
-    y: nextY,
-    width: nextWidth,
-    height: nextHeight
-  }, true)
+  const next = { x: nextX, y: nextY, width: nextWidth, height: nextHeight }
+  lastSetBounds = next
+  mainWindow.setBounds(next, true)
 }
 
 function createMainWindow() {

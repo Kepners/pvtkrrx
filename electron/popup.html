@@ -785,11 +785,13 @@
         label.textContent = 'Stopped';
         portEl.style.display = 'none';
       }
+      invalidatePopupFit();
       requestPopupFit();
     }
 
     function setVersion(version) {
       document.querySelector('.version').textContent = 'v' + version;
+      invalidatePopupFit();
       requestPopupFit();
     }
 
@@ -797,6 +799,7 @@
       const el = document.getElementById('pathNote');
       el.textContent = text || '';
       el.style.color = isError ? '#ff6a8a' : '#6f6f6f';
+      invalidatePopupFit();
       requestPopupFit();
     }
 
@@ -805,11 +808,13 @@
       if (!el) return;
       el.textContent = text || '';
       el.style.color = isError ? '#ff6a8a' : '#7f949b';
+      invalidatePopupFit();
       requestPopupFit();
     }
 
     let fitPopupTimer = null;
     let lastRequestedPopupHeight = 0;
+    let popupFitSettled = false;
     function requestPopupFit() {
       if (!window.electronAPI || !window.electronAPI.fitPopupWindow) return;
       if (fitPopupTimer) clearTimeout(fitPopupTimer);
@@ -823,11 +828,16 @@
             body ? body.scrollHeight : 0
           ) + (dragBar ? dragBar.offsetHeight : 20) + 8
         );
-        if (Math.abs(height - lastRequestedPopupHeight) < 6) return;
+        // Only grow if content genuinely changed, never by rounding drift alone
+        const delta = height - lastRequestedPopupHeight;
+        if (popupFitSettled && Math.abs(delta) < 10) return;
         lastRequestedPopupHeight = height;
+        popupFitSettled = true;
         window.electronAPI.fitPopupWindow({ height, lockWidth: true });
       }, 40);
     }
+    // Reset settled flag when content actually changes
+    function invalidatePopupFit() { popupFitSettled = false; }
 
     async function copyLocalInstallUrl() {
       try {
