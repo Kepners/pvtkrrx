@@ -87,7 +87,7 @@ const REQUIRE_ACTIVE_SUBSCRIPTION = false
 const IS_VERCEL_RUNTIME = Boolean(process.env.VERCEL)
 const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing'])
 const SENSITIVE_WEB_ORIGINS = parseOriginAllowlist(
-  process.env.PVTKRRX_ALLOWED_WEB_ORIGINS || 'https://pvtkrrx.vercel.app'
+  process.env.PVTKRRX_ALLOWED_WEB_ORIGINS || 'https://www.pvtkrrx.cc'
 )
 const CSRF_COOKIE_NAME = 'pvtkrrx_csrf'
 const SECRET_CONFIG_FIELDS = Object.freeze([

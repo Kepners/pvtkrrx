@@ -108,13 +108,13 @@ Operational note:
 
 - Use the Windows runtime or Electron app for real `PC Local` / `LAN Bridge` acceptance. A WSL-started Node process is fine for code-level smoke work, but it can advertise the WSL bridge IP instead of the real Windows LAN IP, which makes it a poor source of truth for LAN-pair validation.
 
-## Required Vercel Configuration For LAN Pair Relay
+## Required Hosted Configuration For LAN Pair Relay
 
 Use these on the hosted deployment:
 
 1. `ENCRYPTION_SECRET` (existing required secret).
 2. `KV_REST_API_URL` and `KV_REST_API_TOKEN` (recommended) to persist pair heartbeat state across serverless invocations.
-3. Optional: `PVTKRRX_PAIR_RELAY_URL` (defaults to `https://pvtkrrx.vercel.app`).
+3. Optional: `PVTKRRX_PAIR_RELAY_URL` (defaults to `https://www.pvtkrrx.cc`).
 4. Optional: `PVTKRRX_LAN_PAIR_TTL_SECONDS` (default `21600`, minimum enforced `300`).
 5. Optional security tuning:
    - `PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP` (default `false`)

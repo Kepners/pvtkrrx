@@ -66,9 +66,9 @@ The February 2026 planning docs under `docs/` are kept as project history and ar
 
 ### Use the Hosted Service (Currently Free)
 
-Visit **[pvtkrrx.vercel.app](https://pvtkrrx.vercel.app)** to configure your addon in 60 seconds.
-Use the canonical hosted base only: `https://pvtkrrx.vercel.app`.
-Hosted install links should resolve under `https://pvtkrrx.vercel.app/{token}/manifest.json?...`.
+Visit **[www.pvtkrrx.cc](https://www.pvtkrrx.cc)** to configure your addon in 60 seconds.
+Use the canonical hosted base only: `https://www.pvtkrrx.cc`.
+Hosted install links should resolve under `https://www.pvtkrrx.cc/{token}/manifest.json?...`.
 
 ### Self-Host (Free)
 
@@ -240,7 +240,7 @@ ENCRYPTION_SECRET=your-secret-here npm start
 | AUTH_TOKEN_SECRET | Recommended | Key for signing account auth tokens (falls back to ENCRYPTION_SECRET) |
 | KV_REST_API_URL | Recommended | Persist LAN pair heartbeat state on Vercel |
 | KV_REST_API_TOKEN | Recommended | Auth token for KV REST API |
-| PVTKRRX_PAIR_RELAY_URL | Optional | Hosted relay base URL (default https://pvtkrrx.vercel.app) |
+| PVTKRRX_PAIR_RELAY_URL | Optional | Hosted relay base URL (default https://www.pvtkrrx.cc) |
 | PVTKRRX_LAN_PAIR_TTL_SECONDS | Optional | Pair record TTL (default 21600) |
 | PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP | Optional | Bind hosted pair redirects to heartbeat source network (default false) |
 | PVTKRRX_LAN_PAIR_LOCK_HOST | Optional | Reject heartbeat takeover attempts from a different active host IP (default true) |

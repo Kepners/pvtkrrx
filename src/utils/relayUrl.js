@@ -1,4 +1,4 @@
-const DEFAULT_PAIR_RELAY_URL = 'https://pvtkrrx.vercel.app'
+const DEFAULT_PAIR_RELAY_URL = 'https://www.pvtkrrx.cc'
 
 function normalizeBaseUrl(input) {
   return String(input || '').trim().replace(/\/+$/, '')
