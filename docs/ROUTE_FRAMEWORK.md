@@ -39,6 +39,8 @@ For the broader runtime and storage model, see `docs/CURRENT_DESIGN.md`.
 
 - Same content catalogs as the configured host
 - Hosted account-sync install path
+- Primary install should use the `stremio://www.pvtkrrx.cc/{token}/manifest.json?mode=hosted` deep link
+- Plain `https://www.pvtkrrx.cc/{token}/manifest.json?mode=hosted` is manual fallback only when Stremio explicitly asks for an addon URL
 - Hosted-to-local redirect when the pair heartbeat is online
 
 ### Remote Seedbox

@@ -29,7 +29,7 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 PVTKRRX is one runtime with three install routes:
 
 - **PC Local** — Real same-PC addon for the Windows host running PVTKRRX. Installs from the copied `127.0.0.1` URL and exposes movies, TV, sports, and library on that machine.
-- **LAN Bridge** — Home-network route for your phone, TV, web, and Apple TV on the same Stremio account. Installs from the hosted LAN-pair URL and redirects back to the active host PC when paired.
+- **LAN Bridge** — Home-network route for your phone, TV, web, and Apple TV on the same Stremio account. Primary install uses the hosted `stremio://...` LAN Bridge link, while the plain hosted `https://.../manifest.json` value is manual fallback only if Stremio explicitly asks for an addon URL.
 - **Remote Seedbox** — Public HTTPS route for away-from-home or seedbox-first playback. Requires public qBittorrent, Prowlarr, and file serving endpoints, and is ready-file-first on the hosted relay unless you self-host playback support.
 
 See [docs/CURRENT_DESIGN.md](docs/CURRENT_DESIGN.md) for the canonical current design, [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) for the route model, and [docs/STREMIO_INSTALL_TRACKER.md](docs/STREMIO_INSTALL_TRACKER.md) for current client install behavior.
@@ -69,6 +69,7 @@ The February 2026 planning docs under `docs/` are kept as project history and ar
 Visit **[www.pvtkrrx.cc](https://www.pvtkrrx.cc)** to configure your addon in 60 seconds.
 Use the canonical hosted base only: `https://www.pvtkrrx.cc`.
 Hosted install links should resolve under `https://www.pvtkrrx.cc/{token}/manifest.json?...`.
+For `LAN Bridge`, the primary install action should start with `stremio://`; the hosted HTTPS manifest is manual fallback only when Stremio shows an `Add Addon URL` box.
 
 ### Self-Host (Free)
 

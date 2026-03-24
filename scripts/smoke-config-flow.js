@@ -133,6 +133,8 @@ async function run() {
     assert.match(configureHtml, /<h2>Addon URL<\/h2>/, 'configure page should render addon url section')
     assert.match(configureHtml, /id="installActionBtn"/, 'configure page should render install action button')
     assert.match(configureHtml, /Copy Addon URL/, 'configure page should render a primary addon url copy action')
+    assert.match(configureHtml, /Copy Stremio Install Link/, 'configure page should render a dedicated Stremio install link copy action for LAN Bridge')
+    assert.match(configureHtml, /primary install link should start with stremio:\/\//i, 'configure page should explain that the primary LAN Bridge install link must start with stremio://')
     assert.match(configureHtml, /Copy PC Local URL/, 'configure page should render same-PC local install action')
     assert.match(configureHtml, /testConnection\(\)/, 'configure page should expose test connection action')
     assert.match(configureHtml, /Auto Setup \(Home LAN\)/, 'configure page should render auto setup action')

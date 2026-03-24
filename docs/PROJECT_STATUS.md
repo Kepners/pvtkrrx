@@ -4,7 +4,7 @@ Updated: 2026-03-24
 
 ## Current Stage
 
-PVTKRRX is at **v1.1.8** — structured sports enrichment and the current security-hardening baseline are implemented and smoke-tested, but the final live-device/runtime acceptance pass is still pending.
+PVTKRRX is at **v1.1.9** — structured sports enrichment and the current security-hardening baseline are implemented and smoke-tested, but the final live-device/runtime acceptance pass is still pending.
 
 - Core addon flow (catalog, stream, playback, local config, encryption, desktop wrapper) is complete and shipping.
 - Current route model is `PC Local`, `LAN Bridge`, and `Remote Seedbox`.
@@ -80,6 +80,7 @@ PVTKRRX is at **v1.1.8** — structured sports enrichment and the current securi
    - hosted `Remote Seedbox` is explicitly not presented as a generic tracker-buffering path on the hosted site
    - hosted remote copy now states it is effectively ready-file / public-playback only unless the runtime can truly serve playback
    - auth-protected external file-server playback is flagged as needing real-device validation
+   - `LAN Bridge` primary install is the `stremio://` deep link; the hosted HTTPS manifest is fallback/manual only when Stremio explicitly asks for an addon URL
 
 ## Latest Automated Verification (2026-03-24)
 

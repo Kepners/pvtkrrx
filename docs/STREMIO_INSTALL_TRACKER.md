@@ -1,6 +1,6 @@
 # Stremio Install Protocol Tracker (Truth Table)
 
-Updated: 2026-03-22
+Updated: 2026-03-24
 
 ## Why this file exists
 We keep this as a single source of truth so we stop repeating failed install patterns.
@@ -55,7 +55,8 @@ Link: https://github.com/Stremio/stremio-addon-client
    - Real same-PC addon for movies, TV, sports, and library
 2. Hosted LAN pair mode (phone/TV/account-sync on same LAN as host PC):
    - `LAN Bridge`
-   - Install Method 4 URL from configure page (hosted token with `lanPair*` fields).
+   - Primary install link should be `stremio://www.pvtkrrx.cc/{token}/manifest.json?mode=hosted`.
+   - The plain `https://www.pvtkrrx.cc/{token}/manifest.json?mode=hosted` value is manual fallback only when Stremio explicitly shows an `Add Addon URL` box.
    - Desktop app sends silent relay heartbeat every ~30s.
    - Hosted requests 307-redirect to active LAN endpoint when pair is online.
    - Pair status responses are metadata-minimized (no LAN endpoint list).
@@ -72,7 +73,9 @@ See also: `docs/ROUTE_FRAMEWORK.md`
   - `Copy PC Local URL` for same-PC install via `127.0.0.1`
 - LAN configure page now exposes:
   - `Install Or Refresh LAN Bridge In Stremio` for same-account sync installs on desktop/web before phone/TV pickup
+  - `Copy Stremio Install Link` as the primary LAN Bridge artifact
   - `Copy Hosted Manifest URL` / `Copy Hosted Stremio URL` for direct phone/TV install
+- LAN Bridge primary install must start with `stremio://`; the hosted HTTPS manifest is fallback/manual only.
 - `PC Local` is explicitly documented as desktop-host-only and should not be treated as the phone/TV addon.
 - `PC Local` now remains a full same-PC addon route instead of a helper-only manifest.
 - Heartbeat/AuthKey/account linking stay on Method 4 hosted LAN-pair installs only.

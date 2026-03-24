@@ -1319,12 +1319,12 @@
             <button class="btn-install" type="button" id="quickInstallLanBtn" onclick="triggerLanInstall()" disabled>Install Or Refresh LAN Bridge In Stremio</button>
           </div>
           <div class="quick-addon-url">
-            <div class="install-section-title">Paste This URL Into Stremio</div>
+            <div class="install-section-title">Primary Stremio Install Link</div>
             <div class="url-row">
-              <input type="text" id="quickAddonUrlValue" readonly placeholder="Run Auto Setup first to generate the LAN Bridge addon URL">
-              <button class="btn-copy" type="button" id="quickCopyAddonUrlBtn" onclick="copyCurrentAddonUrl(this)">Copy Addon URL</button>
+              <input type="text" id="quickAddonUrlValue" readonly placeholder="Run Auto Setup first to generate the stremio:// LAN Bridge install link">
+              <button class="btn-copy" type="button" id="quickCopyAddonUrlBtn" onclick="copyCurrentQuickInstallUrl(this)">Copy Stremio Install Link</button>
             </div>
-            <p class="quick-step-note" id="quickAddonUrlNote">If Stremio shows an Add Addon URL box, paste the HTTPS LAN Bridge URL here.</p>
+            <p class="quick-step-note" id="quickAddonUrlNote">This primary install link should start with stremio://. Only use the HTTPS addon URL below if Stremio explicitly asks for Add Addon URL.</p>
           </div>
           <p class="quick-step-note" id="quickSetupHint">Auto Setup also checks Prowlarr, qBittorrent, local storage, and the signed-in Stremio session on this PC. If Stremio already has an older LAN Bridge URL, clicking Install again refreshes it.</p>
         </section>
@@ -1465,7 +1465,7 @@
 
     <div class="card" id="installActionsCard">
       <h2>Addon URL</h2>
-      <p class="section-lead" id="installActionLead">Generate one addon URL for the selected route. If Stremio asks for an addon URL, paste the URL shown here.</p>
+      <p class="section-lead" id="installActionLead">Generate the install links for the selected route. If Stremio explicitly asks for an addon URL, use the manual HTTPS fallback shown here.</p>
       <div id="testStatus" class="status"></div>
       <button class="btn-test" onclick="testConnection()">Test Connection</button>
 
@@ -1474,13 +1474,13 @@
 
       <div id="installLink" class="install-link">
         <div class="install-primary">
-          <p class="install-section-title" id="addonUrlTitle">Addon URL For Stremio</p>
-          <p class="install-note" id="addonUrlLead">If Stremio asks for an addon URL, paste this exact URL.</p>
+          <p class="install-section-title" id="addonUrlTitle">Manual Addon URL For Stremio</p>
+          <p class="install-note" id="addonUrlLead">Only use this if Stremio explicitly asks for an Add Addon URL value.</p>
           <div class="url-row">
             <input type="text" id="addonUrlDisplay" readonly placeholder="Click the button above to generate the addon URL for the selected route.">
             <button class="btn-copy" id="copyAddonUrlBtn" onclick="copyCurrentAddonUrl(this)">Copy Addon URL</button>
           </div>
-          <p class="install-note" id="addonUrlHint">PC Local uses the loopback URL on this Windows machine. LAN Bridge and Remote Seedbox use hosted HTTPS manifest URLs.</p>
+          <p class="install-note" id="addonUrlHint">PC Local uses the loopback URL on this Windows machine. For hosted routes, the primary install action is the stremio:// link; this HTTPS manifest is the manual fallback.</p>
         </div>
 
         <div id="localInstall">
@@ -2587,6 +2587,12 @@
       return '';
     }
 
+    function getCurrentQuickInstallUrl(target = getInstallTarget()) {
+      if (target === 'lan') return String(privateInstallLinks.pairHostedStremio || '').trim();
+      if (target === 'seedbox') return String(privateInstallLinks.hostedStremio || '').trim();
+      return '';
+    }
+
     function getCurrentAddonUiCopy(target = getInstallTarget()) {
       if (target === 'pc') {
         return {
@@ -2605,10 +2611,10 @@
         };
       }
       return {
-        title: 'LAN Bridge Addon URL',
-        lead: 'If Stremio asks for an addon URL, paste this HTTPS URL.',
-        hint: 'LAN Bridge is the normal home-device route. This HTTPS manifest URL is the one plain value to paste into Stremio manually.',
-        placeholder: 'Run Auto Setup or Save And Generate to create the LAN Bridge addon URL.'
+        title: 'LAN Bridge Manual Addon URL',
+        lead: 'Only use this HTTPS URL if Stremio explicitly asks for Add Addon URL.',
+        hint: 'LAN Bridge primary install should use the stremio:// link in Step 3. This HTTPS manifest is fallback/manual only.',
+        placeholder: 'Run Auto Setup or Save And Generate to create the LAN Bridge HTTPS fallback URL.'
       };
     }
 
@@ -2662,27 +2668,32 @@
       }
       if (addonCopyBtn) addonCopyBtn.disabled = !value;
 
+      const quickValue = getCurrentQuickInstallUrl(target);
       const quickAddonValue = document.getElementById('quickAddonUrlValue');
       const quickAddonNote = document.getElementById('quickAddonUrlNote');
       const quickAddonCopyBtn = document.getElementById('quickCopyAddonUrlBtn');
       if (quickAddonValue) {
-        quickAddonValue.value = target === 'lan' ? value : '';
-        quickAddonValue.placeholder = 'Run Auto Setup first to generate the LAN Bridge addon URL';
+        quickAddonValue.value = target === 'lan' ? quickValue : '';
+        quickAddonValue.placeholder = 'Run Auto Setup first to generate the stremio:// LAN Bridge install link';
       }
       if (quickAddonCopyBtn) {
-        quickAddonCopyBtn.disabled = !(target === 'lan' && value);
+        quickAddonCopyBtn.disabled = !(target === 'lan' && quickValue);
       }
       if (quickAddonNote) {
         quickAddonNote.textContent = target === 'lan'
-          ? (value
-              ? 'If Stremio shows an Add Addon URL box, paste the HTTPS LAN Bridge URL above.'
-              : 'Run Auto Setup first to generate the HTTPS LAN Bridge URL.')
+          ? (quickValue
+              ? 'This primary install link should start with stremio://. Only use the manual HTTPS addon URL below if Stremio explicitly asks for Add Addon URL.'
+              : 'Run Auto Setup first to generate the stremio:// LAN Bridge install link. The HTTPS addon URL below is fallback only.')
           : 'LAN Bridge is the home-device route when you want one addon across your home network.';
       }
     }
 
     async function copyCurrentAddonUrl(btn) {
       await copyTextValue(getCurrentAddonUrl(), btn);
+    }
+
+    async function copyCurrentQuickInstallUrl(btn) {
+      await copyTextValue(getCurrentQuickInstallUrl(), btn);
     }
 
     function clearLanPairInstallFields() {
@@ -2942,8 +2953,8 @@
         if (installActionBtn) installActionBtn.textContent = 'Save And Generate PC Local URL';
         if (connectionSectionLead) connectionSectionLead.textContent = 'Home mode uses built-in local file serving. Use the Storage tab if completed files may live on NAS shares or extra drives.';
       } else if (target === 'lan') {
-        if (installActionLead) installActionLead.textContent = 'Generate one LAN Bridge addon URL. If Stremio asks for an addon URL, paste the HTTPS URL shown here.';
-        if (installActionBtn) installActionBtn.textContent = 'Save And Generate LAN Bridge URL';
+        if (installActionLead) installActionLead.textContent = 'Generate the LAN Bridge Stremio install link plus the manual HTTPS fallback URL. The main install should start with stremio://.';
+        if (installActionBtn) installActionBtn.textContent = 'Save And Generate LAN Bridge Links';
         if (connectionSectionLead) connectionSectionLead.textContent = 'Home LAN mode uses built-in local file serving. Storage roots can point at NAS shares or extra HDD folders the Windows host can already read.';
       } else {
         if (installActionLead) installActionLead.textContent = 'Generate the Remote Seedbox addon URL for Stremio. This route is separate from LAN Bridge and uses the hosted HTTPS manifest.';
