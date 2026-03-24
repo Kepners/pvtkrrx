@@ -1550,6 +1550,10 @@
     const routeParity = window.PVTKRRXRouteParity;
     const defaultLocalHostname = 'pvtkrrx.local';
     const defaultLanPairRelayUrl = 'https://www.pvtkrrx.cc';
+    const legacyRelayHosts = new Set([
+      'pvtkrrx.vercel.app',
+      'www.pvtkrrx.vercel.app'
+    ]);
     let activeLocalHostname = defaultLocalHostname;
     let activeInstallTarget = 'lan';
     let activeServiceTab = 'prowlarr';
@@ -1851,6 +1855,7 @@
       try {
         const url = new URL(text);
         if (url.protocol !== 'http:' && url.protocol !== 'https:') return fallback;
+        if (legacyRelayHosts.has(String(url.host || '').toLowerCase())) return defaultLanPairRelayUrl;
         return `${url.protocol}//${url.host}`;
       } catch (_) {
         return fallback;

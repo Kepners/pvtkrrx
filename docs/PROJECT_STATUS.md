@@ -4,7 +4,7 @@ Updated: 2026-03-24
 
 ## Current Stage
 
-PVTKRRX is at **v1.1.7** — structured sports enrichment and the current security-hardening baseline are implemented and smoke-tested, but the final live-device/runtime acceptance pass is still pending.
+PVTKRRX is at **v1.1.8** — structured sports enrichment and the current security-hardening baseline are implemented and smoke-tested, but the final live-device/runtime acceptance pass is still pending.
 
 - Core addon flow (catalog, stream, playback, local config, encryption, desktop wrapper) is complete and shipping.
 - Current route model is `PC Local`, `LAN Bridge`, and `Remote Seedbox`.
