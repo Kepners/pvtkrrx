@@ -2190,12 +2190,59 @@ app.get('/network-info', requireLocalNetworkRoute, (req, res) => {
   })
 })
 
-// LAN token minting derives a local install token from saved local secrets, so keep it
-// same-host-only in addition to the configure page's double-submit CSRF requirement.
-app.post('/local/lan-token', requireLocalNetworkRoute, requireCsrfToken, async (req, res) => {
-  const secret = String(process.env.ENCRYPTION_SECRET || '').trim()
-  if (!secret) return res.status(500).json({ error: 'ENCRYPTION_SECRET not configured' })
+async function mintHostedConfigToken(relayUrl, payload) {
+  const relayBase = normalizeRelayUrl(relayUrl)
+  const target = `${relayBase}/encrypt`
 
+  let response
+  try {
+    response = await fetch(target, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'User-Agent': 'PVTKRRX-local-runtime'
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15000)
+    })
+  } catch (err) {
+    const wrapped = new Error(`Hosted relay token request failed: ${err.message}`)
+    wrapped.statusCode = 502
+    throw wrapped
+  }
+
+  const raw = await response.text()
+  let data = {}
+  if (raw) {
+    try {
+      data = JSON.parse(raw)
+    } catch (_) {
+      data = { error: raw.slice(0, 300) }
+    }
+  }
+
+  if (!response.ok) {
+    const wrapped = new Error(String(data.error || `Hosted relay token request failed (${response.status})`))
+    wrapped.statusCode = response.status >= 500 ? 502 : response.status
+    throw wrapped
+  }
+
+  const token = String(data.token || '').trim()
+  if (!token) {
+    const wrapped = new Error('Hosted relay token response missing token')
+    wrapped.statusCode = 502
+    throw wrapped
+  }
+
+  return {
+    relayBase,
+    token
+  }
+}
+
+// LAN Bridge is a hosted route, so the same-host helper must ask the relay to mint
+// the token with the relay's secret instead of encrypting it with the local runtime secret.
+app.post('/local/lan-token', requireLocalNetworkRoute, requireCsrfToken, async (req, res) => {
   const localConfig = loadLocalConfigFile()
   if (!localConfig) return res.status(404).json({ error: 'Local config not saved yet' })
 
@@ -2211,16 +2258,16 @@ app.post('/local/lan-token', requireLocalNetworkRoute, requireCsrfToken, async (
       return res.status(400).json({ error: 'LAN Bridge is not configured yet' })
     }
 
-    const token = encrypt(normalized, secret)
+    const hosted = await mintHostedConfigToken(normalized.lanPairRelayUrl || '', normalized)
     res.setHeader('Cache-Control', 'no-store')
     res.json({
       ok: true,
-      token,
+      token: hosted.token,
       lanPairId: pairId,
-      lanPairRelayUrl: normalizeRelayUrl(normalized.lanPairRelayUrl || '')
+      lanPairRelayUrl: hosted.relayBase
     })
   } catch (err) {
-    res.status(500).json({ error: 'Failed to build LAN token', detail: err.message })
+    res.status(Number(err?.statusCode || 500)).json({ error: 'Failed to build LAN token', detail: err.message })
   }
 })
 

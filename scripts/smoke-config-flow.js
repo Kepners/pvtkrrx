@@ -9,7 +9,10 @@ const { decrypt, encrypt } = require('../src/utils/crypto')
 const { buildLocalModeUrls } = require('../src/utils/localInstallUrls')
 const { DEFAULT_PAIR_RELAY_URL, normalizeRelayUrl } = require('../src/utils/relayUrl')
 
-process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'local-smoke-secret-12345678901234567890'
+const LOCAL_SMOKE_SECRET = 'local-smoke-secret-12345678901234567890'
+const RELAY_SMOKE_SECRET = 'relay-smoke-secret-12345678901234567890'
+
+process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || LOCAL_SMOKE_SECRET
 const LINKED_STREMIO_USER_ID = 'stremio_user_abc123'
 
 function derivePairIdFromStremioUserId(stremioUserId) {
@@ -64,6 +67,7 @@ async function run() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-auth-scan-'))
   const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-config-flow-'))
   const localConfigPath = path.join(runtimeDir, 'local-config.json')
+  const relayEncryptBodies = []
   const scanDir = path.join(tempRoot, 'leveldb')
   fs.mkdirSync(scanDir, { recursive: true })
   fs.writeFileSync(
@@ -71,6 +75,28 @@ async function run() {
     `)_https://web.stremio.com\u0001profile\u0001{"auth":{"key":"${sampleDetectedAuthKey}"},"user":{"_id":"${LINKED_STREMIO_USER_ID}","email":"linked@example.com"}}`,
     'utf8'
   )
+
+  const relayServer = http.createServer((req, res) => {
+    if (req.method !== 'POST' || req.url !== '/encrypt') {
+      res.statusCode = 404
+      return res.end('not found')
+    }
+
+    let body = ''
+    req.setEncoding('utf8')
+    req.on('data', chunk => { body += chunk })
+    req.on('end', () => {
+      const parsed = body ? JSON.parse(body) : {}
+      relayEncryptBodies.push(parsed)
+      res.statusCode = 200
+      res.setHeader('Content-Type', 'application/json')
+      res.end(JSON.stringify({
+        token: encrypt(parsed, RELAY_SMOKE_SECRET)
+      }))
+    })
+  })
+  await new Promise(resolve => relayServer.listen(0, '127.0.0.1', resolve))
+  const relayBase = `http://127.0.0.1:${relayServer.address().port}`
 
   const stremioApiServer = http.createServer((req, res) => {
     if (req.method !== 'POST' || req.url !== '/api/getUser') {
@@ -245,6 +271,7 @@ async function run() {
       body: JSON.stringify({
         ...sampleConfig,
         stremioUserId: LINKED_STREMIO_USER_ID,
+        lanPairRelayUrl: relayBase,
         lanPairId: '',
         lanPairKey: ''
       })
@@ -285,12 +312,20 @@ async function run() {
     const localLanTokenPayload = await localLanTokenRes.json()
     assert.equal(Boolean(localLanTokenPayload?.ok), true)
     assert.equal(localLanTokenPayload?.lanPairId, expectedLinkedPairId)
+    assert.equal(localLanTokenPayload?.lanPairRelayUrl, relayBase)
     assert.equal(localLanTokenPayload?.lanPairKey, undefined, 'local lan token helper should not expose pair key')
-    const lanBridgeTokenConfig = decrypt(localLanTokenPayload.token, process.env.ENCRYPTION_SECRET)
+    assert.ok(relayEncryptBodies.length >= 1, 'local lan token helper should ask the relay to mint the hosted token')
+    const relayEncryptPayload = relayEncryptBodies.at(-1)
+    assert.equal(String(relayEncryptPayload.jackettApiKey || ''), sampleConfig.jackettApiKey, 'relay mint should include saved jackett api key from local config')
+    assert.equal(String(relayEncryptPayload.qbitUsername || ''), sampleConfig.qbitUsername, 'relay mint should include saved qBit username from local config')
+    assert.equal(String(relayEncryptPayload.qbitPassword || ''), sampleConfig.qbitPassword, 'relay mint should include saved qBit password from local config')
+    assert.equal(String(relayEncryptPayload.lanPairRelayUrl || ''), relayBase, 'relay mint should target the configured relay')
+    assert.throws(() => decrypt(localLanTokenPayload.token, LOCAL_SMOKE_SECRET), 'LAN Bridge token should no longer be encrypted with the local runtime secret')
+    const lanBridgeTokenConfig = decrypt(localLanTokenPayload.token, RELAY_SMOKE_SECRET)
     assert.equal(String(lanBridgeTokenConfig.lanPairId || ''), expectedLinkedPairId, 'LAN Bridge token should retain pair id')
     assert.equal(Boolean(String(lanBridgeTokenConfig.lanPairKey || '').trim()), true, 'LAN Bridge token should retain pair key')
     assert.equal(String(lanBridgeTokenConfig.localHostname || ''), 'pvtkrrx.local', 'LAN Bridge token should retain local hostname for the paired host')
-    assert.equal(Boolean(String(lanBridgeTokenConfig.lanPairRelayUrl || '').trim()), true, 'LAN Bridge token should retain relay URL')
+    assert.equal(String(lanBridgeTokenConfig.lanPairRelayUrl || ''), relayBase, 'LAN Bridge token should retain relay URL')
 
     const localLanTokenBadOriginRes = await fetch(`${base}/local/lan-token`, {
       method: 'POST',
@@ -515,6 +550,7 @@ async function run() {
     console.log(`Install link format: ${installLink}`)
   } finally {
     server.close()
+    relayServer.close()
     stremioApiServer.close()
     try {
       fs.rmSync(tempRoot, { recursive: true, force: true })

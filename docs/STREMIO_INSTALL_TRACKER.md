@@ -76,6 +76,7 @@ See also: `docs/ROUTE_FRAMEWORK.md`
   - `Copy Stremio Install Link` as the primary LAN Bridge artifact
   - `Copy Hosted Manifest URL` / `Copy Hosted Stremio URL` for direct phone/TV install
 - LAN Bridge primary install must start with `stremio://`; the hosted HTTPS manifest is fallback/manual only.
+- Hosted LAN Bridge tokens must be minted by the hosted relay, not encrypted locally on the Windows host runtime. If the desktop falls back to its own local secret and encrypts the hosted token itself, the hosted manifest fetch will fail with `400 Invalid config token`.
 - `PC Local` is explicitly documented as desktop-host-only and should not be treated as the phone/TV addon.
 - `PC Local` now remains a full same-PC addon route instead of a helper-only manifest.
 - Heartbeat/AuthKey/account linking stay on Method 4 hosted LAN-pair installs only.
