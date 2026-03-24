@@ -30,7 +30,26 @@
       "Bash(python -c \"import tkinter; print\\(''tkinter: OK''\\)\")",
       "Bash(netstat -ano)",
       "Bash(findstr \":7000\")",
-      "Bash(grep -E \"\\\\.js$\")"
+      "Bash(grep -E \"\\\\.js$\")",
+      "Bash(find /c/Users/kepne/OneDrive/Documents/GitHub/pvtkrrx/src -name \"*.js\" -type f ! -path \"*/node_modules/*\" -exec grep -H \"require\\\\|import\" {})",
+      "Bash(grep -v \"^[^:]*:\\\\s*//\")",
+      "Bash(echo \"=== Checking localStorageRoots ===\" grep \"buildLocalFileCandidates\\\\|hasAccessibleLocalFile\" /c/Users/kepne/OneDrive/Documents/GitHub/pvtkrrx/src --include=\"*.js\" -r --exclude-dir=node_modules)",
+      "Bash(__NEW_LINE_a5c475edb0f5c28c__ cd:*)",
+      "Bash(do grep:*)",
+      "Bash(grep -r $func . --exclude-dir=node_modules --exclude-dir=website --include=*.js)",
+      "Bash(grep -v \"^.*:function $func\\\\|^.*:const $func = \")",
+      "Bash(__NEW_LINE_92fbfda72c302e37__ grep:*)",
+      "Bash(__NEW_LINE_af2bdf8355fe3a10__ grep:*)",
+      "Bash(__NEW_LINE_142fab35b305b6ed__ grep:*)",
+      "Bash(__NEW_LINE_d9029791b728308d__ grep:*)",
+      "Bash(__NEW_LINE_96ecb4ef2b0d441e__ cd:*)",
+      "Bash(__NEW_LINE_a4c49cac2d6eedd0__ grep:*)",
+      "Bash(__NEW_LINE_012a75445236592d__ grep:*)",
+      "Bash(__NEW_LINE_ab960ce7c700c457__ grep:*)",
+      "Bash(__NEW_LINE_f48bde95228338f8__ grep:*)",
+      "Bash(__NEW_LINE_b1626abc35603c11__ grep:*)",
+      "Bash(grep -l \"^module.exports\" src/utils/*.js)",
+      "Bash(done)"
     ],
     "additionalDirectories": [
       "C:\\Users\\kepne\\AppData\\Local\\Temp\\aws-api-mcp\\workdir"
