@@ -28,11 +28,26 @@ function compactSportsPayload(payload = {}) {
   return compact
 }
 
+function compactLibraryPayload(payload = {}) {
+  const compact = {
+    y: String(payload.y || 'movie').trim() || 'movie',
+    t: String(payload.t || '').trim(),
+    n: String(payload.n || payload.t || '').trim(),
+    h: String(payload.h || '').trim(),
+    s: Number(payload.s || 0) || 0,
+    d: Number(payload.d || 0) || 0
+  }
+
+  const imdbId = String(payload.m || '').trim()
+  if (imdbId) compact.m = imdbId
+  return compact
+}
+
 function encodeCustomId(payload = {}, options = {}) {
   const compactMode = String(options.compact || '').trim().toLowerCase()
-  const normalized = compactMode === 'sports'
-    ? compactSportsPayload(payload)
-    : payload
+  let normalized = payload
+  if (compactMode === 'sports') normalized = compactSportsPayload(payload)
+  else if (compactMode === 'library') normalized = compactLibraryPayload(payload)
   const raw = Buffer.from(JSON.stringify(normalized), 'utf8')
 
   if (options.compress === true) {

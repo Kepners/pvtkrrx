@@ -803,6 +803,9 @@ async function libraryCatalog(config, extra) {
         m: imdbId,
         a: poster,
         b: background
+      }, {
+        compress: true,
+        compact: 'library'
       }),
       type: resolvedType,
       name: displayName,

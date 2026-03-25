@@ -140,11 +140,63 @@ async function testOrderAgnosticSportsGrouping() {
   )
 }
 
+async function testLibraryCustomIdsStayCompact() {
+  class FakeQBitClient {
+    async torrents(scope) {
+      assert.equal(scope, 'completed')
+      return [
+        {
+          name: 'UFC.Fight.Night.267.Strickland.vs.Hernandez.Prelims.1080p.WEB.h264-VERUM',
+          hash: '6cd321a1334efb29eb8f4fc077adca70ce24cbb1',
+          size: 8_110_701_419,
+          completion_on: 1
+        }
+      ]
+    }
+  }
+
+  class FakeCinemetaClient {
+    async searchMovies() {
+      return [{
+        id: 'tt7512512',
+        imdb_id: 'tt7512512',
+        type: 'movie',
+        name: 'UFC Fight Night: Poirier vs. Pettis',
+        poster: 'https://images.metahub.space/poster/small/tt7512512/img',
+        background: 'https://images.metahub.space/background/medium/tt7512512/img'
+      }]
+    }
+  }
+
+  const { handleCatalog } = loadCatalogWithStubs({
+    '../clients/qbittorrent': { QBitClient: FakeQBitClient },
+    '../clients/cinemeta': { CinemetaClient: FakeCinemetaClient }
+  })
+
+  const result = await handleCatalog(
+    {
+      qbitUrl: 'http://127.0.0.1:8080',
+      maxResults: '10'
+    },
+    'movie',
+    'pvtkrrx-library',
+    '',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  )
+
+  assert.equal(result.metas.length, 1, 'expected one library meta')
+  assert.ok(result.metas[0].id.length < 256, 'expected library custom id to stay under common Stremio client limits')
+  const decoded = decodeCustomId(result.metas[0].id)
+  assert.equal(decoded.h, '6cd321a1334efb29eb8f4fc077adca70ce24cbb1')
+  assert.equal(decoded.m, 'tt7512512')
+}
+
 async function main() {
   try {
     testParserAndLeagueMap()
     await testStructuredFallbackToFuzzyLookup()
     await testOrderAgnosticSportsGrouping()
+    await testLibraryCustomIdsStayCompact()
     console.log('Smoke sports structured flow passed')
   } finally {
     fs.rmSync(runtimeDir, { recursive: true, force: true })
