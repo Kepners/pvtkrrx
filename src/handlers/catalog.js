@@ -473,6 +473,31 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
     items = [...byKey.values()]
   }
 
+  // Fallback: many indexers don't support empty-query text search — try
+  // tvsearch browse (Torznab browse mode) then seed with popular sport terms
+  if (items.length === 0 && !query) {
+    const browseItems = await cachedProwlarrSearch(
+      config, torznab, '', SPORT_CATS, 'tvsearch', { useCategories: true }
+    )
+    if (browseItems.length > 0) {
+      items = browseItems
+    } else {
+      const SEED_TERMS = ['UFC', 'Premier League', 'F1', 'NBA', 'WWE', 'Boxing']
+      const seedBatches = await Promise.all(
+        SEED_TERMS.map(term => cachedProwlarrSearch(config, torznab, term, SPORT_CATS))
+      )
+      const byKey = new Map()
+      for (const batch of seedBatches) {
+        for (const item of batch) {
+          const key = `${String(item?.indexer || '').trim().toLowerCase()}|${String(item?.title || '').trim().toLowerCase()}`
+          if (!key || byKey.has(key)) continue
+          byKey.set(key, item)
+        }
+      }
+      items = [...byKey.values()]
+    }
+  }
+
   const requestedSportHint = resolveSportHint({ explicitHint: extra.genre })
   const normalizedItems = items.map(item => {
     const parsedSportsEvent = parseSportsTitle(item?.title || '')
@@ -494,13 +519,18 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
     !isLikelyPackedReleaseTitle(item.title)
   )
   let filtered = strictFiltered
-  if (filtered.length < Math.min(12, limit) && String(extra.search || '').trim()) {
+  if (filtered.length < Math.min(12, limit)) {
+    // Strict event-title filter left too few results — relax to sport-hint +
+    // noise rejection so the catalog isn't empty on default browse or sparse
+    // genre/search results
     filtered = normalizedItems.filter(item =>
       (isSportsOnlyIndexer(item.indexer) || Boolean(item.sportHint)) &&
       !isSportsNoiseTitle(item.title) &&
       !isLikelyPackedReleaseTitle(item.title)
     )
   }
+  console.log(`[sports-catalog] query="${query}" prowlarr=${items.length} normalized=${normalizedItems.length} strict=${strictFiltered.length} filtered=${filtered.length}`)
+
   const grouped = groupSportsItems(filtered.sort((a, b) => compareItems(a, b, query)), query)
 
   const skip = parseInt(extra.skip || '0', 10)
