@@ -7,6 +7,7 @@ const os = require('node:os')
 const path = require('node:path')
 const { decrypt, encrypt } = require('../src/utils/crypto')
 const { buildLocalModeUrls } = require('../src/utils/localInstallUrls')
+const { loadSecureJsonFile } = require('../src/utils/secureJsonFile')
 const { DEFAULT_PAIR_RELAY_URL, normalizeRelayUrl } = require('../src/utils/relayUrl')
 
 const LOCAL_SMOKE_SECRET = 'local-smoke-secret-12345678901234567890'
@@ -63,6 +64,14 @@ function withCsrf(csrf, headers = {}) {
 }
 
 async function run() {
+  const provisionModule = require('../src/utils/provision')
+  const originalDiscoverProwlarrConfig = provisionModule.discoverProwlarrConfig
+  provisionModule.discoverProwlarrConfig = async () => ({
+    installed: true,
+    running: true,
+    url: 'http://127.0.0.1:9696',
+    apiKey: 'recovered-prowlarr-key'
+  })
   const sampleDetectedAuthKey = 'stremioLocalAuthKey1234567890='
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-auth-scan-'))
   const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-config-flow-'))
@@ -259,6 +268,22 @@ async function run() {
     assert.equal(Boolean(localConfig.savedSecrets?.qbitUsername), true)
     assert.equal(Boolean(localConfig.savedSecrets?.qbitPassword), true)
 
+    const localRepairSaveRes = await fetch(`${base}/local-config`, {
+      method: 'POST',
+      headers: withCsrf(csrf, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        ...sampleConfig,
+        jackettApiKey: ''
+      })
+    })
+    assert.equal(localRepairSaveRes.status, 200, 'POST /local-config should allow a blank local Prowlarr key for repair testing')
+    const localRepairConfigRes = await fetch(`${base}/local/config.json`)
+    assert.equal(localRepairConfigRes.status, 200, 'GET /local/config.json should trigger local Prowlarr repair when the key is missing')
+    const localRepairConfig = await localRepairConfigRes.json()
+    assert.equal(Boolean(localRepairConfig.savedSecrets?.jackettApiKey), true, 'local config repair should restore the saved Prowlarr API key')
+    const repairedLocalConfig = loadSecureJsonFile(localConfigPath, { defaultValue: null })
+    assert.equal(repairedLocalConfig?.jackettApiKey, 'recovered-prowlarr-key', 'local config repair should persist the discovered Prowlarr API key')
+
     const evilLocalConfigRes = await fetch(`${base}/local/config.json`, {
       headers: { Origin: 'https://evil.example' }
     })
@@ -382,11 +407,11 @@ async function run() {
     assert.equal(localManifest.id, 'com.kepners.pvtkrrx.local')
     assert.equal(localManifest.name, 'PVTKRRX (PC Local)')
     assert.equal(localManifest.behaviorHints?.configurationRequired, false)
-    assert.ok(Array.isArray(localManifest.types) && localManifest.types.includes('sports'), 'local manifest should expose sports as a top-level type')
-    assert.ok(Array.isArray(localManifest.catalogs) && localManifest.catalogs.some((catalog) => catalog?.id === 'pvtkrrx-sports' && catalog?.type === 'sports'), 'local manifest should expose the sports catalog')
+    assert.deepEqual(localManifest.types, ['movie', 'series', 'tv'], 'local manifest should keep the legacy Stremio type contract')
+    assert.ok(Array.isArray(localManifest.catalogs) && localManifest.catalogs.some((catalog) => catalog?.id === 'pvtkrrx-sports' && catalog?.type === 'movie'), 'local manifest should expose sports through the legacy movie catalog contract')
 
-    const localSportsCatalogRes = await fetch(`${base}/local/catalog/sports/pvtkrrx-sports.json?mode=local`)
-    assert.equal(localSportsCatalogRes.status, 200, 'GET /local/catalog/sports/pvtkrrx-sports.json should return 200')
+    const localSportsCatalogRes = await fetch(`${base}/local/catalog/movie/pvtkrrx-sports.json?mode=local`)
+    assert.equal(localSportsCatalogRes.status, 200, 'GET /local/catalog/movie/pvtkrrx-sports.json should return 200')
     const localSportsCatalog = await localSportsCatalogRes.json()
     assert.ok(Array.isArray(localSportsCatalog.metas), 'sports catalog should return metas array')
 
@@ -492,9 +517,9 @@ async function run() {
     assert.equal(tokenManifest.id, 'com.kepners.pvtkrrx.online')
     assert.equal(tokenManifest.behaviorHints?.configurable, true)
     assert.equal(tokenManifest.behaviorHints?.configurationRequired, false)
-    assert.ok(Array.isArray(tokenManifest.types) && tokenManifest.types.includes('sports'), 'hosted manifest should expose sports as a top-level type')
-    assert.ok(tokenManifest.resources?.some((resource) => resource?.name === 'stream' && Array.isArray(resource.types) && resource.types.includes('sports')), 'hosted manifest stream resource should support sports')
-    assert.ok(tokenManifest.catalogs?.some((catalog) => catalog?.id === 'pvtkrrx-sports' && catalog?.type === 'sports'), 'hosted manifest should register sports as a top-level catalog')
+    assert.deepEqual(tokenManifest.types, ['movie', 'series', 'tv'], 'hosted manifest should keep the legacy Stremio type contract')
+    assert.ok(tokenManifest.resources?.some((resource) => resource?.name === 'stream' && Array.isArray(resource.types) && !resource.types.includes('sports')), 'hosted manifest stream resource should keep sports behind the legacy movie contract')
+    assert.ok(tokenManifest.catalogs?.some((catalog) => catalog?.id === 'pvtkrrx-sports' && catalog?.type === 'movie'), 'hosted manifest should register sports through the legacy movie catalog contract')
 
     const tokenManifestLocalRes = await fetch(`${base}/${token}/manifest.json?mode=local`)
     assert.equal(tokenManifestLocalRes.status, 200, 'GET /:token/manifest.json?mode=local should return 200')
@@ -533,12 +558,16 @@ async function run() {
     const rootManifestRes = await fetch(`${base}/manifest.json`)
     assert.equal(rootManifestRes.status, 200, 'GET /manifest.json should return 200')
     const rootManifest = await rootManifestRes.json()
-    assert.equal(rootManifest.id, 'com.kepners.pvtkrrx.bootstrap')
-    assert.equal(rootManifest.name, 'PVTKRRX (Configure)')
-    assert.equal(rootManifest.behaviorHints?.configurationRequired, true)
-    assert.deepEqual(rootManifest.resources, [], 'root manifest should be an honest bootstrap placeholder')
-    assert.deepEqual(rootManifest.catalogs, [], 'root manifest should not claim route catalogs')
-    assert.match(String(rootManifest.description || ''), /bootstrap manifest only/i)
+    assert.equal(rootManifest.id, 'com.kepners.pvtkrrx.local')
+    assert.equal(rootManifest.name, 'PVTKRRX (PC Local)')
+    assert.ok(Array.isArray(rootManifest.catalogs) && rootManifest.catalogs.length > 0, 'root manifest should remain a real addon manifest')
+    assert.ok(rootManifest.catalogs.some((catalog) => catalog?.id === 'pvtkrrx-sports' && catalog?.type === 'movie'), 'root manifest should keep the legacy sports catalog contract')
+    const rootHostedManifestRes = await fetch(`${base}/manifest.json?mode=hosted`)
+    assert.equal(rootHostedManifestRes.status, 200, 'GET /manifest.json?mode=hosted should return 200')
+    const rootHostedManifest = await rootHostedManifestRes.json()
+    assert.equal(rootHostedManifest.id, 'com.kepners.pvtkrrx.online')
+    assert.equal(rootHostedManifest.name, 'PVTKRRX (Remote Seedbox)')
+    assert.ok(rootHostedManifest.catalogs.some((catalog) => catalog?.id === 'pvtkrrx-sports' && catalog?.type === 'movie'), 'hosted-mode root manifest should keep the legacy sports catalog contract')
 
     const persistedLocalConfig = fs.readFileSync(localConfigPath, 'utf8')
     assert.ok(persistedLocalConfig.includes('__pvtkrrxSecure'), 'local config should be stored using secure-json wrapper')
@@ -549,6 +578,7 @@ async function run() {
     console.log('Smoke config flow passed')
     console.log(`Install link format: ${installLink}`)
   } finally {
+    provisionModule.discoverProwlarrConfig = originalDiscoverProwlarrConfig
     server.close()
     relayServer.close()
     stremioApiServer.close()

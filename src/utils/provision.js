@@ -388,6 +388,25 @@ async function ensureProwlarrRunning(installIfMissing, startIfStopped, notes) {
   }
 }
 
+async function discoverProwlarrConfig() {
+  const hints = await getProwlarrHints()
+  const cfg = readFirstExisting([
+    ...normalizePathList(hints?.paths),
+    ...PROWLARR_CONFIG_PATHS
+  ])
+  const xml = cfg ? cfg.content : ''
+  const apiKey = parseXmlValue(xml, 'ApiKey')
+  const port = parseInt(parseXmlValue(xml, 'Port') || '9696', 10)
+  const url = `http://127.0.0.1:${Number.isFinite(port) ? port : 9696}`
+
+  return {
+    installed: Boolean(cfg || hints?.serviceExists || (hints?.exePaths || []).length),
+    running: Boolean(hints?.running),
+    url,
+    apiKey
+  }
+}
+
 async function ensureQbitRunning(installIfMissing, startIfStopped, configureLocalNoAuth, notes) {
   const hintsBefore = await getQbitHints()
   const iniCandidates = [
@@ -610,5 +629,6 @@ async function autoProvisionWindows(options = {}) {
 
 module.exports = {
   autoProvisionWindows,
-  ensureWindowsLanAccess
+  ensureWindowsLanAccess,
+  discoverProwlarrConfig
 }

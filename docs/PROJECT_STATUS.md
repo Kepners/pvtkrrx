@@ -14,7 +14,7 @@ PVTKRRX is at **v1.1.10** — structured sports enrichment and the current secur
 - The live architecture is documented in `docs/CURRENT_DESIGN.md` and `docs/ROUTE_FRAMEWORK.md`.
 - Implementation currently looks aligned with the live `PC Local` / `LAN Bridge` / `Remote Seedbox` design, but hosted auth/public playback behavior still needs proof on real clients and a real hosted deployment.
 - Status shorthand: implementation hardened, wording aligned, smoke locked, awaiting real client verification.
-- That remaining client pass matters because sports is a custom top-level Stremio type, sports/library items use internal `pvtkrrx:` ids, and PVTKRRX must own how those rows render on real Stremio clients instead of assuming Cinemeta or generic client behavior will smooth it over.
+- That remaining client pass matters because sports/library items use internal `pvtkrrx:` ids, and PVTKRRX must own how those rows render on real Stremio clients instead of assuming Cinemeta or generic client behavior will smooth it over.
 
 ## Status Summary
 

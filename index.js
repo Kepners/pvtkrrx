@@ -16,7 +16,7 @@ const { handleStream } = require('./src/handlers/stream')
 const { handleMeta } = require('./src/handlers/meta')
 const { ProwlarrClient } = require('./src/clients/prowlarr')
 const { QBitClient } = require('./src/clients/qbittorrent')
-const { autoProvisionWindows, ensureWindowsLanAccess } = require('./src/utils/provision')
+const { autoProvisionWindows, ensureWindowsLanAccess, discoverProwlarrConfig } = require('./src/utils/provision')
 const { getLanIpv4Addresses, normalizeLocalHostname, startLanAlias } = require('./src/utils/lanAlias')
 const { buildLocalModeUrls } = require('./src/utils/localInstallUrls')
 const { isBlockedPrivateTargetHost, isPrivateIpv4, isPrivateIpv6 } = require('./src/utils/privateTargetHosts')
@@ -168,6 +168,7 @@ const accountStore = new AccountStore({
 const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null
 let bootLanAccessPromise = null
 let localProviderWarmupPromise = null
+let localConfigRepairPromise = null
 
 function loadLocalConfigFile() {
   try {
@@ -203,6 +204,45 @@ function normalizeBaseUrl(input) {
   const value = String(input || '').trim().replace(/\/+$/, '')
   if (!value) return ''
   return value
+}
+
+function parseUrlCandidate(input) {
+  const value = String(input || '').trim()
+  if (!value) return null
+  try {
+    return new URL(value)
+  } catch (_) {
+    return null
+  }
+}
+
+function defaultPortForProtocol(protocol) {
+  return protocol === 'https:' ? '443' : '80'
+}
+
+function isLikelyLocalServiceUrl(input) {
+  const parsed = parseUrlCandidate(input)
+  if (!parsed) return false
+  const hostname = String(parsed.hostname || '').trim().toLowerCase()
+  if (!hostname) return false
+  if (hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1') return true
+  if (hostname.endsWith('.local')) return true
+  return isPrivateIpv4(hostname) || isPrivateIpv6(hostname)
+}
+
+function isCompatibleLocalServiceUrl(currentUrl, discoveredUrl) {
+  const current = parseUrlCandidate(currentUrl)
+  const discovered = parseUrlCandidate(discoveredUrl)
+  if (!current || !discovered) return false
+  if (current.origin === discovered.origin) return true
+  const currentPort = current.port || defaultPortForProtocol(current.protocol)
+  const discoveredPort = discovered.port || defaultPortForProtocol(discovered.protocol)
+  return (
+    current.protocol === discovered.protocol &&
+    currentPort === discoveredPort &&
+    isLikelyLocalServiceUrl(currentUrl) &&
+    isLikelyLocalServiceUrl(discoveredUrl)
+  )
 }
 
 async function ensureBootLanAccess(logger = console) {
@@ -1697,6 +1737,59 @@ function scheduleLocalProviderWarmup(config = loadLocalConfigFile(), logger = co
   return localProviderWarmupPromise
 }
 
+function shouldRepairLocalProwlarrConfig(config = {}) {
+  const jackettUrl = String(config?.jackettUrl || '').trim()
+  const jackettApiKey = String(config?.jackettApiKey || '').trim()
+  return Boolean(jackettUrl && !jackettApiKey && isLikelyLocalServiceUrl(jackettUrl))
+}
+
+async function repairLocalProwlarrConfig(config = loadLocalConfigFile(), logger = console, reason = 'boot') {
+  const snapshot = config && typeof config === 'object' ? { ...config } : null
+  if (!snapshot || process.platform !== 'win32' || IS_VERCEL_RUNTIME) return snapshot
+  if (!shouldRepairLocalProwlarrConfig(snapshot)) return snapshot
+  if (localConfigRepairPromise) return localConfigRepairPromise
+
+  const safeLogger = createRedactingLogger(logger)
+  localConfigRepairPromise = (async () => {
+    const discovered = await discoverProwlarrConfig()
+    const discoveredUrl = String(discovered?.url || '').trim()
+    const discoveredApiKey = String(discovered?.apiKey || '').trim()
+    if (!discoveredUrl || !discoveredApiKey) {
+      safeLogger.warn(`[config-repair] skipped (${reason}): local Prowlarr API key not available`)
+      return snapshot
+    }
+
+    const currentUrl = String(snapshot.jackettUrl || '').trim()
+    if (!isCompatibleLocalServiceUrl(currentUrl, discoveredUrl)) {
+      safeLogger.warn(`[config-repair] skipped (${reason}): configured Prowlarr URL does not match discovered local service`)
+      return snapshot
+    }
+
+    const repaired = normalizeAddonConfig({
+      ...snapshot,
+      jackettApiKey: discoveredApiKey
+    }, {
+      defaultEnabled: true,
+      defaultRequired: true,
+      includeLocalSecrets: true
+    })
+
+    if (JSON.stringify(repaired) !== JSON.stringify(snapshot)) {
+      saveLocalConfigFile(repaired)
+      safeLogger.log(`[config-repair] restored local Prowlarr API key (${reason})`)
+    }
+
+    return repaired
+  })().catch((err) => {
+    safeLogger.warn(`[config-repair] failed (${reason}): ${err.message}`)
+    return snapshot
+  }).finally(() => {
+    localConfigRepairPromise = null
+  })
+
+  return localConfigRepairPromise
+}
+
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -2622,30 +2715,35 @@ app.post('/test-connection', requireCsrfToken, async (req, res) => {
 })
 
 // ─── withConfig middleware ──────────────────────────────────
-function withConfig(req, res, next) {
+async function withConfig(req, res, next) {
   req.localConfigMissing = false
   req.configIssues = []
   if (req.params.config === 'local') {
-    const localConfig = loadLocalConfigFile()
-    if (!localConfig) {
-      // Allow local manifest/configure bootstrap even before credentials are saved.
-      req.localConfigMissing = true
-      req.config = {}
+    try {
+      const localConfig = loadLocalConfigFile()
+      if (!localConfig) {
+        // Allow local manifest/configure bootstrap even before credentials are saved.
+        req.localConfigMissing = true
+        req.config = {}
+        return next()
+      }
+      const repairedLocal = await repairLocalProwlarrConfig(localConfig, console, 'local-request')
+      const normalizedLocal = normalizeAddonConfig(repairedLocal, {
+        defaultEnabled: true,
+        defaultRequired: true,
+        includeLocalSecrets: true
+      })
+      if (JSON.stringify(normalizedLocal) !== JSON.stringify(repairedLocal)) {
+        saveLocalConfigFile(normalizedLocal)
+      }
+      req.config = normalizedLocal
+      req.configIssues = getConfigIssues(req.config, {
+        requestBaseUrl: getPublicBaseUrl(req)
+      })
       return next()
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to load local config' })
     }
-    const normalizedLocal = normalizeAddonConfig(localConfig, {
-      defaultEnabled: true,
-      defaultRequired: true,
-      includeLocalSecrets: true
-    })
-    if (JSON.stringify(normalizedLocal) !== JSON.stringify(localConfig)) {
-      saveLocalConfigFile(normalizedLocal)
-    }
-    req.config = normalizedLocal
-    req.configIssues = getConfigIssues(req.config, {
-      requestBaseUrl: getPublicBaseUrl(req)
-    })
-    return next()
   }
 
   const secret = process.env.ENCRYPTION_SECRET
@@ -2786,6 +2884,7 @@ function maybeLanPairRedirect(routeKind) {
 
 // ─── Stremio addon routes (config-authenticated) ────────────
 app.get('/:config/manifest.json', withConfig, (req, res) => {
+  console.log(`[stremio] ← manifest  config=${req.params.config === 'local' ? 'local' : 'token'} from=${req.ip || req.socket?.remoteAddress || '?'}`)
   const m = getManifest(req)
   // Configured URL — user is already set up, show Install not Configure.
   // For /local without saved credentials, keep configurationRequired=true
@@ -2795,6 +2894,7 @@ app.get('/:config/manifest.json', withConfig, (req, res) => {
     if (m.behaviorHints) m.behaviorHints.configurationRequired = true
     m.description = req.configIssues[0].message
   }
+  console.log(`[stremio] → manifest  id=${m.id} catalogs=${m.catalogs?.length || 0} configRequired=${m.behaviorHints?.configurationRequired} issues=${req.configIssues.length}`)
   applyHostedRouteCacheHeaders(req, res, 60, { sMaxAge: 300, staleWhileRevalidate: 900 })
   res.json(m)
 })
@@ -2805,23 +2905,30 @@ app.get('/:config/config.json', withConfig, requireLocalConfigReadback, (req, re
 })
 
 app.get('/manifest.json', (req, res) => {
+  console.log(`[stremio] ← manifest  config=root from=${req.ip || req.socket?.remoteAddress || '?'}`)
   setPublicCacheHeaders(res, 60, { sMaxAge: 300, staleWhileRevalidate: 900 })
-  res.json(manifest.createBootstrapManifest(getPublicBaseUrl(req)))
+  const m = getManifest(req)
+  console.log(`[stremio] → manifest  id=${m.id} catalogs=${m.catalogs?.length || 0} configRequired=${m.behaviorHints?.configurationRequired}`)
+  res.json(m)
 })
 
 app.get('/:config/catalog/:type/:id.json', withConfig, requireConfigSubscription, maybeLanPairRedirect('catalog'), async (req, res) => {
+  console.log(`[stremio] ← catalog   type=${req.params.type} id=${req.params.id} from=${req.ip || req.socket?.remoteAddress || '?'}`)
   const result = await handleCatalog(req.config, req.params.type, req.params.id, null, {
     baseUrl: getPublicBaseUrl(req)
   })
+  console.log(`[stremio] → catalog   type=${req.params.type} id=${req.params.id} metas=${result?.metas?.length || 0}`)
   const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
   applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: ttl, staleWhileRevalidate: Math.min(ttl * 4, 3600) })
   res.json(result)
 })
 
 app.get('/:config/catalog/:type/:id/:extra.json', withConfig, requireConfigSubscription, maybeLanPairRedirect('catalog'), async (req, res) => {
+  console.log(`[stremio] ← catalog   type=${req.params.type} id=${req.params.id} extra=${req.params.extra} from=${req.ip || req.socket?.remoteAddress || '?'}`)
   const result = await handleCatalog(req.config, req.params.type, req.params.id, req.params.extra, {
     baseUrl: getPublicBaseUrl(req)
   })
+  console.log(`[stremio] → catalog   type=${req.params.type} id=${req.params.id} metas=${result?.metas?.length || 0}`)
   const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
   applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: ttl, staleWhileRevalidate: Math.min(ttl * 4, 3600) })
   res.json(result)
@@ -2838,6 +2945,7 @@ app.get('/:config/stream/:type/:id.json', withConfig, requireConfigSubscription,
 })
 
 app.get('/:config/meta/:type/:id.json', withConfig, requireConfigSubscription, maybeLanPairRedirect('meta'), async (req, res) => {
+  console.log(`[stremio] ← meta     type=${req.params.type} id=${req.params.id} from=${req.ip || req.socket?.remoteAddress || '?'}`)
   const result = await handleMeta(req.config, req.params.type, req.params.id, {
     baseUrl: getPublicBaseUrl(req)
   })
@@ -3257,9 +3365,11 @@ function startLocalServers(options = {}) {
   const bootConfig = loadLocalConfigFile()
   if (bootConfig) {
     const warmTimer = setTimeout(() => {
-      scheduleLocalProviderWarmup(bootConfig, logger, 'server-boot').catch(err => {
-        logger.warn('[boot] Provider warmup failed:', err.message)
-      })
+      repairLocalProwlarrConfig(bootConfig, logger, 'server-boot')
+        .then((repairedConfig) => scheduleLocalProviderWarmup(repairedConfig, logger, 'server-boot'))
+        .catch(err => {
+          logger.warn('[boot] Provider warmup failed:', err.message)
+        })
     }, 900)
     if (typeof warmTimer.unref === 'function') warmTimer.unref()
   }

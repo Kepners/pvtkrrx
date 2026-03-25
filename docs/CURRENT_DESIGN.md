@@ -74,7 +74,7 @@ PVTKRRX is one codebase with three active pieces:
 
 ## Content Model
 
-- Top-level addon types are `movie`, `series`, `tv`, and `sports`.
+- Top-level addon types are `movie`, `series`, and `tv`.
 - Sports catalog content can be enriched with TheSportsDB posters, thumbnails, and cached artwork lookups.
 - Library and sports items use internal `pvtkrrx:` custom ids inside Stremio responses.
 - There is no standalone `.pvtk` file format in this repository.
@@ -102,7 +102,7 @@ PVTKRRX is one codebase with three active pieces:
 2. `PC Local` is the only supported same-PC install route.
 3. `LAN Bridge` is the supported home-device route and depends on the host desktop app remaining online.
 4. Hosted LAN-pair installs must be refreshable because stale installed tokens can point at old pair state or route behavior.
-5. Root `/manifest.json` is bootstrap/configure-only and is not one of the three real install routes.
+5. Root `/manifest.json` must remain a real addon manifest for compatibility with the legacy working Stremio contract.
 6. The repo contains historical planning docs from February 2026. They are useful for project history, but they are not the live architecture unless explicitly updated.
 
 ## Documentation Canon

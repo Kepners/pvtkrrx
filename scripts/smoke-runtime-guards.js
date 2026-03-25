@@ -9,6 +9,8 @@ process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'local-smoke-se
 const { isBlockedPrivateTargetHost } = require('../public/route-parity')
 const { encrypt } = require('../src/utils/crypto')
 const { encodePlaybackStateToken } = require('../src/utils/opaqueState')
+const CANONICAL_HOST = 'www.pvtkrrx.cc'
+const CANONICAL_ORIGIN = `https://${CANONICAL_HOST}`
 
 function loadApp(vercelEnabled) {
   if (vercelEnabled) process.env.VERCEL = '1'
@@ -122,7 +124,7 @@ async function run() {
       `/${token}/playback/${playbackInfo}`,
       null,
       {
-        Host: 'pvtkrrx.vercel.app',
+        Host: CANONICAL_HOST,
         'X-Forwarded-For': '203.0.113.10'
       }
     )
@@ -135,7 +137,7 @@ async function run() {
       '/configure',
       null,
       {
-        Host: 'pvtkrrx.vercel.app',
+        Host: CANONICAL_HOST,
         'X-Forwarded-For': '203.0.113.10'
       }
     )
@@ -149,9 +151,9 @@ async function run() {
       { authKey: 'bad' },
       {
         Cookie: hostedCsrf.cookie,
-        Host: 'pvtkrrx.vercel.app',
-        Origin: 'https://pvtkrrx.vercel.app',
-        Referer: 'https://pvtkrrx.vercel.app/configure',
+        Host: CANONICAL_HOST,
+        Origin: CANONICAL_ORIGIN,
+        Referer: `${CANONICAL_ORIGIN}/configure`,
         'X-PVTKRRX-CSRF': hostedCsrf.token,
         'X-Forwarded-For': '203.0.113.10'
       }
@@ -166,7 +168,7 @@ async function run() {
       { authKey: 'bad' },
       {
         Cookie: hostedCsrf.cookie,
-        Host: 'pvtkrrx.vercel.app',
+        Host: CANONICAL_HOST,
         Origin: 'https://evil.example',
         Referer: 'https://evil.example/pvtkrrx',
         'X-PVTKRRX-CSRF': hostedCsrf.token,
@@ -182,9 +184,9 @@ async function run() {
       {},
       {
         Cookie: hostedCsrf.cookie,
-        Host: 'pvtkrrx.vercel.app',
-        Origin: 'https://pvtkrrx.vercel.app',
-        Referer: 'https://pvtkrrx.vercel.app/configure',
+        Host: CANONICAL_HOST,
+        Origin: CANONICAL_ORIGIN,
+        Referer: `${CANONICAL_ORIGIN}/configure`,
         'X-PVTKRRX-CSRF': hostedCsrf.token,
         'X-Forwarded-For': '203.0.113.10'
       }
@@ -199,9 +201,9 @@ async function run() {
       {},
       {
         Cookie: hostedCsrf.cookie,
-        Host: 'pvtkrrx.vercel.app',
-        Origin: 'https://pvtkrrx.vercel.app',
-        Referer: 'https://pvtkrrx.vercel.app/configure',
+        Host: CANONICAL_HOST,
+        Origin: CANONICAL_ORIGIN,
+        Referer: `${CANONICAL_ORIGIN}/configure`,
         'X-PVTKRRX-CSRF': hostedCsrf.token,
         'X-Forwarded-For': '203.0.113.10'
       }
@@ -221,9 +223,9 @@ async function run() {
         qbitPassword: 'demo'
       },
       {
-        Host: 'pvtkrrx.vercel.app',
-        Origin: 'https://pvtkrrx.vercel.app',
-        Referer: 'https://pvtkrrx.vercel.app/configure',
+        Host: CANONICAL_HOST,
+        Origin: CANONICAL_ORIGIN,
+        Referer: `${CANONICAL_ORIGIN}/configure`,
         'X-Forwarded-For': '203.0.113.10'
       }
     )
@@ -243,9 +245,9 @@ async function run() {
       },
       {
         Cookie: hostedCsrf.cookie,
-        Host: 'pvtkrrx.vercel.app',
-        Origin: 'https://pvtkrrx.vercel.app',
-        Referer: 'https://pvtkrrx.vercel.app/configure',
+        Host: CANONICAL_HOST,
+        Origin: CANONICAL_ORIGIN,
+        Referer: `${CANONICAL_ORIGIN}/configure`,
         'X-PVTKRRX-CSRF': hostedCsrf.token,
         'X-Forwarded-For': '203.0.113.10'
       }
@@ -266,9 +268,9 @@ async function run() {
       },
       {
         Cookie: hostedCsrf.cookie,
-        Host: 'pvtkrrx.vercel.app',
-        Origin: 'https://pvtkrrx.vercel.app',
-        Referer: 'https://pvtkrrx.vercel.app/configure',
+        Host: CANONICAL_HOST,
+        Origin: CANONICAL_ORIGIN,
+        Referer: `${CANONICAL_ORIGIN}/configure`,
         'X-PVTKRRX-CSRF': hostedCsrf.token,
         'X-Forwarded-For': '203.0.113.10'
       }
@@ -289,9 +291,9 @@ async function run() {
       },
       {
         Cookie: hostedCsrf.cookie,
-        Host: 'pvtkrrx.vercel.app',
-        Origin: 'https://pvtkrrx.vercel.app',
-        Referer: 'https://pvtkrrx.vercel.app/configure',
+        Host: CANONICAL_HOST,
+        Origin: CANONICAL_ORIGIN,
+        Referer: `${CANONICAL_ORIGIN}/configure`,
         'X-PVTKRRX-CSRF': hostedCsrf.token,
         'X-Forwarded-For': '203.0.113.10'
       }
@@ -312,9 +314,9 @@ async function run() {
       },
       {
         Cookie: hostedCsrf.cookie,
-        Host: 'pvtkrrx.vercel.app',
-        Origin: 'https://pvtkrrx.vercel.app',
-        Referer: 'https://pvtkrrx.vercel.app/configure',
+        Host: CANONICAL_HOST,
+        Origin: CANONICAL_ORIGIN,
+        Referer: `${CANONICAL_ORIGIN}/configure`,
         'X-PVTKRRX-CSRF': hostedCsrf.token,
         'X-Forwarded-For': '203.0.113.10'
       }
@@ -328,7 +330,7 @@ async function run() {
       '/local-config',
       { qbitUrl: 'http://127.0.0.1:8080' },
       {
-        Host: 'pvtkrrx.vercel.app',
+        Host: CANONICAL_HOST,
         'X-Forwarded-For': '127.0.0.1'
       }
     )
@@ -359,9 +361,9 @@ async function run() {
       },
       {
         Cookie: hostedCsrf.cookie,
-        Host: 'pvtkrrx.vercel.app',
-        Origin: 'https://pvtkrrx.vercel.app',
-        Referer: 'https://pvtkrrx.vercel.app/configure',
+        Host: CANONICAL_HOST,
+        Origin: CANONICAL_ORIGIN,
+        Referer: `${CANONICAL_ORIGIN}/configure`,
         'X-PVTKRRX-CSRF': hostedCsrf.token,
         'X-Forwarded-For': '203.0.113.10'
       }

@@ -9,12 +9,12 @@ const manifest = {
   resources: [
     'catalog',
     'meta',
-    { name: 'stream', types: ['movie', 'series', 'tv', 'sports'] }
+    { name: 'stream', types: ['movie', 'series', 'tv'] }
   ],
-  types: ['movie', 'series', 'tv', 'sports'],
+  types: ['movie', 'series', 'tv'],
   catalogs: [
     {
-      type: 'sports',
+      type: 'movie',
       id: 'pvtkrrx-sports',
       name: 'Sports',
       extra: [
@@ -60,29 +60,5 @@ const manifest = {
     configurationRequired: true
   }
 }
-
-function createBootstrapManifest(baseUrl = '') {
-  const normalizedBaseUrl = String(baseUrl || '').trim().replace(/\/+$/, '')
-  const logoUrl = normalizedBaseUrl ? `${normalizedBaseUrl}/logo.ico` : manifest.logo
-  return {
-    id: 'com.kepners.pvtkrrx.bootstrap',
-    version: manifest.version,
-    name: 'PVTKRRX (Configure)',
-    description: 'Bootstrap manifest only. Open /configure and install PC Local, LAN Bridge, or Remote Seedbox from their explicit route URLs.',
-    logo: logoUrl,
-    resources: [],
-    types: [],
-    catalogs: [],
-    behaviorHints: {
-      configurable: true,
-      configurationRequired: true
-    }
-  }
-}
-
-Object.defineProperty(manifest, 'createBootstrapManifest', {
-  value: createBootstrapManifest,
-  enumerable: false
-})
 
 module.exports = manifest

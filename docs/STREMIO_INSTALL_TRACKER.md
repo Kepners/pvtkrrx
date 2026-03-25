@@ -81,7 +81,7 @@ See also: `docs/ROUTE_FRAMEWORK.md`
 - `PC Local` now remains a full same-PC addon route instead of a helper-only manifest.
 - Heartbeat/AuthKey/account linking stay on Method 4 hosted LAN-pair installs only.
 - LAN phone/TV and remote seedbox installs remain separate hosted URL panels.
-- Sports is now declared as a real top-level Stremio type instead of being nested under `Movie`, so it should appear in the first dropdown alongside other custom addon types.
+- Sports stays nested under `Movie` for compatibility with the legacy working Stremio contract instead of being promoted to a custom top-level type.
 - Local desktop builds now derive the auth-token secret at runtime, fixing false `AUTH_TOKEN_SECRET not configured` failures during automatic account-link/LAN setup.
 - Website, configurator, local install helper, and desktop popup now present the three routes as explicit products: `PC Local`, `LAN Bridge`, and `Remote Seedbox`.
 - LAN Bridge account sync now tries signed-in local Stremio sessions first by scanning Stremio Desktop plus common Chromium browser profiles on the Windows host before falling back to the console snippet helper.
@@ -139,7 +139,7 @@ Get-Content "$env:APPDATA\PVTKRRX\runtime\logs\desktop-$(Get-Date -Format yyyy-M
 Automated coverage now proves the wording shape and guard behavior for the hosted notice rows, but it does not prove how Stremio renders and orders those rows on real devices.
 
 That client pass is still required because:
-- sports is a custom top-level Stremio type
+- sports still rides the legacy movie catalog contract and needs real-client proof on that surface
 - sports and library items use internal `pvtkrrx:` ids
 - the addon must fully own presentation of its own rows instead of assuming Cinemeta or generic client behavior will rescue rough edges
 

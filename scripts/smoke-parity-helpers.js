@@ -93,7 +93,7 @@ function run() {
   )
   assert.equal(
     resolveRuntimeDir({}, { platform: 'linux', cwd: '/tmp/pvtkrrx-dev' }),
-    '/tmp/pvtkrrx-dev/.runtime',
+    path.normalize('/tmp/pvtkrrx-dev/.runtime'),
     'non-Windows fallback should remain repo-local when no override exists'
   )
 

@@ -27,6 +27,8 @@ const { encrypt } = require('../src/utils/crypto')
 const { encodePlaybackStateToken } = require('../src/utils/opaqueState')
 const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJsonFile')
 const app = require('../index')
+const CANONICAL_HOST = 'www.pvtkrrx.cc'
+const CANONICAL_ORIGIN = `https://${CANONICAL_HOST}`
 
 function readCsrf(setCookieHeader) {
   const raw = Array.isArray(setCookieHeader) ? setCookieHeader.join('; ') : String(setCookieHeader || '')
@@ -110,8 +112,8 @@ async function run() {
 
     // ── #1a: hosted /:token/config.json must redact secrets ─────────────────
     const hostedConfigRes = await request(port, 'GET', `/${token}/config.json`, null, {
-      Host: 'pvtkrrx.vercel.app',
-      Origin: 'https://pvtkrrx.vercel.app'
+      Host: CANONICAL_HOST,
+      Origin: CANONICAL_ORIGIN
     })
     assert.equal(hostedConfigRes.status, 200, '#1a hosted config.json should succeed')
     const hostedCfg = hostedConfigRes.json
@@ -124,7 +126,7 @@ async function run() {
 
     // ── #1b: evil-origin GET to hosted config.json gets no CORS allow header ─
     const evilOriginConfigRes = await request(port, 'GET', `/${token}/config.json`, null, {
-      Host: 'pvtkrrx.vercel.app',
+      Host: CANONICAL_HOST,
       Origin: 'https://evil.example.com'
     })
     const corsHeader = evilOriginConfigRes.headers['access-control-allow-origin']
@@ -136,7 +138,7 @@ async function run() {
 
     // ── #2a: spoofed X-Forwarded-For must NOT unlock local-only routes ───────
     const xffSpoofed = await request(port, 'POST', '/local-config', { qbitUrl: 'http://127.0.0.1:8080' }, {
-      Host: 'pvtkrrx.vercel.app',
+      Host: CANONICAL_HOST,
       'X-Forwarded-For': '127.0.0.1'
     })
     assert.equal(xffSpoofed.status, 403, '#2a spoofed XFF must not unlock /local-config on Vercel')
@@ -152,7 +154,7 @@ async function run() {
 
     // ── #3a/#3b: get a CSRF token from configure (same as the configure page would) ─
     const configureRes = await request(port, 'GET', '/configure', null, {
-      Host: 'pvtkrrx.vercel.app',
+      Host: CANONICAL_HOST,
       'X-Forwarded-For': '203.0.113.10'
     })
     const csrf = readCsrf(configureRes.headers['set-cookie'])
@@ -167,9 +169,9 @@ async function run() {
       qbitPassword: 'p'
     }, {
       Cookie: csrf.cookie,
-      Host: 'pvtkrrx.vercel.app',
-      Origin: 'https://pvtkrrx.vercel.app',
-      Referer: 'https://pvtkrrx.vercel.app/configure',
+      Host: CANONICAL_HOST,
+      Origin: CANONICAL_ORIGIN,
+      Referer: `${CANONICAL_ORIGIN}/configure`,
       'X-PVTKRRX-CSRF': csrf.token
     })
     assert.equal(nipIoTest.status, 403, '#3a nip.io loopback target must be blocked')
@@ -185,9 +187,9 @@ async function run() {
       qbitPassword: 'p'
     }, {
       Cookie: csrf.cookie,
-      Host: 'pvtkrrx.vercel.app',
-      Origin: 'https://pvtkrrx.vercel.app',
-      Referer: 'https://pvtkrrx.vercel.app/configure',
+      Host: CANONICAL_HOST,
+      Origin: CANONICAL_ORIGIN,
+      Referer: `${CANONICAL_ORIGIN}/configure`,
       'X-PVTKRRX-CSRF': csrf.token
     })
     assert.equal(lvhTest.status, 403, '#3b lvh.me target must be blocked')
@@ -233,7 +235,7 @@ async function run() {
     })).toString('base64url')
 
     const legacyPlaybackRes = await request(port, 'GET', `/${token}/playback/${legacyPayload}`, null, {
-      Host: 'pvtkrrx.vercel.app'
+      Host: CANONICAL_HOST
     })
     // On Vercel the playback route should 403 (disabled); on local it should also 403 (invalid token)
     assert.ok(
