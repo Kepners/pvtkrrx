@@ -11,6 +11,7 @@ const { makeSportsThumbUrl } = require('../utils/sportsThumb')
 const { parseSportsTitle } = require('../utils/sportsTitleParser')
 const { mapLeague } = require('../utils/leagueMap')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
+const { encodeCustomId } = require('../utils/customId')
 
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 const cinemeta = new CinemetaClient()
@@ -586,36 +587,40 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
     const backgroundUrl = sportsArtwork?.backgroundImage || posterUrl
 
     return {
-    id: 'pvtkrrx:' + Buffer.from(JSON.stringify({
-      y: mediaType,
-      k: 'sports',
-      n: displayTitle,
-      t: item.title || displayTitle,
-      h: '',
-      l: '',
-      i: item.indexer,
-      s: item.size,
-      d: item.seeders,
-      p: item.pubDate || '',
-      c: group.count,
-      e: eventDate,
-      g: league,
-      r: resolvedSportHint,
-      u: parsedSportsEvent?.league || '',
-      o: parsedSportsEvent?.homeTeam || '',
-      w: parsedSportsEvent?.awayTeam || '',
-      v: String(sportsArtwork?.eventId || '').trim(),
-      a: sportsArtwork?.poster || sportsArtwork?.image || posterUrl || '',
-      b: backgroundUrl
-    })).toString('base64url'),
-    type: mediaType,
-    name: displayTitle,
-    description: descriptionParts.join(' | '),
-    poster: posterUrl,
-    background: backgroundUrl,
-    releaseInfo: eventDate || undefined,
-    posterShape: 'landscape'
-  }})
+      id: encodeCustomId({
+        y: mediaType,
+        k: 'sports',
+        n: displayTitle,
+        t: item.title || displayTitle,
+        h: '',
+        l: '',
+        i: item.indexer,
+        s: item.size,
+        d: item.seeders,
+        p: item.pubDate || '',
+        c: group.count,
+        e: eventDate,
+        g: league,
+        r: resolvedSportHint,
+        u: parsedSportsEvent?.league || '',
+        o: parsedSportsEvent?.homeTeam || '',
+        w: parsedSportsEvent?.awayTeam || '',
+        v: String(sportsArtwork?.eventId || '').trim(),
+        a: sportsArtwork?.poster || sportsArtwork?.image || posterUrl || '',
+        b: backgroundUrl
+      }, {
+        compress: true,
+        compact: 'sports'
+      }),
+      type: mediaType,
+      name: displayTitle,
+      description: descriptionParts.join(' | '),
+      poster: posterUrl,
+      background: backgroundUrl,
+      releaseInfo: eventDate || undefined,
+      posterShape: 'landscape'
+    }
+  })
 
   return { metas, cacheMaxAge: SPORTS_CATALOG_CACHE_MAX_AGE }
 }
@@ -788,7 +793,7 @@ async function libraryCatalog(config, extra) {
     }
 
     return {
-      id: 'pvtkrrx:' + Buffer.from(JSON.stringify({
+      id: encodeCustomId({
         y: resolvedType,
         t: t.name,
         n: displayName,
@@ -798,7 +803,7 @@ async function libraryCatalog(config, extra) {
         m: imdbId,
         a: poster,
         b: background
-      })).toString('base64url'),
+      }),
       type: resolvedType,
       name: displayName,
       description: formatSize(t.size),

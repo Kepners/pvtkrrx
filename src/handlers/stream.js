@@ -9,6 +9,7 @@ const { buildOnSeedboxStream, buildOnBufferingStream, buildOnTrackerStream, buil
 const { encodePlaybackStateToken } = require('../utils/opaqueState')
 const { parseSportsTitle } = require('../utils/sportsTitleParser')
 const { buildPlaybackFileUrl, canEmitTrackerPlayback, getTrackerPlaybackRestriction } = require('../utils/fileServing')
+const { decodeCustomId } = require('../utils/customId')
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '7000', 10))
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '5000', 10))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '20', 10))
@@ -568,8 +569,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
 }
 
 async function handleCustomStream(config, id, addonUrl, configToken) {
-  const encoded = id.replace('pvtkrrx:', '')
-  const info = JSON.parse(Buffer.from(encoded, 'base64url').toString())
+  const info = decodeCustomId(id)
   const infoHash = String(info.h || '').toLowerCase()
   const directLink = String(info.l || '')
   const seenSourceKeys = new Set()

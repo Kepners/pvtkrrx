@@ -4,6 +4,7 @@ const { formatSize } = require('../utils/streams')
 const { makeSportsThumbUrl } = require('../utils/sportsThumb')
 const { resolveSportHint } = require('../utils/sportsRules')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
+const { decodeCustomId } = require('../utils/customId')
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 
 async function handleMeta(config, type, id, context = {}) {
@@ -31,8 +32,7 @@ async function handleMeta(config, type, id, context = {}) {
 }
 
 async function handleCustomMeta(config, id, context = {}) {
-  const encoded = id.replace('pvtkrrx:', '')
-  const info = JSON.parse(Buffer.from(encoded, 'base64url').toString())
+  const info = decodeCustomId(id)
   const baseUrl = String(context.baseUrl || '').replace(/\/+$/, '')
   const imdbId = normalizeImdbId(String(info.m || '').trim())
   let sportsArtwork = null

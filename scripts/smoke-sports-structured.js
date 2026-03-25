@@ -10,6 +10,7 @@ process.env.PVTKRRX_RUNTIME_DIR = runtimeDir
 const { mapLeague } = require('../src/utils/leagueMap')
 const { parseSportsTitle } = require('../src/utils/sportsTitleParser')
 const { SportsDbClient } = require('../src/clients/sportsdb')
+const { decodeCustomId } = require('../src/utils/customId')
 
 function loadCatalogWithStubs(stubs) {
   const catalogPath = path.resolve(__dirname, '../src/handlers/catalog.js')
@@ -127,6 +128,16 @@ async function testOrderAgnosticSportsGrouping() {
   )
 
   assert.equal(result.metas.length, 1, 'expected reversed team order to dedupe into one sports meta')
+  assert.ok(result.metas[0].id.length < 256, 'expected sports meta id to stay under common Stremio client limits')
+  const decoded = decodeCustomId(result.metas[0].id)
+  assert.equal(decoded.k, 'sports')
+  assert.ok(
+    [
+      'EPL.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-A',
+      'EPL.2026.03.15.Chelsea.vs.Arsenal.720p.HDTV.x264-B'
+    ].includes(decoded.t),
+    'expected compressed sports id to preserve one of the grouped source titles'
+  )
 }
 
 async function main() {
