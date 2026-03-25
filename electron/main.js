@@ -21,7 +21,7 @@ const logsDir = path.join(runtimeDir, 'logs')
 const localConfigPath = path.join(runtimeDir, 'local-config.json')
 const appIconPath = path.join(__dirname, 'assets', 'logo.ico')
 const WINDOW_WIDTH = 920
-const WINDOW_HEIGHT = 560
+const WINDOW_HEIGHT = 660
 const WINDOW_MARGIN = 28
 let lastSetBounds = null
 const PROVISION_ONLY_ARG = '--pvtkrrx-provision-only'
@@ -678,7 +678,6 @@ function createMainWindow() {
   mainWindow.loadFile(path.join(__dirname, 'popup.html'))
   mainWindow.webContents.on('did-finish-load', () => {
     pushStatus()
-    setTimeout(() => fitMainWindowToContent({ width: WINDOW_WIDTH, height: 660 }), 60)
   })
 }
 

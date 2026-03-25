@@ -768,7 +768,12 @@
       }
     }
 
+    let _lastStatusKey = '';
     function setStatus(running, port) {
+      const key = running ? 'r' + port : 's';
+      if (key === _lastStatusKey) return;
+      _lastStatusKey = key;
+
       const dot = document.getElementById('statusDot');
       const label = document.getElementById('statusLabel');
       const portEl = document.getElementById('statusPort');
@@ -789,13 +794,20 @@
       requestPopupFit();
     }
 
+    let _lastVersion = '';
     function setVersion(version) {
+      if (version === _lastVersion) return;
+      _lastVersion = version;
       document.querySelector('.version').textContent = 'v' + version;
       invalidatePopupFit();
       requestPopupFit();
     }
 
+    let _lastPathNote = '';
     function setPathNote(text, isError = false) {
+      const key = (text || '') + (isError ? '!' : '');
+      if (key === _lastPathNote) return;
+      _lastPathNote = key;
       const el = document.getElementById('pathNote');
       el.textContent = text || '';
       el.style.color = isError ? '#ff6a8a' : '#6f6f6f';
@@ -803,9 +815,13 @@
       requestPopupFit();
     }
 
+    let _lastInstallNote = '';
     function setInstallCopyNote(text, isError = false) {
       const el = document.getElementById('installCopyNote');
       if (!el) return;
+      const key = (text || '') + (isError ? '!' : '');
+      if (key === _lastInstallNote) return;
+      _lastInstallNote = key;
       el.textContent = text || '';
       el.style.color = isError ? '#ff6a8a' : '#7f949b';
       invalidatePopupFit();
