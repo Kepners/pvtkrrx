@@ -35,7 +35,7 @@
       -webkit-backdrop-filter: blur(24px);
       border: 1px solid rgba(0, 255, 65, 0.16);
       border-radius: 14px;
-      overflow: hidden;
+      overflow: hidden auto;
       box-shadow:
         0 14px 40px rgba(0, 0, 0, 0.64),
         0 0 1px rgba(0, 255, 65, 0.3),
@@ -828,32 +828,10 @@
       requestPopupFit();
     }
 
-    let fitPopupTimer = null;
-    let lastRequestedPopupHeight = 0;
-    let popupFitSettled = false;
-    function requestPopupFit() {
-      if (!window.electronAPI || !window.electronAPI.fitPopupWindow) return;
-      if (fitPopupTimer) clearTimeout(fitPopupTimer);
-      fitPopupTimer = setTimeout(() => {
-        const content = document.querySelector('.content');
-        const dragBar = document.querySelector('.drag-bar');
-        const body = document.body;
-        const height = Math.ceil(
-          Math.max(
-            content ? content.scrollHeight : 0,
-            body ? body.scrollHeight : 0
-          ) + (dragBar ? dragBar.offsetHeight : 20) + 8
-        );
-        // Only grow if content genuinely changed, never by rounding drift alone
-        const delta = height - lastRequestedPopupHeight;
-        if (popupFitSettled && Math.abs(delta) < 10) return;
-        lastRequestedPopupHeight = height;
-        popupFitSettled = true;
-        window.electronAPI.fitPopupWindow({ height, lockWidth: true });
-      }, 40);
-    }
-    // Reset settled flag when content actually changes
-    function invalidatePopupFit() { popupFitSettled = false; }
+    // Window size is fixed at creation — no runtime resizing needed.
+    // The CSS grid layout handles any window size gracefully.
+    function requestPopupFit() {}
+    function invalidatePopupFit() {}
 
     async function copyLocalInstallUrl() {
       try {
@@ -918,10 +896,6 @@
     document.addEventListener('DOMContentLoaded', () => {
       refreshDownloadPath();
       setInterval(refreshDownloadPath, 15000);
-      requestPopupFit();
-      if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(() => requestPopupFit()).catch(() => {});
-      }
     });
 
     window.popupAPI = { setStatus, setVersion };

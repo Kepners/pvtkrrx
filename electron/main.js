@@ -22,8 +22,6 @@ const localConfigPath = path.join(runtimeDir, 'local-config.json')
 const appIconPath = path.join(__dirname, 'assets', 'logo.ico')
 const WINDOW_WIDTH = 920
 const WINDOW_HEIGHT = 660
-const WINDOW_MARGIN = 28
-let lastSetBounds = null
 const PROVISION_ONLY_ARG = '--pvtkrrx-provision-only'
 const NETWORK_ACCESS_ONLY_ARG = '--pvtkrrx-network-access-only'
 const provisionOnlyMode = process.argv.includes(PROVISION_ONLY_ARG)
@@ -622,38 +620,8 @@ function createSplashWindow() {
   splashWindow.loadFile(path.join(__dirname, 'splash.html'))
 }
 
-function fitMainWindowToContent(size = {}) {
-  if (!mainWindow || mainWindow.isDestroyed()) return
-
-  const bounds = mainWindow.getBounds()
-  const display = screen.getDisplayMatching(bounds)
-  const workArea = display?.workArea || { x: 0, y: 0, width: WINDOW_WIDTH, height: WINDOW_HEIGHT }
-  const maxHeight = Math.max(WINDOW_HEIGHT, workArea.height - WINDOW_MARGIN)
-  const lockWidth = size?.lockWidth !== false
-  const requestedWidth = lockWidth
-    ? WINDOW_WIDTH
-    : Math.ceil(Number(size?.width) || bounds.width || WINDOW_WIDTH)
-  const requestedHeight = Math.ceil(Number(size?.height) || bounds.height || WINDOW_HEIGHT)
-  const nextWidth = Math.max(WINDOW_WIDTH, Math.min(workArea.width - WINDOW_MARGIN, requestedWidth))
-  const nextHeight = Math.max(WINDOW_HEIGHT, Math.min(maxHeight, requestedHeight))
-
-  // Compare against last-set bounds to prevent creep from OS rounding / DPI drift
-  const ref = lastSetBounds || bounds
-  if (Math.abs(ref.width - nextWidth) < 4 && Math.abs(ref.height - nextHeight) < 4) return
-
-  const centerX = bounds.x + Math.round(bounds.width / 2)
-  const centerY = bounds.y + Math.round(bounds.height / 2)
-  const minX = workArea.x
-  const minY = workArea.y
-  const maxX = workArea.x + workArea.width - nextWidth
-  const maxY = workArea.y + workArea.height - nextHeight
-  const nextX = Math.min(Math.max(centerX - Math.round(nextWidth / 2), minX), Math.max(minX, maxX))
-  const nextY = Math.min(Math.max(centerY - Math.round(nextHeight / 2), minY), Math.max(minY, maxY))
-
-  const next = { x: nextX, y: nextY, width: nextWidth, height: nextHeight }
-  lastSetBounds = next
-  mainWindow.setBounds(next, true)
-}
+// Window size is fixed at creation — no runtime resizing.
+// The CSS grid layout in popup.html handles any window size gracefully.
 
 function createMainWindow() {
   mainWindow = new BrowserWindow({
@@ -667,7 +635,6 @@ function createMainWindow() {
     backgroundColor: '#00000000',
     icon: appIconPath,
     show: false,
-    useContentSize: true,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -896,9 +863,7 @@ ipcMain.handle('open-qbit', async () => {
   await shell.openExternal(urls.qbitUrl)
 })
 
-ipcMain.on('fit-popup-window', (_event, size) => {
-  fitMainWindowToContent(size)
-})
+// fit-popup-window IPC removed — window size is fixed at creation
 
 ipcMain.handle('get-download-path', async () => {
   const prefs = await fetchJson(`http://127.0.0.1:${port}/local/qbit/preferences`)
