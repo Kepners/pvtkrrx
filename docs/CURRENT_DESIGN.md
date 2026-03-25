@@ -114,6 +114,7 @@ Use these as the live set:
 - `docs/CURRENT_DESIGN.md` for canonical current behavior
 - `docs/ROUTE_FRAMEWORK.md` for install-route rules
 - `docs/STREMIO_INSTALL_TRACKER.md` for verified Stremio client behavior
+- `docs/LAN_BRIDGE_PROCESS.md` for LAN Bridge pairing, heartbeat, and troubleshooting
 - `docs/PROJECT_STATUS.md` for current verification and deployment state
 
 The following files are planning/history records and should be read as archival context unless a section explicitly says otherwise:

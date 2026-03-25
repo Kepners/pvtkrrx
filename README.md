@@ -33,6 +33,7 @@ PVTKRRX is one runtime with three install routes:
 - **Remote Seedbox** — Public HTTPS route for away-from-home or seedbox-first playback. Requires public qBittorrent, Prowlarr, and file serving endpoints, and is ready-file-first on the hosted relay unless you self-host playback support.
 
 See [docs/CURRENT_DESIGN.md](docs/CURRENT_DESIGN.md) for the canonical current design, [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) for the route model, and [docs/STREMIO_INSTALL_TRACKER.md](docs/STREMIO_INSTALL_TRACKER.md) for current client install behavior.
+See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the exact LAN Bridge lifecycle, pair generation rules, and empty-content troubleshooting.
 
 ## What's Working
 
@@ -58,6 +59,7 @@ Use these files as the live documentation set:
 - [ARCHITECTURE.md](ARCHITECTURE.md) — component/runtime structure
 - [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) — route selection and install rules
 - [docs/STREMIO_INSTALL_TRACKER.md](docs/STREMIO_INSTALL_TRACKER.md) — verified Stremio client truth table
+- [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) — LAN Bridge setup, pairing, heartbeat, and troubleshooting
 - [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) — current verification and deployment status
 
 The February 2026 planning docs under `docs/` are kept as project history and are now marked as historical where they no longer describe the live runtime.
