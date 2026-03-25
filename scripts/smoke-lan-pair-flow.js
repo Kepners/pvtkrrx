@@ -98,7 +98,8 @@ async function run() {
     assert.ok(!rawDecoded.includes('passkey'), 'opaque token should not expose tracker query params')
 
     const pairId = 'pairtest01'
-    const pairKey = 'ABCDEFGHIJKLMNOPQRSTUVWX'
+    const initialPairKey = 'ABCDEFGHIJKLMNOPQRSTUVWX'
+    let pairKey = initialPairKey
     const ownerId = 'pairownerABCDEFGHIJKLMNOP'
     const endpointBaseUrl = `http://10.10.10.42:${port}`
     const mdnsBaseUrl = `http://pvtkrrx.local:${port}`
@@ -150,6 +151,43 @@ async function run() {
     assert.equal(statusPayload?.endpointBaseUrl, undefined, 'pair status should not expose endpointBaseUrl')
     assert.equal(statusPayload?.endpointSource, undefined, 'pair status should not expose endpointSource')
     assert.equal(statusPayload?.localHostname, undefined, 'pair status should not expose localHostname')
+
+    const rotatedPairKey = 'ROTATEDPAIRKEYABCDEFGHIJKLMN'
+    const rotateRes = await fetch(`${base}/pair/heartbeat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        pairId,
+        pairKey: rotatedPairKey,
+        ownerId,
+        localHostname: 'pvtkrrx.local',
+        relayUrl: base,
+        endpoints: [
+          { baseUrl: mdnsBaseUrl, source: 'mdns' },
+          { baseUrl: endpointBaseUrl, source: 'lan-ip' }
+        ]
+      })
+    })
+    assert.equal(rotateRes.status, 200, 'same-owner heartbeat should allow pair key rotation')
+    pairKey = rotatedPairKey
+
+    const rotatedStatusRes = await fetch(`${base}/pair/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pairId, pairKey })
+    })
+    assert.equal(rotatedStatusRes.status, 200, 'rotated pair status should return 200')
+    const rotatedStatusPayload = await rotatedStatusRes.json()
+    assert.equal(Boolean(rotatedStatusPayload?.online), true, 'rotated pair key should be online')
+
+    const staleStatusRes = await fetch(`${base}/pair/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pairId, pairKey: initialPairKey })
+    })
+    assert.equal(staleStatusRes.status, 200, 'stale pair status should return 200')
+    const staleStatusPayload = await staleStatusRes.json()
+    assert.equal(Boolean(staleStatusPayload?.online), false, 'stale pair key should no longer authenticate')
 
     const hostedConfig = {
       jackettUrl: 'http://seedbox.example:9696',

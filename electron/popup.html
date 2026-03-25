@@ -296,6 +296,34 @@
       gap: 6px;
     }
 
+    .shell-console {
+      min-height: 150px;
+      max-height: 220px;
+      overflow: auto;
+      border: 1px solid rgba(0, 255, 65, 0.08);
+      border-radius: 10px;
+      background:
+        linear-gradient(180deg, rgba(7, 11, 18, 0.96), rgba(4, 7, 12, 0.92)),
+        rgba(0, 0, 0, 0.42);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.03),
+        0 0 10px rgba(0, 255, 65, 0.08);
+      padding: 10px;
+      font-size: 10px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #9ed7ff;
+      text-shadow: 0 0 8px rgba(0, 128, 255, 0.16);
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 255, 65, 0.3) rgba(255, 255, 255, 0.04);
+    }
+
+    .shell-console.is-empty {
+      color: #6f8594;
+      text-shadow: none;
+    }
+
     .btn {
       min-height: 42px;
       padding: 10px 12px;
@@ -644,6 +672,7 @@
         </div>
 
         <div class="section-label">Server Shell</div>
+        <div class="shell-console is-empty" id="shellConsole">Waiting for runtime logs...</div>
         <div class="shell-actions">
           <button class="btn btn-configure" onclick="openConfigure()">Open Full Configure</button>
           <button class="btn btn-quit" onclick="quitApp()">Quit</button>
@@ -828,6 +857,39 @@
       requestPopupFit();
     }
 
+    let _lastShellText = '';
+    async function refreshShellConsole() {
+      const el = document.getElementById('shellConsole');
+      if (!el) return;
+
+      try {
+        if (!window.electronAPI || !window.electronAPI.getRecentLogs) {
+          throw new Error('Desktop bridge not available');
+        }
+        const nearBottom = (el.scrollTop + el.clientHeight) >= (el.scrollHeight - 24);
+        const data = await window.electronAPI.getRecentLogs(80);
+        const text = String(data && data.text ? data.text : '').trim();
+        const next = text || 'No runtime logs yet.';
+        if (next === _lastShellText) return;
+        _lastShellText = next;
+        el.textContent = next;
+        el.classList.toggle('is-empty', !text);
+        if (nearBottom || !text) {
+          el.scrollTop = el.scrollHeight;
+        }
+        invalidatePopupFit();
+        requestPopupFit();
+      } catch (err) {
+        const next = err && err.message ? err.message : 'Failed to read runtime logs';
+        if (next === _lastShellText) return;
+        _lastShellText = next;
+        el.textContent = next;
+        el.classList.add('is-empty');
+        invalidatePopupFit();
+        requestPopupFit();
+      }
+    }
+
     // Window size is fixed at creation — no runtime resizing needed.
     // The CSS grid layout handles any window size gracefully.
     function requestPopupFit() {}
@@ -895,7 +957,9 @@
 
     document.addEventListener('DOMContentLoaded', () => {
       refreshDownloadPath();
+      refreshShellConsole();
       setInterval(refreshDownloadPath, 15000);
+      setInterval(refreshShellConsole, 2000);
     });
 
     window.popupAPI = { setStatus, setVersion };

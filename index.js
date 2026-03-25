@@ -1971,8 +1971,11 @@ app.post('/auto-provision', requireLocalNetworkRoute, async (req, res) => {
       openFirewall: options.openFirewall,
       localHostname
     })
-    const provisionedConfig = result.config
-      ? normalizeAddonConfig({
+    const existingConfig = result.config
+      ? resolveExistingConfigForBody(result.config, { preferLocal: true })
+      : null
+    const provisionedSource = result.config
+      ? mergeRetainedSecrets({
         ...result.config,
         ...(accountUserId ? { accountUserId } : {}),
         ...(accountProvider ? { accountProvider } : {}),
@@ -1981,7 +1984,10 @@ app.post('/auto-provision', requireLocalNetworkRoute, async (req, res) => {
         ...(hintedPairId ? { lanPairId: hintedPairId } : {}),
         localHostname,
         localHostnameCustom
-      }, {
+      }, existingConfig)
+      : null
+    const provisionedConfig = provisionedSource
+      ? normalizeAddonConfig(provisionedSource, {
         defaultEnabled: true,
         defaultRequired: true,
         includeLocalSecrets: true
@@ -2333,11 +2339,13 @@ app.post('/pair/heartbeat', async (req, res) => {
     const incomingIpHash = LAN_PAIR_BIND_PUBLIC_IP ? hashClientIp(req) : ''
     const existingState = await lanPairStore.get(pairId)
     if (existingState) {
-      if (incomingKeyHash !== String(existingState.keyHash || '')) {
+      const existingKeyHash = String(existingState.keyHash || '')
+      const existingOwnerHash = String(existingState.ownerHash || '')
+      const ownerMatches = Boolean(existingOwnerHash) && existingOwnerHash === incomingOwnerHash
+      if (existingKeyHash && incomingKeyHash !== existingKeyHash && !ownerMatches) {
         return res.status(403).json({ ok: false, error: 'invalid pair key' })
       }
       if (LAN_PAIR_LOCK_HOST) {
-        const existingOwnerHash = String(existingState.ownerHash || '')
         if (existingOwnerHash && existingOwnerHash !== incomingOwnerHash) {
           return res.status(409).json({ ok: false, error: 'pair owner mismatch' })
         }

@@ -259,6 +259,41 @@ function setupBoundedLogging() {
 
 setupBoundedLogging()
 
+function getLatestDesktopLogPath() {
+  try {
+    const files = fs.readdirSync(logsDir)
+      .filter(f => /^desktop-\d{4}-\d{2}-\d{2}\.log$/i.test(f))
+      .map(name => {
+        const full = path.join(logsDir, name)
+        const stat = fs.statSync(full)
+        return { full, mtimeMs: stat.mtimeMs }
+      })
+      .sort((a, b) => b.mtimeMs - a.mtimeMs)
+    return files[0]?.full || ''
+  } catch (_) {
+    return ''
+  }
+}
+
+function readRecentDesktopLogs(limit = 80) {
+  const maxLines = Math.max(10, Math.min(400, parseInt(String(limit || 80), 10) || 80))
+  const logPath = getLatestDesktopLogPath()
+  if (!logPath || !fs.existsSync(logPath)) {
+    return { path: '', text: '' }
+  }
+
+  try {
+    const raw = fs.readFileSync(logPath, 'utf8')
+    const lines = raw.split(/\r?\n/).filter(Boolean)
+    return {
+      path: logPath,
+      text: lines.slice(-maxLines).join('\n')
+    }
+  } catch (_) {
+    return { path: logPath, text: '' }
+  }
+}
+
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock && !provisionOnlyMode && !networkAccessOnlyMode) {
   app.quit()
@@ -872,6 +907,10 @@ ipcMain.handle('get-download-path', async () => {
     tempPath: String(prefs?.tempPath || ''),
     incompletePathEnabled: Boolean(prefs?.incompletePathEnabled)
   }
+})
+
+ipcMain.handle('get-recent-logs', async (_event, limit = 80) => {
+  return readRecentDesktopLogs(limit)
 })
 
 ipcMain.handle('set-download-path', async (_event, savePath) => {
