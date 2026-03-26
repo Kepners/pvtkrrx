@@ -257,6 +257,12 @@ The home Windows runtime must stay online because it is the playback-capable sid
 
 The desktop popup now exposes a live tail of recent runtime logs rather than a dead placeholder area.
 
+It also now:
+
+- allows direct text selection in the shell panel
+- exposes a `Copy Runtime Log` action for the full current log file
+- shows boot, heartbeat, Stremio-launch, and addon-contact trace lines instead of only failure noise
+
 Use it to watch:
 
 - startup state

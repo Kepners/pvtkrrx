@@ -317,11 +317,23 @@
       text-shadow: 0 0 8px rgba(0, 128, 255, 0.16);
       scrollbar-width: thin;
       scrollbar-color: rgba(0, 255, 65, 0.3) rgba(255, 255, 255, 0.04);
+      user-select: text;
+      -webkit-user-select: text;
+      cursor: text;
     }
 
     .shell-console.is-empty {
       color: #6f8594;
       text-shadow: none;
+    }
+
+    .shell-note {
+      font-size: 11px;
+      color: #6f6f6f;
+      min-height: 16px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
 
     .btn {
@@ -674,9 +686,11 @@
         <div class="section-label">Server Shell</div>
         <div class="shell-console is-empty" id="shellConsole">Waiting for runtime logs...</div>
         <div class="shell-actions">
+          <button class="btn" onclick="copyRuntimeLog()">Copy Runtime Log</button>
           <button class="btn btn-configure" onclick="openConfigure()">Open Full Configure</button>
           <button class="btn btn-quit" onclick="quitApp()">Quit</button>
         </div>
+        <div class="shell-note" id="shellNote"></div>
 
         <div class="sidebar-note">
           One runtime. Three separate Stremio routes. PC Local is a real same-PC addon on this Windows machine, and LAN Bridge is the home-device route for phone, TV, and web.
@@ -857,6 +871,19 @@
       requestPopupFit();
     }
 
+    let _lastShellNote = '';
+    function setShellNote(text, isError = false) {
+      const el = document.getElementById('shellNote');
+      if (!el) return;
+      const key = (text || '') + (isError ? '!' : '');
+      if (key === _lastShellNote) return;
+      _lastShellNote = key;
+      el.textContent = text || '';
+      el.style.color = isError ? '#ff6a8a' : '#6f6f6f';
+      invalidatePopupFit();
+      requestPopupFit();
+    }
+
     let _lastShellText = '';
     async function refreshShellConsole() {
       const el = document.getElementById('shellConsole');
@@ -887,6 +914,19 @@
         el.classList.add('is-empty');
         invalidatePopupFit();
         requestPopupFit();
+      }
+    }
+
+    async function copyRuntimeLog() {
+      try {
+        if (!window.electronAPI || !window.electronAPI.copyRuntimeLog) {
+          throw new Error('Desktop bridge not available');
+        }
+        const data = await window.electronAPI.copyRuntimeLog();
+        const lineCount = Number(data && data.lineCount) || 0;
+        setShellNote(`Copied runtime log (${lineCount} line${lineCount === 1 ? '' : 's'}) to clipboard.`);
+      } catch (err) {
+        setShellNote(err.message || 'Failed to copy runtime log', true);
       }
     }
 

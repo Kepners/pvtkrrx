@@ -10,6 +10,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getLocalInstallUrls: () => ipcRenderer.invoke('get-local-install-urls'),
   copyLocalInstallUrl: () => ipcRenderer.invoke('copy-local-install-url'),
   getRecentLogs: (limit) => ipcRenderer.invoke('get-recent-logs', limit),
+  copyRuntimeLog: () => ipcRenderer.invoke('copy-runtime-log'),
   getDownloadPath: () => ipcRenderer.invoke('get-download-path'),
   setDownloadPath: (savePath) => ipcRenderer.invoke('set-download-path', savePath),
   openDownloadFolder: (folderPath) => ipcRenderer.invoke('open-download-folder', folderPath),

@@ -113,6 +113,16 @@ explorer "$env:APPDATA\PVTKRRX\runtime\logs"
 Get-Content "$env:APPDATA\PVTKRRX\runtime\logs\desktop-$(Get-Date -Format yyyy-MM-dd).log" -Tail 200
 ```
 
+Desktop popup behavior:
+- `Server Shell` now allows text selection instead of trapping the log tail as non-copyable UI text.
+- `Copy Runtime Log` copies the current desktop log file to the clipboard so the boot sequence and contact trace can be pasted elsewhere.
+- Current trace lines now include:
+  - desktop boot start
+  - heartbeat loop activation and success/failure
+  - Stremio launch detection pulses
+  - hosted `/pair/heartbeat` accept/reject outcomes
+  - hosted/local addon request lines for manifest, catalog, meta, and stream routes
+
 ## Automated coverage (2026-03-22)
 
 - `npm run smoke:config` validates:

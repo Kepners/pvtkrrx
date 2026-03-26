@@ -320,6 +320,13 @@ function makePairKey() {
   return crypto.randomBytes(24).toString('base64url')
 }
 
+function summarizePairId(value) {
+  const pairId = sanitizePairId(value)
+  if (!pairId) return 'unknown'
+  if (pairId.length <= 12) return pairId
+  return `${pairId.slice(0, 6)}...${pairId.slice(-4)}`
+}
+
 function sanitizePairOwnerId(value) {
   const ownerId = String(value || '').trim()
   if (!ownerId) return ''
@@ -691,6 +698,10 @@ function hashClientIp(req) {
   return crypto.createHash('sha256').update(ip).digest('hex')
 }
 
+function requestClientLabel(req) {
+  return getClientIp(req) || req.ip || req.socket?.remoteAddress || '?'
+}
+
 function consumeLanPairRateLimit(scope, key, maxPerWindow) {
   const now = Date.now()
   const safeScope = String(scope || 'default').trim() || 'default'
@@ -794,6 +805,18 @@ function normalizePairEndpoints(endpoints) {
     })
   }
   return out
+}
+
+function summarizeEndpointSources(endpoints) {
+  const labels = []
+  const seen = new Set()
+  for (const entry of Array.isArray(endpoints) ? endpoints : []) {
+    const label = String(entry?.source || '').trim() || 'unknown'
+    if (seen.has(label)) continue
+    seen.add(label)
+    labels.push(label)
+  }
+  return labels.length ? labels.join(',') : 'none'
 }
 
 function buildLanPairEndpoints(port, httpsPort) {
@@ -2409,11 +2432,16 @@ app.post('/pair/heartbeat', async (req, res) => {
     const localHostname = normalizeLocalHostname(req.body?.localHostname || DEFAULT_LOCAL_HOSTNAME)
     const relayUrl = normalizeRelayUrl(req.body?.relayUrl || '')
     const endpoints = normalizePairEndpoints(req.body?.endpoints || [])
+    const pairLabel = summarizePairId(pairId || req.body?.pairId)
+    const clientLabel = requestClientLabel(req)
+    const endpointSources = summarizeEndpointSources(endpoints)
 
     if (!pairId || !pairKey || !ownerId) {
+      console.warn(`[pair] heartbeat rejected id=${pairLabel} from=${clientLabel} reason=missing-fields`)
       return res.status(400).json({ ok: false, error: 'pairId, pairKey, and ownerId are required' })
     }
     if (!endpoints.length) {
+      console.warn(`[pair] heartbeat rejected id=${pairLabel} from=${clientLabel} reason=no-endpoints`)
       return res.status(400).json({ ok: false, error: 'At least one valid LAN endpoint is required' })
     }
     const clientIp = getClientIp(req)
@@ -2423,6 +2451,7 @@ app.post('/pair/heartbeat', async (req, res) => {
       LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW
     )
     if (!limit.allowed) {
+      console.warn(`[pair] heartbeat rate-limited id=${pairLabel} from=${clientLabel}`)
       res.setHeader('Retry-After', String(limit.retryAfterSeconds))
       return res.status(429).json({ ok: false, error: 'too many requests' })
     }
@@ -2436,16 +2465,19 @@ app.post('/pair/heartbeat', async (req, res) => {
       const existingOwnerHash = String(existingState.ownerHash || '')
       const ownerMatches = Boolean(existingOwnerHash) && existingOwnerHash === incomingOwnerHash
       if (existingKeyHash && incomingKeyHash !== existingKeyHash && !ownerMatches) {
+        console.warn(`[pair] heartbeat rejected id=${pairLabel} from=${clientLabel} reason=invalid-key`)
         return res.status(403).json({ ok: false, error: 'invalid pair key' })
       }
       if (LAN_PAIR_LOCK_HOST) {
         if (existingOwnerHash && existingOwnerHash !== incomingOwnerHash) {
+          console.warn(`[pair] heartbeat rejected id=${pairLabel} from=${clientLabel} reason=owner-mismatch`)
           return res.status(409).json({ ok: false, error: 'pair owner mismatch' })
         }
       }
       if (LAN_PAIR_BIND_PUBLIC_IP && LAN_PAIR_LOCK_HOST) {
         const existingIpHash = String(existingState.clientIpHash || '')
         if (existingIpHash && incomingIpHash && existingIpHash !== incomingIpHash) {
+          console.warn(`[pair] heartbeat rejected id=${pairLabel} from=${clientLabel} reason=host-mismatch`)
           return res.status(409).json({ ok: false, error: 'pair host mismatch' })
         }
       }
@@ -2471,7 +2503,11 @@ app.post('/pair/heartbeat', async (req, res) => {
       ttlSeconds: LAN_PAIR_TTL_SECONDS,
       updatedAt: state.updatedAt
     })
+    console.log(
+      `[pair] heartbeat ok id=${pairLabel} from=${clientLabel} endpoints=${endpoints.length} sources=${endpointSources} ttl=${LAN_PAIR_TTL_SECONDS}s`
+    )
   } catch (err) {
+    console.error('[pair] heartbeat error:', err.message)
     res.status(500).json({ ok: false, error: 'heartbeat failed', detail: err.message })
   }
 })
@@ -2856,6 +2892,9 @@ function maybeLanPairRedirect(routeKind) {
       if (!resolution.enabled) return next()
 
       if (!resolution.online) {
+        console.log(
+          `[lan-pair] ${routeKind} offline reason=${resolution.reason || 'unknown'} from=${requestClientLabel(req)}`
+        )
         if (parseBooleanLoose(req.config?.lanPairRequired, false)) {
           return lanPairOfflineResponse(req, res, routeKind)
         }
@@ -2872,6 +2911,9 @@ function maybeLanPairRedirect(routeKind) {
 
       res.setHeader('Cache-Control', 'no-store')
       res.setHeader('X-PVTKRRX-LAN-Pair', 'redirect')
+      console.log(
+        `[lan-pair] ${routeKind} redirect source=${String(resolution.endpoint?.source || 'unknown')} from=${requestClientLabel(req)}`
+      )
       res.redirect(307, redirectUrl)
     } catch (err) {
       if (parseBooleanLoose(req.config?.lanPairRequired, false)) {
@@ -2936,9 +2978,9 @@ app.get('/:config/catalog/:type/:id/:extra.json', withConfig, requireConfigSubsc
 
 app.get('/:config/stream/:type/:id.json', withConfig, requireConfigSubscription, maybeLanPairRedirect('stream'), async (req, res) => {
   const addonUrl = getPublicBaseUrl(req)
-  console.log(`[stream-route] type=${req.params.type} id=${req.params.id}`)
+  console.log(`[stremio] <- stream   type=${req.params.type} id=${req.params.id} from=${requestClientLabel(req)}`)
   const result = await handleStream(req.config, req.params.type, req.params.id, addonUrl, req.params.config)
-  console.log(`[stream-route] streams=${Array.isArray(result?.streams) ? result.streams.length : 0}`)
+  console.log(`[stremio] -> stream   type=${req.params.type} id=${req.params.id} streams=${Array.isArray(result?.streams) ? result.streams.length : 0}`)
   const ttl = parseCacheSeconds(result?.cacheMaxAge, 20, 5, 120)
   applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: ttl, staleWhileRevalidate: Math.min(ttl * 3, 300) })
   res.json(result)
@@ -3355,6 +3397,8 @@ function startLocalServers(options = {}) {
     httpsPort,
     lanAlias: null
   }
+
+  logger.log(`[boot] starting local runtime port=${port} httpsPort=${httpsPort}`)
 
   if (ensureLanAccessOnBoot) {
     ensureBootLanAccess(logger).catch(err => {

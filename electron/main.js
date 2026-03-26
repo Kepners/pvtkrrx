@@ -294,6 +294,22 @@ function readRecentDesktopLogs(limit = 80) {
   }
 }
 
+function readCurrentDesktopLog() {
+  const logPath = getLatestDesktopLogPath()
+  if (!logPath || !fs.existsSync(logPath)) {
+    return { path: '', text: '' }
+  }
+
+  try {
+    return {
+      path: logPath,
+      text: fs.readFileSync(logPath, 'utf8')
+    }
+  } catch (_) {
+    return { path: logPath, text: '' }
+  }
+}
+
 const gotSingleInstanceLock = app.requestSingleInstanceLock()
 if (!gotSingleInstanceLock && !provisionOnlyMode && !networkAccessOnlyMode) {
   app.quit()
@@ -310,6 +326,7 @@ let running = false
 let ownsServer = false
 let lanPairTimer = null
 let lanPairFailureCount = 0
+let hasLoggedHeartbeatSuccess = false
 let stremioLaunchWatchTimer = null
 let stremioWasRunning = false
 let stremioLaunchWatchFailureCount = 0
@@ -473,6 +490,36 @@ function dedupeEndpoints(list) {
   return out
 }
 
+function summarizePairId(pairId) {
+  const value = String(pairId || '').trim().toLowerCase()
+  if (!value) return 'unknown'
+  if (value.length <= 12) return value
+  return `${value.slice(0, 6)}...${value.slice(-4)}`
+}
+
+function summarizeEndpointSources(endpoints) {
+  const seen = new Set()
+  const labels = []
+  for (const entry of Array.isArray(endpoints) ? endpoints : []) {
+    const label = String(entry?.source || '').trim() || 'unknown'
+    if (seen.has(label)) continue
+    seen.add(label)
+    labels.push(label)
+  }
+  return labels.length ? labels.join(',') : 'none'
+}
+
+function summarizeHeartbeatPayload(payload) {
+  const body = payload?.body && typeof payload.body === 'object' ? payload.body : {}
+  const endpoints = Array.isArray(body.endpoints) ? body.endpoints : []
+  return {
+    pairId: summarizePairId(body.pairId),
+    endpointCount: endpoints.length,
+    endpointSources: summarizeEndpointSources(endpoints),
+    appVersion: String(body.appVersion || '').trim() || 'unknown'
+  }
+}
+
 async function buildLanPairHeartbeatPayload() {
   const cfg = await getLocalConfig()
   if (!cfg || cfg.lanPairEnabled === false) return null
@@ -500,10 +547,17 @@ async function buildLanPairHeartbeatPayload() {
   }
 }
 
-async function sendLanPairHeartbeat() {
+async function sendLanPairHeartbeat(source = 'interval') {
   try {
     const payload = await buildLanPairHeartbeatPayload()
-    if (!payload) return
+    if (!payload) {
+      if (source !== 'interval') {
+        console.log(`[desktop] lan pair heartbeat skipped (${source}): LAN Bridge is not ready yet`)
+      }
+      return false
+    }
+
+    const summary = summarizeHeartbeatPayload(payload)
 
     const res = await fetch(`${payload.relayUrl}/pair/heartbeat`, {
       method: 'POST',
@@ -514,21 +568,32 @@ async function sendLanPairHeartbeat() {
 
     if (!res.ok) {
       lanPairFailureCount += 1
-      if (lanPairFailureCount >= 3) {
-        console.warn('[desktop] lan pair heartbeat failed with status', res.status)
+      if (source !== 'interval' || lanPairFailureCount >= 3) {
+        console.warn(
+          `[desktop] lan pair heartbeat failed (${source}) status=${res.status} pair=${summary.pairId} endpoints=${summary.endpointCount}`
+        )
       }
-      return
+      return false
     }
 
-    if (lanPairFailureCount >= 3) {
+    const recovered = lanPairFailureCount >= 3
+    if (source !== 'interval' || !hasLoggedHeartbeatSuccess || recovered) {
+      console.log(
+        `[desktop] lan pair heartbeat ok (${source}) pair=${summary.pairId} endpoints=${summary.endpointCount} sources=${summary.endpointSources} app=${summary.appVersion}`
+      )
+    }
+    if (recovered) {
       console.log('[desktop] lan pair heartbeat restored')
     }
     lanPairFailureCount = 0
+    hasLoggedHeartbeatSuccess = true
+    return true
   } catch (err) {
     lanPairFailureCount += 1
-    if (lanPairFailureCount >= 3) {
-      console.warn('[desktop] lan pair heartbeat error:', redactSensitiveText(err.message))
+    if (source !== 'interval' || lanPairFailureCount >= 3) {
+      console.warn(`[desktop] lan pair heartbeat error (${source}):`, redactSensitiveText(err.message))
     }
+    return false
   }
 }
 
@@ -558,7 +623,8 @@ async function pulseLanPairOnStremioLaunch() {
     stremioWasRunning = runningNow
 
     if (launched) {
-      sendLanPairHeartbeat().catch(err => {
+      console.log('[desktop] Stremio launch detected')
+      sendLanPairHeartbeat('stremio-launch').catch(err => {
         console.warn('[desktop] Stremio-launch heartbeat failed:', err.message)
       })
     }
@@ -579,6 +645,7 @@ function startStremioLaunchWatch() {
   stopStremioLaunchWatch()
   if (!STREMIO_LAUNCH_WATCH_ENABLED) return
   if (process.platform !== 'win32') return
+  console.log(`[desktop] stremio launch watch active (poll=${STREMIO_LAUNCH_POLL_MS}ms)`)
   pulseLanPairOnStremioLaunch().catch(err => {
     console.warn('[desktop] Initial Stremio launch pulse failed:', err.message)
   })
@@ -600,13 +667,14 @@ function stopStremioLaunchWatch() {
 
 function startLanPairHeartbeatLoop() {
   stopLanPairHeartbeatLoop()
-  sendLanPairHeartbeat().catch(err => {
+  sendLanPairHeartbeat('startup').catch(err => {
     console.warn('[desktop] Initial heartbeat failed:', err.message)
   })
   if (LAN_PAIR_HEARTBEAT_MS <= 0) return
   const intervalMs = Math.max(60000, LAN_PAIR_HEARTBEAT_MS)
+  console.log(`[desktop] lan pair heartbeat loop active (interval=${intervalMs}ms)`)
   lanPairTimer = setInterval(() => {
-    sendLanPairHeartbeat().catch(err => {
+    sendLanPairHeartbeat('interval').catch(err => {
       lanPairFailureCount = (lanPairFailureCount || 0) + 1
       if (lanPairFailureCount <= 3) {
         console.warn('[desktop] Heartbeat failed:', err.message)
@@ -824,6 +892,7 @@ app.whenReady().then(async () => {
     return
   }
 
+  console.log(`[desktop] boot start v${pkg.version}`)
   const reconciled = await reconcilePortOnBoot(port)
   if (!reconciled.ok && reconciled.action === 'occupied-by-other') {
     console.warn('[desktop] port', port, 'is held by a non-PVTKRRX process; cannot auto-kill safely')
@@ -911,6 +980,17 @@ ipcMain.handle('get-download-path', async () => {
 
 ipcMain.handle('get-recent-logs', async (_event, limit = 80) => {
   return readRecentDesktopLogs(limit)
+})
+
+ipcMain.handle('copy-runtime-log', async () => {
+  const currentLog = readCurrentDesktopLog()
+  const text = String(currentLog.text || '')
+  if (!currentLog.path || !text.trim()) throw new Error('No runtime log available yet')
+  clipboard.writeText(text)
+  return {
+    path: currentLog.path,
+    lineCount: text.split(/\r?\n/).filter(Boolean).length
+  }
 })
 
 ipcMain.handle('set-download-path', async (_event, savePath) => {

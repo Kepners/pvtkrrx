@@ -104,6 +104,7 @@ async function handleStream(config, type, id, addonUrl, configToken) {
 
     return { streams: [] }
   } catch (err) {
+    console.error(`[stream] ERROR type=${type} id=${id}: ${err.message}`)
     return { streams: [] }
   }
 }

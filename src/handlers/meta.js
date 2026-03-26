@@ -27,6 +27,7 @@ async function handleMeta(config, type, id, context = {}) {
 
     return { meta: null }
   } catch (err) {
+    console.error(`[meta] ERROR type=${type} id=${id}: ${err.message}`)
     return { meta: null }
   }
 }
