@@ -45,6 +45,30 @@ async function fetchHttpsJson(url) {
   })
 }
 
+function requestJsonWithHostHeader(port, reqPath, hostHeader) {
+  return new Promise((resolve, reject) => {
+    const req = http.request({
+      host: '127.0.0.1',
+      port,
+      method: 'GET',
+      path: reqPath,
+      headers: {
+        Host: hostHeader
+      }
+    }, (res) => {
+      let body = ''
+      res.setEncoding('utf8')
+      res.on('data', chunk => { body += chunk })
+      res.on('end', () => resolve({
+        status: Number(res.statusCode || 0),
+        json: body ? JSON.parse(body) : null
+      }))
+    })
+    req.on('error', reject)
+    req.end()
+  })
+}
+
 function readCsrf(setCookieHeader) {
   const raw = Array.isArray(setCookieHeader) ? setCookieHeader.join('; ') : String(setCookieHeader || '')
   const match = raw.match(/pvtkrrx_csrf=([^;]+)/)
@@ -409,6 +433,15 @@ async function run() {
     assert.equal(localManifest.behaviorHints?.configurationRequired, false)
     assert.deepEqual(localManifest.types, ['movie', 'series', 'tv'], 'local manifest should keep the legacy Stremio type contract')
     assert.ok(Array.isArray(localManifest.catalogs) && localManifest.catalogs.some((catalog) => catalog?.id === 'pvtkrrx-sports' && catalog?.type === 'movie'), 'local manifest should expose sports through the legacy movie catalog contract')
+
+    const legacyLanManifestRes = await requestJsonWithHostHeader(port, '/local/manifest.json?mode=local', `192.168.50.48:${port}`)
+    assert.equal(legacyLanManifestRes.status, 200, 'legacy same-LAN local manifest fetch should keep returning 200')
+    assert.equal(legacyLanManifestRes.json?.id, 'com.kepners.pvtkrrx.local')
+    assert.equal(
+      legacyLanManifestRes.json?.behaviorHints?.configurationRequired,
+      false,
+      'legacy same-LAN local manifest fetch should not be downgraded to Configure-required'
+    )
 
     const localSportsCatalogRes = await fetch(`${base}/local/catalog/movie/pvtkrrx-sports.json?mode=local`)
     assert.equal(localSportsCatalogRes.status, 200, 'GET /local/catalog/movie/pvtkrrx-sports.json should return 200')

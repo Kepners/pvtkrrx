@@ -327,6 +327,7 @@ let ownsServer = false
 let lanPairTimer = null
 let lanPairFailureCount = 0
 let hasLoggedHeartbeatSuccess = false
+let lastHeartbeatSuccessAt = 0
 let stremioLaunchWatchTimer = null
 let stremioWasRunning = false
 let stremioLaunchWatchFailureCount = 0
@@ -549,6 +550,13 @@ async function buildLanPairHeartbeatPayload() {
 
 async function sendLanPairHeartbeat(source = 'interval') {
   try {
+    const now = Date.now()
+    const sinceLast = now - lastHeartbeatSuccessAt
+    if (sinceLast < 10000 && source !== 'interval') {
+      console.log(`[desktop] lan pair heartbeat skipped (${source}): last success ${Math.round(sinceLast / 1000)}s ago`)
+      return true
+    }
+
     const payload = await buildLanPairHeartbeatPayload()
     if (!payload) {
       if (source !== 'interval') {
@@ -569,8 +577,10 @@ async function sendLanPairHeartbeat(source = 'interval') {
     if (!res.ok) {
       lanPairFailureCount += 1
       if (source !== 'interval' || lanPairFailureCount >= 3) {
+        let detail = ''
+        try { const body = await res.json(); detail = ` reason=${body.error || JSON.stringify(body)}` } catch (_) {}
         console.warn(
-          `[desktop] lan pair heartbeat failed (${source}) status=${res.status} pair=${summary.pairId} endpoints=${summary.endpointCount}`
+          `[desktop] lan pair heartbeat failed (${source}) status=${res.status}${detail} pair=${summary.pairId} endpoints=${summary.endpointCount}`
         )
       }
       return false
@@ -587,6 +597,7 @@ async function sendLanPairHeartbeat(source = 'interval') {
     }
     lanPairFailureCount = 0
     hasLoggedHeartbeatSuccess = true
+    lastHeartbeatSuccessAt = Date.now()
     return true
   } catch (err) {
     lanPairFailureCount += 1
