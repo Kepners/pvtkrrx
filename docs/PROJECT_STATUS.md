@@ -1,10 +1,10 @@
 # PVTKRRX Project Status
 
-Updated: 2026-03-24
+Updated: 2026-03-26
 
 ## Current Stage
 
-PVTKRRX is at **v1.1.10** — structured sports enrichment and the current security-hardening baseline are implemented and smoke-tested, but the final live-device/runtime acceptance pass is still pending.
+PVTKRRX is at **v1.1.14** — the LAN Bridge heartbeat dedup and same-LAN manifest regression are fixed, the current security-hardening baseline is in place, and the remaining gap is live-device/runtime acceptance plus hosted relay persistence proof.
 
 - Core addon flow (catalog, stream, playback, local config, encryption, desktop wrapper) is complete and shipping.
 - Current route model is `PC Local`, `LAN Bridge`, and `Remote Seedbox`.
@@ -24,7 +24,7 @@ PVTKRRX is at **v1.1.10** — structured sports enrichment and the current secur
 - Architecture/docs/code wiring currently align with `docs/CURRENT_DESIGN.md`, `docs/ROUTE_FRAMEWORK.md`, and `docs/STREMIO_INSTALL_TRACKER.md`.
 - `PC Local` remains the supported same-host route via `http://127.0.0.1:7000/local/manifest.json?mode=local`.
 - LAN Bridge local-token minting now proxies to the hosted relay so the Windows runtime's local secret cannot produce `400 Invalid config token` hosted manifest URLs.
-- Current automated verification is green: `smoke:config`, `smoke:guards`, `smoke:pipeline`, `smoke:lan-pair`, `smoke:stremio-link`, `smoke:security`, and `smoke:sports` all passed locally on 2026-03-24.
+- Current automated verification is green: `smoke:config`, `smoke:guards`, `smoke:pipeline`, `smoke:lan-pair`, `smoke:stremio-link`, `smoke:security`, and `smoke:sports` all passed locally on 2026-03-26.
 - A Windows-host runtime probe also passed on 2026-03-24: `npm start` bound `http://127.0.0.1:7000` and `https://127.0.0.1:7001`, `/network-info` advertised the expected `127.0.0.1`, `pvtkrrx.local`, and `192.168.50.48` endpoints, and both HTTP + HTTPS local manifests responded on the Windows host.
 
 ### PARTIAL
@@ -83,7 +83,7 @@ PVTKRRX is at **v1.1.10** — structured sports enrichment and the current secur
    - auth-protected external file-server playback is flagged as needing real-device validation
    - `LAN Bridge` primary install is the `stremio://` deep link; the hosted HTTPS manifest is fallback/manual only when Stremio explicitly asks for an addon URL
 
-## Latest Automated Verification (2026-03-24)
+## Latest Automated Verification (2026-03-26)
 
 1. `npm run smoke:config` - PASS
 2. `npm run smoke:guards` - PASS
