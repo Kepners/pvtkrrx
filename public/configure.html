@@ -1367,7 +1367,7 @@
         <button type="button" class="service-tab" data-service-tab="qbit" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('qbit')">qBittorrent</button>
         <button type="button" class="service-tab" data-service-tab="storage" data-service-visible="pc lan" onclick="setActiveServiceTab('storage')">Storage</button>
         <button type="button" class="service-tab mode-hidden" data-service-tab="files" data-service-visible="seedbox" onclick="setActiveServiceTab('files')">File Server</button>
-        <button type="button" class="service-tab" data-service-tab="options" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('options')">Options</button>
+        <button type="button" class="service-tab" data-service-tab="options" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('options')">Settings</button>
       </div>
       <p class="hint" id="serviceTabHint">Prowlarr settings are open.</p>
 
@@ -1378,11 +1378,6 @@
         <p class="hint">Paste the base URL only. Legacy Torznab/API URLs are auto-normalized.</p>
         <label for="jackettApiKey">API Key</label>
         <input type="text" id="jackettApiKey" placeholder="Your Prowlarr API key">
-        <label for="sportsDbApiKey">TheSportsDB API Key (optional)</label>
-        <input type="text" id="sportsDbApiKey" value="123" placeholder="123">
-        <label for="sportsDbCacheHours">TheSportsDB Cache (hours)</label>
-        <input type="number" id="sportsDbCacheHours" value="24" min="1" max="168">
-        <p class="hint">Used for sports posters only. Cached to avoid repeated API calls on each catalog request.</p>
       </div>
 
       <div class="service-card" id="serviceCard-qbit" data-service-visible="pc lan seedbox">
@@ -1445,9 +1440,14 @@
       </div>
 
       <div class="service-card" id="serviceCard-options" data-service-visible="pc lan seedbox">
-        <h2>Options</h2>
+        <h2>Settings</h2>
         <label for="maxResults">Max Results Per Search</label>
         <input type="number" id="maxResults" value="50" min="10" max="200">
+        <label for="sportsDbApiKey">TheSportsDB API Key (optional)</label>
+        <input type="text" id="sportsDbApiKey" value="123" placeholder="123">
+        <label for="sportsDbCacheHours">TheSportsDB Cache (hours)</label>
+        <input type="number" id="sportsDbCacheHours" value="24" min="1" max="168">
+        <p class="hint">Used for sports posters only. Cached to avoid repeated API calls on each catalog request.</p>
         <div id="localHostnameBlock">
           <label for="localHostname">Local Hostname (.local alias)</label>
           <input type="text" id="localHostname" value="pvtkrrx.local" placeholder="pvtkrrx.local">
@@ -2920,7 +2920,7 @@
       } else if (next === 'files') {
         hint.textContent = 'File server and path mapping settings are open.';
       } else {
-        hint.textContent = 'General addon options are open.';
+        hint.textContent = 'General addon settings are open.';
       }
     }
 
