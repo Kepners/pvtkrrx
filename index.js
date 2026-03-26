@@ -1320,6 +1320,10 @@ function getInstallMode(req) {
   return isLoopbackHost(req) ? 'local' : 'hosted'
 }
 
+function isUnsupportedPcLocalManifestRequest(req) {
+  return String(req.params?.config || '').toLowerCase() === 'local' && !isLoopbackHost(req)
+}
+
 function parseBoolean(value) {
   const normalized = String(value || '').trim().toLowerCase()
   return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on'
@@ -2932,6 +2936,13 @@ app.get('/:config/manifest.json', withConfig, (req, res) => {
   // For /local without saved credentials, keep configurationRequired=true
   // so Stremio can install and then guide user to Configure instead of failing fetch.
   if (m.behaviorHints) m.behaviorHints.configurationRequired = Boolean(req.localConfigMissing)
+  if (isUnsupportedPcLocalManifestRequest(req)) {
+    if (m.behaviorHints) m.behaviorHints.configurationRequired = true
+    m.description = 'PC Local only works from http://127.0.0.1 on the same Windows PC. For LAN phones, TVs, or other devices, install LAN Bridge instead.'
+    console.warn(
+      `[stremio] local manifest rejected for non-loopback host=${requestHostname(req) || '?'} from=${requestClientLabel(req)}`
+    )
+  }
   if (req.configIssues.length > 0) {
     if (m.behaviorHints) m.behaviorHints.configurationRequired = true
     m.description = req.configIssues[0].message

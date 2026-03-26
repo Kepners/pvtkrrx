@@ -96,6 +96,7 @@ See also: `docs/ROUTE_FRAMEWORK.md`
 - LAN Bridge now prefers the live LAN IP for hosted heartbeat redirects, with `pvtkrrx.local` kept as a fallback/discovery alias when available.
 - Quick Setup now highlights only the next required action with a glow/pulse, locks later-step buttons until earlier checks are complete, and labels the final action as `Install Or Refresh` because stale installed LAN Bridge URLs in Stremio can keep pointing at old routes.
 - `Copy PC Local URL` is explicitly marked as host-only and not part of the LAN Bridge install path.
+- The local `/local/manifest.json` route now fails closed for non-loopback hosts so LAN-IP `PC Local` installs do not masquerade as valid and then stall at `EmptyContent`.
 
 ## Runtime logs
 
