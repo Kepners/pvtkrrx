@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openQbit: () => ipcRenderer.invoke('open-qbit'),
   getLocalInstallUrl: () => ipcRenderer.invoke('get-local-install-url'),
   getLocalInstallUrls: () => ipcRenderer.invoke('get-local-install-urls'),
+  getLocalStremioStatus: () => ipcRenderer.invoke('get-local-stremio-status'),
   copyLocalInstallUrl: () => ipcRenderer.invoke('copy-local-install-url'),
   getRecentLogs: (limit) => ipcRenderer.invoke('get-recent-logs', limit),
   copyRuntimeLog: () => ipcRenderer.invoke('copy-runtime-log'),

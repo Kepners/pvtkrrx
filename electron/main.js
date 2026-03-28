@@ -962,6 +962,19 @@ ipcMain.handle('get-local-install-urls', async () => {
   return getLocalInstallUrls()
 })
 
+ipcMain.handle('get-local-stremio-status', async () => {
+  try {
+    return await fetchJson(`http://127.0.0.1:${port}/auth/stremio/local-status`)
+  } catch (err) {
+    return {
+      ok: false,
+      installed: false,
+      signedInSessionFound: false,
+      error: String(err?.message || 'Local Stremio status unavailable')
+    }
+  }
+})
+
 ipcMain.handle('copy-local-install-url', async () => {
   const url = getLocalInstallManifestUrl()
   clipboard.writeText(url)

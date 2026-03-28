@@ -501,6 +501,201 @@
       color: var(--text-muted);
     }
 
+    .simple-flow-grid {
+      display: grid;
+      gap: 0.85rem;
+    }
+
+    .simple-flow-panel {
+      padding: 1rem;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 246, 255, 0.18);
+      background: linear-gradient(180deg, rgba(8, 18, 34, 0.82), rgba(9, 15, 28, 0.72));
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+
+    .simple-flow-kicker {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+      color: var(--accent);
+      margin-bottom: 0.35rem;
+    }
+
+    .simple-flow-title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 1rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #f1f7ff;
+      margin-bottom: 0.45rem;
+    }
+
+    .simple-flow-copy {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.68rem;
+      line-height: 1.55;
+      color: var(--text-dim);
+      margin-bottom: 0.8rem;
+    }
+
+    .simple-flow-status {
+      display: block;
+      margin-bottom: 0.8rem;
+      padding: 0.78rem 0.85rem;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 246, 255, 0.22);
+      background: rgba(0, 246, 255, 0.08);
+      color: #d5ebff;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.67rem;
+      line-height: 1.5;
+      letter-spacing: 0.5px;
+    }
+
+    .simple-flow-status.ok {
+      border-color: rgba(0, 255, 102, 0.3);
+      background: rgba(0, 255, 102, 0.1);
+      color: #c9ffe4;
+    }
+
+    .simple-flow-status.err {
+      border-color: rgba(255, 106, 123, 0.35);
+      background: rgba(255, 106, 123, 0.1);
+      color: #ffd4dc;
+    }
+
+    .simple-flow-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      margin-bottom: 0.65rem;
+    }
+
+    .simple-flow-actions .btn-copy,
+    .simple-flow-actions .btn-test,
+    .simple-flow-actions .btn-install {
+      width: auto;
+      min-width: 220px;
+      margin: 0;
+      flex: 0 1 auto;
+    }
+
+    .simple-flow-actions .btn-copy,
+    .simple-flow-actions .btn-test {
+      min-height: 48px;
+    }
+
+    .advanced-shell {
+      overflow: hidden;
+    }
+
+    .advanced-shell > summary {
+      list-style: none;
+      cursor: pointer;
+    }
+
+    .advanced-shell > summary::-webkit-details-marker {
+      display: none;
+    }
+
+    .advanced-summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .advanced-summary-text {
+      min-width: 0;
+    }
+
+    .advanced-summary-title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.84rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #f1f7ff;
+      margin-bottom: 0.3rem;
+    }
+
+    .advanced-summary-meta {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.63rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+    }
+
+    .advanced-summary-toggle {
+      flex: 0 0 auto;
+      min-width: 150px;
+      text-align: center;
+      padding: 0.6rem 0.8rem;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 246, 255, 0.24);
+      background: rgba(0, 246, 255, 0.08);
+      color: #d7ecff;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.65rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .advanced-shell[open] .advanced-summary-toggle {
+      border-color: rgba(0, 255, 102, 0.42);
+      background: rgba(0, 255, 102, 0.1);
+      color: #cbffe2;
+    }
+
+    .advanced-shell-body {
+      margin-top: 1rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(0, 246, 255, 0.14);
+    }
+
+    .advanced-tabs {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .advanced-tab {
+      width: auto;
+      min-height: 46px;
+      padding: 0.62rem 0.95rem;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 246, 255, 0.22);
+      background: rgba(0, 246, 255, 0.08);
+      color: #bfd6ff;
+      box-shadow: none;
+    }
+
+    .advanced-tab:hover {
+      border-color: rgba(255, 0, 212, 0.42);
+      box-shadow: 0 0 0 3px rgba(255, 0, 212, 0.12);
+    }
+
+    .advanced-tab.active {
+      background: linear-gradient(135deg, rgba(0, 246, 255, 0.22), rgba(0, 255, 102, 0.18));
+      color: #f1fbff;
+      border-color: rgba(0, 255, 102, 0.58);
+      box-shadow: 0 0 0 3px var(--accent-2-soft);
+    }
+
+    .advanced-panel {
+      display: none;
+    }
+
+    .advanced-panel.active {
+      display: block;
+    }
+
+    .advanced-panel .card {
+      margin-bottom: 0;
+    }
+
     .service-tabs {
       display: flex;
       flex-wrap: wrap;
@@ -1178,6 +1373,14 @@
       .btn-copy { width: 100%; }
       .action-row { flex-direction: column; }
       .action-row .btn-copy { width: 100%; min-width: 0; }
+      .simple-flow-actions { flex-direction: column; }
+      .simple-flow-actions .btn-copy,
+      .simple-flow-actions .btn-test,
+      .simple-flow-actions .btn-install { width: 100%; min-width: 0; }
+      .advanced-summary { flex-direction: column; align-items: stretch; }
+      .advanced-summary-toggle { width: 100%; min-width: 0; }
+      .advanced-tabs { flex-direction: column; }
+      .advanced-tab { width: 100%; }
       .quick-step-head { flex-direction: column; }
       .quick-step-badge { min-width: 0; width: 100%; }
       .quick-step-actions { flex-direction: column; }
@@ -1193,6 +1396,10 @@
       .service-tabs { gap: 0.75rem; }
       .action-row { flex-direction: column; }
       .action-row .btn-copy { width: 100%; min-width: 0; }
+      .simple-flow-actions { flex-direction: column; }
+      .simple-flow-actions .btn-copy,
+      .simple-flow-actions .btn-test,
+      .simple-flow-actions .btn-install { width: 100%; min-width: 0; }
     }
   </style>
 </head>
@@ -1271,7 +1478,45 @@
       <p class="hint" id="installModeHint">LAN Bridge selected. This is the normal home setup. The app checks Stremio on this Windows PC, reuses the signed-in Stremio account when possible, then prepares the addon install for your home devices.</p>
     </div>
 
-    <div class="card mode-hidden" id="accountLinkCard">
+    <div class="card" id="simpleFlowCard">
+      <h2>Next Step</h2>
+      <p class="section-lead" id="simpleFlowLead">Pick a route above. PVTKRRX will keep the main install path short and leave fallback tools hidden unless you need them.</p>
+      <div class="simple-flow-grid">
+        <section class="simple-flow-panel">
+          <div class="simple-flow-kicker" id="simpleFlowKicker">Home route</div>
+          <div class="simple-flow-title" id="simpleFlowTitle">LAN Bridge</div>
+          <p class="simple-flow-copy" id="simpleFlowCopy">Sign in to Stremio on this Windows PC first. PVTKRRX then checks the local Stremio session, prepares the right URLs, and keeps the noisy manual tools hidden below.</p>
+          <div class="simple-flow-status info" id="simpleFlowStatus">Checking this PC so the simple install path can stay short.</div>
+          <div class="simple-flow-actions">
+            <button class="btn-copy" type="button" id="simpleCheckStremioBtn" onclick="refreshLocalStremioStatus()">Check Stremio On This PC</button>
+            <button class="btn-test" type="button" id="simpleAutoSetupBtn" onclick="autoSetup()">Auto Setup</button>
+            <button class="btn-install" type="button" id="simpleGenerateBtn" onclick="install()">Save And Generate URL</button>
+            <button class="btn-install" type="button" id="simpleInstallBtn" onclick="triggerLanInstall()">Install Or Refresh In Stremio</button>
+            <button class="btn-copy" type="button" id="simpleCopyBtn" onclick="copySimplePrimaryLink(this)">Copy Primary Link</button>
+            <button class="btn-copy" type="button" id="simpleAdvancedBtn" onclick="openAdvancedTools()">Open Hidden Setup Tab</button>
+          </div>
+          <p class="hint" id="simpleFlowHint">Need to edit service URLs, storage roots, or manual fallback URLs? Use the hidden setup tab below.</p>
+        </section>
+      </div>
+    </div>
+
+    <details class="card advanced-shell" id="advancedWorkspace">
+      <summary class="advanced-summary">
+        <div class="advanced-summary-text">
+          <div class="advanced-summary-title">Hidden Setup Tabs</div>
+          <div class="advanced-summary-meta" id="advancedSummaryMeta">Open this only for fallback tools, connection changes, or manual addon URLs.</div>
+        </div>
+        <div class="advanced-summary-toggle">Show Advanced</div>
+      </summary>
+      <div class="advanced-shell-body">
+        <div class="advanced-tabs" role="tablist" aria-label="Advanced setup tabs">
+          <button type="button" class="advanced-tab" data-advanced-tab="checklist" data-advanced-visible="lan" onclick="setAdvancedTab('checklist')">LAN Checklist</button>
+          <button type="button" class="advanced-tab active" data-advanced-tab="connections" onclick="setAdvancedTab('connections')">Connections</button>
+          <button type="button" class="advanced-tab" data-advanced-tab="manual" onclick="setAdvancedTab('manual')">Manual URLs</button>
+        </div>
+
+        <div class="advanced-panel" id="advancedPanel-checklist" data-advanced-visible="lan">
+          <div class="card mode-hidden" id="accountLinkCard">
       <h2>LAN Bridge Quick Setup</h2>
       <p class="section-lead" id="quickSetupLead">Follow the glow. Only the next required button pulses. When all three steps are green, install or refresh LAN Bridge in Stremio for your other home devices. On this Windows PC itself, browse with PC Local.</p>
       <div class="quick-setup-grid">
@@ -1357,9 +1602,11 @@
         </div>
       </details>
       <p class="hint" id="accountSyncModeHint">LAN Bridge is the addon that should sync to your phone, TV, and web clients on the same Stremio account. This Windows PC itself should use PC Local for browsing and playback. Manual tools are only here as fallback.</p>
-    </div>
+          </div>
+        </div>
 
-    <div class="card" id="connectionCard">
+        <div class="advanced-panel active" id="advancedPanel-connections">
+          <div class="card" id="connectionCard">
       <h2>Connection Details</h2>
       <p class="section-lead" id="connectionSectionLead">Home mode uses built-in local file serving. Open the service tab you want to edit.</p>
       <div class="service-tabs">
@@ -1461,9 +1708,11 @@
         <input type="number" id="watchedDeleteGraceSeconds" value="300" min="0" max="86400">
         <p class="hint">Uses near-end playback detection because Stremio does not emit direct watched callbacks to addons.</p>
       </div>
-    </div>
+          </div>
+        </div>
 
-    <div class="card" id="installActionsCard">
+        <div class="advanced-panel" id="advancedPanel-manual">
+          <div class="card" id="installActionsCard">
       <h2>Addon URL</h2>
       <p class="section-lead" id="installActionLead">Generate the install links for the selected route. If Stremio explicitly asks for an addon URL, use the manual HTTPS fallback shown here.</p>
       <div id="testStatus" class="status"></div>
@@ -1538,7 +1787,10 @@
           <p class="install-note" style="margin-top:0.5rem">Hosted Remote Seedbox is ready-file-first on the hosted site. Extra notice rows can appear when a file-server login cannot be forwarded safely or qBittorrent has not exposed enough live file info for a safe buffer URL yet. Auth-protected playback still depends on real client support for the emitted auth behavior.</p>
         </div>
       </div>
-    </div>
+          </div>
+        </div>
+      </div>
+    </details>
 
     <footer>
       PVTKRRX &mdash; Your credentials are encrypted and never stored.
@@ -1557,6 +1809,7 @@
     let activeLocalHostname = defaultLocalHostname;
     let activeInstallTarget = 'lan';
     let activeServiceTab = 'prowlarr';
+    let activeAdvancedTab = 'connections';
     let pairStatusTimer = null;
     let pairStatusPollCount = 0;
     let pairStatusOnlineStreak = 0;
@@ -1896,6 +2149,7 @@
     }
 
     function openManualAccountTools() {
+      openAdvancedTools('checklist');
       const details = document.getElementById('accountLinkDetails');
       if (!details) return;
       details.open = true;
@@ -1930,7 +2184,10 @@
     function updateQuickSetupStatus() {
       const target = getInstallTarget();
       const quickCard = document.getElementById('accountLinkCard');
-      if (!quickCard || target !== 'lan') return;
+      if (!quickCard || target !== 'lan') {
+        updateSimpleFlowCard();
+        return;
+      }
 
       const downloadLink = document.getElementById('stremioDesktopDownloadLink');
       if (downloadLink && localStremioStatus.downloadUrl) {
@@ -2049,6 +2306,8 @@
         setGuidedButtonState('quickInstallLanBtn', true, false);
         if (quickLead) quickLead.textContent = 'All three steps are green. Install LAN Bridge in Stremio now so your other home devices can sync. On this Windows PC itself, use PC Local.';
       }
+
+      updateSimpleFlowCard();
     }
 
     async function refreshLocalStremioStatus() {
@@ -2688,6 +2947,8 @@
               : 'Run Auto Setup first to generate the stremio:// LAN Bridge install link. The HTTPS addon URL below is fallback only.')
           : 'LAN Bridge is the home-device route when you want one addon across your home network.';
       }
+
+      updateSimpleFlowCard();
     }
 
     async function copyCurrentAddonUrl(btn) {
@@ -2889,6 +3150,64 @@
       return raw.split(/\s+/).includes(target);
     }
 
+    function targetAllowsAdvanced(element, target = getInstallTarget()) {
+      if (!element) return false;
+      const raw = element.dataset.advancedVisible;
+      if (!raw) return true;
+      return raw.split(/\s+/).includes(target);
+    }
+
+    function getAllowedAdvancedTabs(target = getInstallTarget()) {
+      return ['checklist', 'connections', 'manual'].filter((name) => {
+        const button = document.querySelector(`[data-advanced-tab="${name}"]`);
+        return targetAllowsAdvanced(button, target);
+      });
+    }
+
+    function syncAdvancedUi() {
+      const target = getInstallTarget();
+      const allowedTabs = getAllowedAdvancedTabs(target);
+      const next = allowedTabs.includes(activeAdvancedTab) ? activeAdvancedTab : (allowedTabs[0] || 'connections');
+      activeAdvancedTab = next;
+
+      document.querySelectorAll('[data-advanced-tab]').forEach((button) => {
+        const allowed = targetAllowsAdvanced(button, target);
+        button.classList.toggle('mode-hidden', !allowed);
+        button.classList.toggle('active', allowed && button.dataset.advancedTab === next);
+      });
+
+      document.querySelectorAll('.advanced-panel').forEach((panel) => {
+        const allowed = targetAllowsAdvanced(panel, target);
+        panel.classList.toggle('mode-hidden', !allowed);
+        panel.classList.toggle('active', allowed && panel.id === `advancedPanel-${next}`);
+      });
+
+      const summaryMeta = document.getElementById('advancedSummaryMeta');
+      if (summaryMeta) {
+        if (target === 'lan') {
+          summaryMeta.textContent = 'Hidden by default. Open this only if Auto Setup needs the LAN checklist, service edits, or manual fallback URLs.';
+        } else if (target === 'pc') {
+          summaryMeta.textContent = 'Hidden by default. Open this only if you need to edit local service details or rebuild/copy the PC Local URL.';
+        } else {
+          summaryMeta.textContent = 'Hidden by default. Open this only if you need to edit public endpoints, path mapping, or the raw hosted URLs.';
+        }
+      }
+    }
+
+    function setAdvancedTab(name) {
+      activeAdvancedTab = String(name || '').trim() || 'connections';
+      syncAdvancedUi();
+    }
+
+    function openAdvancedTools(tab = activeAdvancedTab || 'connections') {
+      const details = document.getElementById('advancedWorkspace');
+      if (!details) return;
+      details.open = true;
+      activeAdvancedTab = String(tab || '').trim() || activeAdvancedTab;
+      syncAdvancedUi();
+      details.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }
+
     function getAllowedServiceTabs(target = getInstallTarget()) {
       return ['prowlarr', 'qbit', 'storage', 'files', 'options'].filter((name) => {
         const button = document.querySelector(`[data-service-tab="${name}"]`);
@@ -2923,6 +3242,164 @@
         hint.textContent = 'File server and path mapping settings are open.';
       } else {
         hint.textContent = 'General addon settings are open.';
+      }
+    }
+
+    function setSimpleFlowStatus(state, text) {
+      const el = document.getElementById('simpleFlowStatus');
+      if (!el) return;
+      el.className = `simple-flow-status ${state || 'info'}`.trim();
+      el.textContent = text;
+    }
+
+    async function copySimplePrimaryLink(btn) {
+      const target = getInstallTarget();
+      if (target === 'lan') {
+        return copyTextValue(getCurrentQuickInstallUrl(target) || getCurrentAddonUrl(target), btn);
+      }
+      if (target === 'seedbox') {
+        return copyTextValue(getCurrentQuickInstallUrl(target) || getCurrentAddonUrl(target), btn);
+      }
+      return copyTextValue(getCurrentAddonUrl(target), btn);
+    }
+
+    function updateSimpleFlowCard() {
+      const target = getInstallTarget();
+      const canUseLocal = canQueryLocalRuntime();
+      const localReady = Boolean(getCurrentAddonUrl('pc'));
+      const lanReady = Boolean(getCurrentQuickInstallUrl('lan'));
+      const remoteReady = Boolean(getCurrentQuickInstallUrl('seedbox') || getCurrentAddonUrl('seedbox'));
+      const installStatusText = String(document.getElementById('installStatus')?.textContent || '').trim();
+      const autoStatusText = String(document.getElementById('autoStatus')?.textContent || '').trim();
+      const pairStatusText = String(document.getElementById('pairStatusNote')?.textContent || '').trim();
+
+      const kicker = document.getElementById('simpleFlowKicker');
+      const title = document.getElementById('simpleFlowTitle');
+      const lead = document.getElementById('simpleFlowLead');
+      const copy = document.getElementById('simpleFlowCopy');
+      const hint = document.getElementById('simpleFlowHint');
+      const checkBtn = document.getElementById('simpleCheckStremioBtn');
+      const autoBtn = document.getElementById('simpleAutoSetupBtn');
+      const generateBtn = document.getElementById('simpleGenerateBtn');
+      const installBtn = document.getElementById('simpleInstallBtn');
+      const copyBtn = document.getElementById('simpleCopyBtn');
+
+      const toggle = (el, show) => {
+        if (!el) return;
+        el.classList.toggle('mode-hidden', !show);
+      };
+
+      if (target === 'pc') {
+        if (kicker) kicker.textContent = 'Desktop only';
+        if (title) title.textContent = 'PC Local';
+        if (lead) lead.textContent = 'PC Local is the real addon for this Windows machine. Keep LAN Bridge for your other home devices.';
+        if (copy) copy.textContent = 'Make sure Stremio Desktop is installed and signed in here, then save and generate the loopback addon URL for this PC.';
+        if (hint) hint.textContent = 'Need to change service URLs, storage roots, or manual fallback details? Open the hidden setup tabs below.';
+
+        toggle(checkBtn, true);
+        toggle(autoBtn, true);
+        toggle(generateBtn, true);
+        toggle(installBtn, false);
+        toggle(copyBtn, true);
+
+        if (checkBtn) checkBtn.disabled = !canUseLocal;
+        if (autoBtn) {
+          autoBtn.textContent = 'Auto Setup This PC';
+          autoBtn.disabled = !canUseLocal;
+        }
+        if (generateBtn) {
+          generateBtn.textContent = localReady ? 'Rebuild PC Local URL' : 'Save And Generate PC Local URL';
+          generateBtn.disabled = false;
+        }
+        if (copyBtn) {
+          copyBtn.textContent = 'Copy PC Local URL';
+          copyBtn.disabled = !localReady;
+        }
+
+        if (!canUseLocal) {
+          setSimpleFlowStatus('err', 'Open this configure page on the Windows host PC. PC Local only exists on the machine running PVTKRRX.');
+        } else if (localStremioStatus.checked && !localStremioStatus.installed) {
+          setSimpleFlowStatus('err', 'Install Stremio Desktop on this Windows PC first, then come back and generate the PC Local addon URL.');
+        } else if (localReady) {
+          setSimpleFlowStatus('ok', 'PC Local URL is ready. Install it in Stremio Desktop on this Windows PC for direct same-machine browsing and playback.');
+        } else if (localStremioStatus.signedInSessionFound) {
+          setSimpleFlowStatus('info', 'Stremio is already signed in on this PC. Save and generate the PC Local URL next.');
+        } else {
+          setSimpleFlowStatus('info', 'Sign in to Stremio Desktop on this PC, then save and generate the PC Local URL.');
+        }
+        return;
+      }
+
+      if (target === 'seedbox') {
+        if (kicker) kicker.textContent = 'Public endpoints';
+        if (title) title.textContent = 'Remote Seedbox';
+        if (lead) lead.textContent = 'Use this only when Prowlarr, qBittorrent, and file serving are reachable publicly over HTTPS.';
+        if (copy) copy.textContent = 'This path is for away-from-home playback. The hosted relay expects public ready-file playback and public service URLs.';
+        if (hint) hint.textContent = 'Need to edit public URLs, path mapping, or the raw hosted manifest? Open the hidden setup tabs below.';
+
+        toggle(checkBtn, false);
+        toggle(autoBtn, false);
+        toggle(generateBtn, true);
+        toggle(installBtn, false);
+        toggle(copyBtn, true);
+
+        if (generateBtn) {
+          generateBtn.textContent = remoteReady ? 'Rebuild Remote Seedbox URL' : 'Generate Remote Seedbox URL';
+          generateBtn.disabled = false;
+        }
+        if (copyBtn) {
+          copyBtn.textContent = 'Copy Remote Stremio URL';
+          copyBtn.disabled = !remoteReady;
+        }
+
+        if (remoteReady) {
+          setSimpleFlowStatus('ok', 'Remote Seedbox links are ready. Use them only on clients that should hit your public playback endpoints.');
+        } else if (installStatusText) {
+          setSimpleFlowStatus('info', installStatusText);
+        } else {
+          setSimpleFlowStatus('info', 'Enter or confirm the public service URLs in the hidden setup tabs, then generate the Remote Seedbox URL.');
+        }
+        return;
+      }
+
+      if (kicker) kicker.textContent = 'Home network sync';
+      if (title) title.textContent = 'LAN Bridge';
+      if (lead) lead.textContent = 'Sign in to Stremio on this Windows PC first. PVTKRRX will reuse that session, build the hosted install link, and keep the advanced tools out of the way.';
+      if (copy) copy.textContent = 'This route is for your phone, TV, web, and Apple TV on the same Stremio account. This Windows PC itself should use PC Local.';
+      if (hint) hint.textContent = 'Need the old checklist, service tabs, or raw URLs? Open the hidden setup tabs below.';
+
+      toggle(checkBtn, true);
+      toggle(autoBtn, true);
+      toggle(generateBtn, false);
+      toggle(installBtn, true);
+      toggle(copyBtn, true);
+
+      if (checkBtn) checkBtn.disabled = !canUseLocal;
+      if (autoBtn) {
+        autoBtn.textContent = 'Auto Setup Home LAN';
+        autoBtn.disabled = !(canUseLocal && localStremioStatus.installed && (hasLinkedAccount() || localStremioStatus.signedInSessionFound));
+      }
+      if (installBtn) {
+        installBtn.textContent = 'Install Or Refresh In Stremio';
+        installBtn.disabled = !lanReady;
+      }
+      if (copyBtn) {
+        copyBtn.textContent = 'Copy LAN Install Link';
+        copyBtn.disabled = !lanReady;
+      }
+
+      if (!canUseLocal) {
+        setSimpleFlowStatus('err', 'Open this configure page on the Windows host PC. LAN Bridge setup needs to inspect local Stremio there first.');
+      } else if (localStremioStatus.checked && !localStremioStatus.installed) {
+        setSimpleFlowStatus('err', 'Install Stremio Desktop on this Windows PC first. LAN Bridge setup depends on the host Stremio app being present here.');
+      } else if (!hasLinkedAccount() && !localStremioStatus.signedInSessionFound) {
+        setSimpleFlowStatus('info', 'Sign in to Stremio Desktop on this PC first, then click Check Stremio On This PC and Auto Setup Home LAN.');
+      } else if (lanReady) {
+        setSimpleFlowStatus('ok', pairStatusText || 'LAN Bridge is ready. Install or refresh it in Stremio for your other home devices.');
+      } else if (autoStatusText) {
+        setSimpleFlowStatus('info', autoStatusText);
+      } else {
+        setSimpleFlowStatus('info', 'Click Auto Setup Home LAN. PVTKRRX will check Stremio, services, local storage, and build the correct install link for your home devices.');
       }
     }
 
@@ -2987,6 +3464,7 @@
         }
       }
 
+      syncAdvancedUi();
       updateAddonUrlUi();
 
       setActiveServiceTab(activeServiceTab);
@@ -2995,6 +3473,7 @@
         void maybeAutoDetectStremioSession();
       }
       updateQuickSetupStatus();
+      updateSimpleFlowCard();
     }
 
     function setInstallTarget(target) {
@@ -3534,6 +4013,7 @@
       if (id === 'autoStatus' || id === 'installStatus') {
         updateQuickSetupStatus();
       }
+      updateSimpleFlowCard();
     }
 
     async function testConnection() {

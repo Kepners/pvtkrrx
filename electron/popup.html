@@ -444,6 +444,38 @@
       max-width: 280px;
     }
 
+    .stremio-alert {
+      border-radius: 10px;
+      border: 1px solid rgba(0, 128, 255, 0.22);
+      background: rgba(0, 128, 255, 0.08);
+      padding: 10px 12px;
+      display: grid;
+      gap: 5px;
+    }
+
+    .stremio-alert.ready {
+      border-color: rgba(0, 255, 65, 0.24);
+      background: rgba(0, 255, 65, 0.08);
+    }
+
+    .stremio-alert.warn {
+      border-color: rgba(255, 0, 64, 0.2);
+      background: rgba(255, 0, 64, 0.06);
+    }
+
+    .stremio-alert-title {
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #dbeaff;
+    }
+
+    .stremio-alert-copy {
+      font-size: 10px;
+      line-height: 1.45;
+      color: #9bb8c3;
+    }
+
     .route-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -709,6 +741,11 @@
             <div class="panel-subtitle">Pick the route that matches playback. PC Local is the real addon for this Windows machine. LAN Bridge is the route for your other home devices.</div>
           </div>
 
+          <div class="stremio-alert" id="stremioAlert">
+            <div class="stremio-alert-title" id="stremioAlertTitle">Before LAN Bridge</div>
+            <div class="stremio-alert-copy" id="stremioAlertCopy">Make sure Stremio Desktop is installed and signed in on this PC. PVTKRRX uses that local session to prepare the home-device route automatically.</div>
+          </div>
+
           <div class="route-grid">
             <article class="route-card local">
               <div class="route-kicker">Desktop only</div>
@@ -947,6 +984,62 @@
       }
     }
 
+    function setStremioAlert(type, title, copy) {
+      const box = document.getElementById('stremioAlert');
+      const titleEl = document.getElementById('stremioAlertTitle');
+      const copyEl = document.getElementById('stremioAlertCopy');
+      if (!box || !titleEl || !copyEl) return;
+      box.className = 'stremio-alert' + (type ? ' ' + type : '');
+      titleEl.textContent = title || 'Before LAN Bridge';
+      copyEl.textContent = copy || 'Make sure Stremio Desktop is installed and signed in on this PC.';
+      invalidatePopupFit();
+      requestPopupFit();
+    }
+
+    async function refreshStremioAlert() {
+      try {
+        if (!window.electronAPI || !window.electronAPI.getLocalStremioStatus) {
+          throw new Error('Desktop bridge not available');
+        }
+        const data = await window.electronAPI.getLocalStremioStatus();
+        if (data && data.ok && data.installed && data.signedInSessionFound) {
+          setStremioAlert(
+            'ready',
+            'Stremio Signed In',
+            'This PC already has a signed-in Stremio session. LAN Bridge can reuse it when you open the simple setup.'
+          );
+          return;
+        }
+        if (data && data.ok && data.installed) {
+          setStremioAlert(
+            'warn',
+            'Sign In To Stremio',
+            'Stremio Desktop is installed here, but no signed-in session was found yet. Sign in on this PC before using LAN Bridge.'
+          );
+          return;
+        }
+        if (data && data.ok) {
+          setStremioAlert(
+            'warn',
+            'Install Stremio First',
+            'Stremio Desktop was not detected on this PC yet. Install it here before using LAN Bridge for your other home devices.'
+          );
+          return;
+        }
+        setStremioAlert(
+          '',
+          'Before LAN Bridge',
+          'Make sure Stremio Desktop is installed and signed in on this PC. PVTKRRX uses that local session to prepare the home-device route automatically.'
+        );
+      } catch (_) {
+        setStremioAlert(
+          '',
+          'Before LAN Bridge',
+          'Make sure Stremio Desktop is installed and signed in on this PC. PVTKRRX uses that local session to prepare the home-device route automatically.'
+        );
+      }
+    }
+
     async function refreshDownloadPath() {
       const current = document.getElementById('currentPath');
       const input = document.getElementById('pathInput');
@@ -1001,8 +1094,10 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      refreshStremioAlert();
       refreshDownloadPath();
       refreshShellConsole();
+      setInterval(refreshStremioAlert, 15000);
       setInterval(refreshDownloadPath, 15000);
       setInterval(refreshShellConsole, 2000);
     });
