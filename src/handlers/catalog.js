@@ -101,17 +101,7 @@ async function getCinemetaCached(type, imdbId) {
   return meta
 }
 
-function withTimeout(promise, timeoutMs, fallbackValue) {
-  const timeout = Math.max(500, Number.parseInt(String(timeoutMs || 0), 10) || 0)
-  if (!timeout) {
-    return Promise.resolve(promise).catch(() => fallbackValue)
-  }
-
-  return Promise.race([
-    Promise.resolve(promise).catch(() => fallbackValue),
-    new Promise(resolve => setTimeout(() => resolve(fallbackValue), timeout))
-  ])
-}
+const { withTimeout } = require('../utils/timeout')
 
 function cacheKeyForProwlarrSearch(config, query, cats, type = 'search', options = {}) {
   const apiKey = String(config?.jackettApiKey || '').trim()

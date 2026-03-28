@@ -7,7 +7,6 @@ const path = require('path')
 const crypto = require('crypto')
 const selfsigned = require('selfsigned')
 const express = require('express')
-const Stripe = require('stripe')
 const manifest = require('./src/config/manifest')
 const { encrypt, decrypt } = require('./src/utils/crypto')
 const { decodeFileStateToken, decodePlaybackStateToken } = require('./src/utils/opaqueState')
@@ -28,6 +27,7 @@ const { findVideoFile, hasPackedArchiveFiles, isSampleVideoName } = require('./s
 const { buildPlaybackFileUrl } = require('./src/utils/fileServing')
 const { normalizeLocalStorageRoots } = require('./src/utils/localStorageRoots')
 const { PairStore } = require('./src/utils/pairStore')
+const { RateLimiter } = require('./src/utils/rateLimiter')
 const {
   AccountStore,
   normalizeAccountEmail,
@@ -60,32 +60,13 @@ const LAN_PAIR_TTL_SECONDS = Math.max(300, parseInt(process.env.PVTKRRX_LAN_PAIR
 const LAN_PAIR_BIND_PUBLIC_IP = String(process.env.PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP || 'false').trim().toLowerCase() === 'true'
 const LAN_PAIR_LOCK_HOST = String(process.env.PVTKRRX_LAN_PAIR_LOCK_HOST || 'true').trim().toLowerCase() !== 'false'
 const LAN_PAIR_RATE_LIMIT_WINDOW_MS = Math.max(1000, parseInt(process.env.PVTKRRX_LAN_PAIR_RATE_LIMIT_WINDOW_MS || '60000', 10))
-const LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW || '30', 10))
-const LAN_PAIR_STATUS_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_LAN_PAIR_STATUS_MAX_PER_WINDOW || '60', 10))
-const ENCRYPT_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_ENCRYPT_MAX_PER_WINDOW || '30', 10))
-const TEST_CONNECTION_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_TEST_CONNECTION_MAX_PER_WINDOW || '20', 10))
-const AUTH_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_AUTH_MAX_PER_WINDOW || '20', 10))
-const BILLING_MAX_PER_WINDOW = Math.max(5, parseInt(process.env.PVTKRRX_BILLING_MAX_PER_WINDOW || '30', 10))
 const AUTH_TOKEN_TTL_SECONDS = Math.max(900, parseInt(process.env.PVTKRRX_AUTH_TOKEN_TTL_SECONDS || '2592000', 10))
-const STRIPE_SECRET_KEY = String(process.env.STRIPE_SECRET_KEY || '').trim()
-const STRIPE_WEBHOOK_SECRET = String(process.env.STRIPE_WEBHOOK_SECRET || '').trim()
-const STRIPE_DEFAULT_PRICE_ID = String(process.env.STRIPE_DEFAULT_PRICE_ID || '').trim()
-const STRIPE_SUCCESS_URL = String(process.env.STRIPE_SUCCESS_URL || '').trim()
-const STRIPE_CANCEL_URL = String(process.env.STRIPE_CANCEL_URL || '').trim()
-const STRIPE_PORTAL_RETURN_URL = String(process.env.STRIPE_PORTAL_RETURN_URL || '').trim()
 const STREMIO_API_BASE_URL = normalizeBaseUrl(process.env.PVTKRRX_STREMIO_API_BASE_URL || 'https://api.strem.io')
 const STREMIO_API_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREMIO_API_TIMEOUT_MS || '10000', 10))
 const STREMIO_AUTH_KEY_REGEX = /^[A-Za-z0-9._~+/=-]{16,1024}$/
 const STREMIO_AUTH_KEY_CAPTURE_PATTERN = '[A-Za-z0-9._~+/=-]{16,1024}'
 const STREMIO_AUTH_SCAN_DIRS_OVERRIDE = String(process.env.PVTKRRX_STREMIO_AUTH_SCAN_DIRS || '').trim()
-// Temporary commercial mode: keep addon free for all users.
-const FREE_MODE = true
-const TRIAL_ENABLED = String(process.env.PVTKRRX_TRIAL_ENABLED || 'true').trim().toLowerCase() !== 'false'
-const TRIAL_DAYS = Math.max(1, Math.min(30, parseInt(process.env.PVTKRRX_TRIAL_DAYS || '3', 10)))
-const TRIAL_REQUIRE_LINKED_ACCOUNT = String(process.env.PVTKRRX_TRIAL_REQUIRE_LINKED_ACCOUNT || 'true').trim().toLowerCase() !== 'false'
-const REQUIRE_ACTIVE_SUBSCRIPTION = false
 const IS_VERCEL_RUNTIME = Boolean(process.env.VERCEL)
-const ACTIVE_SUBSCRIPTION_STATUSES = new Set(['active', 'trialing'])
 const SENSITIVE_WEB_ORIGINS = parseOriginAllowlist(
   process.env.PVTKRRX_ALLOWED_WEB_ORIGINS || 'https://www.pvtkrrx.cc'
 )
@@ -98,7 +79,13 @@ const SECRET_CONFIG_FIELDS = Object.freeze([
 ])
 const watchedDeleteTimers = new Map()
 const watchedDeleteInFlight = new Set()
-const lanPairRateBuckets = new Map()
+const rateLimiters = {
+  encrypt: new RateLimiter(LAN_PAIR_RATE_LIMIT_WINDOW_MS, Math.max(5, parseInt(process.env.PVTKRRX_ENCRYPT_MAX_PER_WINDOW || '30', 10))),
+  testConnection: new RateLimiter(LAN_PAIR_RATE_LIMIT_WINDOW_MS, Math.max(5, parseInt(process.env.PVTKRRX_TEST_CONNECTION_MAX_PER_WINDOW || '20', 10))),
+  auth: new RateLimiter(LAN_PAIR_RATE_LIMIT_WINDOW_MS, Math.max(5, parseInt(process.env.PVTKRRX_AUTH_MAX_PER_WINDOW || '20', 10))),
+  heartbeat: new RateLimiter(LAN_PAIR_RATE_LIMIT_WINDOW_MS, Math.max(5, parseInt(process.env.PVTKRRX_LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW || '30', 10))),
+  status: new RateLimiter(LAN_PAIR_RATE_LIMIT_WINDOW_MS, Math.max(5, parseInt(process.env.PVTKRRX_LAN_PAIR_STATUS_MAX_PER_WINDOW || '60', 10)))
+}
 const DEFAULT_LOCAL_HOSTNAME = 'pvtkrrx.local'
 
 function parseStartFraction(raw) {
@@ -165,7 +152,6 @@ const lanPairStore = new PairStore({
 const accountStore = new AccountStore({
   filePath: process.env.PVTKRRX_ACCOUNT_STORE_FILE || path.join(runtimeDir, 'accounts-store.json')
 })
-const stripe = STRIPE_SECRET_KEY ? new Stripe(STRIPE_SECRET_KEY) : null
 let bootLanAccessPromise = null
 let localProviderWarmupPromise = null
 let localConfigRepairPromise = null
@@ -702,30 +688,6 @@ function requestClientLabel(req) {
   return getClientIp(req) || req.ip || req.socket?.remoteAddress || '?'
 }
 
-function consumeLanPairRateLimit(scope, key, maxPerWindow) {
-  const now = Date.now()
-  const safeScope = String(scope || 'default').trim() || 'default'
-  const safeKey = String(key || 'anon').trim() || 'anon'
-  const bucketKey = `${safeScope}:${safeKey}`
-  let bucket = lanPairRateBuckets.get(bucketKey)
-  if (!bucket || Number(bucket.resetAt || 0) <= now) {
-    bucket = { count: 0, resetAt: now + LAN_PAIR_RATE_LIMIT_WINDOW_MS }
-  }
-  bucket.count += 1
-  lanPairRateBuckets.set(bucketKey, bucket)
-
-  if (lanPairRateBuckets.size > 4096) {
-    for (const [k, v] of lanPairRateBuckets.entries()) {
-      if (Number(v?.resetAt || 0) <= now) lanPairRateBuckets.delete(k)
-    }
-  }
-
-  return {
-    allowed: bucket.count <= maxPerWindow,
-    retryAfterSeconds: Math.max(1, Math.ceil((Number(bucket.resetAt || now) - now) / 1000))
-  }
-}
-
 function isLikelyLanHost(hostname) {
   const host = String(hostname || '').trim().toLowerCase()
   if (!host) return false
@@ -1082,8 +1044,7 @@ function isSensitiveCorsRoute(req) {
     /\/qbit\//i.test(pathName) ||
     isConfigReadbackPath(pathName) ||
     pathName.startsWith('/pair/') ||
-    pathName.startsWith('/auth/') ||
-    pathName.startsWith('/billing/')
+    pathName.startsWith('/auth/')
   )
 }
 
@@ -1337,10 +1298,6 @@ function authSecretAvailable() {
   return Boolean(getAuthTokenSecret())
 }
 
-function stripeBillingAvailable() {
-  return Boolean(stripe)
-}
-
 function isValidEmail(email) {
   const value = normalizeAccountEmail(email)
   if (!value) return false
@@ -1348,159 +1305,18 @@ function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
-function isValidPassword(password) {
-  const value = String(password || '')
-  if (value.length < 8 || value.length > 256) return false
-  return true
-}
-
-function hashPassword(password, salt = crypto.randomBytes(16).toString('hex')) {
-  const hash = crypto.scryptSync(String(password || ''), salt, 64).toString('hex')
-  return `${salt}:${hash}`
-}
-
-function verifyPassword(password, storedHash) {
-  const raw = String(storedHash || '')
-  const parts = raw.split(':')
-  if (parts.length !== 2) return false
-  const salt = parts[0]
-  const expectedHex = parts[1]
-  if (!salt || !expectedHex) return false
-  try {
-    const derived = crypto.scryptSync(String(password || ''), salt, 64)
-    const expected = Buffer.from(expectedHex, 'hex')
-    if (expected.length !== derived.length) return false
-    return crypto.timingSafeEqual(expected, derived)
-  } catch (_) {
-    return false
-  }
-}
-
-function toUnixMsFromStripe(secondsValue) {
-  const n = Number(secondsValue || 0)
-  if (!Number.isFinite(n) || n <= 0) return 0
-  return Math.floor(n * 1000)
-}
-
-function isSubscriptionActiveStatus(status) {
-  return ACTIVE_SUBSCRIPTION_STATUSES.has(String(status || '').toLowerCase())
-}
-
-function isUserSubscriptionActive(user) {
-  const status = String(user?.billing?.status || '').toLowerCase()
-  if (!isSubscriptionActiveStatus(status)) return false
-  const end = Number(user?.billing?.currentPeriodEndMs || 0)
-  if (!Number.isFinite(end) || end <= 0) return true
-  return end > Date.now()
-}
-
-function trialStartMsForUser(user) {
-  const linkedAt = Number(user?.stremio?.linkedAt || 0)
-  if (Number.isFinite(linkedAt) && linkedAt > 0) return linkedAt
-  const createdAt = Number(user?.createdAt || 0)
-  if (Number.isFinite(createdAt) && createdAt > 0) return createdAt
-  return 0
-}
-
-function getUserTrialState(user) {
-  const base = {
-    enabled: TRIAL_ENABLED,
-    days: TRIAL_DAYS,
-    requiresLinkedAccount: TRIAL_REQUIRE_LINKED_ACCOUNT,
-    eligible: false,
-    active: false,
-    startMs: 0,
-    endMs: 0,
-    remainingMs: 0
-  }
-  if (!TRIAL_ENABLED) return base
-
-  const startMs = trialStartMsForUser(user)
-  if (!startMs) return base
-
-  const durationMs = TRIAL_DAYS * 24 * 60 * 60 * 1000
-  const endMs = startMs + durationMs
-  const now = Date.now()
-  const active = now < endMs
-
-  return {
-    ...base,
-    eligible: true,
-    active,
-    startMs,
-    endMs,
-    remainingMs: active ? Math.max(0, endMs - now) : 0
-  }
-}
 
 function publicUserModel(user) {
   if (!user || typeof user !== 'object') return null
-  const billing = user.billing && typeof user.billing === 'object' ? user.billing : {}
   const stremio = user.stremio && typeof user.stremio === 'object' ? user.stremio : {}
-  const trial = getUserTrialState(user)
   return {
     stremio: {
       linked: Boolean(stremio.userId),
       userId: String(stremio.userId || ''),
       linkedAt: Number(stremio.linkedAt || 0),
       lastVerifiedAt: Number(stremio.lastVerifiedAt || 0)
-    },
-    trial: {
-      enabled: trial.enabled,
-      days: trial.days,
-      requiresLinkedAccount: trial.requiresLinkedAccount,
-      eligible: trial.eligible,
-      active: trial.active,
-      startMs: trial.startMs,
-      endMs: trial.endMs,
-      remainingMs: trial.remainingMs
-    },
-    billing: {
-      status: String(billing.status || 'inactive'),
-      active: isUserSubscriptionActive(user),
-      currentPeriodEndMs: Number(billing.currentPeriodEndMs || 0),
-      cancelAtPeriodEnd: Boolean(billing.cancelAtPeriodEnd)
     }
   }
-}
-
-function sanitizeRedirectUrl(input, fallback = '') {
-  const candidate = String(input || '').trim()
-  if (candidate) {
-    try {
-      const parsed = new URL(candidate)
-      if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return parsed.toString()
-    } catch (_) {}
-  }
-  const fb = String(fallback || '').trim()
-  if (!fb) return ''
-  try {
-    const parsed = new URL(fb)
-    if (parsed.protocol === 'https:' || parsed.protocol === 'http:') return parsed.toString()
-  } catch (_) {}
-  return ''
-}
-
-async function applyBillingUpdateToUser(user, patch = {}) {
-  if (!user || typeof user !== 'object') return null
-  const next = {
-    ...user,
-    billing: {
-      ...(user.billing && typeof user.billing === 'object' ? user.billing : {}),
-      status: String(patch.status || user?.billing?.status || 'inactive'),
-      customerId: String(patch.customerId || user?.billing?.customerId || ''),
-      subscriptionId: String(patch.subscriptionId || user?.billing?.subscriptionId || ''),
-      priceId: String(patch.priceId || user?.billing?.priceId || ''),
-      currentPeriodEndMs: Number(patch.currentPeriodEndMs || user?.billing?.currentPeriodEndMs || 0),
-      cancelAtPeriodEnd: Boolean(
-        patch.cancelAtPeriodEnd !== undefined
-          ? patch.cancelAtPeriodEnd
-          : user?.billing?.cancelAtPeriodEnd
-      ),
-      updatedAt: Date.now()
-    }
-  }
-  return accountStore.saveUser(next)
 }
 
 async function requireAuthUser(req, res, next) {
@@ -1521,72 +1337,10 @@ async function requireAuthUser(req, res, next) {
   next()
 }
 
-async function requireActiveSubscription(req, res, next) {
-  if (!req.authUser) return res.status(401).json({ error: 'Not authenticated' })
-  if (!isUserSubscriptionActive(req.authUser)) {
-    return res.status(402).json({ error: 'Active subscription required' })
-  }
-  next()
-}
-
+// Billing/subscription gating removed — addon is free.
+// Kept as pass-through so route signatures don't change.
 async function requireConfigSubscription(req, res, next) {
-  if (!REQUIRE_ACTIVE_SUBSCRIPTION) return next()
-
-  const userId = String(req?.config?.accountUserId || '').trim()
-  if (!userId) {
-    if (TRIAL_ENABLED && !TRIAL_REQUIRE_LINKED_ACCOUNT) {
-      req.trialAccess = {
-        enabled: true,
-        active: true,
-        guest: true,
-        requiresLinkedAccount: false
-      }
-      return next()
-    }
-    return res.status(402).json({
-      error: 'Active subscription required',
-      detail: TRIAL_ENABLED
-        ? 'Link Stremio account in Configure to start your free trial.'
-        : 'Subscription required'
-    })
-  }
-
-  const user = await accountStore.getUserById(userId)
-  if (!user) {
-    return res.status(402).json({
-      error: 'Active subscription required',
-      detail: TRIAL_ENABLED
-        ? 'Linked account not found. Re-link your Stremio account in Configure.'
-        : 'Subscription required'
-    })
-  }
-
-  if (isUserSubscriptionActive(user)) {
-    req.configAccountUser = user
-    return next()
-  }
-
-  const trial = getUserTrialState(user)
-  if (trial.active) {
-    req.configAccountUser = user
-    req.trialAccess = trial
-    return next()
-  }
-
-  return res.status(402).json({
-    error: 'Active subscription required',
-    detail: trial.enabled && trial.eligible
-      ? 'Free trial has ended. Activate subscription to continue.'
-      : 'Subscription required',
-    trial: trial.enabled ? {
-      enabled: true,
-      active: false,
-      days: trial.days,
-      startMs: trial.startMs,
-      endMs: trial.endMs,
-      requiresLinkedAccount: trial.requiresLinkedAccount
-    } : { enabled: false }
-  })
+  return next()
 }
 
 function parseCacheSeconds(value, fallback, min = 0, max = 3600) {
@@ -2009,7 +1763,7 @@ app.post('/encrypt', async (req, res) => {
   const secret = process.env.ENCRYPTION_SECRET
   if (!secret) return res.status(500).json({ error: 'ENCRYPTION_SECRET not configured' })
   const clientIp = getClientIp(req)
-  const limit = consumeLanPairRateLimit('encrypt', clientIp || 'unknown', ENCRYPT_MAX_PER_WINDOW)
+  const limit = rateLimiters.encrypt.consume(clientIp || 'unknown')
   if (!limit.allowed) {
     res.setHeader('Retry-After', String(limit.retryAfterSeconds))
     return res.status(429).json({ error: 'too many requests' })
@@ -2194,11 +1948,7 @@ app.post('/auth/stremio/auto-link-local', requireCsrfToken, async (req, res) => 
 
   try {
     const clientIp = getClientIp(req)
-    const limit = consumeLanPairRateLimit(
-      'auth-stremio-auto-link',
-      clientIp || 'unknown',
-      AUTH_MAX_PER_WINDOW
-    )
+    const limit = rateLimiters.auth.consume(clientIp || 'unknown')
     if (!limit.allowed) {
       res.setHeader('Retry-After', String(limit.retryAfterSeconds))
       return res.status(429).json({ error: 'too many requests' })
@@ -2262,11 +2012,7 @@ app.post('/auth/stremio/link-authkey', requireCsrfToken, async (req, res) => {
 
   try {
     const clientIp = getClientIp(req)
-    const limit = consumeLanPairRateLimit(
-      'auth-stremio-link',
-      clientIp || 'unknown',
-      AUTH_MAX_PER_WINDOW
-    )
+    const limit = rateLimiters.auth.consume(clientIp || 'unknown')
     if (!limit.allowed) {
       res.setHeader('Retry-After', String(limit.retryAfterSeconds))
       return res.status(429).json({ error: 'too many requests' })
@@ -2286,9 +2032,7 @@ app.get('/auth/me', requireAuthUser, (req, res) => {
   res.setHeader('Cache-Control', 'no-store')
   res.json({
     ok: true,
-    user: publicUserModel(req.authUser),
-    freeMode: FREE_MODE,
-    requiresActiveSubscription: REQUIRE_ACTIVE_SUBSCRIPTION
+    user: publicUserModel(req.authUser)
   })
 })
 
@@ -2453,11 +2197,7 @@ app.post('/pair/heartbeat', async (req, res) => {
       return res.status(400).json({ ok: false, error: 'At least one valid LAN endpoint is required' })
     }
     const clientIp = getClientIp(req)
-    const limit = consumeLanPairRateLimit(
-      'pair-heartbeat',
-      `${clientIp || 'unknown'}:${pairId}`,
-      LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW
-    )
+    const limit = rateLimiters.heartbeat.consume(`${clientIp || 'unknown'}:${pairId}`)
     if (!limit.allowed) {
       console.warn(`[pair] heartbeat rate-limited id=${pairLabel} from=${clientLabel}`)
       res.setHeader('Retry-After', String(limit.retryAfterSeconds))
@@ -2526,11 +2266,7 @@ app.post('/pair/status', async (req, res) => {
     const pairKey = sanitizePairKey(req.body?.pairKey)
     if (!pairId || !pairKey) return res.status(400).json({ ok: false, error: 'pairId and pairKey are required' })
     const clientIp = getClientIp(req)
-    const limit = consumeLanPairRateLimit(
-      'pair-status',
-      `${clientIp || 'unknown'}:${pairId}`,
-      LAN_PAIR_STATUS_MAX_PER_WINDOW
-    )
+    const limit = rateLimiters.status.consume(`${clientIp || 'unknown'}:${pairId}`)
     if (!limit.allowed) {
       res.setHeader('Retry-After', String(limit.retryAfterSeconds))
       return res.status(429).json({ ok: false, error: 'too many requests' })
@@ -2698,11 +2434,7 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
 // ─── POST /test-connection — validate credentials ──────────
 app.post('/test-connection', requireCsrfToken, async (req, res) => {
   const clientIp = getClientIp(req)
-  const limit = consumeLanPairRateLimit(
-    'test-connection',
-    clientIp || 'unknown',
-    TEST_CONNECTION_MAX_PER_WINDOW
-  )
+  const limit = rateLimiters.testConnection.consume(clientIp || 'unknown')
   if (!limit.allowed) {
     res.setHeader('Retry-After', String(limit.retryAfterSeconds))
     return res.status(429).json({ error: 'too many requests' })
@@ -2802,6 +2534,15 @@ async function withConfig(req, res, next) {
   } catch (err) {
     res.status(400).json({ error: 'Invalid config token' })
   }
+}
+
+async function withLegacyRootLocalConfig(req, res, next) {
+  req.params = {
+    ...(req.params || {}),
+    config: 'local'
+  }
+  req.legacyRootCompat = true
+  return withConfig(req, res, next)
 }
 
 function isMagnetLink(link) {
@@ -2964,9 +2705,50 @@ app.get('/:config/config.json', withConfig, requireLocalConfigReadback, (req, re
 app.get('/manifest.json', (req, res) => {
   console.log(`[stremio] ← manifest  config=root from=${req.ip || req.socket?.remoteAddress || '?'}`)
   setPublicCacheHeaders(res, 60, { sMaxAge: 300, staleWhileRevalidate: 900 })
-  const m = getManifest(req)
+  const m = manifest.createBootstrapManifest(getPublicBaseUrl(req))
   console.log(`[stremio] → manifest  id=${m.id} catalogs=${m.catalogs?.length || 0} configRequired=${m.behaviorHints?.configurationRequired}`)
   res.json(m)
+})
+
+app.get('/catalog/:type/:id.json', withLegacyRootLocalConfig, requireConfigSubscription, async (req, res) => {
+  console.warn(`[stremio] compat root catalog type=${req.params.type} id=${req.params.id} from=${requestClientLabel(req)} -> /local`)
+  const result = await handleCatalog(req.config, req.params.type, req.params.id, null, {
+    baseUrl: getPublicBaseUrl(req)
+  })
+  console.log(`[stremio] compat root catalog result type=${req.params.type} id=${req.params.id} metas=${result?.metas?.length || 0}`)
+  const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
+  applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: ttl, staleWhileRevalidate: Math.min(ttl * 4, 3600) })
+  res.json(result)
+})
+
+app.get('/catalog/:type/:id/:extra.json', withLegacyRootLocalConfig, requireConfigSubscription, async (req, res) => {
+  console.warn(`[stremio] compat root catalog type=${req.params.type} id=${req.params.id} extra=${req.params.extra} from=${requestClientLabel(req)} -> /local`)
+  const result = await handleCatalog(req.config, req.params.type, req.params.id, req.params.extra, {
+    baseUrl: getPublicBaseUrl(req)
+  })
+  console.log(`[stremio] compat root catalog result type=${req.params.type} id=${req.params.id} metas=${result?.metas?.length || 0}`)
+  const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
+  applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: ttl, staleWhileRevalidate: Math.min(ttl * 4, 3600) })
+  res.json(result)
+})
+
+app.get('/stream/:type/:id.json', withLegacyRootLocalConfig, requireConfigSubscription, async (req, res) => {
+  const addonUrl = getPublicBaseUrl(req)
+  console.warn(`[stremio] compat root stream type=${req.params.type} id=${req.params.id} from=${requestClientLabel(req)} -> /local`)
+  const result = await handleStream(req.config, req.params.type, req.params.id, addonUrl, 'local')
+  console.log(`[stremio] compat root stream result type=${req.params.type} id=${req.params.id} streams=${Array.isArray(result?.streams) ? result.streams.length : 0}`)
+  const ttl = parseCacheSeconds(result?.cacheMaxAge, 20, 5, 120)
+  applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: ttl, staleWhileRevalidate: Math.min(ttl * 3, 300) })
+  res.json(result)
+})
+
+app.get('/meta/:type/:id.json', withLegacyRootLocalConfig, requireConfigSubscription, async (req, res) => {
+  console.warn(`[stremio] compat root meta type=${req.params.type} id=${req.params.id} from=${requestClientLabel(req)} -> /local`)
+  const result = await handleMeta(req.config, req.params.type, req.params.id, {
+    baseUrl: getPublicBaseUrl(req)
+  })
+  applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: 300, staleWhileRevalidate: 1800 })
+  res.json(result)
 })
 
 app.get('/:config/catalog/:type/:id.json', withConfig, requireConfigSubscription, maybeLanPairRedirect('catalog'), async (req, res) => {

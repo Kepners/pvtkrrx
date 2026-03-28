@@ -181,19 +181,6 @@ async function run() {
       String(linkedUser.id || ''),
       'auth token subject should map only to the internal linked account id'
     )
-    await accountStore.saveUser({
-      ...linkedUser,
-      billing: {
-        ...(linkedUser.billing && typeof linkedUser.billing === 'object' ? linkedUser.billing : {}),
-        status: 'active',
-        customerId: 'cus_hidden',
-        subscriptionId: 'sub_hidden',
-        priceId: 'price_hidden',
-        currentPeriodEndMs: Date.now() + 86400000,
-        cancelAtPeriodEnd: false
-      }
-    })
-
     await new Promise(resolve => server.close(resolve))
     delete require.cache[require.resolve('../index')]
     app = require('../index')
@@ -211,9 +198,6 @@ async function run() {
     assert.equal(Boolean(meData?.user?.stremio?.linked), true)
     assert.equal(meData?.user?.id, undefined, '/auth/me should omit internal user id')
     assert.equal(meData?.user?.email, undefined, '/auth/me should omit account email')
-    assert.equal(meData?.user?.billing?.customerId, undefined, '/auth/me should omit stripe customer id')
-    assert.equal(meData?.user?.billing?.subscriptionId, undefined, '/auth/me should omit stripe subscription id')
-    assert.equal(meData?.user?.billing?.priceId, undefined, '/auth/me should omit stripe price id')
 
     const legacyMeRes = await fetch(`${base}/auth/me`, {
       headers: { Authorization: `Bearer ${legacyReadableBearer}` }

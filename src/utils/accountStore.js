@@ -72,14 +72,6 @@ class AccountStore {
     return `acct:email:${String(emailHash || '').trim()}`
   }
 
-  stripeCustomerKey(customerId) {
-    return `acct:stripe_customer:${String(customerId || '').trim()}`
-  }
-
-  stripeSubscriptionKey(subscriptionId) {
-    return `acct:stripe_subscription:${String(subscriptionId || '').trim()}`
-  }
-
   stremioUserKey(stremioUserId) {
     return `acct:stremio_user:${String(stremioUserId || '').trim()}`
   }
@@ -104,16 +96,7 @@ class AccountStore {
       emailHash,
       passwordHash: String(input.passwordHash),
       createdAt: now,
-      updatedAt: now,
-      billing: {
-        status: 'inactive',
-        customerId: '',
-        subscriptionId: '',
-        priceId: '',
-        currentPeriodEndMs: 0,
-        cancelAtPeriodEnd: false,
-        updatedAt: now
-      }
+      updatedAt: now
     }
 
     await this.set(this.emailKey(emailHash), user.id)
@@ -139,22 +122,6 @@ class AccountStore {
     const normalized = normalizeAccountEmail(email)
     if (!normalized) return null
     const userId = await this.get(this.emailKey(hashAccountEmail(normalized)))
-    if (!userId) return null
-    return this.getUserById(userId)
-  }
-
-  async getUserByStripeCustomerId(customerId) {
-    const id = String(customerId || '').trim()
-    if (!id) return null
-    const userId = await this.get(this.stripeCustomerKey(id))
-    if (!userId) return null
-    return this.getUserById(userId)
-  }
-
-  async getUserByStripeSubscriptionId(subscriptionId) {
-    const id = String(subscriptionId || '').trim()
-    if (!id) return null
-    const userId = await this.get(this.stripeSubscriptionKey(id))
     if (!userId) return null
     return this.getUserById(userId)
   }
@@ -207,15 +174,6 @@ class AccountStore {
         authKeyHash,
         linkedAt: now,
         lastVerifiedAt: now
-      },
-      billing: {
-        status: 'inactive',
-        customerId: '',
-        subscriptionId: '',
-        priceId: '',
-        currentPeriodEndMs: 0,
-        cancelAtPeriodEnd: false,
-        updatedAt: now
       }
     }
 
@@ -237,37 +195,10 @@ class AccountStore {
       emailHash: hashAccountEmail(email),
       updatedAt: Date.now()
     }
-    if (!next.billing || typeof next.billing !== 'object') {
-      next.billing = {
-        status: 'inactive',
-        customerId: '',
-        subscriptionId: '',
-        priceId: '',
-        currentPeriodEndMs: 0,
-        cancelAtPeriodEnd: false,
-        updatedAt: Date.now()
-      }
-    } else {
-      next.billing = {
-        status: String(next.billing.status || 'inactive'),
-        customerId: String(next.billing.customerId || ''),
-        subscriptionId: String(next.billing.subscriptionId || ''),
-        priceId: String(next.billing.priceId || ''),
-        currentPeriodEndMs: Number(next.billing.currentPeriodEndMs || 0),
-        cancelAtPeriodEnd: Boolean(next.billing.cancelAtPeriodEnd),
-        updatedAt: Date.now()
-      }
-    }
 
     await this.set(this.userKey(id), JSON.stringify(next))
     await this.set(this.emailKey(next.emailHash), id)
 
-    if (next.billing.customerId) {
-      await this.set(this.stripeCustomerKey(next.billing.customerId), id)
-    }
-    if (next.billing.subscriptionId) {
-      await this.set(this.stripeSubscriptionKey(next.billing.subscriptionId), id)
-    }
     const stremioUserId = normalizeStremioUserId(next?.stremio?.userId)
     if (stremioUserId) {
       await this.set(this.stremioUserKey(stremioUserId), id)

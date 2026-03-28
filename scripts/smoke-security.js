@@ -6,7 +6,7 @@
  *  #2  Spoofed Host / X-Forwarded-For does NOT unlock local-only routes
  *  #3  nip.io / lvh.me rebinding targets are blocked in test-connection
  *  #4  pair/status does not return raw endpoint URLs or pairKey
- *  #5  /auth/me omits billing identifiers (customerId, subscriptionId, priceId)
+ *  #5  /auth/me requires auth token
  *  #6  Legacy plain base64-JSON playback/file tokens are rejected
  *  #7  Server-side log output redacts paths, tracker URLs, auth ids, and pair secrets
  *  #8  Secure JSON reads legacy plaintext but new saves stay encrypted-at-rest
@@ -220,13 +220,10 @@ async function run() {
     assert.equal(statusRes.json?.localHostname, undefined, '#4 pair/status must NOT return localHostname')
     console.log('✓ #4 pair/status omits private endpoint metadata')
 
-    // ── #5: /auth/me must omit billing internal identifiers ─────────────────
-    // We can't easily get a real auth token in this test; check the publicUserModel shape
-    // by inspecting what fields would be exposed — verify via direct route attempt
+    // ── #5: /auth/me must require auth token ────────────────────────────────
     const authMeNoToken = await request(port, 'GET', '/auth/me')
     assert.equal(authMeNoToken.status, 401, '#5 /auth/me without token must return 401')
-    // Can't check full model without a real token, but verify the route exists
-    console.log('✓ #5 /auth/me requires auth (billing fields shape verified via code review)')
+    console.log('✓ #5 /auth/me requires auth token')
 
     // ── #6: plain base64-JSON playback token is rejected ────────────────────
     const legacyPayload = Buffer.from(JSON.stringify({
