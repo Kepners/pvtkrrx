@@ -4,6 +4,7 @@ const path = require('path')
 const selfsigned = require('selfsigned')
 const express = require('express')
 const shared = require('./src/lib/shared')
+const { isCompletedTorrent } = require('./src/utils/torrentState')
 
 // Destructure everything routes need from the shared module.
 // Shared module initializes env, console redaction, stores, and rate limiters at load time.

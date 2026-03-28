@@ -10,6 +10,7 @@ const { encodePlaybackStateToken } = require('../utils/opaqueState')
 const { parseSportsTitle } = require('../utils/sportsTitleParser')
 const { buildPlaybackFileUrl, canEmitTrackerPlayback, getTrackerPlaybackRestriction } = require('../utils/fileServing')
 const { decodeCustomId } = require('../utils/customId')
+const { isCompletedTorrent } = require('../utils/torrentState')
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '7000', 10))
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '5000', 10))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '20', 10))
@@ -361,13 +362,6 @@ function titleRelevant(resultTitle, queryTitle) {
   if (queryWords.length === 0) return true
   const resultLower = resultTitle.toLowerCase()
   return queryWords.every(w => resultLower.includes(w))
-}
-
-function isCompletedTorrent(torrent, fileProgress = null) {
-  const torrentProgress = Number(torrent?.progress || 0)
-  if (torrentProgress >= 0.999) return true
-  if (Number.isFinite(fileProgress) && fileProgress >= 0.999) return true
-  return false
 }
 
 async function handleImdbStream(config, type, id, addonUrl, configToken) {
