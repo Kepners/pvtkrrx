@@ -7,54 +7,57 @@
   <meta name="description" content="Provider runbooks for PVTKRRX deployment on major seedbox platforms with LAN Bridge, Remote Seedbox, and direct-host options.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@500;700&family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@500;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
+    :root {
+      --bg-0: #010203;
+      --bg-1: #080a12;
+      --bg-2: #0d1019;
+      --cyan: #00f6ff;
+      --blue: #00a8ff;
+      --green: #00ff66;
+      --red: #ff134f;
+      --magenta: #ff00d4;
+      --text: #d8e4ff;
+      --muted: #8ca0c8;
+      --line: rgba(0, 246, 255, 0.35);
+      --line-soft: rgba(0, 246, 255, 0.18);
+    }
+
     * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
-  </style>
-  <style>
-    :root {
-      --void-0: #000000;
-      --void-1: #050505;
-      --void-2: #0a0a0a;
-      --cyber-cyan: #00ffff;
-      --cyber-magenta: #ff00ff;
-      --cyber-lime: #00ff44;
-      --cyber-blue: #00ccff;
-      --cyber-red: #ff0033;
-      --cyber-text: #eeffff;
-      --cyber-muted: #bdd7e4;
+
+    html,
+    body {
+      min-height: 100%;
     }
 
     body {
-      background: radial-gradient(circle at 50% 42%, #111 0%, #050505 45%, #000 100%) !important;
       font-family: "Rajdhani", sans-serif;
-      color: var(--cyber-text);
-      text-shadow: -1px 0 rgba(255, 0, 51, 0.2), 1px 0 rgba(0, 255, 255, 0.2);
+      color: var(--text);
+      background:
+        radial-gradient(1100px 700px at 50% 40%, rgba(0, 168, 255, 0.13), transparent 62%),
+        radial-gradient(900px 560px at 20% 75%, rgba(255, 0, 212, 0.08), transparent 66%),
+        linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 52%, var(--bg-2) 100%);
       overflow-x: hidden;
       position: relative;
     }
 
-    body::before {
-      display: none;
-    }
-
     .vortex,
-    #void-tunnel,
-    .floating-debrid,
-    .crt-scanlines,
-    .noise-layer,
-    #glitch-flash {
+    .particles,
+    .scanlines,
+    .noise,
+    .glitch-flash {
       position: fixed;
       inset: 0;
       pointer-events: none;
     }
 
     .vortex {
-      z-index: 0;
+      z-index: 1;
       overflow: hidden;
     }
 
@@ -67,128 +70,92 @@
       transform: translate(-50%, -50%);
       border-radius: 999px;
       mix-blend-mode: screen;
-      opacity: 0.16;
+      opacity: 0.18;
+      filter: blur(1px);
     }
 
     .vortex-layer.one {
       background:
         repeating-radial-gradient(circle at center, rgba(0, 246, 255, 0.55) 0 2px, transparent 2px 16px),
-        conic-gradient(from 0deg, transparent, rgba(0, 246, 255, 0.2), transparent, rgba(255, 0, 212, 0.18), transparent);
-      animation: runbook-vortex-a 22s linear infinite;
+        conic-gradient(from 0deg, transparent, rgba(0, 246, 255, 0.22), transparent, rgba(255, 0, 212, 0.2), transparent);
+      animation: vortex-spin-a 20s linear infinite, vortex-pulse 8s ease-in-out infinite;
     }
 
     .vortex-layer.two {
       background:
         repeating-radial-gradient(circle at center, rgba(0, 255, 102, 0.4) 0 1px, transparent 1px 14px),
-        conic-gradient(from 120deg, transparent, rgba(255, 0, 51, 0.2), transparent, rgba(0, 204, 255, 0.18), transparent);
-      animation: runbook-vortex-b 34s linear infinite reverse;
+        conic-gradient(from 120deg, transparent, rgba(255, 19, 79, 0.22), transparent, rgba(0, 168, 255, 0.2), transparent);
+      animation: vortex-spin-b 28s linear infinite reverse, vortex-pulse 10s ease-in-out infinite 0.8s;
       opacity: 0.14;
     }
 
     .vortex-layer.three {
       background:
-        repeating-radial-gradient(circle at center, rgba(255, 0, 212, 0.4) 0 1px, transparent 1px 13px),
-        conic-gradient(from 220deg, transparent, rgba(0, 255, 102, 0.2), transparent, rgba(0, 168, 255, 0.16), transparent);
-      animation: runbook-vortex-c 52s linear infinite;
+        repeating-radial-gradient(circle at center, rgba(255, 0, 212, 0.45) 0 1px, transparent 1px 13px),
+        conic-gradient(from 220deg, transparent, rgba(0, 255, 102, 0.24), transparent, rgba(0, 168, 255, 0.2), transparent);
+      animation: vortex-spin-c 35s linear infinite, vortex-pulse 12s ease-in-out infinite 1.4s;
       opacity: 0.12;
     }
 
-    #void-tunnel {
-      z-index: 1;
-      width: 100%;
-      height: 100%;
-      filter: contrast(1.42) saturate(1.34) blur(0.15px);
-      opacity: 0.58;
-      mix-blend-mode: screen;
-      animation: tunnel-flicker 6.2s infinite steps(2, end);
-    }
-
-    .floating-debrid {
+    .particles {
       z-index: 2;
       overflow: hidden;
     }
 
-    .floating-debrid .debrid-dot {
+    .particle {
       position: absolute;
       left: 0;
       top: 0;
       width: var(--size);
       height: var(--size);
       border-radius: 2px;
-      opacity: 0.56;
+      opacity: 0.55;
       background: hsl(var(--hue), 100%, 62%);
       box-shadow:
         0 0 10px hsla(var(--hue), 100%, 62%, 0.75),
-        0 0 20px hsla(var(--hue), 100%, 62%, 0.44);
-      transform: translate3d(var(--x), var(--y), 0) scale(0.66);
-      animation: debrid-rise var(--dur) linear infinite;
+        0 0 22px hsla(var(--hue), 100%, 62%, 0.45);
+      transform: translate3d(var(--x), var(--y), 0) scale(0.65);
+      animation: particle-drift var(--dur) linear infinite;
       animation-delay: var(--delay);
     }
 
-    .crt-scanlines {
-      z-index: 3;
-      background: repeating-linear-gradient(
-        to bottom,
-        rgba(255, 255, 255, 0.06) 0px,
-        rgba(255, 255, 255, 0.06) 1px,
-        transparent 2px,
-        transparent 4px
-      );
-      opacity: 0.16;
-      mix-blend-mode: screen;
-      animation: scanline-move 0.17s linear infinite;
-    }
-
-    .noise-layer {
-      z-index: 4;
-      opacity: 0.08;
+    .scanlines {
+      z-index: 6;
+      opacity: 0.28;
       background:
-        radial-gradient(circle at 18% 34%, rgba(255, 255, 255, 0.34) 0 0.8px, transparent 0.8px),
-        radial-gradient(circle at 76% 19%, rgba(255, 255, 255, 0.26) 0 0.7px, transparent 0.7px),
-        radial-gradient(circle at 67% 81%, rgba(255, 255, 255, 0.2) 0 0.9px, transparent 0.9px),
-        radial-gradient(circle at 31% 73%, rgba(255, 255, 255, 0.2) 0 0.8px, transparent 0.8px);
-      background-size: 3px 3px, 4px 4px, 5px 5px, 6px 6px;
-      animation: noise-shift 0.2s steps(2) infinite;
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 3px),
+        repeating-linear-gradient(90deg, rgba(0, 246, 255, 0.04) 0 1px, transparent 1px 2px);
+      animation: scan-drift 8s linear infinite;
     }
 
-    #glitch-flash {
-      z-index: 5;
+    .noise {
+      z-index: 7;
+      opacity: 0.05;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84' viewBox='0 0 84 84'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='84' height='84' filter='url(%23n)'/%3E%3C/svg%3E");
+      animation: noise-jump 0.2s steps(2) infinite;
+    }
+
+    .glitch-flash {
+      z-index: 8;
       opacity: 0;
-      --tear-top: 44%;
-      --tear-height: 12%;
       background:
-        linear-gradient(
-          to bottom,
-          transparent 0,
-          transparent var(--tear-top),
-          rgba(255, 255, 255, 0.2) var(--tear-top),
-          rgba(255, 255, 255, 0.2) calc(var(--tear-top) + var(--tear-height)),
-          transparent calc(var(--tear-top) + var(--tear-height)),
-          transparent 100%
-        ),
-        repeating-linear-gradient(
-          90deg,
-          rgba(0, 255, 255, 0.18) 0 2px,
-          rgba(255, 0, 255, 0.17) 2px 4px,
-          transparent 4px 8px
-        );
+        linear-gradient(90deg, rgba(255, 19, 79, 0.16), transparent 25%, rgba(0, 246, 255, 0.14) 56%, transparent 82%),
+        radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.18), transparent 58%);
       mix-blend-mode: screen;
-    }
-
-    body.glitch-burst #glitch-flash {
-      opacity: 1;
-      animation: glitch-burst 0.28s steps(2, end) 1;
+      transition: opacity 90ms linear;
     }
 
     .shell {
-      position: relative;
-      z-index: 8;
-      width: min(1240px, 95vw);
+      width: min(1200px, 94vw);
       margin: 0 auto;
-      padding: 1rem 0 3rem;
+      padding: 22px 0 44px;
+      position: relative;
+      z-index: 10;
     }
 
     .topbar {
+      border: 1px solid rgba(0, 246, 255, 0.2);
+      background: rgba(6, 9, 16, 0.74);
       border-radius: 14px;
       padding: 10px 12px;
       margin-bottom: 14px;
@@ -196,6 +163,9 @@
       align-items: center;
       justify-content: space-between;
       gap: 12px;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+        0 0 22px rgba(0, 168, 255, 0.14);
     }
 
     .brand {
@@ -203,6 +173,25 @@
       align-items: center;
       gap: 10px;
       min-width: 0;
+    }
+
+    .brand-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--cyan);
+      box-shadow: 0 0 12px var(--cyan), 0 0 26px rgba(0, 246, 255, 0.75);
+      flex: 0 0 auto;
+    }
+
+    .brand-text {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #d2e4ff;
+      text-shadow: 0 0 8px rgba(0, 168, 255, 0.45);
+      white-space: nowrap;
     }
 
     .nav {
@@ -214,133 +203,51 @@
 
     .nav a {
       text-decoration: none;
+      border: 1px solid rgba(0, 246, 255, 0.28);
       border-radius: 999px;
       padding: 6px 10px;
+      color: #bfd6ff;
       font-family: "IBM Plex Mono", monospace;
       font-size: 11px;
       letter-spacing: 1px;
       text-transform: uppercase;
       transition: all 0.18s ease;
+      position: relative;
+      overflow: hidden;
+      background: rgba(2, 8, 18, 0.58);
+    }
+
+    .nav a:hover {
+      color: #fff;
+      border-color: rgba(255, 0, 212, 0.55);
+      box-shadow: 0 0 0 2px rgba(255, 0, 212, 0.18), 0 0 14px rgba(0, 246, 255, 0.3);
+      transform: translateY(-1px);
     }
 
     .hero {
+      border: 1px solid rgba(0, 246, 255, 0.2);
+      background:
+        radial-gradient(700px 360px at 52% 42%, rgba(0, 168, 255, 0.15), transparent 66%),
+        radial-gradient(560px 240px at 45% 55%, rgba(255, 0, 212, 0.09), transparent 60%),
+        rgba(6, 9, 16, 0.74);
       border-radius: 18px;
       margin-bottom: 14px;
+      text-align: center;
+      padding: 1.8rem 1.3rem 1.4rem;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+        0 0 22px rgba(0, 168, 255, 0.14);
     }
 
     .panel {
+      border: 1px solid rgba(0, 246, 255, 0.2);
+      background: rgba(6, 9, 16, 0.74);
       border-radius: 12px;
       padding: 18px;
       margin-bottom: 12px;
-    }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
-    th,
-    td {
-      padding: 8px 10px;
-      text-align: left;
-      vertical-align: top;
-    }
-
-    .chip {
-      display: inline-block;
-      text-decoration: none;
-      border-radius: 999px;
-      padding: 6px 10px;
-      font-size: 11px;
-      text-transform: uppercase;
-    }
-
-    .badge {
-      display: inline-block;
-      border-radius: 999px;
-      padding: 4px 8px;
-      font-size: 11px;
-      text-transform: uppercase;
-    }
-
-    pre {
-      overflow: hidden;
-      -ms-overflow-style: none;
-      scrollbar-width: none;
-    }
-
-    pre::-webkit-scrollbar {
-      display: none;
-    }
-
-    footer {
-      border-radius: 0.84rem;
-      padding: 0.82rem 0.95rem !important;
-      display: flex;
-      justify-content: space-between;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    .topbar,
-    .hero,
-    .panel,
-    footer {
-      background: rgba(3, 8, 12, 0.62) !important;
-      border: 1px solid rgba(0, 255, 255, 0.4) !important;
       box-shadow:
-        inset 0 0 0 1px rgba(255, 255, 255, 0.06),
-        0 0 16px rgba(0, 255, 255, 0.36),
-        0 0 40px rgba(255, 0, 255, 0.26);
-      backdrop-filter: blur(7px);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .topbar::before,
-    .hero::before,
-    .panel::before,
-    footer::before {
-      content: "";
-      position: absolute;
-      inset: -1px;
-      border: 1px solid rgba(0, 204, 255, 0.25);
-      pointer-events: none;
-      animation: border-jitter 5s steps(2, end) infinite;
-    }
-
-    .brand-dot {
-      background: var(--cyber-lime);
-      box-shadow: 0 0 12px var(--cyber-lime), 0 0 26px rgba(0, 255, 68, 0.7);
-    }
-
-    .brand-text {
-      font-family: "IBM Plex Mono", monospace;
-      letter-spacing: 0.14em;
-      text-shadow: -1px 0 rgba(255, 0, 51, 0.4), 1px 0 rgba(0, 255, 255, 0.5), 0 0 8px rgba(0, 255, 255, 0.5);
-    }
-
-    .hero {
-      text-align: center;
-      padding: 1.8rem 1.3rem 1.4rem;
-      border-radius: 1.2rem;
-      background:
-        radial-gradient(circle at 55% 37%, rgba(0, 204, 255, 0.18), transparent 44%),
-        radial-gradient(circle at 42% 64%, rgba(255, 0, 255, 0.16), transparent 42%),
-        rgba(3, 8, 12, 0.66) !important;
-    }
-
-    .hero::after {
-      content: "";
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 48%;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, rgba(255, 0, 255, 0.92), rgba(0, 255, 255, 0.92), transparent);
-      opacity: 0.28;
-      animation: hero-tear 4.6s linear infinite;
-      pointer-events: none;
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+        0 0 22px rgba(0, 168, 255, 0.14);
     }
 
     .logo {
@@ -352,23 +259,13 @@
       letter-spacing: 0.18em;
       text-transform: uppercase;
       margin-bottom: 0.65rem;
-      color: transparent;
-      background: linear-gradient(
-        180deg,
-        #ffffff 0%,
-        #ebfdff 24%,
-        #7ef7ff 34%,
-        #ffffff 47%,
-        #9db4c8 64%,
-        #f7fbff 100%
-      );
-      -webkit-background-clip: text;
-      background-clip: text;
+      color: #d9ebff;
       text-shadow:
-        0 0 10px rgba(255, 255, 255, 0.9),
-        0 0 24px rgba(0, 255, 255, 0.62),
-        0 0 52px rgba(255, 0, 255, 0.45);
-      animation: logo-pulse 3s ease-in-out infinite;
+        0 0 8px rgba(255, 255, 255, 0.9),
+        0 0 26px rgba(0, 246, 255, 0.66),
+        0 0 54px rgba(0, 168, 255, 0.5),
+        0 0 82px rgba(255, 0, 212, 0.28);
+      animation: rgb-jitter 2.8s infinite steps(2, end);
     }
 
     .hero h1 {
@@ -387,20 +284,22 @@
     .subtitle-static {
       position: relative;
       transform-style: preserve-3d;
-      animation: subtitle-rgb-jitter 2.8s infinite steps(2, end);
+      animation: rgb-jitter 2.8s infinite steps(2, end);
+      color: #d9ebff;
       text-shadow:
         0 0 8px rgba(255, 255, 255, 0.9),
-        0 0 24px rgba(0, 255, 255, 0.62),
-        0 0 48px rgba(255, 0, 255, 0.38);
+        0 0 26px rgba(0, 246, 255, 0.66),
+        0 0 54px rgba(0, 168, 255, 0.5),
+        0 0 82px rgba(255, 0, 212, 0.28);
     }
 
     .subtitle-static > span {
       position: relative;
       display: inline-block;
-      background: linear-gradient(180deg, #f7fcff 0%, #d7ecff 55%, #b8dcff 100%);
+      background: linear-gradient(180deg, #f7fcff 0%, #c9e6ff 55%, #b4d9ff 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
-      filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.15));
+      filter: drop-shadow(0 2px 0 rgba(255, 255, 255, 0.16));
     }
 
     .subtitle-static::before,
@@ -413,37 +312,43 @@
     }
 
     .subtitle-static::before {
-      color: rgba(0, 255, 255, 0.82);
+      color: var(--cyan);
       transform: translate3d(-2px, 1px, 0);
-      text-shadow: -2px 0 0 rgba(0, 255, 255, 0.7);
-      animation: subtitle-glitch-slice-a 2100ms infinite steps(2, end);
-      opacity: 0.86;
+      text-shadow: -2px 0 0 rgba(0, 246, 255, 0.7);
+      animation: glitch-slice-a 2100ms infinite steps(2, end);
+      opacity: 0.85;
     }
 
     .subtitle-static::after {
-      color: rgba(255, 0, 51, 0.78);
+      color: var(--red);
       transform: translate3d(2px, -1px, 0);
-      text-shadow: 2px 0 0 rgba(255, 0, 51, 0.72);
-      animation: subtitle-glitch-slice-b 2700ms infinite steps(2, end);
-      opacity: 0.82;
+      text-shadow: 2px 0 0 rgba(255, 19, 79, 0.72);
+      animation: glitch-slice-b 2700ms infinite steps(2, end);
+      opacity: 0.8;
     }
 
     .hero p {
-      font-family: "Share Tech Mono", monospace !important;
+      font-family: "IBM Plex Mono", monospace;
       font-size: clamp(0.78rem, 2.1vw, 0.96rem);
       letter-spacing: 0.06em;
       text-transform: uppercase;
-      color: #d7e9ef !important;
+      color: #c4d5ef;
       max-width: 910px;
-      margin-bottom: 0.55rem;
+      margin: 0 auto 0.55rem;
+      line-height: 1.5;
     }
 
     .stamp {
-      border-color: rgba(255, 0, 255, 0.65) !important;
-      background: rgba(255, 0, 255, 0.14) !important;
-      color: #fff !important;
-      text-shadow: -1px 0 rgba(255, 0, 51, 0.5), 1px 0 rgba(0, 255, 255, 0.6), 0 0 9px rgba(255, 0, 255, 0.4);
-      font-family: "Share Tech Mono", monospace;
+      display: inline-block;
+      border: 1px solid rgba(255, 0, 212, 0.45);
+      background: rgba(8, 12, 24, 0.7);
+      color: #bfd6ff;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      border-radius: 999px;
+      padding: 6px 10px;
     }
 
     .glitch-text {
@@ -461,14 +366,14 @@
     }
 
     .glitch-text::before {
-      color: rgba(0, 255, 255, 0.85);
+      color: rgba(0, 246, 255, 0.85);
       transform: translate(-2px, 0);
       clip-path: polygon(0 3%, 100% 0, 100% 33%, 0 37%);
       animation: glitch-a 1.85s steps(2, end) infinite;
     }
 
     .glitch-text::after {
-      color: rgba(255, 0, 51, 0.78);
+      color: rgba(255, 19, 79, 0.78);
       transform: translate(2px, 0);
       clip-path: polygon(0 63%, 100% 58%, 100% 100%, 0 97%);
       animation: glitch-b 1.4s steps(2, end) infinite;
@@ -476,117 +381,125 @@
 
     h2,
     h3 {
-      font-family: "Orbitron", sans-serif !important;
+      font-family: "Orbitron", sans-serif;
       text-transform: uppercase;
-      letter-spacing: 0.13em !important;
-      color: #f1ffff !important;
-      text-shadow: -2px 0 rgba(255, 0, 51, 0.52), 2px 0 rgba(0, 255, 255, 0.74), 0 0 18px rgba(0, 255, 255, 0.42);
-      animation: flicker 3.2s steps(2, end) infinite;
+      letter-spacing: 0.13em;
+      color: #f0f7ff;
+      text-shadow: 0 0 12px rgba(0, 246, 255, 0.22);
+      margin-bottom: 8px;
     }
 
     h2 {
-      font-size: clamp(1rem, 2.8vw, 1.72rem) !important;
+      font-size: clamp(1rem, 2.8vw, 1.72rem);
     }
 
     h3 {
-      font-size: clamp(0.92rem, 2.4vw, 1.26rem) !important;
-    }
-
-    p,
-    li,
-    td {
-      text-shadow: -1px 0 rgba(255, 0, 51, 0.24), 1px 0 rgba(0, 255, 255, 0.24);
-      transition: text-shadow 0.2s ease;
-    }
-
-    .panel:hover p,
-    .panel:hover li,
-    .panel:hover td {
-      text-shadow: -1px 0 rgba(255, 0, 51, 0.42), 1px 0 rgba(0, 255, 255, 0.54), 0 0 10px rgba(0, 255, 255, 0.25);
-    }
-
-    .chips {
-      gap: 0.42rem;
-    }
-
-    .nav a,
-    .chip,
-    .badge {
-      border: 1px solid rgba(0, 255, 255, 0.55) !important;
-      background: rgba(0, 0, 0, 0.62) !important;
-      color: #f2ffff !important;
-      font-family: "IBM Plex Mono", monospace !important;
-      letter-spacing: 0.08em !important;
-      text-shadow: 0 0 7px rgba(0, 255, 255, 0.6);
-      overflow: hidden;
-      position: relative;
-    }
-
-    .nav a::after,
-    .chip::after,
-    .badge::after {
-      content: "";
-      position: absolute;
-      inset: 0;
-      transform: translateX(-110%);
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
-      transition: transform 0.26s ease;
-      pointer-events: none;
-    }
-
-    .nav a:hover::after,
-    .chip:hover::after,
-    .badge:hover::after {
-      transform: translateX(110%);
-    }
-
-    .nav a:hover,
-    .chip:hover,
-    .badge:hover {
-      border-color: rgba(255, 0, 255, 0.78) !important;
-      text-shadow: -2px 0 rgba(255, 0, 51, 0.6), 2px 0 rgba(0, 255, 255, 0.8), 0 0 14px rgba(255, 0, 255, 0.5);
-      animation: hover-glitch 0.16s steps(2, end) infinite;
+      font-size: clamp(0.92rem, 2.4vw, 1.26rem);
     }
 
     table {
-      border: 1px solid rgba(0, 255, 255, 0.5);
-      box-shadow: 0 0 20px rgba(0, 255, 255, 0.23);
-      background: rgba(0, 0, 0, 0.32);
+      width: 100%;
+      border-collapse: collapse;
+      border: 1px solid rgba(0, 246, 255, 0.2);
+      background: rgba(4, 8, 18, 0.7);
     }
 
     th,
     td {
-      border: 1px solid rgba(0, 255, 255, 0.26);
-      background: rgba(0, 0, 0, 0.34);
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+      border: 1px solid rgba(0, 246, 255, 0.15);
     }
 
     th {
-      background: rgba(0, 204, 255, 0.14);
-      color: #efffff;
-      font-family: "Share Tech Mono", monospace !important;
-      letter-spacing: 0.09em !important;
-      text-shadow: 0 0 9px rgba(0, 255, 255, 0.55);
+      background: rgba(0, 168, 255, 0.1);
+      color: #e5f5ff;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.9px;
+      text-transform: uppercase;
     }
 
     tbody tr:hover td {
-      background: rgba(255, 0, 255, 0.1);
-      text-shadow: -1px 0 rgba(255, 0, 51, 0.48), 1px 0 rgba(0, 255, 255, 0.66), 0 0 12px rgba(0, 255, 255, 0.35);
-      animation: row-glitch 0.2s steps(2, end) infinite;
+      background: rgba(0, 168, 255, 0.06);
     }
 
     .ok {
-      color: #71ffb8 !important;
-      text-shadow: 0 0 10px rgba(0, 255, 68, 0.5);
+      color: #71ffb8;
     }
 
     .warn {
-      color: #ffe6a4 !important;
-      text-shadow: 0 0 9px rgba(255, 180, 0, 0.44);
+      color: #ffe6a4;
     }
 
     .no {
-      color: #ff8da2 !important;
-      text-shadow: 0 0 9px rgba(255, 0, 51, 0.45);
+      color: #ff8da2;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.42rem;
+      margin-bottom: 10px;
+    }
+
+    .chip {
+      display: inline-block;
+      text-decoration: none;
+      border: 1px solid rgba(0, 246, 255, 0.28);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #bfd6ff;
+      background: rgba(2, 8, 18, 0.58);
+      transition: all 0.18s ease;
+    }
+
+    .chip:hover {
+      color: #fff;
+      border-color: rgba(255, 0, 212, 0.55);
+      box-shadow: 0 0 0 2px rgba(255, 0, 212, 0.18), 0 0 14px rgba(0, 246, 255, 0.3);
+      transform: translateY(-1px);
+    }
+
+    .badge {
+      display: inline-block;
+      border: 1px solid rgba(0, 246, 255, 0.28);
+      border-radius: 999px;
+      padding: 4px 8px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #bfd6ff;
+      background: rgba(2, 8, 18, 0.58);
+    }
+
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .note {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .note code {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      color: #e5f5ff;
+      background: rgba(3, 16, 32, 0.78);
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 246, 255, 0.2);
     }
 
     ol {
@@ -595,58 +508,32 @@
     }
 
     li {
-      position: relative;
       margin-bottom: 0.46rem;
     }
 
-    li::after {
-      content: "";
-      position: absolute;
-      left: -1.02rem;
-      top: 0.63em;
-      width: 6px;
-      height: 6px;
-      background: var(--cyber-cyan);
-      transform: rotate(45deg) translateY(-50%);
-      box-shadow: 0 0 7px var(--cyber-cyan), 0 0 13px rgba(255, 0, 255, 0.35);
-      opacity: 0.84;
+    li code {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      color: #e5f5ff;
+      background: rgba(3, 16, 32, 0.78);
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 246, 255, 0.2);
     }
 
     pre {
-      background:
-        linear-gradient(180deg, rgba(0, 0, 0, 0.94), rgba(0, 0, 0, 0.74)),
-        repeating-linear-gradient(
-          to bottom,
-          rgba(255, 255, 255, 0.04) 0px,
-          rgba(255, 255, 255, 0.04) 1px,
-          transparent 2px,
-          transparent 5px
-        ) !important;
-      border: 1px solid rgba(0, 255, 255, 0.52) !important;
-      box-shadow: inset 0 0 24px rgba(0, 204, 255, 0.15), 0 0 20px rgba(0, 255, 255, 0.24);
-      position: relative;
+      background: rgba(4, 8, 18, 0.85);
+      border: 1px solid rgba(0, 246, 255, 0.2);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      overflow: hidden;
+      -ms-overflow-style: none;
+      scrollbar-width: none;
     }
 
-    pre::before,
-    pre::after {
-      content: "";
-      position: absolute;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, rgba(255, 0, 255, 0.85), transparent);
-      opacity: 0.45;
-      animation: tear-line 2.9s linear infinite;
-      pointer-events: none;
-    }
-
-    pre::before {
-      top: 16%;
-    }
-
-    pre::after {
-      top: 68%;
-      animation-delay: 1s;
+    pre::-webkit-scrollbar {
+      display: none;
     }
 
     pre code {
@@ -657,154 +544,157 @@
     }
 
     code {
-      font-family: "Share Tech Mono", monospace !important;
-      font-size: 0.79rem !important;
-      line-height: 1.48 !important;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 0.79rem;
+      line-height: 1.48;
       color: #d9f7ff;
-      text-shadow: 0 0 8px rgba(0, 255, 255, 0.24);
     }
 
     .tok-key {
-      color: var(--cyber-magenta);
-      text-shadow: 0 0 8px rgba(255, 0, 255, 0.5);
+      color: var(--magenta);
     }
 
     .tok-string {
-      color: var(--cyber-cyan);
-      text-shadow: 0 0 8px rgba(0, 255, 255, 0.5);
+      color: var(--cyan);
     }
 
     .tok-comment {
-      color: var(--cyber-lime);
-      text-shadow: 0 0 8px rgba(0, 255, 68, 0.5);
+      color: var(--green);
     }
 
     .tok-fn {
-      color: var(--cyber-red);
-      text-shadow: 0 0 8px rgba(255, 0, 51, 0.5);
+      color: var(--red);
     }
 
     .tok-var {
-      color: var(--cyber-blue);
-      text-shadow: 0 0 8px rgba(0, 204, 255, 0.5);
+      color: var(--blue);
     }
 
     .docs {
       color: #d6ecff;
+      line-height: 1.6;
     }
 
     .docs a {
-      color: #8dfbff !important;
+      color: #8ce1ff;
       text-decoration: none;
-      border-bottom: 1px solid rgba(0, 255, 255, 0.5);
-      text-shadow: 0 0 8px rgba(0, 255, 255, 0.45);
+      border-bottom: 1px solid rgba(0, 246, 255, 0.35);
       transition: color 0.18s ease, border-color 0.18s ease;
     }
 
     .docs a:hover {
-      color: #fff !important;
-      border-color: rgba(255, 0, 255, 0.8);
-      text-shadow: -2px 0 rgba(255, 0, 51, 0.55), 2px 0 rgba(0, 255, 255, 0.78), 0 0 14px rgba(255, 0, 255, 0.45);
-      animation: hover-glitch 0.16s steps(2, end) infinite;
+      color: #fff;
+      border-color: rgba(255, 0, 212, 0.55);
     }
 
     footer {
-      margin-top: 0.95rem;
-      border-radius: 0.84rem;
-      padding: 0.82rem 0.95rem !important;
-      font-family: "Share Tech Mono", monospace !important;
-      font-size: 0.62rem !important;
-      letter-spacing: 0.11em !important;
+      margin-top: 12px;
+      border: 1px solid rgba(0, 246, 255, 0.2);
+      background: rgba(6, 9, 16, 0.74);
+      border-radius: 14px;
+      padding: 14px 16px;
+      display: flex;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      color: #8ea8cf;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+        0 0 22px rgba(0, 168, 255, 0.14);
     }
 
     .relay {
-      color: #fff;
-      text-shadow: -1px 0 rgba(255, 0, 51, 0.5), 1px 0 rgba(0, 255, 255, 0.6), 0 0 12px rgba(255, 0, 255, 0.4);
+      color: #d2e4ff;
     }
 
-    .footer-particles {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      overflow: hidden;
+    body.glitch-burst .glitch-flash {
+      opacity: 1;
     }
 
-    .footer-particles span {
-      position: absolute;
-      width: 3px;
-      height: 3px;
-      left: var(--x);
-      bottom: -10%;
-      color: var(--cyber-cyan);
-      background: currentColor;
-      box-shadow: 0 0 8px currentColor;
-      animation: drift var(--dur) linear infinite;
-      animation-delay: var(--delay);
-      opacity: 0.76;
+    @keyframes vortex-spin-a {
+      0% { transform: translate(-50%, -50%) rotate(0deg) scale(0.92); }
+      100% { transform: translate(-50%, -50%) rotate(360deg) scale(1.08); }
     }
 
-    body.is-scrolling .panel {
-      animation: scroll-jitter 0.14s steps(2, end) infinite;
+    @keyframes vortex-spin-b {
+      0% { transform: translate(-50%, -50%) rotate(0deg) scale(1.08); }
+      100% { transform: translate(-50%, -50%) rotate(360deg) scale(0.9); }
     }
 
-    @keyframes scanline-move {
+    @keyframes vortex-spin-c {
+      0% { transform: translate(-50%, -50%) rotate(0deg) scale(0.95); }
+      100% { transform: translate(-50%, -50%) rotate(360deg) scale(1.1); }
+    }
+
+    @keyframes vortex-pulse {
+      0%, 100% { opacity: 0.12; }
+      50% { opacity: 0.22; }
+    }
+
+    @keyframes particle-drift {
+      0% { transform: translate3d(var(--x), var(--y), 0) scale(0.6); opacity: 0; }
+      8% { opacity: 0.65; }
+      45% { opacity: 0.7; }
+      100% { transform: translate3d(calc(var(--x) + 8vw), calc(var(--y) - 120vh), 0) scale(1.15); opacity: 0; }
+    }
+
+    @keyframes scan-drift {
       0% { transform: translateY(0); }
-      100% { transform: translateY(4px); }
+      100% { transform: translateY(120px); }
     }
 
-    @keyframes noise-shift {
+    @keyframes noise-jump {
       0% { transform: translate(0, 0); }
-      25% { transform: translate(-1%, 1%); }
-      50% { transform: translate(1%, -1%); }
-      75% { transform: translate(0.6%, 0.6%); }
+      25% { transform: translate(-1px, 1px); }
+      50% { transform: translate(1px, -1px); }
+      75% { transform: translate(-1px, -1px); }
       100% { transform: translate(0, 0); }
     }
 
-    @keyframes runbook-vortex-a {
-      0% { transform: translate(-50%, -50%) rotate(0deg); }
-      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    @keyframes rgb-jitter {
+      0%, 6%, 100% { transform: translateX(0); }
+      7% { transform: translateX(-1px); }
+      8% { transform: translateX(1px); }
+      25% { transform: translateX(0); }
+      26% { transform: translateX(2px); }
+      27% { transform: translateX(0); }
+      51% { transform: translateX(0); }
+      52% { transform: translateX(-2px); }
+      53% { transform: translateX(0); }
     }
 
-    @keyframes runbook-vortex-b {
-      0% { transform: translate(-50%, -50%) rotate(0deg); }
-      100% { transform: translate(-50%, -50%) rotate(360deg); }
+    @keyframes glitch-slice-a {
+      0%, 100% { clip-path: inset(0 0 0 0); }
+      8% { clip-path: inset(8% 0 75% 0); transform: translate(-6px, -1px); }
+      11% { clip-path: inset(18% 0 57% 0); transform: translate(-2px, 1px); }
+      22% { clip-path: inset(38% 0 35% 0); transform: translate(-4px, 0); }
+      26% { clip-path: inset(0 0 0 0); transform: translate(-3px, 1px); }
+      35% { clip-path: inset(60% 0 18% 0); transform: translate(2px, -1px); }
+      37% { clip-path: inset(0 0 0 0); transform: translate(-3px, 1px); }
+      52% { clip-path: inset(42% 0 31% 0); transform: translate(-5px, 1px); }
+      56% { clip-path: inset(0 0 0 0); transform: translate(-3px, 1px); }
+      71% { clip-path: inset(78% 0 3% 0); transform: translate(-7px, 2px); }
+      73% { clip-path: inset(0 0 0 0); transform: translate(-3px, 1px); }
+      89% { clip-path: inset(22% 0 49% 0); transform: translate(-4px, 0); }
+      92% { clip-path: inset(0 0 0 0); transform: translate(-3px, 1px); }
     }
 
-    @keyframes runbook-vortex-c {
-      0% { transform: translate(-50%, -50%) rotate(0deg); }
-      100% { transform: translate(-50%, -50%) rotate(360deg); }
-    }
-
-    @keyframes glitch-burst {
-      0% { opacity: 0.05; transform: translateX(0); }
-      25% { opacity: 0.3; transform: translateX(-1.5%); }
-      48% { opacity: 0.32; transform: translateX(1.5%); }
-      100% { opacity: 0; transform: translateX(0); }
-    }
-
-    @keyframes tunnel-flicker {
-      0%, 100% { opacity: 0.58; filter: contrast(1.42) saturate(1.34) blur(0.15px); }
-      15% { opacity: 0.52; }
-      16% { opacity: 0.6; }
-      45% { opacity: 0.49; filter: contrast(1.38) saturate(1.28) blur(0.22px); }
-      46% { opacity: 0.59; filter: contrast(1.44) saturate(1.38) blur(0.1px); }
-      77% { opacity: 0.54; }
-      78% { opacity: 0.6; }
-    }
-
-    @keyframes hero-tear {
-      0% { transform: translateX(-105%); opacity: 0; }
-      16% { opacity: 0.35; }
-      42% { opacity: 0.3; }
-      100% { transform: translateX(105%); opacity: 0; }
-    }
-
-    @keyframes border-jitter {
-      0%, 100% { transform: translate(0); }
-      12% { transform: translate(1px, 0); }
-      13% { transform: translate(-1px, 0); }
-      75% { transform: translate(0, 1px); }
-      76% { transform: translate(0, -1px); }
+    @keyframes glitch-slice-b {
+      0%, 100% { clip-path: inset(0 0 0 0); }
+      6% { clip-path: inset(14% 0 65% 0); transform: translate(5px, -1px); }
+      10% { clip-path: inset(0 0 0 0); transform: translate(3px, -1px); }
+      28% { clip-path: inset(52% 0 22% 0); transform: translate(6px, 1px); }
+      31% { clip-path: inset(0 0 0 0); transform: translate(3px, -1px); }
+      46% { clip-path: inset(26% 0 48% 0); transform: translate(4px, 0); }
+      48% { clip-path: inset(0 0 0 0); transform: translate(3px, -1px); }
+      64% { clip-path: inset(72% 0 8% 0); transform: translate(8px, 1px); }
+      67% { clip-path: inset(0 0 0 0); transform: translate(3px, -1px); }
+      84% { clip-path: inset(36% 0 38% 0); transform: translate(5px, 0); }
+      88% { clip-path: inset(0 0 0 0); transform: translate(3px, -1px); }
     }
 
     @keyframes glitch-a {
@@ -821,108 +711,9 @@
       85% { transform: translate(-1px, 0); }
     }
 
-    @keyframes flicker {
-      0%, 100% { opacity: 1; }
-      30% { opacity: 0.94; }
-      31% { opacity: 1; }
-      68% { opacity: 0.92; }
-      69% { opacity: 1; }
-    }
-
-    @keyframes logo-pulse {
-      0%, 100% { filter: brightness(1) saturate(1); }
-      50% { filter: brightness(1.16) saturate(1.2); }
-    }
-
-    @keyframes subtitle-rgb-jitter {
-      0%, 6%, 100% { transform: translateX(0); }
-      7% { transform: translateX(-1px); }
-      8% { transform: translateX(1px); }
-      25% { transform: translateX(0); }
-      26% { transform: translateX(2px); }
-      27% { transform: translateX(0); }
-      51% { transform: translateX(0); }
-      52% { transform: translateX(-2px); }
-      53% { transform: translateX(0); }
-    }
-
-    @keyframes subtitle-glitch-slice-a {
-      0%, 100% { clip-path: inset(0 0 0 0); transform: translate3d(-2px, 1px, 0); }
-      8% { clip-path: inset(8% 0 75% 0); transform: translate3d(-5px, -1px, 0); }
-      11% { clip-path: inset(18% 0 57% 0); transform: translate3d(-2px, 1px, 0); }
-      22% { clip-path: inset(38% 0 35% 0); transform: translate3d(-4px, 0, 0); }
-      26% { clip-path: inset(0 0 0 0); transform: translate3d(-2px, 1px, 0); }
-      35% { clip-path: inset(60% 0 18% 0); transform: translate3d(1px, -1px, 0); }
-      37% { clip-path: inset(0 0 0 0); transform: translate3d(-2px, 1px, 0); }
-      52% { clip-path: inset(42% 0 31% 0); transform: translate3d(-4px, 1px, 0); }
-      56% { clip-path: inset(0 0 0 0); transform: translate3d(-2px, 1px, 0); }
-      71% { clip-path: inset(78% 0 3% 0); transform: translate3d(-6px, 2px, 0); }
-      73% { clip-path: inset(0 0 0 0); transform: translate3d(-2px, 1px, 0); }
-      89% { clip-path: inset(22% 0 49% 0); transform: translate3d(-3px, 0, 0); }
-      92% { clip-path: inset(0 0 0 0); transform: translate3d(-2px, 1px, 0); }
-    }
-
-    @keyframes subtitle-glitch-slice-b {
-      0%, 100% { clip-path: inset(0 0 0 0); transform: translate3d(2px, -1px, 0); }
-      6% { clip-path: inset(14% 0 65% 0); transform: translate3d(4px, -1px, 0); }
-      9% { clip-path: inset(0 0 0 0); transform: translate3d(2px, -1px, 0); }
-      18% { clip-path: inset(45% 0 21% 0); transform: translate3d(6px, 2px, 0); }
-      22% { clip-path: inset(0 0 0 0); transform: translate3d(2px, -1px, 0); }
-      33% { clip-path: inset(12% 0 66% 0); transform: translate3d(4px, 0, 0); }
-      35% { clip-path: inset(0 0 0 0); transform: translate3d(2px, -1px, 0); }
-      48% { clip-path: inset(69% 0 9% 0); transform: translate3d(2px, 1px, 0); }
-      52% { clip-path: inset(0 0 0 0); transform: translate3d(2px, -1px, 0); }
-      64% { clip-path: inset(72% 0 8% 0); transform: translate3d(6px, 1px, 0); }
-      67% { clip-path: inset(0 0 0 0); transform: translate3d(2px, -1px, 0); }
-      84% { clip-path: inset(36% 0 38% 0); transform: translate3d(4px, 0, 0); }
-      88% { clip-path: inset(0 0 0 0); transform: translate3d(2px, -1px, 0); }
-    }
-
-    @keyframes hover-glitch {
-      0%, 100% { transform: translate(0); }
-      35% { transform: translate(-1px, 0); }
-      36% { transform: translate(1px, 0); }
-      67% { transform: translate(0, -1px); }
-      68% { transform: translate(0, 1px); }
-    }
-
-    @keyframes row-glitch {
-      0%, 100% { transform: translate(0); }
-      50% { transform: translate(-1px, 0); }
-    }
-
-    @keyframes tear-line {
-      0% { transform: translateX(-104%); }
-      100% { transform: translateX(104%); }
-    }
-
-    @keyframes scroll-jitter {
-      0%, 100% { transform: translateY(0); }
-      50% { transform: translateY(-1px); }
-    }
-
-    @keyframes drift {
-      0% { transform: translateY(0) translateX(0) scale(1); opacity: 0; }
-      20% { opacity: 0.76; }
-      100% { transform: translateY(-210%) translateX(14px) scale(0.3); opacity: 0; }
-    }
-
-    @keyframes debrid-rise {
-      0% {
-        transform: translate3d(var(--x), calc(var(--y) + 10vh), 0) scale(0.5);
-        opacity: 0;
-      }
-      16% { opacity: 0.58; }
-      100% {
-        transform: translate3d(calc(var(--x) + 18px), calc(var(--y) - 100vh), 0) scale(0.28);
-        opacity: 0;
-      }
-    }
-
     @media (max-width: 980px) {
       .shell {
-        width: min(1240px, 96vw);
-        padding-top: 0.9rem;
+        width: min(1200px, 96vw);
       }
 
       .topbar {
@@ -932,16 +723,6 @@
 
       .nav {
         justify-content: flex-start;
-      }
-
-      p,
-      li,
-      td {
-        font-size: 0.95rem;
-      }
-
-      th {
-        font-size: 0.64rem;
       }
     }
 
@@ -958,17 +739,13 @@
         letter-spacing: 0.1em;
       }
 
-      .glitch-text::before,
-      .glitch-text::after {
-        opacity: 0.55;
+      .topbar {
+        border-radius: 11px;
       }
 
-      #void-tunnel {
-        opacity: 0.46;
-      }
-
-      .noise-layer {
-        opacity: 0.06;
+      .brand-text {
+        font-size: 11px;
+        letter-spacing: 0.8px;
       }
     }
 
@@ -976,9 +753,19 @@
       *,
       *::before,
       *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
+        animation: none !important;
         transition: none !important;
+      }
+
+      .vortex-layer {
+        opacity: 0.08;
+      }
+
+      .scanlines,
+      .noise,
+      .particles,
+      .glitch-flash {
+        display: none;
       }
     }
   </style>
@@ -989,11 +776,10 @@
     <div class="vortex-layer two"></div>
     <div class="vortex-layer three"></div>
   </div>
-  <canvas id="void-tunnel" aria-hidden="true"></canvas>
-  <div class="floating-debrid" aria-hidden="true"></div>
-  <div class="crt-scanlines" aria-hidden="true"></div>
-  <div class="noise-layer" aria-hidden="true"></div>
-  <div id="glitch-flash" aria-hidden="true"></div>
+  <div class="particles" aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div class="noise" aria-hidden="true"></div>
+  <div class="glitch-flash" aria-hidden="true"></div>
 
   <main class="shell">
     <header class="topbar">
@@ -1321,124 +1107,15 @@ PORT=7000 ENCRYPTION_SECRET=$(openssl rand -hex 32) node index.js</code></pre>
     </section>
 
     <footer>
-      <div class="footer-particles" aria-hidden="true"></div>
       <span class="relay glitch-text" data-text="GLITCH RELAY // PVTKRRX runbook matrix for active provider docs.">GLITCH RELAY // PVTKRRX runbook matrix for active provider docs.</span>
       <span class="glitch-text" data-text="If your provider changed features, update this page before deployment.">If your provider changed features, update this page before deployment.</span>
     </footer>
   </main>
   <script>
     (function () {
-      const canvas = document.getElementById("void-tunnel");
-      const ctx = canvas.getContext("2d", { alpha: true });
-      const mobile = window.matchMedia("(max-width: 720px)").matches;
-      const particleCount = mobile ? 95 : 240;
-      const colors = ["#00ffff", "#ff00ff", "#00ff44", "#00ccff", "#ff0033"];
-      const particles = [];
-      let width = 0;
-      let height = 0;
-      let dpr = Math.min(window.devicePixelRatio || 1, 2);
-      let pointerX = 0;
-      let pointerY = 0;
-      let targetX = 0;
-      let targetY = 0;
-
-      const codeKeywords = /\b(ssh|mkdir|cd|git|npm|node|nohup|openssl|bash|wget|tar|rm|if|then|fi|source|app-ports|echo|grep)\b/g;
-      const codeVars = /\b(PORT|ENCRYPTION_SECRET|PATH|HOME)\b/g;
-      const codeFns = /\b(index\.js|pvtkrrx\.log|node-v\d[\w.\-]*)\b/g;
-
-      function randomParticle() {
-        const angle = Math.random() * Math.PI * 2;
-        const radius = 40 + Math.random() * Math.max(width, height) * 0.45;
-        return {
-          angle: angle,
-          radius: radius,
-          z: Math.random() * 1.1 + 0.05,
-          speed: 0.0018 + Math.random() * 0.0044,
-          size: 1 + Math.random() * 3.6,
-          color: colors[(Math.random() * colors.length) | 0]
-        };
-      }
-
-      function resetParticle(p) {
-        const np = randomParticle();
-        p.angle = np.angle;
-        p.radius = np.radius;
-        p.z = 1.2;
-        p.speed = np.speed;
-        p.size = np.size;
-        p.color = np.color;
-      }
-
-      function resize() {
-        width = window.innerWidth;
-        height = window.innerHeight;
-        dpr = Math.min(window.devicePixelRatio || 1, 2);
-        canvas.width = Math.floor(width * dpr);
-        canvas.height = Math.floor(height * dpr);
-        canvas.style.width = width + "px";
-        canvas.style.height = height + "px";
-        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      }
-
-      function drawParticle(x, y, size, color) {
-        const glow = Math.max(2, size * 1.3);
-        ctx.globalCompositeOperation = "lighter";
-        ctx.fillStyle = "rgba(255, 0, 51, 0.2)";
-        ctx.fillRect(x + 2, y, size, size);
-        ctx.fillStyle = "rgba(0, 255, 255, 0.26)";
-        ctx.fillRect(x - 2, y, size, size);
-        ctx.fillStyle = color;
-        ctx.globalAlpha = 0.34;
-        ctx.fillRect(x, y, size, size);
-        ctx.globalAlpha = 0.16;
-        ctx.fillRect(x - size * 0.16, y - glow * 0.8, Math.max(1, size * 0.2), glow * 1.6);
-        ctx.globalAlpha = 1;
-        ctx.globalCompositeOperation = "source-over";
-      }
-
-      function animate() {
-        pointerX += (targetX - pointerX) * 0.06;
-        pointerY += (targetY - pointerY) * 0.06;
-        ctx.fillStyle = "rgba(0, 0, 0, 0.22)";
-        ctx.fillRect(0, 0, width, height);
-
-        const cx = width * 0.5 + pointerX * 36;
-        const cy = height * 0.5 + pointerY * 28;
-
-        for (let i = 0; i < particles.length; i++) {
-          const p = particles[i];
-          p.z -= p.speed;
-          if (p.z <= 0.02) {
-            resetParticle(p);
-            continue;
-          }
-          const px = Math.cos(p.angle) * p.radius;
-          const py = Math.sin(p.angle) * p.radius;
-          const persp = 1 / p.z;
-          const x = cx + px * persp * 0.55;
-          const y = cy + py * persp * 0.55;
-          const size = Math.min(16, Math.max(1, p.size * persp * 0.25));
-          if (x < -24 || x > width + 24 || y < -24 || y > height + 24) {
-            resetParticle(p);
-            continue;
-          }
-          drawParticle(x, y, size, p.color);
-        }
-        requestAnimationFrame(animate);
-      }
-
-      function randomBurst() {
-        const overlay = document.getElementById("glitch-flash");
-        if (overlay) {
-          overlay.style.setProperty("--tear-top", (Math.random() * 82).toFixed(2) + "%");
-          overlay.style.setProperty("--tear-height", (6 + Math.random() * 20).toFixed(2) + "%");
-        }
-        document.body.classList.add("glitch-burst");
-        window.setTimeout(function () {
-          document.body.classList.remove("glitch-burst");
-        }, 280 + Math.random() * 240);
-        window.setTimeout(randomBurst, 8000 + Math.random() * 12000);
-      }
+      var codeKeywords = /\b(ssh|mkdir|cd|git|npm|node|nohup|openssl|bash|wget|tar|rm|if|then|fi|source|app-ports|echo|grep)\b/g;
+      var codeVars = /\b(PORT|ENCRYPTION_SECRET|PATH|HOME)\b/g;
+      var codeFns = /\b(index\.js|pvtkrrx\.log|node-v\d[\w.\-]*)\b/g;
 
       function escapeHtml(value) {
         return value
@@ -1448,7 +1125,7 @@ PORT=7000 ENCRYPTION_SECRET=$(openssl rand -hex 32) node index.js</code></pre>
       }
 
       function highlightCode(source) {
-        let out = escapeHtml(source);
+        var out = escapeHtml(source);
         out = out.replace(/"(?:[^"\\]|\\.)*"/g, "<span class='tok-string'>$&</span>");
         out = out.replace(codeVars, "<span class='tok-var'>$1</span>");
         out = out.replace(codeFns, "<span class='tok-fn'>$1</span>");
@@ -1458,7 +1135,7 @@ PORT=7000 ENCRYPTION_SECRET=$(openssl rand -hex 32) node index.js</code></pre>
       }
 
       function applyTextEffects() {
-        const glitchTargets = document.querySelectorAll("h2, h3");
+        var glitchTargets = document.querySelectorAll("h2, h3");
         glitchTargets.forEach(function (el) {
           if (!el.classList.contains("glitch-text")) {
             el.classList.add("glitch-text");
@@ -1468,90 +1145,49 @@ PORT=7000 ENCRYPTION_SECRET=$(openssl rand -hex 32) node index.js</code></pre>
           }
         });
 
-        const codeBlocks = document.querySelectorAll("pre code");
+        var codeBlocks = document.querySelectorAll("pre code");
         codeBlocks.forEach(function (code) {
           code.innerHTML = highlightCode(code.textContent || "");
         });
       }
 
-      function addFooterParticles() {
-        const container = document.querySelector(".footer-particles");
-        if (!container) {
-          return;
-        }
-        const count = mobile ? 10 : 20;
-        for (let i = 0; i < count; i++) {
-          const span = document.createElement("span");
-          span.style.setProperty("--x", (Math.random() * 100).toFixed(2) + "%");
-          span.style.setProperty("--delay", (Math.random() * -12).toFixed(2) + "s");
-          span.style.setProperty("--dur", (6 + Math.random() * 8).toFixed(2) + "s");
-          span.style.color = colors[(Math.random() * colors.length) | 0];
-          container.appendChild(span);
-        }
+      /* Particles — same approach as index.html */
+      var particlesContainer = document.querySelector('.particles');
+      var hueSet = [190, 203, 136, 345, 302];
+
+      for (var i = 0; i < 46; i += 1) {
+        var node = document.createElement('span');
+        var size = 1 + Math.random() * 3.5;
+        var x = (Math.random() * 100) + 'vw';
+        var y = (70 + Math.random() * 45) + 'vh';
+        var dur = (8 + Math.random() * 11) + 's';
+        var delay = (-Math.random() * 12) + 's';
+        var hue = hueSet[Math.floor(Math.random() * hueSet.length)];
+        node.className = 'particle';
+        node.style.setProperty('--size', size + 'px');
+        node.style.setProperty('--x', x);
+        node.style.setProperty('--y', y);
+        node.style.setProperty('--dur', dur);
+        node.style.setProperty('--delay', delay);
+        node.style.setProperty('--hue', String(hue));
+        particlesContainer.appendChild(node);
       }
 
-      function addFloatingDebrid() {
-        const layer = document.querySelector(".floating-debrid");
-        if (!layer) return;
-        const hues = [190, 203, 136, 345, 302];
-        const count = mobile ? 26 : 46;
-        for (let i = 0; i < count; i += 1) {
-          const dot = document.createElement("span");
-          const size = 1 + Math.random() * 3.4;
-          const x = `${Math.random() * 100}vw`;
-          const y = `${68 + Math.random() * 44}vh`;
-          const dur = `${8 + Math.random() * 12}s`;
-          const delay = `${-Math.random() * 12}s`;
-          const hue = hues[(Math.random() * hues.length) | 0];
-          dot.className = "debrid-dot";
-          dot.style.setProperty("--size", `${size}px`);
-          dot.style.setProperty("--x", x);
-          dot.style.setProperty("--y", y);
-          dot.style.setProperty("--dur", dur);
-          dot.style.setProperty("--delay", delay);
-          dot.style.setProperty("--hue", String(hue));
-          layer.appendChild(dot);
-        }
+      /* Glitch burst — same approach as index.html */
+      function scheduleBurst() {
+        var wait = 8000 + Math.random() * 7000;
+        window.setTimeout(function () {
+          document.body.classList.add('glitch-burst');
+          window.setTimeout(function () {
+            document.body.classList.remove('glitch-burst');
+          }, 140);
+          scheduleBurst();
+        }, wait);
       }
 
-      let scrollTimer;
-      window.addEventListener("scroll", function () {
-        document.body.classList.add("is-scrolling");
-        clearTimeout(scrollTimer);
-        scrollTimer = window.setTimeout(function () {
-          document.body.classList.remove("is-scrolling");
-        }, 130);
-      });
-
-      window.addEventListener("mousemove", function (event) {
-        targetX = (event.clientX / width - 0.5) * 2;
-        targetY = (event.clientY / height - 0.5) * 2;
-      });
-
-      window.addEventListener("touchmove", function (event) {
-        const touch = event.touches[0];
-        if (!touch) {
-          return;
-        }
-        targetX = (touch.clientX / width - 0.5) * 2;
-        targetY = (touch.clientY / height - 0.5) * 2;
-      }, { passive: true });
-
-      window.addEventListener("resize", resize);
-
-      resize();
-      while (particles.length < particleCount) {
-        particles.push(randomParticle());
-      }
       applyTextEffects();
-      addFooterParticles();
-      addFloatingDebrid();
-      randomBurst();
-      ctx.fillStyle = "#000";
-      ctx.fillRect(0, 0, width, height);
-      animate();
+      scheduleBurst();
     }());
   </script>
 </body>
 </html>
-
