@@ -97,6 +97,7 @@ See also: `docs/ROUTE_FRAMEWORK.md`
 - Quick Setup now highlights only the next required action with a glow/pulse, locks later-step buttons until earlier checks are complete, and labels the final action as `Install Or Refresh` because stale installed LAN Bridge URLs in Stremio can keep pointing at old routes.
 - `Copy PC Local URL` is explicitly marked as host-only and not part of the LAN Bridge install path.
 - The local `/local/manifest.json` route still serves already-installed same-LAN clients so updates do not blank out older home-device installs, but raw LAN `PC Local` URLs remain debug-only and `LAN Bridge` is still the supported home-device path.
+- Root `/manifest.json` must stay bootstrap-only. If it advertises the same addon id/catalogs as `PC Local`, Stremio can latch onto `/manifest.json`, render the catalog labels, and then fetch nonexistent root `/catalog/...` paths that show `EmptyContent`.
 
 ## Runtime logs
 

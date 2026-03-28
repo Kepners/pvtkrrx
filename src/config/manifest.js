@@ -61,4 +61,28 @@ const manifest = {
   }
 }
 
+function createBootstrapManifest(baseUrl = '') {
+  const normalizedBaseUrl = String(baseUrl || '').trim().replace(/\/+$/, '')
+  const logoUrl = normalizedBaseUrl ? `${normalizedBaseUrl}/logo.ico` : manifest.logo
+  return {
+    id: 'com.kepners.pvtkrrx.bootstrap',
+    version: manifest.version,
+    name: 'PVTKRRX (Configure)',
+    description: 'Bootstrap manifest only. Open /configure and install PC Local, LAN Bridge, or Remote Seedbox from their explicit route URLs.',
+    logo: logoUrl,
+    resources: [],
+    types: [],
+    catalogs: [],
+    behaviorHints: {
+      configurable: true,
+      configurationRequired: true
+    }
+  }
+}
+
+Object.defineProperty(manifest, 'createBootstrapManifest', {
+  value: createBootstrapManifest,
+  enumerable: false
+})
+
 module.exports = manifest

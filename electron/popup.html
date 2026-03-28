@@ -953,6 +953,11 @@
       try {
         if (!window.electronAPI) throw new Error('Desktop bridge not available');
         const data = await window.electronAPI.getDownloadPath();
+        if (data && data.available === false) {
+          current.textContent = 'Unavailable';
+          setPathNote('qBittorrent preferences are not ready yet');
+          return;
+        }
         const savePath = (data && data.savePath) ? data.savePath : '';
         current.textContent = savePath || 'Not configured';
         if (!input.value.trim()) input.value = savePath || '';

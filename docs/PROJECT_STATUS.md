@@ -1,158 +1,98 @@
 # PVTKRRX Project Status
 
-Updated: 2026-03-26
+Updated: 2026-03-27
 
 ## Current Stage
 
-PVTKRRX is at **v1.1.14** — the LAN Bridge heartbeat dedup and same-LAN manifest regression are fixed, the current security-hardening baseline is in place, and the remaining gap is live-device/runtime acceptance plus hosted relay persistence proof.
+PVTKRRX is at a reset point.
 
-- Core addon flow (catalog, stream, playback, local config, encryption, desktop wrapper) is complete and shipping.
-- Current route model is `PC Local`, `LAN Bridge`, and `Remote Seedbox`.
-- `PC Local` is a real same-PC addon via `http://127.0.0.1:7000/local/manifest.json?mode=local`.
-- LAN pair relay flow for Android TV/mobile account-sync is implemented and covered by smoke checks.
-- Stremio AuthKey linking flow is implemented and smoke-tested with a local API mock.
-- The live architecture is documented in `docs/CURRENT_DESIGN.md` and `docs/ROUTE_FRAMEWORK.md`.
-- Implementation currently looks aligned with the live `PC Local` / `LAN Bridge` / `Remote Seedbox` design, but hosted auth/public playback behavior still needs proof on real clients and a real hosted deployment.
-- Status shorthand: implementation hardened, wording aligned, smoke locked, awaiting real client verification.
-- That remaining client pass matters because sports/library items use internal `pvtkrrx:` ids, and PVTKRRX must own how those rows render on real Stremio clients instead of assuming Cinemeta or generic client behavior will smooth it over.
+The current code is not blocked because the basic server-side flows are obviously missing. It is blocked because we have spent too much time patching Stremio-specific edge cases without enough real-client proof that the product now behaves correctly on desktop, mobile, TV, and hosted routes.
 
-## Status Summary
+The practical reading of the project today is:
 
-### PASS
+- core route logic exists for `PC Local`, `LAN Bridge`, and `Remote Seedbox`
+- the current branch now passes the full local smoke suite again
+- the latest pivot changed root `/manifest.json` into a bootstrap-only manifest and added compatibility resource routes to avoid the latest `EmptyContent` failure mode
+- real Stremio client acceptance is still the blocker
+- a clean rebuild is now a reasonable next step
 
-- Route-model parity matches the live three-route canon: `PC Local`, `LAN Bridge`, and `Remote Seedbox`.
-- Architecture/docs/code wiring currently align with `docs/CURRENT_DESIGN.md`, `docs/ROUTE_FRAMEWORK.md`, and `docs/STREMIO_INSTALL_TRACKER.md`.
-- `PC Local` remains the supported same-host route via `http://127.0.0.1:7000/local/manifest.json?mode=local`.
-- LAN Bridge local-token minting now proxies to the hosted relay so the Windows runtime's local secret cannot produce `400 Invalid config token` hosted manifest URLs.
-- Current automated verification is green: `smoke:config`, `smoke:guards`, `smoke:pipeline`, `smoke:lan-pair`, `smoke:stremio-link`, `smoke:security`, and `smoke:sports` all passed locally on 2026-03-26.
-- A Windows-host runtime probe also passed on 2026-03-24: `npm start` bound `http://127.0.0.1:7000` and `https://127.0.0.1:7001`, `/network-info` advertised the expected `127.0.0.1`, `pvtkrrx.local`, and `192.168.50.48` endpoints, and both HTTP + HTTPS local manifests responded on the Windows host.
+## Verified Working Now
 
-### PARTIAL
+These items are actually verified in the current workspace, not just intended:
 
-- End-device acceptance is not yet fully proven.
-- Pending live validation still includes Android TV/mobile Method 4 pickup, Apple TV same-account sync, one real public `Remote Seedbox` ready-file playback path, one auth-protected external file-server playback path, and KV-backed hosted pair-state persistence across restarts/redeploys.
-- Hosted `LAN Bridge` production reliability still depends on live heartbeat plus KV-backed pair state.
-- Real-client rendering of notice-only stream rows still needs proof so info rows do not bury playable streams or mislead users on different Stremio clients.
-- Non-Windows `./.runtime` fallback remains a minor dev-path consistency risk.
+- `npm run smoke:config` passed on 2026-03-27
+- `npm run smoke:guards` passed on 2026-03-27
+- `npm run smoke:pipeline` passed on 2026-03-27
+- `npm run smoke:lan-pair` passed on 2026-03-27
+- `npm run smoke:stremio-link` passed on 2026-03-27
+- `npm run smoke:security` passed on 2026-03-27
+- `npm run smoke:sports` passed on 2026-03-27
+- root `/manifest.json` now returns a bootstrap manifest (`com.kepners.pvtkrrx.bootstrap`) with no catalogs/resources and `configurationRequired=true`
+- root compatibility `/catalog`, `/meta`, and `/stream` routes now resolve safely instead of falling into missing root resource paths
+- `PC Local` still resolves as a real addon from `http://127.0.0.1:7000/local/manifest.json?mode=local`
+- hosted token manifests still resolve for configured installs
+- LAN pair heartbeat/status/redirect behavior is covered by smoke tests
+- Stremio AuthKey link flow is covered by a local mock API smoke test
+- hosted/local security hardening remains covered by automated checks
+- sports catalog and structured enrichment pipeline remain covered by automated checks
+- desktop qBittorrent path lookup now degrades cleanly when qBit preferences are not ready
 
-### FAIL
+## Not Solved Yet
 
-- No current route-model regression is detected in docs, code wiring, or smoke coverage.
-- Raw `192.168.x.x:7000` addon install remains unsupported by Stremio protocol policy; this is an expected platform constraint, not a regression.
+These are still the real blockers:
 
-## What Is Implemented
+- we still do not have enough real-client proof that the bootstrap-root manifest fix fully solves the latest Stremio `EmptyContent` behavior
+- Android TV and Android mobile same-account `LAN Bridge` pickup is still not proven end to end on real devices
+- Apple TV synced-addon behavior is still not proven end to end on a real client path
+- one real public `Remote Seedbox` ready-file playback path is still not proven
+- one auth-protected external file-server playback path is still not proven on real clients
+- KV-backed hosted pair persistence across restarts/redeploys is still not proven
+- notice-only stream rows still need real-client verification so they do not bury or visually outrank a playable stream
+- smoke runs can still log non-fatal startup warm-up noise when live qBittorrent or Prowlarr credentials are missing or invalid
 
-1. Local + hosted install modes with stable local config.
-2. Three explicit install routes:
-   - `PC Local` for the host Windows machine
-   - `LAN Bridge` for same-account home-device sync
-   - `Remote Seedbox` for public HTTPS playback
-3. Built-in file serving + progressive playback buffering.
-4. Sports catalog and structured artwork enrichment.
-   - `src/clients/sportsdb.js` — SportsDB structured event lookup with persistent disk cache, in-flight deduplication, rate-limit back-off, league and team asset caching, and team name aliases (e.g. `Spurs → Tottenham Hotspur`).
-   - `src/utils/sportsTitleParser.js` — Parse torrent titles into structured `{ homeTeam, awayTeam, date, league }` objects for reliable event matching.
-   - `src/utils/leagueMap.js` — Normalize league codes (e.g. `epl → English Premier League`) for catalog display and API lookup.
-   - `src/handlers/catalog.js`, `src/handlers/stream.js`, `src/handlers/meta.js` — All three handlers updated to consume structured sports data.
-   - `scripts/smoke-sports-structured.js` — Order-agnostic event dedup smoke test (`npm run smoke:sports`).
-5. Electron desktop packaging (`dist/` current release artifacts + `dist/releases/<version>/` archives).
-6. LAN pair relay plumbing:
-   - `POST /pair/heartbeat`
-   - `POST /pair/status`
-   - hosted route redirect to active LAN endpoint when pair is online
-   - desktop background heartbeat loop + Stremio launch pulse
-   - configure UI Method 4 hosted LAN-pair install URL generation
-7. LAN pair privacy hardening:
-   - `/pair/status` now requires both `pairId` and `pairKey`
-   - status responses expose only the selected LAN endpoint metadata, and only to callers that prove `pairId` + `pairKey`
-   - hosted fallback responses avoid exposing resolver reason details
-   - heartbeat/status endpoints are rate limited
-   - optional public-IP binding can block pair reuse from other networks when enabled (`PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP=true`)
-   - heartbeat host-lock can reject active-session takeover from a different source IP (`PVTKRRX_LAN_PAIR_LOCK_HOST=true`)
-   - sensitive routes (`/encrypt`, `/pair/*`, `/test-connection`, auth, billing) use strict browser-origin allowlists
-   - hosted `/test-connection` is rate limited and refuses loopback/LAN/.local targets; local/loopback configure can still validate local endpoints
-   - local admin routes (`/local-config`, `/auto-provision`, `/network-info`, local qBit control) are local-network/loopback guarded
-   - hosted `/file` and `/playback` fail fast instead of waiting for local-only playback paths
-8. Additional security hardening:
-   - browser-driven helper POST routes enforce CSRF tokens in addition to origin checks
-   - config readback and server-side logging redact stored secrets, private URLs, local file paths, and auth identifiers
-   - legacy plain base64 playback/file tokens are rejected in favor of opaque encrypted state
-   - secure JSON storage reads legacy plaintext for migration only, writes encrypted state, and fails closed if no at-rest secret is configured
-9. Configure/install wording now matches the live hosted route contract:
-   - hosted `Remote Seedbox` is explicitly not presented as a generic tracker-buffering path on the hosted site
-   - hosted remote copy now states it is effectively ready-file / public-playback only unless the runtime can truly serve playback
-   - auth-protected external file-server playback is flagged as needing real-device validation
-   - `LAN Bridge` primary install is the `stremio://` deep link; the hosted HTTPS manifest is fallback/manual only when Stremio explicitly asks for an addon URL
+## Why Progress Stalled
 
-## Latest Automated Verification (2026-03-26)
+The repeated churn has mostly come from a small number of structural problems:
 
-1. `npm run smoke:config` - PASS
-2. `npm run smoke:guards` - PASS
-3. `npm run smoke:pipeline` - PASS
-4. `npm run smoke:lan-pair` - PASS
-5. `npm run smoke:stremio-link` - PASS
-6. `npm run smoke:security` - PASS
-7. `npm run smoke:sports` - PASS (structured event dedup, order-agnostic)
+- raw LAN addon URLs kept fighting official Stremio transport rules instead of working with them
+- root `/manifest.json` behavior was too close to the configured route manifests, which let Stremio attach to the wrong manifest/resource shape and then fetch paths that did not exist
+- hosted relay logic, local runtime logic, and desktop shell logic are still too intertwined, mainly inside `index.js` plus `electron/main.js`
+- install wording, route rules, fallback paths, and real-device validation drifted apart during repeated fix attempts
 
-These checks validate the current `PC Local` install/profile routes, configure/encrypt/install behavior, hosted runtime guard behavior, route-capability stream suppression, `/test-connection` hardening, LAN pair heartbeat/status + hosted redirect behavior, Stremio AuthKey account-link flow, the security-hardening regression set, and the structured sports enrichment pipeline.
+## Recommended Next Move
 
-They do not replace the remaining real-device acceptance proof for Android TV/mobile/desktop playback behavior, public remote seedbox playback, auth-protected external file-server playback, or KV-backed LAN-pair behavior on an actual hosted deployment.
+The current repo should now be treated as:
 
-Note: the `/auth/me` billing-field part of `smoke:security` is currently checked against the public user model shape rather than a full authenticated end-to-end response.
+- a behavior reference
+- a smoke-test reference
+- a Stremio edge-case notebook
+- not the architecture to blindly keep extending
 
-## Latest Host Runtime Probe (2026-03-24)
+Recommended next step:
 
-1. Windows-host `npm start` - PASS
-2. `GET http://127.0.0.1:7000/network-info` on the Windows host - PASS
-3. `GET http://127.0.0.1:7000/local/manifest.json?mode=local` on the Windows host - PASS
-4. `GET https://127.0.0.1:7001/local/manifest.json?mode=local` on the Windows host - PASS
+1. Stop layering more tactical fixes into the current structure unless a blocker is trivial and isolated.
+2. Use [docs/REBUILD_PROMPT.md](docs/REBUILD_PROMPT.md) as the handoff brief for a clean rebuild.
+3. Treat these files as the source of truth for the rewrite:
+   - [docs/CURRENT_DESIGN.md](docs/CURRENT_DESIGN.md)
+   - [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md)
+   - [docs/STREMIO_INSTALL_TRACKER.md](docs/STREMIO_INSTALL_TRACKER.md)
+   - [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md)
+   - [docs/SPEC.md](docs/SPEC.md)
+   - [docs/STREMIO_ADDON_REFERENCE.md](docs/STREMIO_ADDON_REFERENCE.md)
+4. Treat the current implementation as reference material, not as mandatory structure.
 
-Operational note:
+## Release Gate Still Blocked By
 
-- Use the Windows runtime or Electron app for real `PC Local` / `LAN Bridge` acceptance. A WSL-started Node process is fine for code-level smoke work, but it can advertise the WSL bridge IP instead of the real Windows LAN IP, which makes it a poor source of truth for LAN-pair validation.
+Do not call this production-trustworthy until these are proven:
 
-## Required Hosted Configuration For LAN Pair Relay
+1. `PC Local` installs and plays correctly on the Windows host using the real Stremio desktop client.
+2. `LAN Bridge` installs cleanly from the hosted path and browses/plays correctly from a second same-account device on the same LAN.
+3. `LAN Bridge` fails clearly when the host desktop heartbeat is offline.
+4. Android TV/mobile same-account sync is proven on real clients.
+5. Apple TV synced-addon behavior is proven on a real client path.
+6. `Remote Seedbox` plays one real public HTTPS ready-file successfully.
+7. Hosted pair state survives restart/redeploy with KV enabled.
 
-Use these on the hosted deployment:
+## Handoff Note
 
-1. `ENCRYPTION_SECRET` (existing required secret).
-2. `KV_REST_API_URL` and `KV_REST_API_TOKEN` (recommended) to persist pair heartbeat state across serverless invocations.
-3. Optional: `PVTKRRX_PAIR_RELAY_URL` (defaults to `https://www.pvtkrrx.cc`).
-4. Optional: `PVTKRRX_LAN_PAIR_TTL_SECONDS` (default `21600`, minimum enforced `300`).
-5. Optional security tuning:
-   - `PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP` (default `false`)
-   - `PVTKRRX_LAN_PAIR_LOCK_HOST` (default `true`)
-   - `PVTKRRX_LAN_PAIR_RATE_LIMIT_WINDOW_MS` (default `60000`)
-   - `PVTKRRX_LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW` (default `30`)
-   - `PVTKRRX_LAN_PAIR_STATUS_MAX_PER_WINDOW` (default `60`)
-   - `PVTKRRX_ENCRYPT_MAX_PER_WINDOW` (default `30`)
-   - `PVTKRRX_TEST_CONNECTION_MAX_PER_WINDOW` (default `20`)
-   - `PVTKRRX_ALLOWED_WEB_ORIGINS` (browser allowlist, defaults to hosted production origin)
-
-Without KV, pair state falls back to in-memory state and may reset on restarts or redeploys.
-
-## Release Candidate Gate
-
-Call this release-candidate ready only if all seven live checks pass:
-
-1. `PC Local` installs and plays on the host PC.
-2. `LAN Bridge` redirects live for both catalog browse and actual stream open while heartbeat is up.
-3. `LAN Bridge` fails gracefully for both browse and stream open when heartbeat is down.
-4. Android TV/mobile pick up the installed addon on the same account.
-5. Apple TV syncs after desktop/web install.
-6. `Remote Seedbox` plays one real public HTTPS ready-file.
-7. Hosted pair state survives restarts/redeploys with KV enabled.
-
-## Still Blocking Full Production Pass
-
-- Android TV/mobile Method 4 same-account sync is not yet proven on real clients.
-- Apple TV synced-addon behavior is not yet proven reliable on a live client path.
-- Hosted `Remote Seedbox` playback is not yet proven with a real public ready-file.
-- Auth-protected external file-server playback still needs a real-client validation pass, ideally on a client path that may drop headers.
-- KV-backed hosted pair-state persistence is not yet proven across restarts/redeploys.
-- Notice-only stream rows still need real-client validation:
-  - `[INFO] Ready Files Only`
-  - `[INFO] Direct Buffer Hidden`
-  - `[INFO] Buffer URL Not Ready`
-  - confirm they do not truncate, duplicate, or bury a genuinely playable stream beside them.
-
-Record the exact pass/fail results here once the live acceptance sweep is complete.
+If the next step is a rewrite, start from [docs/REBUILD_PROMPT.md](docs/REBUILD_PROMPT.md), not from the February planning docs and not from assumptions about how Stremio "should" behave.

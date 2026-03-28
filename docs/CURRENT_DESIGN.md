@@ -102,7 +102,7 @@ PVTKRRX is one codebase with three active pieces:
 2. `PC Local` is the only supported same-PC install route.
 3. `LAN Bridge` is the supported home-device route and depends on the host desktop app remaining online.
 4. Hosted LAN-pair installs must be refreshable because stale installed tokens can point at old pair state or route behavior.
-5. Root `/manifest.json` must remain a real addon manifest for compatibility with the legacy working Stremio contract.
+5. Root `/manifest.json` must remain a real bootstrap manifest for compatibility with the legacy working Stremio contract, but it must not reuse the configured route addon id or catalog list.
 6. The repo contains historical planning docs from February 2026. They are useful for project history, but they are not the live architecture unless explicitly updated.
 
 ## Documentation Canon

@@ -981,11 +981,21 @@ ipcMain.handle('open-qbit', async () => {
 // fit-popup-window IPC removed — window size is fixed at creation
 
 ipcMain.handle('get-download-path', async () => {
-  const prefs = await fetchJson(`http://127.0.0.1:${port}/local/qbit/preferences`)
-  return {
-    savePath: String(prefs?.savePath || ''),
-    tempPath: String(prefs?.tempPath || ''),
-    incompletePathEnabled: Boolean(prefs?.incompletePathEnabled)
+  try {
+    const prefs = await fetchJson(`http://127.0.0.1:${port}/local/qbit/preferences`)
+    return {
+      available: true,
+      savePath: String(prefs?.savePath || ''),
+      tempPath: String(prefs?.tempPath || ''),
+      incompletePathEnabled: Boolean(prefs?.incompletePathEnabled)
+    }
+  } catch (_) {
+    return {
+      available: false,
+      savePath: '',
+      tempPath: '',
+      incompletePathEnabled: false
+    }
   }
 })
 
