@@ -37,6 +37,7 @@ Link: https://github.com/Stremio/stremio-addon-client
 - Same-PC local install should stay manual: trusted HTTPS paste first, then `127.0.0.1:7000` HTTP fallback.
 - Hosted LAN pair mode is now the preferred account-sync path for Android TV/mobile on local networks.
 - `PC Local` is now a real same-PC addon route, not a gateway-only helper.
+- If the Windows host desktop itself shows `Failed to fetch` while browsing `LAN Bridge`, that is the wrong same-PC route. Use `PC Local` on the host desktop and keep `LAN Bridge` for the other home devices on the same account/LAN.
 
 ## Apple TV notes (tvOS)
 

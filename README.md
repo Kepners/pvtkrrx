@@ -302,6 +302,13 @@ Configure page now supports optional Stremio AuthKey linking:
 4. Desktop app should auto-ensure inbound TCP `7000/7001` + UDP `5353` on install/startup; if Windows still blocks it, run the installed app once as Administrator
 5. If pair shows offline in configure page, restart desktop app and re-check pair status
 
+### Host PC desktop shows `Failed to fetch` on LAN Bridge
+
+1. On the Windows host itself, use `PC Local` via `http://127.0.0.1:7000/local/manifest.json?mode=local`
+2. Treat `LAN Bridge` as the synced addon for your other home devices on the same account and LAN
+3. If Stremio Desktop on the host PC is currently browsing the hosted `LAN Bridge` addon, install `PC Local` as well and use that route on this machine
+4. Keep the desktop app running so `LAN Bridge` stays alive for phone, TV, and web clients
+
 ### Apple TV does not show addon URL/configure controls
 
 1. Install/configure PVTKRRX from Stremio Web or desktop first (same Stremio account as Apple TV).

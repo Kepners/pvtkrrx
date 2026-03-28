@@ -1273,7 +1273,7 @@
 
     <div class="card mode-hidden" id="accountLinkCard">
       <h2>LAN Bridge Quick Setup</h2>
-      <p class="section-lead" id="quickSetupLead">Follow the glow. Only the next required button pulses. When all three steps are green, click Install Or Refresh LAN Bridge In Stremio.</p>
+      <p class="section-lead" id="quickSetupLead">Follow the glow. Only the next required button pulses. When all three steps are green, install or refresh LAN Bridge in Stremio for your other home devices. On this Windows PC itself, browse with PC Local.</p>
       <div class="quick-setup-grid">
         <section class="quick-step" id="quickStepStremioDesktop">
           <div class="quick-step-head">
@@ -1313,7 +1313,7 @@
             </div>
             <span class="quick-step-badge" id="lanInstallBadge">Waiting</span>
           </div>
-          <p class="quick-step-copy" id="lanInstallMeta">Run Auto Setup once. When this step turns ready, click Install Or Refresh LAN Bridge In Stremio.</p>
+          <p class="quick-step-copy" id="lanInstallMeta">Run Auto Setup once. When this step turns ready, install or refresh LAN Bridge in Stremio for your other home devices. On this Windows PC itself, use PC Local.</p>
           <div class="quick-step-actions">
             <button class="btn-test" type="button" id="lanAutoSetupBtn" onclick="autoSetup()">Auto Setup (Home LAN)</button>
             <button class="btn-install" type="button" id="quickInstallLanBtn" onclick="triggerLanInstall()" disabled>Install Or Refresh LAN Bridge In Stremio</button>
@@ -1326,7 +1326,7 @@
             </div>
             <p class="quick-step-note" id="quickAddonUrlNote">This primary install link should start with stremio://. Only use the HTTPS addon URL below if Stremio explicitly asks for Add Addon URL.</p>
           </div>
-          <p class="quick-step-note" id="quickSetupHint">Auto Setup also checks Prowlarr, qBittorrent, local storage, and the signed-in Stremio session on this PC. If Stremio already has an older LAN Bridge URL, clicking Install again refreshes it.</p>
+          <p class="quick-step-note" id="quickSetupHint">Auto Setup also checks Prowlarr, qBittorrent, local storage, and the signed-in Stremio session on this PC. If Stremio already has an older LAN Bridge URL, clicking Install again refreshes it for your other home devices. On this Windows PC itself, use Copy PC Local URL below.</p>
         </section>
       </div>
       <div id="autoStatus" class="status"></div>
@@ -1356,7 +1356,7 @@
           <div id="stremioLinkStatus" class="status"></div>
         </div>
       </details>
-      <p class="hint" id="accountSyncModeHint">LAN Bridge is the addon that should sync to your phone, TV, and web clients on the same Stremio account. Manual tools are only here as fallback.</p>
+      <p class="hint" id="accountSyncModeHint">LAN Bridge is the addon that should sync to your phone, TV, and web clients on the same Stremio account. This Windows PC itself should use PC Local for browsing and playback. Manual tools are only here as fallback.</p>
     </div>
 
     <div class="card" id="connectionCard">
@@ -1970,7 +1970,7 @@
       if (hasLinkedAccount()) {
         const sourceText = stremioLinkSession.sourceLabel ? ` via ${stremioLinkSession.sourceLabel}` : '';
         setQuickStepBadge('authLinkBadge', 'ready', 'Ready');
-        document.getElementById('authLinkMeta').textContent = `The server checked the Stremio account link${sourceText} and is ready to install the addon for secured same-account access.`;
+        document.getElementById('authLinkMeta').textContent = `The server checked the Stremio account link${sourceText} and is ready to install LAN Bridge for secured same-account sync on your other home devices.`;
       } else if (!canQueryLocalRuntime()) {
         setQuickStepBadge('authLinkBadge', 'error', 'Host PC Only');
         document.getElementById('authLinkMeta').textContent = 'Open this page on the Windows host PC so Auto Find can reuse the signed-in Stremio session.';
@@ -1994,13 +1994,15 @@
 
       if (lanInstallReady) {
         setQuickStepBadge('lanInstallBadge', 'ready', 'Ready');
-        document.getElementById('lanInstallMeta').textContent = pairStatusText || 'LAN Bridge is prepared. Open it in Stremio now, or copy the HTTPS addon URL below if Stremio asks for a URL.';
+        document.getElementById('lanInstallMeta').textContent = pairStatusText
+          ? `${pairStatusText} On this Windows PC itself, use PC Local.`
+          : 'LAN Bridge is prepared for your other home devices. Install it in Stremio now, or copy the HTTPS addon URL below if Stremio asks for a URL. On this Windows PC itself, use PC Local.';
       } else if (!canQueryLocalRuntime()) {
         setQuickStepBadge('lanInstallBadge', 'error', 'Host PC Only');
-        document.getElementById('lanInstallMeta').textContent = 'Run this on the Windows host PC so PVTKRRX can prepare the hosted LAN Bridge URL for Stremio.';
+        document.getElementById('lanInstallMeta').textContent = 'Run this on the Windows host PC so PVTKRRX can prepare the hosted LAN Bridge URL for your other home devices in Stremio.';
       } else {
         setQuickStepBadge('lanInstallBadge', 'checking', 'Waiting');
-        document.getElementById('lanInstallMeta').textContent = 'Run Auto Setup once after the secure account link is ready. PVTKRRX will check services, reuse the signed-in Stremio account, and then make the Install button ready.';
+        document.getElementById('lanInstallMeta').textContent = 'Run Auto Setup once after the secure account link is ready. PVTKRRX will check services, reuse the signed-in Stremio account, and then prepare the hosted LAN Bridge URL for your other home devices.';
       }
 
       if (checkBtn) {
@@ -2045,7 +2047,7 @@
         if (quickLead) quickLead.textContent = 'Step 3 next. Click Auto Setup once so PVTKRRX checks Prowlarr, qBittorrent, storage, and the LAN Bridge install URL.';
       } else {
         setGuidedButtonState('quickInstallLanBtn', true, false);
-        if (quickLead) quickLead.textContent = 'All three steps are green. Open LAN Bridge in Stremio now, or paste the HTTPS addon URL shown below if Stremio asks for it.';
+        if (quickLead) quickLead.textContent = 'All three steps are green. Install LAN Bridge in Stremio now so your other home devices can sync. On this Windows PC itself, use PC Local.';
       }
     }
 
@@ -2851,26 +2853,26 @@
 
       if (relayNote) {
         relayNote.textContent = linked
-          ? `Linked Stremio account detected${sourceText}. The LAN Bridge addon URL is ready. Open it in Stremio or paste the HTTPS URL above if Stremio asks for a URL.`
+          ? `Linked Stremio account detected${sourceText}. The LAN Bridge addon URL is ready for your other home devices. Open it in Stremio or paste the HTTPS URL above if Stremio asks for a URL. On this Windows PC itself, use PC Local.`
           : 'Use the HTTPS LAN Bridge addon URL above if you need to paste it manually into Stremio.';
       }
 
       if (syncNote) {
         syncNote.textContent = linked
-          ? 'LAN Bridge is the synced addon for your same-account home devices. If content still looks stale, remove the older LAN Bridge entry and install again.'
+          ? 'LAN Bridge is the synced addon for your same-account home devices. If content still looks stale there, remove the older LAN Bridge entry and install again. On this Windows PC itself, browse via PC Local.'
           : 'No Stremio account is linked yet. Auto Find AuthKey is still the normal home-device step if you want this addon to sync to your other devices.';
       }
 
       if (accountSyncModeHint) {
         accountSyncModeHint.textContent = linked
-          ? `Stremio account linked${sourceText}. LAN Bridge is now the addon that should sync across your home devices on this account.`
-          : 'LAN Bridge is the addon that should sync to your other home devices. Auto Find first tries to reuse the signed-in Stremio session from this Windows host.';
+          ? `Stremio account linked${sourceText}. LAN Bridge is now the addon that should sync across your other home devices on this account. This Windows PC itself should use PC Local.`
+          : 'LAN Bridge is the addon that should sync to your other home devices. This Windows PC itself should use PC Local. Auto Find first tries to reuse the signed-in Stremio session from this Windows host.';
       }
 
       if (quickSetupHint) {
         quickSetupHint.textContent = linked
-          ? `The server has already checked the Stremio account${sourceText}. Run Auto Setup if the install button is not ready yet, then install or refresh LAN Bridge once in Stremio.`
-          : 'Auto Setup checks Prowlarr, qBittorrent, local storage, and the signed-in Stremio session on this PC. Manual tools stay below as fallback only.';
+          ? `The server has already checked the Stremio account${sourceText}. Run Auto Setup if the install button is not ready yet, then install or refresh LAN Bridge once in Stremio for your other home devices. On this Windows PC itself, use PC Local.`
+          : 'Auto Setup checks Prowlarr, qBittorrent, local storage, and the signed-in Stremio session on this PC. LAN Bridge is for your other home devices, while this Windows PC itself should use PC Local. Manual tools stay below as fallback only.';
       }
 
       updateQuickSetupStatus();
@@ -3011,7 +3013,7 @@
       if (target === 'pc') {
         hint.textContent = 'PC Local selected. This route works on this Windows host and installs a real same-PC addon for browsing and playback. LAN Bridge is the route for your other home devices.';
       } else if (target === 'lan') {
-        hint.textContent = 'LAN Bridge selected. This is the normal home setup. The app checks Stremio on this Windows PC, reuses the signed-in Stremio account when possible, then prepares the addon install for your home devices.';
+        hint.textContent = 'LAN Bridge selected. This is the normal home-device setup. The app checks Stremio on this Windows PC, reuses the signed-in Stremio account when possible, then prepares the hosted addon for your other home devices. For browsing and playback on this Windows host itself, switch to PC Local.';
       } else {
         hint.textContent = 'Remote Seedbox selected. Hosted playback is effectively ready-file-first here. Direct queue-and-buffer only appears when the runtime can safely serve it, and auth-protected file-server playback still needs real-device proof.';
       }
@@ -3359,8 +3361,8 @@
           const target = getInstallTarget();
           const message = target === 'lan'
             ? (linkedDuringSetup
-              ? 'Auto setup complete. The server checked your Stremio account and LAN Bridge is ready to install or refresh in Stremio.'
-              : 'Auto setup complete. LAN Bridge is ready. If the account step is not green yet, use Auto Find AuthKey once and then install or refresh the addon in Stremio.')
+              ? 'Auto setup complete. The server checked your Stremio account and LAN Bridge is ready to install or refresh in Stremio for your other home devices. On this Windows PC itself, use PC Local for browsing and playback.'
+              : 'Auto setup complete. LAN Bridge is ready for your other home devices. If the account step is not green yet, use Auto Find AuthKey once and then install or refresh the addon in Stremio. On this Windows PC itself, use PC Local for browsing and playback.')
             : 'Auto setup complete. PC Local is ready on this Windows host, and LAN Bridge remains ready for your other home devices.';
           setStatus('autoStatus', 'ok', message);
         } else {
@@ -3644,8 +3646,8 @@
             'ok',
             target === 'lan'
               ? (hasLinkedAccount()
-                  ? 'Saved. LAN Bridge is ready. Install or refresh it once in Stremio and let your linked home devices sync.'
-                  : 'Saved. LAN Bridge is prepared. If the account step is not green yet, run Auto Find AuthKey once before installing or refreshing it in Stremio.')
+                  ? 'Saved. LAN Bridge is ready. Install or refresh it once in Stremio and let your linked home devices sync. On this Windows PC itself, use PC Local for browsing and playback.'
+                  : 'Saved. LAN Bridge is prepared for your other home devices. If the account step is not green yet, run Auto Find AuthKey once before installing or refreshing it in Stremio. On this Windows PC itself, use PC Local for browsing and playback.')
               : 'Saved. PC Local URL is ready for Stremio Desktop on this Windows host. LAN Bridge remains the route for your other home devices.'
           );
         } else {
