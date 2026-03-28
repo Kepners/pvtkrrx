@@ -17,6 +17,7 @@ function loadApp(vercelEnabled) {
   else delete process.env.VERCEL
   process.env.PVTKRRX_RUNTIME_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-runtime-guards-'))
   delete require.cache[require.resolve('../index')]
+  delete require.cache[require.resolve('../src/lib/shared')]
   return require('../index')
 }
 

@@ -183,6 +183,7 @@ async function run() {
     )
     await new Promise(resolve => server.close(resolve))
     delete require.cache[require.resolve('../index')]
+    delete require.cache[require.resolve('../src/lib/shared')]
     app = require('../index')
     server = http.createServer(app)
     await new Promise(resolve => server.listen(0, resolve))
