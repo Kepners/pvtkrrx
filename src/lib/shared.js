@@ -372,6 +372,19 @@ function extractStremioAuthKeysFromBlob(blob) {
     }
   }
 
+  // Chromium/WebView2 LevelDB payloads often interleave control bytes into the
+  // profile JSON, which breaks strict `"auth":{"key":"..."}` matching even
+  // though the token is still present in plaintext nearby.
+  const candidateRegex = new RegExp(`(${STREMIO_AUTH_KEY_CAPTURE_PATTERN})`, 'g')
+  let candidateMatch = null
+  while ((candidateMatch = candidateRegex.exec(compact))) {
+    const candidate = candidateMatch[1]
+    const before = compact.slice(Math.max(0, candidateMatch.index - 120), candidateMatch.index)
+    if (/auth.{0,40}key.{0,20}$/is.test(before)) {
+      pushCandidate(candidate)
+    }
+  }
+
   return matches
 }
 

@@ -276,11 +276,36 @@ app.post('/auto-provision', requireLocalNetworkRoute, async (req, res) => {
     const options = req.body || {}
     const localHostname = normalizeLocalHostname(options.localHostname || DEFAULT_LOCAL_HOSTNAME)
     const localHostnameCustom = localHostname !== DEFAULT_LOCAL_HOSTNAME
-    const accountUserId = String(options.accountUserId || '').trim()
-    const accountProvider = String(options.accountProvider || '').trim()
-    const accountLinkedAt = Number(options.accountLinkedAt || 0)
-    const stremioUserId = normalizeStremioUserId(options.stremioUserId || '')
-    const hintedPairId = sanitizePairId(options.lanPairId || '')
+    let accountUserId = String(options.accountUserId || '').trim()
+    let accountProvider = String(options.accountProvider || '').trim()
+    let accountLinkedAt = Number(options.accountLinkedAt || 0)
+    let stremioUserId = normalizeStremioUserId(options.stremioUserId || '')
+    let hintedPairId = sanitizePairId(options.lanPairId || '')
+    let autoLinkedSourceLabel = ''
+
+    if (!stremioUserId && authSecretAvailable()) {
+      const authSecret = getAuthTokenSecret()
+      const candidates = discoverLocalStremioAuthKeyCandidates()
+      for (const candidate of candidates) {
+        try {
+          const linked = await createLinkedStremioAuthSession(candidate.authKey, authSecret)
+          stremioUserId = normalizeStremioUserId(linked?.stremio?.userId || '')
+          if (!hintedPairId) {
+            hintedPairId = sanitizePairId(linked?.stremio?.recommendedPairId || '')
+          }
+          if (stremioUserId) {
+            if (!accountProvider) accountProvider = 'stremio-authkey'
+            if (!accountLinkedAt) accountLinkedAt = Date.now()
+            autoLinkedSourceLabel = String(candidate.sourceLabel || '').trim()
+          }
+          break
+        } catch (err) {
+          if (Number(err?.statusCode || 0) === 401) continue
+          throw err
+        }
+      }
+    }
+
     const result = await autoProvisionWindows({
       installIfMissing: options.installIfMissing,
       startIfStopped: options.startIfStopped,
@@ -320,8 +345,13 @@ app.post('/auto-provision', requireLocalNetworkRoute, async (req, res) => {
         console.warn('[auto-provision] Provider warmup failed:', err.message)
       })
     }
+    const responseNotes = Array.isArray(result.notes) ? [...result.notes] : []
+    if (autoLinkedSourceLabel) {
+      responseNotes.push(`Signed-in Stremio session detected on this PC (${autoLinkedSourceLabel}) and linked automatically`)
+    }
     res.json({
       ...result,
+      notes: responseNotes,
       config: hydratedProvisionedConfig
         ? buildConfigReadback(hydratedProvisionedConfig)
         : (result.config ? buildConfigReadback(result.config) : null),

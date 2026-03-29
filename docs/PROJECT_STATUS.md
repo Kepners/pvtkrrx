@@ -31,6 +31,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - completed-file playback error `isCompletedTorrent is not defined` was fixed in the local playback path
 - the desktop splash now appears on every cold boot and stays frontmost until the main shell is ready
 - host-side `LAN Bridge` status now checks the hosted relay directly, and the desktop can repair a stale local pair identity after an `invalid pair key` rejection
+- host-side Stremio Desktop session scanning now detects the real WebView2 `profile/auth/key` storage format again, and startup auto-provision can link that signed-in session automatically
 - sports catalog tiles now prefer landscape artwork when TheSportsDB provides it
 - `1.1.15` installers were built successfully into `dist/`
 
@@ -54,6 +55,9 @@ These items are verified in the current workspace or by direct client/log proof:
 6. LAN Bridge pair drift after desktop auto-provision:
    - Root cause: desktop boot could rewrite the saved local config with a sanitized `/auto-provision` readback payload, which dropped `lanPairKey` / `lanPairOwnerId`. A later local auto-setup then regenerated a new key for the same pair id and the hosted relay rejected it as `invalid pair key`.
    - Fix: desktop boot no longer persists sanitized provision readbacks, host-side pair status now asks the relay directly, and the desktop can repair the local LAN identity if the relay rejects a stale pair.
+7. Host-side Stremio account reuse stopped auto-detecting the signed-in desktop session:
+   - Root cause: the local auth scanner only matched clean JSON-style `auth.key` blobs and missed the noisy Chromium/WebView2 LevelDB encoding actually used by Stremio Desktop on this machine.
+   - Fix: the scanner now accepts the real `profile/auth/key` blob layout, and startup `/auto-provision` reuses that signed-in host session automatically instead of waiting for a manual check button.
 
 ## Still Needs Real-Client Proof
 

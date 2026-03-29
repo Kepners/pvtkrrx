@@ -92,7 +92,7 @@ Use the configure page to prepare the route you actually want to use:
 - **LAN Bridge** for Android TV / phone / web on the same network and Stremio account
 - **Remote Seedbox** when your playback endpoints are public over HTTPS
 
-When using `LAN Bridge` on Windows, install and sign into Stremio Desktop on the host PC first. The desktop popup and configure flow now check that local Stremio state before preparing the home-device route.
+When using `LAN Bridge` on Windows, install and sign into Stremio Desktop on the host PC first. On boot, the local runtime now scans the host Stremio Desktop WebView2 session automatically and links that account into startup auto-provision when a signed-in session is present. The configure page still exposes the host check as a manual fallback.
 
 Auto Setup also attempts to:
 - install/start Prowlarr and qBittorrent (Windows, via winget + service/process start)

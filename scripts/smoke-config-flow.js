@@ -106,7 +106,7 @@ async function run() {
   fs.mkdirSync(scanDir, { recursive: true })
   fs.writeFileSync(
     path.join(scanDir, '000001.log'),
-    `)_https://web.stremio.com\u0001profile\u0001{"auth":{"key":"${sampleDetectedAuthKey}"},"user":{"_id":"${LINKED_STREMIO_USER_ID}","email":"linked@example.com"}}`,
+    `)_https://web.stremio.com\u0001profile\u0001{"auth":keyðið"${sampleDetectedAuthKey}","user":{"_id":"${LINKED_STREMIO_USER_ID}","email":"linked@example.com"}}`,
     'utf8'
   )
 
@@ -273,6 +273,7 @@ async function run() {
     assert.match(localInstallDebugHtml, /Debug-only raw LAN URL/i, 'local install helper should label raw LAN URLs as debug-only')
     assert.match(localInstallDebugHtml, /http:\/\/192\.168\.50\.48:7000\/local\/manifest\.json\?mode=local/, 'local install helper should surface the raw LAN URL only as a debug aid')
 
+    const expectedLinkedPairId = derivePairIdFromStremioUserId(LINKED_STREMIO_USER_ID)
     const autoProvisionRes = await fetch(`${base}/auto-provision`, {
       method: 'POST',
       headers: withCsrf(csrf, { 'Content-Type': 'application/json' }),
@@ -284,6 +285,10 @@ async function run() {
       })
     })
     assert.equal(autoProvisionRes.status, 200, 'POST /auto-provision should return 200')
+    const autoProvisionPayload = await autoProvisionRes.json()
+    assert.equal(String(autoProvisionPayload?.config?.stremioUserId || ''), LINKED_STREMIO_USER_ID, 'auto-provision should auto-link the signed-in local Stremio session')
+    assert.equal(String(autoProvisionPayload?.config?.accountProvider || ''), 'stremio-authkey', 'auto-provision should persist the linked Stremio account provider')
+    assert.equal(String(autoProvisionPayload?.config?.lanPairId || ''), expectedLinkedPairId, 'auto-provision should derive the LAN pair id from the linked Stremio user')
 
     const localSaveRes = await fetch(`${base}/local-config`, {
       method: 'POST',
@@ -335,7 +340,6 @@ async function run() {
     })
     assert.equal(evilLocalConfigRes.status, 403, 'evil-origin local config readback should be blocked')
 
-    const expectedLinkedPairId = derivePairIdFromStremioUserId(LINKED_STREMIO_USER_ID)
     const linkedSaveRes = await fetch(`${base}/local-config`, {
       method: 'POST',
       headers: withCsrf(csrf, { 'Content-Type': 'application/json' }),

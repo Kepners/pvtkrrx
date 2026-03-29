@@ -84,6 +84,7 @@ PVTKRRX is one codebase with three active runtime pieces:
 - Startup still runs:
   - local server boot
   - provider warm-up
+  - automatic host-side Stremio session scan and account-link reuse when a signed-in desktop session is present
   - firewall/Bonjour checks
   - LAN pair heartbeat startup pulse
   - Stremio launch watch
