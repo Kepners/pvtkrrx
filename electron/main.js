@@ -11,7 +11,6 @@ const { normalizeRelayUrl } = require('../src/utils/relayUrl')
 const { resolveRuntimeDir } = require('../src/utils/runtimeDir')
 const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJsonFile')
 const { redactSensitiveArgs, redactSensitiveText } = require('../src/utils/logRedaction')
-const { shouldPersistProvisionConfig } = require('./provisionPersistence')
 
 if (!process.env.PVTKRRX_RUNTIME_DIR) {
   process.env.PVTKRRX_RUNTIME_DIR = resolveRuntimeDir()
@@ -84,14 +83,6 @@ function getProvisionPayload() {
     openFirewall: true,
     localHostname: process.env.PVTKRRX_LOCAL_HOSTNAME
   }
-}
-
-function persistProvisionConfig(result) {
-  if (shouldPersistProvisionConfig(result)) {
-    saveLocalConfig(result.config)
-    return true
-  }
-  return false
 }
 
 function makeDesktopPairId() {
@@ -181,7 +172,6 @@ function needsElevatedProvisionPass(notes) {
 async function runProvisionOnlyMode() {
   try {
     const result = await autoProvisionWindows(getProvisionPayload())
-    persistProvisionConfig(result)
     console.log('[desktop-provision] message:', result?.message || 'ok')
     if (Array.isArray(result?.notes)) {
       for (const n of result.notes) console.log('[desktop-provision] note:', n)
@@ -932,9 +922,6 @@ async function bootstrapAutoProvision() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(getProvisionPayload())
       }, 180000)
-      // The local server already saves the full provisioned config. Do not
-      // overwrite it here with the redacted readback payload from /auto-provision.
-      persistProvisionConfig(data)
       return data
     }
 
