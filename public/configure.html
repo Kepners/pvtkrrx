@@ -1489,7 +1489,7 @@
           <p class="simple-flow-copy" id="simpleFlowCopy">Sign in to Stremio on this Windows PC first. PVTKRRX then checks the local Stremio session, prepares the right URLs, and keeps the noisy manual tools hidden below.</p>
           <div class="simple-flow-status info" id="simpleFlowStatus">Checking this PC so the simple install path can stay short.</div>
           <div class="simple-flow-actions">
-            <button class="btn-copy" type="button" id="simpleCheckStremioBtn" onclick="refreshLocalStremioStatus()">Check Stremio On This PC</button>
+            <button class="btn-copy" type="button" id="simpleCheckStremioBtn" onclick="checkAndLinkStremioOnThisPc(this)">Check Stremio Login On This PC</button>
             <button class="btn-test" type="button" id="simpleAutoSetupBtn" onclick="autoSetup()">Auto Setup</button>
             <button class="btn-install" type="button" id="simpleGenerateBtn" onclick="install()">Save And Generate URL</button>
             <button class="btn-install" type="button" id="simpleInstallBtn" onclick="triggerLanInstall()">Install Or Refresh In Stremio</button>
@@ -1531,7 +1531,7 @@
           </div>
           <p class="quick-step-copy" id="stremioDesktopMeta">Checking whether Stremio Desktop is installed on this Windows host.</p>
           <div class="quick-step-actions">
-            <button class="btn-copy" type="button" id="stremioCheckBtn" onclick="refreshLocalStremioStatus()">Check Again</button>
+            <button class="btn-copy" type="button" id="stremioCheckBtn" onclick="checkAndLinkStremioOnThisPc(this)">Check Again</button>
             <a class="secondary-link" id="stremioDesktopDownloadLink" href="https://www.stremio.com/downloads" target="_blank" rel="noopener">Download Stremio</a>
           </div>
         </section>
@@ -2351,6 +2351,78 @@
       }
 
       return localStremioStatus;
+    }
+
+    function setLocalStremioCheckButtonsBusy(isBusy, busyButton = null, busyLabel = 'Checking This PC...') {
+      const buttons = [
+        document.getElementById('simpleCheckStremioBtn'),
+        document.getElementById('stremioCheckBtn')
+      ].filter(Boolean);
+
+      for (const btn of buttons) {
+        if (!btn.dataset.defaultText) {
+          btn.dataset.defaultText = btn.textContent;
+        }
+        btn.disabled = Boolean(isBusy) || !canQueryLocalRuntime();
+      }
+
+      if (busyButton && typeof busyButton.textContent === 'string') {
+        busyButton.textContent = isBusy ? String(busyLabel || 'Checking This PC...') : busyButton.dataset.defaultText || busyButton.textContent;
+      }
+    }
+
+    async function checkAndLinkStremioOnThisPc(triggerBtn = null) {
+      const activeBtn = triggerBtn || document.getElementById('simpleCheckStremioBtn') || document.getElementById('stremioCheckBtn');
+      if (activeBtn && typeof activeBtn.textContent === 'string' && !activeBtn.dataset.defaultText) {
+        activeBtn.dataset.defaultText = activeBtn.textContent;
+      }
+
+      setLocalStremioCheckButtonsBusy(true, activeBtn, 'Checking This PC...');
+      setStremioLinkStatus('info', 'Checking Stremio on this PC and trying to reuse the signed-in session...');
+
+      try {
+        const status = await refreshLocalStremioStatus();
+
+        if (!canQueryLocalRuntime()) {
+          setStremioLinkStatus('err', 'Open configure on the Windows host PC to check and reuse the Stremio session.');
+          return status;
+        }
+
+        if (!status.installed) {
+          setStremioLinkStatus('err', 'Stremio Desktop was not detected on this PC. Install it first, then click Check Stremio Login On This PC again.');
+          return status;
+        }
+
+        if (hasLinkedAccount()) {
+          setStremioLinkStatus('ok', 'Stremio Desktop and the linked Stremio account are already ready on this PC.');
+          return status;
+        }
+
+        const localSession = await autoLinkStremioFromLocalSession({ triggerBtn: activeBtn, silent: true });
+        if (localSession?.ok) {
+          return {
+            ...status,
+            linked: true
+          };
+        }
+
+        const detail = String(localSession?.detail || '').trim();
+        const suffix = detail ? ` ${detail}` : '';
+        if (status.signedInSessionFound) {
+          setStremioLinkStatus('err', `A signed-in Stremio session was found on this PC, but PVTKRRX could not reuse it automatically.${suffix} Open the hidden setup tab if you need fallback tools.`);
+        } else {
+          setStremioLinkStatus('err', `Stremio Desktop is installed here, but no signed-in session was found yet. Sign in on this PC first, then click this button again.${suffix}`);
+        }
+
+        return {
+          ...status,
+          linked: false,
+          linkError: String(localSession?.error || '').trim()
+        };
+      } finally {
+        setLocalStremioCheckButtonsBusy(false, activeBtn);
+        updateQuickSetupStatus();
+      }
     }
 
     function applyStremioLinkResponse(data, options = {}) {
