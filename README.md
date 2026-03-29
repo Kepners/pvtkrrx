@@ -44,7 +44,7 @@ See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the exact LAN B
 | Movie/TV streams from private trackers | Working |
 | Sports contamination filter | Working (SportsCult excluded from movie searches) |
 | Already-downloaded files | Working (built-in file server with Range support) |
-| Packed RAR scene releases already added to qBittorrent | Working via Stremio `rarUrls` on local playback-capable routes |
+| Packed RAR scene releases already added to qBittorrent | Working on supported local routes once complete: completed archive sets emit ordered Stremio-core-compatible `rarUrls`; partial multi-volume archive playback is suppressed truthfully because Stremio cannot start that path reliably while the archive is still incomplete |
 | On-tracker download + play | Working on playback-capable routes (PC Local, LAN Bridge via local redirect, or self-hosted runtime) |
 | Local + Hosted install modes | Working |
 | Hosted LAN pair mode (Android TV/mobile) | Implemented (requires relay config) |
@@ -155,7 +155,7 @@ Hosted relay routes do not proxy video bytes, and hosted `/file` or `/playback` 
 
 **[INFO] Remote notice** — Hosted Remote Seedbox can append an explanation row when direct queue-and-buffer is hidden to protect your file-server login or when qBittorrent has not exposed enough live file info for a safe buffer URL yet.
 
-**Packed RAR scene release** — If a tracker source is a multi-part RAR release (`.r00`, `.r01`, ...), the first click can still be the queue step. Once qBittorrent has added the torrent and exposed the archive parts, reopening the stream list on a local playback-capable route now emits a Stremio `rarUrls` stream so Stremio can read the archive set directly without manual extraction.
+**Packed RAR scene release** — If a tracker source is a multi-part RAR release (`.rar`, `.r00`, `.r01`, ...), the first click can still queue the torrent, but PVTKRRX no longer pretends that partial archive playback will work. Real Stremio clients can fail with `liberror` on incomplete multi-volume archives, so PVTKRRX now suppresses live tracker playback for packed-only torrents and fails fast on `/playback` with a truthful message after queueing the download. Once qBittorrent has the full archive set, reopening the stream list on a local playback-capable route emits an ordered, Stremio-core-compatible `rarUrls` stream plus array-based `fileMustInclude` rules so Stremio can read the archive set directly without manual extraction.
 
 ## Verify Stremio Config Flow
 

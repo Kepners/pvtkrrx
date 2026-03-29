@@ -4,7 +4,7 @@ const VIDEO_EXTENSIONS = ['.mkv', '.mp4', '.avi', '.wmv', '.ts', '.m4v']
 const SAMPLE_HINT_RE = /(^|[\\/.\-_ ])[sS]ample([\\/.\-_ ]|$)|(^|[\\/.\-_ ])[tT]railer([\\/.\-_ ]|$)|(^|[\\/.\-_ ])[pP]review([\\/.\-_ ]|$)|(^|[\\/.\-_ ])[pP]roof([\\/.\-_ ]|$)/
 const ARCHIVE_EXT_RE = /\.(?:rar|r\d{2,3}|zip|7z|001)$/i
 const RAR_EXT_RE = /\.(?:rar|r\d{2,3}|part\d{1,3}\.rar)$/i
-const ARCHIVE_VIDEO_INCLUDE_RE = '/\\.(mkv|mp4|avi|wmv|ts|m4v)$/i'
+const ARCHIVE_VIDEO_INCLUDE_PATTERNS = ['/\\.(mkv|mp4|avi|wmv|ts|m4v)$/i']
 
 function formatSize(bytes) {
   if (!bytes || bytes <= 0) return '0 B'
@@ -62,15 +62,15 @@ function formatPeerLabel(seeders, mode) {
 
 function buildStreamName(parsed, mode) {
   const badge = mode === 'seedbox'
-    ? '[SB⚡]'
+    ? '[SB]'
     : mode === 'buffering'
-      ? '[BUF⏳]'
-      : '[DL⬇]'
+      ? '[BUF]'
+      : '[DL]'
   const quality = parsed?.quality || 'AUTO'
   const shortSource = parsed?.source || ''
   const shortCodec = parsed?.codec || ''
   const tech = uniqueNonEmpty([shortSource, shortCodec]).join(' ')
-  return tech ? `${badge} PVTKRRX ${quality} ${tech}` : `${badge} PVTKRRX ${quality}`
+  return tech ? `PVTKRRX ${badge} ${quality} ${tech}` : `PVTKRRX ${badge} ${quality}`
 }
 
 function buildDescription(item, parsed, mode, progressPercent = null) {
@@ -188,7 +188,7 @@ function buildOnArchiveStream(item, rarUrls, fileName, totalBytes, parsed, progr
       ['Multi-part RAR archive stream']
     ),
     rarUrls,
-    fileMustInclude: ARCHIVE_VIDEO_INCLUDE_RE,
+    fileMustInclude: [...ARCHIVE_VIDEO_INCLUDE_PATTERNS],
     behaviorHints: {
       notWebReady: true,
       bingeGroup: buildBingeGroup(item, parsed, mode),
@@ -238,6 +238,33 @@ function buildInfoStream(code, helpUrl, count = 1) {
         'Wait for more progress, or use PC Local, LAN Bridge, or self-hosted playback for local queue-and-buffer.'
       ]
     )
+  } else if (code === 'packed-archive-pending') {
+    name = '[INFO] Packed Release Downloading'
+    description = withExtraDescription(
+      'This source is a multi-part RAR release and is still downloading.',
+      [
+        `${total} packed-release ${noun} ${verb} hidden until every archive volume is available for Stremio to open safely.`,
+        'Choose a direct WEB-DL/REMUX source now, or wait until the packed release finishes downloading.'
+      ]
+    )
+  } else if (code === 'packed-archive-live-unsupported') {
+    name = '[INFO] Packed Release Needs Full Download'
+    description = withExtraDescription(
+      'This source is a multi-part RAR scene release, not a direct video file.',
+      [
+        `${total} packed-release ${noun} ${verb} not offered as live playback because this Stremio path cannot reliably start a partial multi-volume archive while it is still downloading.`,
+        'Choose a direct WEB-DL/REMUX source for instant playback, or wait until the packed release fully downloads and the ready RAR stream appears.'
+      ]
+    )
+  } else if (code === 'tracker-link-unverified') {
+    name = '[INFO] Source Verification Failed'
+    description = withExtraDescription(
+      'Some tracker download URLs could not be verified safely before playback.',
+      [
+        `${total} stream ${noun} ${verb} hidden because PVTKRRX could not fetch and inspect the tracker payload ahead of time.`,
+        'Refresh later or choose another source that can be verified and queued safely.'
+      ]
+    )
   }
 
   return {
@@ -271,10 +298,60 @@ function hasPackedArchiveFiles(files) {
   return (files || []).some(f => isArchiveFileName(f?.name))
 }
 
+function archiveVolumeSortKey(name) {
+  const normalized = String(name || '').replace(/[\\/]+/g, '/').toLowerCase()
+  const basename = normalized.split('/').pop() || normalized
+
+  let match = basename.match(/^(.*)\.part(\d{1,4})\.rar$/i)
+  if (match) {
+    return {
+      stem: match[1],
+      volume: Math.max(0, Number.parseInt(match[2], 10) - 1),
+      fallback: basename
+    }
+  }
+
+  match = basename.match(/^(.*)\.rar$/i)
+  if (match) {
+    return {
+      stem: match[1],
+      volume: 0,
+      fallback: basename
+    }
+  }
+
+  match = basename.match(/^(.*)\.r(\d{2,3})$/i)
+  if (match) {
+    return {
+      stem: match[1],
+      volume: Number.parseInt(match[2], 10) + 1,
+      fallback: basename
+    }
+  }
+
+  return {
+    stem: basename,
+    volume: Number.MAX_SAFE_INTEGER,
+    fallback: basename
+  }
+}
+
 function findPackedArchiveFiles(files) {
   return (Array.isArray(files) ? files : [])
     .filter(f => RAR_EXT_RE.test(String(f?.name || '').toLowerCase()))
-    .sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || ''), undefined, { numeric: true, sensitivity: 'base' }))
+    .sort((a, b) => {
+      const left = archiveVolumeSortKey(a?.name)
+      const right = archiveVolumeSortKey(b?.name)
+      const stemDiff = left.stem.localeCompare(right.stem, undefined, { numeric: true, sensitivity: 'base' })
+      if (stemDiff !== 0) return stemDiff
+      if (left.volume !== right.volume) return left.volume - right.volume
+      return left.fallback.localeCompare(right.fallback, undefined, { numeric: true, sensitivity: 'base' })
+    })
+}
+
+function arePackedArchiveFilesReady(files) {
+  const archiveFiles = findPackedArchiveFiles(files)
+  return archiveFiles.length > 0 && archiveFiles.every(file => Number(file?.progress || 0) >= 0.999)
 }
 
 function pickLargestFile(files) {
@@ -372,8 +449,9 @@ function sortStreams(streams) {
     if (mode === 'buffering') return 1
     if (mode === 'tracker') return 2
     if (mode === 'notice') return 3
-    if (stream.name.includes('\u26A1')) return 0
-    if (stream.name.includes('\u23F3')) return 1
+    const streamName = String(stream?.name || '')
+    if (streamName.includes('[SB]')) return 0
+    if (streamName.includes('[BUF]')) return 1
     return 2
   }
 
@@ -431,6 +509,7 @@ module.exports = {
   isArchiveFileName,
   hasPackedArchiveFiles,
   findPackedArchiveFiles,
+  arePackedArchiveFilesReady,
   findVideoFile,
   findEpisodeFile,
   sortStreams

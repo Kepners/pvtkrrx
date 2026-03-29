@@ -8,7 +8,9 @@ const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-sports-smoke-'
 process.env.PVTKRRX_RUNTIME_DIR = runtimeDir
 
 const { mapLeague } = require('../src/utils/leagueMap')
-const { parseSportsTitle } = require('../src/utils/sportsTitleParser')
+const { parseSportsTitle, parseSportsEventTitle } = require('../src/utils/sportsTitleParser')
+const { resolveSportHint, scoreSportsEventSignals, isLikelySportsEventTitle } = require('../src/utils/sportsRules')
+const { detectSport } = require('../src/utils/sportClassifier')
 const { SportsDbClient } = require('../src/clients/sportsdb')
 const { encodeCustomId, decodeCustomId } = require('../src/utils/customId')
 const { setPublicCacheHeaders } = require('../src/lib/shared')
@@ -255,14 +257,212 @@ async function testSportsMetaIncludesGenres() {
   assert.equal(result.meta.releaseInfo, '2026-03-15')
 }
 
+function testEventTitleParser() {
+  // F1 with date
+  const f1 = parseSportsEventTitle('Formula1.2026.03.28.Japanese.Grand.Prix.Qualifying.1080p.WEB.h265-VERUM')
+  assert.ok(f1, 'expected F1 title with date to parse')
+  assert.equal(f1.league, 'Formula1')
+  assert.equal(f1.date, '2026-03-28')
+  assert.equal(f1.eventName, 'Japanese Grand Prix Qualifying')
+  assert.equal(f1.quality, '1080p')
+
+  // F1 without date
+  const f1b = parseSportsEventTitle('Formula1.2026.Japanese.Grand.Prix.Practice.Two.HLG.2160p.WEB.h265-VERUM')
+  assert.ok(f1b, 'expected F1 title without full date to parse')
+  assert.equal(f1b.league, 'Formula1')
+  assert.equal(f1b.eventName, 'Japanese Grand Prix Practice Two')
+
+  // UFC event-style (no vs)
+  const ufc = parseSportsEventTitle('UFC.Fight.Night.270.Main.Card.1080p.WEB.h264-GROUP')
+  assert.ok(ufc, 'expected UFC event title to parse')
+  assert.equal(ufc.league, 'UFC')
+  assert.equal(ufc.eventName, 'Fight Night 270 Main Card')
+
+  // MotoGP
+  const moto = parseSportsEventTitle('MotoGP.2026.Round.04.Spanish.GP.Sprint.720p.HDTV')
+  assert.ok(moto, 'expected MotoGP title to parse')
+  assert.equal(moto.league, 'MotoGP')
+  assert.equal(moto.eventName, 'Round 04 Spanish GP Sprint')
+
+  // Supercars
+  const sc = parseSportsEventTitle('Supercars.2026.Round.03.Melbourne.Race.1.1080p.HDTV.x264-GROUP')
+  assert.ok(sc, 'expected Supercars title to parse')
+  assert.equal(sc.league, 'Supercars')
+  assert.equal(sc.eventName, 'Round 03 Melbourne Race 1')
+
+  // Non-event title should not parse
+  assert.equal(parseSportsEventTitle('EPL.2026.03.15.Arsenal.vs.Chelsea.1080p'), null, 'vs-style title should not match event parser')
+  assert.equal(parseSportsEventTitle('Random.Movie.Title.2026.1080p'), null, 'non-sports title should not match event parser')
+}
+
+function testSportDisambiguation() {
+  // Supercars and V8 should detect as motorsport
+  assert.equal(detectSport('Supercars 2026 Round 03 Melbourne'), 'motorsport', 'Supercars should detect as motorsport')
+  assert.equal(detectSport('V8 Supercars Bathurst 1000'), 'motorsport', 'V8 Supercars should detect as motorsport')
+  assert.equal(detectSport('NASCAR Cup Series 2026'), 'motorsport', 'NASCAR should detect as motorsport')
+  assert.equal(detectSport('Formula1 2026 Japanese Grand Prix'), 'motorsport', 'Formula1 should detect as motorsport')
+  assert.equal(detectSport('PDC Darts World Championship 2026'), 'darts', 'PDC Darts should detect as darts')
+  assert.equal(detectSport('Premier League Darts Night 10'), 'darts', 'Premier League Darts should detect as darts')
+
+  // League mapping
+  assert.equal(mapLeague('formula1'), 'Formula 1')
+  assert.equal(mapLeague('supercars'), 'Supercars Championship')
+  assert.equal(mapLeague('motogp'), 'MotoGP')
+  assert.equal(mapLeague('nascar'), 'NASCAR')
+
+  // Sport hint resolution
+  assert.equal(resolveSportHint({ explicitHint: 'supercars' }), 'motorsport')
+  assert.equal(resolveSportHint({ explicitHint: 'v8sc' }), 'motorsport')
+  assert.equal(resolveSportHint({ explicitHint: 'pdc' }), 'darts')
+
+  // Event signals should score well for non-vs event titles
+  const f1Score = scoreSportsEventSignals('Formula1.2026.03.28.Japanese.Grand.Prix.Qualifying.1080p.WEB', 'motorsport')
+  assert.ok(f1Score >= 5, `expected F1 event score >= 5, got ${f1Score}`)
+
+  const ufcScore = scoreSportsEventSignals('UFC.Fight.Night.270.Main.Card.1080p.WEB', 'mma')
+  assert.ok(ufcScore >= 5, `expected UFC event score >= 5, got ${ufcScore}`)
+
+  // isLikelySportsEventTitle should accept non-vs events with enough signals
+  assert.ok(isLikelySportsEventTitle('Formula1.2026.03.28.Japanese.Grand.Prix.Qualifying.1080p.WEB', 'motorsport'), 'F1 event should be likely sports')
+  assert.ok(isLikelySportsEventTitle('UFC.Fight.Night.270.Main.Card.1080p.WEB', 'mma'), 'UFC event should be likely sports')
+}
+
+async function testEventTitleCatalogGrouping() {
+  class FakeProwlarrClient {
+    async search() {
+      return [
+        {
+          title: 'Formula1.2026.03.28.Japanese.Grand.Prix.Qualifying.1080p.WEB.h265-VERUM',
+          indexer: 'SportsTracker',
+          size: 2_000_000_000,
+          seeders: 30,
+          pubDate: '2026-03-28T12:00:00Z'
+        },
+        {
+          title: 'Formula1.2026.03.28.Japanese.Grand.Prix.Qualifying.720p.HDTV.x264-SPORTS',
+          indexer: 'SportsTracker',
+          size: 1_200_000_000,
+          seeders: 15,
+          pubDate: '2026-03-28T14:00:00Z'
+        },
+        {
+          title: 'Formula1.2026.03.28.Japanese.Grand.Prix.Race.1080p.WEB.h265-VERUM',
+          indexer: 'SportsTracker',
+          size: 3_000_000_000,
+          seeders: 50,
+          pubDate: '2026-03-28T18:00:00Z'
+        }
+      ]
+    }
+  }
+
+  class FakeSportsDbClient {
+    async getEventArtwork() {
+      return {
+        poster: 'https://example.com/f1-poster.jpg',
+        landscapeImage: 'https://example.com/f1-landscape.jpg',
+        backgroundImage: 'https://example.com/f1-background.jpg',
+        image: 'https://example.com/f1-landscape.jpg',
+        eventId: 'f1-event-1',
+        eventDate: '2026-03-28',
+        league: 'Formula 1'
+      }
+    }
+  }
+
+  const { handleCatalog } = loadCatalogWithStubs({
+    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient },
+    '../clients/sportsdb': { SportsDbClient: FakeSportsDbClient }
+  })
+
+  const result = await handleCatalog(
+    {
+      jackettUrl: 'http://127.0.0.1:9696',
+      jackettApiKey: 'smoke-api-key',
+      sportsDbApiKey: 'smoke-sports-key',
+      maxResults: '10'
+    },
+    'movie',
+    'pvtkrrx-sports',
+    'genre=F1',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  )
+
+  // Qualifying variants should group together, Race should be separate
+  assert.equal(result.metas.length, 2, `expected 2 grouped F1 metas (Qualifying + Race), got ${result.metas.length}`)
+  const names = result.metas.map(m => m.name)
+  assert.ok(names.some(n => /qualifying/i.test(n)), 'expected a Qualifying entry')
+  assert.ok(names.some(n => /race/i.test(n)), 'expected a Race entry')
+  assert.equal(result.metas[0].poster, 'https://example.com/f1-landscape.jpg', 'expected landscape poster for F1 event')
+}
+
+async function testSportsMetaRichDescription() {
+  const { handleMeta } = require('../src/handlers/meta')
+  const id = encodeCustomId({
+    y: 'movie',
+    k: 'sports',
+    n: 'Formula 1 Japanese Grand Prix Qualifying',
+    t: 'Formula1.2026.03.28.Japanese.Grand.Prix.Qualifying.1080p.WEB',
+    s: 2_000_000_000,
+    d: 30,
+    p: '2026-03-28T12:00:00Z',
+    c: 2,
+    r: 'motorsport',
+    e: '2026-03-28',
+    g: 'Formula 1',
+    u: 'Formula1',
+    a: 'https://example.com/f1-poster.jpg',
+    b: 'https://example.com/f1-bg.jpg'
+  }, { compress: true })
+
+  const result = await handleMeta({}, 'movie', id, { baseUrl: 'http://127.0.0.1:7000' })
+  assert.ok(result.meta, 'expected meta to exist')
+  assert.ok(result.meta.description, 'expected non-empty description')
+  assert.ok(result.meta.description.includes('Formula 1'), 'expected description to mention league')
+  assert.ok(result.meta.genres.includes('Motorsport'), 'expected Motorsport genre')
+  assert.equal(result.meta.releaseInfo, '2026-03-28')
+  assert.equal(result.meta.poster, 'https://example.com/f1-poster.jpg')
+  assert.equal(result.meta.background, 'https://example.com/f1-bg.jpg')
+  assert.ok(result.meta.runtime, 'expected runtime to carry sport type label')
+}
+
+async function testArtworkFallbackBehavior() {
+  const { handleMeta } = require('../src/handlers/meta')
+  // Sports entry with NO carried artwork — should fall back to SVG thumb
+  const id = encodeCustomId({
+    y: 'movie',
+    k: 'sports',
+    n: 'UFC Fight Night 270 Main Card',
+    t: 'UFC.Fight.Night.270.Main.Card.1080p.WEB',
+    s: 1_500_000_000,
+    d: 25,
+    p: '2026-03-26T00:00:00Z',
+    r: 'mma',
+    e: '2026-03-26',
+    g: 'UFC'
+  }, { compress: true })
+
+  const result = await handleMeta({}, 'movie', id, { baseUrl: 'http://127.0.0.1:7000' })
+  assert.ok(result.meta, 'expected meta to exist for UFC entry')
+  assert.ok(result.meta.poster, 'expected a poster fallback')
+  assert.ok(result.meta.background, 'expected a background fallback')
+  assert.ok(result.meta.description, 'expected non-empty description')
+  assert.deepEqual(result.meta.genres, ['MMA', 'UFC'], 'expected MMA + UFC genres')
+}
+
 async function main() {
   try {
     testCacheHeadersIncludeStaleIfError()
     testParserAndLeagueMap()
+    testEventTitleParser()
+    testSportDisambiguation()
     await testStructuredFallbackToFuzzyLookup()
     await testOrderAgnosticSportsGrouping()
+    await testEventTitleCatalogGrouping()
     await testLibraryCustomIdsStayCompact()
     await testSportsMetaIncludesGenres()
+    await testSportsMetaRichDescription()
+    await testArtworkFallbackBehavior()
     console.log('Smoke sports structured flow passed')
   } finally {
     fs.rmSync(runtimeDir, { recursive: true, force: true })

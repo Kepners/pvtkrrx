@@ -9,11 +9,12 @@ const SPORTS = [
   { key: 'tennis', keywords: ['tennis', 'atp', 'wta'] },
   { key: 'rugby', keywords: ['rugby'] },
   { key: 'cricket', keywords: ['cricket', 'ipl', 't20'] },
-  { key: 'motorsport', keywords: ['f1', 'formula 1', 'motogp', 'motorsport', 'grand prix', 'indycar', 'wrc'] },
+  { key: 'motorsport', keywords: ['f1', 'formula 1', 'formula1', 'motogp', 'motorsport', 'grand prix', 'indycar', 'wrc', 'nascar', 'supercars', 'v8 supercars', 'bathurst', 'wsbk', 'wec', 'formula e', 'rally', 'dakar', 'sprint cup'] },
   { key: 'cycling', keywords: ['cycling', 'tour de france', 'giro', 'vuelta'] },
   { key: 'wrestling', keywords: ['wwe', 'aew', 'wrestling', 'smackdown', 'raw'] },
+  { key: 'darts', keywords: ['darts', 'pdc darts', 'bdo darts', 'premier league darts'] },
   { key: 'snooker', keywords: ['snooker'] },
-  { key: 'golf', keywords: ['golf', 'pga', 'lpga'] },
+  { key: 'golf', keywords: ['golf', 'pga', 'lpga', 'masters'] },
   { key: 'olympics', keywords: ['olympics', 'olympic games'] }
 ]
 

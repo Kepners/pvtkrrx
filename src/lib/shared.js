@@ -23,6 +23,7 @@ const { normalizeRelayUrl } = require('../utils/relayUrl')
 const { stripRemoteSeedboxLanFields } = require('../utils/remoteSeedboxConfig')
 const { resolveRuntimeDir } = require('../utils/runtimeDir')
 const { decodeSportsThumbToken, renderSportsThumbSvg } = require('../utils/sportsThumb')
+const { parseTorrentFileName, fetchTorrentPayload } = require('../utils/torrentPayload')
 const { findVideoFile, hasPackedArchiveFiles, isSampleVideoName, isArchiveFileName, findPackedArchiveFiles } = require('../utils/streams')
 const { buildPlaybackFileUrl } = require('../utils/fileServing')
 const { normalizeLocalStorageRoots, findExistingLocalFilePath } = require('../utils/localStorageRoots')
@@ -1570,7 +1571,7 @@ async function primeTorrentForStreaming(qbit, torrent, videoFile, allFiles = nul
   const firstLastEnabled = torrent?.f_l_piece_prio === true
   const files = Array.isArray(allFiles) ? allFiles : []
   const archiveFiles = findPackedArchiveFiles(files)
-  const archiveMode = Boolean(videoFile?.name) && isArchiveFileName(videoFile.name) && archiveFiles.length > 0
+  const archiveMode = archiveFiles.length > 0 && (!videoFile?.name || isArchiveFileName(videoFile.name))
 
   if (!seqEnabled) {
     try {
@@ -1595,13 +1596,16 @@ async function primeTorrentForStreaming(qbit, torrent, videoFile, allFiles = nul
     }
   }
 
-  if (videoFile && Number.isInteger(videoFile.index)) {
+  const activeIds = archiveMode
+    ? archiveFiles
+      .filter(f => Number.isInteger(f?.index))
+      .map(f => f.index)
+    : (videoFile && Number.isInteger(videoFile.index))
+      ? [videoFile.index]
+      : []
+
+  if (activeIds.length > 0) {
     try {
-      const activeIds = archiveMode
-        ? archiveFiles
-          .filter(f => Number.isInteger(f?.index))
-          .map(f => f.index)
-        : [videoFile.index]
       const activeIdSet = new Set(activeIds)
       const otherFileIds = files
         .filter(f => Number.isInteger(f?.index) && !activeIdSet.has(f.index))
@@ -1637,7 +1641,9 @@ async function loadTorrentPlaybackState(qbit, hash, targetPath, additionalStorag
   }
   const targetFile = findTorrentFileByPath(files, targetPath)
   const preferredVideoFile = findVideoFile(files)
-  const packedArchive = hasPackedArchiveFiles(files)
+  const archiveFiles = findPackedArchiveFiles(files)
+  const packedArchive = archiveFiles.length > 0
+  const archiveReady = packedArchive && archiveFiles.every(file => Number(file?.progress || 0) >= 0.999)
 
   // If a previous URL points to a Sample file, upgrade to the primary video when available.
   // For packed scene releases (RAR + Sample), avoid selecting Sample as main playback target.
@@ -1663,6 +1669,7 @@ async function loadTorrentPlaybackState(qbit, hash, targetPath, additionalStorag
     diskSize,
     readableBytes,
     packedArchive,
+    archiveReady,
     ready: isPlaybackReady(chosenFile, readableBytes)
   }
 }
@@ -1773,42 +1780,6 @@ async function withLegacyRootLocalConfig(req, res, next) {
 
 function isMagnetLink(link) {
   return String(link || '').trim().toLowerCase().startsWith('magnet:')
-}
-
-function parseTorrentFileName(contentDisposition, fallback = 'download.torrent') {
-  const text = String(contentDisposition || '')
-  const utf8Match = text.match(/filename\*=UTF-8''([^;]+)/i)
-  if (utf8Match && utf8Match[1]) {
-    try {
-      const decoded = decodeURIComponent(utf8Match[1]).trim()
-      if (decoded) return decoded
-    } catch (_) {}
-  }
-  const plainMatch = text.match(/filename="?([^\";]+)"?/i)
-  if (plainMatch && plainMatch[1]) {
-    const value = String(plainMatch[1]).trim()
-    if (value) return value
-  }
-  return fallback
-}
-
-async function fetchTorrentPayload(link) {
-  const target = String(link || '').trim()
-  if (!target) throw new Error('Empty tracker link')
-  const response = await fetch(target, {
-    redirect: 'follow',
-    signal: AbortSignal.timeout(10000),
-    headers: {
-      Accept: 'application/x-bittorrent, application/octet-stream, */*'
-    }
-  })
-  if (!response.ok) {
-    throw new Error(`tracker download HTTP ${response.status}`)
-  }
-  const bytes = new Uint8Array(await response.arrayBuffer())
-  if (!bytes.length) throw new Error('tracker download returned empty payload')
-  const fileName = parseTorrentFileName(response.headers.get('content-disposition'), 'download.torrent')
-  return { bytes, fileName }
 }
 
 async function resolveLanPair(config, req) {

@@ -15,14 +15,31 @@ function normalizeSportKey(value) {
     ['f1', 'motorsport'],
     ['formula 1', 'motorsport'],
     ['formula1', 'motorsport'],
+    ['motogp', 'motorsport'],
+    ['nascar', 'motorsport'],
+    ['indycar', 'motorsport'],
+    ['wrc', 'motorsport'],
+    ['supercars', 'motorsport'],
+    ['v8 supercars', 'motorsport'],
+    ['v8sc', 'motorsport'],
+    ['wsbk', 'motorsport'],
+    ['wec', 'motorsport'],
+    ['formula e', 'motorsport'],
+    ['formulae', 'motorsport'],
     ['nfl', 'american-football'],
     ['ncaa football', 'american-football'],
     ['soccer', 'football'],
     ['epl', 'football'],
     ['ufc', 'mma'],
     ['bellator', 'mma'],
+    ['pfl', 'mma'],
     ['wwe', 'wrestling'],
-    ['aew', 'wrestling']
+    ['aew', 'wrestling'],
+    ['pdc', 'darts'],
+    ['bdo', 'darts'],
+    ['pga', 'golf'],
+    ['lpga', 'golf'],
+    ['masters', 'golf']
   ])
 
   if (aliases.has(raw)) return aliases.get(raw)
@@ -60,6 +77,7 @@ function scoreSportsEventSignals(title, sportHint = '') {
 
   if (/\b(?:vs\.?|v|@)\b/i.test(value)) score += 3
   if (/\b(?:match|round|r\d{1,2}|stage|heat|qualifier|quarter[\s.\-_]*final|semi[\s.\-_]*final|final|play[\s.\-_]*off|playoff|main[\s.\-_]*card|prelims?)\b/i.test(value)) score += 2
+  if (/\b(?:grand[\s.\-_]*prix|gp|fight[\s.\-_]*night|race[\s.\-_]*\d|sprint|qualifying|practice|free[\s.\-_]*practice|fp[1-3]|warm[\s.\-_]*up)\b/i.test(value)) score += 2
   if (/\b(?:19|20)\d{2}[.\-_\s]\d{2}[.\-_\s]\d{2}\b/i.test(value) || /\b\d{2}[.\-_\s]\d{2}[.\-_\s](?:19|20)\d{2}\b/i.test(value) || /\b(?:19|20)\d{2}\d{2}\d{2}\b/i.test(value)) score += 2
   if (/\b(?:1080p|720p|2160p)\b/i.test(value)) score += 1
 
@@ -69,8 +87,10 @@ function scoreSportsEventSignals(title, sportHint = '') {
     if (sport === 'football' && /\b(?:epl|premier[\s.\-_]*league|la[\s.\-_]*liga|serie[\s.\-_]*a|bundesliga|champions[\s.\-_]*league|europa[\s.\-_]*league)\b/i.test(value)) score += 2
     if (sport === 'basketball' && /\b(?:nba|wnba|euroleague|ncaa)\b/i.test(value)) score += 2
     if (sport === 'american-football' && /\b(?:nfl|ncaa|cfl|ufl)\b/i.test(value)) score += 2
-    if (sport === 'motorsport' && /\b(?:f1|formula[\s.\-_]*1|motogp|nascar|indycar|wrc|grand[\s.\-_]*prix|gp)\b/i.test(value)) score += 2
-    if (sport === 'mma' && /\b(?:ufc|bellator|fight[\s.\-_]*night|one[\s.\-_]*championship)\b/i.test(value)) score += 2
+    if (sport === 'motorsport' && /\b(?:f1|formula[\s.\-_]*1|formula1|motogp|nascar|indycar|wrc|supercars|v8[\s.\-_]*supercars|bathurst|wsbk|wec|formula[\s.\-_]*e|grand[\s.\-_]*prix|gp)\b/i.test(value)) score += 2
+    if (sport === 'mma' && /\b(?:ufc|bellator|pfl|fight[\s.\-_]*night|one[\s.\-_]*championship)\b/i.test(value)) score += 2
+    if (sport === 'darts' && /\b(?:pdc|bdo|darts|premier[\s.\-_]*league[\s.\-_]*darts)\b/i.test(value)) score += 2
+    if (sport === 'golf' && /\b(?:pga|lpga|masters|open[\s.\-_]*championship|ryder[\s.\-_]*cup)\b/i.test(value)) score += 2
   }
 
   return score

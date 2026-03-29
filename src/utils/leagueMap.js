@@ -9,7 +9,24 @@ const LEAGUE_MAP = Object.freeze({
   nba: 'NBA',
   nfl: 'NFL',
   ufc: 'UFC',
-  f1: 'Formula 1'
+  f1: 'Formula 1',
+  formula1: 'Formula 1',
+  motogp: 'MotoGP',
+  nascar: 'NASCAR',
+  indycar: 'IndyCar',
+  wrc: 'WRC',
+  supercars: 'Supercars Championship',
+  v8sc: 'Supercars Championship',
+  wsbk: 'World Superbikes',
+  wec: 'WEC',
+  formulae: 'Formula E',
+  pga: 'PGA Tour',
+  lpga: 'LPGA Tour',
+  pdc: 'PDC Darts',
+  mlb: 'MLB',
+  nhl: 'NHL',
+  wwe: 'WWE',
+  aew: 'AEW'
 })
 
 function normalizeLeagueCode(value) {

@@ -5,6 +5,10 @@ const { QBitClient } = require('../src/clients/qbittorrent')
 const { CinemetaClient } = require('../src/clients/cinemeta')
 const { handleStream } = require('../src/handlers/stream')
 const { buildExternalFileUrl } = require('../src/utils/fileServing')
+const { decodeFileStateToken } = require('../src/utils/opaqueState')
+const { encodeCustomId } = require('../src/utils/customId')
+const { inspectTorrentPayload } = require('../src/utils/torrentPayload')
+const ORIGINAL_FETCH = global.fetch
 
 const ORIGINALS = {
   searchImdb: ProwlarrClient.prototype.searchImdb,
@@ -22,6 +26,7 @@ function resetMocks() {
   QBitClient.prototype.files = ORIGINALS.files
   CinemetaClient.prototype.getMovie = ORIGINALS.getMovie
   CinemetaClient.prototype.getSeries = ORIGINALS.getSeries
+  global.fetch = ORIGINAL_FETCH
 }
 
 function makeBaseConfig(overrides = {}) {
@@ -76,7 +81,7 @@ function matchedFile(overrides = {}) {
   }
 }
 
-function packedArchiveFiles() {
+function packedArchiveFilesPartial() {
   return [
     {
       name: 'Release/Sample/sample-release.mkv',
@@ -105,8 +110,112 @@ function packedArchiveFiles() {
   ]
 }
 
+function packedArchiveFilesComplete() {
+  return [
+    {
+      name: 'Release/Sample/sample-release.mkv',
+      size: 125_948_856,
+      progress: 1,
+      index: 0
+    },
+    {
+      name: 'Release/release.rar',
+      size: 100_000_000,
+      progress: 1,
+      index: 1
+    },
+    {
+      name: 'Release/release.r00',
+      size: 100_000_000,
+      progress: 1,
+      index: 2
+    },
+    {
+      name: 'Release/release.r01',
+      size: 100_000_000,
+      progress: 1,
+      index: 3
+    }
+  ]
+}
+
 function findNoticeStream(streams, code) {
   return (streams || []).find(stream => String(stream?.behaviorHints?.sourceNoticeCode || '') === code)
+}
+
+function decodeOpaqueFilePath(url) {
+  const resolvedUrl = Array.isArray(url)
+    ? String(url[0] || '')
+    : String(url?.url || url || '')
+  const parsed = new URL(resolvedUrl)
+  const token = decodeURIComponent(parsed.pathname.split('/').pop() || '')
+  return String(decodeFileStateToken(token)?.p || '')
+}
+
+function customPackedId(overrides = {}) {
+  return encodeCustomId({
+    y: 'movie',
+    k: 'sports',
+    t: 'SeriesX 2026 Event 03 Practice Two HLG 2160p WEB h265 VERUM',
+    n: 'SeriesX Event 03 Practice 2',
+    h: matchedTorrent().hash,
+    l: 'https://tracker.example/download/seriesx-practice.torrent',
+    i: 'SmokeTracker',
+    s: 7_890_000_000,
+    d: 4,
+    ...overrides
+  }, {
+    compress: true,
+    compact: 'sports'
+  })
+}
+
+function bencode(value) {
+  if (Buffer.isBuffer(value)) return Buffer.concat([Buffer.from(String(value.length)), Buffer.from(':'), value])
+  if (value instanceof Uint8Array) return bencode(Buffer.from(value))
+  if (typeof value === 'string') return bencode(Buffer.from(value, 'utf8'))
+  if (typeof value === 'number') return Buffer.from(`i${value}e`)
+  if (Array.isArray(value)) {
+    return Buffer.concat([Buffer.from('l'), ...value.map(bencode), Buffer.from('e')])
+  }
+  if (value && typeof value === 'object') {
+    const keys = Object.keys(value).sort()
+    return Buffer.concat([
+      Buffer.from('d'),
+      ...keys.flatMap(key => [bencode(key), bencode(value[key])]),
+      Buffer.from('e')
+    ])
+  }
+  return bencode('')
+}
+
+function buildTorrentPayload(fileEntries) {
+  return bencode({
+    info: {
+      name: 'packed-release',
+      files: fileEntries.map(entry => ({
+        length: entry.length,
+        path: entry.path.split('/').filter(Boolean)
+      }))
+    }
+  })
+}
+
+function createFetchResponse(bytes, headers = {}) {
+  return {
+    ok: true,
+    status: 200,
+    headers: {
+      get(name) {
+        const key = String(name || '').toLowerCase()
+        return headers[key] || null
+      }
+    },
+    async arrayBuffer() {
+      const buffer = Buffer.from(bytes)
+      return buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength)
+    }
+  }
 }
 
 async function withScenario(setup, run) {
@@ -128,6 +237,9 @@ async function run() {
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem()]
       QBitClient.prototype.torrents = async () => []
       CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([
+        { path: 'Movie.Name.2026.1080p.WEB-DL.x264.mkv', length: 12_000_000_000 }
+      ]))
     }, async () => {
       const result = await handleStream(
         makeBaseConfig(),
@@ -150,6 +262,9 @@ async function run() {
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem()]
       QBitClient.prototype.torrents = async () => []
       CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([
+        { path: 'Movie.Name.2026.1080p.WEB-DL.x264.mkv', length: 12_000_000_000 }
+      ]))
     }, async () => {
       const result = await handleStream(
         makeBaseConfig({ fileServerAuth: 'seedboxuser:seedboxpass' }),
@@ -226,6 +341,9 @@ async function run() {
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem()]
       QBitClient.prototype.torrents = async () => []
       CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([
+        { path: 'Movie.Name.2026.1080p.WEB-DL.x264.mkv', length: 12_000_000_000 }
+      ]))
     }, async () => {
       const result = await handleStream(
         makeBaseConfig(),
@@ -263,7 +381,7 @@ async function run() {
       delete process.env.VERCEL
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent().hash, link: '' })]
       QBitClient.prototype.torrents = async () => [matchedTorrent()]
-      QBitClient.prototype.files = async () => packedArchiveFiles()
+      QBitClient.prototype.files = async () => packedArchiveFilesPartial()
       CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
     }, async () => {
       const result = await handleStream(
@@ -274,12 +392,274 @@ async function run() {
         'local'
       )
 
-      assert.equal(result.streams.length, 1, '#4c matched packed archive should emit a single archive-mode stream')
-      assert.ok(Array.isArray(result.streams[0]?.rarUrls), '#4c packed archive stream should expose rarUrls')
-      assert.equal(result.streams[0].rarUrls.length, 3, '#4c packed archive stream should include all archive parts and skip the sample clip')
-      assert.equal(String(result.streams[0]?.fileMustInclude || ''), '/\\.(mkv|mp4|avi|wmv|ts|m4v)$/i', '#4c packed archive stream should tell Stremio how to find the video inside the archive set')
-      assert.equal(String(result.streams[0]?.behaviorHints?.sourceContainer || ''), 'rar', '#4c packed archive stream should advertise archive container type')
-      assert.match(String(result.streams[0]?.rarUrls?.[0]?.url || ''), /\/local\/file\//, '#4c packed archive source objects should reuse the local file route')
+      assert.equal(result.streams.filter(stream => Array.isArray(stream?.rarUrls)).length, 0, '#4c incomplete packed archive should stay hidden until all archive parts are ready')
+      const archiveNotice = findNoticeStream(result.streams, 'packed-archive-pending')
+      assert.ok(archiveNotice, '#4c incomplete packed archive should show a user-facing pending notice')
+      assert.match(String(archiveNotice?.description || ''), /still downloading/i, '#4c pending notice should explain why packed playback is hidden')
+    })
+
+    await withScenario(async () => {
+      delete process.env.VERCEL
+      ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent({ progress: 1 }).hash, link: '' })]
+      QBitClient.prototype.torrents = async () => [matchedTorrent({ progress: 1 })]
+      QBitClient.prototype.files = async () => packedArchiveFilesComplete()
+      CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        'tt1234567',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.length, 1, '#4d completed packed archive should emit a single archive-mode stream')
+      assert.ok(Array.isArray(result.streams[0]?.rarUrls), '#4d completed packed archive stream should expose rarUrls')
+      assert.equal(result.streams[0].rarUrls.length, 3, '#4d completed packed archive stream should include all archive parts and skip the sample clip')
+      assert.ok(Array.isArray(result.streams[0]?.rarUrls?.[0]), '#4d completed packed archive stream should serialize archive parts as tuple entries for Stremio core')
+      assert.equal(String(result.streams[0]?.rarUrls?.[0]?.[1] || ''), '100000000', '#4d completed packed archive stream should carry archive size bytes in the tuple form')
+      assert.deepEqual(result.streams[0]?.fileMustInclude || [], ['/\\.(mkv|mp4|avi|wmv|ts|m4v)$/i'], '#4d completed packed archive stream should serialize fileMustInclude as Stremio-compatible string patterns')
+      assert.equal(String(result.streams[0]?.behaviorHints?.sourceContainer || ''), 'rar', '#4d completed packed archive stream should advertise archive container type')
+      assert.match(decodeOpaqueFilePath(result.streams[0]?.rarUrls?.[0] || ''), /release\.rar/i, '#4d completed packed archive stream should start with the first archive volume')
+      assert.match(decodeOpaqueFilePath(result.streams[0]?.rarUrls?.[1] || ''), /release\.r00/i, '#4d completed packed archive stream should keep classic multi-volume order')
+      assert.match(decodeOpaqueFilePath(result.streams[0]?.rarUrls?.[2] || ''), /release\.r01/i, '#4d completed packed archive stream should keep classic multi-volume order')
+    })
+
+    await withScenario(async () => {
+      delete process.env.VERCEL
+      QBitClient.prototype.torrents = async () => [matchedTorrent()]
+      QBitClient.prototype.files = async () => packedArchiveFilesPartial()
+      ProwlarrClient.prototype.search = async () => []
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        customPackedId(),
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.filter(stream => Array.isArray(stream?.rarUrls)).length, 0, '#4e incomplete packed custom streams should not expose archive playback yet')
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4e incomplete packed custom streams should not fall back to stale tracker playback')
+      const archiveNotice = findNoticeStream(result.streams, 'packed-archive-pending')
+      assert.ok(archiveNotice, '#4e incomplete packed custom streams should explain the archive is still downloading')
+    })
+
+    await withScenario(async () => {
+      delete process.env.VERCEL
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      ProwlarrClient.prototype.search = async () => []
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([
+        { path: 'SeriesX.2026.Event03.Practice.Two.HLG.2160p.WEB.h265-VERUM.rar', length: 100_000_000 },
+        { path: 'SeriesX.2026.Event03.Practice.Two.HLG.2160p.WEB.h265-VERUM.r00', length: 100_000_000 }
+      ]))
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        customPackedId({
+          t: 'SeriesX 2026 Event 03 Practice Two HLG 2160p WEB h265 VERUM RAR r00',
+          h: '',
+          l: 'https://tracker.example/download/seriesx-packed-scene.torrent'
+        }),
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4f unmatched packed custom streams should not be advertised as live tracker playback')
+      const unsupportedNotice = findNoticeStream(result.streams, 'packed-archive-live-unsupported')
+      assert.ok(unsupportedNotice, '#4f unmatched packed custom streams should explain that partial packed playback is not offered')
+      assert.match(String(unsupportedNotice?.description || ''), /not offered as live playback/i, '#4f unmatched packed custom notice should explain why the play-now stream is suppressed')
+    })
+
+    await withScenario(async () => {
+      delete process.env.VERCEL
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      ProwlarrClient.prototype.search = async () => []
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([
+        { path: 'Sports.2026.03.28.Home.Club.vs.Away.Club.1080p.WEB.h264-BILLIE.rar', length: 476_800_000 },
+        { path: 'Sports.2026.03.28.Home.Club.vs.Away.Club.1080p.WEB.h264-BILLIE.r00', length: 476_800_000 },
+        { path: 'Sports.2026.03.28.Home.Club.vs.Away.Club.1080p.WEB.h264-BILLIE.r01', length: 476_800_000 }
+      ]))
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        customPackedId({
+          t: 'Sports RS 2026 Home Club vs Away Club 28 03 720pEN60fps FDSN',
+          n: 'Home Club vs Away Club',
+          h: '',
+          l: 'https://tracker.example/download/home-away-packed.torrent'
+        }),
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4g neutral-title packed torrents should be dynamically suppressed before tracker playback is emitted')
+      const unsupportedNotice = findNoticeStream(result.streams, 'packed-archive-live-unsupported')
+      assert.ok(unsupportedNotice, '#4g neutral-title packed torrents should still surface the packed-release notice')
+    })
+
+    await withScenario(async () => {
+      delete process.env.VERCEL
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      ProwlarrClient.prototype.search = async () => [
+        trackerItem({
+          title: 'Sports.2026.03.28.Home.Club.vs.Away.Club.1080p.WEB.h264-BILLIE',
+          link: 'https://tracker.example/download/home-away-packed.torrent',
+          infohash: ''
+        })
+      ]
+      global.fetch = async (url) => {
+        const target = String(url || '')
+        if (/home-away-packed\.torrent/i.test(target)) {
+          return createFetchResponse(buildTorrentPayload([
+            { path: 'Sports.2026.03.28.Home.Club.vs.Away.Club.1080p.WEB.h264-BILLIE.rar', length: 476_800_000 },
+            { path: 'Sports.2026.03.28.Home.Club.vs.Away.Club.1080p.WEB.h264-BILLIE.r00', length: 476_800_000 },
+            { path: 'Sports.2026.03.28.Home.Club.vs.Away.Club.1080p.WEB.h264-BILLIE.r01', length: 476_800_000 }
+          ]))
+        }
+        return createFetchResponse(buildTorrentPayload([
+          { path: 'fallback-video.mkv', length: 100_000_000 }
+        ]))
+      }
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        customPackedId({
+          t: 'Sports RS 2026 Home Club vs Away Club 28 03 720pEN60fps FDSN',
+          n: 'Home Club vs Away Club',
+          h: '',
+          l: '',
+          p: '2026-03-28',
+          o: 'Home Club',
+          w: 'Away Club'
+        }),
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4h packed supplemental sports torrents should not leak into generic tracker playback')
+      const unsupportedNotice = findNoticeStream(result.streams, 'packed-archive-live-unsupported')
+      assert.ok(unsupportedNotice, '#4h packed supplemental sports torrents should still surface the packed-release notice')
+    })
+
+    await withScenario(async () => {
+      delete process.env.VERCEL
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      ProwlarrClient.prototype.search = async () => [
+        trackerItem({
+          title: 'Sports RS 2026 Home Club vs Away Club 28 03 720pEN60fps FDSN',
+          link: 'https://tracker.example/download/home-away-unverified.torrent',
+          infohash: ''
+        })
+      ]
+      global.fetch = async () => {
+        throw new Error('tracker fetch failed')
+      }
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        customPackedId({
+          t: 'Sports RS 2026 Home Club vs Away Club 28 03 720pEN60fps FDSN',
+          n: 'Home Club vs Away Club',
+          h: '',
+          l: '',
+          p: '2026-03-28',
+          o: 'Home Club',
+          w: 'Away Club'
+        }),
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4i unverified supplemental sports torrents should not be advertised as playable')
+      const verificationNotice = findNoticeStream(result.streams, 'tracker-link-unverified')
+      assert.ok(verificationNotice, '#4i unverified supplemental sports torrents should show a verification notice instead')
+    })
+
+    await withScenario(async () => {
+      delete process.env.VERCEL
+      const payload = buildTorrentPayload([
+        { path: 'Sports.RS.2026.Home.Club.vs.Away.Club.720p.mp4', length: 3_600_000_000 }
+      ])
+      const inferredHash = String(inspectTorrentPayload(payload).infoHash || '').toLowerCase()
+      QBitClient.prototype.torrents = async () => [
+        matchedTorrent({
+          hash: inferredHash,
+          name: 'Sports RS 2026 Home Club vs Away Club 28 03 720pEN60fps FDSN',
+          progress: 1,
+          content_path: '/downloads/incomplete/Sports.RS.2026.Home.Club.vs.Away.Club.720p.mp4'
+        })
+      ]
+      QBitClient.prototype.files = async () => [
+        matchedFile({
+          name: 'Sports.RS.2026.Home.Club.vs.Away.Club.720p.mp4',
+          size: 3_600_000_000,
+          progress: 1
+        })
+      ]
+      ProwlarrClient.prototype.search = async () => []
+      global.fetch = async () => createFetchResponse(payload)
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        customPackedId({
+          t: 'Sports RS 2026 Home Club vs Away Club 28 03 720pEN60fps FDSN',
+          n: 'Home Club vs Away Club',
+          h: '',
+          l: 'https://tracker.example/download/home-away-complete.torrent'
+        }),
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4j completed direct-video torrents without embedded hashes should resolve to the existing qBit torrent instead of falling back to tracker playback')
+      assert.equal(result.streams.filter(stream => /\/file\//.test(String(stream?.url || ''))).length, 1, '#4j completed direct-video torrents without embedded hashes should emit the ready file stream')
+      assert.ok(result.streams.every(stream => String(stream?.name || '').startsWith('PVTKRRX ') || !stream?.name), '#4j stream names should start with PVTKRRX so Stremio can group them under the addon source')
+    })
+
+    await withScenario(async () => {
+      delete process.env.VERCEL
+      const payload = buildTorrentPayload([
+        { path: 'Release/release.rar', length: 100_000_000 },
+        { path: 'Release/release.r00', length: 100_000_000 },
+        { path: 'Release/release.r01', length: 100_000_000 }
+      ])
+      const inferredHash = String(inspectTorrentPayload(payload).infoHash || '').toLowerCase()
+      QBitClient.prototype.torrents = async () => [
+        matchedTorrent({
+          hash: inferredHash,
+          name: 'SeriesX 2026 Event 03 1080p WEB h264 BILLIE',
+          progress: 1
+        })
+      ]
+      QBitClient.prototype.files = async () => packedArchiveFilesComplete()
+      ProwlarrClient.prototype.search = async () => []
+      global.fetch = async () => createFetchResponse(payload)
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        customPackedId({
+          t: 'SeriesX 2026 Event 03 1080p WEB h264 BILLIE',
+          h: '',
+          l: 'https://tracker.example/download/seriesx-complete-packed.torrent'
+        }),
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.filter(stream => Array.isArray(stream?.rarUrls)).length, 1, '#4k completed packed torrents without embedded hashes should resolve to the existing qBit torrent and expose the ready RAR stream')
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4k completed packed torrents without embedded hashes should not fall back to generic tracker playback')
+      assert.ok(result.streams.every(stream => String(stream?.name || '').startsWith('PVTKRRX ') || !stream?.name), '#4k packed ready stream names should start with PVTKRRX so Stremio can group them under the addon source')
     })
 
     console.log('Smoke stream pipeline passed')

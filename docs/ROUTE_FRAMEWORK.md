@@ -29,29 +29,85 @@ For the broader runtime and storage model, see `docs/CURRENT_DESIGN.md`.
 
 ## What Each Route Exposes
 
+### Catalogs (Same On All Routes)
+
+All three routes expose the same four catalogs:
+
+| Catalog | Type | Source |
+|---|---|---|
+| Sports | movie | Prowlarr search with sports filtering |
+| Movies | movie | Prowlarr search with Cinemeta enrichment |
+| TV | series | Prowlarr search with Cinemeta enrichment |
+| Library | movie | Completed qBittorrent downloads |
+
+There is no per-route catalog filtering. The Library catalog queries qBittorrent directly on every route.
+
 ### PC Local
 
-- Movies
-- TV
-- Sports
-- Library
-- Direct same-PC playback from the local runtime
+- Install: `http://127.0.0.1:7000/local/manifest.json?mode=local`
+- Config loaded from disk (`local-config.json`)
+- Built-in `/file` route serves bytes with HTTP Range support
+- Built-in `/playback` route queues torrents via tracker link, polls qBit, and 302-redirects to `/file` when ready
+- Tracker `/playback` streams emitted for on-tracker content
+- Packed RAR archive streams emitted once ALL volumes are 100% complete
+- `proxyHeaders` with Basic Auth included on seedbox/buffering streams when `fileServerAuth` is configured
 
 ### LAN Bridge
 
-- Same content catalogs as the configured host
-- Hosted account-sync install path
-- Primary install should use the `stremio://www.pvtkrrx.cc/{token}/manifest.json?mode=hosted` deep link
-- Plain `https://www.pvtkrrx.cc/{token}/manifest.json?mode=hosted` is manual fallback only when Stremio explicitly asks for an addon URL
-- Hosted-to-local redirect when the pair heartbeat is online
+- Install: `stremio://www.pvtkrrx.cc/{token}/manifest.json?mode=hosted` (primary); plain `https://...` is manual fallback only
+- Config loaded from encrypted hosted token
+- The hosted relay **307-redirects** every catalog, stream, meta, `/file`, and `/playback` request to the active LAN host when the pair heartbeat is online
+- The redirect rewrites the token path to `/local/...?mode=local`, so the LAN device effectively hits PC Local on the host
+- After redirect, all PC Local capabilities apply (queue, buffer, file serve, packed RAR)
+- If the pair is offline and `lanPairRequired` is true, requests fail with an offline notice instead of falling through to hosted behavior
+- If the pair is offline and `lanPairRequired` is false, requests fall through to hosted behavior (ready-file-first, no `/playback`)
 
 ### Remote Seedbox
 
-- Same content model
-- Intended for public HTTPS ready-file playback paths
-- Ready-file-first on the hosted relay unless PVTKRRX is self-hosted on a playback-capable runtime
-- Does not depend on LAN heartbeat/redirect behavior
-- Hosted responses must not promise tracker `/playback` when the runtime cannot actually serve it
+- Install: hosted HTTPS manifest URL
+- Config loaded from encrypted hosted token
+- On the canonical hosted relay (Vercel): `/file` and `/playback` routes return **403 Forbidden** for non-local requests
+- Playback depends entirely on external infrastructure:
+  - Completed files served via `fileServerUrl` (external HTTP server) or public qBit WebUI
+  - No queue-and-buffer capability unless PVTKRRX is self-hosted on a runtime that can actually serve `/playback`
+- Tracker `/playback` streams are **suppressed** at stream emission time (not just blocked at the route)
+- If `fileServerAuth` is configured, tracker playback is also suppressed on any non-local route because Stremio cannot forward `proxyHeaders` through a redirect chain
+- Packed RAR archive streams are still emitted for completed archives when `fileServerUrl` can serve the volumes
+- Info/notice streams are added to explain why tracker playback or buffering is unavailable
+
+## Playback Capability Matrix
+
+This is the authoritative per-route, per-release-type behavior derived from the live code.
+
+### By Release Type
+
+| Release type | PC Local | LAN Bridge (online) | LAN Bridge (offline, required) | Remote Seedbox (Vercel) |
+|---|---|---|---|---|
+| **Completed unpacked video** | `/file` serves bytes directly | 307 → local `/file` | Offline notice | External `fileServerUrl` or public qBit URL |
+| **In-progress unpacked video** | `/playback` queues + polls → 302 to `/file` | 307 → local `/playback` | Offline notice | **Suppressed** (no buffering on Vercel) |
+| **On-tracker (not yet added)** | `/playback` fetches .torrent, adds to qBit, polls | 307 → local `/playback` | Offline notice | **Suppressed** at stream emission |
+| **Packed RAR (complete)** | `rarUrls` stream with ordered `/file` URLs | 307 → local `rarUrls` via `/file` | Offline notice | `rarUrls` via `fileServerUrl` if configured |
+| **Packed RAR (incomplete)** | Suppressed; `/playback` fails fast with truthful message | 307 → same as local | Offline notice | **Suppressed** |
+| **Packed RAR (on tracker, not added)** | Suppressed at stream emission; torrent still queued but playback not promised | 307 → same as local | Offline notice | **Suppressed** |
+
+### By Endpoint
+
+| Endpoint | PC Local | LAN Bridge (online) | Remote Seedbox (Vercel) |
+|---|---|---|---|
+| `/:config/file/:info` | Serves bytes (200/206) | 307 → local `/file` | 403 Forbidden |
+| `/:config/playback/:info` | Queue + comet poll (503 → 302) | 307 → local `/playback` | 403 Forbidden |
+| `/:config/stream/:type/:id.json` | All stream types emitted | 307 → local stream handler | Ready-file streams only |
+| `/:config/catalog/:type/:id.json` | All catalogs | 307 → local catalog handler | All catalogs (direct from hosted) |
+| `/:config/meta/:type/:id.json` | All meta | 307 → local meta handler | All meta (direct from hosted) |
+
+### Auth-Protected File Servers
+
+When `fileServerAuth` is configured:
+
+- **PC Local**: `proxyHeaders` with Basic Auth are added to seedbox and buffering stream URLs. Tracker `/playback` streams are still emitted because the local runtime handles the redirect internally.
+- **LAN Bridge**: After 307 redirect, behaves like PC Local.
+- **Remote Seedbox (non-local token)**: Tracker `/playback` streams are **suppressed** because the `/playback` → external file server redirect cannot safely forward `proxyHeaders`. Completed-file streams with `proxyHeaders` still work when Stremio fetches the external URL directly.
+- An `auth-suppressed` info stream is added to explain the suppression.
 
 ## Current UI Shape
 

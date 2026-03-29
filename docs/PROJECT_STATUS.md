@@ -33,7 +33,13 @@ These items are verified in the current workspace or by direct client/log proof:
 - host-side `LAN Bridge` status now checks the hosted relay directly, and the desktop can repair a stale local pair identity after an `invalid pair key` rejection
 - host-side Stremio Desktop session scanning now detects the real WebView2 `profile/auth/key` storage format again, and startup auto-provision can link that signed-in session automatically
 - sports catalog tiles now prefer landscape artwork when TheSportsDB provides it
-- matched packed scene releases already present in qBittorrent now emit Stremio `rarUrls` streams on local playback-capable routes instead of failing on `Sample` files
+- completed matched packed scene releases now emit ordered Stremio-core-compatible `rarUrls` streams on local playback-capable routes, while incomplete archive sets stay hidden until every volume is ready
+- packed-only tracker torrents are now inspected dynamically before stream emission, so neutral-title `.torrent` links no longer fall through to fake live `/playback` streams
+- sports event title parsing now handles non-vs formats (F1, UFC, MotoGP, Supercars, NASCAR, etc.) with structured league/date/event extraction
+- sports catalog grouping correctly deduplicates quality variants of the same non-vs event into one tile
+- sports detail pages now carry richer metadata: multi-line descriptions, sport type labels, league/date/event info
+- Supercars, V8, NASCAR, WSBK, WEC, Formula E, Darts, and expanded Golf coverage added to sport detection
+- local `/playback` now fails fast for incomplete multi-volume RAR releases after queueing the torrent, instead of timing out behind a false progressive-playback promise
 - `1.1.15` installers were built successfully into `dist/`
 
 ## What We Fixed On 2026-03-28 And 2026-03-29
@@ -62,6 +68,15 @@ These items are verified in the current workspace or by direct client/log proof:
 8. Packed sports/movie scene releases were added to qBittorrent as `.r00/.r01/...` archives and could not play:
    - Root cause: the addon only emitted direct video/file URLs and intentionally rejected `Sample + RAR` torrents as non-playable, even though Stremio supports archive playback through `rarUrls`.
    - Fix: once a packed torrent already exists in qBittorrent, local playback-capable routes now emit a Stremio `rarUrls` stream over the built-in `/file` route so Stremio can read the archive set without manual extraction. First-click tracker queueing is still a separate step.
+9. Packed archive streams were still surfacing too early and classic volume ordering was wrong:
+   - Root cause: the addon emitted `rarUrls` before every archive volume was fully ready, and classic multi-part sets were sorted lexically (`.r00`, `.r01`, `.rar`) instead of archive order (`.rar`, `.r00`, `.r01`).
+   - Fix: incomplete packed releases are now hidden behind a clear notice until every archive volume is ready, classic volume ordering is corrected, and stale `/playback` links now stay in a waiting state instead of pretending the packed release is ready.
+10. Packed archive payload shape did not match the modern Stremio core contract:
+   - Root cause: the addon emitted archive entries as object-shaped `rarUrls` items and scalar `fileMustInclude`, while current `stremio-core` examples and stream conversion logic expect tuple-style archive URLs and array-based include patterns.
+   - Fix: packed archive streams now serialize `rarUrls` in Stremio-core-compatible tuple form and emit `fileMustInclude` as an array of string patterns.
+11. Partial packed RAR playback was still being falsely advertised on neutral-title tracker sources:
+   - Root cause: unmatched `.torrent` links were being emitted as generic `/playback` streams before the addon had inspected the torrent payload, and archive-only torrents were not being prioritized as a bundle when qBittorrent primed the download.
+   - Fix: tracker links are now inspected dynamically before stream emission, neutral packed-only torrents are suppressed behind a truthful packed-release notice, archive-only priming now prioritizes the full RAR bundle instead of a sample clip, and `/playback` now returns an immediate packed-archive explanation instead of stalling.
 
 ## Still Needs Real-Client Proof
 
@@ -78,20 +93,34 @@ These items should still be treated as open until captured on real clients:
 - `LAN Bridge` still depends on the Windows host desktop staying online and heartbeating
 - Bonjour may still be missing or stopped on some hosts; that affects discovery/fallback polish, not the core loopback path
 - remote/auth-protected playback behavior still depends on what the target Stremio client honors during redirect/auth handoff
-- Stremio client behavior for local `rarUrls` archive playback is still not signed off; current real-device result was `liberror`
+- Stremio client behavior for fully complete local `rarUrls` archive playback is still not signed off on a real device; the previous `liberror` was reproduced against an incomplete archive set, and PVTKRRX now suppresses incomplete multi-volume archive playback instead of promising it
 
 ## Tonight's Priority List
 
 1. Rework packed RAR playback after the real-device `liberror` result.
-   - Confirm whether Stremio needs different `rarUrls` ordering, `fileIdx` selection, archive bytes hints, or whether packed releases should be hidden until extracted.
+   - Confirm the real-client result on a fully complete ordered archive set now that incomplete packed releases are suppressed, classic volume ordering is fixed, the archive payload shape matches `stremio-core`, and `/playback` fails fast truthfully for partial RAR sets.
 2. Make the configure flow more automatic.
    - On boot, check host Stremio state automatically, reuse the signed-in session automatically, and reduce manual button steps on the configure page.
-3. Trace the exact seedbox playback model end to end.
-   - Document what is different between local host, LAN Bridge, and true remote seedbox playback so route-specific behavior stops drifting.
-4. Fix sports identity quality.
-   - Wrong event/title matching is still happening (`Supercars/V8` resolving to Japanese practice), and sports posters still need better event-specific selection, including UFC.
-5. Fix sports metadata/detail pages.
-   - Sports detail views are still too empty in Stremio and need proper meta fields so the page does not look broken.
+3. ~~Trace the exact seedbox playback model end to end.~~ **Done 2026-03-29.**
+   - Full code trace confirmed route detection (`getInstallMode` + `getManifest` profile assignment), stream emission per route, 307 LAN redirect mechanics, and `/file`/`/playback` route guards.
+   - All three routes expose the same four catalogs (sports, movies, tv, library) — no per-route catalog filtering.
+   - LAN Bridge 307-redirects rewrite the token path to `/local/...?mode=local`, giving LAN devices full PC Local playback after redirect.
+   - Remote Seedbox on Vercel: `/file` and `/playback` return 403 for non-local tokens; ready-file-first via `fileServerUrl`.
+   - Auth-protected file servers: tracker `/playback` suppressed on non-local routes because redirect can't forward `proxyHeaders`.
+   - Packed RAR: emitted only when all volumes 100% complete; suppressed at stream emission for tracker first-click; `/playback` fails fast for incomplete archives.
+   - Explicit capability matrix now in `docs/ROUTE_FRAMEWORK.md`.
+4. ~~Fix sports identity quality.~~ **Done 2026-03-29.**
+   - Non-vs event titles (F1, UFC, MotoGP, Supercars, NASCAR, etc.) now parse via `parseSportsEventTitle` with structured league/date/event extraction.
+   - Motorsport coverage expanded: Supercars, V8, NASCAR, WSBK, WEC, Formula E, Rally, Dakar now recognized.
+   - Darts and golf added as distinct sport categories.
+   - Sport hint resolution, scoring signals, and catalog grouping all updated for non-vs events.
+   - TheSportsDB query builder now uses structured event names for better artwork matches.
+   - Smoke tests cover event parsing, sport disambiguation, catalog grouping for F1/motorsport events, meta richness, and artwork fallback.
+5. ~~Fix sports metadata/detail pages.~~ **Done 2026-03-29.**
+   - Sports detail pages now carry multi-line descriptions with league, date, event name, matchup, and stats.
+   - `runtime` field now shows the sport type label (e.g. "Motorsport", "MMA").
+   - `genres` tags include both sport category and league name.
+   - Artwork fallback still works when TheSportsDB returns nothing (SVG thumb or brand poster).
 6. Test moving sports out of the `movie` bucket into its own top-level surface.
    - Verify what Stremio actually allows in the left-column type selector and then implement the cleanest supported sports heading.
 7. Ensure `PVTKRRX` appears in the source list for normal films.

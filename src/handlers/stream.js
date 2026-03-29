@@ -5,15 +5,18 @@ const { normalizeTeamName } = require('../clients/sportsdb')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { parse, matchesEpisode, isLikelyPackedReleaseTitle, cleanTitle } = require('../utils/parser')
 const { isSportsOnlyIndexer } = require('../utils/sportsIndexers')
-const { buildOnSeedboxStream, buildOnBufferingStream, buildOnArchiveStream, buildOnTrackerStream, buildInfoStream, findVideoFile, findPackedArchiveFiles, findEpisodeFile, sortStreams } = require('../utils/streams')
+const { buildOnSeedboxStream, buildOnBufferingStream, buildOnArchiveStream, buildOnTrackerStream, buildInfoStream, findVideoFile, findPackedArchiveFiles, arePackedArchiveFilesReady, findEpisodeFile, sortStreams } = require('../utils/streams')
 const { encodePlaybackStateToken } = require('../utils/opaqueState')
 const { parseSportsTitle } = require('../utils/sportsTitleParser')
 const { buildPlaybackFileUrl, canEmitTrackerPlayback, getTrackerPlaybackRestriction } = require('../utils/fileServing')
 const { decodeCustomId } = require('../utils/customId')
 const { isCompletedTorrent } = require('../utils/torrentState')
+const { fetchTorrentPayload, inspectTorrentPayload } = require('../utils/torrentPayload')
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '7000', 10))
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '5000', 10))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '20', 10))
+const TRACKER_LINK_INSPECTION_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_TIMEOUT_MS || '4000', 10))
+const TRACKER_LINK_INSPECTION_CACHE_MS = Math.max(60 * 1000, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_CACHE_MS || String(10 * 60 * 1000), 10))
 
 // Module-level constant Sets — avoid recreating on every call
 const TITLE_RELEVANT_STOPWORDS = new Set(['the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or'])
@@ -22,6 +25,7 @@ const LOOSE_TEAM_NOISE = new Set([
   'europa', 'uefa', 'nba', 'nfl', 'ufc', 'formula', 'grand', 'prix', 'f1', 'match', 'sports',
   'sport', 'live', 'full', 'replay', 'highlights', 'extended', 'main', 'card', 'prelims', 'early'
 ])
+const trackerLinkInspectionCache = new Map()
 
 function buildFileUrl(config, configToken, addonUrl, hash, torrent, fileName, options = {}) {
   return buildPlaybackFileUrl(config, configToken, addonUrl, hash, torrent, fileName, options)
@@ -30,6 +34,52 @@ function buildFileUrl(config, configToken, addonUrl, hash, torrent, fileName, op
 function buildConfigureHelpUrl(addonUrl, target = 'seedbox') {
   const base = String(addonUrl || '').replace(/\/+$/, '')
   return `${base}/configure?target=${encodeURIComponent(target)}`
+}
+
+async function inspectTrackerLink(link) {
+  const target = String(link || '').trim()
+  if (!target) return { packedOnly: false, inspected: false }
+
+  const now = Date.now()
+  const cached = trackerLinkInspectionCache.get(target)
+  if (cached && cached.expiresAt > now) {
+    return cached.promise
+  }
+
+  const promise = (async () => {
+    try {
+      const payload = await fetchTorrentPayload(target, {
+        timeoutMs: TRACKER_LINK_INSPECTION_TIMEOUT_MS
+      })
+      const inspection = inspectTorrentPayload(payload.bytes)
+      return {
+        infoHash: String(inspection.infoHash || '').toLowerCase(),
+        packedOnly: Boolean(inspection.packedOnly),
+        inspected: true,
+        fileCount: inspection.files.length,
+        archiveCount: inspection.archiveFiles.length,
+        directVideoCount: inspection.directVideoFiles.length
+      }
+    } catch (err) {
+      return {
+        packedOnly: false,
+        inspected: false,
+        error: String(err?.message || '')
+      }
+    }
+  })()
+
+  trackerLinkInspectionCache.set(target, {
+    expiresAt: now + TRACKER_LINK_INSPECTION_CACHE_MS,
+    promise
+  })
+
+  const result = await promise
+  trackerLinkInspectionCache.set(target, {
+    expiresAt: Date.now() + TRACKER_LINK_INSPECTION_CACHE_MS,
+    promise: Promise.resolve(result)
+  })
+  return result
 }
 
 function buildArchiveDisplayFilename(title) {
@@ -44,24 +94,19 @@ function buildArchiveDisplayFilename(title) {
 function buildMatchedArchiveStream(config, configToken, addonUrl, matched, files, item, parsed) {
   const archiveFiles = findPackedArchiveFiles(files)
   if (archiveFiles.length === 0) return null
+  if (!arePackedArchiveFilesReady(archiveFiles)) return null
 
   const rarUrls = []
   for (const archiveFile of archiveFiles) {
     const archiveUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched, archiveFile.name, {
       multipleFiles: files.length > 1,
-      requireCurrentPathProof: !isCompletedTorrent(matched, Number(archiveFile?.progress || 0))
+      requireCurrentPathProof: false
     })
     if (!archiveUrl) return null
-    rarUrls.push({
-      url: archiveUrl,
-      bytes: Math.max(0, Number(archiveFile?.size || 0))
-    })
+    const archiveBytes = Math.max(0, Number(archiveFile?.size || 0))
+    rarUrls.push(archiveBytes > 0 ? [archiveUrl, archiveBytes] : [archiveUrl])
   }
 
-  const archiveDone = archiveFiles.every(file => Number(file?.progress || 0) >= 0.999)
-  const progressPercent = archiveDone
-    ? 100
-    : Math.max(0, Math.min(99, Math.floor(Number(matched?.progress || 0) * 100)))
   const totalBytes = archiveFiles.reduce((sum, file) => sum + Math.max(0, Number(file?.size || 0)), 0)
   return buildOnArchiveStream(
     item,
@@ -69,7 +114,7 @@ function buildMatchedArchiveStream(config, configToken, addonUrl, matched, files
     buildArchiveDisplayFilename(item?.title || matched?.name || ''),
     totalBytes,
     parsed,
-    progressPercent
+    100
   )
 }
 
@@ -77,7 +122,10 @@ function createNoticeCounts() {
   return {
     hostedReadyOnly: 0,
     authSuppressed: 0,
-    bufferingPathUnproven: 0
+    bufferingPathUnproven: 0,
+    packedArchivePending: 0,
+    packedArchiveLiveUnsupported: 0,
+    trackerLinkUnverified: 0
   }
 }
 
@@ -99,6 +147,15 @@ function appendNoticeStreams(streams, noticeCounts, addonUrl) {
   }
   if (noticeCounts.bufferingPathUnproven > 0) {
     streams.push(buildInfoStream('buffering-path-unproven', helpUrl, noticeCounts.bufferingPathUnproven))
+  }
+  if (noticeCounts.packedArchivePending > 0) {
+    streams.push(buildInfoStream('packed-archive-pending', helpUrl, noticeCounts.packedArchivePending))
+  }
+  if (noticeCounts.packedArchiveLiveUnsupported > 0) {
+    streams.push(buildInfoStream('packed-archive-live-unsupported', helpUrl, noticeCounts.packedArchiveLiveUnsupported))
+  }
+  if (noticeCounts.trackerLinkUnverified > 0) {
+    streams.push(buildInfoStream('tracker-link-unverified', helpUrl, noticeCounts.trackerLinkUnverified))
   }
 }
 
@@ -246,8 +303,21 @@ function sourceItemKey(item = {}) {
     .toLowerCase()
 }
 
-async function buildSupplementalSportsStreams({ info, torznab, addonUrl, configToken, config, seenKeys }) {
-  if (!canEmitTrackerPlayback(config, configToken)) return []
+async function buildSupplementalSportsStreams({
+  info,
+  torznab,
+  addonUrl,
+  configToken,
+  config,
+  seenKeys,
+  noticeCounts,
+  trackerPlaybackEnabled,
+  trackerPlaybackRestriction
+}) {
+  if (!canEmitTrackerPlayback(config, configToken)) {
+    if (noticeCounts) recordTrackerRestrictionNotice(noticeCounts, getTrackerPlaybackRestriction(config, configToken))
+    return []
+  }
 
   const targetEvent = buildStructuredSportsTarget(info)
   if (!targetEvent?.date || !targetEvent?.homeTeam || !targetEvent?.awayTeam) return []
@@ -298,12 +368,28 @@ async function buildSupplementalSportsStreams({ info, torznab, addonUrl, configT
   const ordered = preferSeededResults(deduped, 'supplemental sports streams')
   const streams = []
   for (const item of ordered) {
-    try {
-      const playbackInfo = encodePlaybackStateToken({
-        h: item.infohash || '',
-        l: item.link
-      })
-      streams.push(buildOnTrackerStream(
+    const titleLooksPacked = isLikelyPackedReleaseTitle(item.title)
+    const inspection = titleLooksPacked
+      ? { packedOnly: true, inspected: false }
+      : await inspectTrackerLink(item.link)
+    if (titleLooksPacked || inspection.packedOnly) {
+      if (noticeCounts) noticeCounts.packedArchiveLiveUnsupported += 1
+      continue
+    }
+    if (!inspection.inspected) {
+      if (noticeCounts) noticeCounts.trackerLinkUnverified += 1
+      continue
+    }
+    if (!trackerPlaybackEnabled) {
+      recordTrackerRestrictionNotice(noticeCounts, trackerPlaybackRestriction)
+      break
+    }
+        try {
+          const playbackInfo = encodePlaybackStateToken({
+            h: item.infohash || inspection.infoHash || '',
+            l: item.link
+          })
+          streams.push(buildOnTrackerStream(
         item,
         `${addonUrl}/${configToken}/playback/${playbackInfo}`,
         parse(item.title || searchQuery)
@@ -532,7 +618,11 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
           : findVideoFile(files)
         if (!videoFile?.name) {
           const archiveStream = buildMatchedArchiveStream(config, configToken, addonUrl, matched, files, item, parsed)
-          if (archiveStream) streams.push(archiveStream)
+          if (archiveStream) {
+            streams.push(archiveStream)
+          } else if (findPackedArchiveFiles(files).length > 0) {
+            noticeCounts.packedArchivePending += 1
+          }
           continue
         }
         const videoProgress = Number(videoFile?.progress || 0)
@@ -557,11 +647,23 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
         // File listing failed, skip this stream
       }
     } else if (item.link) {
+      const titleLooksPacked = isLikelyPackedReleaseTitle(item.title)
+      const inspection = titleLooksPacked
+        ? { packedOnly: true, inspected: false }
+        : await inspectTrackerLink(item.link)
+      if (titleLooksPacked || inspection.packedOnly) {
+        noticeCounts.packedArchiveLiveUnsupported += 1
+        continue
+      }
+      if (!inspection.inspected) {
+        noticeCounts.trackerLinkUnverified += 1
+        continue
+      }
       if (trackerPlaybackEnabled) {
         // On tracker — playback URL (works with or without infohash)
         try {
           const info = encodePlaybackStateToken({
-            h: item.infohash || '',
+            h: item.infohash || inspection.infoHash || '',
             l: item.link
           })
           streams.push(buildOnTrackerStream(item, `${addonUrl}/${configToken}/playback/${info}`, parsed))
@@ -580,7 +682,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
 
 async function handleCustomStream(config, id, addonUrl, configToken) {
   const info = decodeCustomId(id)
-  const infoHash = String(info.h || '').toLowerCase()
+  let infoHash = String(info.h || '').toLowerCase()
   const directLink = String(info.l || '')
   const seenSourceKeys = new Set()
   if (infoHash) seenSourceKeys.add(infoHash)
@@ -592,12 +694,23 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
   const trackerPlaybackEnabled = !trackerPlaybackRestriction
   const noticeCounts = createNoticeCounts()
   const torrents = await qbit.torrents('all')
+  const likelyPackedDirectRelease = isLikelyPackedReleaseTitle(info.t)
+  let directInspection = null
   let matched = infoHash ? torrents.find(t => t.hash.toLowerCase() === infoHash) : null
+  if (!matched && !infoHash && directLink && !likelyPackedDirectRelease) {
+    directInspection = await inspectTrackerLink(directLink)
+    if (directInspection.infoHash) {
+      infoHash = String(directInspection.infoHash || '').toLowerCase()
+      seenSourceKeys.add(infoHash)
+      matched = torrents.find(t => t.hash.toLowerCase() === infoHash) || null
+    }
+  }
   if (!matched) matched = findTorrentByTitle(torrents, info.t)
   if (matched?.hash) seenSourceKeys.add(String(matched.hash).toLowerCase())
 
   const parsed = parse(info.t)
   const streams = []
+  let packedArchivePending = false
 
   console.log(`[stream] custom title="${info.t}" hash=${infoHash || 'none'} matched=${matched ? matched.hash : 'none'}`)
 
@@ -617,6 +730,9 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
         )
         if (archiveStream) {
           streams.push(archiveStream)
+        } else if (findPackedArchiveFiles(files).length > 0) {
+          packedArchivePending = true
+          noticeCounts.packedArchivePending += 1
         } else {
           throw new Error('No playable video in matched torrent')
         }
@@ -646,11 +762,19 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
     }
   }
 
-  if (streams.length === 0 && directLink) {
-    if (trackerPlaybackEnabled) {
+  if (streams.length === 0 && directLink && !packedArchivePending) {
+    const inspection = directInspection || (likelyPackedDirectRelease
+      ? { packedOnly: true, inspected: false }
+      : await inspectTrackerLink(directLink))
+
+    if (inspection.packedOnly) {
+      noticeCounts.packedArchiveLiveUnsupported += 1
+    } else if (!inspection.inspected) {
+      noticeCounts.trackerLinkUnverified += 1
+    } else if (trackerPlaybackEnabled) {
       try {
         const playbackInfo = encodePlaybackStateToken({
-          h: infoHash,
+          h: infoHash || String(inspection.infoHash || '').toLowerCase(),
           l: directLink
         })
         streams.push(buildOnTrackerStream(
@@ -673,7 +797,10 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
       addonUrl,
       configToken,
       config,
-      seenKeys: seenSourceKeys
+      seenKeys: seenSourceKeys,
+      noticeCounts,
+      trackerPlaybackEnabled,
+      trackerPlaybackRestriction
     })
     if (supplementalStreams.length > 0) {
       streams.push(...supplementalStreams)
@@ -705,13 +832,25 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
       const ordered = preferSeededResults(deduped, 'custom re-search')
 
       for (const item of ordered) {
+        const titleLooksPacked = isLikelyPackedReleaseTitle(item.title)
+        const inspection = titleLooksPacked
+          ? { packedOnly: true, inspected: false }
+          : await inspectTrackerLink(item.link)
+        if (titleLooksPacked || inspection.packedOnly) {
+          noticeCounts.packedArchiveLiveUnsupported += 1
+          continue
+        }
+        if (!inspection.inspected) {
+          noticeCounts.trackerLinkUnverified += 1
+          continue
+        }
         if (!trackerPlaybackEnabled) {
           recordTrackerRestrictionNotice(noticeCounts, trackerPlaybackRestriction)
           break
         }
         try {
           const playbackInfo = encodePlaybackStateToken({
-            h: item.infohash || '',
+            h: item.infohash || inspection.infoHash || '',
             l: item.link
           })
           streams.push(buildOnTrackerStream(

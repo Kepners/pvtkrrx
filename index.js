@@ -6,6 +6,7 @@ const selfsigned = require('selfsigned')
 const express = require('express')
 const shared = require('./src/lib/shared')
 const { isCompletedTorrent } = require('./src/utils/torrentState')
+const { inspectTorrentPayload } = require('./src/utils/torrentPayload')
 
 // Destructure everything routes need from the shared module.
 // Shared module initializes env, console redaction, stores, and rate limiters at load time.
@@ -1287,6 +1288,20 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
     let maxAvailability = 0
     let maxSeedersSeen = 0
     let maxPeersSeen = 0
+    let trackerPayload = null
+    let trackerInspection = null
+
+    if (!trackedHash && info.l && !isMagnetLink(info.l)) {
+      try {
+        trackerPayload = await fetchTorrentPayload(info.l)
+        trackerInspection = inspectTorrentPayload(trackerPayload.bytes)
+        if (trackerInspection.infoHash) {
+          trackedHash = String(trackerInspection.infoHash || '').toLowerCase()
+        }
+      } catch (err) {
+        console.warn(`[playback-route] tracker payload inspect failed: ${redactSensitiveText(err.message)}`)
+      }
+    }
 
     // If we can identify the torrent hash, check whether it's already playable.
     if (trackedHash) {
@@ -1297,11 +1312,19 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
           primedTorrent = true
           if (existing.file) primedFile = true
         }
-        if (!existing.file && (existing.packedArchive || Number(existing.torrent.progress || 0) >= 0.999)) {
+        if (!existing.file && existing.packedArchive && existing.archiveReady) {
           return res.status(422).json({
-            error: existing.packedArchive
-              ? 'Packed archive release detected (RAR). Reopen the stream list after qBittorrent adds it and use the RAR stream.'
-              : 'Torrent completed but no playable video file was detected.'
+            error: 'Packed archive release detected (RAR). Reopen the stream list and use the ready RAR stream.'
+          })
+        }
+        if (!existing.file && existing.packedArchive) {
+          return res.status(422).json({
+            error: 'Packed archive release detected (RAR). This Stremio path cannot start a partial multi-volume archive while it is still downloading. Wait until every RAR volume is complete, then reopen the stream list and use the ready RAR stream.'
+          })
+        }
+        if (!existing.file && !existing.packedArchive && Number(existing.torrent.progress || 0) >= 0.999) {
+          return res.status(422).json({
+            error: 'Torrent completed but no playable video file was detected.'
           })
         }
         hasTorrent = true
@@ -1357,11 +1380,24 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
             firstLastPiecePrio: STREAM_PRIORITIZE_LAST_PIECES
           })
         } else {
-          const payload = await fetchTorrentPayload(info.l)
-          await qbit.addTorrentFile(payload.bytes, payload.fileName, {
+          if (!trackerPayload) {
+            trackerPayload = await fetchTorrentPayload(info.l)
+          }
+          if (!trackerInspection) {
+            trackerInspection = inspectTorrentPayload(trackerPayload.bytes)
+            if (!trackedHash && trackerInspection.infoHash) {
+              trackedHash = String(trackerInspection.infoHash || '').toLowerCase()
+            }
+          }
+          await qbit.addTorrentFile(trackerPayload.bytes, trackerPayload.fileName, {
             sequentialDownload: true,
             firstLastPiecePrio: STREAM_PRIORITIZE_LAST_PIECES
           })
+          if (trackerInspection.packedOnly) {
+            return res.status(422).json({
+              error: 'Packed archive release detected (RAR). Download queued, but this Stremio path cannot start a partial multi-volume archive while it is still downloading. Wait until every RAR volume is complete, then reopen the stream list and use the ready RAR stream.'
+            })
+          }
         }
       } catch (addErr) {
         // qBit may reject duplicate/stale URLs; continue probing torrent list.
@@ -1395,11 +1431,19 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
         if (state.file) primedFile = true
       }
       if (!state.file) {
-        if (state.packedArchive || Number(state.torrent.progress || 0) >= 0.999) {
+        if (state.packedArchive && state.archiveReady) {
           return res.status(422).json({
-            error: state.packedArchive
-              ? 'Packed archive release detected (RAR). Reopen the stream list after qBittorrent adds it and use the RAR stream.'
-              : 'Torrent completed but no playable video file was detected.'
+            error: 'Packed archive release detected (RAR). Reopen the stream list and use the ready RAR stream.'
+          })
+        }
+        if (state.packedArchive) {
+          return res.status(422).json({
+            error: 'Packed archive release detected (RAR). This Stremio path cannot start a partial multi-volume archive while it is still downloading. Wait until every RAR volume is complete, then reopen the stream list and use the ready RAR stream.'
+          })
+        }
+        if (!state.packedArchive && Number(state.torrent.progress || 0) >= 0.999) {
+          return res.status(422).json({
+            error: 'Torrent completed but no playable video file was detected.'
           })
         }
         lastProgress = Number(state.torrent.progress || 0)

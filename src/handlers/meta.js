@@ -145,30 +145,46 @@ async function handleCustomMeta(config, id, context = {}) {
   const poster = carriedArtwork || sportsArtwork?.poster || sportsArtwork?.image || posterFallback
   const background = carriedBackground || String(sportsArtwork?.backgroundImage || sportsArtwork?.image || '').trim() || poster
 
-  const descriptionParts = [
-    `${info.d} seeders`,
-    formatSize(info.s)
-  ]
-  if (Number.isFinite(Number(info.c)) && Number(info.c) > 0) {
-    const count = Number(info.c)
-    descriptionParts.push(`${count} source${count === 1 ? '' : 's'}`)
-  }
   const eventDate = carriedEventDate || sportsArtwork?.eventDate || ''
   const league = carriedLeague || sportsArtwork?.league || ''
-  if (eventDate) descriptionParts.push(eventDate)
-  if (league) descriptionParts.push(league)
   const sportsGenres = isSports ? buildSportsGenres(resolvedSportHint, league) : []
+
+  // Build a rich description for sports detail pages
+  const descriptionLines = []
+  if (isSports) {
+    const eventName = sportsArtwork?.eventName || ''
+    if (eventName) descriptionLines.push(eventName)
+    if (league && !descriptionLines.some(line => line.includes(league))) descriptionLines.push(league)
+    if (eventDate) descriptionLines.push(`Date: ${eventDate}`)
+    if (carriedHomeTeam && carriedAwayTeam) {
+      descriptionLines.push(`${carriedHomeTeam} vs ${carriedAwayTeam}`)
+    }
+  }
+  const statParts = []
+  if (Number(info.d) > 0) statParts.push(`${info.d} seeders`)
+  if (Number(info.s) > 0) statParts.push(formatSize(info.s))
+  if (Number.isFinite(Number(info.c)) && Number(info.c) > 0) {
+    const count = Number(info.c)
+    statParts.push(`${count} source${count === 1 ? '' : 's'}`)
+  }
+  if (statParts.length > 0) descriptionLines.push(statParts.join(' | '))
+  const description = descriptionLines.filter(Boolean).join('\n') || statParts.join(' | ')
+
+  const displayName = String(info.n || info.t || '').trim() || String(info.t || '')
 
   const meta = {
     id,
     type: String(info.y || 'movie'),
-    name: String(info.n || info.t || '').trim() || String(info.t || ''),
-    description: descriptionParts.join(' | '),
+    name: displayName,
+    description,
     poster,
     background
   }
   if (sportsGenres.length > 0) meta.genres = sportsGenres
   if (eventDate) meta.releaseInfo = eventDate
+  if (isSports && resolvedSportHint) {
+    meta.runtime = formatSportGenreLabel(resolvedSportHint)
+  }
   return { meta }
 }
 

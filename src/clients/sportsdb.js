@@ -2,7 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const { cleanTitle } = require('../utils/parser')
 const { detectSport, stripSportTerms } = require('../utils/sportClassifier')
-const { parseSportsTitle } = require('../utils/sportsTitleParser')
+const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
 const { mapLeague } = require('../utils/leagueMap')
 const { resolveRuntimeDir } = require('../utils/runtimeDir')
 
@@ -138,7 +138,12 @@ function sportKeyFromLeagueCode(value) {
   if (['nba'].includes(code)) return 'basketball'
   if (['nfl'].includes(code)) return 'american-football'
   if (['ufc'].includes(code)) return 'mma'
-  if (['f1'].includes(code)) return 'motorsport'
+  if (['f1', 'formula1', 'motogp', 'nascar', 'indycar', 'wrc', 'supercars', 'v8sc', 'wsbk', 'wec', 'formulae'].includes(code)) return 'motorsport'
+  if (['pdc', 'bdo'].includes(code)) return 'darts'
+  if (['pga', 'lpga', 'masters'].includes(code)) return 'golf'
+  if (['mlb'].includes(code)) return 'baseball'
+  if (['nhl'].includes(code)) return 'hockey'
+  if (['wwe', 'aew'].includes(code)) return 'wrestling'
   if (mapLeague(value)) return 'football'
   return ''
 }
@@ -322,6 +327,17 @@ function buildCandidateQueries(title) {
   if (!cleaned && !original) return []
 
   const variants = []
+
+  // For non-vs event titles, use the event name directly as a high-priority query
+  const eventParsed = parseSportsEventTitle(title)
+  if (eventParsed?.eventName) {
+    const leagueDisplay = mapLeague(eventParsed.league) || eventParsed.league || ''
+    if (leagueDisplay && eventParsed.eventName) {
+      variants.push(`${leagueDisplay} ${eventParsed.eventName}`)
+    }
+    variants.push(capitalizeWords(eventParsed.eventName))
+  }
+
   const teams = extractTeamsQuery(title)
   if (teams) variants.push(teams)
 
@@ -603,7 +619,22 @@ function buildStructuredEventData(item) {
     }
   }
 
-  return parseSportsTitle(item?.title || '')
+  const vsResult = parseSportsTitle(item?.title || '')
+  if (vsResult) return vsResult
+
+  // Try event-style parsing for non-vs titles (F1, UFC, Supercars, etc.)
+  const eventResult = parseSportsEventTitle(item?.title || '')
+  if (eventResult) {
+    return {
+      league: eventResult.league,
+      date: eventResult.date || explicitDate || '',
+      eventName: eventResult.eventName,
+      quality: eventResult.quality || '',
+      raw: eventResult.raw
+    }
+  }
+
+  return null
 }
 
 function structuredFingerprint(event) {

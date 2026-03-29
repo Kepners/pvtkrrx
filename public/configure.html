@@ -2204,7 +2204,8 @@
       const lanInstallReady = Boolean(privateInstallLinks.pairHostedStremio);
       const pairStatusText = String(document.getElementById('pairStatusNote')?.textContent || '').trim();
       const step1Ready = canQueryLocalRuntime() && localStremioStatus.installed;
-      const step2Ready = step1Ready && hasLinkedAccount();
+      const autoLinkReady = step1Ready && (hasLinkedAccount() || localStremioStatus.signedInSessionFound);
+      const step2Ready = autoLinkReady;
 
       if (!canQueryLocalRuntime()) {
         setQuickStepBadge('stremioDesktopBadge', 'error', 'Host PC Only');
@@ -2236,18 +2237,21 @@
         setQuickStepBadge('authLinkBadge', 'checking', 'Checking');
         document.getElementById('authLinkMeta').textContent = 'Checking whether a signed-in Stremio session on this PC can be reused automatically.';
       } else if (localStremioStatus.signedInSessionFound) {
-        setQuickStepBadge('authLinkBadge', 'checking', 'Found Session');
-        document.getElementById('authLinkMeta').textContent = `Signed-in Stremio session found from ${localStremioStatus.signedInSourceLabel || 'this PC'}. Auto Find AuthKey should finish the secure link if it has not already.`;
+        setQuickStepBadge('authLinkBadge', 'ready', 'Ready To Reuse');
+        document.getElementById('authLinkMeta').textContent = `Signed-in Stremio session found from ${localStremioStatus.signedInSourceLabel || 'this PC'}. Auto Setup can reuse it automatically without making you run the old AuthKey step first.`;
       } else if (localStremioStatus.error) {
         setQuickStepBadge('authLinkBadge', 'error', 'Check Failed');
         document.getElementById('authLinkMeta').textContent = localStremioStatus.error;
       } else {
         setQuickStepBadge('authLinkBadge', 'error', 'Needs Sign-In');
-        document.getElementById('authLinkMeta').textContent = 'No signed-in Stremio session was detected on this PC yet. Sign in to Stremio Desktop or Stremio Web here, then click Auto Find AuthKey.';
+        document.getElementById('authLinkMeta').textContent = 'No signed-in Stremio session was detected on this PC yet. Sign in to Stremio Desktop or Stremio Web here first, then Auto Setup can finish the rest.';
       }
 
       if (quickAutoBtn) {
         quickAutoBtn.disabled = !step1Ready;
+      }
+      if (autoSetupBtn) {
+        autoSetupBtn.disabled = !step1Ready;
       }
 
       if (lanInstallReady) {
@@ -2260,7 +2264,7 @@
         document.getElementById('lanInstallMeta').textContent = 'Run this on the Windows host PC so PVTKRRX can prepare the hosted LAN Bridge URL for your other home devices in Stremio.';
       } else {
         setQuickStepBadge('lanInstallBadge', 'checking', 'Waiting');
-        document.getElementById('lanInstallMeta').textContent = 'Run Auto Setup once after the secure account link is ready. PVTKRRX will check services, reuse the signed-in Stremio account, and then prepare the hosted LAN Bridge URL for your other home devices.';
+        document.getElementById('lanInstallMeta').textContent = 'Run Auto Setup once. PVTKRRX will check services, reuse the signed-in Stremio session on this PC when available, secure the account link, and then prepare the hosted LAN Bridge URL for your other home devices.';
       }
 
       if (checkBtn) {
@@ -2297,12 +2301,14 @@
           setGuidedButtonState('stremioCheckBtn', true, !canQueryLocalRuntime());
           if (quickLead) quickLead.textContent = 'Step 1 first. Let PVTKRRX confirm Stremio Desktop on this Windows PC.';
         }
-      } else if (!step2Ready) {
+      } else if (!hasLinkedAccount() && !localStremioStatus.signedInSessionFound) {
         setGuidedButtonState('stremioQuickAutoBtn', true, false);
-        if (quickLead) quickLead.textContent = 'Step 2 next. Click Auto Find AuthKey so the server can secure the Stremio account link from this PC.';
+        if (quickLead) quickLead.textContent = 'Step 2 next. Sign in to Stremio on this Windows PC. Auto Setup can reuse that live session once it exists.';
       } else if (!lanInstallReady) {
         setGuidedButtonState('lanAutoSetupBtn', true, false);
-        if (quickLead) quickLead.textContent = 'Step 3 next. Click Auto Setup once so PVTKRRX checks Prowlarr, qBittorrent, storage, and the LAN Bridge install URL.';
+        if (quickLead) quickLead.textContent = hasLinkedAccount()
+          ? 'Step 3 next. Click Auto Setup once so PVTKRRX checks Prowlarr, qBittorrent, storage, and the LAN Bridge install URL.'
+          : 'Step 3 next. Click Auto Setup once. PVTKRRX will reuse the signed-in Stremio session on this PC, secure the account link, check services, and build the LAN Bridge install URL.';
       } else {
         setGuidedButtonState('quickInstallLanBtn', true, false);
         if (quickLead) quickLead.textContent = 'All three steps are green. Install LAN Bridge in Stremio now so your other home devices can sync. On this Windows PC itself, use PC Local.';
@@ -3440,20 +3446,19 @@
 
       if (kicker) kicker.textContent = 'Home network sync';
       if (title) title.textContent = 'LAN Bridge';
-      if (lead) lead.textContent = 'Sign in to Stremio on this Windows PC first. PVTKRRX will reuse that session, build the hosted install link, and keep the advanced tools out of the way.';
-      if (copy) copy.textContent = 'This route is for your phone, TV, web, and Apple TV on the same Stremio account. This Windows PC itself should use PC Local.';
+      if (lead) lead.textContent = 'PVTKRRX checks for signed-in Stremio on this Windows PC automatically. Auto Setup reuses that session, builds the hosted install link, and keeps the advanced tools out of the way.';
+      if (copy) copy.textContent = 'This route is for your phone, TV, web, and Apple TV on the same Stremio account. This Windows PC itself should use PC Local. Auto Setup is the normal one-click path.';
       if (hint) hint.textContent = 'Need the old checklist, service tabs, or raw URLs? Open the hidden setup tabs below.';
 
-      toggle(checkBtn, true);
+      toggle(checkBtn, false);
       toggle(autoBtn, true);
       toggle(generateBtn, false);
       toggle(installBtn, true);
       toggle(copyBtn, true);
 
-      if (checkBtn) checkBtn.disabled = !canUseLocal;
       if (autoBtn) {
         autoBtn.textContent = 'Auto Setup Home LAN';
-        autoBtn.disabled = !(canUseLocal && localStremioStatus.installed && (hasLinkedAccount() || localStremioStatus.signedInSessionFound));
+        autoBtn.disabled = !(canUseLocal && localStremioStatus.installed);
       }
       if (installBtn) {
         installBtn.textContent = 'Install Or Refresh In Stremio';
@@ -3469,13 +3474,15 @@
       } else if (localStremioStatus.checked && !localStremioStatus.installed) {
         setSimpleFlowStatus('err', 'Install Stremio Desktop on this Windows PC first. LAN Bridge setup depends on the host Stremio app being present here.');
       } else if (!hasLinkedAccount() && !localStremioStatus.signedInSessionFound) {
-        setSimpleFlowStatus('info', 'Sign in to Stremio Desktop on this PC first, then click Check Stremio On This PC and Auto Setup Home LAN.');
+        setSimpleFlowStatus('info', 'Sign in to Stremio Desktop on this PC first, then click Auto Setup Home LAN. PVTKRRX will do the Stremio check and secure the account link for you.');
+      } else if (!hasLinkedAccount() && localStremioStatus.signedInSessionFound) {
+        setSimpleFlowStatus('info', 'Stremio is already signed in on this PC. Click Auto Setup Home LAN and PVTKRRX will reuse that session automatically.');
       } else if (lanReady) {
         setSimpleFlowStatus('ok', pairStatusText || 'LAN Bridge is ready. Install or refresh it in Stremio for your other home devices.');
       } else if (autoStatusText) {
         setSimpleFlowStatus('info', autoStatusText);
       } else {
-        setSimpleFlowStatus('info', 'Click Auto Setup Home LAN. PVTKRRX will check Stremio, services, local storage, and build the correct install link for your home devices.');
+        setSimpleFlowStatus('info', 'Click Auto Setup Home LAN. PVTKRRX will check Stremio, services, local storage, and build the correct install link for your home devices without the old manual checkpoint steps.');
       }
     }
 
