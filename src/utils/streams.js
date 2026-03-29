@@ -3,6 +3,8 @@
 const VIDEO_EXTENSIONS = ['.mkv', '.mp4', '.avi', '.wmv', '.ts', '.m4v']
 const SAMPLE_HINT_RE = /(^|[\\/.\-_ ])[sS]ample([\\/.\-_ ]|$)|(^|[\\/.\-_ ])[tT]railer([\\/.\-_ ]|$)|(^|[\\/.\-_ ])[pP]review([\\/.\-_ ]|$)|(^|[\\/.\-_ ])[pP]roof([\\/.\-_ ]|$)/
 const ARCHIVE_EXT_RE = /\.(?:rar|r\d{2,3}|zip|7z|001)$/i
+const RAR_EXT_RE = /\.(?:rar|r\d{2,3}|part\d{1,3}\.rar)$/i
+const ARCHIVE_VIDEO_INCLUDE_RE = '/\\.(mkv|mp4|avi|wmv|ts|m4v)$/i'
 
 function formatSize(bytes) {
   if (!bytes || bytes <= 0) return '0 B'
@@ -176,6 +178,32 @@ function buildOnTrackerStream(item, playbackUrl, parsed) {
   }
 }
 
+function buildOnArchiveStream(item, rarUrls, fileName, totalBytes, parsed, progressPercent = null) {
+  const buffering = Number.isFinite(progressPercent) && progressPercent < 100
+  const mode = buffering ? 'buffering' : 'seedbox'
+  return {
+    name: `${buildStreamName(parsed, mode)} RAR`,
+    description: withExtraDescription(
+      buildDescription(item, parsed, mode, progressPercent),
+      ['Multi-part RAR archive stream']
+    ),
+    rarUrls,
+    fileMustInclude: ARCHIVE_VIDEO_INCLUDE_RE,
+    behaviorHints: {
+      notWebReady: true,
+      bingeGroup: buildBingeGroup(item, parsed, mode),
+      filename: fileName,
+      sourceSeeders: Math.max(0, Number(item.seeders || 0)),
+      sourceCodec: String(parsed?.codec || ''),
+      sourceHdr: String(parsed?.hdr || ''),
+      sourceQuality: String(parsed?.quality || ''),
+      sourceSize: Math.max(0, Number(totalBytes || item?.size || 0)),
+      sourceMode: mode,
+      sourceContainer: 'rar'
+    }
+  }
+}
+
 function buildInfoStream(code, helpUrl, count = 1) {
   const total = Math.max(1, Number(count || 0))
   let name = '[INFO] PVTKRRX'
@@ -235,8 +263,18 @@ function isSampleVideoName(name) {
   return SAMPLE_HINT_RE.test(String(name || ''))
 }
 
+function isArchiveFileName(name) {
+  return ARCHIVE_EXT_RE.test(String(name || '').toLowerCase())
+}
+
 function hasPackedArchiveFiles(files) {
-  return (files || []).some(f => ARCHIVE_EXT_RE.test(String(f?.name || '').toLowerCase()))
+  return (files || []).some(f => isArchiveFileName(f?.name))
+}
+
+function findPackedArchiveFiles(files) {
+  return (Array.isArray(files) ? files : [])
+    .filter(f => RAR_EXT_RE.test(String(f?.name || '').toLowerCase()))
+    .sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || ''), undefined, { numeric: true, sensitivity: 'base' }))
 }
 
 function pickLargestFile(files) {
@@ -386,10 +424,13 @@ module.exports = {
   formatSize,
   buildOnSeedboxStream,
   buildOnBufferingStream,
+  buildOnArchiveStream,
   buildOnTrackerStream,
   buildInfoStream,
   isSampleVideoName,
+  isArchiveFileName,
   hasPackedArchiveFiles,
+  findPackedArchiveFiles,
   findVideoFile,
   findEpisodeFile,
   sortStreams

@@ -23,7 +23,7 @@ const { normalizeRelayUrl } = require('../utils/relayUrl')
 const { stripRemoteSeedboxLanFields } = require('../utils/remoteSeedboxConfig')
 const { resolveRuntimeDir } = require('../utils/runtimeDir')
 const { decodeSportsThumbToken, renderSportsThumbSvg } = require('../utils/sportsThumb')
-const { findVideoFile, hasPackedArchiveFiles, isSampleVideoName } = require('../utils/streams')
+const { findVideoFile, hasPackedArchiveFiles, isSampleVideoName, isArchiveFileName, findPackedArchiveFiles } = require('../utils/streams')
 const { buildPlaybackFileUrl } = require('../utils/fileServing')
 const { normalizeLocalStorageRoots, findExistingLocalFilePath } = require('../utils/localStorageRoots')
 const { PairStore } = require('../utils/pairStore')
@@ -1561,6 +1561,9 @@ async function primeTorrentForStreaming(qbit, torrent, videoFile, allFiles = nul
 
   const seqEnabled = torrent?.seq_dl === true
   const firstLastEnabled = torrent?.f_l_piece_prio === true
+  const files = Array.isArray(allFiles) ? allFiles : []
+  const archiveFiles = findPackedArchiveFiles(files)
+  const archiveMode = Boolean(videoFile?.name) && isArchiveFileName(videoFile.name) && archiveFiles.length > 0
 
   if (!seqEnabled) {
     try {
@@ -1587,14 +1590,19 @@ async function primeTorrentForStreaming(qbit, torrent, videoFile, allFiles = nul
 
   if (videoFile && Number.isInteger(videoFile.index)) {
     try {
-      const files = Array.isArray(allFiles) ? allFiles : []
+      const activeIds = archiveMode
+        ? archiveFiles
+          .filter(f => Number.isInteger(f?.index))
+          .map(f => f.index)
+        : [videoFile.index]
+      const activeIdSet = new Set(activeIds)
       const otherFileIds = files
-        .filter(f => Number.isInteger(f?.index) && f.index !== videoFile.index)
+        .filter(f => Number.isInteger(f?.index) && !activeIdSet.has(f.index))
         .map(f => f.index)
       if (otherFileIds.length > 0) {
         await qbit.setFilePriority(hash, otherFileIds, 0)
       }
-      await qbit.setFilePriority(hash, [videoFile.index], 7)
+      await qbit.setFilePriority(hash, activeIds, 7)
     } catch (err) {
       console.warn(`[streaming-prime] file priority failed ${hash.slice(0, 8)}: ${err.message}`)
     }

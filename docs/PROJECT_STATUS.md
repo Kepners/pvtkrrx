@@ -33,6 +33,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - host-side `LAN Bridge` status now checks the hosted relay directly, and the desktop can repair a stale local pair identity after an `invalid pair key` rejection
 - host-side Stremio Desktop session scanning now detects the real WebView2 `profile/auth/key` storage format again, and startup auto-provision can link that signed-in session automatically
 - sports catalog tiles now prefer landscape artwork when TheSportsDB provides it
+- matched packed scene releases already present in qBittorrent now emit Stremio `rarUrls` streams on local playback-capable routes instead of failing on `Sample` files
 - `1.1.15` installers were built successfully into `dist/`
 
 ## What We Fixed On 2026-03-28 And 2026-03-29
@@ -58,6 +59,9 @@ These items are verified in the current workspace or by direct client/log proof:
 7. Host-side Stremio account reuse stopped auto-detecting the signed-in desktop session:
    - Root cause: the local auth scanner only matched clean JSON-style `auth.key` blobs and missed the noisy Chromium/WebView2 LevelDB encoding actually used by Stremio Desktop on this machine.
    - Fix: the scanner now accepts the real `profile/auth/key` blob layout, and startup `/auto-provision` reuses that signed-in host session automatically instead of waiting for a manual check button.
+8. Packed sports/movie scene releases were added to qBittorrent as `.r00/.r01/...` archives and could not play:
+   - Root cause: the addon only emitted direct video/file URLs and intentionally rejected `Sample + RAR` torrents as non-playable, even though Stremio supports archive playback through `rarUrls`.
+   - Fix: once a packed torrent already exists in qBittorrent, local playback-capable routes now emit a Stremio `rarUrls` stream over the built-in `/file` route so Stremio can read the archive set without manual extraction. First-click tracker queueing is still a separate step.
 
 ## Still Needs Real-Client Proof
 

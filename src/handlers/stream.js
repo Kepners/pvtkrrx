@@ -5,7 +5,7 @@ const { normalizeTeamName } = require('../clients/sportsdb')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { parse, matchesEpisode, isLikelyPackedReleaseTitle, cleanTitle } = require('../utils/parser')
 const { isSportsOnlyIndexer } = require('../utils/sportsIndexers')
-const { buildOnSeedboxStream, buildOnBufferingStream, buildOnTrackerStream, buildInfoStream, findVideoFile, findEpisodeFile, sortStreams } = require('../utils/streams')
+const { buildOnSeedboxStream, buildOnBufferingStream, buildOnArchiveStream, buildOnTrackerStream, buildInfoStream, findVideoFile, findPackedArchiveFiles, findEpisodeFile, sortStreams } = require('../utils/streams')
 const { encodePlaybackStateToken } = require('../utils/opaqueState')
 const { parseSportsTitle } = require('../utils/sportsTitleParser')
 const { buildPlaybackFileUrl, canEmitTrackerPlayback, getTrackerPlaybackRestriction } = require('../utils/fileServing')
@@ -30,6 +30,47 @@ function buildFileUrl(config, configToken, addonUrl, hash, torrent, fileName, op
 function buildConfigureHelpUrl(addonUrl, target = 'seedbox') {
   const base = String(addonUrl || '').replace(/\/+$/, '')
   return `${base}/configure?target=${encodeURIComponent(target)}`
+}
+
+function buildArchiveDisplayFilename(title) {
+  const safeBase = String(title || 'archive')
+    .replace(/[^\w.\-()[\] ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/\.[a-z0-9]{2,4}$/i, '')
+  return `${safeBase || 'archive'}.mkv`
+}
+
+function buildMatchedArchiveStream(config, configToken, addonUrl, matched, files, item, parsed) {
+  const archiveFiles = findPackedArchiveFiles(files)
+  if (archiveFiles.length === 0) return null
+
+  const rarUrls = []
+  for (const archiveFile of archiveFiles) {
+    const archiveUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched, archiveFile.name, {
+      multipleFiles: files.length > 1,
+      requireCurrentPathProof: !isCompletedTorrent(matched, Number(archiveFile?.progress || 0))
+    })
+    if (!archiveUrl) return null
+    rarUrls.push({
+      url: archiveUrl,
+      bytes: Math.max(0, Number(archiveFile?.size || 0))
+    })
+  }
+
+  const archiveDone = archiveFiles.every(file => Number(file?.progress || 0) >= 0.999)
+  const progressPercent = archiveDone
+    ? 100
+    : Math.max(0, Math.min(99, Math.floor(Number(matched?.progress || 0) * 100)))
+  const totalBytes = archiveFiles.reduce((sum, file) => sum + Math.max(0, Number(file?.size || 0)), 0)
+  return buildOnArchiveStream(
+    item,
+    rarUrls,
+    buildArchiveDisplayFilename(item?.title || matched?.name || ''),
+    totalBytes,
+    parsed,
+    progressPercent
+  )
 }
 
 function createNoticeCounts() {
@@ -489,7 +530,11 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
         const videoFile = (season && episode)
           ? findEpisodeFile(files, season, episode)
           : findVideoFile(files)
-        if (!videoFile?.name) continue
+        if (!videoFile?.name) {
+          const archiveStream = buildMatchedArchiveStream(config, configToken, addonUrl, matched, files, item, parsed)
+          if (archiveStream) streams.push(archiveStream)
+          continue
+        }
         const videoProgress = Number(videoFile?.progress || 0)
         const requireCurrentPathProof = !isCompletedTorrent(matched, videoProgress)
         const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched, videoFile.name, {
@@ -560,26 +605,41 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
     try {
       const files = await qbit.files(matched.hash)
       const videoFile = findVideoFile(files)
-      if (!videoFile?.name) throw new Error('No playable video in matched torrent')
-
-      const videoProgress = Number(videoFile?.progress || 0)
-      const requireCurrentPathProof = !isCompletedTorrent(matched, videoProgress)
-      const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched, videoFile.name, {
-        multipleFiles: files.length > 1,
-        requireCurrentPathProof
-      })
-      if (!fileUrl) {
-        if (requireCurrentPathProof && config?.fileServerUrl) {
-          noticeCounts.bufferingPathUnproven += 1
+      if (!videoFile?.name) {
+        const archiveStream = buildMatchedArchiveStream(
+          config,
+          configToken,
+          addonUrl,
+          matched,
+          files,
+          { title: info.t, size: info.s, seeders: info.d, indexer: info.i || '' },
+          parsed
+        )
+        if (archiveStream) {
+          streams.push(archiveStream)
+        } else {
+          throw new Error('No playable video in matched torrent')
         }
-        throw new Error('Hosted mode requires a provable playback path for on-seedbox streams')
-      }
-      const item = { title: info.t, size: info.s, seeders: info.d }
-      if (isCompletedTorrent(matched, videoProgress)) {
-        streams.push(buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed))
       } else {
-        const percent = Math.max(0, Math.min(99, Math.floor(videoProgress * 100)))
-        streams.push(buildOnBufferingStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed, percent))
+        const videoProgress = Number(videoFile?.progress || 0)
+        const requireCurrentPathProof = !isCompletedTorrent(matched, videoProgress)
+        const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched, videoFile.name, {
+          multipleFiles: files.length > 1,
+          requireCurrentPathProof
+        })
+        if (!fileUrl) {
+          if (requireCurrentPathProof && config?.fileServerUrl) {
+            noticeCounts.bufferingPathUnproven += 1
+          }
+          throw new Error('Hosted mode requires a provable playback path for on-seedbox streams')
+        }
+        const item = { title: info.t, size: info.s, seeders: info.d }
+        if (isCompletedTorrent(matched, videoProgress)) {
+          streams.push(buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed))
+        } else {
+          const percent = Math.max(0, Math.min(99, Math.floor(videoProgress * 100)))
+          streams.push(buildOnBufferingStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed, percent))
+        }
       }
     } catch (e) {
       console.error('[stream] custom file listing failed:', e.message)

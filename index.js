@@ -1268,7 +1268,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
         if (!existing.file && (existing.packedArchive || Number(existing.torrent.progress || 0) >= 0.999)) {
           return res.status(422).json({
             error: existing.packedArchive
-              ? 'Packed archive release detected (RAR). Pick a source with direct .mkv/.mp4 video.'
+              ? 'Packed archive release detected (RAR). Reopen the stream list after qBittorrent adds it and use the RAR stream.'
               : 'Torrent completed but no playable video file was detected.'
           })
         }
@@ -1366,7 +1366,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
         if (state.packedArchive || Number(state.torrent.progress || 0) >= 0.999) {
           return res.status(422).json({
             error: state.packedArchive
-              ? 'Packed archive release detected (RAR). Pick a source with direct .mkv/.mp4 video.'
+              ? 'Packed archive release detected (RAR). Reopen the stream list after qBittorrent adds it and use the RAR stream.'
               : 'Torrent completed but no playable video file was detected.'
           })
         }

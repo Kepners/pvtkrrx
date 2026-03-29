@@ -44,6 +44,7 @@ See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the exact LAN B
 | Movie/TV streams from private trackers | Working |
 | Sports contamination filter | Working (SportsCult excluded from movie searches) |
 | Already-downloaded files | Working (built-in file server with Range support) |
+| Packed RAR scene releases already added to qBittorrent | Working via Stremio `rarUrls` on local playback-capable routes |
 | On-tracker download + play | Working on playback-capable routes (PC Local, LAN Bridge via local redirect, or self-hosted runtime) |
 | Local + Hosted install modes | Working |
 | Hosted LAN pair mode (Android TV/mobile) | Implemented (requires relay config) |
@@ -153,6 +154,8 @@ Hosted relay routes do not proxy video bytes, and hosted `/file` or `/playback` 
 **📥 Available** — File is on a private tracker. PC Local and LAN Bridge can use local `/playback` queue-and-buffer behavior. Hosted Remote Seedbox does not expose dead tracker `/playback` links and is effectively ready-file playback unless you run a playback-capable self-hosted runtime.
 
 **[INFO] Remote notice** — Hosted Remote Seedbox can append an explanation row when direct queue-and-buffer is hidden to protect your file-server login or when qBittorrent has not exposed enough live file info for a safe buffer URL yet.
+
+**Packed RAR scene release** — If a tracker source is a multi-part RAR release (`.r00`, `.r01`, ...), the first click can still be the queue step. Once qBittorrent has added the torrent and exposed the archive parts, reopening the stream list on a local playback-capable route now emits a Stremio `rarUrls` stream so Stremio can read the archive set directly without manual extraction.
 
 ## Verify Stremio Config Flow
 

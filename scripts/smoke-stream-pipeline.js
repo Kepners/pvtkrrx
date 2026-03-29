@@ -76,6 +76,35 @@ function matchedFile(overrides = {}) {
   }
 }
 
+function packedArchiveFiles() {
+  return [
+    {
+      name: 'Release/Sample/sample-release.mkv',
+      size: 125_948_856,
+      progress: 1,
+      index: 0
+    },
+    {
+      name: 'Release/release.r00',
+      size: 100_000_000,
+      progress: 1,
+      index: 1
+    },
+    {
+      name: 'Release/release.r01',
+      size: 100_000_000,
+      progress: 0.35,
+      index: 2
+    },
+    {
+      name: 'Release/release.r02',
+      size: 100_000_000,
+      progress: 0,
+      index: 3
+    }
+  ]
+}
+
 function findNoticeStream(streams, code) {
   return (streams || []).find(stream => String(stream?.behaviorHints?.sourceNoticeCode || '') === code)
 }
@@ -228,6 +257,29 @@ async function run() {
       assert.equal(result.streams.length, 1, '#4b local buffering flow should remain intact')
       assert.match(String(result.streams[0]?.url || ''), /\/local\/file\//)
       assert.equal(String(result.streams[0]?.behaviorHints?.sourceMode || ''), 'buffering')
+    })
+
+    await withScenario(async () => {
+      delete process.env.VERCEL
+      ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent().hash, link: '' })]
+      QBitClient.prototype.torrents = async () => [matchedTorrent()]
+      QBitClient.prototype.files = async () => packedArchiveFiles()
+      CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        'tt1234567',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.length, 1, '#4c matched packed archive should emit a single archive-mode stream')
+      assert.ok(Array.isArray(result.streams[0]?.rarUrls), '#4c packed archive stream should expose rarUrls')
+      assert.equal(result.streams[0].rarUrls.length, 3, '#4c packed archive stream should include all archive parts and skip the sample clip')
+      assert.equal(String(result.streams[0]?.fileMustInclude || ''), '/\\.(mkv|mp4|avi|wmv|ts|m4v)$/i', '#4c packed archive stream should tell Stremio how to find the video inside the archive set')
+      assert.equal(String(result.streams[0]?.behaviorHints?.sourceContainer || ''), 'rar', '#4c packed archive stream should advertise archive container type')
+      assert.match(String(result.streams[0]?.rarUrls?.[0]?.url || ''), /\/local\/file\//, '#4c packed archive source objects should reuse the local file route')
     })
 
     console.log('Smoke stream pipeline passed')

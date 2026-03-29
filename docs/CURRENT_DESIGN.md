@@ -72,6 +72,7 @@ PVTKRRX is one codebase with three active runtime pieces:
 - Local `/file` serves bytes with range support when the file is locally accessible.
 - Local `/playback` is the queued-download path for tracker content that is not yet ready.
 - Completed-file playback now correctly checks torrent completion state before redirecting into `/file`.
+- If qBittorrent already has a packed scene release (`Sample` + `.r00/.r01/...`), local playback-capable routes can now emit a Stremio `rarUrls` stream over the built-in `/file` route so Stremio can read the archive set without manual extraction.
 - External `fileServerUrl` is optional and mainly for remote/public playback setups.
 - Remote buffering URLs are emitted only when the current file path is provable from live torrent state.
 - Hosted `Remote Seedbox` remains ready-file-first on the hosted relay.
