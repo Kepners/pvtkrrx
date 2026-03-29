@@ -1,98 +1,74 @@
 # PVTKRRX Project Status
 
-Updated: 2026-03-27
+Updated: 2026-03-29
 
 ## Current Stage
 
-PVTKRRX is at a reset point.
-
-The current code is not blocked because the basic server-side flows are obviously missing. It is blocked because we have spent too much time patching Stremio-specific edge cases without enough real-client proof that the product now behaves correctly on desktop, mobile, TV, and hosted routes.
+PVTKRRX is in a working `1.1.15` state on the main Windows/local route set.
 
 The practical reading of the project today is:
 
-- core route logic exists for `PC Local`, `LAN Bridge`, and `Remote Seedbox`
-- the current branch now passes the full local smoke suite again
-- the latest pivot changed root `/manifest.json` into a bootstrap-only manifest and added compatibility resource routes to avoid the latest `EmptyContent` failure mode
-- real Stremio client acceptance is still the blocker
-- a clean rebuild is now a reasonable next step
+- `PC Local` is the real host-desktop route and is working
+- `LAN Bridge` is the same-account home-device route and the host desktop should not use it for local browsing
+- completed-file playback on the local runtime is working again after the `/playback` route fix
+- the sports catalog artwork path now prefers landscape art for tiles when available
+- the Windows installer/build flow is reproducible again
+- the remaining work is real-device coverage and performance tuning, not a reset/rebuild
 
 ## Verified Working Now
 
-These items are actually verified in the current workspace, not just intended:
+These items are verified in the current workspace or by direct client/log proof:
 
-- `npm run smoke:config` passed on 2026-03-27
-- `npm run smoke:guards` passed on 2026-03-27
-- `npm run smoke:pipeline` passed on 2026-03-27
-- `npm run smoke:lan-pair` passed on 2026-03-27
-- `npm run smoke:stremio-link` passed on 2026-03-27
-- `npm run smoke:security` passed on 2026-03-27
-- `npm run smoke:sports` passed on 2026-03-27
-- root `/manifest.json` now returns a bootstrap manifest (`com.kepners.pvtkrrx.bootstrap`) with no catalogs/resources and `configurationRequired=true`
-- root compatibility `/catalog`, `/meta`, and `/stream` routes now resolve safely instead of falling into missing root resource paths
-- `PC Local` still resolves as a real addon from `http://127.0.0.1:7000/local/manifest.json?mode=local`
-- hosted token manifests still resolve for configured installs
-- LAN pair heartbeat/status/redirect behavior is covered by smoke tests
-- Stremio AuthKey link flow is covered by a local mock API smoke test
-- hosted/local security hardening remains covered by automated checks
-- sports catalog and structured enrichment pipeline remain covered by automated checks
-- desktop qBittorrent path lookup now degrades cleanly when qBit preferences are not ready
+- `npm run smoke:config` passed on 2026-03-29
+- `npm run smoke:playback` passed on 2026-03-29
+- `npm run smoke:pipeline` passed on 2026-03-29
+- `npm run smoke:sports` passed on 2026-03-29
+- `npm run dist:win` passed on 2026-03-29
+- root `/manifest.json` returns the bootstrap manifest (`com.kepners.pvtkrrx.bootstrap`) with no catalogs/resources and `configurationRequired=true`
+- `PC Local` resolves as a real addon from `http://127.0.0.1:7000/local/manifest.json?mode=local`
+- same-host `LAN Bridge` `Failed to fetch` was traced to route choice on 2026-03-28, not to server failure
+- completed-file playback error `isCompletedTorrent is not defined` was fixed in the local playback path
+- the desktop splash now appears on every cold boot and stays frontmost until the main shell is ready
+- sports catalog tiles now prefer landscape artwork when TheSportsDB provides it
+- `1.1.15` installers were built successfully into `dist/`
 
-## Not Solved Yet
+## What We Fixed On 2026-03-28 And 2026-03-29
 
-These are still the real blockers:
+1. Host-desktop `LAN Bridge` browsing:
+   - Root cause: the host Windows PC was using the hosted `LAN Bridge` route instead of `PC Local`.
+   - Fix: keep `LAN Bridge` for the other home devices and use `PC Local` on the host desktop.
+2. Playback error on a fully downloaded file:
+   - Root cause: `/playback` crashed with `isCompletedTorrent is not defined`.
+   - Fix: restored the completion-state helper and re-covered the route with `smoke:playback`.
+3. Windows installer build failure:
+   - Root cause: `electron-builder`/`rcedit` was failing when writing EXE metadata directly inside the OneDrive-backed repo output folder.
+   - Fix: build in temp first, then copy/archive back into `dist/`.
+4. Startup shell behavior:
+   - Root cause: the splash could disappear too quickly and was not forced to the front.
+   - Fix: splash is now frontmost, minimum-duration, and replaced only after the local runtime is reachable.
+5. Sports posters:
+   - Root cause: sports tiles were biased toward portrait/fallback art even when landscape event art existed.
+   - Fix: sports artwork now tracks portrait, landscape, and background separately, and tiles prefer landscape.
 
-- we still do not have enough real-client proof that the bootstrap-root manifest fix fully solves the latest Stremio `EmptyContent` behavior
-- Android TV and Android mobile same-account `LAN Bridge` pickup is still not proven end to end on real devices
-- Apple TV synced-addon behavior is still not proven end to end on a real client path
-- one real public `Remote Seedbox` ready-file playback path is still not proven
-- one auth-protected external file-server playback path is still not proven on real clients
-- KV-backed hosted pair persistence across restarts/redeploys is still not proven
-- notice-only stream rows still need real-client verification so they do not bury or visually outrank a playable stream
-- smoke runs can still log non-fatal startup warm-up noise when live qBittorrent or Prowlarr credentials are missing or invalid
+## Still Needs Real-Client Proof
 
-## Why Progress Stalled
+These items should still be treated as open until captured on real clients:
 
-The repeated churn has mostly come from a small number of structural problems:
+- second-device `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.15` desktop build
+- Apple TV synced-addon flow after desktop/web install
+- one real public `Remote Seedbox` ready-file playback success on a remote client
+- one auth-protected external file-server playback success on a real Stremio client
+- long-session playback/performance tuning after qBittorrent download-speed adjustments
 
-- raw LAN addon URLs kept fighting official Stremio transport rules instead of working with them
-- root `/manifest.json` behavior was too close to the configured route manifests, which let Stremio attach to the wrong manifest/resource shape and then fetch paths that did not exist
-- hosted relay logic, local runtime logic, and desktop shell logic are still too intertwined, mainly inside `index.js` plus `electron/main.js`
-- install wording, route rules, fallback paths, and real-device validation drifted apart during repeated fix attempts
+## Current Risks
 
-## Recommended Next Move
+- `LAN Bridge` still depends on the Windows host desktop staying online and heartbeating
+- Bonjour may still be missing or stopped on some hosts; that affects discovery/fallback polish, not the core loopback path
+- remote/auth-protected playback behavior still depends on what the target Stremio client honors during redirect/auth handoff
 
-The current repo should now be treated as:
+## Recommended Next Work
 
-- a behavior reference
-- a smoke-test reference
-- a Stremio edge-case notebook
-- not the architecture to blindly keep extending
-
-Recommended next step:
-
-1. Stop layering more tactical fixes into the current structure unless a blocker is trivial and isolated.
-2. Use [docs/REBUILD_PROMPT.md](docs/REBUILD_PROMPT.md) as the handoff brief for a clean rebuild.
-3. Treat these files as the source of truth for the rewrite:
-   - [docs/CURRENT_DESIGN.md](docs/CURRENT_DESIGN.md)
-   - [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md)
-   - [docs/STREMIO_INSTALL_TRACKER.md](docs/STREMIO_INSTALL_TRACKER.md)
-   - [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md)
-   - [docs/SPEC.md](docs/SPEC.md)
-   - [docs/STREMIO_ADDON_REFERENCE.md](docs/STREMIO_ADDON_REFERENCE.md)
-4. Treat the current implementation as reference material, not as mandatory structure.
-
-## Release Gate Still Blocked By
-
-Do not call this production-trustworthy until these are proven:
-
-1. `PC Local` installs and plays correctly on the Windows host using the real Stremio desktop client.
-2. `LAN Bridge` installs cleanly from the hosted path and browses/plays correctly from a second same-account device on the same LAN.
-3. `LAN Bridge` fails clearly when the host desktop heartbeat is offline.
-4. Android TV/mobile same-account sync is proven on real clients.
-5. Apple TV synced-addon behavior is proven on a real client path.
-6. `Remote Seedbox` plays one real public HTTPS ready-file successfully.
-7. Hosted pair state survives restart/redeploy with KV enabled.
-
-## Handoff Note
-
-If the next step is a rewrite, start from [docs/REBUILD_PROMPT.md](docs/REBUILD_PROMPT.md), not from the February planning docs and not from assumptions about how Stremio "should" behave.
+1. Tune qBittorrent for faster early playback and confirm stream start time improvements on real clients.
+2. Re-test `LAN Bridge` from a second device using the latest `1.1.15` build and record the exact device/client result.
+3. Keep sports poster review focused on what Stremio clients actually render, not just what the metadata payload contains.
+4. Keep this file updated whenever a real device test changes the truth table.

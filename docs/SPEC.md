@@ -1,7 +1,7 @@
 # PVTKRRX Specification
 
 > **Status:** Live product specification
-> **Updated:** 2026-03-15
+> **Updated:** 2026-03-29
 
 ## Product Statement
 
@@ -14,6 +14,7 @@ PVTKRRX connects private tracker and seedbox infrastructure to Stremio without u
 - Provide a hosted route for public HTTPS seedbox playback.
 - Surface sports, movies, TV, and library content in one addon family.
 - Keep tracker/file hints protected by encrypted config tokens and opaque playback state tokens.
+- Keep the local Windows desktop experience route-first and simple, with advanced/fallback tools hidden by default.
 
 ## Required Route Model
 
@@ -25,6 +26,7 @@ PVTKRRX connects private tracker and seedbox infrastructure to Stremio without u
    - install from hosted manifest token
    - use pair heartbeat plus hosted redirect
    - same Stremio account across devices
+   - not the route for the Windows host desktop itself
 3. `Remote Seedbox`
    - install from hosted manifest token
    - use public HTTPS ready-file playback endpoints
@@ -33,17 +35,19 @@ PVTKRRX connects private tracker and seedbox infrastructure to Stremio without u
 ## Functional Scope
 
 1. Configure page with route-aware install actions.
-2. Local config save for host-PC runtime.
-3. Hosted token encryption for non-local installs.
-4. Sports catalog with TheSportsDB enrichment and cached artwork.
-5. Movie and TV stream resolution using Prowlarr/Torznab-compatible search plus Cinemeta metadata assistance.
-6. Seedbox library browsing from qBittorrent state.
-7. Built-in `/file` serving with range support when the host can read the file locally.
-8. `/playback` queue-and-wait behavior for tracker content not yet ready on playback-capable runtimes.
-9. LAN pair heartbeat/status flow for hosted home-device routing.
-10. Optional Stremio AuthKey account linking and account-scoped access state.
-11. Windows desktop packaging for the local runtime.
-12. Route-aware connection testing: hosted configure may test public HTTP/HTTPS service endpoints, while local configure may test loopback/LAN endpoints on the host.
+2. Route-first configure UI with advanced/manual tabs hidden by default.
+3. Local config save for the host-PC runtime.
+4. Hosted token encryption for non-local installs.
+5. Sports catalog with TheSportsDB enrichment and cached portrait/landscape/background artwork.
+6. Movie and TV stream resolution using Prowlarr/Torznab-compatible search plus Cinemeta metadata assistance.
+7. Seedbox library browsing from qBittorrent state.
+8. Built-in `/file` serving with range support when the host can read the file locally.
+9. `/playback` queue-and-wait behavior for tracker content not yet ready on playback-capable runtimes.
+10. LAN pair heartbeat/status flow for hosted home-device routing.
+11. Optional Stremio AuthKey account linking and account-scoped access state.
+12. Windows desktop packaging for the local runtime.
+13. Desktop startup splash and route-aware popup guidance on Windows.
+14. Route-aware connection testing: hosted configure may test public HTTP/HTTPS service endpoints, while local configure may test loopback/LAN endpoints on the host.
 
 ## Non-Goals
 
@@ -57,12 +61,14 @@ PVTKRRX connects private tracker and seedbox infrastructure to Stremio without u
 - Hosted manifests must be HTTPS.
 - Same-PC local install must remain available through `http://127.0.0.1:7000/local/manifest.json?mode=local`.
 - Hosted LAN Bridge requests must resolve to the best active LAN endpoint, preferring live LAN IP over `.local`.
+- The Windows host desktop must use `PC Local`, not the hosted `LAN Bridge` route, for its own browsing/playback.
 - Local playback should prefer the built-in file server when the runtime can read the completed file.
-- Hosted `/file` and `/playback` must fail fast instead of waiting on serverless runtime for local-only playback paths.
-- Hosted Remote Seedbox on Vercel must not emit tracker `/playback` streams that depend on that disabled hosted route.
+- Hosted `/file` and `/playback` must fail fast instead of waiting on a hosted runtime for local-only playback paths.
+- Hosted `Remote Seedbox` must not emit tracker `/playback` streams that depend on a disabled hosted playback path.
 - Remote tracker flows that would lose required external file-server auth must be suppressed.
 - Remote buffering URLs must only be emitted when the current file path is provable from live torrent state.
 - Hosted connection-test routes must be rate limited and reject loopback/LAN/private targets.
+- Windows packaging must remain reproducible from `npm run dist:win`.
 
 ## Canonical Companion Docs
 

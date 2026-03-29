@@ -16,7 +16,7 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 ## Key Features
 
 - **Sports** — Browse and search private tracker sports content (EPL, F1, UFC) directly in Stremio
-- **Sports artwork enrichment** — Optional TheSportsDB posters/thumbs with cache-aware lookups
+- **Sports artwork enrichment** — Optional TheSportsDB portrait, landscape, and background artwork with cache-aware lookups; sports catalog tiles now prefer landscape art when available
 - **Movies & TV** — IMDb-matched content from your private trackers
 - **Seedbox Library** — Browse everything already downloaded on your seedbox
 - **Smart filtering** — Sports indexers never contaminate movie/TV searches
@@ -40,12 +40,15 @@ See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the exact LAN B
 | Feature | Status |
 |---------|--------|
 | Sports catalog (EPL, F1, UFC tiles) | Working |
+| Sports artwork enrichment | Working (landscape art preferred for sports tiles when available) |
 | Movie/TV streams from private trackers | Working |
 | Sports contamination filter | Working (SportsCult excluded from movie searches) |
 | Already-downloaded files | Working (built-in file server with Range support) |
 | On-tracker download + play | Working on playback-capable routes (PC Local, LAN Bridge via local redirect, or self-hosted runtime) |
 | Local + Hosted install modes | Working |
 | Hosted LAN pair mode (Android TV/mobile) | Implemented (requires relay config) |
+| Windows desktop startup shell | Working (frontmost splash + route-aware popup on boot) |
+| Windows packaged build | Working (`npm run dist:win` now rebuilds `dist/` and `dist/releases/<version>/`) |
 
 ## Current Project Status
 
@@ -88,6 +91,8 @@ Use the configure page to prepare the route you actually want to use:
 - **PC Local** for this Windows host (`127.0.0.1`)
 - **LAN Bridge** for Android TV / phone / web on the same network and Stremio account
 - **Remote Seedbox** when your playback endpoints are public over HTTPS
+
+When using `LAN Bridge` on Windows, install and sign into Stremio Desktop on the host PC first. The desktop popup and configure flow now check that local Stremio state before preparing the home-device route.
 
 Auto Setup also attempts to:
 - install/start Prowlarr and qBittorrent (Windows, via winget + service/process start)
@@ -233,6 +238,14 @@ Production updates are deployed from the synced GitHub branch and must preserve 
 ```bash
 ENCRYPTION_SECRET=your-secret-here npm start
 ```
+
+### Windows Build
+
+```bash
+npm run dist:win
+```
+
+This now builds in the system temp directory first, then copies the finished `1.1.15` artifacts back into `dist/` and `dist/releases/<version>/`. That avoids the Windows `rcedit` failure we were hitting when building directly inside the OneDrive-backed repo output folder.
 
 ## Environment Variables
 

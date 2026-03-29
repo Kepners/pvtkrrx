@@ -1,6 +1,6 @@
 # PVTKRRX Architecture
 
-Updated: 2026-03-24
+Updated: 2026-03-29
 
 ## Canonical Sources
 
@@ -46,15 +46,17 @@ Stremio client
 | `src/utils/opaqueState.js` | Opaque state tokens for `/file` and `/playback` |
 | `src/utils/pairStore.js` | LAN pair persistence |
 | `src/utils/accountStore.js` | Stremio-linked account and billing/trial data store |
-| `electron/main.js` | Desktop wrapper, startup automation, heartbeat loop, Windows integration |
-| `public/configure.html` | Route-aware configure/install UI |
+| `electron/main.js` | Desktop wrapper, startup splash, heartbeat loop, Windows integration |
+| `electron/popup.html` | Route-aware Windows shell with runtime logs and host path controls |
+| `public/configure.html` | Route-first configure/install UI with hidden advanced tabs |
+| `scripts/build-win.js` | Temp-output Windows packaging workflow that copies/archive artifacts back into `dist/` |
 
 ## Route Model
 
 | Route | Install surface | Runtime dependency | Intended device |
 |---|---|---|---|
 | `PC Local` | Local manifest on `127.0.0.1` | Local runtime only | The host Windows PC |
-| `LAN Bridge` | Hosted manifest with `lanPair*` fields | Hosted relay + live desktop heartbeat | Same-account home devices |
+| `LAN Bridge` | Hosted manifest with `lanPair*` fields | Hosted relay + live desktop heartbeat | Other home devices on the same account |
 | `Remote Seedbox` | Hosted manifest with public playback config | Hosted relay + public ready-file playback endpoints | Away-from-home / public route |
 
 ## Main Flows
@@ -62,9 +64,22 @@ Stremio client
 ### Configure And Save
 
 1. User opens `/configure`.
-2. User selects a route: `PC Local`, `LAN Bridge`, or `Remote Seedbox`.
-3. Local route saves config into the Windows runtime folder.
-4. Hosted routes call `POST /encrypt` and install a hosted manifest token.
+2. User selects a route card: `PC Local`, `LAN Bridge`, or `Remote Seedbox`.
+3. The page focuses on the next action for that route.
+4. Manual/fallback controls stay hidden in `Hidden Setup Tabs`.
+5. Local route saves config into the Windows runtime folder.
+6. Hosted routes call `POST /encrypt` and install a hosted manifest token.
+
+### Desktop Shell
+
+1. Electron starts the splash immediately on cold boot.
+2. The splash stays frontmost while the local runtime comes up.
+3. The main popup appears only after the local runtime is reachable.
+4. The popup then exposes:
+   - route launchers
+   - Stremio preflight guidance for `LAN Bridge`
+   - qBittorrent download path controls
+   - recent runtime logs and clipboard export
 
 ### LAN Bridge Resolve
 
@@ -73,21 +88,24 @@ Stremio client
 3. Hosted addon requests resolve the pair state.
 4. Non-loopback hosted requests 307-redirect to the best current endpoint.
 5. Redirect preference is the live LAN IP first, with `.local` as fallback.
+6. The host desktop itself should not browse this hosted route; it should use `PC Local`.
 
 ### Playback
 
 1. Stream handler resolves content from Prowlarr/Torznab-compatible search plus qBittorrent state.
 2. Completed local files prefer `/file/:info`.
-3. Not-ready content uses `/playback/:info` only on playback-capable runtimes such as PC Local, LAN Bridge after local redirect, or self-hosted installs that actually serve `/playback`.
+3. Not-ready content uses `/playback/:info` only on playback-capable runtimes such as `PC Local`, `LAN Bridge` after local redirect, or self-hosted installs that actually serve `/playback`.
 4. External `fileServerUrl` is optional and mainly used when the local runtime cannot read the file directly.
-5. Hosted runtime must fail fast rather than buffering or serving local-only playback, and hosted Remote Seedbox responses must suppress dead tracker `/playback` streams.
+5. Hosted runtime fails fast rather than buffering or serving local-only playback.
+6. Completed local playback now correctly checks torrent completion state before redirecting to `/file`.
 
 ### Sports And Library
 
 1. Sports catalog items use internal `pvtkrrx:` ids.
 2. Meta and stream handlers decode those ids at request time.
-3. TheSportsDB is used for posters, fanart, and cached enrichment where configured.
-4. Library items expose completed qBittorrent content through the same addon surface.
+3. TheSportsDB is used for posters, landscape art, and backgrounds where configured.
+4. Sports catalog tiles now prefer landscape event art when available.
+5. Library items expose completed qBittorrent content through the same addon surface.
 
 ## Storage Model
 
@@ -107,3 +125,9 @@ Stremio client
 4. Hosted relay responses may redirect into the local runtime, but they should not become the video proxy.
 5. Hosted connection checks may validate public endpoints from the configure page, but they must not probe loopback/LAN/private targets.
 6. There is no `.pvtk` file format in the live code; the repo uses `pvtkrrx:` ids inside addon responses.
+
+## Build And Packaging
+
+- `npm run dist:win` now runs through `scripts/build-win.js`.
+- Packages are built in temp output first, then copied into `dist/` and archived into `dist/releases/<version>/`.
+- This keeps Windows packaging reliable when the repo itself lives inside a OneDrive-backed path.
