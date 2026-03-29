@@ -101,6 +101,7 @@ async function run() {
   const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-config-flow-'))
   const localConfigPath = path.join(runtimeDir, 'local-config.json')
   const relayEncryptBodies = []
+  const relayPairStatus = new Map()
   const scanDir = path.join(tempRoot, 'leveldb')
   fs.mkdirSync(scanDir, { recursive: true })
   fs.writeFileSync(
@@ -110,7 +111,7 @@ async function run() {
   )
 
   const relayServer = http.createServer((req, res) => {
-    if (req.method !== 'POST' || req.url !== '/encrypt') {
+    if (req.method !== 'POST' || (req.url !== '/encrypt' && req.url !== '/pair/status')) {
       res.statusCode = 404
       return res.end('not found')
     }
@@ -120,7 +121,28 @@ async function run() {
     req.on('data', chunk => { body += chunk })
     req.on('end', () => {
       const parsed = body ? JSON.parse(body) : {}
+      if (req.url === '/pair/status') {
+        const pairId = String(parsed.pairId || '').trim()
+        const pairKey = String(parsed.pairKey || '').trim()
+        const record = relayPairStatus.get(pairId)
+        res.statusCode = 200
+        res.setHeader('Content-Type', 'application/json')
+        return res.end(JSON.stringify({
+          ok: true,
+          online: Boolean(record && record.pairKey === pairKey),
+          updatedAt: Number(record?.updatedAt || 0),
+          expiresAt: Number(record?.expiresAt || 0)
+        }))
+      }
       relayEncryptBodies.push(parsed)
+      if (String(parsed.lanPairId || '').trim() && String(parsed.lanPairKey || '').trim()) {
+        const now = Date.now()
+        relayPairStatus.set(String(parsed.lanPairId || '').trim(), {
+          pairKey: String(parsed.lanPairKey || '').trim(),
+          updatedAt: now,
+          expiresAt: now + 600000
+        })
+      }
       res.statusCode = 200
       res.setHeader('Content-Type', 'application/json')
       res.end(JSON.stringify({
@@ -375,6 +397,13 @@ async function run() {
     assert.equal(Boolean(String(lanBridgeTokenConfig.lanPairKey || '').trim()), true, 'LAN Bridge token should retain pair key')
     assert.equal(String(lanBridgeTokenConfig.localHostname || ''), 'pvtkrrx.local', 'LAN Bridge token should retain local hostname for the paired host')
     assert.equal(String(lanBridgeTokenConfig.lanPairRelayUrl || ''), relayBase, 'LAN Bridge token should retain relay URL')
+
+    const localPairStatusRes = await fetch(`${base}/local/pair-status`)
+    assert.equal(localPairStatusRes.status, 200, 'local pair status should proxy relay status')
+    const localPairStatus = await localPairStatusRes.json()
+    assert.equal(Boolean(localPairStatus?.ok), true)
+    assert.equal(Boolean(localPairStatus?.online), true, 'local pair status should reflect relay-backed LAN status')
+    assert.ok(Number(localPairStatus?.updatedAt || 0) > 0, 'local pair status should forward relay timestamps')
 
     const localLanTokenBadOriginRes = await fetch(`${base}/local/lan-token`, {
       method: 'POST',

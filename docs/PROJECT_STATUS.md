@@ -20,6 +20,7 @@ The practical reading of the project today is:
 These items are verified in the current workspace or by direct client/log proof:
 
 - `npm run smoke:config` passed on 2026-03-29
+- `npm run smoke:desktop` passed on 2026-03-29 and now guards the desktop auto-provision persistence path against writing redacted config readbacks back to disk
 - `npm run smoke:playback` passed on 2026-03-29 and now covers redirect plus byte-serving on the shared `/file` route
 - `npm run smoke:pipeline` passed on 2026-03-29
 - `npm run smoke:sports` passed on 2026-03-29
@@ -29,6 +30,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - same-host `LAN Bridge` `Failed to fetch` was traced to route choice on 2026-03-28, not to server failure
 - completed-file playback error `isCompletedTorrent is not defined` was fixed in the local playback path
 - the desktop splash now appears on every cold boot and stays frontmost until the main shell is ready
+- host-side `LAN Bridge` status now checks the hosted relay directly, and the desktop can repair a stale local pair identity after an `invalid pair key` rejection
 - sports catalog tiles now prefer landscape artwork when TheSportsDB provides it
 - `1.1.15` installers were built successfully into `dist/`
 
@@ -49,6 +51,9 @@ These items are verified in the current workspace or by direct client/log proof:
 5. Sports posters:
    - Root cause: sports tiles were biased toward portrait/fallback art even when landscape event art existed.
    - Fix: sports artwork now tracks portrait, landscape, and background separately, and tiles prefer landscape.
+6. LAN Bridge pair drift after desktop auto-provision:
+   - Root cause: desktop boot could rewrite the saved local config with a sanitized `/auto-provision` readback payload, which dropped `lanPairKey` / `lanPairOwnerId`. A later local auto-setup then regenerated a new key for the same pair id and the hosted relay rejected it as `invalid pair key`.
+   - Fix: desktop boot no longer persists sanitized provision readbacks, host-side pair status now asks the relay directly, and the desktop can repair the local LAN identity if the relay rejects a stale pair.
 
 ## Still Needs Real-Client Proof
 

@@ -543,26 +543,39 @@ app.get('/local/pair-status', requireLocalNetworkRoute, async (req, res) => {
 
   const pairId = sanitizePairId(localConfig.lanPairId)
   const pairKey = sanitizePairKey(localConfig.lanPairKey)
-  if (!pairId || !pairKey || localConfig.lanPairEnabled === false) {
+  const relayUrl = normalizeRelayUrl(localConfig.lanPairRelayUrl || '')
+  if (!pairId || !pairKey || !relayUrl || localConfig.lanPairEnabled === false) {
     return res.json({ ok: true, online: false })
   }
 
   try {
-    const state = await lanPairStore.get(pairId)
-    if (!state || hashPairKey(pairKey) !== String(state.keyHash || '')) {
-      return res.json({ ok: true, online: false })
+    const relayRes = await fetch(`${relayUrl}/pair/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pairId, pairKey }),
+      signal: AbortSignal.timeout(4000)
+    })
+    const relayData = await relayRes.json().catch(() => ({}))
+    if (!relayRes.ok) {
+      if (relayRes.status === 429) {
+        res.setHeader('Retry-After', String(relayRes.headers.get('retry-after') || '60'))
+        return res.status(429).json({ ok: false, error: 'relay rate-limited' })
+      }
+      return res.status(502).json({
+        ok: false,
+        error: 'relay status failed',
+        detail: String(relayData?.error || `HTTP ${relayRes.status}`).trim()
+      })
     }
-    const preferred = chooseLanPairEndpoint(state)
     res.setHeader('Cache-Control', 'no-store')
     res.json({
       ok: true,
-      online: Boolean(preferred),
-      updatedAt: Number(state.updatedAt || 0),
-      expiresAt: Number(state.expiresAt || 0),
-      endpointSource: String(preferred?.source || '')
+      online: relayData?.online === true,
+      updatedAt: Number(relayData?.updatedAt || 0),
+      expiresAt: Number(relayData?.expiresAt || 0)
     })
   } catch (err) {
-    res.status(500).json({ ok: false, error: 'status failed', detail: err.message })
+    res.status(502).json({ ok: false, error: 'relay status failed', detail: err.message })
   }
 })
 

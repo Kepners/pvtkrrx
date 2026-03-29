@@ -152,6 +152,7 @@ Current heartbeat behavior:
 - startup pulse
 - Stremio-launch pulse
 - long periodic background heartbeat (default 12 minutes)
+- if the hosted relay rejects the saved pair with `invalid pair key`, the desktop app now rotates the local LAN-pair identity and the user should refresh `LAN Bridge` once in Stremio on the other home devices
 
 ### 8. Hosted catalogs resolve through the live pair
 
@@ -196,6 +197,11 @@ Likely cause:
 - heartbeat never reached the relay
 - `lanPairKey` in local config no longer matches the relay's stored key for the same `lanPairId`
 - local runtime is not running
+
+Host-side configure note:
+
+- the local configure page now asks the hosted relay for `LAN Bridge` status instead of reading only local runtime state
+- if that status is red after an `invalid pair key` repair, refresh the hosted `LAN Bridge` install once in Stremio so the other home devices use the repaired pair identity
 
 ### Host desktop shows `Failed to fetch`
 

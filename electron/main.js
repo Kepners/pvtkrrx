@@ -11,6 +11,7 @@ const { normalizeRelayUrl } = require('../src/utils/relayUrl')
 const { resolveRuntimeDir } = require('../src/utils/runtimeDir')
 const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJsonFile')
 const { redactSensitiveArgs, redactSensitiveText } = require('../src/utils/logRedaction')
+const { shouldPersistProvisionConfig } = require('./provisionPersistence')
 
 if (!process.env.PVTKRRX_RUNTIME_DIR) {
   process.env.PVTKRRX_RUNTIME_DIR = resolveRuntimeDir()
@@ -86,8 +87,43 @@ function getProvisionPayload() {
 }
 
 function persistProvisionConfig(result) {
-  if (result?.config && result.config.qbitUrl) {
+  if (shouldPersistProvisionConfig(result)) {
     saveLocalConfig(result.config)
+    return true
+  }
+  return false
+}
+
+function makeDesktopPairId() {
+  return crypto.randomBytes(9).toString('base64url').toLowerCase()
+}
+
+function makeDesktopPairKey() {
+  return crypto.randomBytes(24).toString('base64url')
+}
+
+function makeDesktopPairOwnerId() {
+  return crypto.randomBytes(24).toString('base64url')
+}
+
+function repairLanPairIdentity(reason = 'invalid pair key') {
+  try {
+    const current = loadSecureJsonFile(localConfigPath, { defaultValue: null })
+    if (!current || typeof current !== 'object') return null
+    if (current.lanPairEnabled === false) return null
+
+    const next = {
+      ...current,
+      lanPairId: makeDesktopPairId(),
+      lanPairKey: makeDesktopPairKey(),
+      lanPairOwnerId: makeDesktopPairOwnerId()
+    }
+    saveSecureJsonFile(localConfigPath, next)
+    console.warn(`[desktop] lan pair identity repaired (${reason}); refresh LAN Bridge in Stremio on your home devices`)
+    return next
+  } catch (err) {
+    console.warn('[desktop] lan pair identity repair failed:', err.message)
+    return null
   }
 }
 
@@ -554,7 +590,7 @@ async function buildLanPairHeartbeatPayload() {
   }
 }
 
-async function sendLanPairHeartbeat(source = 'interval') {
+async function sendLanPairHeartbeat(source = 'interval', options = {}) {
   try {
     const now = Date.now()
     const sinceLast = now - lastHeartbeatSuccessAt
@@ -582,9 +618,24 @@ async function sendLanPairHeartbeat(source = 'interval') {
 
     if (!res.ok) {
       lanPairFailureCount += 1
+      let body = null
+      let detail = ''
+      try {
+        body = await res.json()
+        detail = ` reason=${body?.error || JSON.stringify(body)}`
+      } catch (_) {}
+      const reason = String(body?.error || '').trim().toLowerCase()
+      if (
+        options.allowRepair !== false &&
+        res.status === 403 &&
+        (reason === 'invalid pair key' || reason === 'pair owner mismatch')
+      ) {
+        const repaired = repairLanPairIdentity(reason)
+        if (repaired) {
+          return sendLanPairHeartbeat(`${source}-repair`, { allowRepair: false })
+        }
+      }
       if (source !== 'interval' || lanPairFailureCount >= 3) {
-        let detail = ''
-        try { const body = await res.json(); detail = ` reason=${body.error || JSON.stringify(body)}` } catch (_) {}
         console.warn(
           `[desktop] lan pair heartbeat failed (${source}) status=${res.status}${detail} pair=${summary.pairId} endpoints=${summary.endpointCount}`
         )
@@ -881,6 +932,8 @@ async function bootstrapAutoProvision() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(getProvisionPayload())
       }, 180000)
+      // The local server already saves the full provisioned config. Do not
+      // overwrite it here with the redacted readback payload from /auto-provision.
       persistProvisionConfig(data)
       return data
     }

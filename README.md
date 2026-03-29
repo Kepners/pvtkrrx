@@ -313,7 +313,8 @@ Configure page now supports optional Stremio AuthKey linking:
 2. Ensure the desktop app is running on the host PC (heartbeat keeps pair active silently)
 3. Ensure TV/phone and PC are on the same network
 4. Desktop app should auto-ensure inbound TCP `7000/7001` + UDP `5353` on install/startup; if Windows still blocks it, run the installed app once as Administrator
-5. If pair shows offline in configure page, restart desktop app and re-check pair status
+5. If pair shows offline in configure page, restart the desktop app and re-check pair status; the host page now asks the relay directly instead of guessing from stale local state
+6. If the relay rejects a stale `lanPairId`/`lanPairKey` combo, the desktop app now repairs the local LAN identity automatically; after that, refresh `LAN Bridge` once in Stremio on the other home devices
 
 ### Host PC desktop shows `Failed to fetch` on LAN Bridge
 

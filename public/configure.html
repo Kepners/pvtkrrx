@@ -2411,9 +2411,12 @@
       return stremioLinkSession.recommendedPairId;
     }
 
-    function applyRecommendedLanPairId() {
+    function applyRecommendedLanPairId(options = {}) {
       const pairId = String(stremioLinkSession.recommendedPairId || '').trim();
       if (!pairId) return false;
+      const currentPairId = String(lanPair.pairId || '').trim();
+      const canOverrideCurrent = options.force === true || !currentPairId || isLikelyDerivedLanPairId(currentPairId);
+      if (!canOverrideCurrent) return false;
       lanPair.pairId = pairId;
       return true;
     }
@@ -4079,7 +4082,11 @@
         if (authKey) {
           setStatus('installStatus', 'info', 'Linking Stremio account...');
           const linked = await linkStremioAuthKeyIfProvided();
-          if (linked?.recommendedPairId && installMode === 'local') {
+          if (
+            linked?.recommendedPairId &&
+            installMode === 'local' &&
+            (!String(lanPair.pairId || '').trim() || isLikelyDerivedLanPairId(lanPair.pairId))
+          ) {
             lanPair.pairId = linked.recommendedPairId;
           }
           config = attachAccountLink({
