@@ -78,6 +78,24 @@ These items should still be treated as open until captured on real clients:
 - `LAN Bridge` still depends on the Windows host desktop staying online and heartbeating
 - Bonjour may still be missing or stopped on some hosts; that affects discovery/fallback polish, not the core loopback path
 - remote/auth-protected playback behavior still depends on what the target Stremio client honors during redirect/auth handoff
+- Stremio client behavior for local `rarUrls` archive playback is still not signed off; current real-device result was `liberror`
+
+## Tonight's Priority List
+
+1. Rework packed RAR playback after the real-device `liberror` result.
+   - Confirm whether Stremio needs different `rarUrls` ordering, `fileIdx` selection, archive bytes hints, or whether packed releases should be hidden until extracted.
+2. Make the configure flow more automatic.
+   - On boot, check host Stremio state automatically, reuse the signed-in session automatically, and reduce manual button steps on the configure page.
+3. Trace the exact seedbox playback model end to end.
+   - Document what is different between local host, LAN Bridge, and true remote seedbox playback so route-specific behavior stops drifting.
+4. Fix sports identity quality.
+   - Wrong event/title matching is still happening (`Supercars/V8` resolving to Japanese practice), and sports posters still need better event-specific selection, including UFC.
+5. Fix sports metadata/detail pages.
+   - Sports detail views are still too empty in Stremio and need proper meta fields so the page does not look broken.
+6. Test moving sports out of the `movie` bucket into its own top-level surface.
+   - Verify what Stremio actually allows in the left-column type selector and then implement the cleanest supported sports heading.
+7. Ensure `PVTKRRX` appears in the source list for normal films.
+   - Investigate why stream/source attribution currently shows other addons only and make sure PVTKRRX is clearly represented in the source picker.
 
 ## Recommended Next Work
 
