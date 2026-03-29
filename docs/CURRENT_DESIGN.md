@@ -62,6 +62,7 @@ PVTKRRX is one codebase with three active runtime pieces:
   - `landscapeImage`
   - `backgroundImage`
 - Sports catalog tiles now prefer `landscapeImage` first when available, while portrait art is retained separately for detail/fallback use.
+- Sports detail meta now exposes Stremio `genres` tags from the resolved sport classification when available.
 - Library and sports items use internal `pvtkrrx:` custom ids inside Stremio responses.
 - There is no standalone `.pvtk` file format in this repository.
 

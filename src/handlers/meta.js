@@ -7,6 +7,48 @@ const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { decodeCustomId } = require('../utils/customId')
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 
+function formatSportGenreLabel(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (!normalized) return ''
+
+  const labels = {
+    'american-football': 'American Football',
+    basketball: 'Basketball',
+    baseball: 'Baseball',
+    boxing: 'Boxing',
+    cricket: 'Cricket',
+    cycling: 'Cycling',
+    darts: 'Darts',
+    football: 'Football',
+    golf: 'Golf',
+    mma: 'MMA',
+    motorsport: 'Motorsport',
+    rugby: 'Rugby',
+    snooker: 'Snooker',
+    tennis: 'Tennis',
+    wrestling: 'Wrestling'
+  }
+
+  return labels[normalized] || normalized
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .map(part => part[0].toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function buildSportsGenres(sportHint, league) {
+  const genres = []
+  const primary = formatSportGenreLabel(sportHint)
+  const leagueLabel = String(league || '').trim()
+
+  if (primary) genres.push(primary)
+  if (leagueLabel && !genres.some(value => value.toLowerCase() === leagueLabel.toLowerCase())) {
+    genres.push(leagueLabel)
+  }
+
+  return genres
+}
+
 async function handleMeta(config, type, id, context = {}) {
   try {
     // Custom ID (sports, library)
@@ -115,6 +157,7 @@ async function handleCustomMeta(config, id, context = {}) {
   const league = carriedLeague || sportsArtwork?.league || ''
   if (eventDate) descriptionParts.push(eventDate)
   if (league) descriptionParts.push(league)
+  const sportsGenres = isSports ? buildSportsGenres(resolvedSportHint, league) : []
 
   const meta = {
     id,
@@ -124,6 +167,7 @@ async function handleCustomMeta(config, id, context = {}) {
     poster,
     background
   }
+  if (sportsGenres.length > 0) meta.genres = sportsGenres
   if (eventDate) meta.releaseInfo = eventDate
   return { meta }
 }

@@ -10,7 +10,8 @@ process.env.PVTKRRX_RUNTIME_DIR = runtimeDir
 const { mapLeague } = require('../src/utils/leagueMap')
 const { parseSportsTitle } = require('../src/utils/sportsTitleParser')
 const { SportsDbClient } = require('../src/clients/sportsdb')
-const { decodeCustomId } = require('../src/utils/customId')
+const { encodeCustomId, decodeCustomId } = require('../src/utils/customId')
+const { setPublicCacheHeaders } = require('../src/lib/shared')
 
 function loadCatalogWithStubs(stubs) {
   const catalogPath = path.resolve(__dirname, '../src/handlers/catalog.js')
@@ -29,6 +30,26 @@ function loadCatalogWithStubs(stubs) {
   } finally {
     Module._load = originalLoad
   }
+}
+
+function testCacheHeadersIncludeStaleIfError() {
+  const headers = {}
+  const res = {
+    setHeader(name, value) {
+      headers[name] = value
+    }
+  }
+
+  setPublicCacheHeaders(res, 0, {
+    sMaxAge: 300,
+    staleWhileRevalidate: 900,
+    staleIfError: 7200
+  })
+
+  assert.equal(
+    headers['Cache-Control'],
+    'public, max-age=0, s-maxage=300, stale-while-revalidate=900, stale-if-error=7200'
+  )
 }
 
 function testParserAndLeagueMap() {
@@ -207,12 +228,41 @@ async function testLibraryCustomIdsStayCompact() {
   assert.equal(decoded.m, 'tt7512512')
 }
 
+async function testSportsMetaIncludesGenres() {
+  const { handleMeta } = require('../src/handlers/meta')
+  const id = encodeCustomId({
+    y: 'movie',
+    k: 'sports',
+    n: 'Arsenal vs Chelsea',
+    t: 'EPL.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-A',
+    s: 1_000_000_000,
+    d: 20,
+    p: '2026-03-15T09:00:00Z',
+    r: 'football',
+    e: '2026-03-15',
+    g: 'English Premier League',
+    a: 'https://example.com/portrait.jpg',
+    b: 'https://example.com/background.jpg'
+  }, {
+    compress: true
+  })
+
+  const result = await handleMeta({}, 'movie', id, {
+    baseUrl: 'http://127.0.0.1:7000'
+  })
+
+  assert.deepEqual(result.meta.genres, ['Football', 'English Premier League'])
+  assert.equal(result.meta.releaseInfo, '2026-03-15')
+}
+
 async function main() {
   try {
+    testCacheHeadersIncludeStaleIfError()
     testParserAndLeagueMap()
     await testStructuredFallbackToFuzzyLookup()
     await testOrderAgnosticSportsGrouping()
     await testLibraryCustomIdsStayCompact()
+    await testSportsMetaIncludesGenres()
     console.log('Smoke sports structured flow passed')
   } finally {
     fs.rmSync(runtimeDir, { recursive: true, force: true })

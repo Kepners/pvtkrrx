@@ -946,7 +946,11 @@ app.get('/:config/manifest.json', withConfig, (req, res) => {
     m.description = req.configIssues[0].message
   }
   console.log(`[stremio] → manifest  id=${m.id} catalogs=${m.catalogs?.length || 0} configRequired=${m.behaviorHints?.configurationRequired} issues=${req.configIssues.length}`)
-  applyHostedRouteCacheHeaders(req, res, 60, { sMaxAge: 300, staleWhileRevalidate: 900 })
+  applyHostedRouteCacheHeaders(req, res, 60, {
+    sMaxAge: 300,
+    staleWhileRevalidate: 900,
+    staleIfError: 86400
+  })
   res.json(m)
 })
 
@@ -957,7 +961,11 @@ app.get('/:config/config.json', withConfig, requireLocalConfigReadback, (req, re
 
 app.get('/manifest.json', (req, res) => {
   console.log(`[stremio] ← manifest  config=root from=${req.ip || req.socket?.remoteAddress || '?'}`)
-  setPublicCacheHeaders(res, 60, { sMaxAge: 300, staleWhileRevalidate: 900 })
+  setPublicCacheHeaders(res, 60, {
+    sMaxAge: 300,
+    staleWhileRevalidate: 900,
+    staleIfError: 86400
+  })
   const m = manifest.createBootstrapManifest(getPublicBaseUrl(req))
   console.log(`[stremio] → manifest  id=${m.id} catalogs=${m.catalogs?.length || 0} configRequired=${m.behaviorHints?.configurationRequired}`)
   res.json(m)
@@ -970,7 +978,11 @@ app.get('/catalog/:type/:id.json', withLegacyRootLocalConfig, requireConfigSubsc
   })
   console.log(`[stremio] compat root catalog result type=${req.params.type} id=${req.params.id} metas=${result?.metas?.length || 0}`)
   const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
-  applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: ttl, staleWhileRevalidate: Math.min(ttl * 4, 3600) })
+  applyHostedRouteCacheHeaders(req, res, 0, {
+    sMaxAge: ttl,
+    staleWhileRevalidate: Math.min(ttl * 4, 3600),
+    staleIfError: Math.min(Math.max(ttl * 24, 3600), 86400)
+  })
   res.json(result)
 })
 
@@ -981,7 +993,11 @@ app.get('/catalog/:type/:id/:extra.json', withLegacyRootLocalConfig, requireConf
   })
   console.log(`[stremio] compat root catalog result type=${req.params.type} id=${req.params.id} metas=${result?.metas?.length || 0}`)
   const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
-  applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: ttl, staleWhileRevalidate: Math.min(ttl * 4, 3600) })
+  applyHostedRouteCacheHeaders(req, res, 0, {
+    sMaxAge: ttl,
+    staleWhileRevalidate: Math.min(ttl * 4, 3600),
+    staleIfError: Math.min(Math.max(ttl * 24, 3600), 86400)
+  })
   res.json(result)
 })
 
@@ -1000,7 +1016,11 @@ app.get('/meta/:type/:id.json', withLegacyRootLocalConfig, requireConfigSubscrip
   const result = await handleMeta(req.config, req.params.type, req.params.id, {
     baseUrl: getPublicBaseUrl(req)
   })
-  applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: 300, staleWhileRevalidate: 1800 })
+  applyHostedRouteCacheHeaders(req, res, 0, {
+    sMaxAge: 300,
+    staleWhileRevalidate: 1800,
+    staleIfError: 86400
+  })
   res.json(result)
 })
 
@@ -1011,7 +1031,11 @@ app.get('/:config/catalog/:type/:id.json', withConfig, requireConfigSubscription
   })
   console.log(`[stremio] → catalog   type=${req.params.type} id=${req.params.id} metas=${result?.metas?.length || 0}`)
   const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
-  applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: ttl, staleWhileRevalidate: Math.min(ttl * 4, 3600) })
+  applyHostedRouteCacheHeaders(req, res, 0, {
+    sMaxAge: ttl,
+    staleWhileRevalidate: Math.min(ttl * 4, 3600),
+    staleIfError: Math.min(Math.max(ttl * 24, 3600), 86400)
+  })
   res.json(result)
 })
 
@@ -1022,7 +1046,11 @@ app.get('/:config/catalog/:type/:id/:extra.json', withConfig, requireConfigSubsc
   })
   console.log(`[stremio] → catalog   type=${req.params.type} id=${req.params.id} metas=${result?.metas?.length || 0}`)
   const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
-  applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: ttl, staleWhileRevalidate: Math.min(ttl * 4, 3600) })
+  applyHostedRouteCacheHeaders(req, res, 0, {
+    sMaxAge: ttl,
+    staleWhileRevalidate: Math.min(ttl * 4, 3600),
+    staleIfError: Math.min(Math.max(ttl * 24, 3600), 86400)
+  })
   res.json(result)
 })
 
@@ -1041,7 +1069,11 @@ app.get('/:config/meta/:type/:id.json', withConfig, requireConfigSubscription, m
   const result = await handleMeta(req.config, req.params.type, req.params.id, {
     baseUrl: getPublicBaseUrl(req)
   })
-  applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: 300, staleWhileRevalidate: 1800 })
+  applyHostedRouteCacheHeaders(req, res, 0, {
+    sMaxAge: 300,
+    staleWhileRevalidate: 1800,
+    staleIfError: 86400
+  })
   res.json(result)
 })
 

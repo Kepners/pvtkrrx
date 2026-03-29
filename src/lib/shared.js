@@ -1253,12 +1253,19 @@ function setPublicCacheHeaders(res, browserMaxAgeSeconds, options = {}) {
     0,
     31536000
   )
+  const staleIfError = parseCacheSeconds(
+    options.staleIfError,
+    0,
+    0,
+    31536000
+  )
   const directives = [
     'public',
     `max-age=${browserMaxAge}`,
     `s-maxage=${sMaxAge}`,
     `stale-while-revalidate=${staleWhileRevalidate}`
   ]
+  if (staleIfError > 0) directives.push(`stale-if-error=${staleIfError}`)
   if (options.immutable) directives.push('immutable')
   res.setHeader('Cache-Control', directives.join(', '))
 }
