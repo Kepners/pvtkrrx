@@ -570,11 +570,12 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
     if (eventDate) descriptionParts.push(eventDate)
     if (league) descriptionParts.push(league)
 
-    const posterUrl = sportsArtwork?.poster || sportsArtwork?.image ||
+    const posterUrl = sportsArtwork?.landscapeImage || sportsArtwork?.image || sportsArtwork?.poster ||
       (item.imdbId
         ? (imdbPoster(item.imdbId) || placeholderPoster())
         : makeSportsThumbUrl(options.baseUrl, { ...item, publishDate: item.pubDate || item.publishDate || '', sportHint: resolvedSportHint }))
     const backgroundUrl = sportsArtwork?.backgroundImage || posterUrl
+    const carriedPosterUrl = sportsArtwork?.poster || sportsArtwork?.image || posterUrl
 
     return {
       id: encodeCustomId({
@@ -596,7 +597,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
         o: parsedSportsEvent?.homeTeam || '',
         w: parsedSportsEvent?.awayTeam || '',
         v: String(sportsArtwork?.eventId || '').trim(),
-        a: sportsArtwork?.poster || sportsArtwork?.image || posterUrl || '',
+        a: carriedPosterUrl || '',
         b: backgroundUrl
       }, {
         compress: true,

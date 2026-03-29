@@ -22,6 +22,7 @@ const localConfigPath = path.join(runtimeDir, 'local-config.json')
 const appIconPath = path.join(__dirname, 'assets', 'logo.ico')
 const WINDOW_WIDTH = 920
 const WINDOW_HEIGHT = 660
+const MIN_SPLASH_MS = Math.max(1500, parseInt(process.env.PVTKRRX_MIN_SPLASH_MS || '2600', 10) || 2600)
 const PROVISION_ONLY_ARG = '--pvtkrrx-provision-only'
 const NETWORK_ACCESS_ONLY_ARG = '--pvtkrrx-network-access-only'
 const provisionOnlyMode = process.argv.includes(PROVISION_ONLY_ARG)
@@ -331,6 +332,7 @@ let lastHeartbeatSuccessAt = 0
 let stremioLaunchWatchTimer = null
 let stremioWasRunning = false
 let stremioLaunchWatchFailureCount = 0
+let splashShownAt = 0
 
 function getLocalInstallUrls() {
   const httpsPort = parseInt(process.env.HTTPS_PORT || '7001', 10)
@@ -445,6 +447,10 @@ async function waitForServerReady(checkPort = port, timeoutMs = 20000) {
     await new Promise(r => setTimeout(r, 400))
   }
   return false
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, Math.max(0, Number(ms) || 0)))
 }
 
 async function getLocalConfig() {
@@ -715,23 +721,65 @@ function pushStatus() {
   })
 }
 
+function bringWindowToFront(targetWindow) {
+  if (!targetWindow || targetWindow.isDestroyed()) return
+  try { targetWindow.show() } catch (_) {}
+  try { targetWindow.moveTop() } catch (_) {}
+  try { targetWindow.focus() } catch (_) {}
+}
+
+function pinSplashToFront() {
+  if (!splashWindow || splashWindow.isDestroyed()) return
+  try {
+    splashWindow.setAlwaysOnTop(true, 'screen-saver', 1)
+  } catch (_) {
+    try { splashWindow.setAlwaysOnTop(true) } catch (_) {}
+  }
+  try { splashWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true }) } catch (_) {}
+  bringWindowToFront(splashWindow)
+}
+
 function createSplashWindow() {
+  splashShownAt = Date.now()
   splashWindow = new BrowserWindow({
     width: WINDOW_WIDTH,
     height: WINDOW_HEIGHT,
     frame: false,
     resizable: false,
+    movable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
     transparent: false,
     backgroundColor: '#000000',
     icon: appIconPath,
     show: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    autoHideMenuBar: true,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false
     }
   })
 
+  splashWindow.once('ready-to-show', () => {
+    pinSplashToFront()
+  })
+  splashWindow.webContents.once('did-finish-load', () => {
+    pinSplashToFront()
+  })
+  splashWindow.on('blur', () => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      setTimeout(() => {
+        pinSplashToFront()
+      }, 60)
+    }
+  })
   splashWindow.loadFile(path.join(__dirname, 'splash.html'))
+  setTimeout(() => {
+    pinSplashToFront()
+  }, 100)
 }
 
 // Window size is fixed at creation — no runtime resizing.
@@ -762,9 +810,19 @@ function createMainWindow() {
   })
 }
 
-function showMainAndCloseSplash() {
-  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.show()
-  if (splashWindow && !splashWindow.isDestroyed()) splashWindow.destroy()
+async function showMainAndCloseSplash() {
+  const elapsed = Date.now() - splashShownAt
+  const remaining = MIN_SPLASH_MS - elapsed
+  if (remaining > 0) await wait(remaining)
+
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    try { splashWindow.setAlwaysOnTop(false) } catch (_) {}
+    splashWindow.destroy()
+  }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.show()
+    bringWindowToFront(mainWindow)
+  }
 }
 
 function startAddonServer() {
@@ -882,9 +940,13 @@ function stopAddonServer() {
 }
 
 app.on('second-instance', () => {
+  if (splashWindow && !splashWindow.isDestroyed()) {
+    pinSplashToFront()
+    return
+  }
   if (mainWindow && !mainWindow.isDestroyed()) {
     if (mainWindow.isMinimized()) mainWindow.restore()
-    mainWindow.focus()
+    bringWindowToFront(mainWindow)
   }
 })
 
@@ -920,7 +982,7 @@ app.whenReady().then(async () => {
   }
   running = await isServerReachable(port)
   pushStatus()
-  showMainAndCloseSplash()
+  await showMainAndCloseSplash()
   startLanPairHeartbeatLoop()
   startStremioLaunchWatch()
 

@@ -49,6 +49,7 @@ function testParserAndLeagueMap() {
 async function testStructuredFallbackToFuzzyLookup() {
   const client = new SportsDbClient('smoke-key', { cacheHours: 1 })
   const poster = 'https://example.com/poster.jpg'
+  const landscape = 'https://example.com/thumb.jpg'
   const background = 'https://example.com/background.jpg'
 
   client.findEventByStructuredData = async () => null
@@ -60,11 +61,14 @@ async function testStructuredFallbackToFuzzyLookup() {
     strLeague: 'English Premier League',
     strHomeTeam: 'North London Blue',
     strAwayTeam: 'West London Red',
-    strThumb: poster
+    strPoster: poster,
+    strThumb: landscape,
+    strBanner: background
   }]
   client._fetchEventsByDate = async () => []
   client._fetchTvEventsByDate = async () => []
-  client._resolveFallbackImage = async (_event, prefer) => (prefer === 'background' ? background : poster)
+  client._lookupLeague = async () => null
+  client._lookupTeam = async () => null
 
   const artwork = await client.getEventArtwork({
     title: 'EPL.2026.03.18.North.London.Blue.vs.West.London.Red.1080p.HDTV.x264-SMOKE',
@@ -78,6 +82,8 @@ async function testStructuredFallbackToFuzzyLookup() {
   assert.ok(artwork, 'expected fuzzy fallback artwork after structured miss')
   assert.equal(artwork.source, 'thesportsdb')
   assert.equal(artwork.poster, poster)
+  assert.equal(artwork.landscapeImage, landscape)
+  assert.equal(artwork.image, landscape)
   assert.equal(artwork.backgroundImage, background)
 }
 
@@ -105,7 +111,15 @@ async function testOrderAgnosticSportsGrouping() {
 
   class FakeSportsDbClient {
     async getEventArtwork() {
-      return null
+      return {
+        poster: 'https://example.com/portrait.jpg',
+        landscapeImage: 'https://example.com/landscape.jpg',
+        backgroundImage: 'https://example.com/background.jpg',
+        image: 'https://example.com/landscape.jpg',
+        eventId: 'sports-event-1',
+        eventDate: '2026-03-15',
+        league: 'English Premier League'
+      }
     }
   }
 
@@ -129,6 +143,8 @@ async function testOrderAgnosticSportsGrouping() {
 
   assert.equal(result.metas.length, 1, 'expected reversed team order to dedupe into one sports meta')
   assert.ok(result.metas[0].id.length < 256, 'expected sports meta id to stay under common Stremio client limits')
+  assert.equal(result.metas[0].poster, 'https://example.com/landscape.jpg', 'expected sports catalog to prefer landscape artwork')
+  assert.equal(result.metas[0].background, 'https://example.com/background.jpg')
   const decoded = decodeCustomId(result.metas[0].id)
   assert.equal(decoded.k, 'sports')
   assert.ok(
