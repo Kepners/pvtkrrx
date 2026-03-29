@@ -56,22 +56,24 @@ function request(port, reqPath) {
 
 async function run() {
   const hash = 'c1287d13aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+  const payload = Buffer.from('smoke playback bytes', 'utf8')
   const torrent = {
     hash,
     name: 'UFC Fight Night 270 Main Card 21 03 26 Z3R0 1080p',
     progress: 1,
     seq_dl: true,
     f_l_piece_prio: false,
-    save_path: 'C:\\downloads',
-    download_path: 'C:\\downloads',
+    save_path: runtimeDir,
+    download_path: runtimeDir,
     content_path: ''
   }
   const file = {
-    name: 'UFC.Fight.Night.270.Main.Card.1080p.mkv',
-    size: 4_000_000_000,
+    name: 'UFC.Fight.Night.270.Main.Card.1080p.mp4',
+    size: payload.length,
     progress: 1,
     index: 0
   }
+  fs.writeFileSync(path.join(runtimeDir, file.name), payload)
 
   QBitClient.prototype.torrentsByHashes = async () => [torrent]
   QBitClient.prototype.files = async () => [file]
@@ -96,6 +98,10 @@ async function run() {
     const response = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(playbackToken)}`)
     assert.equal(response.status, 302, 'completed playback should redirect instead of crashing')
     assert.match(String(response.headers.location || ''), new RegExp(`/${configToken}/file/`), 'playback redirect should target the shared file route')
+    const fileResponse = await request(server.address().port, String(response.headers.location || ''))
+    assert.equal(fileResponse.status, 200, 'file route should serve the completed local file')
+    assert.equal(fileResponse.text, payload.toString('utf8'))
+    assert.equal(String(fileResponse.headers['content-type'] || ''), 'video/mp4')
   } finally {
     await new Promise(resolve => server.close(resolve))
     restoreMocks()

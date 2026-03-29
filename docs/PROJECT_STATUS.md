@@ -10,7 +10,7 @@ The practical reading of the project today is:
 
 - `PC Local` is the real host-desktop route and is working
 - `LAN Bridge` is the same-account home-device route and the host desktop should not use it for local browsing
-- completed-file playback on the local runtime is working again after the `/playback` route fix
+- completed-file playback on the local runtime is working again after the `/playback` and `/file` path fixes
 - the sports catalog artwork path now prefers landscape art for tiles when available
 - the Windows installer/build flow is reproducible again
 - the remaining work is real-device coverage and performance tuning, not a reset/rebuild
@@ -20,7 +20,7 @@ The practical reading of the project today is:
 These items are verified in the current workspace or by direct client/log proof:
 
 - `npm run smoke:config` passed on 2026-03-29
-- `npm run smoke:playback` passed on 2026-03-29
+- `npm run smoke:playback` passed on 2026-03-29 and now covers redirect plus byte-serving on the shared `/file` route
 - `npm run smoke:pipeline` passed on 2026-03-29
 - `npm run smoke:sports` passed on 2026-03-29
 - `npm run dist:win` passed on 2026-03-29
@@ -38,8 +38,8 @@ These items are verified in the current workspace or by direct client/log proof:
    - Root cause: the host Windows PC was using the hosted `LAN Bridge` route instead of `PC Local`.
    - Fix: keep `LAN Bridge` for the other home devices and use `PC Local` on the host desktop.
 2. Playback error on a fully downloaded file:
-   - Root cause: `/playback` crashed with `isCompletedTorrent is not defined`.
-   - Fix: restored the completion-state helper and re-covered the route with `smoke:playback`.
+   - Root cause: first `/playback` crashed with `isCompletedTorrent is not defined`, and after that was fixed the redirected `/file` route still crashed because `fs` was not imported in `index.js`.
+   - Fix: restored the completion-state helper, re-imported `fs` for the built-in file server, and re-covered the route with a smoke test that follows playback redirect all the way into served bytes.
 3. Windows installer build failure:
    - Root cause: `electron-builder`/`rcedit` was failing when writing EXE metadata directly inside the OneDrive-backed repo output folder.
    - Fix: build in temp first, then copy/archive back into `dist/`.
