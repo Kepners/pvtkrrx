@@ -36,6 +36,22 @@ function loadCatalogWithStubs(stubs) {
   }
 }
 
+async function withSportsDbPrototypePatches(patches, run) {
+  const originals = new Map()
+  for (const [name, impl] of Object.entries(patches || {})) {
+    originals.set(name, SportsDbClient.prototype[name])
+    SportsDbClient.prototype[name] = impl
+  }
+
+  try {
+    return await run()
+  } finally {
+    for (const [name, original] of originals.entries()) {
+      SportsDbClient.prototype[name] = original
+    }
+  }
+}
+
 function testCacheHeadersIncludeStaleIfError() {
   const headers = {}
   const res = {
@@ -554,6 +570,55 @@ async function testArtworkFallbackBehavior() {
   assert.deepEqual(result.meta.genres, ['MMA', 'UFC'], 'expected MMA + UFC genres')
 }
 
+async function testCompactSportsIdMetaArtwork() {
+  // This test exercises the REAL production path: compact: 'sports' strips
+  // artwork URLs (a/b/z) from the custom ID, so the meta handler must rely
+  // on TheSportsDB lookups (via carried eventId/league/date) or fallbacks.
+  const { handleMeta } = require('../src/handlers/meta')
+
+  // Encode exactly like catalog.js does: compact + compress strips artwork URLs
+  const id = encodeCustomId({
+    y: 'movie',
+    k: 'sports',
+    n: 'Arsenal vs Chelsea',
+    t: 'EPL.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-A',
+    s: 1_000_000_000,
+    d: 20,
+    p: '2026-03-15T09:00:00Z',
+    r: 'football',
+    e: '2026-03-15',
+    g: 'English Premier League',
+    v: '9999999',
+    // These are stripped by compact: 'sports':
+    a: 'https://example.com/should-be-stripped.jpg',
+    b: 'https://example.com/should-be-stripped-bg.jpg',
+    z: 'https://example.com/should-be-stripped-logo.png'
+  }, {
+    compress: true,
+    compact: 'sports'
+  })
+
+  // Verify compact stripped the artwork URLs
+  const decoded = decodeCustomId(id)
+  assert.ok(!decoded.a, 'compact should strip poster URL from ID')
+  assert.ok(!decoded.b, 'compact should strip background URL from ID')
+  assert.ok(!decoded.z, 'compact should strip logo URL from ID')
+  assert.equal(decoded.e, '2026-03-15', 'compact should carry eventDate')
+  assert.equal(decoded.g, 'English Premier League', 'compact should carry league')
+  assert.equal(decoded.v, '9999999', 'compact should carry eventId')
+
+  // Call meta with the compact ID — no real SportsDB API key, so the
+  // external lookup will fail. This verifies the fallback path.
+  const result = await handleMeta({}, 'movie', id, { baseUrl: 'http://127.0.0.1:7000' })
+  assert.ok(result.meta, 'compact sports meta should still return a meta object')
+  assert.equal(result.meta.name, 'Arsenal vs Chelsea')
+  assert.ok(result.meta.poster, 'compact sports meta should have a poster fallback (SVG thumb or brand)')
+  assert.ok(result.meta.background, 'compact sports meta should have a background fallback')
+  assert.ok(result.meta.logo, 'compact sports meta should have a logo fallback')
+  assert.deepEqual(result.meta.genres, ['Football', 'English Premier League'])
+  assert.equal(result.meta.releaseInfo, '2026-03-15')
+}
+
 async function main() {
   try {
     testCacheHeadersIncludeStaleIfError()
@@ -569,6 +634,7 @@ async function main() {
     await testSportsMetaIncludesGenres()
     await testSportsMetaRichDescription()
     await testArtworkFallbackBehavior()
+    await testCompactSportsIdMetaArtwork()
     console.log('Smoke sports structured flow passed')
   } finally {
     fs.rmSync(runtimeDir, { recursive: true, force: true })

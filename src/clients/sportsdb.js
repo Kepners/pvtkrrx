@@ -11,7 +11,7 @@ const DEFAULT_API_KEY = '123'
 const DEFAULT_TIMEOUT_MS = 8000
 const PERSIST_FILE_NAME = 'sportsdb-poster-cache.json'
 const PERSIST_MAX_ENTRIES = 5000
-const CACHE_KEY_VERSION = 'v4'
+const CACHE_KEY_VERSION = 'v5'
 const RATE_LIMIT_COOLDOWN_MS = 10 * 60 * 1000
 const DEFAULT_ARTWORK_CACHE_HOURS = 24
 const DEFAULT_MISS_CACHE_HOURS = 6
@@ -24,6 +24,8 @@ const leagueCache = new Map()
 const teamCache = new Map()
 const eventCache = new Map()
 const eventInFlight = new Map()
+const eventLookupCache = new Map()
+const eventLookupInFlight = new Map()
 const endpointCache = new Map()
 const endpointInFlight = new Map()
 const leaguesBySportCache = new Map()
@@ -86,8 +88,9 @@ function hydratePersistentCache() {
   }
 }
 
-function persistResolvedPoster(key, value, expiresAt) {
+function persistResolvedArtwork(key, value, expiresAt) {
   if (!key || !value || !Number.isFinite(expiresAt)) return
+  cache.set(key, { value, expiresAt })
   persistentStore.set(key, { value, expiresAt })
   schedulePersistFlush()
 }
@@ -690,6 +693,38 @@ function cacheKey(apiKey, title, publishDate, eventId = '', sportHint = '', stru
   return `${CACHE_KEY_VERSION}|${String(apiKey || '').trim().toLowerCase()}|${String(eventId || '').trim().toLowerCase()}|${normalizeToken(title)}|${String(publishDate || '').slice(0, 10)}|${normalizeToken(sportHint)}|${structuredFingerprint(structuredEvent)}`
 }
 
+function eventArtworkCacheKey(apiKey, eventId = '') {
+  const normalizedEventId = String(eventId || '').trim().toLowerCase()
+  if (!normalizedEventId) return ''
+  return `${CACHE_KEY_VERSION}|event-artwork|${String(apiKey || '').trim().toLowerCase()}|${normalizedEventId}`
+}
+
+function leagueArtworkCacheKey(apiKey, league = '', date = '', sportHint = '') {
+  const normalizedLeague = normalizeLeagueName(league) || normalizeToken(league)
+  const normalizedDate = String(date || '').slice(0, 10)
+  const normalizedSport = normalizeToken(sportHint)
+  if (!normalizedLeague && !normalizedDate && !normalizedSport) return ''
+  return `${CACHE_KEY_VERSION}|league-artwork|${String(apiKey || '').trim().toLowerCase()}|${normalizedLeague}|${normalizedDate}|${normalizedSport}`
+}
+
+function persistResolvedArtworkVariants(primaryKey, value, expiresAt, options = {}) {
+  if (!value || !Number.isFinite(expiresAt)) return
+
+  if (primaryKey) persistResolvedArtwork(primaryKey, value, expiresAt)
+
+  const apiKey = String(options.apiKey || '').trim()
+  const eventKey = eventArtworkCacheKey(apiKey, options.eventId || value?.eventId)
+  if (eventKey) persistResolvedArtwork(eventKey, value, expiresAt)
+
+  const leagueKey = leagueArtworkCacheKey(
+    apiKey,
+    options.league || value?.league || '',
+    options.dateHint || value?.eventDate || '',
+    options.sportHint || value?.sport || ''
+  )
+  if (leagueKey) persistResolvedArtwork(leagueKey, value, expiresAt)
+}
+
 function scoreLeague(league, title, titleSport) {
   const leagueText = [
     league?.strLeague,
@@ -926,6 +961,39 @@ class SportsDbClient {
     }
   }
 
+  async _lookupEvent(idEvent) {
+    const key = String(idEvent || '').trim()
+    if (!key) return null
+    const hit = getCachedValue(eventLookupCache, key)
+    if (hit !== undefined) return hit || null
+
+    const ongoing = eventLookupInFlight.get(key)
+    if (ongoing) return ongoing
+
+    const pending = (async () => {
+      try {
+        const url = `${BASE_URL}/${encodeURIComponent(this.apiKey)}/lookupevent.php?id=${encodeURIComponent(key)}`
+        const res = await fetch(url, { signal: AbortSignal.timeout(this.timeoutMs) })
+        if (!res.ok) {
+          setCachedValue(eventLookupCache, key, null, this.missTtlMs)
+          return null
+        }
+        const data = await res.json()
+        const event = Array.isArray(data?.events) ? data.events[0] : null
+        setCachedValue(eventLookupCache, key, event || null, event ? this.artworkHitTtlMs : this.missTtlMs)
+        return event || null
+      } catch (_) {
+        setCachedValue(eventLookupCache, key, null, this.missTtlMs)
+        return null
+      } finally {
+        eventLookupInFlight.delete(key)
+      }
+    })()
+
+    eventLookupInFlight.set(key, pending)
+    return pending
+  }
+
   async _lookupTeam(idTeam) {
     const key = String(idTeam || '').trim()
     if (!key) return null
@@ -1141,13 +1209,18 @@ class SportsDbClient {
     const structuredSportHint = structuredEvent ? sportKeyFromLeagueCode(structuredEvent.league) : ''
     const itemSportHint = String(item?.sportHint || item?.sport || structuredSportHint).trim().toLowerCase()
     const titleSport = itemSportHint || detectSport(title)
-    if (!title && !structuredEvent) return null
+    const requestedEventIdRaw = String(item?.eventId || '').trim()
+    const dateHint = structuredEvent?.date || extractDateHint(title, publishDate)
+    const mappedLeague = mapLeague(structuredEvent?.league || item?.league || item?.leagueCode || '') ||
+      normalizeSpace(item?.league || structuredEvent?.league || item?.leagueCode || '')
+    const sportHint = sportsDbNameForSportKey(titleSport || structuredSportHint)
+    if (!title && !structuredEvent && !requestedEventIdRaw && !mappedLeague) return null
 
     const key = cacheKey(
       this.apiKey,
       title,
       publishDate,
-      String(item?.eventId || '').trim(),
+      requestedEventIdRaw,
       titleSport,
       structuredEvent
     )
@@ -1155,14 +1228,51 @@ class SportsDbClient {
     const hit = cache.get(key)
     if (hit && hit.expiresAt > now) return hit.value
 
+    const eventArtHit = getCachedValue(cache, eventArtworkCacheKey(this.apiKey, requestedEventIdRaw))
+    if (eventArtHit !== undefined) return eventArtHit || null
+
+    const leagueArtHit = getCachedValue(
+      cache,
+      leagueArtworkCacheKey(this.apiKey, mappedLeague, dateHint, sportHint || titleSport || structuredSportHint)
+    )
+    if (leagueArtHit !== undefined) return leagueArtHit || null
+
     const ongoing = inFlight.get(key)
     if (ongoing) return ongoing
 
     const pending = (async () => {
       try {
-        const dateHint = structuredEvent?.date || extractDateHint(title, publishDate)
-        const mappedLeague = mapLeague(structuredEvent?.league || '') || String(structuredEvent?.league || '').trim()
-        const sportHint = sportsDbNameForSportKey(titleSport || structuredSportHint)
+        const rememberArtwork = (value, expiresAt, overrides = {}) => {
+          persistResolvedArtworkVariants(key, value, expiresAt, {
+            apiKey: this.apiKey,
+            eventId: overrides.eventId || requestedEventIdRaw || value?.eventId,
+            league: overrides.league || value?.league || mappedLeague,
+            dateHint: overrides.dateHint || value?.eventDate || dateHint,
+            sportHint: overrides.sportHint || value?.sport || sportHint || titleSport || structuredSportHint
+          })
+        }
+
+        // Fast path: direct event lookup by ID (skips title parsing entirely).
+        // The catalog resolves eventId during artwork lookup and carries it in
+        // the compact custom ID, so the meta handler can reuse it here for a
+        // single-request hit instead of the multi-query title-based search.
+        if (requestedEventIdRaw) {
+          const directEvent = await this._lookupEvent(requestedEventIdRaw)
+          if (directEvent) {
+            const directPoster = await this._resolveFallbackImage(directEvent, 'poster')
+            const directLandscape = await this._resolveFallbackImage(directEvent, 'landscape') || directPoster
+            const directBackground = await this._resolveFallbackImage(directEvent, 'background') || directLandscape || directPoster
+            const directLogo = await this._resolveFallbackLogo(directEvent)
+            const directValue = buildArtworkValue(directEvent, directPoster, directLandscape, directBackground, directLogo, 'thesportsdb-direct')
+            if (directValue) {
+              const expiresAt = Date.now() + this.artworkHitTtlMs
+              cache.set(key, { value: directValue, expiresAt })
+              rememberArtwork(directValue, expiresAt)
+              return directValue
+            }
+          }
+        }
+
         const queries = buildCandidateQueries(title)
         if (queries.length === 0 && !(structuredEvent || (dateHint && sportHint))) {
           cache.set(key, { value: null, expiresAt: now + this.missTtlMs })
@@ -1186,7 +1296,7 @@ class SportsDbClient {
           if (structuredValue) {
             const expiresAt = Date.now() + this.artworkHitTtlMs
             cache.set(key, { value: structuredValue, expiresAt })
-            persistResolvedPoster(key, structuredValue, expiresAt)
+            rememberArtwork(structuredValue, expiresAt)
             return structuredValue
           }
         }
@@ -1219,7 +1329,7 @@ class SportsDbClient {
           if (leagueValue) {
             const expiresAt = Date.now() + this.artworkHitTtlMs
             cache.set(key, { value: leagueValue, expiresAt })
-            persistResolvedPoster(key, leagueValue, expiresAt)
+            rememberArtwork(leagueValue, expiresAt)
             return leagueValue
           }
           cache.set(key, { value: null, expiresAt: Date.now() + this.missTtlMs })
@@ -1249,7 +1359,7 @@ class SportsDbClient {
           if (leagueValue) {
             const expiresAt = Date.now() + this.artworkHitTtlMs
             cache.set(key, { value: leagueValue, expiresAt })
-            persistResolvedPoster(key, leagueValue, expiresAt)
+            rememberArtwork(leagueValue, expiresAt)
             return leagueValue
           }
           cache.set(key, { value: null, expiresAt: Date.now() + this.missTtlMs })
@@ -1259,7 +1369,7 @@ class SportsDbClient {
         const value = buildArtworkValue(best, posterImage, landscapeImage, backgroundImage, logoImage, 'thesportsdb')
         const expiresAt = Date.now() + this.artworkHitTtlMs
         cache.set(key, { value, expiresAt })
-        persistResolvedPoster(key, value, expiresAt)
+        rememberArtwork(value, expiresAt)
         return value
       } catch (_) {
         cache.set(key, { value: null, expiresAt: Date.now() + this.missTtlMs })
