@@ -58,10 +58,9 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 
 ## Content Model
 
-- Top-level addon types remain `movie`, `series`, and `tv`.
-- Sports stays under the `movie` surface for Stremio compatibility.
-- A true top-level `sports` type is not currently a supported Stremio addon content type in the official SDK docs, which still document `movie`, `series`, `channel`, and `tv` as the supported surfaces. Until Stremio adds native sports-type support, the correct dynamic implementation is to keep sports under the supported movie/catalog surface and improve identity, artwork, and metadata there instead of faking a custom first-column type.
-- Sports discovery is no longer one generic catalog plus broad sport-type genre filters. The movie surface now leads with an `All Sports` catalog followed by sport-family catalogs such as `Football`, `Motorsport`, `MMA`, `American Football`, and others, so sport selection happens in Stremio's catalog column first.
+- Top-level addon types are `movie`, `series`, and `sports`.
+- Sports now uses its own top-level `sports` surface instead of being hidden under `movie`.
+- Sports discovery is no longer one generic catalog plus broad sport-type genre filters. The sports surface now leads with an `All Sports` catalog followed by sport-family catalogs such as `Football`, `Motorsport`, `MMA`, `American Football`, and others, so sport selection happens in Stremio's type picker and catalog column first.
 - Sport-family catalogs keep the third-column `genre` dropdown for narrower league/team-style filters such as `Premier League`, `Arsenal`, `Formula 1`, `UFC`, or `NBA`.
 - Sports artwork can now carry three distinct shapes from TheSportsDB:
   - `poster`
@@ -75,6 +74,7 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 - Sports catalog grouping uses structured event keys for both vs and non-vs titles, so different quality variants of the same event collapse into one tile.
 - Sports detail pages now carry richer metadata: league, date, event name, sport type label, and multi-line descriptions instead of flat stat lines.
 - Library and sports items use internal `pvtkrrx:` custom ids inside Stremio responses.
+- Installed route manifests keep the plain addon name `PVTKRRX`; route identity now lives in the manifest `id` and description so Stremio source grouping stays consistent.
 - There is no standalone `.pvtk` file format in this repository.
 
 ## Playback Model
@@ -83,6 +83,7 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 - Hosted `/file` and `/playback` return 403 on the Vercel-hosted relay for non-local requests.
 - `LAN Bridge` requests 307-redirect to the host's local runtime before hitting `/file` or `/playback`, so after redirect all local playback capabilities apply.
 - Local `/file` serves bytes with HTTP Range support when the file is locally accessible on disk.
+- Local `/file` can continue serving a known absolute local file path even after qBittorrent no longer reports the torrent row, as long as the file still exists on disk.
 - Local `/playback` is the queued-download path for tracker content that is not yet ready. It fetches the `.torrent` payload, adds it to qBittorrent, polls for readiness, and 302-redirects to `/file` when the file is playable.
 - Completed-file playback correctly checks torrent completion state before redirecting into `/file`.
 - Packed RAR releases (`.rar/.r00/.r01/...`):

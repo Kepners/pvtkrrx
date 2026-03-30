@@ -1131,21 +1131,45 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
     console.log(`[file-route] hash=${String(h || '').slice(0, 8)} hasPath=${Boolean(p)}`)
     const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
     const playback = await loadTorrentPlaybackState(qbit, String(h || '').toLowerCase(), p, req.config.additionalStorageRoots)
+    let isOrphanFile = false
+    let orphanFileStat = null
+
     if (!playback?.torrent) {
-      console.warn(`[file-route] torrent not found hash=${String(h || '').slice(0, 8)}`)
-      return res.status(404).json({ error: 'Torrent not found' })
+      const absoluteTokenPath = path.isAbsolute(p) ? path.normalize(p) : ''
+      if (!absoluteTokenPath || !fs.existsSync(absoluteTokenPath)) {
+        console.warn(`[file-route] torrent not found hash=${String(h || '').slice(0, 8)}`)
+        return res.status(404).json({ error: 'Torrent not found' })
+      }
+      orphanFileStat = fs.statSync(absoluteTokenPath)
+      if (!orphanFileStat?.isFile()) {
+        console.warn(`[file-route] orphan path is not a file hash=${String(h || '').slice(0, 8)}`)
+        return res.status(404).json({ error: 'File not found' })
+      }
+      isOrphanFile = true
     }
 
-    const { torrent, files, file, resolvedFilePath } = playback
+    const torrent = playback?.torrent || { hash: h, progress: 1 }
+    const files = playback?.files || []
+    let file = playback?.file || null
+    const resolvedFilePath = playback?.resolvedFilePath || (isOrphanFile ? path.normalize(p) : '')
     const torrentHash = String(torrent?.hash || h || '').toLowerCase()
+    if (!file && isOrphanFile) {
+      file = {
+        name: path.basename(path.normalize(p)),
+        size: Number(orphanFileStat?.size || 0),
+        progress: 1
+      }
+    }
     if (!file) {
       const errMsg = playback.packedArchive
         ? 'Packed archive release detected (RAR) with no direct video file. Choose a WEB-DL/REMUX source.'
         : 'No playable video file found in torrent.'
       return res.status(422).json({ error: errMsg })
     }
-    await primeTorrentForStreaming(qbit, torrent, file, files)
-    if (!playback.fileExists || !resolvedFilePath) {
+    if (!isOrphanFile) {
+      await primeTorrentForStreaming(qbit, torrent, file, files)
+    }
+    if ((!isOrphanFile && !playback.fileExists) || !resolvedFilePath) {
       console.warn('[file-route] file not found on disk')
       return res.status(425).json({
         error: 'Buffering torrent metadata',
@@ -1153,9 +1177,9 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
       })
     }
 
-    let fileSize = Math.max(0, Number(file?.size || playback.diskSize || 0))
-    let readableBytes = Number(playback.readableBytes || 0)
-    let isComplete = Number(file?.progress || torrent.progress || 0) >= 0.999
+    let fileSize = Math.max(0, Number(file?.size || playback?.diskSize || orphanFileStat?.size || 0))
+    let readableBytes = isOrphanFile ? fileSize : Number(playback.readableBytes || 0)
+    let isComplete = isOrphanFile || Number(file?.progress || torrent.progress || 0) >= 0.999
 
     const ext = path.extname(resolvedFilePath).toLowerCase()
     const mime = { '.mp4': 'video/mp4', '.mkv': 'video/x-matroska', '.avi': 'video/x-msvideo', '.wmv': 'video/x-ms-wmv', '.ts': 'video/mp2t', '.m4v': 'video/x-m4v' }
@@ -1190,7 +1214,7 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
       if (!Number.isFinite(start) || start < 0 || start >= maxReadable) {
         // Stremio can request ranges ahead of currently downloaded bytes.
         // Avoid immediate hard failure: wait briefly for the needed range.
-        if (!isComplete && Number.isFinite(start) && start >= 0) {
+        if (!isComplete && !isOrphanFile && Number.isFinite(start) && start >= 0) {
           const waitUntil = Date.now() + STREAM_RANGE_WAIT_TIMEOUT_MS
           while (Date.now() < waitUntil && start >= maxReadable) {
             await sleep(STREAM_RANGE_WAIT_INTERVAL_MS)
@@ -1223,7 +1247,7 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
         return res.sendStatus(416)
       }
 
-      if (isComplete && fileSize > 0) {
+      if (isComplete && fileSize > 0 && !isOrphanFile) {
         const watchedRatio = (end + 1) / fileSize
         if (watchedRatio >= WATCHED_DELETE_THRESHOLD) {
           scheduleWatchedCleanup(req.config, torrentHash, `range-${Math.round(watchedRatio * 100)}pct`)

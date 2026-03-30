@@ -110,7 +110,9 @@ function buildPlaybackFileUrl(config, configToken, baseUrl, hash, torrent, fileN
 
   try {
     const { encodeFileStateToken } = require('./opaqueState')
-    const info = encodeFileStateToken({ h: String(hash || '').toLowerCase(), p: fileName })
+    const currentFilePath = resolveCurrentFilePath(torrent, fileName, options)
+    const tokenPath = currentFilePath || String(fileName || '')
+    const info = encodeFileStateToken({ h: String(hash || '').toLowerCase(), p: tokenPath })
     return `${baseUrl}/${configToken}/file/${info}`
   } catch (_) {
     return null

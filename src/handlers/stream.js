@@ -1,3 +1,5 @@
+const fs = require('fs')
+const path = require('path')
 const { ProwlarrClient } = require('../clients/prowlarr')
 const { QBitClient } = require('../clients/qbittorrent')
 const { CinemetaClient } = require('../clients/cinemeta')
@@ -6,7 +8,7 @@ const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { parse, matchesEpisode, isLikelyPackedReleaseTitle, cleanTitle } = require('../utils/parser')
 const { isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { buildOnSeedboxStream, buildOnBufferingStream, buildOnArchiveStream, buildOnTrackerStream, buildInfoStream, findVideoFile, findPackedArchiveFiles, arePackedArchiveFilesReady, findEpisodeFile, sortStreams } = require('../utils/streams')
-const { encodePlaybackStateToken } = require('../utils/opaqueState')
+const { encodePlaybackStateToken, encodeFileStateToken } = require('../utils/opaqueState')
 const { parseSportsTitle } = require('../utils/sportsTitleParser')
 const { buildPlaybackFileUrl, canEmitTrackerPlayback, getTrackerPlaybackRestriction } = require('../utils/fileServing')
 const { decodeCustomId } = require('../utils/customId')
@@ -34,6 +36,51 @@ function buildFileUrl(config, configToken, addonUrl, hash, torrent, fileName, op
 function buildConfigureHelpUrl(addonUrl, target = 'seedbox') {
   const base = String(addonUrl || '').replace(/\/+$/, '')
   return `${base}/configure?target=${encodeURIComponent(target)}`
+}
+
+function canServeBuiltinFileRoute(configToken) {
+  return String(configToken || '') === 'local' || !process.env.VERCEL
+}
+
+function buildDirectLocalFileUrl(addonUrl, configToken, hash, filePath) {
+  try {
+    const info = encodeFileStateToken({
+      h: String(hash || '').toLowerCase(),
+      p: filePath
+    })
+    return `${addonUrl}/${configToken}/file/${info}`
+  } catch (_) {
+    return null
+  }
+}
+
+function buildOrphanedCustomFileStream(config, configToken, addonUrl, info, parsed) {
+  if (!canServeBuiltinFileRoute(configToken)) return null
+
+  const infoHash = String(info?.h || '').toLowerCase()
+  const filePath = String(info?.f || '').trim()
+  if (!infoHash || !filePath || !path.isAbsolute(filePath)) return null
+  if (!fs.existsSync(filePath)) return null
+
+  let stat = null
+  try {
+    stat = fs.statSync(filePath)
+  } catch (_) {
+    return null
+  }
+  if (!stat?.isFile?.()) return null
+
+  const fileUrl = buildDirectLocalFileUrl(addonUrl, configToken, infoHash, filePath)
+  if (!fileUrl) return null
+
+  return buildOnSeedboxStream(
+    { title: info?.t, size: stat.size, seeders: info?.d || 0 },
+    fileUrl,
+    path.basename(filePath),
+    stat.size,
+    config,
+    parsed
+  )
 }
 
 async function inspectTrackerLink(link) {
@@ -759,6 +806,13 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
       }
     } catch (e) {
       console.error('[stream] custom file listing failed:', e.message)
+    }
+  }
+
+  if (streams.length === 0) {
+    const orphanedFileStream = buildOrphanedCustomFileStream(config, configToken, addonUrl, info, parsed)
+    if (orphanedFileStream) {
+      streams.push(orphanedFileStream)
     }
   }
 

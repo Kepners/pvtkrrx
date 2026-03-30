@@ -256,6 +256,7 @@ async function run() {
     const inferredPlaybackToken = encodePlaybackStateToken({ h: '', l: 'https://tracker.example/existing-without-hash.torrent' })
     const packedPlaybackToken = encodePlaybackStateToken({ h: packedHash })
     const archiveFileToken = encodeFileStateToken({ h: readyPackedHash, p: 'Release/release.rar' })
+    const orphanFileToken = encodeFileStateToken({ h: 'ffffffffffffffffffffffffffffffffffffffff', p: path.join(runtimeDir, file.name) })
 
     const response = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(playbackToken)}`)
     assert.equal(response.status, 302, 'completed playback should redirect instead of crashing')
@@ -283,6 +284,10 @@ async function run() {
     assert.equal(archiveFileResponse.status, 200, 'file route should serve completed archive parts for RAR streams')
     assert.equal(archiveFileResponse.text, archivePayload.toString('utf8'))
     assert.equal(String(archiveFileResponse.headers['content-type'] || ''), 'application/octet-stream')
+
+    const orphanFileResponse = await request(server.address().port, `/${configToken}/file/${encodeURIComponent(orphanFileToken)}`)
+    assert.equal(orphanFileResponse.status, 200, 'file route should still serve an absolute local file path when the qBit torrent row no longer exists')
+    assert.equal(orphanFileResponse.text, payload.toString('utf8'))
   } finally {
     await new Promise(resolve => server.close(resolve))
     restoreMocks()

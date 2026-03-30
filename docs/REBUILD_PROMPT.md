@@ -69,7 +69,7 @@ Non-negotiable protocol and product rules:
 - hosted relay must never proxy video bytes
 - hosted /playback must fail fast or be suppressed when the hosted runtime cannot actually serve playback
 - remote buffering/file flows that would leak external file-server auth or depend on unprovable live file paths must be suppressed
-- sports must stay on the legacy movie catalog contract for Stremio compatibility
+- sports must stay on the dedicated top-level `sports` catalog contract so Stremio exposes a real Sports type instead of hiding it under Movie
 - sports/library custom ids use pvtkrrx: internally
 - there is no .pvtk file format in this repo
 - hosted config tokens must be encrypted

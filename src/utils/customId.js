@@ -29,17 +29,19 @@ function compactSportsPayload(payload = {}) {
 }
 
 function compactLibraryPayload(payload = {}) {
+  const displayTitle = String(payload.n || payload.t || '').trim()
   const compact = {
     y: String(payload.y || 'movie').trim() || 'movie',
-    t: String(payload.t || '').trim(),
-    n: String(payload.n || payload.t || '').trim(),
-    h: String(payload.h || '').trim(),
-    s: Number(payload.s || 0) || 0,
-    d: Number(payload.d || 0) || 0
+    t: displayTitle,
+    h: String(payload.h || '').trim()
   }
 
+  const seeders = Number(payload.d || 0) || 0
   const imdbId = String(payload.m || '').trim()
+  const filePath = String(payload.f || '').trim()
+  if (seeders > 0) compact.d = seeders
   if (imdbId) compact.m = imdbId
+  if (filePath) compact.f = filePath
   return compact
 }
 

@@ -4,7 +4,7 @@ Updated: 2026-03-30
 
 ## Current Stage
 
-PVTKRRX is in a working `1.1.16` state on the main Windows/local route set.
+PVTKRRX is in a working `1.1.17` state on the main Windows/local route set.
 
 The practical reading of the project today is:
 
@@ -24,7 +24,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - `npm run smoke:playback` passed on 2026-03-29 and now covers redirect plus byte-serving on the shared `/file` route
 - `npm run smoke:pipeline` passed on 2026-03-29
 - `npm run smoke:sports` passed on 2026-03-29
-- `npm run dist:win` passed on 2026-03-29 and again on 2026-03-30 for the `1.1.16` desktop release build
+- `npm run dist:win` passed on 2026-03-29, again on 2026-03-30 for the `1.1.16` desktop release build, and again on 2026-03-30 for the `1.1.17` bug-fix desktop release build
 - `npm run smoke:config`, `npm run smoke:desktop`, `npm run smoke:stremio-link`, `npm run smoke:lan-pair`, `npm run smoke:guards`, `npm run smoke:security`, `npm run smoke:pipeline`, `npm run smoke:playback`, and `npm run smoke:sports` all passed again on 2026-03-30
 - root `/manifest.json` returns the bootstrap manifest (`com.kepners.pvtkrrx.bootstrap`) with no catalogs/resources and `configurationRequired=true`
 - `PC Local` resolves as a real addon from `http://127.0.0.1:7000/local/manifest.json?mode=local`
@@ -43,7 +43,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - local `/playback` now fails fast for incomplete multi-volume RAR releases after queueing the torrent, instead of timing out behind a false progressive-playback promise
 - current configure flow exposes route-aware primary install links while keeping manual addon URLs as fallback, and the current `public/configure.html` flow passed the 2026-03-30 config/desktop/link smoke pass
 - the Stremio WebView2 client cache on this machine contains cached PVTKRRX stream responses with `PVTKRRX` in the stream `name`, confirming branded source labels are reaching the real client
-- `1.1.16` installers were built successfully into `dist/`
+- `1.1.17` installers were built successfully into `dist/`
 
 ## What We Fixed On 2026-03-28 And 2026-03-29
 
@@ -85,7 +85,7 @@ These items are verified in the current workspace or by direct client/log proof:
 
 These items should still be treated as open until captured on real clients:
 
-- second-device `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.16` desktop build
+- second-device `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.17` desktop build
 - Apple TV synced-addon flow after desktop/web install
 - one real public `Remote Seedbox` ready-file playback success on a remote client
 - one auth-protected external file-server playback success on a real Stremio client
@@ -141,6 +141,6 @@ These items should still be treated as open until captured on real clients:
 ## Recommended Next Work
 
 1. Tune qBittorrent for faster early playback and confirm stream start time improvements on real clients.
-2. Re-test `LAN Bridge` from a second device using the latest `1.1.16` build and record the exact device/client result.
+2. Re-test `LAN Bridge` from a second device using the latest `1.1.17` build and record the exact device/client result.
 3. Keep sports poster review focused on what Stremio clients actually render, not just what the metadata payload contains.
 4. Keep this file updated whenever a real device test changes the truth table.

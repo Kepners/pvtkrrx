@@ -1,4 +1,7 @@
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const os = require('node:os')
+const path = require('node:path')
 
 const { ProwlarrClient } = require('../src/clients/prowlarr')
 const { QBitClient } = require('../src/clients/qbittorrent')
@@ -154,7 +157,7 @@ function decodeOpaqueFilePath(url) {
 
 function customPackedId(overrides = {}) {
   return encodeCustomId({
-    y: 'movie',
+    y: 'sports',
     k: 'sports',
     t: 'SeriesX 2026 Event 03 Practice Two HLG 2160p WEB h265 VERUM',
     n: 'SeriesX Event 03 Practice 2',
@@ -230,6 +233,9 @@ async function withScenario(setup, run) {
 
 async function run() {
   const originalVercel = process.env.VERCEL
+  const orphanRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-stream-pipeline-'))
+  const orphanFilePath = path.join(orphanRoot, 'Downloaded.Movie.2026.1080p.mp4')
+  fs.writeFileSync(orphanFilePath, 'orphaned local file bytes', 'utf8')
 
   try {
     await withScenario(async () => {
@@ -375,6 +381,39 @@ async function run() {
       assert.equal(result.streams.length, 1, '#4b local buffering flow should remain intact')
       assert.match(String(result.streams[0]?.url || ''), /\/local\/file\//)
       assert.equal(String(result.streams[0]?.behaviorHints?.sourceMode || ''), 'buffering')
+    })
+
+    await withScenario(async () => {
+      delete process.env.VERCEL
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      ProwlarrClient.prototype.search = async () => []
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        encodeCustomId({
+          y: 'movie',
+          t: 'Downloaded Movie 2026 1080p',
+          n: 'Downloaded Movie',
+          h: matchedTorrent().hash,
+          s: 1234,
+          d: 0,
+          f: orphanFilePath
+        }, {
+          compress: true,
+          compact: 'library'
+        }),
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.filter(stream => /\/local\/file\//.test(String(stream?.url || ''))).length, 1, '#4ba orphaned local library items should still emit a direct file stream when the file exists on disk')
+      assert.equal(
+        decodeOpaqueFilePath(result.streams[0]?.url || ''),
+        orphanFilePath,
+        '#4ba orphaned local library stream should carry the absolute local file path in the opaque file token'
+      )
     })
 
     await withScenario(async () => {
@@ -623,6 +662,11 @@ async function run() {
 
       assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4j completed direct-video torrents without embedded hashes should resolve to the existing qBit torrent instead of falling back to tracker playback')
       assert.equal(result.streams.filter(stream => /\/file\//.test(String(stream?.url || ''))).length, 1, '#4j completed direct-video torrents without embedded hashes should emit the ready file stream')
+      assert.equal(
+        decodeOpaqueFilePath(result.streams[0]?.url || ''),
+        path.normalize('/downloads/incomplete/Sports.RS.2026.Home.Club.vs.Away.Club.720p.mp4'),
+        '#4j completed direct-video streams should carry the resolved absolute file path so playback survives if the torrent row disappears later'
+      )
       assert.ok(result.streams.every(stream => String(stream?.name || '').startsWith('PVTKRRX ') || !stream?.name), '#4j stream names should start with PVTKRRX so Stremio can group them under the addon source')
     })
 
@@ -667,6 +711,7 @@ async function run() {
     resetMocks()
     if (originalVercel === undefined) delete process.env.VERCEL
     else process.env.VERCEL = originalVercel
+    fs.rmSync(orphanRoot, { recursive: true, force: true })
   }
 }
 

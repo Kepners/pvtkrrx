@@ -1344,7 +1344,7 @@ function getManifest(req) {
     ...manifest,
     behaviorHints: { ...(manifest.behaviorHints || {}) },
     id: `com.kepners.pvtkrrx.${idSuffix}`,
-    name: `PVTKRRX (${nameLabel})`,
+    name: 'PVTKRRX',
     logo: logoUrl
   }
 
@@ -1355,7 +1355,17 @@ function getManifest(req) {
     }
   }
 
-  return nextManifest
+  if (profile === 'lan') {
+    return {
+      ...nextManifest,
+      description: 'LAN Bridge addon for your other home devices. Browse movies, TV, sports, and library, then redirect playback into the paired Windows host.'
+    }
+  }
+
+  return {
+    ...nextManifest,
+    description: 'Remote Seedbox addon for ready-file playback away from home. Browse movies, TV, sports, and library through your configured public file server.'
+  }
 }
 
 async function warmLocalProviders(config, logger = console, reason = 'boot') {

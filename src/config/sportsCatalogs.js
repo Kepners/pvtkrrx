@@ -136,7 +136,7 @@ function buildSportsCatalogExtra(detailOptions = []) {
 
 function buildSportsCatalogManifestEntries() {
   return SPORTS_DISCOVERY_CATALOGS.map((catalog) => ({
-    type: 'movie',
+    type: 'sports',
     id: catalog.id,
     name: catalog.name,
     extra: buildSportsCatalogExtra(catalog.detailOptions)

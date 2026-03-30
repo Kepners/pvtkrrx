@@ -57,14 +57,14 @@ function testCacheHeadersIncludeStaleIfError() {
 }
 
 function testSportsDiscoveryCatalogLayout() {
-  const movieCatalogIds = manifest.catalogs
-    .filter((catalog) => catalog?.type === 'movie')
+  const sportsCatalogIds = manifest.catalogs
+    .filter((catalog) => catalog?.type === 'sports')
     .map((catalog) => catalog?.id)
 
   assert.deepEqual(
-    movieCatalogIds.slice(0, 4),
+    sportsCatalogIds.slice(0, 4),
     ['pvtkrrx-sports', 'pvtkrrx-sports-football', 'pvtkrrx-sports-motorsport', 'pvtkrrx-sports-mma'],
-    'sports families should lead movie discovery catalogs'
+    'sports families should lead sports discovery catalogs'
   )
 
   const footballCatalog = findSportsDiscoveryCatalog('pvtkrrx-sports-football')
@@ -177,7 +177,7 @@ async function testOrderAgnosticSportsGrouping() {
       sportsDbApiKey: 'smoke-sports-key',
       maxResults: '10'
     },
-    'movie',
+    'sports',
     'pvtkrrx-sports',
     'search=Arsenal',
     { baseUrl: 'http://127.0.0.1:7000' }
@@ -253,7 +253,7 @@ async function testSportSpecificCatalogDetailFiltering() {
       sportsDbApiKey: 'smoke-sports-key',
       maxResults: '10'
     },
-    'movie',
+    'sports',
     'pvtkrrx-sports-football',
     'genre=Arsenal',
     { baseUrl: 'http://127.0.0.1:7000' }
@@ -275,9 +275,19 @@ async function testLibraryCustomIdsStayCompact() {
           name: 'UFC.Fight.Night.267.Strickland.vs.Hernandez.Prelims.1080p.WEB.h264-VERUM',
           hash: '6cd321a1334efb29eb8f4fc077adca70ce24cbb1',
           size: 8_110_701_419,
-          completion_on: 1
+          completion_on: 1,
+          content_path: '/media/UFC.Fight.Night.267.Strickland.vs.Hernandez.Prelims.1080p.WEB.h264-VERUM.mp4'
         }
       ]
+    }
+
+    async files() {
+      return [{
+        name: 'UFC.Fight.Night.267.Strickland.vs.Hernandez.Prelims.1080p.WEB.h264-VERUM.mp4',
+        size: 8_110_701_419,
+        progress: 1,
+        index: 0
+      }]
     }
   }
 
@@ -315,12 +325,13 @@ async function testLibraryCustomIdsStayCompact() {
   const decoded = decodeCustomId(result.metas[0].id)
   assert.equal(decoded.h, '6cd321a1334efb29eb8f4fc077adca70ce24cbb1')
   assert.equal(decoded.m, 'tt7512512')
+  assert.equal(decoded.f, path.normalize('/media/UFC.Fight.Night.267.Strickland.vs.Hernandez.Prelims.1080p.WEB.h264-VERUM.mp4'))
 }
 
 async function testSportsMetaIncludesGenres() {
   const { handleMeta } = require('../src/handlers/meta')
   const id = encodeCustomId({
-    y: 'movie',
+    y: 'sports',
     k: 'sports',
     n: 'Arsenal vs Chelsea',
     t: 'EPL.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-A',
@@ -336,10 +347,11 @@ async function testSportsMetaIncludesGenres() {
     compress: true
   })
 
-  const result = await handleMeta({}, 'movie', id, {
+  const result = await handleMeta({}, 'sports', id, {
     baseUrl: 'http://127.0.0.1:7000'
   })
 
+  assert.equal(result.meta.type, 'sports')
   assert.deepEqual(result.meta.genres, ['Football', 'English Premier League'])
   assert.equal(result.meta.releaseInfo, '2026-03-15')
 }
@@ -469,7 +481,7 @@ async function testEventTitleCatalogGrouping() {
       sportsDbApiKey: 'smoke-sports-key',
       maxResults: '10'
     },
-    'movie',
+    'sports',
     'pvtkrrx-sports',
     'genre=F1',
     { baseUrl: 'http://127.0.0.1:7000' }
@@ -486,7 +498,7 @@ async function testEventTitleCatalogGrouping() {
 async function testSportsMetaRichDescription() {
   const { handleMeta } = require('../src/handlers/meta')
   const id = encodeCustomId({
-    y: 'movie',
+    y: 'sports',
     k: 'sports',
     n: 'Formula 1 Japanese Grand Prix Qualifying',
     t: 'Formula1.2026.03.28.Japanese.Grand.Prix.Qualifying.1080p.WEB',
@@ -502,8 +514,9 @@ async function testSportsMetaRichDescription() {
     b: 'https://example.com/f1-bg.jpg'
   }, { compress: true })
 
-  const result = await handleMeta({}, 'movie', id, { baseUrl: 'http://127.0.0.1:7000' })
+  const result = await handleMeta({}, 'sports', id, { baseUrl: 'http://127.0.0.1:7000' })
   assert.ok(result.meta, 'expected meta to exist')
+  assert.equal(result.meta.type, 'sports')
   assert.ok(result.meta.description, 'expected non-empty description')
   assert.ok(result.meta.description.includes('Formula 1'), 'expected description to mention league')
   assert.ok(result.meta.genres.includes('Motorsport'), 'expected Motorsport genre')
@@ -517,7 +530,7 @@ async function testArtworkFallbackBehavior() {
   const { handleMeta } = require('../src/handlers/meta')
   // Sports entry with NO carried artwork — should fall back to SVG thumb
   const id = encodeCustomId({
-    y: 'movie',
+    y: 'sports',
     k: 'sports',
     n: 'UFC Fight Night 270 Main Card',
     t: 'UFC.Fight.Night.270.Main.Card.1080p.WEB',
@@ -529,8 +542,9 @@ async function testArtworkFallbackBehavior() {
     g: 'UFC'
   }, { compress: true })
 
-  const result = await handleMeta({}, 'movie', id, { baseUrl: 'http://127.0.0.1:7000' })
+  const result = await handleMeta({}, 'sports', id, { baseUrl: 'http://127.0.0.1:7000' })
   assert.ok(result.meta, 'expected meta to exist for UFC entry')
+  assert.equal(result.meta.type, 'sports')
   assert.ok(result.meta.poster, 'expected a poster fallback')
   assert.ok(result.meta.background, 'expected a background fallback')
   assert.ok(result.meta.description, 'expected non-empty description')

@@ -7,12 +7,13 @@ const { findSportsDiscoveryCatalog, getSportsSearchSeedTerms } = require('../con
 const { cleanTitle, isLikelyPackedReleaseTitle } = require('../utils/parser')
 const { normalizeSportKey, resolveSportHint, isSportsNoiseTitle, isLikelySportsEventTitle } = require('../utils/sportsRules')
 const { isSportsOnlyIndexer } = require('../utils/sportsIndexers')
-const { formatSize } = require('../utils/streams')
+const { formatSize, findVideoFile } = require('../utils/streams')
 const { makeSportsThumbUrl } = require('../utils/sportsThumb')
 const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
 const { mapLeague } = require('../utils/leagueMap')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { encodeCustomId } = require('../utils/customId')
+const { findExistingLocalFilePath } = require('../utils/localStorageRoots')
 
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 const cinemeta = new CinemetaClient()
@@ -854,6 +855,17 @@ async function libraryCatalog(config, extra) {
 
   const page = filtered.slice(skip, skip + limit)
   const metas = await mapLimit(page, 6, async (t) => {
+    let directVideoFilePath = ''
+    try {
+      const files = await qbit.files(t.hash)
+      const videoFile = findVideoFile(files)
+      if (videoFile?.name) {
+        directVideoFilePath = findExistingLocalFilePath(t, videoFile.name, config.additionalStorageRoots)
+      }
+    } catch (_) {
+      directVideoFilePath = ''
+    }
+
     const seriesLike = isLikelySeriesRelease(t.name)
     const type = seriesLike ? 'series' : 'movie'
     const fallbackName = cleanTitle(t.name)
@@ -899,6 +911,7 @@ async function libraryCatalog(config, extra) {
         s: t.size,
         d: 0,
         m: imdbId,
+        f: directVideoFilePath,
         a: poster,
         b: background
       }, {
