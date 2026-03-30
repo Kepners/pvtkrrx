@@ -571,52 +571,160 @@ async function testArtworkFallbackBehavior() {
 }
 
 async function testCompactSportsIdMetaArtwork() {
-  // This test exercises the REAL production path: compact: 'sports' strips
-  // artwork URLs (a/b/z) from the custom ID, so the meta handler must rely
-  // on TheSportsDB lookups (via carried eventId/league/date) or fallbacks.
   const { handleMeta } = require('../src/handlers/meta')
 
-  // Encode exactly like catalog.js does: compact + compress strips artwork URLs
-  const id = encodeCustomId({
+  class FakeProwlarrClient {
+    async search() {
+      return [{
+        title: 'EPL.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-A',
+        indexer: 'GeneralA',
+        size: 1_000_000_000,
+        seeders: 20,
+        pubDate: '2026-03-15T09:00:00Z'
+      }]
+    }
+  }
+
+  const event = {
+    idEvent: 'cache-bridge-event-1',
+    strEvent: 'Arsenal vs Chelsea',
+    dateEvent: '2026-03-15',
+    strSport: 'Soccer',
+    strLeague: 'English Premier League'
+  }
+  const poster = 'https://example.com/cache-bridge-poster.jpg'
+  const landscape = 'https://example.com/cache-bridge-landscape.jpg'
+  const background = 'https://example.com/cache-bridge-background.jpg'
+  const logo = 'https://example.com/cache-bridge-logo.png'
+
+  const catalogResult = await withSportsDbPrototypePatches({
+    findEventByStructuredData: async () => event,
+    _resolveFallbackImage: async (_event, prefer) => {
+      if (prefer === 'poster') return poster
+      if (prefer === 'landscape') return landscape
+      if (prefer === 'background') return background
+      return ''
+    },
+    _resolveFallbackLogo: async () => logo,
+    _fetchEvents: async () => [],
+    _fetchEventsByDate: async () => [],
+    _fetchTvEventsByDate: async () => [],
+    _resolveLeagueArtworkFromTitle: async () => null
+  }, async () => {
+    const { handleCatalog } = loadCatalogWithStubs({
+      '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient }
+    })
+
+    return handleCatalog(
+      {
+        jackettUrl: 'http://127.0.0.1:9696',
+        jackettApiKey: 'smoke-api-key',
+        sportsDbApiKey: 'smoke-sports-key',
+        maxResults: '10'
+      },
+      'sports',
+      'pvtkrrx-sports',
+      'search=Arsenal',
+      { baseUrl: 'http://127.0.0.1:7000' }
+    )
+  })
+
+  assert.equal(catalogResult.metas.length, 1, 'expected one compact sports meta from catalog')
+  const compactId = catalogResult.metas[0].id
+  const decoded = decodeCustomId(compactId)
+  assert.ok(!decoded.a, 'compact sports ids should not carry poster URLs')
+  assert.ok(!decoded.b, 'compact sports ids should not carry background URLs')
+  assert.ok(!decoded.z, 'compact sports ids should not carry logo URLs')
+  assert.equal(decoded.v, event.idEvent, 'compact sports ids should carry eventId for meta lookups')
+
+  const metaResult = await withSportsDbPrototypePatches({
+    _lookupEvent: async () => {
+      throw new Error('meta should reuse cached catalog artwork before doing a direct event lookup')
+    },
+    findEventByStructuredData: async () => {
+      throw new Error('meta should not need structured title parsing when cached artwork aliases exist')
+    },
+    _fetchEvents: async () => {
+      throw new Error('meta should not need title-based SportsDB searches when cached artwork aliases exist')
+    },
+    _fetchEventsByDate: async () => [],
+    _fetchTvEventsByDate: async () => [],
+    _resolveLeagueArtworkFromTitle: async () => null
+  }, async () => handleMeta({ sportsDbApiKey: 'smoke-sports-key' }, 'movie', compactId, { baseUrl: 'http://127.0.0.1:7000' }))
+
+  assert.ok(metaResult.meta, 'compact sports meta should still resolve a meta object')
+  assert.equal(metaResult.meta.poster, poster, 'meta should reuse the cached portrait poster from the catalog lookup')
+  assert.equal(metaResult.meta.background, background, 'meta should reuse the cached background from the catalog lookup')
+  assert.equal(metaResult.meta.logo, logo, 'meta should reuse the cached logo from the catalog lookup')
+}
+
+async function testCompactSportsMetaUsesDirectEventLookup() {
+  const { handleMeta } = require('../src/handlers/meta')
+  const eventId = 'direct-event-lookup-1'
+  const event = {
+    idEvent: eventId,
+    strEvent: 'Liverpool vs Real Madrid',
+    dateEvent: '2026-03-15',
+    strSport: 'Soccer',
+    strLeague: 'UEFA Champions League'
+  }
+  const poster = 'https://example.com/direct-event-poster.jpg'
+  const landscape = 'https://example.com/direct-event-landscape.jpg'
+  const background = 'https://example.com/direct-event-background.jpg'
+  const logo = 'https://example.com/direct-event-logo.png'
+  let lookupCalls = 0
+  let structuredCalls = 0
+  let titleSearchCalls = 0
+
+  const compactId = encodeCustomId({
     y: 'movie',
     k: 'sports',
-    n: 'Arsenal vs Chelsea',
-    t: 'EPL.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-A',
-    s: 1_000_000_000,
-    d: 20,
-    p: '2026-03-15T09:00:00Z',
+    n: 'Liverpool vs Real Madrid',
+    t: 'UEFA.Champions.League.2026.03.15.Liverpool.vs.Real.Madrid.1080p.HDTV.x264-B',
+    s: 1_100_000_000,
+    d: 18,
+    p: '2026-03-15T11:00:00Z',
     r: 'football',
     e: '2026-03-15',
-    g: 'English Premier League',
-    v: '9999999',
-    // These are stripped by compact: 'sports':
-    a: 'https://example.com/should-be-stripped.jpg',
-    b: 'https://example.com/should-be-stripped-bg.jpg',
-    z: 'https://example.com/should-be-stripped-logo.png'
+    g: 'UEFA Champions League',
+    v: eventId
   }, {
     compress: true,
     compact: 'sports'
   })
 
-  // Verify compact stripped the artwork URLs
-  const decoded = decodeCustomId(id)
-  assert.ok(!decoded.a, 'compact should strip poster URL from ID')
-  assert.ok(!decoded.b, 'compact should strip background URL from ID')
-  assert.ok(!decoded.z, 'compact should strip logo URL from ID')
-  assert.equal(decoded.e, '2026-03-15', 'compact should carry eventDate')
-  assert.equal(decoded.g, 'English Premier League', 'compact should carry league')
-  assert.equal(decoded.v, '9999999', 'compact should carry eventId')
+  const result = await withSportsDbPrototypePatches({
+    _lookupEvent: async (requestedId) => {
+      lookupCalls += 1
+      return String(requestedId || '') === eventId ? event : null
+    },
+    _resolveFallbackImage: async (_event, prefer) => {
+      if (prefer === 'poster') return poster
+      if (prefer === 'landscape') return landscape
+      if (prefer === 'background') return background
+      return ''
+    },
+    _resolveFallbackLogo: async () => logo,
+    findEventByStructuredData: async () => {
+      structuredCalls += 1
+      throw new Error('direct event lookup should win before structured parsing')
+    },
+    _fetchEvents: async () => {
+      titleSearchCalls += 1
+      throw new Error('direct event lookup should win before title searches')
+    },
+    _fetchEventsByDate: async () => [],
+    _fetchTvEventsByDate: async () => [],
+    _resolveLeagueArtworkFromTitle: async () => null
+  }, async () => handleMeta({ sportsDbApiKey: 'smoke-sports-key' }, 'movie', compactId, { baseUrl: 'http://127.0.0.1:7000' }))
 
-  // Call meta with the compact ID — no real SportsDB API key, so the
-  // external lookup will fail. This verifies the fallback path.
-  const result = await handleMeta({}, 'movie', id, { baseUrl: 'http://127.0.0.1:7000' })
-  assert.ok(result.meta, 'compact sports meta should still return a meta object')
-  assert.equal(result.meta.name, 'Arsenal vs Chelsea')
-  assert.ok(result.meta.poster, 'compact sports meta should have a poster fallback (SVG thumb or brand)')
-  assert.ok(result.meta.background, 'compact sports meta should have a background fallback')
-  assert.ok(result.meta.logo, 'compact sports meta should have a logo fallback')
-  assert.deepEqual(result.meta.genres, ['Football', 'English Premier League'])
-  assert.equal(result.meta.releaseInfo, '2026-03-15')
+  assert.equal(lookupCalls, 1, 'meta should perform a single direct event lookup when eventId is available')
+  assert.equal(structuredCalls, 0, 'direct event lookup should avoid structured title parsing')
+  assert.equal(titleSearchCalls, 0, 'direct event lookup should avoid fallback title searches')
+  assert.equal(result.meta.poster, poster)
+  assert.equal(result.meta.background, background)
+  assert.equal(result.meta.logo, logo)
+  assert.deepEqual(result.meta.genres, ['Football', 'UEFA Champions League'])
 }
 
 async function main() {
@@ -635,6 +743,7 @@ async function main() {
     await testSportsMetaRichDescription()
     await testArtworkFallbackBehavior()
     await testCompactSportsIdMetaArtwork()
+    await testCompactSportsMetaUsesDirectEventLookup()
     console.log('Smoke sports structured flow passed')
   } finally {
     fs.rmSync(runtimeDir, { recursive: true, force: true })
