@@ -466,6 +466,42 @@ async function run() {
 
     await withScenario(async () => {
       delete process.env.VERCEL
+      const torrent = matchedTorrent({
+        progress: 1,
+        save_path: orphanRoot,
+        download_path: orphanRoot
+      })
+      const extractedDir = path.join(orphanRoot, '.pvtkrrx-extracted', torrent.hash)
+      const extractedFilePath = path.join(extractedDir, 'release-extracted.mp4')
+      fs.mkdirSync(extractedDir, { recursive: true })
+      fs.writeFileSync(extractedFilePath, Buffer.from('extracted archive stream', 'utf8'))
+      fs.writeFileSync(path.join(extractedDir, '.pvtkrrx-ready.json'), JSON.stringify({
+        hash: torrent.hash,
+        videoPath: extractedFilePath,
+        sourceArchivePath: path.join(orphanRoot, 'Release', 'release.rar'),
+        extractedAt: new Date().toISOString()
+      }, null, 2))
+      ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: torrent.hash, link: '' })]
+      QBitClient.prototype.torrents = async () => [torrent]
+      QBitClient.prototype.files = async () => packedArchiveFilesComplete()
+      CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        'tt1234567',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.length, 1, '#4d2 extracted packed archive should emit a single direct-play stream')
+      assert.equal(Array.isArray(result.streams[0]?.rarUrls), false, '#4d2 extracted packed archive should prefer a normal direct file stream over rarUrls')
+      assert.match(String(result.streams[0]?.url || ''), /\/file\//, '#4d2 extracted packed archive should still use the shared file route')
+      assert.match(decodeOpaqueFilePath(result.streams[0]?.url || ''), /release-extracted\.mp4/i, '#4d2 extracted packed archive should point at the extracted video file')
+    })
+
+    await withScenario(async () => {
+      delete process.env.VERCEL
       QBitClient.prototype.torrents = async () => [matchedTorrent()]
       QBitClient.prototype.files = async () => packedArchiveFilesPartial()
       ProwlarrClient.prototype.search = async () => []

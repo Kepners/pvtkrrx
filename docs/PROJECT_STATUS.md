@@ -4,7 +4,7 @@ Updated: 2026-03-30
 
 ## Current Stage
 
-PVTKRRX is in a working `1.1.17` state on the main Windows/local route set.
+PVTKRRX is in a working `1.1.18` state on the main Windows/local route set.
 
 The practical reading of the project today is:
 
@@ -24,7 +24,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - `npm run smoke:playback` passed on 2026-03-29 and now covers redirect plus byte-serving on the shared `/file` route
 - `npm run smoke:pipeline` passed on 2026-03-29
 - `npm run smoke:sports` passed on 2026-03-29
-- `npm run dist:win` passed on 2026-03-29, again on 2026-03-30 for the `1.1.16` desktop release build, and again on 2026-03-30 for the `1.1.17` bug-fix desktop release build
+- `npm run dist:win` passed on 2026-03-29, again on 2026-03-30 for the `1.1.16` desktop release build, again on 2026-03-30 for the `1.1.17` bug-fix desktop release build, and again on 2026-03-30 for the `1.1.18` archive-extraction desktop release build
 - `npm run smoke:config`, `npm run smoke:desktop`, `npm run smoke:stremio-link`, `npm run smoke:lan-pair`, `npm run smoke:guards`, `npm run smoke:security`, `npm run smoke:pipeline`, `npm run smoke:playback`, and `npm run smoke:sports` all passed again on 2026-03-30
 - root `/manifest.json` returns the bootstrap manifest (`com.kepners.pvtkrrx.bootstrap`) with no catalogs/resources and `configurationRequired=true`
 - `PC Local` resolves as a real addon from `http://127.0.0.1:7000/local/manifest.json?mode=local`
@@ -41,9 +41,10 @@ These items are verified in the current workspace or by direct client/log proof:
 - sports detail pages now carry richer metadata: multi-line descriptions, sport type labels, league/date/event info
 - Supercars, V8, NASCAR, WSBK, WEC, Formula E, Darts, and expanded Golf coverage added to sport detection
 - local `/playback` now fails fast for incomplete multi-volume RAR releases after queueing the torrent, instead of timing out behind a false progressive-playback promise
+- completed packed RAR releases now start background extraction into a managed `.pvtkrrx-extracted/<hash>` folder when the local host can reach the archive volumes, and direct extracted playback is preferred once ready while `rarUrls` remain the fallback
 - current configure flow exposes route-aware primary install links while keeping manual addon URLs as fallback, and the current `public/configure.html` flow passed the 2026-03-30 config/desktop/link smoke pass
 - the Stremio WebView2 client cache on this machine contains cached PVTKRRX stream responses with `PVTKRRX` in the stream `name`, confirming branded source labels are reaching the real client
-- `1.1.17` installers were built successfully into `dist/`
+- `1.1.18` installers were built successfully into `dist/`
 
 ## What We Fixed On 2026-03-28 And 2026-03-29
 
@@ -80,12 +81,15 @@ These items are verified in the current workspace or by direct client/log proof:
 11. Partial packed RAR playback was still being falsely advertised on neutral-title tracker sources:
    - Root cause: unmatched `.torrent` links were being emitted as generic `/playback` streams before the addon had inspected the torrent payload, and archive-only torrents were not being prioritized as a bundle when qBittorrent primed the download.
    - Fix: tracker links are now inspected dynamically before stream emission, neutral packed-only torrents are suppressed behind a truthful packed-release notice, archive-only priming now prioritizes the full RAR bundle instead of a sample clip, and `/playback` now returns an immediate packed-archive explanation instead of stalling.
+12. Completed packed releases still failed on tablet/mobile clients even when desktop `rarUrls` playback worked:
+   - Root cause: the addon relied entirely on client-side native RAR support, but real Stremio client support is uneven outside desktop and the tablet path still needed a normal direct-play video file.
+   - Fix: the local/host runtime now bundles `7zip-bin`, starts background extraction for completed packed releases when the archive volumes are locally reachable, and prefers the extracted direct video stream once available while keeping native `rarUrls` as the desktop-capable fallback.
 
 ## Still Needs Real-Client Proof
 
 These items should still be treated as open until captured on real clients:
 
-- second-device `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.17` desktop build
+- second-device `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.18` desktop build
 - Apple TV synced-addon flow after desktop/web install
 - one real public `Remote Seedbox` ready-file playback success on a remote client
 - one auth-protected external file-server playback success on a real Stremio client
@@ -103,7 +107,7 @@ These items should still be treated as open until captured on real clients:
 1. ~~Rework packed RAR playback after the real-device `liberror` result.~~ **Closed 2026-03-30.**
    - `npm run smoke:pipeline` and `npm run smoke:playback` passed again on 2026-03-30.
    - The later `/file` `torrent not found` log was traced to `watch-cleanup` deleting the torrent and data after playback, not to an active playback bug.
-   - Supported behavior is now fixed and truthful: incomplete multi-volume archives are suppressed or fail fast with a clear message, and only completed bundles emit ordered Stremio-core-compatible `rarUrls`.
+   - Supported behavior is now fixed and truthful: incomplete multi-volume archives are suppressed or fail fast with a clear message, completed bundles still emit ordered Stremio-core-compatible `rarUrls`, and `1.1.18` now adds host-side extraction so local/LAN clients can prefer a normal direct-play file once unpacking finishes.
 2. ~~Make the configure flow more automatic.~~ **Closed 2026-03-30.**
    - `npm run smoke:config`, `npm run smoke:desktop`, and `npm run smoke:stremio-link` passed again on 2026-03-30.
    - The current simple flow now has route-aware primary install links and keeps manual addon URLs as fallback instead of the main path.
@@ -130,10 +134,9 @@ These items should still be treated as open until captured on real clients:
    - `genres` tags include both sport category and league name.
    - Artwork fallback still works when TheSportsDB returns nothing (SVG thumb or brand poster).
    - `npm run smoke:sports` passed again on 2026-03-30.
-6. Verify whether sports can become its own top-level Stremio surface.
-   - Result: current official Stremio addon docs still document `movie`, `series`, `channel`, and `tv` as the supported content types.
-   - Conclusion: a true first-column `Sports` type is not something PVTKRRX can implement cleanly on its own today without relying on unsupported/custom client behavior.
-   - Decision: keep sports under the supported movie/catalog surface and improve discoverability through sports-specific catalog identity, grouping, posters, and metadata rather than faking an unsupported type.
+6. ~~Verify whether sports can become its own top-level Stremio surface.~~ **Closed 2026-03-30.**
+   - Result: the current live addon manifest now uses a dedicated top-level `sports` surface and the latest local/LAN real-client pass shows it working across sports catalogs such as Premier League and Formula 1.
+   - `npm run smoke:config` and `npm run smoke:sports` cover the current manifest/type shape and sports catalog behavior.
 7. ~~Ensure `PVTKRRX` appears in the source list for normal films.~~ **Closed 2026-03-30.**
    - `npm run smoke:pipeline` still asserts that movie, direct-ready, and packed-ready stream names begin with `PVTKRRX`.
    - The real Stremio WebView2 cache on this machine contains cached stream payloads with `PVTKRRX` in the stream `name`, confirming the client is receiving and storing the branded source labels instead of only third-party addon labels.
@@ -141,6 +144,6 @@ These items should still be treated as open until captured on real clients:
 ## Recommended Next Work
 
 1. Tune qBittorrent for faster early playback and confirm stream start time improvements on real clients.
-2. Re-test `LAN Bridge` from a second device using the latest `1.1.17` build and record the exact device/client result.
+2. Re-test `LAN Bridge` from a second device using the latest `1.1.18` build and record the exact device/client result.
 3. Keep sports poster review focused on what Stremio clients actually render, not just what the metadata payload contains.
 4. Keep this file updated whenever a real device test changes the truth table.

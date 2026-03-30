@@ -1,6 +1,6 @@
 {
   "name": "pvtkrrx",
-  "version": "1.1.17",
+  "version": "1.1.18",
   "description": "PVTKRRX — Stream from your private tracker seedbox through Stremio",
   "main": "index.js",
   "scripts": {
@@ -38,6 +38,7 @@
   },
   "homepage": "https://github.com/Kepners/pvtkrrx#readme",
   "dependencies": {
+    "7zip-bin": "^5.2.0",
     "express": "^5.2.1",
     "fast-xml-parser": "^4.5.0",
     "multicast-dns": "^7.2.5",

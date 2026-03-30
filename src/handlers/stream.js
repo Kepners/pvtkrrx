@@ -14,6 +14,7 @@ const { buildPlaybackFileUrl, canEmitTrackerPlayback, getTrackerPlaybackRestrict
 const { decodeCustomId } = require('../utils/customId')
 const { isCompletedTorrent } = require('../utils/torrentState')
 const { fetchTorrentPayload, inspectTorrentPayload } = require('../utils/torrentPayload')
+const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '7000', 10))
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '5000', 10))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '20', 10))
@@ -165,6 +166,59 @@ function buildMatchedArchiveStream(config, configToken, addonUrl, matched, files
   )
 }
 
+function buildExtractedArchiveStream(config, configToken, addonUrl, matched, item, parsed, extractedFilePath) {
+  const absolutePath = path.normalize(String(extractedFilePath || '').trim())
+  if (!absolutePath || !fs.existsSync(absolutePath)) return null
+
+  let stat = null
+  try {
+    stat = fs.statSync(absolutePath)
+  } catch (_) {
+    stat = null
+  }
+  if (!stat?.isFile?.()) return null
+
+  const fileName = path.basename(absolutePath)
+  const fileUrl = buildFileUrl(config, configToken, addonUrl, matched.hash, matched, fileName, {
+    currentFilePath: absolutePath,
+    requireCurrentPathProof: false
+  })
+  if (!fileUrl) return null
+
+  return buildOnSeedboxStream(item, fileUrl, fileName, stat.size, config, parsed)
+}
+
+async function buildMatchedArchiveCompatibleStream(config, configToken, addonUrl, matched, files, item, parsed) {
+  let extractedFilePath = findExtractedArchiveVideoPath(matched)
+  if (extractedFilePath) {
+    const extractedStream = buildExtractedArchiveStream(config, configToken, addonUrl, matched, item, parsed, extractedFilePath)
+    if (extractedStream) {
+      return { stream: extractedStream, extractionStatus: 'ready' }
+    }
+  }
+
+  let extractionStatus = ''
+  try {
+    const extraction = await ensurePackedArchiveExtracted(matched, files, config.additionalStorageRoots)
+    extractionStatus = String(extraction?.status || '')
+    if (extractionStatus === 'ready' && extraction?.path) {
+      extractedFilePath = extraction.path
+      const extractedStream = buildExtractedArchiveStream(config, configToken, addonUrl, matched, item, parsed, extractedFilePath)
+      if (extractedStream) {
+        return { stream: extractedStream, extractionStatus }
+      }
+    }
+  } catch (err) {
+    console.warn(`[archive-extract] ${String(matched?.hash || '').slice(0, 8)}: ${err.message}`)
+    extractionStatus = 'failed'
+  }
+
+  return {
+    stream: buildMatchedArchiveStream(config, configToken, addonUrl, matched, files, item, parsed),
+    extractionStatus
+  }
+}
+
 function createNoticeCounts() {
   return {
     hostedReadyOnly: 0,
@@ -172,6 +226,8 @@ function createNoticeCounts() {
     bufferingPathUnproven: 0,
     packedArchivePending: 0,
     packedArchiveLiveUnsupported: 0,
+    packedArchiveExtracting: 0,
+    packedArchiveExtractorUnavailable: 0,
     trackerLinkUnverified: 0
   }
 }
@@ -200,6 +256,12 @@ function appendNoticeStreams(streams, noticeCounts, addonUrl) {
   }
   if (noticeCounts.packedArchiveLiveUnsupported > 0) {
     streams.push(buildInfoStream('packed-archive-live-unsupported', helpUrl, noticeCounts.packedArchiveLiveUnsupported))
+  }
+  if (noticeCounts.packedArchiveExtracting > 0) {
+    streams.push(buildInfoStream('packed-archive-extracting', helpUrl, noticeCounts.packedArchiveExtracting))
+  }
+  if (noticeCounts.packedArchiveExtractorUnavailable > 0) {
+    streams.push(buildInfoStream('packed-archive-extractor-unavailable', helpUrl, noticeCounts.packedArchiveExtractorUnavailable))
   }
   if (noticeCounts.trackerLinkUnverified > 0) {
     streams.push(buildInfoStream('tracker-link-unverified', helpUrl, noticeCounts.trackerLinkUnverified))
@@ -664,9 +726,14 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
           ? findEpisodeFile(files, season, episode)
           : findVideoFile(files)
         if (!videoFile?.name) {
-          const archiveStream = buildMatchedArchiveStream(config, configToken, addonUrl, matched, files, item, parsed)
-          if (archiveStream) {
-            streams.push(archiveStream)
+          const archiveResult = await buildMatchedArchiveCompatibleStream(config, configToken, addonUrl, matched, files, item, parsed)
+          if (archiveResult.stream) {
+            streams.push(archiveResult.stream)
+            if (archiveResult.extractionStatus === 'running') {
+              noticeCounts.packedArchiveExtracting += 1
+            } else if (archiveResult.extractionStatus === 'unavailable') {
+              noticeCounts.packedArchiveExtractorUnavailable += 1
+            }
           } else if (findPackedArchiveFiles(files).length > 0) {
             noticeCounts.packedArchivePending += 1
           }
@@ -766,7 +833,7 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
       const files = await qbit.files(matched.hash)
       const videoFile = findVideoFile(files)
       if (!videoFile?.name) {
-        const archiveStream = buildMatchedArchiveStream(
+        const archiveResult = await buildMatchedArchiveCompatibleStream(
           config,
           configToken,
           addonUrl,
@@ -775,8 +842,13 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
           { title: info.t, size: info.s, seeders: info.d, indexer: info.i || '' },
           parsed
         )
-        if (archiveStream) {
-          streams.push(archiveStream)
+        if (archiveResult.stream) {
+          streams.push(archiveResult.stream)
+          if (archiveResult.extractionStatus === 'running') {
+            noticeCounts.packedArchiveExtracting += 1
+          } else if (archiveResult.extractionStatus === 'unavailable') {
+            noticeCounts.packedArchiveExtractorUnavailable += 1
+          }
         } else if (findPackedArchiveFiles(files).length > 0) {
           packedArchivePending = true
           noticeCounts.packedArchivePending += 1

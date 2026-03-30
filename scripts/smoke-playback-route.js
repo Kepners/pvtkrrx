@@ -116,6 +116,7 @@ async function run() {
   const priorityCalls = []
   const payload = Buffer.from('smoke playback bytes', 'utf8')
   const archivePayload = Buffer.from('smoke rar bytes', 'utf8')
+  const extractedPayload = Buffer.from('smoke extracted bytes', 'utf8')
   const torrent = {
     hash,
     name: 'UFC Fight Night 270 Main Card 21 03 26 Z3R0 1080p',
@@ -201,6 +202,16 @@ async function run() {
   fs.writeFileSync(path.join(runtimeDir, file.name), payload)
   fs.mkdirSync(path.join(runtimeDir, 'Release'), { recursive: true })
   fs.writeFileSync(path.join(runtimeDir, 'Release', 'release.rar'), archivePayload)
+  const extractedDir = path.join(runtimeDir, '.pvtkrrx-extracted', readyPackedHash)
+  fs.mkdirSync(extractedDir, { recursive: true })
+  const extractedFilePath = path.join(extractedDir, 'release-extracted.mp4')
+  fs.writeFileSync(extractedFilePath, extractedPayload)
+  fs.writeFileSync(path.join(extractedDir, '.pvtkrrx-ready.json'), JSON.stringify({
+    hash: readyPackedHash,
+    videoPath: extractedFilePath,
+    sourceArchivePath: path.join(runtimeDir, 'Release', 'release.rar'),
+    extractedAt: new Date().toISOString()
+  }, null, 2))
   const inferredPayload = buildTorrentPayload([
     { path: file.name, length: payload.length }
   ])
@@ -255,6 +266,7 @@ async function run() {
     const playbackToken = encodePlaybackStateToken({ h: hash })
     const inferredPlaybackToken = encodePlaybackStateToken({ h: '', l: 'https://tracker.example/existing-without-hash.torrent' })
     const packedPlaybackToken = encodePlaybackStateToken({ h: packedHash })
+    const readyPackedPlaybackToken = encodePlaybackStateToken({ h: readyPackedHash })
     const archiveFileToken = encodeFileStateToken({ h: readyPackedHash, p: 'Release/release.rar' })
     const orphanFileToken = encodeFileStateToken({ h: 'ffffffffffffffffffffffffffffffffffffffff', p: path.join(runtimeDir, file.name) })
 
@@ -279,6 +291,13 @@ async function run() {
       { ids: [0], priority: 0 },
       { ids: [1, 2], priority: 7 }
     ], 'packed playback should demote the sample clip and prioritize the archive bundle when priming archive-only torrents')
+
+    const readyPackedResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(readyPackedPlaybackToken)}`)
+    assert.equal(readyPackedResponse.status, 302, 'completed packed archives with an extracted video should redirect into the shared file route')
+    const readyPackedFileResponse = await request(server.address().port, String(readyPackedResponse.headers.location || ''))
+    assert.equal(readyPackedFileResponse.status, 200, 'completed packed archives should serve the extracted direct-play file once available')
+    assert.equal(readyPackedFileResponse.text, extractedPayload.toString('utf8'))
+    assert.equal(String(readyPackedFileResponse.headers['content-type'] || ''), 'video/mp4')
 
     const archiveFileResponse = await request(server.address().port, `/${configToken}/file/${encodeURIComponent(archiveFileToken)}`)
     assert.equal(archiveFileResponse.status, 200, 'file route should serve completed archive parts for RAR streams')

@@ -14,6 +14,7 @@ const { mapLeague } = require('../utils/leagueMap')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { encodeCustomId } = require('../utils/customId')
 const { findExistingLocalFilePath } = require('../utils/localStorageRoots')
+const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
 
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 const cinemeta = new CinemetaClient()
@@ -861,6 +862,14 @@ async function libraryCatalog(config, extra) {
       const videoFile = findVideoFile(files)
       if (videoFile?.name) {
         directVideoFilePath = findExistingLocalFilePath(t, videoFile.name, config.additionalStorageRoots)
+      } else {
+        directVideoFilePath = findExtractedArchiveVideoPath(t)
+        if (!directVideoFilePath) {
+          const extraction = await ensurePackedArchiveExtracted(t, files, config.additionalStorageRoots)
+          if (extraction?.status === 'ready' && extraction.path) {
+            directVideoFilePath = extraction.path
+          }
+        }
       }
     } catch (_) {
       directVideoFilePath = ''

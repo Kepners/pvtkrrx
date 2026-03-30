@@ -49,7 +49,7 @@ There is no per-route catalog filtering. The Library catalog queries qBittorrent
 - Built-in `/file` route serves bytes with HTTP Range support
 - Built-in `/playback` route queues torrents via tracker link, polls qBit, and 302-redirects to `/file` when ready
 - Tracker `/playback` streams emitted for on-tracker content
-- Packed RAR archive streams emitted once ALL volumes are 100% complete
+- Completed packed RAR releases start background extraction when possible; the extracted direct video is preferred once ready, with native `rarUrls` retained as fallback while extraction is still pending
 - `proxyHeaders` with Basic Auth included on seedbox/buffering streams when `fileServerAuth` is configured
 
 ### LAN Bridge
@@ -72,7 +72,7 @@ There is no per-route catalog filtering. The Library catalog queries qBittorrent
   - No queue-and-buffer capability unless PVTKRRX is self-hosted on a runtime that can actually serve `/playback`
 - Tracker `/playback` streams are **suppressed** at stream emission time (not just blocked at the route)
 - If `fileServerAuth` is configured, tracker playback is also suppressed on any non-local route because Stremio cannot forward `proxyHeaders` through a redirect chain
-- Packed RAR archive streams are still emitted for completed archives when `fileServerUrl` can serve the volumes
+- Completed packed releases prefer the extracted direct video when `fileServerUrl` can reach it; otherwise native `rarUrls` are still emitted when the external route can serve the archive volumes
 - Info/notice streams are added to explain why tracker playback or buffering is unavailable
 
 ## Playback Capability Matrix
@@ -86,7 +86,7 @@ This is the authoritative per-route, per-release-type behavior derived from the 
 | **Completed unpacked video** | `/file` serves bytes directly | 307 → local `/file` | Offline notice | External `fileServerUrl` or public qBit URL |
 | **In-progress unpacked video** | `/playback` queues + polls → 302 to `/file` | 307 → local `/playback` | Offline notice | **Suppressed** (no buffering on Vercel) |
 | **On-tracker (not yet added)** | `/playback` fetches .torrent, adds to qBit, polls | 307 → local `/playback` | Offline notice | **Suppressed** at stream emission |
-| **Packed RAR (complete)** | `rarUrls` stream with ordered `/file` URLs | 307 → local `rarUrls` via `/file` | Offline notice | `rarUrls` via `fileServerUrl` if configured |
+| **Packed RAR (complete)** | Extracted direct video when ready, otherwise `rarUrls` with ordered `/file` URLs | 307 → local direct video or `rarUrls` fallback | Offline notice | Extracted direct file when reachable, otherwise `rarUrls` if the external route can serve the archive volumes |
 | **Packed RAR (incomplete)** | Suppressed; `/playback` fails fast with truthful message | 307 → same as local | Offline notice | **Suppressed** |
 | **Packed RAR (on tracker, not added)** | Suppressed at stream emission; torrent still queued but playback not promised | 307 → same as local | Offline notice | **Suppressed** |
 

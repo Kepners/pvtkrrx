@@ -25,6 +25,7 @@ const { resolveRuntimeDir } = require('../utils/runtimeDir')
 const { decodeSportsThumbToken, renderSportsThumbSvg } = require('../utils/sportsThumb')
 const { parseTorrentFileName, fetchTorrentPayload } = require('../utils/torrentPayload')
 const { findVideoFile, hasPackedArchiveFiles, isSampleVideoName, isArchiveFileName, findPackedArchiveFiles } = require('../utils/streams')
+const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
 const { buildPlaybackFileUrl } = require('../utils/fileServing')
 const { normalizeLocalStorageRoots, findExistingLocalFilePath } = require('../utils/localStorageRoots')
 const { PairStore } = require('../utils/pairStore')
@@ -1654,6 +1655,17 @@ async function loadTorrentPlaybackState(qbit, hash, targetPath, additionalStorag
   const archiveFiles = findPackedArchiveFiles(files)
   const packedArchive = archiveFiles.length > 0
   const archiveReady = packedArchive && archiveFiles.every(file => Number(file?.progress || 0) >= 0.999)
+  let extractedFilePath = packedArchive && archiveReady ? findExtractedArchiveVideoPath(torrent) : ''
+  if (!extractedFilePath && packedArchive && archiveReady) {
+    try {
+      const extraction = await ensurePackedArchiveExtracted(torrent, files, additionalStorageRoots)
+      if (extraction?.status === 'ready' && extraction.path) {
+        extractedFilePath = extraction.path
+      }
+    } catch (err) {
+      console.warn(`[archive-extract] ${String(torrent?.hash || '').slice(0, 8)}: ${err.message}`)
+    }
+  }
 
   // If a previous URL points to a Sample file, upgrade to the primary video when available.
   // For packed scene releases (RAR + Sample), avoid selecting Sample as main playback target.
@@ -1662,14 +1674,29 @@ async function loadTorrentPlaybackState(qbit, hash, targetPath, additionalStorag
     chosenFile = targetFile
   } else if (preferredVideoFile) {
     chosenFile = preferredVideoFile
+  } else if (extractedFilePath) {
+    let extractedSize = 0
+    try {
+      extractedSize = fs.statSync(extractedFilePath).size
+    } catch (_) {
+      extractedSize = 0
+    }
+    chosenFile = {
+      name: path.basename(extractedFilePath),
+      size: extractedSize,
+      progress: 1,
+      extracted: true
+    }
   } else if (targetFile && !packedArchive) {
     chosenFile = targetFile
   }
 
-  const resolvedFilePath = resolveTorrentFilePath(torrent, chosenFile?.name || targetPath, additionalStorageRoots)
+  const resolvedFilePath = chosenFile?.extracted
+    ? extractedFilePath
+    : resolveTorrentFilePath(torrent, chosenFile?.name || targetPath, additionalStorageRoots)
   const fileExists = Boolean(resolvedFilePath && fs.existsSync(resolvedFilePath))
   const diskSize = fileExists ? fs.statSync(resolvedFilePath).size : 0
-  const readableBytes = getReadableBytes(chosenFile, torrent, diskSize)
+  const readableBytes = chosenFile?.extracted ? diskSize : getReadableBytes(chosenFile, torrent, diskSize)
   return {
     torrent,
     files,

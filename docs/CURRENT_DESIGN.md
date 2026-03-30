@@ -87,7 +87,9 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 - Local `/playback` is the queued-download path for tracker content that is not yet ready. It fetches the `.torrent` payload, adds it to qBittorrent, polls for readiness, and 302-redirects to `/file` when the file is playable.
 - Completed-file playback correctly checks torrent completion state before redirecting into `/file`.
 - Packed RAR releases (`.rar/.r00/.r01/...`):
-  - Completed archive sets emit ordered Stremio-core-compatible `rarUrls` streams (tuple form) with array-based `fileMustInclude` on any route that can serve the archive files.
+  - Completed archive sets now trigger background extraction on the host when the archive volumes are locally reachable.
+  - If extraction has already finished, PVTKRRX prefers the extracted direct video file for playback.
+  - If extraction is still running or unavailable, completed archive sets still emit ordered Stremio-core-compatible `rarUrls` streams (tuple form) with array-based `fileMustInclude` on any route that can serve the archive files.
   - Incomplete archive sets are suppressed — no stream is offered until every volume is 100% ready.
   - Packed-only tracker sources are suppressed at stream emission time before `/playback` is ever reached.
   - `/playback` fails fast with a truthful packed-archive message if a packed torrent is already in qBit but not yet complete.

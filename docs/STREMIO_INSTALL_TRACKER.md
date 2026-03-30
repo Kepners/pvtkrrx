@@ -117,7 +117,7 @@ Get-Content "$env:APPDATA\PVTKRRX\runtime\logs\desktop-$(Get-Date -Format yyyy-M
 
 ## Remaining Sign-Off Blockers
 
-1. One fresh second-device `LAN Bridge` browse/play pass using the latest `1.1.17` desktop build.
+1. One fresh second-device `LAN Bridge` browse/play pass using the latest `1.1.18` desktop build.
 2. Apple TV synced-addon verification on a real client.
 3. One real public `Remote Seedbox` playback success.
 4. One auth-protected external file-server playback success on a real client.
