@@ -25,6 +25,17 @@ function compactSportsPayload(payload = {}) {
   if (infoHash) compact.h = infoHash
   if (directLink) compact.l = directLink
   if (imdbId) compact.m = imdbId
+
+  // Carry short event context so the meta handler can pass them to
+  // TheSportsDB for targeted artwork/logo lookups without re-deriving.
+  // Only the most impactful fields — team names and league codes are
+  // too expensive and would push the compressed ID over 256 chars.
+  const eventDate = String(payload.e || '').trim()
+  const league = String(payload.g || '').trim()
+  const eventId = String(payload.v || '').trim()
+  if (eventDate) compact.e = eventDate
+  if (league) compact.g = league
+  if (eventId) compact.v = eventId
   return compact
 }
 

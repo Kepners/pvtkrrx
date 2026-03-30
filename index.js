@@ -1546,7 +1546,18 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
       }
     }
 
-    // Still buffering.
+    // Playback loop timed out — try one final redirect to the /file route
+    // instead of hard 503. The /file route's range-wait mechanism will hold
+    // the HTTP connection while bytes arrive, keeping Stremio on the player
+    // page instead of crashing back to source selection.
+    if (trackedHash) {
+      const finalState = await loadTorrentPlaybackState(qbit, trackedHash, '', req.config.additionalStorageRoots)
+      if (tryRedirectToFileRoute(finalState, 'timeout-fallback')) {
+        return
+      }
+    }
+
+    // Truly no file available — hard 503.
     const stalledNoPieces = lastProgress <= 0.001 && maxAvailability < 0.01
     console.warn(
       `[playback-route] timeout waiting for buffer hash=${trackedHash.slice(0, 8)} ` +

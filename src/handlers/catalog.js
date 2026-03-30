@@ -717,6 +717,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       description: descriptionParts.join(' | '),
       poster: posterUrl,
       background: backgroundUrl,
+      logo: String(sportsArtwork?.logo || '').trim() || undefined,
       releaseInfo: eventDate || undefined,
       posterShape: 'landscape'
     }
