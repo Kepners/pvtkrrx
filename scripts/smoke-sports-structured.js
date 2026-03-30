@@ -203,7 +203,8 @@ async function testOrderAgnosticSportsGrouping() {
 
   assert.equal(result.metas.length, 1, 'expected reversed team order to dedupe into one sports meta')
   assert.ok(result.metas[0].id.length < 256, 'expected sports meta id to stay under common Stremio client limits')
-  assert.equal(result.metas[0].poster, 'https://example.com/landscape.jpg', 'expected sports catalog to prefer landscape artwork')
+  assert.equal(result.metas[0].poster, 'https://example.com/portrait.jpg', 'expected sports catalog to prefer portrait artwork when available')
+  assert.equal(result.metas[0].posterShape, 'poster', 'expected sports catalog to tag portrait artwork as poster-shaped')
   assert.equal(result.metas[0].background, 'https://example.com/background.jpg')
   const decoded = decodeCustomId(result.metas[0].id)
   assert.equal(decoded.k, 'sports')
@@ -507,7 +508,8 @@ async function testEventTitleCatalogGrouping() {
   const names = result.metas.map(m => m.name)
   assert.ok(names.some(n => /qualifying/i.test(n)), 'expected a Qualifying entry')
   assert.ok(names.some(n => /race/i.test(n)), 'expected a Race entry')
-  assert.equal(result.metas[0].poster, 'https://example.com/f1-landscape.jpg', 'expected landscape poster for F1 event')
+  assert.equal(result.metas[0].poster, 'https://example.com/f1-poster.jpg', 'expected sports catalog to prefer portrait poster art for F1 events')
+  assert.equal(result.metas[0].posterShape, 'poster', 'expected F1 catalog cards to declare poster-shaped artwork')
 }
 
 async function testSportsMetaRichDescription() {
@@ -563,6 +565,9 @@ async function testArtworkFallbackBehavior() {
   assert.equal(result.meta.type, 'sports')
   assert.ok(result.meta.poster, 'expected a poster fallback')
   assert.ok(result.meta.background, 'expected a background fallback')
+  assert.match(String(result.meta.poster || ''), /\/thumb\/sports\/poster\//, 'expected sports poster fallback to use the poster artwork route')
+  assert.match(String(result.meta.background || ''), /\/thumb\/sports\/background\//, 'expected sports background fallback to use the background artwork route')
+  assert.equal(result.meta.posterShape, 'poster', 'expected fallback sports meta to declare poster-shaped artwork')
   assert.ok(result.meta.description, 'expected non-empty description')
   assert.deepEqual(result.meta.genres, ['MMA', 'UFC'], 'expected MMA + UFC genres')
 }

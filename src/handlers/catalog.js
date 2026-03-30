@@ -8,7 +8,7 @@ const { cleanTitle, isLikelyPackedReleaseTitle } = require('../utils/parser')
 const { normalizeSportKey, resolveSportHint, isSportsNoiseTitle, isLikelySportsEventTitle } = require('../utils/sportsRules')
 const { isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { formatSize, findVideoFile } = require('../utils/streams')
-const { makeSportsThumbUrl } = require('../utils/sportsThumb')
+const { makeSportsThumbUrl, makeSportsPosterUrl } = require('../utils/sportsThumb')
 const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
 const { mapLeague } = require('../utils/leagueMap')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
@@ -679,12 +679,19 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     if (eventDate) descriptionParts.push(eventDate)
     if (league) descriptionParts.push(league)
 
-    const posterUrl = sportsArtwork?.landscapeImage || sportsArtwork?.image || sportsArtwork?.poster ||
-      (item.imdbId
-        ? (imdbPoster(item.imdbId) || placeholderPoster())
-        : makeSportsThumbUrl(options.baseUrl, { ...item, publishDate: item.pubDate || item.publishDate || '', sportHint: resolvedSportHint }))
-    const backgroundUrl = sportsArtwork?.backgroundImage || posterUrl
-    const carriedPosterUrl = sportsArtwork?.poster || sportsArtwork?.image || posterUrl
+    const generatedArtworkItem = {
+      title: displayTitle,
+      publishDate: eventDate || item.pubDate || item.publishDate || '',
+      sportHint: resolvedSportHint,
+      league
+    }
+    const generatedPosterUrl = makeSportsPosterUrl(options.baseUrl, generatedArtworkItem)
+    const generatedBackgroundUrl = makeSportsThumbUrl(options.baseUrl, generatedArtworkItem, 'background')
+    const portraitPosterUrl = String(sportsArtwork?.poster || '').trim()
+    const landscapePosterUrl = String(sportsArtwork?.image || sportsArtwork?.landscapeImage || '').trim()
+    const posterUrl = portraitPosterUrl || landscapePosterUrl || generatedPosterUrl
+    const backgroundUrl = String(sportsArtwork?.backgroundImage || '').trim() || landscapePosterUrl || generatedBackgroundUrl
+    const posterShape = portraitPosterUrl || posterUrl === generatedPosterUrl ? 'poster' : 'landscape'
 
     return {
       id: encodeCustomId({
@@ -717,7 +724,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       background: backgroundUrl,
       logo: String(sportsArtwork?.logo || '').trim() || undefined,
       releaseInfo: eventDate || undefined,
-      posterShape: 'landscape'
+      posterShape
     }
   })
 

@@ -1,7 +1,7 @@
 const { CinemetaClient } = require('../clients/cinemeta')
 const { SportsDbClient } = require('../clients/sportsdb')
 const { formatSize } = require('../utils/streams')
-const { makeSportsThumbUrl } = require('../utils/sportsThumb')
+const { makeSportsThumbUrl, makeSportsPosterUrl } = require('../utils/sportsThumb')
 const { resolveSportHint } = require('../utils/sportsRules')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { decodeCustomId } = require('../utils/customId')
@@ -143,12 +143,26 @@ async function handleCustomMeta(config, id, context = {}) {
     }
   }
 
+  const generatedArtworkItem = {
+    title: String(info.n || info.t || '').trim() || String(info.t || ''),
+    publishDate: info.p,
+    sportHint: resolvedSportHint,
+    league: carriedLeague || carriedLeagueCode
+  }
   const posterFallback = isSports && baseUrl
-    ? makeSportsThumbUrl(baseUrl, { title: info.t, publishDate: info.p, sportHint: resolvedSportHint })
+    ? makeSportsPosterUrl(baseUrl, generatedArtworkItem)
     : BRAND_POSTER
-  const poster = carriedArtwork || sportsArtwork?.poster || sportsArtwork?.image || posterFallback
-  const background = carriedBackground || String(sportsArtwork?.backgroundImage || sportsArtwork?.image || '').trim() || poster
+  const backgroundFallback = isSports && baseUrl
+    ? makeSportsThumbUrl(baseUrl, generatedArtworkItem, 'background')
+    : posterFallback
+  const portraitPosterUrl = String(sportsArtwork?.poster || '').trim()
+  const landscapePosterUrl = String(sportsArtwork?.image || sportsArtwork?.landscapeImage || '').trim()
+  const poster = carriedArtwork || portraitPosterUrl || landscapePosterUrl || posterFallback
+  const background = carriedBackground || String(sportsArtwork?.backgroundImage || sportsArtwork?.landscapeImage || sportsArtwork?.image || '').trim() || backgroundFallback || poster
   const logo = carriedLogo || String(sportsArtwork?.logo || '').trim() || BRAND_LOGO
+  const posterShape = isSports
+    ? ((carriedArtwork || portraitPosterUrl || poster === posterFallback) ? 'poster' : 'landscape')
+    : undefined
 
   const eventDate = carriedEventDate || sportsArtwork?.eventDate || ''
   const league = carriedLeague || sportsArtwork?.league || ''
@@ -186,6 +200,7 @@ async function handleCustomMeta(config, id, context = {}) {
     background,
     logo
   }
+  if (posterShape) meta.posterShape = posterShape
   if (sportsGenres.length > 0) meta.genres = sportsGenres
   if (eventDate) meta.releaseInfo = eventDate
   if (isSports && resolvedSportHint) {

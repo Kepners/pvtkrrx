@@ -194,10 +194,11 @@ app.get('/seedbox-runbooks', (req, res) => {
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
   res.sendFile(runbooksPage)
 })
-app.get('/thumb/sports/:info.svg', (req, res) => {
+app.get(['/thumb/sports/:info.svg', '/thumb/sports/:variant/:info.svg'], (req, res) => {
   try {
     const payload = decodeSportsThumbToken(req.params.info)
-    const svg = renderSportsThumbSvg(payload)
+    const variant = String(req.params.variant || 'landscape').trim().toLowerCase()
+    const svg = renderSportsThumbSvg(payload, { variant })
     res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8')
     setPublicCacheHeaders(res, 86400, { sMaxAge: 604800, staleWhileRevalidate: 2592000, immutable: true })
     res.send(svg)
