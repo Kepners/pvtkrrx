@@ -249,7 +249,7 @@ ENCRYPTION_SECRET=your-secret-here npm start
 npm run dist:win
 ```
 
-This now builds in the system temp directory first, then copies the finished `1.1.15` artifacts back into `dist/` and `dist/releases/<version>/`. That avoids the Windows `rcedit` failure we were hitting when building directly inside the OneDrive-backed repo output folder.
+This now builds in the system temp directory first, then copies the finished `1.1.16` artifacts back into `dist/` and `dist/releases/<version>/`. That avoids the Windows `rcedit` failure we were hitting when building directly inside the OneDrive-backed repo output folder.
 
 ## Environment Variables
 
