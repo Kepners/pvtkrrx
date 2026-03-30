@@ -705,10 +705,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
         u: parsedSportsEvent?.league || parsedEvent?.league || '',
         o: parsedSportsEvent?.homeTeam || '',
         w: parsedSportsEvent?.awayTeam || '',
-        v: String(sportsArtwork?.eventId || '').trim(),
-        a: carriedPosterUrl || '',
-        b: backgroundUrl,
-        z: String(sportsArtwork?.logo || '').trim()
+        v: String(sportsArtwork?.eventId || '').trim()
       }, {
         compress: true,
         compact: 'sports'
@@ -922,9 +919,7 @@ async function libraryCatalog(config, extra) {
         s: t.size,
         d: 0,
         m: imdbId,
-        f: directVideoFilePath,
-        a: poster,
-        b: background
+        f: directVideoFilePath
       }, {
         compress: true,
         compact: 'library'

@@ -8,44 +8,37 @@ function isCustomId(id) {
 }
 
 function compactSportsPayload(payload = {}) {
+  const displayTitle = String(payload.n || payload.t || '').trim()
   const compact = {
     y: String(payload.y || 'movie').trim() || 'movie',
     k: 'sports',
-    n: String(payload.n || payload.t || '').trim(),
-    t: String(payload.t || payload.n || '').trim(),
+    t: displayTitle,
+    n: displayTitle,
     s: Number(payload.s || 0) || 0,
     d: Number(payload.d || 0) || 0,
-    p: String(payload.p || '').trim(),
     r: String(payload.r || '').trim()
   }
 
   const infoHash = String(payload.h || '').trim()
   const directLink = String(payload.l || '').trim()
-  const imdbId = String(payload.m || '').trim()
   if (infoHash) compact.h = infoHash
   if (directLink) compact.l = directLink
-  if (imdbId) compact.m = imdbId
 
   // Carry short event context so the meta handler can pass them to
   // TheSportsDB for targeted artwork/logo lookups without re-deriving.
-  // Only the most impactful fields — team names and league codes are
-  // too expensive and would push the compressed ID over 256 chars.
+  // Full league name (g) and full torrent title (t) are excluded to stay
+  // under 256 chars — the meta handler can re-derive from league code (u)
+  // and display title (n).
   const eventDate = String(payload.e || '').trim()
-  const league = String(payload.g || '').trim()
   const eventId = String(payload.v || '').trim()
   const leagueCode = String(payload.u || '').trim()
   const homeTeam = String(payload.o || '').trim()
   const awayTeam = String(payload.w || '').trim()
-  const background = String(payload.b || '').trim()
-  const logo = String(payload.z || '').trim()
   if (eventDate) compact.e = eventDate
-  if (league) compact.g = league
   if (eventId) compact.v = eventId
   if (leagueCode) compact.u = leagueCode
   if (homeTeam) compact.o = homeTeam
   if (awayTeam) compact.w = awayTeam
-  if (background) compact.b = background
-  if (logo) compact.z = logo
   return compact
 }
 
@@ -60,15 +53,9 @@ function compactLibraryPayload(payload = {}) {
   const seeders = Number(payload.d || 0) || 0
   const imdbId = String(payload.m || '').trim()
   const filePath = String(payload.f || '').trim()
-  const poster = String(payload.a || '').trim()
-  const background = String(payload.b || '').trim()
-  const logo = String(payload.z || '').trim()
   if (seeders > 0) compact.d = seeders
   if (imdbId) compact.m = imdbId
   if (filePath) compact.f = filePath
-  if (poster) compact.a = poster
-  if (background) compact.b = background
-  if (logo) compact.z = logo
   return compact
 }
 

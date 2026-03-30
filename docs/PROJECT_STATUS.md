@@ -47,7 +47,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - completed packed RAR releases now start background extraction into a managed `.pvtkrrx-extracted/<hash>` folder when the local host can reach the archive volumes, and direct extracted playback is the supported path once ready
 - local `/file` now waits for the specific requested qBittorrent piece window during seek/skip range probes, so already-downloaded later ranges return `206` instead of dropping out after the initial buffer
 - local qBittorrent control can now manage a PVTKRRX-owned completion hook for packed-release extraction without silently overwriting a different existing qBit post-process program
-- stream labels now show explicit download state + format badges (`[Q&B]`, `[BUF]`, `[DL]`, `[EXTRACTED]`, plus container badges like `[MKV]` / `[MP4]`)
+- stream labels now use emoji state badges (`⬇️` download-and-play, `⏳` buffering, `✅` downloaded, `📦` extracted) and a film-icon container badge (`🎬MKV`, `🎬MP4`, etc.)
 - the desktop shell now has explicit `Minimize`, `Send To Tray`, and `Exit App` controls, hides to tray on close, and uses a larger no-scroll default layout
 - the configure page now shows the live qBittorrent save path, incomplete path, fallback storage roots, and extraction-hook state when opened on the Windows host runtime
 - official Stremio sources were re-checked on 2026-03-30: `rarUrls` is a real archive source, tuple-style `ArchiveUrl` is the correct payload shape, and archive sources are routed through the local streaming server at `rar/create`
