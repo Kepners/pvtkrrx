@@ -43,7 +43,7 @@ See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the exact LAN B
 | Feature | Status |
 |---------|--------|
 | Sports discovery catalogs (All Sports, Football, Motorsport, MMA, etc.) | Working |
-| Sports artwork enrichment | Working (landscape art preferred for sports tiles; sports meta now carries Stremio loading-screen background + logo artwork when available) |
+| Sports artwork enrichment | Working (portrait posters + sport-aware backdrops preferred when TheSportsDB provides them; sports meta also carries Stremio loading-screen background + logo artwork when available) |
 | Movie/TV streams from private trackers | Working |
 | Sports contamination filter | Working (SportsCult excluded from movie searches) |
 | Already-downloaded files | Working (built-in file server with Range support) |
@@ -51,7 +51,7 @@ See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the exact LAN B
 | On-tracker download + play | Working on playback-capable routes (PC Local, LAN Bridge via local redirect, or self-hosted runtime) |
 | Local + Hosted install modes | Working |
 | Hosted LAN pair mode (Android TV/mobile) | Implemented (requires relay config) |
-| Windows desktop startup shell | Working (frontmost splash + route-aware popup on boot) |
+| Windows desktop startup shell | Working (frontmost splash + route-aware popup on normal boot, with optional Windows sign-in auto-launch that starts hidden in the tray) |
 | Windows packaged build | Working (`npm run dist:win` now rebuilds `dist/` and `dist/releases/<version>/`) |
 
 ## Current Project Status
@@ -105,6 +105,7 @@ Auto Setup also attempts to:
 
 Windows desktop install/startup now also re-checks those LAN firewall rules automatically on each boot.
 When you open the configure page on the Windows host runtime, it now also shows the live qBittorrent save path, incomplete path, fallback storage roots, and whether PVTKRRX currently manages the qBit completion hook for packed-release extraction.
+The desktop shell also has a Windows startup toggle so PVTKRRX can launch automatically after sign-in, start hidden in the tray, and keep the local runtime online without a manual app open.
 
 ## Requirements
 

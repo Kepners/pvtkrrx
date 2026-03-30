@@ -26,6 +26,7 @@ PVTKRRX is one codebase with three active runtime pieces:
    - launches and packages the local runtime on Windows
    - shows the startup splash and desktop shell
    - performs startup checks, provider warm-up, and local auto-provision helpers
+   - can register/unregister itself with Windows sign-in startup from the desktop shell
    - sends LAN pair heartbeat updates and Stremio launch pulses
 
 ## Current UX Model
@@ -38,6 +39,7 @@ PVTKRRX is one codebase with three active runtime pieces:
   - current runtime status
   - qBittorrent save-path controls
   - qBittorrent packed-release extraction-hook controls
+  - Windows startup auto-launch control
   - runtime log copy/open actions
   - explicit `Minimize`, `Send To Tray`, and `Exit App` actions
 - The configure page now mirrors that local-runtime visibility with a live qBittorrent status panel that shows the effective save path, incomplete path, fallback storage roots, and whether PVTKRRX currently manages the qBit completion hook.
@@ -117,6 +119,8 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 - The desktop shell starts hidden and only appears after the local runtime is reachable.
 - Closing the main desktop shell now hides it to the Windows system tray unless the user explicitly exits.
 - The tray exposes restore/open/exit behavior so the local runtime can keep serving while the window is hidden intentionally.
+- The desktop shell can also toggle Windows sign-in startup on/off without leaving the app.
+- When Windows launches PVTKRRX from sign-in startup, the runtime now stays hidden in the system tray instead of opening the main window immediately.
 - The desktop wrapper now starts a Windows power blocker by default (`prevent-app-suspension`) so the host can stay alive through lock-screen and display-off states while serving local/LAN traffic.
 - Startup still runs:
   - local server boot

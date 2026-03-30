@@ -947,12 +947,20 @@
               <div class="path-label">RAR auto-extract status</div>
               <div class="path-current compact" id="extractMode">Loading...</div>
             </div>
+            <div class="path-summary-item">
+              <div class="path-label">Launch on Windows sign-in</div>
+              <div class="path-current compact" id="startupMode">Loading...</div>
+            </div>
           </div>
           <div class="path-label">Change save location — enter a folder path and click Apply</div>
           <input class="path-input" id="pathInput" placeholder="C:\\Downloads\\Media">
           <label class="toggle-row">
             <input type="checkbox" id="autoExtractToggle">
-            Auto-extract RAR archives when downloads complete — qBittorrent calls PVTKRRX to unpack scene releases automatically so Stremio can play them.
+            Auto-extract RAR archives when downloads complete - qBittorrent calls PVTKRRX to unpack scene releases automatically so Stremio can play them.
+          </label>
+          <label class="toggle-row">
+            <input type="checkbox" id="startupToggle">
+            Launch PVTKRRX when Windows starts - keeps this PC-local runtime online after sign-in so Stremio can find it automatically.
           </label>
           <div class="path-buttons">
             <button class="path-btn" onclick="saveQbitSettings()">Apply Settings</button>
@@ -1219,23 +1227,33 @@
 
     let pathInputDirty = false;
     let autoExtractDirty = false;
+    let startupDirty = false;
 
     async function refreshDownloadPath() {
       const current = document.getElementById('currentPath');
       const tempPath = document.getElementById('tempPath');
       const storageRoots = document.getElementById('storageRoots');
       const extractMode = document.getElementById('extractMode');
+      const startupMode = document.getElementById('startupMode');
       const input = document.getElementById('pathInput');
       const autoExtractToggle = document.getElementById('autoExtractToggle');
+      const startupToggle = document.getElementById('startupToggle');
       try {
         if (!window.electronAPI) throw new Error('Desktop bridge not available');
         const data = await window.electronAPI.getDownloadPath();
+        startupMode.textContent = (data && data.startupLabel) ? data.startupLabel : 'Unavailable';
+        if (startupToggle) {
+          startupToggle.disabled = !Boolean(data && data.startupAvailable);
+          if (!startupDirty) startupToggle.checked = Boolean(data && data.startupEnabled);
+        }
         if (data && data.available === false) {
           current.textContent = 'Unavailable';
           tempPath.textContent = 'Unavailable';
           storageRoots.textContent = 'Unavailable';
           extractMode.textContent = 'Unavailable';
-          setPathNote('qBittorrent preferences are not ready yet');
+          setPathNote((data && data.startupAvailable)
+            ? 'qBittorrent preferences are not ready yet. Windows startup is still available below.'
+            : 'qBittorrent preferences are not ready yet');
           return;
         }
         const savePath = (data && data.savePath) ? data.savePath : '';
@@ -1250,12 +1268,14 @@
           : 'PVTKRRX on-demand extraction only';
         if (!pathInputDirty && !input.value.trim()) input.value = savePath || '';
         if (!autoExtractDirty && autoExtractToggle) autoExtractToggle.checked = Boolean(data && data.autoExtractManagedByPvtkrrx);
-        setPathNote('Save path, fallback roots, and extraction mode synced');
+        setPathNote('Save path, fallback roots, extraction mode, and Windows startup state synced');
       } catch (err) {
         current.textContent = 'Unavailable';
         tempPath.textContent = 'Unavailable';
         storageRoots.textContent = 'Unavailable';
         extractMode.textContent = 'Unavailable';
+        startupMode.textContent = 'Unavailable';
+        if (startupToggle) startupToggle.disabled = true;
         setPathNote(err.message || 'Failed to read qBit settings', true);
       }
     }
@@ -1263,16 +1283,34 @@
     async function saveQbitSettings() {
       const input = document.getElementById('pathInput');
       const autoExtractToggle = document.getElementById('autoExtractToggle');
+      const startupToggle = document.getElementById('startupToggle');
       const value = input.value.trim();
-      if (!value) return setPathNote('Enter a valid folder path', true);
+      const payload = {};
+      const updatedParts = [];
+      if (pathInputDirty) {
+        if (!value) return setPathNote('Enter a valid folder path', true);
+        payload.savePath = value;
+        updatedParts.push('qBittorrent save path');
+      }
+      if (autoExtractDirty) {
+        payload.autoExtractEnabled = Boolean(autoExtractToggle && autoExtractToggle.checked);
+        updatedParts.push('packed-release extraction');
+      }
+      if (startupDirty) {
+        payload.startupEnabled = Boolean(startupToggle && startupToggle.checked);
+        updatedParts.push('Windows startup');
+      }
+      if (!updatedParts.length) {
+        return setPathNote('No changes to apply yet');
+      }
       try {
         if (!window.electronAPI || !window.electronAPI.saveQbitSettings) throw new Error('Desktop bridge not available');
-        const data = await window.electronAPI.saveQbitSettings({
-          savePath: value,
-          autoExtractEnabled: Boolean(autoExtractToggle && autoExtractToggle.checked)
-        });
+        const data = await window.electronAPI.saveQbitSettings(payload);
         const savePath = data && data.savePath ? data.savePath : value;
         document.getElementById('currentPath').textContent = savePath;
+        document.getElementById('startupMode').textContent = (data && data.startupLabel)
+          ? data.startupLabel
+          : 'Unavailable';
         if (data) {
           document.getElementById('tempPath').textContent = data.incompletePathEnabled
             ? (data.tempPath || 'Enabled without path')
@@ -1281,11 +1319,16 @@
             ? data.additionalStorageRoots.join('\n')
             : 'Using qBittorrent save path only';
           document.getElementById('extractMode').textContent = data.autoExtractLabel || 'PVTKRRX on-demand extraction only';
+          if (startupToggle) {
+            startupToggle.disabled = !Boolean(data.startupAvailable);
+            startupToggle.checked = Boolean(data.startupEnabled);
+          }
         }
-        input.value = savePath;
+        if (savePath) input.value = savePath;
         pathInputDirty = false;
         autoExtractDirty = false;
-        setPathNote('qBittorrent save path and packed-release extraction settings updated');
+        startupDirty = false;
+        setPathNote(`${updatedParts.join(', ')} updated`);
       } catch (err) {
         setPathNote(err.message || 'Failed to update qBit settings', true);
       }
@@ -1310,6 +1353,7 @@
     document.addEventListener('DOMContentLoaded', () => {
       const pathInput = document.getElementById('pathInput');
       const autoExtractToggle = document.getElementById('autoExtractToggle');
+      const startupToggle = document.getElementById('startupToggle');
       if (pathInput) {
         pathInput.addEventListener('input', () => {
           pathInputDirty = true;
@@ -1318,6 +1362,11 @@
       if (autoExtractToggle) {
         autoExtractToggle.addEventListener('change', () => {
           autoExtractDirty = true;
+        });
+      }
+      if (startupToggle) {
+        startupToggle.addEventListener('change', () => {
+          startupDirty = true;
         });
       }
       refreshStremioAlert();

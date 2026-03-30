@@ -25,8 +25,10 @@ const WINDOW_HEIGHT = 960
 const MIN_WINDOW_WIDTH = 1200
 const MIN_WINDOW_HEIGHT = 900
 const MIN_SPLASH_MS = Math.max(1500, parseInt(process.env.PVTKRRX_MIN_SPLASH_MS || '2600', 10) || 2600)
+const STARTUP_LAUNCH_ARG = '--pvtkrrx-startup-launch'
 const PROVISION_ONLY_ARG = '--pvtkrrx-provision-only'
 const NETWORK_ACCESS_ONLY_ARG = '--pvtkrrx-network-access-only'
+const startupLaunchMode = process.argv.includes(STARTUP_LAUNCH_ARG)
 const provisionOnlyMode = process.argv.includes(PROVISION_ONLY_ARG)
 const networkAccessOnlyMode = process.argv.includes(NETWORK_ACCESS_ONLY_ARG)
 let hasRetriedPortRecovery = false
@@ -63,6 +65,65 @@ function saveLocalConfig(config) {
   } catch (_) {
     return false
   }
+}
+
+function getDesktopStartupLaunchConfig() {
+  const executablePath = String(process.execPath || '').trim()
+  if (!executablePath) return { path: '', args: [] }
+  if (app.isPackaged) {
+    return {
+      path: executablePath,
+      args: [STARTUP_LAUNCH_ARG]
+    }
+  }
+  const entryPoint = String(process.argv[1] || path.join(__dirname, 'main.js')).trim()
+  return {
+    path: executablePath,
+    args: entryPoint ? [entryPoint, STARTUP_LAUNCH_ARG] : [STARTUP_LAUNCH_ARG]
+  }
+}
+
+function getDesktopStartupState() {
+  if (process.platform !== 'win32') {
+    return {
+      startupAvailable: false,
+      startupEnabled: false,
+      startupLabel: 'Windows startup is only available on Windows'
+    }
+  }
+
+  try {
+    const launchConfig = getDesktopStartupLaunchConfig()
+    const settings = app.getLoginItemSettings({
+      path: launchConfig.path,
+      args: launchConfig.args
+    })
+    const enabled = Boolean(settings?.openAtLogin)
+    return {
+      startupAvailable: true,
+      startupEnabled: enabled,
+      startupLabel: enabled
+        ? 'Enabled - PVTKRRX launches when Windows signs in'
+        : 'Disabled - PVTKRRX only starts when you open it'
+    }
+  } catch (err) {
+    return {
+      startupAvailable: false,
+      startupEnabled: false,
+      startupLabel: `Unavailable - ${err.message || 'startup state read failed'}`
+    }
+  }
+}
+
+function setDesktopStartupEnabled(enabled) {
+  if (process.platform !== 'win32') return getDesktopStartupState()
+  const launchConfig = getDesktopStartupLaunchConfig()
+  app.setLoginItemSettings({
+    openAtLogin: Boolean(enabled),
+    path: launchConfig.path,
+    args: launchConfig.args
+  })
+  return getDesktopStartupState()
 }
 
 function ensureLocalLanPairOwner(config) {
@@ -531,6 +592,36 @@ async function fetchJson(url, options = {}, timeoutMs = 8000) {
     throw new Error(message)
   }
   return data
+}
+
+function normalizeQbitPreferenceSnapshot(prefs = null) {
+  const value = prefs && typeof prefs === 'object' ? prefs : null
+  return {
+    available: Boolean(value),
+    savePath: String(value?.savePath || ''),
+    tempPath: String(value?.tempPath || ''),
+    incompletePathEnabled: Boolean(value?.incompletePathEnabled),
+    additionalStorageRoots: Array.isArray(value?.additionalStorageRoots) ? value.additionalStorageRoots : [],
+    autoExtractEnabled: Boolean(value?.autoExtractEnabled),
+    autoExtractManagedByPvtkrrx: Boolean(value?.autoExtractManagedByPvtkrrx),
+    autoExtractMode: String(value?.autoExtractMode || ''),
+    autoExtractLabel: String(value?.autoExtractLabel || (value ? 'PVTKRRX on-demand extraction only' : 'Unavailable')),
+    autoExtractProgram: String(value?.autoExtractProgram || ''),
+    autoExtractScriptPath: String(value?.autoExtractScriptPath || '')
+  }
+}
+
+async function readDesktopSettingsSnapshot() {
+  let prefs = null
+  try {
+    prefs = await fetchJson(`http://127.0.0.1:${port}/local/qbit/preferences`)
+  } catch (_) {
+    prefs = null
+  }
+  return {
+    ...normalizeQbitPreferenceSnapshot(prefs),
+    ...getDesktopStartupState()
+  }
 }
 
 async function isServerReachable(checkPort = port) {
@@ -1133,6 +1224,9 @@ app.whenReady().then(async () => {
   }
 
   console.log(`[desktop] boot start v${pkg.version}`)
+  if (startupLaunchMode) {
+    console.log('[desktop] startup launch detected; booting hidden in system tray')
+  }
   ensureDesktopPowerBlocker('startup')
   installPowerMonitorHooks()
   const reconciled = await reconcilePortOnBoot(port)
@@ -1140,8 +1234,10 @@ app.whenReady().then(async () => {
     console.warn('[desktop] port', port, 'is held by a non-PVTKRRX process; cannot auto-kill safely')
   }
 
-  createSplashWindow()
   createTray()
+  if (!startupLaunchMode) {
+    createSplashWindow()
+  }
   startAddonServer()
   createMainWindow()
 
@@ -1152,7 +1248,11 @@ app.whenReady().then(async () => {
   }
   running = await isServerReachable(port)
   pushStatus()
-  await showMainAndCloseSplash()
+  if (startupLaunchMode) {
+    hideMainWindowToTray('startup-launch')
+  } else {
+    await showMainAndCloseSplash()
+  }
   startLanPairHeartbeatLoop()
   startStremioLaunchWatch()
 
@@ -1236,37 +1336,7 @@ ipcMain.handle('open-qbit', async () => {
 // fit-popup-window IPC removed — window size is fixed at creation
 
 ipcMain.handle('get-download-path', async () => {
-  try {
-    const prefs = await fetchJson(`http://127.0.0.1:${port}/local/qbit/preferences`)
-    return {
-      available: true,
-      ...prefs,
-      savePath: String(prefs?.savePath || ''),
-      tempPath: String(prefs?.tempPath || ''),
-      incompletePathEnabled: Boolean(prefs?.incompletePathEnabled),
-      additionalStorageRoots: Array.isArray(prefs?.additionalStorageRoots) ? prefs.additionalStorageRoots : [],
-      autoExtractEnabled: Boolean(prefs?.autoExtractEnabled),
-      autoExtractManagedByPvtkrrx: Boolean(prefs?.autoExtractManagedByPvtkrrx),
-      autoExtractMode: String(prefs?.autoExtractMode || ''),
-      autoExtractLabel: String(prefs?.autoExtractLabel || 'PVTKRRX on-demand extraction only'),
-      autoExtractProgram: String(prefs?.autoExtractProgram || ''),
-      autoExtractScriptPath: String(prefs?.autoExtractScriptPath || '')
-    }
-  } catch (_) {
-    return {
-      available: false,
-      savePath: '',
-      tempPath: '',
-      incompletePathEnabled: false,
-      additionalStorageRoots: [],
-      autoExtractEnabled: false,
-      autoExtractManagedByPvtkrrx: false,
-      autoExtractMode: '',
-      autoExtractLabel: 'Unavailable',
-      autoExtractProgram: '',
-      autoExtractScriptPath: ''
-    }
-  }
+  return readDesktopSettingsSnapshot()
 })
 
 ipcMain.handle('get-recent-logs', async (_event, limit = 80) => {
@@ -1299,14 +1369,15 @@ ipcMain.handle('set-download-path', async (_event, savePath) => {
 ipcMain.handle('save-qbit-settings', async (_event, payload = {}) => {
   const value = String(payload?.savePath || '').trim()
   const autoExtractEnabled = payload?.autoExtractEnabled
+  const startupEnabled = payload?.startupEnabled
 
-  if (!value) throw new Error('Download path cannot be empty')
-
-  await fetchJson(`http://127.0.0.1:${port}/local/qbit/download-path`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ savePath: value })
-  })
+  if (value) {
+    await fetchJson(`http://127.0.0.1:${port}/local/qbit/download-path`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ savePath: value })
+    })
+  }
 
   if (typeof autoExtractEnabled === 'boolean') {
     await fetchJson(`http://127.0.0.1:${port}/local/qbit/auto-extract`, {
@@ -1316,7 +1387,11 @@ ipcMain.handle('save-qbit-settings', async (_event, payload = {}) => {
     })
   }
 
-  return fetchJson(`http://127.0.0.1:${port}/local/qbit/preferences`)
+  if (typeof startupEnabled === 'boolean') {
+    setDesktopStartupEnabled(startupEnabled)
+  }
+
+  return readDesktopSettingsSnapshot()
 })
 
 ipcMain.handle('open-download-folder', async (_event, folderPath) => {
