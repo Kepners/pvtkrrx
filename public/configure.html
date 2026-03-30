@@ -6,7 +6,7 @@
   <title>PVTKRRX - Configure</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
       --bg: #06080f;
@@ -300,35 +300,148 @@
       100% { transform: translate(0, 0); }
     }
 
+    @keyframes rgb-jitter {
+      0%, 6%, 100% { transform: translateX(0); }
+      7% { transform: translateX(-1px); }
+      8% { transform: translateX(1px); }
+      25% { transform: translateX(0); }
+      26% { transform: translateX(2px); }
+      27% { transform: translateX(0); }
+      51% { transform: translateX(0); }
+      52% { transform: translateX(-2px); }
+      53% { transform: translateX(0); }
+    }
+
+    @keyframes glitch-slice-a {
+      0%, 100% { clip-path: inset(0 0 0 0); }
+      8% { clip-path: inset(8% 0 75% 0); transform: translate(-6px, -1px); }
+      11% { clip-path: inset(18% 0 57% 0); transform: translate(-2px, 1px); }
+      22% { clip-path: inset(38% 0 35% 0); transform: translate(-4px, 0); }
+      26% { clip-path: inset(0 0 0 0); transform: translate(-3px, 1px); }
+      35% { clip-path: inset(60% 0 18% 0); transform: translate(2px, -1px); }
+      37% { clip-path: inset(0 0 0 0); transform: translate(-3px, 1px); }
+      52% { clip-path: inset(42% 0 31% 0); transform: translate(-5px, 1px); }
+      56% { clip-path: inset(0 0 0 0); transform: translate(-3px, 1px); }
+      71% { clip-path: inset(78% 0 3% 0); transform: translate(-7px, 2px); }
+      73% { clip-path: inset(0 0 0 0); transform: translate(-3px, 1px); }
+      89% { clip-path: inset(22% 0 49% 0); transform: translate(-4px, 0); }
+      92% { clip-path: inset(0 0 0 0); transform: translate(-3px, 1px); }
+    }
+
+    @keyframes glitch-slice-b {
+      0%, 100% { clip-path: inset(0 0 0 0); }
+      6% { clip-path: inset(14% 0 65% 0); transform: translate(5px, -1px); }
+      10% { clip-path: inset(0 0 0 0); transform: translate(3px, -1px); }
+      28% { clip-path: inset(52% 0 22% 0); transform: translate(6px, 1px); }
+      31% { clip-path: inset(0 0 0 0); transform: translate(3px, -1px); }
+      46% { clip-path: inset(26% 0 48% 0); transform: translate(4px, 0); }
+      48% { clip-path: inset(0 0 0 0); transform: translate(3px, -1px); }
+      64% { clip-path: inset(72% 0 8% 0); transform: translate(8px, 1px); }
+      67% { clip-path: inset(0 0 0 0); transform: translate(3px, -1px); }
+      84% { clip-path: inset(36% 0 38% 0); transform: translate(5px, 0); }
+      88% { clip-path: inset(0 0 0 0); transform: translate(3px, -1px); }
+    }
+
+    @keyframes line-flicker {
+      0%, 100% { opacity: 0.9; }
+      12% { opacity: 0.4; }
+      14% { opacity: 0.95; }
+      53% { opacity: 0.48; }
+      55% { opacity: 0.9; }
+      78% { opacity: 0.35; }
+      81% { opacity: 0.95; }
+    }
+
     .logo-header {
-      text-align: center;
       margin-bottom: 2rem;
+      text-align: center;
+      container-type: inline-size;
     }
 
-    h1 {
-      font-family: 'IBM Plex Mono', monospace;
-      font-size: clamp(1.9rem, 4.8vw, 2.5rem);
-      font-weight: 700;
-      letter-spacing: 3px;
-      color: var(--text);
-      text-shadow: 0 0 24px rgba(0, 246, 255, 0.35);
+    .logo-frame {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding-inline: clamp(4px, 1.6cqi, 18px);
+    }
+
+    .logo-title {
+      position: relative;
       display: inline-block;
+      width: max-content;
+      max-width: 100%;
+      margin: 0;
+      font-family: "Orbitron", sans-serif;
+      font-size: clamp(2.9rem, 10.5vw, 5.5rem);
+      font-size: clamp(2.9rem, 15cqi, 5.5rem);
+      font-weight: 900;
+      letter-spacing: 0.16em;
+      line-height: 0.92;
       text-transform: uppercase;
+      color: #d9ebff;
+      text-shadow:
+        0 0 8px rgba(255, 255, 255, 0.9),
+        0 0 26px rgba(0, 246, 255, 0.66),
+        0 0 54px rgba(0, 168, 255, 0.5),
+        0 0 82px rgba(255, 0, 212, 0.28);
+      transform-style: preserve-3d;
+      animation: rgb-jitter 2.8s infinite steps(2, end);
     }
 
-    h1::before,
-    h1::after {
-      display: none;
+    .logo-title > span {
+      position: relative;
+      display: inline-block;
+      background: linear-gradient(180deg, #f7fcff 0%, #c9e6ff 55%, #b4d9ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 2px 0 rgba(255, 255, 255, 0.16));
+    }
+
+    .logo-title::before,
+    .logo-title::after {
+      content: attr(data-text);
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    .logo-title::before {
+      color: var(--blue);
+      transform: translate3d(-3px, 1px, 0);
+      text-shadow: -2px 0 0 rgba(0, 246, 255, 0.7);
+      animation: glitch-slice-a 2100ms infinite steps(2, end);
+      opacity: 0.85;
+    }
+
+    .logo-title::after {
+      color: var(--red);
+      transform: translate3d(3px, -1px, 0);
+      text-shadow: 2px 0 0 rgba(255, 49, 95, 0.72);
+      animation: glitch-slice-b 2700ms infinite steps(2, end);
+      opacity: 0.8;
+    }
+
+    .logo-grid {
+      margin: 12px auto 0;
+      height: 2px;
+      width: min(480px, 88%);
+      background: linear-gradient(90deg, transparent, rgba(0, 246, 255, 0.9), rgba(255, 0, 212, 0.76), transparent);
+      box-shadow: 0 0 18px rgba(0, 246, 255, 0.72);
+      animation: line-flicker 1700ms infinite;
     }
 
     .subtitle {
+      max-width: 680px;
+      margin: 0.8rem auto 0;
       font-family: 'IBM Plex Mono', monospace;
       color: var(--text-dim);
       text-align: center;
-      margin-top: 0.45rem;
       font-size: 0.74rem;
-      letter-spacing: 1px;
+      letter-spacing: 1.2px;
       text-transform: uppercase;
+      text-shadow: 0 0 14px rgba(0, 168, 255, 0.32);
     }
 
     .card {
@@ -1327,13 +1440,18 @@
       text-transform: uppercase;
     }
 
-    .glitch-active {
-      animation: none;
+    body.glitch-burst .logo-title {
+      animation-duration: 130ms;
+      filter: saturate(1.3) contrast(1.08);
     }
 
-    @keyframes glitch-flicker {
-      0%, 100% { filter: invert(0); }
-      50% { filter: invert(1); }
+    body.glitch-burst .logo-grid {
+      opacity: 1;
+      animation-duration: 150ms;
+    }
+
+    body.glitch-burst .logo-header {
+      transform: translateX(2px);
     }
 
     /* Terminal cursor blink on focused inputs */
@@ -1363,7 +1481,12 @@
       body::after { opacity: 0.05; }
       body { padding: 1rem 0.75rem; }
       .card { padding: 1.2rem; }
-      h1 { font-size: 1.6rem; letter-spacing: 2px; }
+      .logo-title {
+        font-size: clamp(2.2rem, 12vw, 3rem);
+        letter-spacing: 0.12em;
+      }
+      .logo-grid { width: min(320px, 86%); }
+      .subtitle { font-size: 0.68rem; }
       .mode-grid { grid-template-columns: 1fr; }
       .mode-summary-grid { grid-template-columns: 1fr; }
       .row { flex-direction: column; gap: 0; }
@@ -1430,7 +1553,10 @@
     </header>
 
     <div class="logo-header">
-      <h1>PVTKRRX</h1>
+      <div class="logo-frame">
+        <h1 class="logo-title" data-text="PVTKRRX"><span>PVTKRRX</span></h1>
+      </div>
+      <div class="logo-grid" aria-hidden="true"></div>
       <p class="subtitle">Connect your private tracker seedbox to Stremio</p>
     </div>
 
@@ -3715,11 +3841,11 @@
     function startPageFlicker() {
       if (window.innerWidth < 768) return;
       const tick = () => {
-        const waitMs = 15000 + Math.floor(Math.random() * 15000);
+        const waitMs = 8000 + Math.floor(Math.random() * 7000);
         setTimeout(() => {
-          if (!document.hidden && Math.random() > 0.5) {
-            document.body.classList.add('glitch-active');
-            setTimeout(() => document.body.classList.remove('glitch-active'), 100);
+          if (!document.hidden) {
+            document.body.classList.add('glitch-burst');
+            setTimeout(() => document.body.classList.remove('glitch-burst'), 140);
           }
           tick();
         }, waitMs);
@@ -4436,4 +4562,3 @@
   </script>
 </body>
 </html>
-
