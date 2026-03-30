@@ -1,10 +1,11 @@
 # PVTKRRX Project Status
 
-Updated: 2026-03-30
+Updated: 2026-03-31
 
 ## Current Stage
 
 PVTKRRX is in a working `1.1.19` state on the main Windows/local route set.
+The current packaged Windows app is now verified as the real host runtime, and a live Apple TV LAN Bridge pass has been captured against it.
 
 The practical reading of the project today is:
 
@@ -13,7 +14,7 @@ The practical reading of the project today is:
 - completed-file playback on the local runtime is working again after the `/playback` and `/file` path fixes
 - official Stremio archive-source support for `rarUrls` is real and was re-verified against upstream SDK/core sources on 2026-03-30
 - PVTKRRX now treats extracted direct video as the only supported packed-RAR playback path by default, and keeps native `rarUrls` behind an explicit experimental override
-- the sports catalog artwork path now prefers landscape art for tiles when available
+- the sports catalog artwork path now prefers portrait poster art for tiles, while keeping separate sport-aware backgrounds/logos for player wallpaper/loading
 - the Windows installer/build flow is reproducible again
 - the remaining work is real-device coverage, remote/auth playback sign-off, and performance tuning, not a reset/rebuild
 
@@ -57,6 +58,8 @@ These items are verified in the current workspace or by direct client/log proof:
 - current configure flow exposes route-aware primary install links while keeping manual addon URLs as fallback, and the current `public/configure.html` flow passed the 2026-03-30 config/desktop/link smoke pass
 - the Stremio WebView2 client cache on this machine contains cached PVTKRRX stream responses with `PVTKRRX` in the stream `name`, confirming branded source labels are reaching the real client
 - `1.1.19` installers were built successfully into `dist/`
+- the packaged Windows desktop app is working on the current host build, including the route-first setup flow and desktop shell controls shown in the live app UI
+- a real Apple TV LAN Bridge playback pass succeeded on 2026-03-31 after desktop/web install; while the Windows host stayed locked, playback started normally, the client reported the video as local, and forward/back seek worked
 
 ## What We Fixed On 2026-03-28 And 2026-03-29
 
@@ -116,8 +119,7 @@ These items are verified in the current workspace or by direct client/log proof:
 
 These items should still be treated as open until captured on real clients:
 
-- second-device `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.19` desktop build
-- Apple TV synced-addon flow after desktop/web install
+- one extra non-tvOS `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.19` desktop build for cross-client parity
 - one real public `Remote Seedbox` ready-file playback success on a remote client
 - one auth-protected external file-server playback success on a real Stremio client
 - long-session playback/performance tuning after qBittorrent download-speed adjustments
@@ -174,6 +176,7 @@ These items should still be treated as open until captured on real clients:
 ## Recommended Next Work
 
 1. Tune qBittorrent for faster early playback and confirm stream start time improvements on real clients.
-2. Re-test `LAN Bridge` from a second device using the latest `1.1.19` build and record the exact device/client result.
-3. Keep sports poster review focused on what Stremio clients actually render, not just what the metadata payload contains.
-4. Keep this file updated whenever a real device test changes the truth table.
+2. Keep sports poster/wallpaper review focused on what Stremio clients actually render, not just what the metadata payload contains.
+3. Capture one extra Android TV or Android mobile `LAN Bridge` pass for cross-client parity beyond the now-verified Apple TV path.
+4. Finish public remote/auth playback sign-off before calling the whole route set fully release-ready.
+5. Keep this file updated whenever a real device test changes the truth table.

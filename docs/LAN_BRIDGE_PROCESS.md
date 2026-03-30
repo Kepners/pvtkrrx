@@ -1,6 +1,6 @@
 # LAN Bridge Process
 
-Updated: 2026-03-29
+Updated: 2026-03-31
 
 ## Purpose
 
@@ -86,6 +86,7 @@ The local config file contains the LAN Bridge identity:
 ### 1. Install and run the Windows app
 
 The EXE starts the local runtime and uses the Windows runtime folder under `%APPDATA%\PVTKRRX\runtime`.
+This packaged Windows app is now a verified working host entrypoint for the current local/LAN route set.
 
 ### 2. Sign into Stremio on the host PC
 
@@ -231,6 +232,8 @@ Refresh or reinstall the addon with a newly minted hosted link.
 `LAN Bridge` is not a fire-and-forget public addon.
 
 The home Windows runtime must stay online because it is the playback-capable side of the bridge.
+
+Real-device proof on 2026-03-31: Apple TV played successfully through `LAN Bridge` while the Windows host stayed locked, as long as the desktop runtime remained running.
 
 ### The popup "Server Shell" panel
 

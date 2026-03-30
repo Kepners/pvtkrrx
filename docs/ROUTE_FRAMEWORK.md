@@ -1,6 +1,6 @@
 # PVTKRRX Route Framework
 
-Updated: 2026-03-30
+Updated: 2026-03-31
 
 ## Purpose
 
@@ -43,7 +43,7 @@ All three routes expose the same sports-first discovery layout:
 
 | Catalog family | Type | Source |
 |---|---|---|
-| All Sports + sport-family catalogs (`Football`, `Motorsport`, `MMA`, `American Football`, etc.) | movie | Prowlarr search with sports filtering |
+| All Sports + sport-family catalogs (`Football`, `Motorsport`, `MMA`, `American Football`, etc.) | sports | Prowlarr search with sports filtering |
 | Movies | movie | Prowlarr search with Cinemeta enrichment |
 | TV | series | Prowlarr search with Cinemeta enrichment |
 | Library | movie | Completed qBittorrent downloads |
@@ -67,6 +67,7 @@ There is no per-route catalog filtering. The Library catalog queries qBittorrent
 - The hosted relay **307-redirects** every catalog, stream, meta, `/file`, and `/playback` request to the active LAN host when the pair heartbeat is online
 - The redirect rewrites the token path to `/local/...?mode=local`, so the LAN device effectively hits PC Local on the host
 - After redirect, all PC Local capabilities apply (queue, buffer, file serve, packed RAR), with extracted direct video still the supported packed-release path
+- A real Apple TV pass on 2026-03-31 confirmed that this route still works while the Windows host stays locked, as long as the desktop runtime remains running
 - If the pair is offline and `lanPairRequired` is true, requests fail with an offline notice instead of falling through to hosted behavior
 - If the pair is offline and `lanPairRequired` is false, requests fall through to hosted behavior (ready-file-first, no `/playback`)
 

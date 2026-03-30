@@ -1,15 +1,17 @@
 # PVTKRRX Player And Server Backlog
 
-Updated: 2026-03-30
+Updated: 2026-03-31
 
 ## Purpose
 
 This file captures the next user-requested work for playback UX, archive handling, server settings clarity, and desktop shell polish.
 
-Implementation status on 2026-03-30:
+Implementation status on 2026-03-31:
 
 - initial implementation pass is now in the repo for seek/range handling, qBit completion-hook extraction, stream-state badges, configure-page/runtime save-path clarity, and desktop tray/window behavior
-- remaining gap before calling the whole area fully closed is still real-client validation on actual Stremio devices, especially around live seek behavior and packed-release extraction UX
+- the packaged Windows app is now verified working as the host runtime
+- Apple TV playback through `LAN Bridge` is now verified on a real client, including playback while the Windows host stayed locked and successful forward/back seek
+- remaining gap before calling the whole area fully closed is now extra Android/mobile parity plus remote/auth playback sign-off, not whether the Windows app itself works
 
 It is intentionally implementation-focused:
 

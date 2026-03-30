@@ -6,6 +6,8 @@ Date: 2026-03-30
 
 This batch covers desktop app usability, stream labelling, player reliability, and qBittorrent integration. Every item is implemented in the same commit.
 
+Post-implementation verification on 2026-03-31 confirmed that the packaged Windows app is working as the real host runtime, and Apple TV playback through `LAN Bridge` worked while the Windows host stayed locked. Forward/back seek also worked, and the player reported the stream as local.
+
 ---
 
 ## 1. Auto-Extract RAR Archives via qBittorrent
@@ -134,6 +136,11 @@ This batch covers desktop app usability, stream labelling, player reliability, a
 ## Verification
 
 All existing smoke tests should continue to pass. Stream name assertions in `smoke:pipeline` need updating for the new emoji badges.
+
+Real-device status after implementation:
+- Windows packaged host app: verified working
+- Apple TV synced-addon playback through `LAN Bridge`: verified working
+- Remaining open proof is now centered on extra Android/mobile parity plus public remote/auth playback
 
 Run:
 ```bash

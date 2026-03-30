@@ -1,6 +1,6 @@
 # Stremio Install Protocol Tracker (Truth Table)
 
-Updated: 2026-03-30
+Updated: 2026-03-31
 
 ## Why this file exists
 
@@ -47,11 +47,17 @@ Link: https://github.com/Stremio/stremio-addon-client
 - `LAN Bridge` is the correct route for the user's other home devices on the same Stremio account and LAN.
 - If the host desktop shows `Failed to fetch` while browsing `LAN Bridge`, the fix is to use `PC Local` on that host, not to keep debugging the hosted relay as if it were down.
 
+## Real Client Result (Current)
+
+- `LAN Bridge` synced playback on Apple TV is now a verified PASS on 2026-03-31.
+- Verified path: install/configure on desktop or web first, keep the same Stremio account on Apple TV, and let the addon sync.
+- Verified behavior: playback started while the Windows host stayed locked, the player reported the stream as local, and forward/back seek worked.
+
 ## Apple TV Notes (tvOS)
 
 - On some Apple builds, addon management UI is limited and direct addon configure/install controls may be missing in-app.
-- Recommended flow: install/configure the addon on Stremio Web or desktop first, then use the same account on Apple TV and allow sync.
-- Treat tvOS as a synced playback client for now; do first-time addon onboarding off-device.
+- Recommended flow remains: install/configure the addon on Stremio Web or desktop first, then use the same account on Apple TV and allow sync.
+- Verified 2026-03-31: this synced-client flow worked on a real Apple TV against the current Windows host build.
 
 ## Supported Install Modes Going Forward
 
@@ -123,12 +129,11 @@ Get-Content "$env:APPDATA\PVTKRRX\runtime\logs\desktop-$(Get-Date -Format yyyy-M
 - `npm run smoke:sports` validates:
   - sports structured enrichment
   - order-agnostic sports grouping
-  - landscape artwork preference for sports catalog tiles
+  - portrait-poster preference plus separate background/logo carriage for sports artwork
 - These smoke checks do not prove end-to-end client playback of native archive streams.
 
 ## Remaining Sign-Off Blockers
 
-1. One fresh second-device `LAN Bridge` browse/play pass using the latest `1.1.19` desktop build.
-2. Apple TV synced-addon verification on a real client.
-3. One real public `Remote Seedbox` playback success.
-4. One auth-protected external file-server playback success on a real client.
+1. One extra Android TV or Android mobile `LAN Bridge` browse/play pass using the latest `1.1.19` desktop build for cross-client parity.
+2. One real public `Remote Seedbox` playback success.
+3. One auth-protected external file-server playback success on a real client.

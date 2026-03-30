@@ -17,7 +17,7 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 
 - **Sports** — Browse and search private tracker sports content (EPL, F1, UFC) directly in Stremio
 - **Sports-first discovery** — `All Sports` plus sport-family catalogs now lead the movie discovery column, with the third-column filter used for league/team detail
-- **Sports artwork enrichment** — Optional TheSportsDB poster, landscape, background, and logo artwork with cache-aware lookups; sports catalog tiles now prefer landscape art when available
+- **Sports artwork enrichment** — Optional TheSportsDB poster, landscape, background, and logo artwork with cache-aware lookups; sports catalog tiles now prefer portrait poster art while keeping separate background/logo loading art
 - **Movies & TV** — IMDb-matched content from your private trackers
 - **Seedbox Library** — Browse everything already downloaded on your seedbox
 - **Smart filtering** — Sports indexers never contaminate movie/TV searches
@@ -25,7 +25,7 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 - **No debrid needed** — Your seedbox IS the streaming server
 - **Free hosted option** — Canonical hosted setup is available at `https://www.pvtkrrx.cc`
 
-- **Desktop host controls** - The Windows shell now exposes qBit save-path visibility, packed-release extraction-hook control, tray restore, minimize, and explicit exit actions
+- **Desktop host controls** - The Windows shell now exposes qBit save-path visibility, packed-release extraction-hook control, tray restore, minimize, explicit exit, and Windows sign-in auto-launch
 
 ## Route Framework
 
@@ -51,7 +51,7 @@ See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the exact LAN B
 | On-tracker download + play | Working on playback-capable routes (PC Local, LAN Bridge via local redirect, or self-hosted runtime) |
 | Local + Hosted install modes | Working |
 | Hosted LAN pair mode (Android TV/mobile) | Implemented (requires relay config) |
-| Windows desktop startup shell | Working (frontmost splash + route-aware popup on normal boot, with optional Windows sign-in auto-launch that starts hidden in the tray) |
+| Windows desktop startup shell | Working and verified on Windows (frontmost splash + route-aware popup on normal boot, optional Windows sign-in auto-launch hidden in tray) |
 | Windows packaged build | Working (`npm run dist:win` now rebuilds `dist/` and `dist/releases/<version>/`) |
 
 ## Current Project Status
@@ -106,6 +106,7 @@ Auto Setup also attempts to:
 Windows desktop install/startup now also re-checks those LAN firewall rules automatically on each boot.
 When you open the configure page on the Windows host runtime, it now also shows the live qBittorrent save path, incomplete path, fallback storage roots, and whether PVTKRRX currently manages the qBit completion hook for packed-release extraction.
 The desktop shell also has a Windows startup toggle so PVTKRRX can launch automatically after sign-in, start hidden in the tray, and keep the local runtime online without a manual app open.
+A 2026-03-31 real-device pass also confirmed the current Windows host flow plus Apple TV LAN Bridge playback while the Windows PC stayed locked; playback started normally, the client reported the video as local, and forward/back seek worked.
 
 ## Requirements
 
@@ -348,6 +349,8 @@ Configure page now supports optional Stremio AuthKey linking:
 3. Reopen Stremio on Apple TV and let account addon sync complete.
 4. If addon list is stale, sign out/in on Apple TV and relaunch the app.
 5. Treat Apple TV as a synced playback client; do first-time addon setup on web/desktop.
+
+Current verified behavior on 2026-03-31: once installed on web/desktop first, Apple TV synced playback worked through LAN Bridge while the Windows host stayed locked, with forward/back seek working and the player recognizing the stream as local.
 
 
 ### Install URL protocol rules (important)

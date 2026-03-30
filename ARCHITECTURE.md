@@ -1,6 +1,6 @@
 # PVTKRRX Architecture
 
-Updated: 2026-03-30
+Updated: 2026-03-31
 
 ## Canonical Sources
 
@@ -78,6 +78,7 @@ Stremio client
 4. The popup then exposes:
    - route launchers
    - Stremio preflight guidance for `LAN Bridge`
+   - Windows startup auto-launch and tray lifecycle controls
    - qBittorrent download path controls
    - recent runtime logs and clipboard export
 
@@ -103,10 +104,10 @@ Stremio client
 
 1. Sports catalog items use internal `pvtkrrx:` ids.
 2. Meta and stream handlers decode those ids at request time.
-3. TheSportsDB is used for posters, landscape art, and backgrounds where configured.
-4. The manifest now exposes a sports-first discovery catalog family: `All Sports` plus sport-family catalogs such as `Football`, `Motorsport`, and `MMA`, all under the supported `movie` type.
+3. TheSportsDB is used for poster, background, and logo enrichment where configured.
+4. The manifest now exposes a dedicated top-level `sports` surface with an `All Sports` catalog plus sport-family catalogs such as `Football`, `Motorsport`, and `MMA`.
 5. Each sport-family catalog uses the third-column `genre` dropdown for narrower league/team filters.
-6. Sports catalog tiles now prefer landscape event art when available.
+6. Sports catalog tiles now prefer portrait poster art, while background/logo art is carried separately for player-loading and wallpaper use.
 7. Library items expose completed qBittorrent content through the same addon surface.
 
 ## Storage Model
