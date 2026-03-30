@@ -253,7 +253,7 @@ function buildInfoStream(code, helpUrl, count = 1) {
       'This source is a multi-part RAR scene release, not a direct video file.',
       [
         `${total} packed-release ${noun} ${verb} not offered as live playback because this Stremio path cannot reliably start a partial multi-volume archive while it is still downloading.`,
-        'Choose a direct WEB-DL/REMUX source for instant playback, or wait until the packed release fully downloads and the ready RAR stream appears.'
+        'Choose a direct WEB-DL/REMUX source for instant playback, or wait until the packed release fully downloads and PVTKRRX can surface a normal direct-play file.'
       ]
     )
   } else if (code === 'packed-archive-extracting') {
@@ -262,16 +262,16 @@ function buildInfoStream(code, helpUrl, count = 1) {
       'This completed packed release is being unpacked on the host for broader playback support.',
       [
         `${total} packed-release ${noun} ${verb} queued for background extraction so phones, tablets, and TVs can use a normal direct video file.`,
-        'Desktop RAR playback may already work now. Refresh the stream list shortly for the extracted direct-play stream.'
+        'Refresh the stream list shortly for the extracted direct-play stream.'
       ]
     )
   } else if (code === 'packed-archive-extractor-unavailable') {
     name = '[INFO] Archive Extraction Unavailable'
     description = withExtraDescription(
-      'This host cannot extract completed packed releases right now.',
+      'This host could not prepare a normal direct-play file for this completed packed release.',
       [
-        `${total} packed-release ${noun} ${verb} limited to native RAR playback only until archive extraction is available on the host.`,
-        'Desktop clients may still handle the RAR stream directly.'
+        `${total} packed-release ${noun} ${verb} hidden because PVTKRRX only treats extracted direct video as supported playback by default.`,
+        'Use another source now, or fix host-side archive extraction and refresh for the direct-play stream.'
       ]
     )
   } else if (code === 'tracker-link-unverified') {

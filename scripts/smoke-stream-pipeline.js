@@ -233,6 +233,7 @@ async function withScenario(setup, run) {
 
 async function run() {
   const originalVercel = process.env.VERCEL
+  const originalExperimentalRar = process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS
   const orphanRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-stream-pipeline-'))
   const orphanFilePath = path.join(orphanRoot, 'Downloaded.Movie.2026.1080p.mp4')
   fs.writeFileSync(orphanFilePath, 'orphaned local file bytes', 'utf8')
@@ -439,6 +440,7 @@ async function run() {
 
     await withScenario(async () => {
       delete process.env.VERCEL
+      delete process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent({ progress: 1 }).hash, link: '' })]
       QBitClient.prototype.torrents = async () => [matchedTorrent({ progress: 1 })]
       QBitClient.prototype.files = async () => packedArchiveFilesComplete()
@@ -452,16 +454,38 @@ async function run() {
         'local'
       )
 
-      assert.equal(result.streams.length, 1, '#4d completed packed archive should emit a single archive-mode stream')
-      assert.ok(Array.isArray(result.streams[0]?.rarUrls), '#4d completed packed archive stream should expose rarUrls')
-      assert.equal(result.streams[0].rarUrls.length, 3, '#4d completed packed archive stream should include all archive parts and skip the sample clip')
-      assert.ok(Array.isArray(result.streams[0]?.rarUrls?.[0]), '#4d completed packed archive stream should serialize archive parts as tuple entries for Stremio core')
-      assert.equal(String(result.streams[0]?.rarUrls?.[0]?.[1] || ''), '100000000', '#4d completed packed archive stream should carry archive size bytes in the tuple form')
-      assert.deepEqual(result.streams[0]?.fileMustInclude || [], ['/\\.(mkv|mp4|avi|wmv|ts|m4v)$/i'], '#4d completed packed archive stream should serialize fileMustInclude as Stremio-compatible string patterns')
-      assert.equal(String(result.streams[0]?.behaviorHints?.sourceContainer || ''), 'rar', '#4d completed packed archive stream should advertise archive container type')
-      assert.match(decodeOpaqueFilePath(result.streams[0]?.rarUrls?.[0] || ''), /release\.rar/i, '#4d completed packed archive stream should start with the first archive volume')
-      assert.match(decodeOpaqueFilePath(result.streams[0]?.rarUrls?.[1] || ''), /release\.r00/i, '#4d completed packed archive stream should keep classic multi-volume order')
-      assert.match(decodeOpaqueFilePath(result.streams[0]?.rarUrls?.[2] || ''), /release\.r01/i, '#4d completed packed archive stream should keep classic multi-volume order')
+      assert.equal(result.streams.filter(stream => Array.isArray(stream?.rarUrls)).length, 0, '#4d completed packed archive should stay hidden by default until a direct-play file is ready')
+      const archiveNotice = findNoticeStream(result.streams, 'packed-archive-extractor-unavailable')
+      assert.ok(archiveNotice, '#4d completed packed archive should explain why the packed release is hidden')
+      assert.match(String(archiveNotice?.description || ''), /direct-play file/i, '#4d archive notice should explain that PVTKRRX is waiting for extracted direct playback')
+    })
+
+    await withScenario(async () => {
+      delete process.env.VERCEL
+      process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS = 'true'
+      ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent({ progress: 1 }).hash, link: '' })]
+      QBitClient.prototype.torrents = async () => [matchedTorrent({ progress: 1 })]
+      QBitClient.prototype.files = async () => packedArchiveFilesComplete()
+      CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        'tt1234567',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.length, 1, '#4d1 experimental native archive mode should still emit a single archive-mode stream when explicitly enabled')
+      assert.ok(Array.isArray(result.streams[0]?.rarUrls), '#4d1 experimental native archive mode should expose rarUrls')
+      assert.equal(result.streams[0].rarUrls.length, 3, '#4d1 experimental native archive stream should include all archive parts and skip the sample clip')
+      assert.ok(Array.isArray(result.streams[0]?.rarUrls?.[0]), '#4d1 experimental native archive stream should serialize archive parts as tuple entries for Stremio core')
+      assert.equal(String(result.streams[0]?.rarUrls?.[0]?.[1] || ''), '100000000', '#4d1 experimental native archive stream should carry archive size bytes in the tuple form')
+      assert.deepEqual(result.streams[0]?.fileMustInclude || [], ['/\\.(mkv|mp4|avi|wmv|ts|m4v)$/i'], '#4d1 experimental native archive stream should serialize fileMustInclude as Stremio-compatible string patterns')
+      assert.equal(String(result.streams[0]?.behaviorHints?.sourceContainer || ''), 'rar', '#4d1 experimental native archive stream should advertise archive container type')
+      assert.match(decodeOpaqueFilePath(result.streams[0]?.rarUrls?.[0] || ''), /release\.rar/i, '#4d1 experimental native archive stream should start with the first archive volume')
+      assert.match(decodeOpaqueFilePath(result.streams[0]?.rarUrls?.[1] || ''), /release\.r00/i, '#4d1 experimental native archive stream should keep classic multi-volume order')
+      assert.match(decodeOpaqueFilePath(result.streams[0]?.rarUrls?.[2] || ''), /release\.r01/i, '#4d1 experimental native archive stream should keep classic multi-volume order')
     })
 
     await withScenario(async () => {
@@ -708,6 +732,7 @@ async function run() {
 
     await withScenario(async () => {
       delete process.env.VERCEL
+      delete process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS
       const payload = buildTorrentPayload([
         { path: 'Release/release.rar', length: 100_000_000 },
         { path: 'Release/release.r00', length: 100_000_000 },
@@ -737,9 +762,15 @@ async function run() {
         'local'
       )
 
-      assert.equal(result.streams.filter(stream => Array.isArray(stream?.rarUrls)).length, 1, '#4k completed packed torrents without embedded hashes should resolve to the existing qBit torrent and expose the ready RAR stream')
+      assert.equal(result.streams.filter(stream => Array.isArray(stream?.rarUrls)).length, 0, '#4k completed packed torrents without embedded hashes should still hide native archive playback by default')
       assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4k completed packed torrents without embedded hashes should not fall back to generic tracker playback')
-      assert.ok(result.streams.every(stream => String(stream?.name || '').startsWith('PVTKRRX ') || !stream?.name), '#4k packed ready stream names should start with PVTKRRX so Stremio can group them under the addon source')
+      assert.ok(findNoticeStream(result.streams, 'packed-archive-extractor-unavailable'), '#4k completed packed torrents without embedded hashes should explain why the packed release stayed hidden')
+      assert.ok(
+        result.streams
+          .filter(stream => stream?.url || Array.isArray(stream?.rarUrls))
+          .every(stream => String(stream?.name || '').startsWith('PVTKRRX ') || !stream?.name),
+        '#4k packed ready stream names should start with PVTKRRX so Stremio can group them under the addon source'
+      )
     })
 
     console.log('Smoke stream pipeline passed')
@@ -747,6 +778,8 @@ async function run() {
     resetMocks()
     if (originalVercel === undefined) delete process.env.VERCEL
     else process.env.VERCEL = originalVercel
+    if (originalExperimentalRar === undefined) delete process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS
+    else process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS = originalExperimentalRar
     fs.rmSync(orphanRoot, { recursive: true, force: true })
   }
 }

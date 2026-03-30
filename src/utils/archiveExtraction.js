@@ -109,8 +109,11 @@ function pickBestExtractedVideo(files) {
 
 function findExtractedArchiveVideoPath(torrent) {
   const marker = readExtractionMarker(torrent)
-  const markerPath = path.normalize(String(marker?.videoPath || '').trim())
-  if (markerPath && fs.existsSync(markerPath)) {
+  const rawMarkerPath = String(marker?.videoPath || '').trim()
+  if (!rawMarkerPath) return ''
+
+  const markerPath = path.normalize(rawMarkerPath)
+  if (markerPath && markerPath !== '.' && fs.existsSync(markerPath)) {
     return markerPath
   }
   return ''

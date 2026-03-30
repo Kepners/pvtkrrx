@@ -139,6 +139,10 @@ function buildArchiveDisplayFilename(title) {
   return `${safeBase || 'archive'}.mkv`
 }
 
+function experimentalNativeRarStreamsEnabled() {
+  return /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS || '').trim())
+}
+
 function buildMatchedArchiveStream(config, configToken, addonUrl, matched, files, item, parsed) {
   const archiveFiles = findPackedArchiveFiles(files)
   if (archiveFiles.length === 0) return null
@@ -193,7 +197,7 @@ async function buildMatchedArchiveCompatibleStream(config, configToken, addonUrl
   if (extractedFilePath) {
     const extractedStream = buildExtractedArchiveStream(config, configToken, addonUrl, matched, item, parsed, extractedFilePath)
     if (extractedStream) {
-      return { stream: extractedStream, extractionStatus: 'ready' }
+      return { stream: extractedStream, extractionStatus: 'ready', streamKind: 'direct' }
     }
   }
 
@@ -205,7 +209,7 @@ async function buildMatchedArchiveCompatibleStream(config, configToken, addonUrl
       extractedFilePath = extraction.path
       const extractedStream = buildExtractedArchiveStream(config, configToken, addonUrl, matched, item, parsed, extractedFilePath)
       if (extractedStream) {
-        return { stream: extractedStream, extractionStatus }
+        return { stream: extractedStream, extractionStatus, streamKind: 'direct' }
       }
     }
   } catch (err) {
@@ -213,10 +217,35 @@ async function buildMatchedArchiveCompatibleStream(config, configToken, addonUrl
     extractionStatus = 'failed'
   }
 
-  return {
-    stream: buildMatchedArchiveStream(config, configToken, addonUrl, matched, files, item, parsed),
-    extractionStatus
+  const archiveStream = buildMatchedArchiveStream(config, configToken, addonUrl, matched, files, item, parsed)
+  if (archiveStream && experimentalNativeRarStreamsEnabled()) {
+    return { stream: archiveStream, extractionStatus, streamKind: 'native-archive' }
   }
+
+  return {
+    stream: null,
+    extractionStatus,
+    streamKind: ''
+  }
+}
+
+function recordPackedArchiveOutcome(noticeCounts, archiveResult) {
+  if (!noticeCounts) return
+
+  const status = String(archiveResult?.extractionStatus || '')
+  if (status === 'pending') {
+    noticeCounts.packedArchivePending += 1
+    return
+  }
+  if (status === 'running') {
+    noticeCounts.packedArchiveExtracting += 1
+    return
+  }
+
+  // Any other non-ready archive state means PVTKRRX could not prepare a
+  // direct-play file, and native archive playback is intentionally hidden
+  // unless the experimental override is enabled.
+  noticeCounts.packedArchiveExtractorUnavailable += 1
 }
 
 function createNoticeCounts() {
@@ -729,13 +758,8 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
           const archiveResult = await buildMatchedArchiveCompatibleStream(config, configToken, addonUrl, matched, files, item, parsed)
           if (archiveResult.stream) {
             streams.push(archiveResult.stream)
-            if (archiveResult.extractionStatus === 'running') {
-              noticeCounts.packedArchiveExtracting += 1
-            } else if (archiveResult.extractionStatus === 'unavailable') {
-              noticeCounts.packedArchiveExtractorUnavailable += 1
-            }
           } else if (findPackedArchiveFiles(files).length > 0) {
-            noticeCounts.packedArchivePending += 1
+            recordPackedArchiveOutcome(noticeCounts, archiveResult)
           }
           continue
         }
@@ -844,14 +868,9 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
         )
         if (archiveResult.stream) {
           streams.push(archiveResult.stream)
-          if (archiveResult.extractionStatus === 'running') {
-            noticeCounts.packedArchiveExtracting += 1
-          } else if (archiveResult.extractionStatus === 'unavailable') {
-            noticeCounts.packedArchiveExtractorUnavailable += 1
-          }
         } else if (findPackedArchiveFiles(files).length > 0) {
           packedArchivePending = true
-          noticeCounts.packedArchivePending += 1
+          recordPackedArchiveOutcome(noticeCounts, archiveResult)
         } else {
           throw new Error('No playable video in matched torrent')
         }

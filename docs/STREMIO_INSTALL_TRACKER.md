@@ -23,8 +23,8 @@ Link: https://github.com/Stremio/stremio-addon-client
 
 - Official Stremio SDK/core support `rarUrls` archive streams.
 - That archive path requires a local or attached Stremio streaming server.
-- PVTKRRX now emits the archive payload in the expected tuple-based shape for completed bundles.
-- This tracker does not yet sign off native packed-RAR playback until one real client succeeds with that path.
+- PVTKRRX keeps the archive payload path in the expected tuple-based shape for manual testing behind `PVTKRRX_EXPERIMENTAL_RAR_STREAMS=true`.
+- The supported default packed-RAR path is now extracted direct video only; native archive playback is no longer advertised by default.
 
 ## Observed Install Results (Current)
 
@@ -117,7 +117,8 @@ Get-Content "$env:APPDATA\PVTKRRX\runtime\logs\desktop-$(Get-Date -Format yyyy-M
   - the local playback route no longer crashes on completion-state checks
 - `npm run smoke:pipeline` validates:
   - hosted remote stream suppression and local playback-capable behavior
-  - completed packed archives emit the expected `rarUrls` payload shape when the bundle is fully ready
+  - completed packed archives stay hidden by default until a direct-play file is ready
+  - the optional experimental native archive override still emits the expected `rarUrls` payload shape when enabled
   - incomplete packed archives stay suppressed behind truthful notices
 - `npm run smoke:sports` validates:
   - sports structured enrichment
@@ -128,7 +129,6 @@ Get-Content "$env:APPDATA\PVTKRRX\runtime\logs\desktop-$(Get-Date -Format yyyy-M
 ## Remaining Sign-Off Blockers
 
 1. One fresh second-device `LAN Bridge` browse/play pass using the latest `1.1.19` desktop build.
-2. One real completed packed RAR playback success on Stremio Desktop v5 or another service-backed client using PVTKRRX's emitted `rarUrls` path.
-3. Apple TV synced-addon verification on a real client.
-4. One real public `Remote Seedbox` playback success.
-5. One auth-protected external file-server playback success on a real client.
+2. Apple TV synced-addon verification on a real client.
+3. One real public `Remote Seedbox` playback success.
+4. One auth-protected external file-server playback success on a real client.

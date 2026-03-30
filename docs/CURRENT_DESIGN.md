@@ -92,8 +92,9 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
   - Official Stremio archive-source support is real: `rarUrls` is part of the addon/core contract and is routed through the client's local streaming server.
   - Completed archive sets now trigger background extraction on the host when the archive volumes are locally reachable.
   - If extraction has already finished, PVTKRRX prefers the extracted direct video file for playback.
-  - If extraction is still running or unavailable, completed archive sets can still emit ordered Stremio-core-compatible `rarUrls` streams (tuple form) with array-based `fileMustInclude` on any route that can serve the archive files.
-  - Emitting `rarUrls` means the addon is using the official archive payload shape; it does not yet count as end-to-end real-client sign-off for PVTKRRX archive playback.
+  - If extraction is still running or unavailable, the packed source stays hidden by default instead of being advertised as normal playback.
+  - Native `rarUrls` emission is now an explicit manual-testing override (`PVTKRRX_EXPERIMENTAL_RAR_STREAMS=true`), not part of the supported default playback contract.
+  - Emitting `rarUrls` still means the addon is using the official archive payload shape; it does not count as end-to-end real-client sign-off for PVTKRRX archive playback.
   - Incomplete archive sets are suppressed — no stream is offered until every volume is 100% ready.
   - Packed-only tracker sources are suppressed at stream emission time before `/playback` is ever reached.
   - `/playback` fails fast with a truthful packed-archive message if a packed torrent is already in qBit but not yet complete.

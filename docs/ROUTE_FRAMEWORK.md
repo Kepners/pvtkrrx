@@ -14,7 +14,8 @@ For the broader runtime and storage model, see `docs/CURRENT_DESIGN.md`.
 - Official Stremio SDK/core support `rarUrls` archive streams.
 - That archive path depends on a local or attached Stremio streaming server.
 - In PVTKRRX, emitted `rarUrls` means the addon is producing the official archive payload shape.
-- It does not, by itself, prove end-to-end playback on every Stremio client.
+- Native archive emission is now opt-in experimental only (`PVTKRRX_EXPERIMENTAL_RAR_STREAMS=true`); the supported default path is extracted direct video.
+- Even with the override enabled, `rarUrls` does not by itself prove end-to-end playback on every Stremio client.
 
 ## Route Summary
 
@@ -56,7 +57,7 @@ There is no per-route catalog filtering. The Library catalog queries qBittorrent
 - Built-in `/file` route serves bytes with HTTP Range support
 - Built-in `/playback` route queues torrents via tracker link, polls qBit, and 302-redirects to `/file` when ready
 - Tracker `/playback` streams emitted for on-tracker content
-- Completed packed RAR releases start background extraction when possible; the extracted direct video is preferred once ready, with native `rarUrls` retained as an experimental fallback while extraction is still pending or unavailable
+- Completed packed RAR releases start background extraction when possible; the extracted direct video is the supported path once ready, and the source stays hidden while extraction is pending or unavailable unless the experimental native archive override is enabled
 - `proxyHeaders` with Basic Auth included on seedbox/buffering streams when `fileServerAuth` is configured
 
 ### LAN Bridge
@@ -65,7 +66,7 @@ There is no per-route catalog filtering. The Library catalog queries qBittorrent
 - Config loaded from encrypted hosted token
 - The hosted relay **307-redirects** every catalog, stream, meta, `/file`, and `/playback` request to the active LAN host when the pair heartbeat is online
 - The redirect rewrites the token path to `/local/...?mode=local`, so the LAN device effectively hits PC Local on the host
-- After redirect, all PC Local capabilities apply (queue, buffer, file serve, packed RAR), with extracted direct video still the preferred packed-release path
+- After redirect, all PC Local capabilities apply (queue, buffer, file serve, packed RAR), with extracted direct video still the supported packed-release path
 - If the pair is offline and `lanPairRequired` is true, requests fail with an offline notice instead of falling through to hosted behavior
 - If the pair is offline and `lanPairRequired` is false, requests fall through to hosted behavior (ready-file-first, no `/playback`)
 
@@ -79,13 +80,13 @@ There is no per-route catalog filtering. The Library catalog queries qBittorrent
   - No queue-and-buffer capability unless PVTKRRX is self-hosted on a runtime that can actually serve `/playback`
 - Tracker `/playback` streams are **suppressed** at stream emission time (not just blocked at the route)
 - If `fileServerAuth` is configured, tracker playback is also suppressed on any non-local route because Stremio cannot forward `proxyHeaders` through a redirect chain
-- Completed packed releases prefer the extracted direct video when `fileServerUrl` can reach it; otherwise native `rarUrls` can still be emitted when the external route can serve the archive volumes, but that archive path is still pending real-client sign-off in this project
+- Completed packed releases prefer the extracted direct video when `fileServerUrl` can reach it; otherwise the packed source stays hidden by default unless the experimental native archive override is enabled for manual testing
 - Info/notice streams are added to explain why tracker playback or buffering is unavailable
 
 ## Playback Capability Matrix
 
 This is the authoritative per-route, per-release-type behavior derived from the live code and current verification.
-If a row says `rarUrls`, that means the addon emits the archive source; it does not automatically mean real-client playback has been signed off.
+If a row says `rarUrls`, that means the addon emits the archive source only when the experimental override is enabled; it does not automatically mean real-client playback has been signed off.
 
 ### By Release Type
 
@@ -94,11 +95,11 @@ If a row says `rarUrls`, that means the addon emits the archive source; it does 
 | **Completed unpacked video** | `/file` serves bytes directly | 307 → local `/file` | Offline notice | External `fileServerUrl` or public qBit URL |
 | **In-progress unpacked video** | `/playback` queues + polls → 302 to `/file` | 307 → local `/playback` | Offline notice | **Suppressed** (no buffering on Vercel) |
 | **On-tracker (not yet added)** | `/playback` fetches .torrent, adds to qBit, polls | 307 → local `/playback` | Offline notice | **Suppressed** at stream emission |
-| **Packed RAR (complete)** | Extracted direct video when ready, otherwise `rarUrls` with ordered `/file` URLs | 307 → local direct video or `rarUrls` fallback | Offline notice | Extracted direct file when reachable, otherwise `rarUrls` if the external route can serve the archive volumes |
+| **Packed RAR (complete)** | Extracted direct video when ready; otherwise hidden until extraction succeeds | 307 → local direct video; otherwise hidden until extraction succeeds | Offline notice | Extracted direct file when reachable; otherwise hidden until extraction succeeds |
 | **Packed RAR (incomplete)** | Suppressed; `/playback` fails fast with truthful message | 307 → same as local | Offline notice | **Suppressed** |
 | **Packed RAR (on tracker, not added)** | Suppressed at stream emission; torrent still queued but playback not promised | 307 → same as local | Offline notice | **Suppressed** |
 
-Today the broadly trusted packed-release path is still extracted direct video. Native `rarUrls` remains implemented and spec-aligned, but it still needs one captured real-client PVTKRRX success before this repo should call it proven playback.
+Today the supported packed-release path is extracted direct video. Native `rarUrls` remains implemented only behind the explicit experimental override for manual testing and future proof capture.
 
 ### By Endpoint
 
