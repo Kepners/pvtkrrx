@@ -112,11 +112,13 @@ function createFetchResponse(bytes, headers = {}) {
 
 async function run() {
   const hash = 'c1287d13aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+  const incompleteHash = 'b1287d13dddddddddddddddddddddddddddddddd'
   const packedHash = 'd1287d13bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
   const readyPackedHash = 'e1287d13cccccccccccccccccccccccccccccccc'
   const priorityCalls = []
   const firstLastToggleCalls = []
   const payload = Buffer.from('smoke playback bytes', 'utf8')
+  const partialPayload = Buffer.alloc(3 * 1024 * 1024, 7)
   const archivePayload = Buffer.from('smoke rar bytes', 'utf8')
   const extractedPayload = Buffer.from('smoke extracted bytes', 'utf8')
   const torrent = {
@@ -129,10 +131,26 @@ async function run() {
     download_path: runtimeDir,
     content_path: ''
   }
+  const incompleteTorrent = {
+    hash: incompleteHash,
+    name: 'Formula1.2026.Japanese.Grand.Prix.Qualifying.1080p',
+    progress: 0.25,
+    seq_dl: true,
+    f_l_piece_prio: false,
+    save_path: runtimeDir,
+    download_path: runtimeDir,
+    content_path: ''
+  }
   const file = {
     name: 'UFC.Fight.Night.270.Main.Card.1080p.mp4',
     size: payload.length,
     progress: 1,
+    index: 0
+  }
+  const incompleteFile = {
+    name: 'buffering/Formula1.2026.Japanese.Grand.Prix.Qualifying.1080p.mkv',
+    size: 30 * 1024 * 1024,
+    progress: 0.25,
     index: 0
   }
   const packedTorrent = {
@@ -202,6 +220,8 @@ async function run() {
     }
   ]
   fs.writeFileSync(path.join(runtimeDir, file.name), payload)
+  fs.mkdirSync(path.join(runtimeDir, 'buffering'), { recursive: true })
+  fs.writeFileSync(path.join(runtimeDir, incompleteFile.name), partialPayload)
   fs.mkdirSync(path.join(runtimeDir, 'Release'), { recursive: true })
   fs.writeFileSync(path.join(runtimeDir, 'Release', 'release.rar'), archivePayload)
   const extractedDir = path.join(runtimeDir, '.pvtkrrx-extracted', readyPackedHash)
@@ -223,11 +243,12 @@ async function run() {
     hash: inferredHash
   }
 
-  QBitClient.prototype.torrents = async () => [torrent, inferredTorrent, packedTorrent, readyPackedTorrent]
+  QBitClient.prototype.torrents = async () => [torrent, inferredTorrent, incompleteTorrent, packedTorrent, readyPackedTorrent]
   QBitClient.prototype.torrentsByHashes = async (inputHash) => {
     const normalized = String(inputHash || '').toLowerCase()
     if (normalized === hash) return [torrent]
     if (normalized === inferredHash) return [inferredTorrent]
+    if (normalized === incompleteHash) return [incompleteTorrent]
     if (normalized === packedHash) return [packedTorrent]
     if (normalized === readyPackedHash) return [readyPackedTorrent]
     return []
@@ -236,6 +257,7 @@ async function run() {
     const normalized = String(inputHash || '').toLowerCase()
     if (normalized === hash) return [file]
     if (normalized === inferredHash) return [file]
+    if (normalized === incompleteHash) return [incompleteFile]
     if (normalized === packedHash) return packedFiles
     if (normalized === readyPackedHash) return readyPackedFiles
     return []
@@ -280,6 +302,7 @@ async function run() {
       lanPairRequired: false
     }, process.env.ENCRYPTION_SECRET))
     const playbackToken = encodePlaybackStateToken({ h: hash })
+    const incompletePlaybackToken = encodePlaybackStateToken({ h: incompleteHash })
     const inferredPlaybackToken = encodePlaybackStateToken({ h: '', l: 'https://tracker.example/existing-without-hash.torrent' })
     const packedPlaybackToken = encodePlaybackStateToken({ h: packedHash })
     const readyPackedPlaybackToken = encodePlaybackStateToken({ h: readyPackedHash })
@@ -299,6 +322,13 @@ async function run() {
     const inferredFileResponse = await request(server.address().port, String(inferredResponse.headers.location || ''))
     assert.equal(inferredFileResponse.status, 200, 'recovered existing torrent should still redirect into the shared file route')
     assert.equal(inferredFileResponse.text, payload.toString('utf8'))
+
+    const incompleteResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(incompletePlaybackToken)}`)
+    assert.equal(incompleteResponse.status, 302, 'incomplete playback should redirect into the shared file route instead of timing out inside /playback')
+    assert.match(String(incompleteResponse.headers.location || ''), new RegExp(`/${configToken}/file/`), 'incomplete playback redirect should target the shared file route')
+    const incompleteFileResponse = await request(server.address().port, String(incompleteResponse.headers.location || ''))
+    assert.equal(incompleteFileResponse.status, 206, 'shared file route should keep Stremio on the player with a partial-content response while bytes continue downloading')
+    assert.match(String(incompleteFileResponse.headers['content-range'] || ''), /^bytes 0-\d+\/31457280$/)
 
     const packedResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(packedPlaybackToken)}`)
     assert.equal(packedResponse.status, 422, 'incomplete packed archives should fail fast with a truthful packed-release message instead of stalling')

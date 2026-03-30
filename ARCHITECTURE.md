@@ -94,7 +94,7 @@ Stremio client
 
 1. Stream handler resolves content from Prowlarr/Torznab-compatible search plus qBittorrent state.
 2. Completed local files prefer `/file/:info`.
-3. Not-ready content uses `/playback/:info` only on playback-capable runtimes such as `PC Local`, `LAN Bridge` after local redirect, or self-hosted installs that actually serve `/playback`.
+3. Not-ready content uses `/playback/:info` only on playback-capable runtimes such as `PC Local`, `LAN Bridge` after local redirect, or self-hosted installs that actually serve `/playback`; once qBittorrent exposes the target file on a built-in playback-capable runtime, `/playback` immediately hands off to `/file/:info` so the shared file route can keep the player request alive while bytes arrive.
 4. External `fileServerUrl` is optional and mainly used when the local runtime cannot read the file directly.
 5. Hosted runtime fails fast rather than buffering or serving local-only playback.
 6. Completed local playback now correctly checks torrent completion state before redirecting to `/file`.

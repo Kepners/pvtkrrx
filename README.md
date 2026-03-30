@@ -17,7 +17,7 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 
 - **Sports** — Browse and search private tracker sports content (EPL, F1, UFC) directly in Stremio
 - **Sports-first discovery** — `All Sports` plus sport-family catalogs now lead the movie discovery column, with the third-column filter used for league/team detail
-- **Sports artwork enrichment** — Optional TheSportsDB portrait, landscape, and background artwork with cache-aware lookups; sports catalog tiles now prefer landscape art when available
+- **Sports artwork enrichment** — Optional TheSportsDB poster, landscape, background, and logo artwork with cache-aware lookups; sports catalog tiles now prefer landscape art when available
 - **Movies & TV** — IMDb-matched content from your private trackers
 - **Seedbox Library** — Browse everything already downloaded on your seedbox
 - **Smart filtering** — Sports indexers never contaminate movie/TV searches
@@ -41,7 +41,7 @@ See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the exact LAN B
 | Feature | Status |
 |---------|--------|
 | Sports discovery catalogs (All Sports, Football, Motorsport, MMA, etc.) | Working |
-| Sports artwork enrichment | Working (landscape art preferred for sports tiles when available) |
+| Sports artwork enrichment | Working (landscape art preferred for sports tiles; sports meta now carries Stremio loading-screen background + logo artwork when available) |
 | Movie/TV streams from private trackers | Working |
 | Sports contamination filter | Working (SportsCult excluded from movie searches) |
 | Already-downloaded files | Working (built-in file server with Range support) |
@@ -277,8 +277,8 @@ This now builds in the system temp directory first, then copies the finished `1.
 | PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS | Optional | Timeout for stream route upstream calls (Prowlarr/qBit/Cinemeta), default 7000 |
 | PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS | Optional | Timeout for stream title-fallback Prowlarr call, default 5000 |
 | PVTKRRX_STREAM_MAX_CANDIDATES | Optional | Max stream candidates to process per request (default 20) |
-| STREAM_READY_START_PERCENT | Optional | Fraction of a file that must be locally readable before `/playback` redirects into `/file` (default `0.5%`) |
-| STREAM_READY_MIN_BYTES | Optional | Minimum readable head buffer required before `/playback` redirects into `/file` (default `24MB`) |
+| STREAM_READY_START_PERCENT | Optional | Fraction of a file that must be locally readable before playback is considered ready for direct file-server redirects (default `0.5%`) |
+| STREAM_READY_MIN_BYTES | Optional | Minimum readable head buffer required before playback is considered ready for direct file-server redirects (default `24MB`) |
 | STREAM_PRIORITIZE_LAST_PIECES | Optional | Keep qBittorrent first+last piece priority enabled for incomplete playback so Stremio footer/range probes do not bounce back to source selection (default true) |
 | PVTKRRX_STREMIO_API_BASE_URL | Optional | Stremio API base URL for AuthKey verification (default https://api.strem.io) |
 | PVTKRRX_STREMIO_API_TIMEOUT_MS | Optional | Timeout for Stremio AuthKey verification calls (default 10000) |

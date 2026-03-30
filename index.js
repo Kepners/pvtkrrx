@@ -1342,6 +1342,38 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
     let maxPeersSeen = 0
     let trackerPayload = null
     let trackerInspection = null
+    const baseUrl = getPublicBaseUrl(req)
+    const builtinFileUrlPrefix = `${baseUrl}/${req.params.config}/file/`
+
+    const tryRedirectToFileRoute = (state, reason) => {
+      if (!state?.torrent || !state?.file?.name) return false
+
+      const videoProgress = Number(state.file?.progress || 0)
+      const complete = isCompletedTorrent(state.torrent, videoProgress)
+      const fileUrl = buildPlaybackFileUrl(
+        req.config,
+        req.params.config,
+        baseUrl,
+        state.torrent.hash,
+        state.torrent,
+        state.file.name,
+        {
+          multipleFiles: Array.isArray(state.files) && state.files.length > 1,
+          currentFilePath: state.fileExists ? state.resolvedFilePath : '',
+          requireCurrentPathProof: !complete
+        }
+      )
+      if (!fileUrl) return false
+
+      const canBufferViaBuiltinFileRoute = fileUrl.startsWith(builtinFileUrlPrefix)
+      if (!complete && !canBufferViaBuiltinFileRoute) return false
+
+      console.log(
+        `[playback-route] ${reason} -> redirect file${complete ? '' : ' (buffering via /file)'}`
+      )
+      res.redirect(302, fileUrl)
+      return true
+    }
 
     if (!trackedHash && info.l && !isMagnetLink(info.l)) {
       try {
@@ -1380,27 +1412,16 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
           })
         }
         hasTorrent = true
-        if ((existing.ready || Number(existing.torrent.progress || 0) >= 0.999) && existing.file?.name) {
-          const fileUrl = buildPlaybackFileUrl(
-            req.config,
-            req.params.config,
-            getPublicBaseUrl(req),
-            existing.torrent.hash,
-            existing.torrent,
-            existing.file.name,
-            {
-              multipleFiles: existing.files.length > 1,
-              currentFilePath: existing.fileExists ? existing.resolvedFilePath : '',
-              requireCurrentPathProof: !isCompletedTorrent(existing.torrent, Number(existing.file?.progress || 0))
-            }
-          )
-          if (!fileUrl) {
-            return res.status(412).json({
-              error: 'Hosted playback requires File Server URL or LAN Pair relay'
-            })
-          }
-          console.log('[playback-route] existing torrent ready -> redirect file')
-          return res.redirect(302, fileUrl)
+        const existingComplete = Number(existing.torrent.progress || 0) >= 0.999 || Number(existing.file?.progress || 0) >= 0.999
+        if (tryRedirectToFileRoute(existing, existing.ready || existingComplete
+          ? 'existing torrent ready'
+          : 'existing torrent buffering')) {
+          return
+        }
+        if (existingComplete && existing.file?.name) {
+          return res.status(412).json({
+            error: 'Hosted playback requires File Server URL or LAN Pair relay'
+          })
         }
         lastProgress = Number(existing.file?.progress || existing.torrent.progress || 0)
         maxAvailability = Math.max(maxAvailability, Number(existing.torrent?.availability || 0))
@@ -1457,7 +1478,9 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
       }
     }
 
-    // Keep request open and auto-redirect once enough start-buffer exists.
+    // Keep the request open only until we can identify the target file or confirm true readiness.
+    // For local/self-hosted built-in playback, redirect into /file as soon as the file path is known
+    // so the shared file route can hold the HTTP connection open while bytes continue arriving.
     while (Date.now() < waitDeadline) {
       await sleep(STREAM_WAIT_INTERVAL_MS)
 
@@ -1510,27 +1533,16 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
       maxAvailability = Math.max(maxAvailability, Number(state.torrent?.availability || 0))
       maxSeedersSeen = Math.max(maxSeedersSeen, Number(state.torrent?.num_seeds || 0))
       maxPeersSeen = Math.max(maxPeersSeen, Number(state.torrent?.num_leechs || 0))
-      if ((state.ready || Number(state.torrent.progress || 0) >= 0.999) && state.file?.name) {
-        const fileUrl = buildPlaybackFileUrl(
-          req.config,
-          req.params.config,
-          getPublicBaseUrl(req),
-          state.torrent.hash,
-          state.torrent,
-          state.file.name,
-          {
-            multipleFiles: state.files.length > 1,
-            currentFilePath: state.fileExists ? state.resolvedFilePath : '',
-            requireCurrentPathProof: !isCompletedTorrent(state.torrent, Number(state.file?.progress || 0))
-          }
-        )
-        if (!fileUrl) {
-          return res.status(412).json({
-            error: 'Hosted playback requires File Server URL or LAN Pair relay'
-          })
-        }
-        console.log('[playback-route] progressive-ready -> redirect file')
-        return res.redirect(302, fileUrl)
+      const stateComplete = Number(state.torrent.progress || 0) >= 0.999 || Number(state.file?.progress || 0) >= 0.999
+      if (tryRedirectToFileRoute(state, state.ready || stateComplete
+        ? 'progressive-ready'
+        : 'progressive-buffering')) {
+        return
+      }
+      if (stateComplete && state.file?.name) {
+        return res.status(412).json({
+          error: 'Hosted playback requires File Server URL or LAN Pair relay'
+        })
       }
     }
 

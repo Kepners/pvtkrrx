@@ -62,10 +62,11 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 - Sports now uses its own top-level `sports` surface instead of being hidden under `movie`.
 - Sports discovery is no longer one generic catalog plus broad sport-type genre filters. The sports surface now leads with an `All Sports` catalog followed by sport-family catalogs such as `Football`, `Motorsport`, `MMA`, `American Football`, and others, so sport selection happens in Stremio's type picker and catalog column first.
 - Sport-family catalogs keep the third-column `genre` dropdown for narrower league/team-style filters such as `Premier League`, `Arsenal`, `Formula 1`, `UFC`, or `NBA`.
-- Sports artwork can now carry three distinct shapes from TheSportsDB:
+- Sports artwork can now carry four distinct assets from TheSportsDB:
   - `poster`
   - `landscapeImage`
   - `backgroundImage`
+  - `logo`
 - Sports catalog tiles now prefer `landscapeImage` first when available, while portrait art is retained separately for detail/fallback use.
 - Sports detail meta now exposes Stremio `genres` tags from the resolved sport classification when available.
 - Sports title parsing now handles both team-vs-team formats (`EPL.2026.03.15.Arsenal.vs.Chelsea`) and non-vs event formats (`Formula1.2026.03.28.Japanese.Grand.Prix.Qualifying`, `UFC.Fight.Night.270.Main.Card`).
@@ -85,7 +86,7 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 - Local `/file` serves bytes with HTTP Range support when the file is locally accessible on disk.
 - Local progressive playback now waits for a safer initial readable buffer and keeps qBittorrent first+last piece priority enabled by default while a file is still incomplete, so Stremio can stay on the player page instead of bouncing back to source selection during early range probes.
 - Local `/file` can continue serving a known absolute local file path even after qBittorrent no longer reports the torrent row, as long as the file still exists on disk.
-- Local `/playback` is the queued-download path for tracker content that is not yet ready. It fetches the `.torrent` payload, adds it to qBittorrent, polls for readiness, and 302-redirects to `/file` when the file is playable.
+- Local `/playback` is the queued-download path for tracker content that is not yet ready. It fetches the `.torrent` payload, adds it to qBittorrent, and as soon as qBittorrent exposes the target file on a built-in playback-capable runtime it 302-redirects into `/file`, letting the shared file route hold the HTTP connection open while bytes arrive. When built-in buffering is not possible, `/playback` still waits for ready-file thresholds before redirecting.
 - Completed-file playback correctly checks torrent completion state before redirecting into `/file`.
 - Packed RAR releases (`.rar/.r00/.r01/...`):
   - Completed archive sets now trigger background extraction on the host when the archive volumes are locally reachable.
