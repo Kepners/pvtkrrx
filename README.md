@@ -56,6 +56,7 @@ See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the exact LAN B
 
 ## Current Project Status
 
+See [docs/WEBSITE_STATUS.md](docs/WEBSITE_STATUS.md) for the current public-site truth table plus homepage rewrite backlog.
 See [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for the authoritative current stage, active worktree items, and deployment checklist. See [docs/CURRENT_DESIGN.md](docs/CURRENT_DESIGN.md) for the live architecture and [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) for route-specific install/playback rules.
 
 ## Documentation Guide
@@ -69,6 +70,7 @@ Use these files as the live documentation set:
 - [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) — LAN Bridge setup, pairing, heartbeat, and troubleshooting
 - [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) — current verification and deployment status
 
+- [docs/WEBSITE_STATUS.md](docs/WEBSITE_STATUS.md) - public route health, canonical host notes, and homepage/content backlog
 The February 2026 planning docs under `docs/` are kept as project history and are now marked as historical where they no longer describe the live runtime.
 
 ## Quick Start
@@ -77,6 +79,7 @@ The February 2026 planning docs under `docs/` are kept as project history and ar
 
 Visit **[www.pvtkrrx.cc](https://www.pvtkrrx.cc)** to configure your addon in 60 seconds.
 Use the canonical hosted base only: `https://www.pvtkrrx.cc`.
+Do not use the old preview host `https://pvtkrrx.vercel.app`; on 2026-03-31 it returned Vercel `DEPLOYMENT_NOT_FOUND`.
 Hosted install links should resolve under `https://www.pvtkrrx.cc/{token}/manifest.json?...`.
 For `LAN Bridge`, the primary install action should start with `stremio://`; the hosted HTTPS manifest is manual fallback only when Stremio shows an `Add Addon URL` box.
 
@@ -245,6 +248,7 @@ npm run smoke:stremio-link
 ### Hosted Production
 
 Use the canonical hosted base: `https://www.pvtkrrx.cc`.
+As of 2026-03-31, `https://www.pvtkrrx.cc/`, `/configure`, `/runbooks`, `/manifest.json`, and `/health` all responded from the live public host, while the old `https://pvtkrrx.vercel.app` preview returned `DEPLOYMENT_NOT_FOUND`.
 Production updates are deployed from the synced GitHub branch and must preserve the active `ENCRYPTION_SECRET`.
 
 ### Self-Host

@@ -9,6 +9,11 @@ One runtime. Three install routes. Use the route that matches where playback hap
 
 For the broader runtime and storage model, see `docs/CURRENT_DESIGN.md`.
 
+## Hosted Base
+
+- The canonical public host is `https://www.pvtkrrx.cc`.
+- The old preview host `https://pvtkrrx.vercel.app` returned Vercel `DEPLOYMENT_NOT_FOUND` on 2026-03-31 and is not part of the supported install surface.
+
 ## Archive Source Note
 
 - Official Stremio SDK/core support `rarUrls` archive streams.
@@ -34,6 +39,7 @@ For the broader runtime and storage model, see `docs/CURRENT_DESIGN.md`.
 5. Raw `192.168.x.x:7000` addon installs are still not a stable Stremio path.
 6. `http://127.0.0.1:7000/...` remains the reliable manual install path for same-PC local use.
 7. `LAN Bridge` installs should be refreshed after meaningful pair/token/route changes because Stremio can keep stale hosted URLs.
+8. `/local/install` is a same-host/local-network helper route; a public `403` is expected.
 
 ## What Each Route Exposes
 
@@ -75,7 +81,7 @@ There is no per-route catalog filtering. The Library catalog queries qBittorrent
 
 - Install: hosted HTTPS manifest URL
 - Config loaded from encrypted hosted token
-- On the canonical hosted relay (Vercel): `/file` and `/playback` routes return **403 Forbidden** for non-local requests
+- On the canonical hosted relay (`https://www.pvtkrrx.cc`): `/file` and `/playback` routes return **403 Forbidden** for non-local requests
 - Playback depends entirely on external infrastructure:
   - Completed files served via `fileServerUrl` (external HTTP server) or public qBit WebUI
   - No queue-and-buffer capability unless PVTKRRX is self-hosted on a runtime that can actually serve `/playback`
@@ -91,10 +97,10 @@ If a row says `rarUrls`, that means the addon emits the archive source only when
 
 ### By Release Type
 
-| Release type | PC Local | LAN Bridge (online) | LAN Bridge (offline, required) | Remote Seedbox (Vercel) |
+| Release type | PC Local | LAN Bridge (online) | LAN Bridge (offline, required) | Remote Seedbox (public hosted relay) |
 |---|---|---|---|---|
 | **Completed unpacked video** | `/file` serves bytes directly | 307 → local `/file` | Offline notice | External `fileServerUrl` or public qBit URL |
-| **In-progress unpacked video** | `/playback` queues + polls → 302 to `/file` | 307 → local `/playback` | Offline notice | **Suppressed** (no buffering on Vercel) |
+| **In-progress unpacked video** | `/playback` queues + polls → 302 to `/file` | 307 → local `/playback` | Offline notice | **Suppressed** (no buffering on the public hosted relay) |
 | **On-tracker (not yet added)** | `/playback` fetches .torrent, adds to qBit, polls | 307 → local `/playback` | Offline notice | **Suppressed** at stream emission |
 | **Packed RAR (complete)** | Extracted direct video when ready; otherwise hidden until extraction succeeds | 307 → local direct video; otherwise hidden until extraction succeeds | Offline notice | Extracted direct file when reachable; otherwise hidden until extraction succeeds |
 | **Packed RAR (incomplete)** | Suppressed; `/playback` fails fast with truthful message | 307 → same as local | Offline notice | **Suppressed** |
@@ -104,7 +110,7 @@ Today the supported packed-release path is extracted direct video. Native `rarUr
 
 ### By Endpoint
 
-| Endpoint | PC Local | LAN Bridge (online) | Remote Seedbox (Vercel) |
+| Endpoint | PC Local | LAN Bridge (online) | Remote Seedbox (public hosted relay) |
 |---|---|---|---|
 | `/:config/file/:info` | Serves bytes (200/206) | 307 → local `/file` | 403 Forbidden |
 | `/:config/playback/:info` | Queue + comet poll (503 → 302) | 307 → local `/playback` | 403 Forbidden |

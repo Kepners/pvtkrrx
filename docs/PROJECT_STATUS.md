@@ -16,6 +16,8 @@ The practical reading of the project today is:
 - PVTKRRX now treats extracted direct video as the only supported packed-RAR playback path by default, and keeps native `rarUrls` behind an explicit experimental override
 - the sports catalog artwork path now prefers portrait poster art for tiles, while keeping separate sport-aware backgrounds/logos for player wallpaper/loading
 - the Windows installer/build flow is reproducible again
+- `https://www.pvtkrrx.cc` is the live public relay; `https://pvtkrrx.vercel.app` is currently a dead preview hostname returning Vercel `DEPLOYMENT_NOT_FOUND`
+- the public homepage is visually on-brand but still explains the product worse than the README, so website clarity/conversion work is now a real backlog item
 - the remaining work is real-device coverage, remote/auth playback sign-off, and performance tuning, not a reset/rebuild
 
 ## Verified Working Now
@@ -30,6 +32,8 @@ These items are verified in the current workspace or by direct client/log proof:
 - `npm run dist:win` passed on 2026-03-29, again on 2026-03-30 for the `1.1.16` desktop release build, again on 2026-03-30 for the `1.1.17` bug-fix desktop release build, again on 2026-03-30 for the `1.1.18` archive-extraction desktop release build, and again on 2026-03-30 for the `1.1.19` desktop power-policy build
 - `npm run smoke:config`, `npm run smoke:desktop`, `npm run smoke:stremio-link`, `npm run smoke:lan-pair`, `npm run smoke:guards`, `npm run smoke:security`, `npm run smoke:pipeline`, `npm run smoke:playback`, and `npm run smoke:sports` all passed again on 2026-03-30
 - root `/manifest.json` returns the bootstrap manifest (`com.kepners.pvtkrrx.bootstrap`) with no catalogs/resources and `configurationRequired=true`
+- 2026-03-31 public host check: `https://www.pvtkrrx.cc/`, `/configure`, `/runbooks`, `/manifest.json`, and `/health` all returned `200` from the live public host; `/local/install` returned `403` as expected for a local-only helper route
+- 2026-03-31 preview-host check: `https://pvtkrrx.vercel.app/` returned `404` with `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`, so treat it as stale and non-canonical
 - `PC Local` resolves as a real addon from `http://127.0.0.1:7000/local/manifest.json?mode=local`
 - same-host `LAN Bridge` `Failed to fetch` was traced to route choice on 2026-03-28, not to server failure
 - completed-file playback error `isCompletedTorrent is not defined` was fixed in the local playback path
@@ -131,6 +135,8 @@ These items should still be treated as open until captured on real clients:
 - remote/auth-protected playback behavior still depends on what the target Stremio client honors during redirect/auth handoff
 - the addon still emits `behaviorHints.sourceContainer = 'rar'` on the experimental native archive path, but official Stremio docs/core do not define that field for archive support
 - if a future Stremio client regresses local archive support, the supported fallback already remains: suppress partial multi-volume archives and only advertise extracted direct-play files
+- the public homepage copy is still too operator-coded and route-heavy; the docs explain the product faster than the landing page
+- the public homepage still exposes `/local/install` as a CTA even though that route is intentionally local-only and returns `403` from the public internet
 
 ## 2026-03-30 Plan Closure
 
@@ -175,8 +181,12 @@ These items should still be treated as open until captured on real clients:
 
 ## Recommended Next Work
 
-1. Tune qBittorrent for faster early playback and confirm stream start time improvements on real clients.
-2. Keep sports poster/wallpaper review focused on what Stremio clients actually render, not just what the metadata payload contains.
-3. Capture one extra Android TV or Android mobile `LAN Bridge` pass for cross-client parity beyond the now-verified Apple TV path.
-4. Finish public remote/auth playback sign-off before calling the whole route set fully release-ready.
-5. Keep this file updated whenever a real device test changes the truth table.
+1. Rewrite the homepage hero with a plain-English product sentence: Stremio addon, private tracker stack, sports/movies/TV/library, your own hardware.
+2. Replace or gate the public `PC Local` CTA so the homepage stops sending public visitors to the local-only `/local/install` route.
+3. Add a clear route comparison block plus a "What you need" section to the homepage.
+4. Give sports its own proof/value section instead of leaving it as a badge strip.
+5. Tune qBittorrent for faster early playback and confirm stream start time improvements on real clients.
+6. Keep sports poster/wallpaper review focused on what Stremio clients actually render, not just what the metadata payload contains.
+7. Capture one extra Android TV or Android mobile `LAN Bridge` pass for cross-client parity beyond the now-verified Apple TV path.
+8. Finish public remote/auth playback sign-off before calling the whole route set fully release-ready.
+9. Keep this file updated whenever a real device test changes the truth table.
