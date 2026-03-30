@@ -89,12 +89,15 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 - Local `/playback` is the queued-download path for tracker content that is not yet ready. It fetches the `.torrent` payload, adds it to qBittorrent, and as soon as qBittorrent exposes the target file on a built-in playback-capable runtime it 302-redirects into `/file`, letting the shared file route hold the HTTP connection open while bytes arrive. When built-in buffering is not possible, `/playback` still waits for ready-file thresholds before redirecting.
 - Completed-file playback correctly checks torrent completion state before redirecting into `/file`.
 - Packed RAR releases (`.rar/.r00/.r01/...`):
+  - Official Stremio archive-source support is real: `rarUrls` is part of the addon/core contract and is routed through the client's local streaming server.
   - Completed archive sets now trigger background extraction on the host when the archive volumes are locally reachable.
   - If extraction has already finished, PVTKRRX prefers the extracted direct video file for playback.
-  - If extraction is still running or unavailable, completed archive sets still emit ordered Stremio-core-compatible `rarUrls` streams (tuple form) with array-based `fileMustInclude` on any route that can serve the archive files.
+  - If extraction is still running or unavailable, completed archive sets can still emit ordered Stremio-core-compatible `rarUrls` streams (tuple form) with array-based `fileMustInclude` on any route that can serve the archive files.
+  - Emitting `rarUrls` means the addon is using the official archive payload shape; it does not yet count as end-to-end real-client sign-off for PVTKRRX archive playback.
   - Incomplete archive sets are suppressed — no stream is offered until every volume is 100% ready.
   - Packed-only tracker sources are suppressed at stream emission time before `/playback` is ever reached.
   - `/playback` fails fast with a truthful packed-archive message if a packed torrent is already in qBit but not yet complete.
+  - The addon still sets `behaviorHints.sourceContainer = 'rar'` as a repo-local hint, but that field is not part of the official Stremio archive contract and should not be used as proof that clients honor the stream.
 - External `fileServerUrl` is optional. It is required for `Remote Seedbox` completed-file playback on the hosted relay but not needed for `PC Local` or `LAN Bridge` where the local runtime reads files from disk.
 - When `fileServerAuth` is configured, `proxyHeaders` with Basic Auth are added to seedbox and buffering stream URLs. Tracker `/playback` is suppressed on non-local routes because Stremio cannot forward auth headers through a redirect chain.
 - Remote buffering URLs are emitted only when the current file path is provable from live torrent state.

@@ -127,14 +127,20 @@ For every item:
 
 ## Current Active Item
 
-None. This plan was closed on 2026-03-30 after a full verification pass across all seven items.
+Follow-up on item 1: real-client sign-off for packed RAR playback.
+
+- Code and smoke coverage for the archive payload path are in place.
+- A 2026-03-30 upstream audit confirmed that official Stremio SDK/core support for `rarUrls` is real.
+- This plan should stay open until one real PVTKRRX client successfully plays a completed packed release through the native archive path, or that path is explicitly downgraded further.
 
 ## 2026-03-30 Closure Notes
 
-1. Item 1 closed.
+1. Item 1 implementation completed, but real-client sign-off reopened during the 2026-03-30 documentation audit.
    - `npm run smoke:pipeline` and `npm run smoke:playback` both passed on 2026-03-30.
    - The later `/file` `torrent not found` log was traced to `watch-cleanup` deleting the torrent and data after playback, not to an active playback bug.
+   - Official Stremio sources were re-checked: `rarUrls` is a real archive source, tuple-style `ArchiveUrl` is correct, and archive sources are routed through `rar/create`.
    - Supported behavior remains: suppress partial multi-volume archives truthfully, and only emit ordered Stremio-core-compatible `rarUrls` once the full bundle is ready.
+   - Remaining blocker: one real-client PVTKRRX success on the native archive path.
 2. Item 2 closed.
    - `npm run smoke:config`, `npm run smoke:desktop`, and `npm run smoke:stremio-link` all passed on 2026-03-30.
    - The current configure flow now exposes route-aware primary install links and keeps manual URLs as fallback instead of the main path.
@@ -155,5 +161,8 @@ None. This plan was closed on 2026-03-30 after a full verification pass across a
 - Incomplete archive sets were being surfaced too early and can trigger real Stremio `liberror`.
 - Classic archive ordering needed to be `.rar`, `.r00`, `.r01`, ... instead of lexical order.
 - Current `stremio-core` examples/stream conversion logic use tuple-style archive URLs and array-based `fileMustInclude`, so the addon payload now needs to match that contract before real-client signoff is meaningful.
+- Official Stremio support for `rarUrls` is real in the SDK/core and routes through the local streaming server at `rar/create`.
+- The repo-local `behaviorHints.sourceContainer = 'rar'` hint is not part of that official archive contract and cannot count as proof that clients honor the stream.
+- Smoke tests prove payload emission and route behavior only; they do not prove end-to-end client playback.
 - Neutral-title `.torrent` links were still slipping into generic `/playback` because the addon had not inspected the torrent payload before emitting live tracker streams.
 - The local Stremio archive path does not behave like progressive `.mp4/.mkv` playback for partial multi-volume RAR sets, so the honest supported result is: queue them, suppress fake live play, and only surface the RAR stream once the full archive bundle is ready.

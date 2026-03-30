@@ -45,7 +45,7 @@ See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the exact LAN B
 | Movie/TV streams from private trackers | Working |
 | Sports contamination filter | Working (SportsCult excluded from movie searches) |
 | Already-downloaded files | Working (built-in file server with Range support) |
-| Packed RAR scene releases already added to qBittorrent | Working on supported routes once complete: the host now background-extracts packed releases when possible and prefers the extracted direct video; native ordered `rarUrls` remain as the desktop-capable fallback, while partial multi-volume archive playback stays suppressed |
+| Packed RAR scene releases already added to qBittorrent | Implemented with honest fallback behavior: partial multi-volume playback stays suppressed, the host prefers the extracted direct video when ready, and completed bundles can emit ordered `rarUrls` as an experimental desktop/service-backed fallback pending real-client proof |
 | On-tracker download + play | Working on playback-capable routes (PC Local, LAN Bridge via local redirect, or self-hosted runtime) |
 | Local + Hosted install modes | Working |
 | Hosted LAN pair mode (Android TV/mobile) | Implemented (requires relay config) |
@@ -157,6 +157,8 @@ Hosted relay routes do not proxy video bytes, and hosted `/file` or `/playback` 
 **[INFO] Remote notice** — Hosted Remote Seedbox can append an explanation row when direct queue-and-buffer is hidden to protect your file-server login or when qBittorrent has not exposed enough live file info for a safe buffer URL yet.
 
 **Packed RAR scene release** — If a tracker source is a multi-part RAR release (`.rar`, `.r00`, `.r01`, ...), the first click can still queue the torrent, but PVTKRRX no longer pretends that partial archive playback will work. Real Stremio clients can fail with `liberror` on incomplete multi-volume archives, so PVTKRRX suppresses live tracker playback for packed-only torrents and fails fast on `/playback` with a truthful message after queueing the download. Once qBittorrent has the full archive set, the host now starts background extraction for broader device compatibility and prefers the extracted direct video stream when ready. If extraction has not finished yet, local playback-capable routes still expose the ordered, Stremio-core-compatible `rarUrls` fallback for desktop-capable Stremio clients.
+
+Official Stremio SDK/core docs do support `rarUrls` archive sources, routed through the client's local streaming server. PVTKRRX emits that tuple-based payload for completed bundles, but this project still treats native RAR playback as an experimental fallback until one real-client success is captured. The host therefore prefers background extraction and a normal direct video stream whenever one is ready.
 
 ## Verify Stremio Config Flow
 

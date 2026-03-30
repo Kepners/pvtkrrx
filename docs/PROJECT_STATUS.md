@@ -11,9 +11,11 @@ The practical reading of the project today is:
 - `PC Local` is the real host-desktop route and is working
 - `LAN Bridge` is the same-account home-device route and the host desktop should not use it for local browsing
 - completed-file playback on the local runtime is working again after the `/playback` and `/file` path fixes
+- official Stremio archive-source support for `rarUrls` is real and was re-verified against upstream SDK/core sources on 2026-03-30
+- PVTKRRX now emits the correct packed-archive payload shape, but one real-client PVTKRRX archive-playback success is still missing before that path should be called proven
 - the sports catalog artwork path now prefers landscape art for tiles when available
 - the Windows installer/build flow is reproducible again
-- the remaining work is real-device coverage and performance tuning, not a reset/rebuild
+- the remaining work is real-device coverage, packed-RAR client sign-off, and performance tuning, not a reset/rebuild
 
 ## Verified Working Now
 
@@ -43,6 +45,9 @@ These items are verified in the current workspace or by direct client/log proof:
 - Supercars, V8, NASCAR, WSBK, WEC, Formula E, Darts, and expanded Golf coverage added to sport detection
 - local `/playback` now fails fast for incomplete multi-volume RAR releases after queueing the torrent, instead of timing out behind a false progressive-playback promise
 - completed packed RAR releases now start background extraction into a managed `.pvtkrrx-extracted/<hash>` folder when the local host can reach the archive volumes, and direct extracted playback is preferred once ready while `rarUrls` remain the fallback
+- official Stremio sources were re-checked on 2026-03-30: `rarUrls` is a real archive source, tuple-style `ArchiveUrl` is the correct payload shape, and archive sources are routed through the local streaming server at `rar/create`
+- the repo-local `behaviorHints.sourceContainer = 'rar'` hint is not part of the official Stremio archive contract and should not be treated as proof that clients honor the stream
+- `npm run smoke:pipeline` and `npm run smoke:playback` both passed again on 2026-03-30 during the documentation audit; these prove payload and route behavior, not end-to-end client playback
 - current configure flow exposes route-aware primary install links while keeping manual addon URLs as fallback, and the current `public/configure.html` flow passed the 2026-03-30 config/desktop/link smoke pass
 - the Stremio WebView2 client cache on this machine contains cached PVTKRRX stream responses with `PVTKRRX` in the stream `name`, confirming branded source labels are reaching the real client
 - `1.1.19` installers were built successfully into `dist/`
@@ -82,8 +87,8 @@ These items are verified in the current workspace or by direct client/log proof:
 11. Partial packed RAR playback was still being falsely advertised on neutral-title tracker sources:
    - Root cause: unmatched `.torrent` links were being emitted as generic `/playback` streams before the addon had inspected the torrent payload, and archive-only torrents were not being prioritized as a bundle when qBittorrent primed the download.
    - Fix: tracker links are now inspected dynamically before stream emission, neutral packed-only torrents are suppressed behind a truthful packed-release notice, archive-only priming now prioritizes the full RAR bundle instead of a sample clip, and `/playback` now returns an immediate packed-archive explanation instead of stalling.
-12. Completed packed releases still failed on tablet/mobile clients even when desktop `rarUrls` playback worked:
-   - Root cause: the addon relied entirely on client-side native RAR support, but real Stremio client support is uneven outside desktop and the tablet path still needed a normal direct-play video file.
+12. Completed packed releases still failed on tablet/mobile clients even when native `rarUrls` was the intended desktop/service-backed fallback:
+   - Root cause: the addon relied entirely on client-side native RAR support, but real Stremio client support is uneven outside desktop/service-backed routes and the tablet path still needed a normal direct-play video file.
    - Fix: the local/host runtime now bundles `7zip-bin`, starts background extraction for completed packed releases when the archive volumes are locally reachable, and prefers the extracted direct video stream once available while keeping native `rarUrls` as the desktop-capable fallback.
 13. The local host could disappear when Windows was locked or the display turned off:
    - Root cause: the Electron desktop wrapper did not request any suspend blocker and did not react to Windows lock/resume state changes, so LAN hosting depended entirely on the user's power plan staying awake.
@@ -93,6 +98,8 @@ These items are verified in the current workspace or by direct client/log proof:
 
 These items should still be treated as open until captured on real clients:
 
+- one completed packed RAR playback success on a real Stremio Desktop v5 or other service-backed client using PVTKRRX's emitted `rarUrls` path
+- one Stremio Web plus attached Stremio Desktop/Stremio Service packed-RAR playback pass, if web/LAN archive delegation is going to be claimed
 - second-device `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.19` desktop build
 - Apple TV synced-addon flow after desktop/web install
 - one real public `Remote Seedbox` ready-file playback success on a remote client
@@ -104,14 +111,17 @@ These items should still be treated as open until captured on real clients:
 - `LAN Bridge` still depends on the Windows host desktop staying online and heartbeating
 - Bonjour may still be missing or stopped on some hosts; that affects discovery/fallback polish, not the core loopback path
 - remote/auth-protected playback behavior still depends on what the target Stremio client honors during redirect/auth handoff
+- the addon still emits `behaviorHints.sourceContainer = 'rar'`, but official Stremio docs/core do not define that field for archive support
 - if a future Stremio client regresses local archive support, the correct fallback remains: suppress partial multi-volume archives and never fake progressive playback on packed releases
 
 ## 2026-03-30 Plan Closure
 
-1. ~~Rework packed RAR playback after the real-device `liberror` result.~~ **Closed 2026-03-30.**
+1. ~~Rework packed RAR playback after the real-device `liberror` result.~~ **Implementation complete; real-client sign-off reopened on 2026-03-30.**
    - `npm run smoke:pipeline` and `npm run smoke:playback` passed again on 2026-03-30.
    - The later `/file` `torrent not found` log was traced to `watch-cleanup` deleting the torrent and data after playback, not to an active playback bug.
-   - Supported behavior is now fixed and truthful: incomplete multi-volume archives are suppressed or fail fast with a clear message, completed bundles still emit ordered Stremio-core-compatible `rarUrls`, and `1.1.18` now adds host-side extraction so local/LAN clients can prefer a normal direct-play file once unpacking finishes.
+   - A 2026-03-30 upstream audit confirmed that Stremio archive support is real: `rarUrls` exists in the SDK/core contract, tuple-style `ArchiveUrl` is correct, and archive sources are routed through `rar/create`.
+   - Supported behavior remains truthful: incomplete multi-volume archives are suppressed or fail fast with a clear message, completed bundles can emit ordered Stremio-core-compatible `rarUrls`, and `1.1.18` adds host-side extraction so local/LAN clients can prefer a normal direct-play file once unpacking finishes.
+   - The repo still lacks one captured real-client PVTKRRX success on the native archive path, so this item should not be treated as fully closed yet.
 2. ~~Make the configure flow more automatic.~~ **Closed 2026-03-30.**
    - `npm run smoke:config`, `npm run smoke:desktop`, and `npm run smoke:stremio-link` passed again on 2026-03-30.
    - The current simple flow now has route-aware primary install links and keeps manual addon URLs as fallback instead of the main path.
