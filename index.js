@@ -1148,10 +1148,10 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
       isOrphanFile = true
     }
 
-    const torrent = playback?.torrent || { hash: h, progress: 1 }
+    let torrent = playback?.torrent || { hash: h, progress: 1 }
     const files = playback?.files || []
     let file = playback?.file || null
-    const resolvedFilePath = playback?.resolvedFilePath || (isOrphanFile ? path.normalize(p) : '')
+    let resolvedFilePath = playback?.resolvedFilePath || (isOrphanFile ? path.normalize(p) : '')
     const torrentHash = String(torrent?.hash || h || '').toLowerCase()
     if (!file && isOrphanFile) {
       file = {
@@ -1169,30 +1169,65 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
     if (!isOrphanFile) {
       await primeTorrentForStreaming(qbit, torrent, file, files)
     }
-    if ((!isOrphanFile && !playback.fileExists) || !resolvedFilePath) {
-      console.warn('[file-route] file not found on disk')
-      return res.status(425).json({
-        error: 'Buffering torrent metadata',
-        progress: Number(file?.progress || torrent.progress || 0)
-      })
-    }
-
+    let fileExists = Boolean(isOrphanFile || playback?.fileExists)
     let fileSize = Math.max(0, Number(file?.size || playback?.diskSize || orphanFileStat?.size || 0))
     let readableBytes = isOrphanFile ? fileSize : Number(playback.readableBytes || 0)
     let isComplete = isOrphanFile || Number(file?.progress || torrent.progress || 0) >= 0.999
+    let maxReadable = isComplete ? fileSize : Math.max(0, Math.min(fileSize, readableBytes))
+
+    const applyRefreshedPlayback = (refreshed) => {
+      if (!refreshed?.torrent || !refreshed?.file) return false
+      torrent = refreshed.torrent
+      file = refreshed.file
+      resolvedFilePath = refreshed.resolvedFilePath || ''
+      fileExists = Boolean(refreshed.fileExists && resolvedFilePath)
+      fileSize = Math.max(0, Number(refreshed.file?.size || refreshed.diskSize || fileSize))
+      readableBytes = Number(refreshed.readableBytes || 0)
+      isComplete = Number(refreshed.file?.progress || refreshed.torrent.progress || 0) >= 0.999
+      maxReadable = isComplete ? fileSize : Math.max(0, Math.min(fileSize, readableBytes))
+      return true
+    }
+
+    const waitForFileState = async (predicate) => {
+      if (isOrphanFile) return false
+      const waitUntil = Date.now() + STREAM_RANGE_WAIT_TIMEOUT_MS
+      while (Date.now() < waitUntil) {
+        await sleep(STREAM_RANGE_WAIT_INTERVAL_MS)
+        const refreshed = await loadTorrentPlaybackState(qbit, torrentHash, file?.name || p, req.config.additionalStorageRoots)
+        if (!applyRefreshedPlayback(refreshed)) {
+          if (!refreshed?.torrent) break
+          continue
+        }
+        if (predicate()) return true
+      }
+      return false
+    }
+
+    if ((!isOrphanFile && !fileExists) || !resolvedFilePath) {
+      const becameAvailable = await waitForFileState(() => Boolean(fileExists && resolvedFilePath))
+      if (!becameAvailable) {
+        console.warn('[file-route] file not found on disk')
+        return res.status(425).json({
+          error: 'Buffering torrent metadata',
+          progress: Number(file?.progress || torrent.progress || 0)
+        })
+      }
+    }
 
     const ext = path.extname(resolvedFilePath).toLowerCase()
     const mime = { '.mp4': 'video/mp4', '.mkv': 'video/x-matroska', '.avi': 'video/x-msvideo', '.wmv': 'video/x-ms-wmv', '.ts': 'video/mp2t', '.m4v': 'video/x-m4v' }
     const contentType = mime[ext] || 'application/octet-stream'
 
     if (!isComplete && readableBytes <= 0) {
-      return res.status(425).json({
-        error: 'Download started — waiting for initial buffer',
-        progress: Number(file?.progress || torrent.progress || 0)
-      })
+      const hasReadableBytes = await waitForFileState(() => Boolean(fileExists && resolvedFilePath && (isComplete || readableBytes > 0)))
+      if (!hasReadableBytes) {
+        return res.status(425).json({
+          error: 'Download started — waiting for initial buffer',
+          progress: Number(file?.progress || torrent.progress || 0)
+        })
+      }
     }
 
-    let maxReadable = isComplete ? fileSize : Math.max(0, Math.min(fileSize, readableBytes))
     const range = req.headers.range
     res.setHeader('Accept-Ranges', 'bytes')
     res.setHeader('Content-Type', contentType)
@@ -1215,17 +1250,7 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
         // Stremio can request ranges ahead of currently downloaded bytes.
         // Avoid immediate hard failure: wait briefly for the needed range.
         if (!isComplete && !isOrphanFile && Number.isFinite(start) && start >= 0) {
-          const waitUntil = Date.now() + STREAM_RANGE_WAIT_TIMEOUT_MS
-          while (Date.now() < waitUntil && start >= maxReadable) {
-            await sleep(STREAM_RANGE_WAIT_INTERVAL_MS)
-            const refreshed = await loadTorrentPlaybackState(qbit, torrentHash, file?.name || p, req.config.additionalStorageRoots)
-            if (!refreshed?.torrent || !refreshed?.file) break
-            fileSize = Math.max(0, Number(refreshed.file?.size || refreshed.diskSize || fileSize))
-            readableBytes = Number(refreshed.readableBytes || readableBytes)
-            isComplete = Number(refreshed.file?.progress || refreshed.torrent.progress || 0) >= 0.999
-            maxReadable = isComplete ? fileSize : Math.max(0, Math.min(fileSize, readableBytes))
-            if (start < maxReadable) break
-          }
+          await waitForFileState(() => start < maxReadable || isComplete)
         }
 
         if (start >= maxReadable) {
@@ -1265,10 +1290,13 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
         fs.createReadStream(resolvedFilePath).pipe(res)
       } else {
         if (maxReadable <= 0) {
-          return res.status(425).json({
-            error: 'Download started — waiting for initial buffer',
-            progress: Number(file?.progress || torrent.progress || 0)
-          })
+          const hasReadableBytes = await waitForFileState(() => Boolean(fileExists && resolvedFilePath && (isComplete || readableBytes > 0)))
+          if (!hasReadableBytes) {
+            return res.status(425).json({
+              error: 'Download started — waiting for initial buffer',
+              progress: Number(file?.progress || torrent.progress || 0)
+            })
+          }
         }
         const end = maxReadable - 1
         res.status(206)

@@ -46,14 +46,15 @@ const {
 
 const STREAM_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_WAIT_TIMEOUT_MS || '90000', 10)
 const STREAM_WAIT_INTERVAL_MS = parseInt(process.env.STREAM_WAIT_INTERVAL_MS || '2000', 10)
-const STREAM_RANGE_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_RANGE_WAIT_TIMEOUT_MS || '15000', 10)
+const STREAM_RANGE_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_RANGE_WAIT_TIMEOUT_MS || '45000', 10)
 const STREAM_RANGE_WAIT_INTERVAL_MS = parseInt(process.env.STREAM_RANGE_WAIT_INTERVAL_MS || '500', 10)
 const STREAM_READY_START_FRACTION = parseStartFraction(
   process.env.STREAM_READY_START_PERCENT ||
   process.env.STREAM_READY_MIN_PROGRESS ||
   '0.5%'
 )
-const STREAM_PRIORITIZE_LAST_PIECES = String(process.env.STREAM_PRIORITIZE_LAST_PIECES || '').trim().toLowerCase() === 'true'
+const STREAM_READY_MIN_BYTES = parseByteCount(process.env.STREAM_READY_MIN_BYTES || '24MB', 24 * 1024 * 1024)
+const STREAM_PRIORITIZE_LAST_PIECES = String(process.env.STREAM_PRIORITIZE_LAST_PIECES || 'true').trim().toLowerCase() !== 'false'
 const WATCHED_DELETE_THRESHOLD = Math.max(0.5, Math.min(0.99, parseFloat(process.env.PVTKRRX_WATCHED_DELETE_THRESHOLD || '0.95')))
 const WATCHED_DELETE_GRACE_MS = Math.max(0, parseInt(process.env.PVTKRRX_WATCHED_DELETE_GRACE_MS || '180000', 10))
 // Pairing should be hash-first and stable: desktop publishes LAN endpoint, hosted token hash resolves it.
@@ -104,6 +105,28 @@ function parseStartFraction(raw) {
     fraction = numeric
   }
   return Math.max(0.001, Math.min(0.99, fraction))
+}
+
+function parseByteCount(raw, fallback) {
+  const text = String(raw || '').trim().toLowerCase()
+  if (!text) return fallback
+
+  const match = text.match(/^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)?$/i)
+  if (!match) return fallback
+
+  const value = Number.parseFloat(match[1])
+  if (!Number.isFinite(value) || value <= 0) return fallback
+
+  const unit = String(match[2] || 'b').toLowerCase()
+  const multiplier = unit === 'gb'
+    ? 1024 * 1024 * 1024
+    : unit === 'mb'
+      ? 1024 * 1024
+      : unit === 'kb'
+        ? 1024
+        : 1
+
+  return Math.max(1, Math.floor(value * multiplier))
 }
 
 function loadLocalEnv() {
@@ -1567,10 +1590,15 @@ function getReadableBytes(fileEntry, torrent, diskBytes) {
   return Math.max(0, Math.min(diskBytes, estimated))
 }
 
-function isPlaybackReady(fileEntry, readableBytes) {
+function getPlaybackReadyByteThreshold(fileEntry) {
   const size = Number(fileEntry?.size || 0)
-  if (!size) return false
-  const required = Math.min(size, Math.max(1, Math.floor(size * STREAM_READY_START_FRACTION)))
+  if (!size) return 0
+  return Math.min(size, Math.max(1, STREAM_READY_MIN_BYTES, Math.floor(size * STREAM_READY_START_FRACTION)))
+}
+
+function isPlaybackReady(fileEntry, readableBytes) {
+  const required = getPlaybackReadyByteThreshold(fileEntry)
+  if (!required) return false
   return readableBytes >= required || Number(fileEntry?.progress || 0) >= 0.999
 }
 
@@ -1580,6 +1608,8 @@ async function primeTorrentForStreaming(qbit, torrent, videoFile, allFiles = nul
 
   const seqEnabled = torrent?.seq_dl === true
   const firstLastEnabled = torrent?.f_l_piece_prio === true
+  const playbackComplete = Number(torrent?.progress || 0) >= 0.999 || Number(videoFile?.progress || 0) >= 0.999
+  const shouldPrioritizeLastPieces = STREAM_PRIORITIZE_LAST_PIECES && !playbackComplete
   const files = Array.isArray(allFiles) ? allFiles : []
   const archiveFiles = findPackedArchiveFiles(files)
   const archiveMode = archiveFiles.length > 0 && (!videoFile?.name || isArchiveFileName(videoFile.name))
@@ -1593,13 +1623,13 @@ async function primeTorrentForStreaming(qbit, torrent, videoFile, allFiles = nul
   }
   // "first + last" can make the piece map appear scattered.
   // Keep it optional so local playback can stay head-first by default.
-  if (STREAM_PRIORITIZE_LAST_PIECES && !firstLastEnabled) {
+  if (shouldPrioritizeLastPieces && !firstLastEnabled) {
     try {
       await qbit.toggleFirstLastPiecePrio(hash)
     } catch (err) {
       console.warn(`[streaming-prime] first/last toggle failed ${hash.slice(0, 8)}: ${err.message}`)
     }
-  } else if (!STREAM_PRIORITIZE_LAST_PIECES && firstLastEnabled) {
+  } else if (!shouldPrioritizeLastPieces && firstLastEnabled) {
     try {
       await qbit.toggleFirstLastPiecePrio(hash)
     } catch (err) {
@@ -1923,6 +1953,7 @@ module.exports = {
   STREAM_RANGE_WAIT_TIMEOUT_MS,
   STREAM_RANGE_WAIT_INTERVAL_MS,
   STREAM_READY_START_FRACTION,
+  STREAM_READY_MIN_BYTES,
   STREAM_PRIORITIZE_LAST_PIECES,
   WATCHED_DELETE_THRESHOLD,
   WATCHED_DELETE_GRACE_MS,
@@ -2048,6 +2079,7 @@ module.exports = {
   findTorrentFileByPath,
   resolveTorrentFilePath,
   getReadableBytes,
+  getPlaybackReadyByteThreshold,
   isPlaybackReady,
   primeTorrentForStreaming,
   loadTorrentPlaybackState,

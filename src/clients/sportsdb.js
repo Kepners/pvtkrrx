@@ -505,6 +505,17 @@ function pickAnyImage(event) {
   return pickLandscapeImage(event) || pickPosterImage(event) || pickBackgroundImage(event)
 }
 
+function pickEventLogo(event) {
+  const candidates = [
+    event?.strLogo
+  ]
+  for (const value of candidates) {
+    const url = String(value || '').trim()
+    if (url) return url
+  }
+  return ''
+}
+
 function makeEventKey(event) {
   if (!event) return ''
   const id = String(event.idEvent || event.id || '').trim()
@@ -573,6 +584,18 @@ function pickLeagueBackgroundImage(league) {
   return ''
 }
 
+function pickLeagueLogo(league) {
+  const candidates = [
+    league?.strLogo,
+    league?.strBadge
+  ]
+  for (const value of candidates) {
+    const url = String(value || '').trim()
+    if (url) return url
+  }
+  return ''
+}
+
 function pickTeamPosterImage(team) {
   const candidates = [
     team?.strTeamLogo,
@@ -595,6 +618,18 @@ function pickTeamLandscapeImage(team) {
     team?.strTeamLogo,
     team?.strBadge,
     team?.strTeamJersey
+  ]
+  for (const value of candidates) {
+    const url = String(value || '').trim()
+    if (url) return url
+  }
+  return ''
+}
+
+function pickTeamLogo(team) {
+  const candidates = [
+    team?.strTeamLogo,
+    team?.strBadge
   ]
   for (const value of candidates) {
     const url = String(value || '').trim()
@@ -688,11 +723,13 @@ function toLeagueFallbackValue(leagueFallback, dateHint, sportHint) {
   const landscapeImage = String(leagueFallback?.landscapeImage || '').trim() || poster
   if (!poster && !landscapeImage) return null
   const backgroundImage = String(leagueFallback?.backgroundImage || '').trim() || landscapeImage || poster
+  const logo = String(leagueFallback?.logo || '').trim()
   return {
     image: landscapeImage || poster,
     poster: poster || landscapeImage,
     landscapeImage: landscapeImage || poster,
     backgroundImage,
+    logo,
     eventId: '',
     eventName: '',
     eventDate: dateHint,
@@ -737,17 +774,19 @@ function getStructuredTeamMatchScore(event, homeTeam, awayTeam) {
   return 0
 }
 
-function buildArtworkValue(event, posterImage, landscapeImage, backgroundImage, source = 'thesportsdb') {
+function buildArtworkValue(event, posterImage, landscapeImage, backgroundImage, logoImage = '', source = 'thesportsdb') {
   if (!event) return null
   const poster = String(posterImage || '').trim()
   const landscape = String(landscapeImage || '').trim() || poster
   const background = String(backgroundImage || '').trim() || landscape || poster
+  const logo = String(logoImage || '').trim()
   if (!poster && !landscape && !background) return null
   return {
     image: landscape || poster || background,
     poster: poster || landscape || background,
     landscapeImage: landscape || poster || background,
     backgroundImage: background || landscape || poster,
+    logo,
     eventId: String(event.idEvent || ''),
     eventName: String(event.strEvent || '').trim(),
     eventDate: String(event.dateEvent || '').trim(),
@@ -983,6 +1022,7 @@ class SportsDbClient {
       poster,
       landscapeImage,
       backgroundImage,
+      logo: pickLeagueLogo(best),
       league: String(best.strLeague || '').trim(),
       sport: String(best.strSport || '').trim()
     }
@@ -1016,6 +1056,23 @@ class SportsDbClient {
       ? pickTeamLandscapeImage(away)
       : pickTeamPosterImage(away)
     return image || ''
+  }
+
+  async _resolveFallbackLogo(bestEvent) {
+    if (!bestEvent) return ''
+    let logo = pickEventLogo(bestEvent)
+    if (logo) return logo
+
+    const league = await this._lookupLeague(bestEvent.idLeague)
+    logo = pickLeagueLogo(league)
+    if (logo) return logo
+
+    const home = await this._lookupTeam(bestEvent.idHomeTeam)
+    logo = pickTeamLogo(home)
+    if (logo) return logo
+
+    const away = await this._lookupTeam(bestEvent.idAwayTeam)
+    return pickTeamLogo(away)
   }
 
   async findEventByStructuredData(input = {}) {
@@ -1117,11 +1174,13 @@ class SportsDbClient {
           const structuredPoster = await this._resolveFallbackImage(structuredMatch, 'poster')
           const structuredLandscape = await this._resolveFallbackImage(structuredMatch, 'landscape') || structuredPoster
           const structuredBackground = await this._resolveFallbackImage(structuredMatch, 'background') || structuredLandscape || structuredPoster
+          const structuredLogo = await this._resolveFallbackLogo(structuredMatch)
           const structuredValue = buildArtworkValue(
             structuredMatch,
             structuredPoster,
             structuredLandscape,
             structuredBackground,
+            structuredLogo,
             'thesportsdb-structured'
           )
           if (structuredValue) {
@@ -1183,6 +1242,7 @@ class SportsDbClient {
         const posterImage = await this._resolveFallbackImage(best, 'poster')
         const landscapeImage = await this._resolveFallbackImage(best, 'landscape') || posterImage
         const backgroundImage = await this._resolveFallbackImage(best, 'background') || landscapeImage || posterImage
+        const logoImage = await this._resolveFallbackLogo(best)
         if (!best || (!posterImage && !landscapeImage && !backgroundImage)) {
           const leagueFallback = await this._resolveLeagueArtworkFromTitle(title, titleSport || structuredSportHint, mappedLeague)
           const leagueValue = toLeagueFallbackValue(leagueFallback, dateHint, sportHint)
@@ -1196,7 +1256,7 @@ class SportsDbClient {
           return null
         }
 
-        const value = buildArtworkValue(best, posterImage, landscapeImage, backgroundImage, 'thesportsdb')
+        const value = buildArtworkValue(best, posterImage, landscapeImage, backgroundImage, logoImage, 'thesportsdb')
         const expiresAt = Date.now() + this.artworkHitTtlMs
         cache.set(key, { value, expiresAt })
         persistResolvedPoster(key, value, expiresAt)

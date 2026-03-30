@@ -6,6 +6,7 @@ const { resolveSportHint } = require('../utils/sportsRules')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { decodeCustomId } = require('../utils/customId')
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
+const BRAND_LOGO = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 
 function formatSportGenreLabel(value) {
   const normalized = String(value || '').trim().toLowerCase()
@@ -81,6 +82,7 @@ async function handleCustomMeta(config, id, context = {}) {
   let sportsArtwork = null
   const carriedArtwork = String(info.a || '').trim()
   const carriedBackground = String(info.b || '').trim()
+  const carriedLogo = String(info.z || '').trim()
   const carriedEventDate = String(info.e || '').trim()
   const carriedLeague = String(info.g || '').trim()
   const carriedLeagueCode = String(info.u || '').trim()
@@ -93,7 +95,7 @@ async function handleCustomMeta(config, id, context = {}) {
     title: info.t
   })
   const isSports = String(info.k || '').toLowerCase() === 'sports' || Boolean(resolvedSportHint)
-  const shouldLookupSportsArtwork = isSports && (!carriedArtwork || !carriedEventDate || !carriedLeague || !carriedBackground)
+  const shouldLookupSportsArtwork = isSports && (!carriedArtwork || !carriedEventDate || !carriedLeague || !carriedBackground || !carriedLogo)
   if (shouldLookupSportsArtwork) {
     try {
       const sportsDb = new SportsDbClient(config?.sportsDbApiKey, {
@@ -123,6 +125,7 @@ async function handleCustomMeta(config, id, context = {}) {
       if (cmeta) {
         const poster = carriedArtwork || String(info.a || '').trim() || String(cmeta.poster || '').trim() || BRAND_POSTER
         const background = String(info.b || '').trim() || String(cmeta.background || '').trim() || poster
+        const logo = carriedLogo || String(cmeta.logo || '').trim() || BRAND_LOGO
         return {
           meta: {
             ...cmeta,
@@ -130,7 +133,8 @@ async function handleCustomMeta(config, id, context = {}) {
             type: String(info.y || cmeta.type || 'movie'),
             name: String(info.n || cmeta.name || info.t || '').trim() || String(cmeta.name || ''),
             poster,
-            background
+            background,
+            logo
           }
         }
       }
@@ -144,6 +148,7 @@ async function handleCustomMeta(config, id, context = {}) {
     : BRAND_POSTER
   const poster = carriedArtwork || sportsArtwork?.poster || sportsArtwork?.image || posterFallback
   const background = carriedBackground || String(sportsArtwork?.backgroundImage || sportsArtwork?.image || '').trim() || poster
+  const logo = carriedLogo || String(sportsArtwork?.logo || '').trim() || BRAND_LOGO
 
   const eventDate = carriedEventDate || sportsArtwork?.eventDate || ''
   const league = carriedLeague || sportsArtwork?.league || ''
@@ -178,7 +183,8 @@ async function handleCustomMeta(config, id, context = {}) {
     name: displayName,
     description,
     poster,
-    background
+    background,
+    logo
   }
   if (sportsGenres.length > 0) meta.genres = sportsGenres
   if (eventDate) meta.releaseInfo = eventDate

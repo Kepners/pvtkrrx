@@ -277,6 +277,9 @@ This now builds in the system temp directory first, then copies the finished `1.
 | PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS | Optional | Timeout for stream route upstream calls (Prowlarr/qBit/Cinemeta), default 7000 |
 | PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS | Optional | Timeout for stream title-fallback Prowlarr call, default 5000 |
 | PVTKRRX_STREAM_MAX_CANDIDATES | Optional | Max stream candidates to process per request (default 20) |
+| STREAM_READY_START_PERCENT | Optional | Fraction of a file that must be locally readable before `/playback` redirects into `/file` (default `0.5%`) |
+| STREAM_READY_MIN_BYTES | Optional | Minimum readable head buffer required before `/playback` redirects into `/file` (default `24MB`) |
+| STREAM_PRIORITIZE_LAST_PIECES | Optional | Keep qBittorrent first+last piece priority enabled for incomplete playback so Stremio footer/range probes do not bounce back to source selection (default true) |
 | PVTKRRX_STREMIO_API_BASE_URL | Optional | Stremio API base URL for AuthKey verification (default https://api.strem.io) |
 | PVTKRRX_STREMIO_API_TIMEOUT_MS | Optional | Timeout for Stremio AuthKey verification calls (default 10000) |
 | PVTKRRX_OPAQUE_STATE_SECRET | Optional | Secret for stream/file opaque state tokens (defaults to `ENCRYPTION_SECRET`) |

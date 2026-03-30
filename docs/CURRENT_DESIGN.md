@@ -83,6 +83,7 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 - Hosted `/file` and `/playback` return 403 on the Vercel-hosted relay for non-local requests.
 - `LAN Bridge` requests 307-redirect to the host's local runtime before hitting `/file` or `/playback`, so after redirect all local playback capabilities apply.
 - Local `/file` serves bytes with HTTP Range support when the file is locally accessible on disk.
+- Local progressive playback now waits for a safer initial readable buffer and keeps qBittorrent first+last piece priority enabled by default while a file is still incomplete, so Stremio can stay on the player page instead of bouncing back to source selection during early range probes.
 - Local `/file` can continue serving a known absolute local file path even after qBittorrent no longer reports the torrent row, as long as the file still exists on disk.
 - Local `/playback` is the queued-download path for tracker content that is not yet ready. It fetches the `.torrent` payload, adds it to qBittorrent, polls for readiness, and 302-redirects to `/file` when the file is playable.
 - Completed-file playback correctly checks torrent completion state before redirecting into `/file`.

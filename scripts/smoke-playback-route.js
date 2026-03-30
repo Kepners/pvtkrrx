@@ -15,6 +15,7 @@ const { encrypt } = require('../src/utils/crypto')
 const { encodePlaybackStateToken, encodeFileStateToken } = require('../src/utils/opaqueState')
 const { QBitClient } = require('../src/clients/qbittorrent')
 const { inspectTorrentPayload } = require('../src/utils/torrentPayload')
+const { isPlaybackReady } = require('../src/lib/shared')
 const app = require('../index')
 
 const ORIGINALS = {
@@ -114,6 +115,7 @@ async function run() {
   const packedHash = 'd1287d13bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
   const readyPackedHash = 'e1287d13cccccccccccccccccccccccccccccccc'
   const priorityCalls = []
+  const firstLastToggleCalls = []
   const payload = Buffer.from('smoke playback bytes', 'utf8')
   const archivePayload = Buffer.from('smoke rar bytes', 'utf8')
   const extractedPayload = Buffer.from('smoke extracted bytes', 'utf8')
@@ -243,7 +245,10 @@ async function run() {
     return 'Ok.'
   }
   QBitClient.prototype.toggleSequentialDownload = async () => 'Ok.'
-  QBitClient.prototype.toggleFirstLastPiecePrio = async () => 'Ok.'
+  QBitClient.prototype.toggleFirstLastPiecePrio = async (inputHash) => {
+    firstLastToggleCalls.push(String(inputHash || '').toLowerCase())
+    return 'Ok.'
+  }
   global.fetch = async (url) => {
     if (/existing-without-hash\.torrent/i.test(String(url || ''))) {
       return createFetchResponse(inferredPayload)
@@ -255,6 +260,17 @@ async function run() {
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve))
 
   try {
+    assert.equal(
+      isPlaybackReady({ size: 100 * 1024 * 1024 }, 8 * 1024 * 1024),
+      false,
+      'tiny head buffers should not be marked playback-ready yet'
+    )
+    assert.equal(
+      isPlaybackReady({ size: 100 * 1024 * 1024 }, 30 * 1024 * 1024),
+      true,
+      'playback should become ready once a meaningful initial buffer exists'
+    )
+
     const configToken = encodeURIComponent(encrypt({
       qbitUrl: 'http://127.0.0.1:8080',
       qbitUsername: 'admin',
@@ -291,6 +307,10 @@ async function run() {
       { ids: [0], priority: 0 },
       { ids: [1, 2], priority: 7 }
     ], 'packed playback should demote the sample clip and prioritize the archive bundle when priming archive-only torrents')
+    assert.ok(
+      firstLastToggleCalls.includes(hash) || firstLastToggleCalls.includes(packedHash),
+      'progressive playback should enable first/last piece priority so Stremio stays on the player while probing both ends of the file'
+    )
 
     const readyPackedResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(readyPackedPlaybackToken)}`)
     assert.equal(readyPackedResponse.status, 302, 'completed packed archives with an extracted video should redirect into the shared file route')

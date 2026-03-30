@@ -103,6 +103,7 @@ async function testStructuredFallbackToFuzzyLookup() {
     strLeague: 'English Premier League',
     strHomeTeam: 'North London Blue',
     strAwayTeam: 'West London Red',
+    strLogo: 'https://example.com/logo.png',
     strPoster: poster,
     strThumb: landscape,
     strBanner: background
@@ -127,6 +128,7 @@ async function testStructuredFallbackToFuzzyLookup() {
   assert.equal(artwork.landscapeImage, landscape)
   assert.equal(artwork.image, landscape)
   assert.equal(artwork.backgroundImage, background)
+  assert.equal(artwork.logo, 'https://example.com/logo.png')
 }
 
 async function testOrderAgnosticSportsGrouping() {
@@ -523,6 +525,7 @@ async function testSportsMetaRichDescription() {
   assert.equal(result.meta.releaseInfo, '2026-03-28')
   assert.equal(result.meta.poster, 'https://example.com/f1-poster.jpg')
   assert.equal(result.meta.background, 'https://example.com/f1-bg.jpg')
+  assert.ok(result.meta.logo, 'expected sports meta to include a logo for the Stremio waiting screen')
   assert.ok(result.meta.runtime, 'expected runtime to carry sport type label')
 }
 
