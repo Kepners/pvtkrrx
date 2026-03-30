@@ -19,6 +19,34 @@ It is intentionally implementation-focused:
 - Do not build a qBittorrent-only extraction path that conflicts with the existing PVTKRRX archive extraction flow.
 - Do not close any playback item until it is verified on a real Stremio client, not just with smoke tests.
 
+## Current Confirmed State
+
+These are the code-backed facts this plan should assume before any implementation starts:
+
+- qBittorrent save-path plumbing already exists:
+  - `index.js` already exposes `GET /:config/qbit/preferences` and `POST /:config/qbit/download-path`
+  - `electron/main.js` already exposes `get-download-path` and `set-download-path` IPC handlers
+  - `electron/popup.html` already shows a basic `Host Download Path` card with `Save Path`, `Open Folder`, and `Refresh`
+- the desktop shell currently has only an explicit `Quit` action:
+  - `electron/main.js` exposes `quit-app`
+  - there is no Electron `Tray` setup yet
+  - there is no hide-to-tray lifecycle yet
+- the server window is currently undersized for the amount of content:
+  - `electron/main.js` creates the main shell at `920 x 660`
+  - `electron/popup.html` uses `.window { overflow: hidden auto; }`, which explains the current visible scrollbar
+- source-state labeling already exists at a low level but is not yet good enough:
+  - `src/utils/streams.js` already separates `seedbox`, `buffering`, and `tracker` naming/mode hints
+  - it still does not expose a dedicated downloaded icon, container badge, or a clean post-download label contract
+- the skip/seek issue is not a blank-sheet playback problem:
+  - `index.js` already contains `/file` range handling and wait-for-range behavior
+  - the bug should be treated as a buffering/range contract failure under real seek probes
+- sports/custom player-flash metadata is partly in place already:
+  - `src/handlers/meta.js` already carries `background` and `logo` on custom meta responses
+  - the remaining work is consistency plus real-client proof, especially across sports, library custom ids, and Cinemeta-backed items
+- archive extraction already exists inside PVTKRRX:
+  - `src/utils/archiveExtraction.js` is already the host-side extraction path
+  - any qBittorrent unrar work must decide ownership cleanly instead of silently introducing a second competing extractor
+
 ## Requested Work
 
 ### 1. Configure PVTKRRX to configure qBittorrent to unrar completed releases
@@ -363,5 +391,7 @@ When the implementation begins, update these as the source of truth:
 ## Current Status
 
 Open.
+
+Backlog validated against the current desktop/server implementation on 2026-03-30.
 
 No code behavior is changed by this file.
