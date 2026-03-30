@@ -8,6 +8,9 @@ const source = fs.readFileSync(mainPath, 'utf8')
 assert.match(source, /async function runProvisionOnlyMode\(/, 'desktop provision-only mode should still exist')
 assert.match(source, /async function bootstrapAutoProvision\(/, 'desktop bootstrap auto-provision should still exist')
 assert.match(source, /\/auto-provision/, 'desktop bootstrap should still call the local auto-provision route')
+assert.match(source, /powerSaveBlocker\.start\(/, 'desktop runtime should keep a power blocker available so Windows lock\/screen-off does not suspend hosting')
+assert.match(source, /powerMonitor\.on\('resume'/, 'desktop runtime should react to system resume events')
+assert.match(source, /powerMonitor\.on\('lock-screen'/, 'desktop runtime should log lock-screen events for troubleshooting')
 
 assert.doesNotMatch(
   source,

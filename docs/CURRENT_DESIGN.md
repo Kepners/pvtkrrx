@@ -103,6 +103,7 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 - On every cold boot, the splash window opens before the main desktop shell.
 - The splash is pinned `alwaysOnTop`, brought to the front, and kept visible for a minimum startup window before the main shell replaces it.
 - The desktop shell starts hidden and only appears after the local runtime is reachable.
+- The desktop wrapper now starts a Windows power blocker by default (`prevent-app-suspension`) so the host can stay alive through lock-screen and display-off states while serving local/LAN traffic.
 - Startup still runs:
   - local server boot
   - provider warm-up
@@ -110,6 +111,7 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
   - firewall/Bonjour checks
   - LAN pair heartbeat startup pulse
   - Stremio launch watch
+- The desktop wrapper also logs `lock-screen`, `unlock-screen`, `suspend`, and `resume`, and sends a fresh LAN heartbeat on unlock/resume.
 
 ## Heartbeat Model
 

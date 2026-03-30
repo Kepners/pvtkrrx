@@ -2,7 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
 const { spawn } = require('child_process')
-const { app, BrowserWindow, ipcMain, shell, clipboard, screen } = require('electron')
+const { app, BrowserWindow, ipcMain, shell, clipboard, screen, powerMonitor, powerSaveBlocker } = require('electron')
 const pkg = require('../package.json')
 const { deriveDefaultLocalHostname, normalizeLocalHostname } = require('../src/utils/lanAlias')
 const { buildLocalModeUrls } = require('../src/utils/localInstallUrls')
@@ -33,6 +33,7 @@ const parsedLanPairHeartbeatMs = parseInt(process.env.PVTKRRX_LAN_PAIR_HEARTBEAT
 const LAN_PAIR_HEARTBEAT_MS = Number.isFinite(parsedLanPairHeartbeatMs) ? parsedLanPairHeartbeatMs : 720000
 const STREMIO_LAUNCH_WATCH_ENABLED = String(process.env.PVTKRRX_STREMIO_LAUNCH_WATCH_ENABLED || 'true').trim().toLowerCase() !== 'false'
 const STREMIO_LAUNCH_POLL_MS = Math.max(5000, parseInt(process.env.PVTKRRX_STREMIO_LAUNCH_POLL_MS || '10000', 10))
+const DEFAULT_POWER_BLOCKER_MODE = normalizePowerBlockerMode(process.env.PVTKRRX_POWER_BLOCKER_MODE || 'prevent-app-suspension')
 
 function readPersistedLocalHostname() {
   try {
@@ -359,6 +360,77 @@ let stremioLaunchWatchTimer = null
 let stremioWasRunning = false
 let stremioLaunchWatchFailureCount = 0
 let splashShownAt = 0
+let powerBlockerId = null
+
+function normalizePowerBlockerMode(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (normalized === 'off' || normalized === 'disabled' || normalized === 'false' || normalized === '0') {
+    return 'off'
+  }
+  if (normalized === 'prevent-display-sleep') return 'prevent-display-sleep'
+  return 'prevent-app-suspension'
+}
+
+function getPowerBlockerMode() {
+  return DEFAULT_POWER_BLOCKER_MODE
+}
+
+function ensureDesktopPowerBlocker(reason = 'startup') {
+  const mode = getPowerBlockerMode()
+  if (mode === 'off') {
+    if (reason === 'startup') {
+      console.log('[desktop-power] blocker disabled (mode=off)')
+    }
+    return
+  }
+
+  if (powerBlockerId && powerSaveBlocker.isStarted(powerBlockerId)) return
+  powerBlockerId = powerSaveBlocker.start(mode)
+  console.log(`[desktop-power] blocker active mode=${mode} id=${powerBlockerId} reason=${reason}`)
+}
+
+function releaseDesktopPowerBlocker(reason = 'shutdown') {
+  if (!powerBlockerId) return
+  try {
+    if (powerSaveBlocker.isStarted(powerBlockerId)) {
+      powerSaveBlocker.stop(powerBlockerId)
+      console.log(`[desktop-power] blocker stopped id=${powerBlockerId} reason=${reason}`)
+    }
+  } catch (_) {
+    // ignore power blocker shutdown errors
+  }
+  powerBlockerId = null
+}
+
+function installPowerMonitorHooks() {
+  powerMonitor.on('lock-screen', () => {
+    console.log('[desktop-power] lock-screen detected')
+  })
+
+  powerMonitor.on('unlock-screen', () => {
+    console.log('[desktop-power] unlock-screen detected')
+    ensureDesktopPowerBlocker('unlock-screen')
+    sendLanPairHeartbeat('unlock-screen').catch(err => {
+      console.warn('[desktop-power] unlock-screen heartbeat failed:', err.message)
+    })
+  })
+
+  powerMonitor.on('suspend', () => {
+    console.warn('[desktop-power] system suspend detected; local server and LAN heartbeat will pause until resume')
+  })
+
+  powerMonitor.on('resume', async () => {
+    console.log('[desktop-power] system resume detected')
+    ensureDesktopPowerBlocker('resume')
+    try {
+      running = await isServerReachable(port)
+      pushStatus()
+      await sendLanPairHeartbeat('resume')
+    } catch (err) {
+      console.warn('[desktop-power] resume recovery failed:', err.message)
+    }
+  })
+}
 
 function getLocalInstallUrls() {
   const httpsPort = parseInt(process.env.HTTPS_PORT || '7001', 10)
@@ -800,7 +872,8 @@ function createSplashWindow() {
     autoHideMenuBar: true,
     webPreferences: {
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      backgroundThrottling: false
     }
   })
 
@@ -841,7 +914,8 @@ function createMainWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
-      nodeIntegration: false
+      nodeIntegration: false,
+      backgroundThrottling: false
     }
   })
 
@@ -1006,6 +1080,8 @@ app.whenReady().then(async () => {
   }
 
   console.log(`[desktop] boot start v${pkg.version}`)
+  ensureDesktopPowerBlocker('startup')
+  installPowerMonitorHooks()
   const reconciled = await reconcilePortOnBoot(port)
   if (!reconciled.ok && reconciled.action === 'occupied-by-other') {
     console.warn('[desktop] port', port, 'is held by a non-PVTKRRX process; cannot auto-kill safely')
@@ -1039,6 +1115,7 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  releaseDesktopPowerBlocker('before-quit')
   stopStremioLaunchWatch()
   stopLanPairHeartbeatLoop()
   stopAddonServer()

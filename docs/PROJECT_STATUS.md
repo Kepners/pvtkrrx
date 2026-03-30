@@ -4,7 +4,7 @@ Updated: 2026-03-30
 
 ## Current Stage
 
-PVTKRRX is in a working `1.1.18` state on the main Windows/local route set.
+PVTKRRX is in a working `1.1.19` state on the main Windows/local route set.
 
 The practical reading of the project today is:
 
@@ -24,13 +24,14 @@ These items are verified in the current workspace or by direct client/log proof:
 - `npm run smoke:playback` passed on 2026-03-29 and now covers redirect plus byte-serving on the shared `/file` route
 - `npm run smoke:pipeline` passed on 2026-03-29
 - `npm run smoke:sports` passed on 2026-03-29
-- `npm run dist:win` passed on 2026-03-29, again on 2026-03-30 for the `1.1.16` desktop release build, again on 2026-03-30 for the `1.1.17` bug-fix desktop release build, and again on 2026-03-30 for the `1.1.18` archive-extraction desktop release build
+- `npm run dist:win` passed on 2026-03-29, again on 2026-03-30 for the `1.1.16` desktop release build, again on 2026-03-30 for the `1.1.17` bug-fix desktop release build, again on 2026-03-30 for the `1.1.18` archive-extraction desktop release build, and again on 2026-03-30 for the `1.1.19` desktop power-policy build
 - `npm run smoke:config`, `npm run smoke:desktop`, `npm run smoke:stremio-link`, `npm run smoke:lan-pair`, `npm run smoke:guards`, `npm run smoke:security`, `npm run smoke:pipeline`, `npm run smoke:playback`, and `npm run smoke:sports` all passed again on 2026-03-30
 - root `/manifest.json` returns the bootstrap manifest (`com.kepners.pvtkrrx.bootstrap`) with no catalogs/resources and `configurationRequired=true`
 - `PC Local` resolves as a real addon from `http://127.0.0.1:7000/local/manifest.json?mode=local`
 - same-host `LAN Bridge` `Failed to fetch` was traced to route choice on 2026-03-28, not to server failure
 - completed-file playback error `isCompletedTorrent is not defined` was fixed in the local playback path
 - the desktop splash now appears on every cold boot and stays frontmost until the main shell is ready
+- the desktop wrapper now starts a Windows power blocker by default and logs lock/unlock/suspend/resume so the host is less likely to disappear when Windows is locked or the display turns off
 - host-side `LAN Bridge` status now checks the hosted relay directly, and the desktop can repair a stale local pair identity after an `invalid pair key` rejection
 - host-side Stremio Desktop session scanning now detects the real WebView2 `profile/auth/key` storage format again, and startup auto-provision can link that signed-in session automatically
 - sports catalog tiles now prefer landscape artwork when TheSportsDB provides it
@@ -44,7 +45,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - completed packed RAR releases now start background extraction into a managed `.pvtkrrx-extracted/<hash>` folder when the local host can reach the archive volumes, and direct extracted playback is preferred once ready while `rarUrls` remain the fallback
 - current configure flow exposes route-aware primary install links while keeping manual addon URLs as fallback, and the current `public/configure.html` flow passed the 2026-03-30 config/desktop/link smoke pass
 - the Stremio WebView2 client cache on this machine contains cached PVTKRRX stream responses with `PVTKRRX` in the stream `name`, confirming branded source labels are reaching the real client
-- `1.1.18` installers were built successfully into `dist/`
+- `1.1.19` installers were built successfully into `dist/`
 
 ## What We Fixed On 2026-03-28 And 2026-03-29
 
@@ -84,12 +85,15 @@ These items are verified in the current workspace or by direct client/log proof:
 12. Completed packed releases still failed on tablet/mobile clients even when desktop `rarUrls` playback worked:
    - Root cause: the addon relied entirely on client-side native RAR support, but real Stremio client support is uneven outside desktop and the tablet path still needed a normal direct-play video file.
    - Fix: the local/host runtime now bundles `7zip-bin`, starts background extraction for completed packed releases when the archive volumes are locally reachable, and prefers the extracted direct video stream once available while keeping native `rarUrls` as the desktop-capable fallback.
+13. The local host could disappear when Windows was locked or the display turned off:
+   - Root cause: the Electron desktop wrapper did not request any suspend blocker and did not react to Windows lock/resume state changes, so LAN hosting depended entirely on the user's power plan staying awake.
+   - Fix: `1.1.19` now starts Electron `powerSaveBlocker` in `prevent-app-suspension` mode by default, disables renderer background throttling for the desktop shell, and logs/re-heartbeats on `lock-screen`, `unlock-screen`, `suspend`, and `resume`.
 
 ## Still Needs Real-Client Proof
 
 These items should still be treated as open until captured on real clients:
 
-- second-device `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.18` desktop build
+- second-device `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.19` desktop build
 - Apple TV synced-addon flow after desktop/web install
 - one real public `Remote Seedbox` ready-file playback success on a remote client
 - one auth-protected external file-server playback success on a real Stremio client
@@ -144,6 +148,6 @@ These items should still be treated as open until captured on real clients:
 ## Recommended Next Work
 
 1. Tune qBittorrent for faster early playback and confirm stream start time improvements on real clients.
-2. Re-test `LAN Bridge` from a second device using the latest `1.1.18` build and record the exact device/client result.
+2. Re-test `LAN Bridge` from a second device using the latest `1.1.19` build and record the exact device/client result.
 3. Keep sports poster review focused on what Stremio clients actually render, not just what the metadata payload contains.
 4. Keep this file updated whenever a real device test changes the truth table.
