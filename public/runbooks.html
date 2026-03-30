@@ -800,9 +800,9 @@
     <section class="hero">
       <h1 class="logo glitch-text" data-text="PVTKRRX">PVTKRRX</h1>
       <h2 class="subtitle subtitle-static" data-text="Seedbox Runbooks"><span>Seedbox Runbooks</span></h2>
-      <p>This page maps PVTKRRX to major seedbox platforms. It covers current install paths for PC Local, LAN Bridge, Remote Seedbox, and direct addon hosting when your provider supports it.</p>
-      <p>Use this as the operational checklist before you buy a plan or migrate providers.</p>
-      <div class="stamp glitch-text" data-text="Updated: February 28, 2026">Updated: February 28, 2026</div>
+      <p>Provider-specific setup for PVTKRRX. Each runbook shows the exact URLs to enter on the configure page for your seedbox provider, covering Prowlarr, qBittorrent, file server, path mapping, and auth.</p>
+      <p>Most users need the <strong>Remote Seedbox</strong> route: select your provider from the dropdown on <code>/configure</code>, fill in the fields below, and save. The configure page auto-fills path mapping when you pick your provider.</p>
+      <div class="stamp glitch-text" data-text="Updated: March 30, 2026">Updated: March 30, 2026</div>
     </section>
 
     <section class="panel">
@@ -907,48 +907,78 @@
         <span class="badge">No Sudo Required</span>
         <span class="badge">Best Mode: Remote Seedbox or Direct</span>
       </div>
+      <h4>Configure Page Fields</h4>
       <ol>
-        <li>Install or verify qBittorrent and Prowlarr from the Manage Apps panel.</li>
-        <li>Use their HTTPS Managed Links URLs in <code>/configure</code> and save profile.</li>
-        <li>If you want to host PVTKRRX directly on Whatbox, run:</li>
+        <li>Install or verify <strong>qBittorrent</strong> and <strong>Prowlarr</strong> from the Whatbox <em>Manage Apps</em> panel.</li>
+        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> route and pick <strong>Whatbox</strong> from the provider dropdown.</li>
+        <li>Fill in the connection fields using your Managed Links HTTPS URLs:</li>
       </ol>
-      <pre><code>ssh user@server.whatbox.ca
-mkdir -p ~/apps
-cd ~/apps
-git clone https://github.com/Kepners/pvtkrrx.git
-cd pvtkrrx
-npm ci --omit=dev
-PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pvtkrrx.log 2&gt;&amp;1 &amp;</code></pre>
+      <table>
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Prowlarr URL</td><td><code>https://&lt;server&gt;.whatbox.ca/prowlarr</code></td></tr>
+          <tr><td>Prowlarr API Key</td><td>Found in Prowlarr → Settings → General</td></tr>
+          <tr><td>qBittorrent URL</td><td><code>https://&lt;server&gt;.whatbox.ca/qbittorrent</code></td></tr>
+          <tr><td>qBit Username/Password</td><td>Your Whatbox login credentials</td></tr>
+          <tr><td>File Server URL</td><td><code>https://&lt;server&gt;.whatbox.ca/files</code></td></tr>
+          <tr><td>File Server Auth</td><td><code>user:password</code> (your Whatbox credentials)</td></tr>
+          <tr><td>Path Mapping</td><td><code>/home/</code> → <code>/</code> (auto-filled by preset)</td></tr>
+        </tbody>
+      </table>
       <ol start="4">
-        <li>Add this app as a custom Managed Link (port <code>15000</code>) to get HTTPS endpoint for Stremio install.</li>
+        <li>Click <strong>Test Connection</strong>, then <strong>Save</strong>.</li>
       </ol>
+      <p class="note">All three URLs above come from Managed Links in the Whatbox panel. If the Managed Link paths differ from the defaults above, use the exact paths shown in your panel.</p>
+      <details>
+        <summary>Advanced: Host PVTKRRX directly on Whatbox</summary>
+        <pre><code>ssh user@server.whatbox.ca
+mkdir -p ~/apps &amp;&amp; cd ~/apps
+git clone https://github.com/Kepners/pvtkrrx.git
+cd pvtkrrx &amp;&amp; npm ci --omit=dev
+PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pvtkrrx.log 2&gt;&amp;1 &amp;</code></pre>
+        <p class="note">Add this app as a custom Managed Link (port <code>15000</code>) to get an HTTPS endpoint for Stremio install.</p>
+      </details>
     </section>
 
     <section id="ultra" class="panel">
       <h3>Ultra.cc Runbook</h3>
       <div class="meta">
-        <span class="badge">No Root/Sudo Apps</span>
-        <span class="badge">Best Mode: LAN Bridge or Remote Seedbox</span>
+        <span class="badge">No Root/Sudo</span>
+        <span class="badge">Best Mode: Remote Seedbox or LAN Bridge</span>
       </div>
+      <h4>Configure Page Fields</h4>
       <ol>
-        <li>Install Node in user space and select a free assigned port:</li>
+        <li>Install <strong>qBittorrent</strong> and <strong>Prowlarr</strong> from the Ultra.cc app panel.</li>
+        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> and pick <strong>Ultra.cc</strong> from the provider dropdown.</li>
+        <li>Fill in the connection fields:</li>
       </ol>
-      <pre><code>ssh username@host
+      <table>
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Prowlarr URL</td><td><code>https://&lt;slot&gt;.ultra.cc/prowlarr</code></td></tr>
+          <tr><td>Prowlarr API Key</td><td>Found in Prowlarr → Settings → General</td></tr>
+          <tr><td>qBittorrent URL</td><td><code>https://&lt;slot&gt;.ultra.cc/qbittorrent</code></td></tr>
+          <tr><td>qBit Username/Password</td><td>Your Ultra.cc slot credentials</td></tr>
+          <tr><td>File Server URL</td><td><code>https://&lt;slot&gt;.ultra.cc</code></td></tr>
+          <tr><td>File Server Auth</td><td><code>user:password</code> (same slot credentials)</td></tr>
+          <tr><td>Path Mapping</td><td><code>/home/</code> → <code>/</code> (auto-filled by preset)</td></tr>
+        </tbody>
+      </table>
+      <ol start="4">
+        <li>Click <strong>Test Connection</strong>, then <strong>Save</strong>.</li>
+      </ol>
+      <p class="note">Check the exact app paths in your Ultra.cc panel — if the subpaths differ from the defaults above (e.g. a custom Nginx proxy path), use those instead. Run <code>app-ports show</code> over SSH to confirm which ports each app uses.</p>
+      <details>
+        <summary>Advanced: Host PVTKRRX directly on Ultra.cc</summary>
+        <pre><code>ssh username@host
 bash &lt;(wget -qO- https://scripts.ultra.cc/util-v2/LanguageInstaller/Node-Installer/main.sh)
-app-ports free</code></pre>
-      <ol start="2">
-        <li>Run PVTKRRX on a free assigned port:</li>
-      </ol>
-      <pre><code>mkdir -p ~/apps
-cd ~/apps
+app-ports free
+mkdir -p ~/apps &amp;&amp; cd ~/apps
 git clone https://github.com/Kepners/pvtkrrx.git
-cd pvtkrrx
-npm ci --omit=dev
+cd pvtkrrx &amp;&amp; npm ci --omit=dev
 PORT=&lt;free-port&gt; ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pvtkrrx.log 2&gt;&amp;1 &amp;</code></pre>
-      <ol start="3">
-        <li>Proxy through <code>~/.apps/nginx/proxy.d/</code> and restart <code>app-nginx</code> for HTTPS.</li>
-        <li>If your route is path-only, prefer LAN Bridge mode or an external relay host for root-path addon URLs.</li>
-      </ol>
+        <p class="note">Proxy through <code>~/.apps/nginx/proxy.d/</code> and restart <code>app-nginx</code> for HTTPS. If your route is path-only, prefer LAN Bridge for stable addon URLs.</p>
+      </details>
     </section>
 
     <section id="seedhost" class="panel">
@@ -957,18 +987,39 @@ PORT=&lt;free-port&gt; ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node inde
         <span class="badge">Shared: No Root</span>
         <span class="badge">SSH: Shared Except HD1</span>
       </div>
+      <h4>Configure Page Fields</h4>
       <ol>
-        <li>Install qBittorrent and Prowlarr from one-click apps.</li>
-        <li>For the Remote Seedbox route, use your public HTTPS app URLs in the PVTKRRX configure page.</li>
-        <li>If hosting addon directly, install Node with SeedHost method:</li>
+        <li>Install <strong>qBittorrent</strong> and <strong>Prowlarr</strong> from SeedHost one-click apps.</li>
+        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> and pick <strong>SeedHost</strong> from the provider dropdown.</li>
+        <li>Fill in the connection fields:</li>
       </ol>
-      <pre><code>if ! grep -qw "PATH=$HOME/bin" ~/.bashrc ; then mkdir -p ~/bin &amp;&amp; echo "PATH=$HOME/bin:$PATH" &gt;&gt; ~/.bashrc &amp;&amp; source ~/.bashrc ; fi
-cd &amp;&amp; wget -q https://nodejs.org/dist/v21.1.0/node-v21.1.0-linux-x64.tar.gz
-tar xf ~/node-v21.1.0-linux-x64.tar.gz --strip-components=1 -C ~/
-rm -f ~/node-v21.1.0-linux-x64.tar.gz</code></pre>
+      <table>
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Prowlarr URL</td><td><code>https://&lt;box&gt;.seedhost.eu/prowlarr</code></td></tr>
+          <tr><td>Prowlarr API Key</td><td>Found in Prowlarr → Settings → General</td></tr>
+          <tr><td>qBittorrent URL</td><td><code>https://&lt;box&gt;.seedhost.eu/qbittorrent</code></td></tr>
+          <tr><td>qBit Username/Password</td><td>Your SeedHost slot credentials</td></tr>
+          <tr><td>File Server URL</td><td><code>https://&lt;box&gt;.seedhost.eu</code></td></tr>
+          <tr><td>File Server Auth</td><td><code>user:password</code> (SeedHost typically needs Basic Auth)</td></tr>
+          <tr><td>Path Mapping</td><td><code>/home/</code> → <code>/</code> (auto-filled by preset)</td></tr>
+        </tbody>
+      </table>
       <ol start="4">
-        <li>Use LAN Bridge if your exact plan cannot expose a clean HTTPS root route for custom Node apps.</li>
+        <li>Click <strong>Test Connection</strong>, then <strong>Save</strong>.</li>
       </ol>
+      <p class="note">Check the SeedHost control panel for the exact HTTPS app paths. HD1 plans do not have SSH, so use the Remote Seedbox route with hosted PVTKRRX. If your plan cannot expose a clean HTTPS root route for custom apps, use LAN Bridge instead.</p>
+      <details>
+        <summary>Advanced: Host PVTKRRX directly on SeedHost (SSH plans only)</summary>
+        <pre><code>if ! grep -qw "PATH=$HOME/bin" ~/.bashrc ; then mkdir -p ~/bin &amp;&amp; echo "PATH=$HOME/bin:$PATH" &gt;&gt; ~/.bashrc &amp;&amp; source ~/.bashrc ; fi
+cd &amp;&amp; wget -q https://nodejs.org/dist/v22.14.0/node-v22.14.0-linux-x64.tar.gz
+tar xf ~/node-v22.14.0-linux-x64.tar.gz --strip-components=1 -C ~/
+rm -f ~/node-v22.14.0-linux-x64.tar.gz
+mkdir -p ~/apps &amp;&amp; cd ~/apps
+git clone https://github.com/Kepners/pvtkrrx.git
+cd pvtkrrx &amp;&amp; npm ci --omit=dev
+PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pvtkrrx.log 2&gt;&amp;1 &amp;</code></pre>
+      </details>
     </section>
 
     <section id="feral" class="panel">
@@ -977,18 +1028,40 @@ rm -f ~/node-v21.1.0-linux-x64.tar.gz</code></pre>
         <span class="badge">No Root/Sudo/Apt</span>
         <span class="badge">Best Mode: Remote Seedbox or LAN Bridge</span>
       </div>
+      <h4>Configure Page Fields</h4>
       <ol>
-        <li>Install Node in home directory and ensure <code>~/bin</code> is in PATH:</li>
+        <li>Install <strong>qBittorrent</strong> and <strong>Prowlarr</strong> from the Feral manager or via user-space install.</li>
+        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> and pick <strong>Feral Hosting</strong> from the provider dropdown.</li>
+        <li>Fill in the connection fields:</li>
       </ol>
-      <pre><code>mkdir -p ~/bin &amp;&amp; bash
-wget -qO ~/node.js.tar.gz https://nodejs.org/dist/v12.18.3/node-v12.18.3-linux-x64.tar.gz
-tar xf ~/node.js.tar.gz --strip-components=1 -C ~/
-mkdir -p ~/node/apps
-cd &amp;&amp; rm -rf node.js.tar.gz</code></pre>
-      <ol start="2">
-        <li>Run addon on a high user port and configure proxypass for HTTPS.</li>
-        <li>If proxypass gives a subpath route only, use LAN Bridge or external relay for stable install URL behavior.</li>
+      <table>
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Prowlarr URL</td><td><code>https://&lt;username&gt;.feralhosting.com/prowlarr</code></td></tr>
+          <tr><td>Prowlarr API Key</td><td>Found in Prowlarr → Settings → General</td></tr>
+          <tr><td>qBittorrent URL</td><td><code>https://&lt;username&gt;.feralhosting.com/qbittorrent</code></td></tr>
+          <tr><td>qBit Username/Password</td><td>Your Feral login credentials</td></tr>
+          <tr><td>File Server URL</td><td><code>https://&lt;username&gt;.feralhosting.com</code></td></tr>
+          <tr><td>File Server Auth</td><td><code>user:password</code> (HTTP auth credentials)</td></tr>
+          <tr><td>Path Mapping</td><td><code>/media/</code> → <code>/</code> (auto-filled by preset — note: Feral uses <code>/media/</code> not <code>/home/</code>)</td></tr>
+        </tbody>
+      </table>
+      <ol start="4">
+        <li>Click <strong>Test Connection</strong>, then <strong>Save</strong>.</li>
       </ol>
+      <p class="note">Feral save paths start with <code>/media/</code> instead of <code>/home/</code>. The preset handles this automatically. If your apps are behind proxypass subpaths, use the exact subpath shown in the Feral wiki.</p>
+      <details>
+        <summary>Advanced: Host PVTKRRX directly on Feral</summary>
+        <pre><code>mkdir -p ~/bin &amp;&amp; cd
+wget -q https://nodejs.org/dist/v22.14.0/node-v22.14.0-linux-x64.tar.gz
+tar xf ~/node-v22.14.0-linux-x64.tar.gz --strip-components=1 -C ~/
+rm -f ~/node-v22.14.0-linux-x64.tar.gz
+mkdir -p ~/apps &amp;&amp; cd ~/apps
+git clone https://github.com/Kepners/pvtkrrx.git
+cd pvtkrrx &amp;&amp; npm ci --omit=dev
+PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pvtkrrx.log 2&gt;&amp;1 &amp;</code></pre>
+        <p class="note">Configure proxypass for HTTPS. If proxypass gives a subpath route only, use LAN Bridge for stable addon URLs.</p>
+      </details>
     </section>
 
     <section id="rapid" class="panel">
@@ -997,11 +1070,37 @@ cd &amp;&amp; rm -rf node.js.tar.gz</code></pre>
         <span class="badge">Lean: No SSH</span>
         <span class="badge">Premium: SSH + Custom Software</span>
       </div>
+      <h4>Configure Page Fields</h4>
       <ol>
-        <li>Lean plans: use the PVTKRRX Remote Seedbox route against your existing public app URLs, or keep LAN Bridge mode. Direct hosting is not available.</li>
-        <li>Premium plans: SSH in, install/run PVTKRRX directly, then expose via your HTTPS routing layer.</li>
-        <li>Lean to Premium migration path: keep same provider and switch plan when direct addon hosting becomes needed.</li>
+        <li>Install <strong>qBittorrent</strong> and <strong>Prowlarr</strong> from the RapidSeedbox dashboard (one-click installers on Premium, pre-installed on Lean).</li>
+        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> and pick <strong>RapidSeedbox</strong> from the provider dropdown.</li>
+        <li>Fill in the connection fields:</li>
       </ol>
+      <table>
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Prowlarr URL</td><td><code>https://&lt;box&gt;.rapidseedbox.com/prowlarr</code></td></tr>
+          <tr><td>Prowlarr API Key</td><td>Found in Prowlarr → Settings → General</td></tr>
+          <tr><td>qBittorrent URL</td><td><code>https://&lt;box&gt;.rapidseedbox.com/qbittorrent</code></td></tr>
+          <tr><td>qBit Username/Password</td><td>Your RapidSeedbox dashboard credentials</td></tr>
+          <tr><td>File Server URL</td><td><code>https://&lt;box&gt;.rapidseedbox.com</code></td></tr>
+          <tr><td>File Server Auth</td><td><code>user:password</code> (dashboard credentials)</td></tr>
+          <tr><td>Path Mapping</td><td><code>/home/</code> → <code>/</code> (auto-filled by preset)</td></tr>
+        </tbody>
+      </table>
+      <ol start="4">
+        <li>Click <strong>Test Connection</strong>, then <strong>Save</strong>.</li>
+      </ol>
+      <p class="note"><strong>Lean plans</strong> have no SSH — Remote Seedbox route with hosted PVTKRRX is the only option. <strong>Premium plans</strong> have SSH and can also self-host PVTKRRX directly. Lean to Premium migration keeps the same provider; switch plan when direct addon hosting becomes needed.</p>
+      <details>
+        <summary>Advanced: Host PVTKRRX directly on RapidSeedbox (Premium only)</summary>
+        <pre><code>ssh user@&lt;box&gt;.rapidseedbox.com
+mkdir -p ~/apps &amp;&amp; cd ~/apps
+git clone https://github.com/Kepners/pvtkrrx.git
+cd pvtkrrx &amp;&amp; npm ci --omit=dev
+PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pvtkrrx.log 2&gt;&amp;1 &amp;</code></pre>
+        <p class="note">Expose via your HTTPS routing layer. Check RapidSeedbox docs for custom app HTTPS setup.</p>
+      </details>
     </section>
 
     <section id="bytesized" class="panel">
@@ -1010,11 +1109,28 @@ cd &amp;&amp; rm -rf node.js.tar.gz</code></pre>
         <span class="badge">Appbox + Connect Modes</span>
         <span class="badge">Connect Requires Docker + Root</span>
       </div>
+      <h4>Configure Page Fields</h4>
       <ol>
-        <li>Use the Remote Seedbox route first: keep PVTKRRX hosted elsewhere and connect to Bytesized qBittorrent/Prowlarr endpoints.</li>
-        <li>Use Bytesized Connect only when you control a server where Connect prerequisites are met (Docker and root).</li>
-        <li>If your plan does not provide clean routing for custom app root paths, keep LAN Bridge mode.</li>
+        <li>Install <strong>qBittorrent</strong> and <strong>Prowlarr</strong> from the Bytesized app dashboard.</li>
+        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> and pick <strong>Bytesized</strong> from the provider dropdown.</li>
+        <li>Fill in the connection fields:</li>
       </ol>
+      <table>
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Prowlarr URL</td><td><code>https://&lt;appbox&gt;.bytesized-hosting.com/prowlarr</code></td></tr>
+          <tr><td>Prowlarr API Key</td><td>Found in Prowlarr → Settings → General</td></tr>
+          <tr><td>qBittorrent URL</td><td><code>https://&lt;appbox&gt;.bytesized-hosting.com/qbittorrent</code></td></tr>
+          <tr><td>qBit Username/Password</td><td>Your Bytesized appbox credentials</td></tr>
+          <tr><td>File Server URL</td><td><code>https://&lt;appbox&gt;.bytesized-hosting.com</code></td></tr>
+          <tr><td>File Server Auth</td><td><code>user:password</code> (appbox login)</td></tr>
+          <tr><td>Path Mapping</td><td><code>/home/</code> → <code>/</code> (auto-filled by preset)</td></tr>
+        </tbody>
+      </table>
+      <ol start="4">
+        <li>Click <strong>Test Connection</strong>, then <strong>Save</strong>.</li>
+      </ol>
+      <p class="note">Use the Remote Seedbox route with hosted PVTKRRX first. Bytesized Connect is only needed when you control a server with Docker and root access. If your plan does not provide clean routing for custom app root paths, use LAN Bridge instead.</p>
     </section>
 
     <section id="swizzin" class="panel">
@@ -1023,16 +1139,35 @@ cd &amp;&amp; rm -rf node.js.tar.gz</code></pre>
         <span class="badge">Best Direct-Host Option</span>
         <span class="badge">Requires Root/Sudo On VPS</span>
       </div>
+      <h4>Configure Page Fields</h4>
       <ol>
-        <li>Install Swizzin on supported OS and add Nginx/panel.</li>
-        <li>Deploy PVTKRRX as a service and reverse proxy a dedicated domain/subdomain to <code>127.0.0.1:7000</code>.</li>
-        <li>Use this mode if you want full control over paths, HTTPS, and process supervision.</li>
+        <li>Install <strong>qBittorrent</strong> and <strong>Prowlarr</strong> via Swizzin (<code>box install qbittorrent prowlarr</code>).</li>
+        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> and pick <strong>Swizzin</strong> from the provider dropdown.</li>
+        <li>Fill in the connection fields using your reverse-proxy HTTPS URLs:</li>
       </ol>
-      <pre><code># after Node install
-git clone https://github.com/Kepners/pvtkrrx.git
-cd pvtkrrx
-npm ci --omit=dev
+      <table>
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Prowlarr URL</td><td><code>https://seedbox.example.com/prowlarr</code></td></tr>
+          <tr><td>Prowlarr API Key</td><td>Found in Prowlarr → Settings → General</td></tr>
+          <tr><td>qBittorrent URL</td><td><code>https://seedbox.example.com/qbittorrent</code></td></tr>
+          <tr><td>qBit Username/Password</td><td>Your Swizzin panel credentials</td></tr>
+          <tr><td>File Server URL</td><td><code>https://seedbox.example.com/files</code></td></tr>
+          <tr><td>File Server Auth</td><td>Depends on your Nginx config — set <code>user:password</code> if auth is required</td></tr>
+          <tr><td>Path Mapping</td><td><code>/home/</code> → <code>/</code> (auto-filled by preset)</td></tr>
+        </tbody>
+      </table>
+      <ol start="4">
+        <li>Click <strong>Test Connection</strong>, then <strong>Save</strong>.</li>
+      </ol>
+      <p class="note">Swizzin URL subpaths depend entirely on your Nginx reverse proxy config. Use the exact paths from your panel. This is the best option for direct hosting since you control root, Nginx, and domain routing.</p>
+      <details>
+        <summary>Direct hosting: Run PVTKRRX on your Swizzin VPS</summary>
+        <pre><code>git clone https://github.com/Kepners/pvtkrrx.git
+cd pvtkrrx &amp;&amp; npm ci --omit=dev
 ENCRYPTION_SECRET=$(openssl rand -hex 32) PORT=7000 node index.js</code></pre>
+        <p class="note">Reverse proxy a dedicated domain/subdomain to <code>127.0.0.1:7000</code> for HTTPS. Use a systemd service for process supervision.</p>
+      </details>
     </section>
 
     <section id="hbd" class="panel">
@@ -1041,11 +1176,28 @@ ENCRYPTION_SECRET=$(openssl rand -hex 32) PORT=7000 node index.js</code></pre>
         <span class="badge">SSH + box Tooling</span>
         <span class="badge">Good For Direct Hosting</span>
       </div>
+      <h4>Configure Page Fields</h4>
       <ol>
-        <li>Confirm SSH and app management via <code>box</code> command.</li>
-        <li>Run PVTKRRX in user space or system service depending your plan access.</li>
-        <li>Expose through your HTTPS route and set <code>PVTKRRX_ALLOWED_WEB_ORIGINS</code> to that exact origin.</li>
+        <li>Install <strong>qBittorrent</strong> and <strong>Prowlarr</strong> via the <code>box</code> command.</li>
+        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> and pick <strong>HostingByDesign</strong> from the provider dropdown.</li>
+        <li>Fill in the connection fields:</li>
       </ol>
+      <table>
+        <thead><tr><th>Field</th><th>Value</th></tr></thead>
+        <tbody>
+          <tr><td>Prowlarr URL</td><td><code>https://&lt;slot&gt;.hostingby.design/prowlarr</code></td></tr>
+          <tr><td>Prowlarr API Key</td><td>Found in Prowlarr → Settings → General</td></tr>
+          <tr><td>qBittorrent URL</td><td><code>https://&lt;slot&gt;.hostingby.design/qbittorrent</code></td></tr>
+          <tr><td>qBit Username/Password</td><td>Your HBD slot credentials</td></tr>
+          <tr><td>File Server URL</td><td><code>https://&lt;slot&gt;.hostingby.design</code></td></tr>
+          <tr><td>File Server Auth</td><td><code>user:password</code> (slot login)</td></tr>
+          <tr><td>Path Mapping</td><td><code>/home/</code> → <code>/</code> (auto-filled by preset)</td></tr>
+        </tbody>
+      </table>
+      <ol start="4">
+        <li>Click <strong>Test Connection</strong>, then <strong>Save</strong>.</li>
+      </ol>
+      <p class="note">HBD has SSH and <code>box</code> tooling available on app hosting slots, making it a good option for direct PVTKRRX hosting too. If self-hosting, set <code>PVTKRRX_ALLOWED_WEB_ORIGINS</code> to your exact HTTPS origin.</p>
     </section>
 
     <section id="other" class="panel">
@@ -1053,22 +1205,35 @@ ENCRYPTION_SECRET=$(openssl rand -hex 32) PORT=7000 node index.js</code></pre>
       <div class="meta">
         <span class="badge">Use This If Not Listed</span>
       </div>
+      <h4>Configure Page Fields</h4>
       <ol>
-        <li>Check 4 requirements:
-          <ol>
-            <li>SSH access</li>
-            <li>Node.js availability (or install in home directory)</li>
-            <li>Long-running process support (<code>screen</code>, <code>tmux</code>, supervisor)</li>
-            <li>HTTPS endpoint for remote Stremio install</li>
-          </ol>
-        </li>
-        <li>If any requirement fails, use PC Local + LAN Bridge and keep seedbox as backend only.</li>
-        <li>Only use the Remote Seedbox route when Prowlarr and qBittorrent endpoints are intentionally public and authenticated.</li>
+        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> and leave provider as <strong>Custom / Other</strong>.</li>
+        <li>Find the following from your provider's control panel and fill them in:</li>
       </ol>
-      <pre><code>git clone https://github.com/Kepners/pvtkrrx.git
-cd pvtkrrx
-npm ci --omit=dev
+      <table>
+        <thead><tr><th>Field</th><th>Where To Find It</th></tr></thead>
+        <tbody>
+          <tr><td>Prowlarr URL</td><td>HTTPS URL from your provider's app panel or reverse proxy config</td></tr>
+          <tr><td>Prowlarr API Key</td><td>Prowlarr → Settings → General → API Key</td></tr>
+          <tr><td>qBittorrent URL</td><td>HTTPS WebUI URL from your provider's app panel</td></tr>
+          <tr><td>qBit Username/Password</td><td>qBittorrent WebUI login (check provider panel or qBit settings)</td></tr>
+          <tr><td>File Server URL</td><td>The HTTPS URL that serves your download directory as browsable files</td></tr>
+          <tr><td>File Server Auth</td><td><code>user:password</code> if file access is behind HTTP Basic Auth — leave blank if public</td></tr>
+          <tr><td>Path Mapping: From</td><td>qBittorrent's save path prefix (e.g. <code>/home/user/downloads/</code>)</td></tr>
+          <tr><td>Path Mapping: To</td><td>The matching path on the file server URL (e.g. <code>/</code> or <code>/files/</code>)</td></tr>
+        </tbody>
+      </table>
+      <ol start="3">
+        <li>Click <strong>Test Connection</strong> to verify Prowlarr and qBittorrent respond, then <strong>Save</strong>.</li>
+      </ol>
+      <p class="note">Only use Remote Seedbox when your Prowlarr, qBittorrent, and file server endpoints are intentionally public over HTTPS and authenticated. If any endpoint is not publicly reachable, use PC Local + LAN Bridge and keep the seedbox as backend only.</p>
+      <details>
+        <summary>Advanced: Self-host PVTKRRX on your seedbox</summary>
+        <p class="note">Requirements: SSH access, Node.js, long-running process support (<code>screen</code>, <code>tmux</code>, systemd), and an HTTPS endpoint.</p>
+        <pre><code>git clone https://github.com/Kepners/pvtkrrx.git
+cd pvtkrrx &amp;&amp; npm ci --omit=dev
 PORT=7000 ENCRYPTION_SECRET=$(openssl rand -hex 32) node index.js</code></pre>
+      </details>
     </section>
 
     <section class="panel">

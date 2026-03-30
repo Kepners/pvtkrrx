@@ -2077,65 +2077,92 @@
       custom: {
         from: '',
         to: '',
+        qbitPlaceholder: 'https://qbit.seedbox.com:8080',
+        prowlarrPlaceholder: 'https://prowlarr.seedbox.com:9696',
         fileServerPlaceholder: 'https://username.seedbox.com/files',
+        authNote: 'Check your provider panel for file server auth requirements.',
         runbookAnchor: '#other',
-        note: 'Custom profile. Use the exact HTTPS file endpoint from your provider panel.'
+        note: 'Custom profile. Use the exact HTTPS endpoints from your provider panel.'
       },
       whatbox: {
         from: '/home/',
         to: '/',
-        fileServerPlaceholder: 'https://<managed-link>.whatbox.ca/files',
+        qbitPlaceholder: 'https://<server>.whatbox.ca/qbittorrent',
+        prowlarrPlaceholder: 'https://<server>.whatbox.ca/prowlarr',
+        fileServerPlaceholder: 'https://<server>.whatbox.ca/files',
+        authNote: 'Managed Links use your Whatbox login. File server auth uses the same credentials as user:password.',
         runbookAnchor: '#whatbox',
-        note: 'Use Whatbox Managed Links HTTPS endpoints for qBit/Prowlarr/files.'
+        note: 'Use Whatbox Managed Links HTTPS endpoints for qBit, Prowlarr, and files.'
       },
       ultra: {
         from: '/home/',
         to: '/',
+        qbitPlaceholder: 'https://<slot>.ultra.cc/qbittorrent',
+        prowlarrPlaceholder: 'https://<slot>.ultra.cc/prowlarr',
         fileServerPlaceholder: 'https://<slot>.ultra.cc',
+        authNote: 'Ultra apps are behind your slot login. File server uses the same credentials.',
         runbookAnchor: '#ultra',
-        note: 'Use your Ultra app host and path proxy URL.'
+        note: 'Use your Ultra.cc slot HTTPS app URLs.'
       },
       seedhost: {
         from: '/home/',
         to: '/',
+        qbitPlaceholder: 'https://<box>.seedhost.eu/qbittorrent',
+        prowlarrPlaceholder: 'https://<box>.seedhost.eu/prowlarr',
         fileServerPlaceholder: 'https://<box>.seedhost.eu',
+        authNote: 'SeedHost apps use your slot credentials. File server typically needs Basic Auth.',
         runbookAnchor: '#seedhost',
-        note: 'Shared plans are usually best with the Remote Seedbox route and hosted PVTKRRX.'
+        note: 'Use your SeedHost slot HTTPS app endpoints.'
       },
       feral: {
         from: '/media/',
         to: '/',
+        qbitPlaceholder: 'https://<username>.feralhosting.com/qbittorrent',
+        prowlarrPlaceholder: 'https://<username>.feralhosting.com/prowlarr',
         fileServerPlaceholder: 'https://<username>.feralhosting.com',
+        authNote: 'Feral file access uses HTTP auth. Set user:password in the Basic Auth field.',
         runbookAnchor: '#feral',
-        note: 'Feral typically needs user-space tooling and HTTPS proxy path.'
+        note: 'Feral uses /media/ save paths. HTTPS needs proxypass setup.'
       },
       rapid: {
         from: '/home/',
         to: '/',
+        qbitPlaceholder: 'https://<box>.rapidseedbox.com/qbittorrent',
+        prowlarrPlaceholder: 'https://<box>.rapidseedbox.com/prowlarr',
         fileServerPlaceholder: 'https://<box>.rapidseedbox.com',
+        authNote: 'RapidSeedbox apps use your dashboard credentials for HTTPS access.',
         runbookAnchor: '#rapid',
-        note: 'Rapid Lean lacks SSH; Premium supports full direct hosting flow.'
+        note: 'Lean: no SSH, use Remote Seedbox route. Premium: SSH available for direct hosting.'
       },
       bytesized: {
         from: '/home/',
         to: '/',
+        qbitPlaceholder: 'https://<appbox>.bytesized-hosting.com/qbittorrent',
+        prowlarrPlaceholder: 'https://<appbox>.bytesized-hosting.com/prowlarr',
         fileServerPlaceholder: 'https://<appbox>.bytesized-hosting.com',
+        authNote: 'Bytesized apps are behind your appbox login.',
         runbookAnchor: '#bytesized',
-        note: 'Use the Remote Seedbox route first unless Connect prerequisites are in place.'
+        note: 'Use Remote Seedbox route unless Connect prerequisites (Docker + root) are met.'
       },
       hbd: {
         from: '/home/',
         to: '/',
+        qbitPlaceholder: 'https://<slot>.hostingby.design/qbittorrent',
+        prowlarrPlaceholder: 'https://<slot>.hostingby.design/prowlarr',
         fileServerPlaceholder: 'https://<slot>.hostingby.design',
+        authNote: 'HBD apps are behind your slot login. Keep HTTPS enabled.',
         runbookAnchor: '#hbd',
-        note: 'Use your HBD app slot URL and keep HTTPS enabled.'
+        note: 'Use your HBD app slot HTTPS URLs.'
       },
       swizzin: {
         from: '/home/',
         to: '/',
+        qbitPlaceholder: 'https://seedbox.example.com/qbittorrent',
+        prowlarrPlaceholder: 'https://seedbox.example.com/prowlarr',
         fileServerPlaceholder: 'https://seedbox.example.com/files',
+        authNote: 'Auth depends on your Nginx/reverse proxy config.',
         runbookAnchor: '#swizzin',
-        note: 'Swizzin works best when you control root + reverse proxy routing.'
+        note: 'Swizzin works best when you control root + reverse proxy + domain routing.'
       }
     };
 
@@ -2151,12 +2178,22 @@
       infoEl.textContent = '';
 
       const textNode = document.createTextNode(`Preset loaded: ${preset.note} `);
+      infoEl.appendChild(textNode);
+      if (preset.authNote) {
+        const authSpan = document.createElement('span');
+        authSpan.style.display = 'block';
+        authSpan.style.marginTop = '0.3rem';
+        authSpan.style.opacity = '0.8';
+        authSpan.textContent = `Auth: ${preset.authNote}`;
+        infoEl.appendChild(authSpan);
+      }
       const link = document.createElement('a');
       link.href = `/runbooks${preset.runbookAnchor || '#other'}`;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       link.textContent = 'Open matching runbook';
-      infoEl.appendChild(textNode);
+      link.style.display = 'inline-block';
+      link.style.marginTop = '0.3rem';
       infoEl.appendChild(link);
     }
 
@@ -2171,6 +2208,14 @@
       const fileServerInput = document.getElementById('fileServerUrl');
       if (fileServerInput && preset.fileServerPlaceholder) {
         fileServerInput.placeholder = preset.fileServerPlaceholder;
+      }
+      const qbitInput = document.getElementById('qbitUrl');
+      if (qbitInput && preset.qbitPlaceholder) {
+        qbitInput.placeholder = preset.qbitPlaceholder;
+      }
+      const prowlarrInput = document.getElementById('jackettUrl');
+      if (prowlarrInput && preset.prowlarrPlaceholder) {
+        prowlarrInput.placeholder = preset.prowlarrPlaceholder;
       }
       renderProviderPresetInfo(providerId);
     }
