@@ -35,7 +35,7 @@
       -webkit-backdrop-filter: blur(24px);
       border: 1px solid rgba(0, 255, 65, 0.16);
       border-radius: 14px;
-      overflow: hidden auto;
+      overflow: hidden;
       box-shadow:
         0 14px 40px rgba(0, 0, 0, 0.64),
         0 0 1px rgba(0, 255, 65, 0.3),
@@ -65,27 +65,102 @@
 
     .drag-bar {
       -webkit-app-region: drag;
-      height: 20px;
+      height: 44px;
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: space-between;
+      padding: 10px 12px 0;
+      gap: 12px;
       border-bottom: 1px solid rgba(0, 255, 65, 0.08);
     }
 
-    .drag-bar::after {
-      content: '';
+    .drag-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .drag-pill {
       width: 34px;
       height: 3px;
       background: rgba(255, 255, 255, 0.16);
       border-radius: 2px;
     }
 
+    .drag-title {
+      font-size: 10px;
+      letter-spacing: 1.6px;
+      text-transform: uppercase;
+      color: #5a7a84;
+    }
+
+    .window-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      -webkit-app-region: no-drag;
+    }
+
+    .window-ctrl {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      position: relative;
+    }
+
+    .window-ctrl::after {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 9px;
+      line-height: 1;
+      opacity: 0;
+      transition: opacity 0.15s;
+    }
+
+    .window-ctrl:hover::after {
+      opacity: 1;
+    }
+
+    .window-ctrl.minimize {
+      background: #ffbd2e;
+      box-shadow: 0 0 6px rgba(255, 189, 46, 0.4);
+    }
+    .window-ctrl.minimize::after { content: '−'; color: rgba(0,0,0,0.6); }
+    .window-ctrl.minimize:hover { box-shadow: 0 0 12px rgba(255, 189, 46, 0.6); }
+
+    .window-ctrl.tray {
+      background: #0080ff;
+      box-shadow: 0 0 6px rgba(0, 128, 255, 0.4);
+    }
+    .window-ctrl.tray::after { content: '▾'; color: rgba(255,255,255,0.8); }
+    .window-ctrl.tray:hover { box-shadow: 0 0 12px rgba(0, 128, 255, 0.6); }
+
+    .window-ctrl.close {
+      background: #ff5f57;
+      box-shadow: 0 0 6px rgba(255, 95, 87, 0.4);
+    }
+    .window-ctrl.close::after { content: '×'; color: rgba(0,0,0,0.6); }
+    .window-ctrl.close:hover { box-shadow: 0 0 12px rgba(255, 95, 87, 0.6); }
+
+    .window-ctrl-label {
+      font-size: 9px;
+      letter-spacing: 0.6px;
+      color: #5a6a72;
+      text-transform: uppercase;
+    }
+
     .content {
-      height: calc(100% - 20px);
+      height: calc(100% - 44px);
       display: grid;
-      grid-template-columns: 252px 1fr;
-      gap: 10px;
-      padding: 10px;
+      grid-template-columns: 286px minmax(0, 1fr);
+      gap: 14px;
+      padding: 14px;
       position: relative;
       z-index: 10;
     }
@@ -99,18 +174,20 @@
     }
 
     .left {
-      display: grid;
-      grid-template-rows: auto auto auto auto 1fr auto;
+      display: flex;
+      flex-direction: column;
       gap: 8px;
       padding: 12px;
+      overflow: hidden;
     }
 
     .right {
       padding: 12px;
-      display: grid;
-      grid-template-rows: auto 1fr;
+      display: flex;
+      flex-direction: column;
       gap: 10px;
       min-height: 0;
+      overflow: hidden;
     }
 
     .brand {
@@ -297,9 +374,10 @@
     }
 
     .shell-console {
-      min-height: 150px;
-      max-height: 220px;
+      min-height: 180px;
+      max-height: none;
       overflow: auto;
+      flex: 1;
       border: 1px solid rgba(0, 255, 65, 0.08);
       border-radius: 10px;
       background:
@@ -597,10 +675,12 @@
 
     .path-card {
       padding: 12px;
-      display: grid;
-      grid-template-rows: auto auto auto auto auto auto;
+      display: flex;
+      flex-direction: column;
       gap: 8px;
       overflow: hidden;
+      flex: 1;
+      min-height: 0;
     }
 
     .path-title {
@@ -611,15 +691,45 @@
       text-shadow: 0 0 8px rgba(138, 176, 187, 0.24);
     }
 
+    .path-summary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    .path-summary-item {
+      border-radius: 10px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.03);
+      padding: 10px;
+      display: grid;
+      gap: 6px;
+      min-height: 0;
+    }
+
+    .path-label {
+      font-size: 10px;
+      color: #7ca5b2;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+    }
+
     .path-current {
       font-size: 12px;
       color: #c8d7db;
       line-height: 1.45;
-      min-height: 42px;
+      min-height: 40px;
       max-height: 62px;
       overflow: auto;
       word-break: break-all;
       padding-right: 2px;
+    }
+
+    .path-current.compact {
+      min-height: 32px;
+      max-height: 54px;
+      font-size: 11px;
+      color: #a8c1ca;
     }
 
     .path-input {
@@ -633,9 +743,28 @@
       font-size: 12px;
     }
 
+    .toggle-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 255, 65, 0.12);
+      background: rgba(0, 255, 65, 0.05);
+      padding: 10px;
+      font-size: 11px;
+      line-height: 1.45;
+      color: #c6dbdf;
+    }
+
+    .toggle-row input {
+      width: auto;
+      transform: scale(1.15);
+      accent-color: #00ff41;
+    }
+
     .path-buttons {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: 1fr 1fr 1fr;
       gap: 8px;
     }
 
@@ -683,9 +812,22 @@
     }
   </style>
 </head>
-<body>
+  <body>
   <div class="window">
-    <div class="drag-bar"></div>
+    <div class="drag-bar">
+      <div class="drag-left">
+        <div class="drag-pill"></div>
+        <span class="drag-title">PVTKRRX Server</span>
+      </div>
+      <div class="window-actions">
+        <span class="window-ctrl-label">minimize</span>
+        <button class="window-ctrl minimize" onclick="minimizeApp()" title="Minimize to taskbar"></button>
+        <span class="window-ctrl-label">tray</span>
+        <button class="window-ctrl tray" onclick="hideToTray()" title="Hide to system tray"></button>
+        <span class="window-ctrl-label">exit</span>
+        <button class="window-ctrl close" onclick="quitApp()" title="Exit PVTKRRX"></button>
+      </div>
+    </div>
 
     <div class="content">
       <aside class="panel left">
@@ -720,7 +862,6 @@
         <div class="shell-actions">
           <button class="btn" onclick="copyRuntimeLog()">Copy Runtime Log</button>
           <button class="btn btn-configure" onclick="openConfigure()">Open Full Configure</button>
-          <button class="btn btn-quit" onclick="quitApp()">Quit</button>
         </div>
         <div class="shell-note" id="shellNote"></div>
 
@@ -788,16 +929,35 @@
         </div>
 
         <div class="path-card">
-          <div class="path-title">Host Download Path</div>
-          <div class="path-current" id="currentPath">Loading...</div>
-          <input class="path-input" id="pathInput" placeholder="C:\\Downloads\\Media">
-          <div class="path-buttons">
-            <button class="path-btn" onclick="saveDownloadPath()">Save Path</button>
-            <button class="path-btn secondary" onclick="openDownloadFolder()">Open Folder</button>
+          <div class="path-title">qBittorrent — Downloads &amp; Auto-Extract</div>
+          <div class="path-summary-grid">
+            <div class="path-summary-item">
+              <div class="path-label">Where completed files are saved</div>
+              <div class="path-current" id="currentPath">Loading...</div>
+            </div>
+            <div class="path-summary-item">
+              <div class="path-label">Incomplete downloads (temp)</div>
+              <div class="path-current compact" id="tempPath">Loading...</div>
+            </div>
+            <div class="path-summary-item">
+              <div class="path-label">Extra folders PVTKRRX scans</div>
+              <div class="path-current compact" id="storageRoots">Loading...</div>
+            </div>
+            <div class="path-summary-item">
+              <div class="path-label">RAR auto-extract status</div>
+              <div class="path-current compact" id="extractMode">Loading...</div>
+            </div>
           </div>
+          <div class="path-label">Change save location — enter a folder path and click Apply</div>
+          <input class="path-input" id="pathInput" placeholder="C:\\Downloads\\Media">
+          <label class="toggle-row">
+            <input type="checkbox" id="autoExtractToggle">
+            Auto-extract RAR archives when downloads complete — qBittorrent calls PVTKRRX to unpack scene releases automatically so Stremio can play them.
+          </label>
           <div class="path-buttons">
+            <button class="path-btn" onclick="saveQbitSettings()">Apply Settings</button>
+            <button class="path-btn secondary" onclick="openDownloadFolder()">Open Folder</button>
             <button class="path-btn secondary" onclick="refreshDownloadPath()">Refresh</button>
-            <span></span>
           </div>
           <div class="path-note" id="pathNote"></div>
         </div>
@@ -838,6 +998,23 @@
     function openQbit() {
       if (!window.electronAPI) return;
       window.electronAPI.openQbit().catch(() => {});
+    }
+
+    function minimizeApp() {
+      if (!window.electronAPI || !window.electronAPI.minimizeWindow) return;
+      window.electronAPI.minimizeWindow().catch(() => {});
+    }
+
+    function hideToTray() {
+      if (window.electronAPI && window.electronAPI.hideToTray) {
+        window.electronAPI.hideToTray().then(() => {
+          setShellNote('Window hidden to system tray. Use the tray icon to restore PVTKRRX.');
+        }).catch((err) => {
+          setShellNote(err.message || 'Failed to hide to tray', true);
+        });
+        return;
+      }
+      window.close();
     }
 
     function quitApp() {
@@ -1040,40 +1217,77 @@
       }
     }
 
+    let pathInputDirty = false;
+    let autoExtractDirty = false;
+
     async function refreshDownloadPath() {
       const current = document.getElementById('currentPath');
+      const tempPath = document.getElementById('tempPath');
+      const storageRoots = document.getElementById('storageRoots');
+      const extractMode = document.getElementById('extractMode');
       const input = document.getElementById('pathInput');
+      const autoExtractToggle = document.getElementById('autoExtractToggle');
       try {
         if (!window.electronAPI) throw new Error('Desktop bridge not available');
         const data = await window.electronAPI.getDownloadPath();
         if (data && data.available === false) {
           current.textContent = 'Unavailable';
+          tempPath.textContent = 'Unavailable';
+          storageRoots.textContent = 'Unavailable';
+          extractMode.textContent = 'Unavailable';
           setPathNote('qBittorrent preferences are not ready yet');
           return;
         }
         const savePath = (data && data.savePath) ? data.savePath : '';
         current.textContent = savePath || 'Not configured';
-        if (!input.value.trim()) input.value = savePath || '';
-        setPathNote('Path synced');
+        tempPath.textContent = (data && data.incompletePathEnabled)
+          ? ((data && data.tempPath) ? data.tempPath : 'Enabled without path')
+          : 'Disabled';
+        const roots = Array.isArray(data && data.additionalStorageRoots) ? data.additionalStorageRoots : [];
+        storageRoots.textContent = roots.length ? roots.join('\n') : 'Using qBittorrent save path only';
+        extractMode.textContent = (data && data.autoExtractLabel)
+          ? data.autoExtractLabel
+          : 'PVTKRRX on-demand extraction only';
+        if (!pathInputDirty && !input.value.trim()) input.value = savePath || '';
+        if (!autoExtractDirty && autoExtractToggle) autoExtractToggle.checked = Boolean(data && data.autoExtractManagedByPvtkrrx);
+        setPathNote('Save path, fallback roots, and extraction mode synced');
       } catch (err) {
         current.textContent = 'Unavailable';
-        setPathNote(err.message || 'Failed to read path', true);
+        tempPath.textContent = 'Unavailable';
+        storageRoots.textContent = 'Unavailable';
+        extractMode.textContent = 'Unavailable';
+        setPathNote(err.message || 'Failed to read qBit settings', true);
       }
     }
 
-    async function saveDownloadPath() {
+    async function saveQbitSettings() {
       const input = document.getElementById('pathInput');
+      const autoExtractToggle = document.getElementById('autoExtractToggle');
       const value = input.value.trim();
       if (!value) return setPathNote('Enter a valid folder path', true);
       try {
-        if (!window.electronAPI) throw new Error('Desktop bridge not available');
-        const data = await window.electronAPI.setDownloadPath(value);
+        if (!window.electronAPI || !window.electronAPI.saveQbitSettings) throw new Error('Desktop bridge not available');
+        const data = await window.electronAPI.saveQbitSettings({
+          savePath: value,
+          autoExtractEnabled: Boolean(autoExtractToggle && autoExtractToggle.checked)
+        });
         const savePath = data && data.savePath ? data.savePath : value;
         document.getElementById('currentPath').textContent = savePath;
+        if (data) {
+          document.getElementById('tempPath').textContent = data.incompletePathEnabled
+            ? (data.tempPath || 'Enabled without path')
+            : 'Disabled';
+          document.getElementById('storageRoots').textContent = Array.isArray(data.additionalStorageRoots) && data.additionalStorageRoots.length
+            ? data.additionalStorageRoots.join('\n')
+            : 'Using qBittorrent save path only';
+          document.getElementById('extractMode').textContent = data.autoExtractLabel || 'PVTKRRX on-demand extraction only';
+        }
         input.value = savePath;
-        setPathNote('Download path updated');
+        pathInputDirty = false;
+        autoExtractDirty = false;
+        setPathNote('qBittorrent save path and packed-release extraction settings updated');
       } catch (err) {
-        setPathNote(err.message || 'Failed to update path', true);
+        setPathNote(err.message || 'Failed to update qBit settings', true);
       }
     }
 
@@ -1094,6 +1308,18 @@
     }
 
     document.addEventListener('DOMContentLoaded', () => {
+      const pathInput = document.getElementById('pathInput');
+      const autoExtractToggle = document.getElementById('autoExtractToggle');
+      if (pathInput) {
+        pathInput.addEventListener('input', () => {
+          pathInputDirty = true;
+        });
+      }
+      if (autoExtractToggle) {
+        autoExtractToggle.addEventListener('change', () => {
+          autoExtractDirty = true;
+        });
+      }
       refreshStremioAlert();
       refreshDownloadPath();
       refreshShellConsole();

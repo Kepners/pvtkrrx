@@ -6,6 +6,11 @@ Updated: 2026-03-30
 
 This file captures the next user-requested work for playback UX, archive handling, server settings clarity, and desktop shell polish.
 
+Implementation status on 2026-03-30:
+
+- initial implementation pass is now in the repo for seek/range handling, qBit completion-hook extraction, stream-state badges, configure-page/runtime save-path clarity, and desktop tray/window behavior
+- remaining gap before calling the whole area fully closed is still real-client validation on actual Stremio devices, especially around live seek behavior and packed-release extraction UX
+
 It is intentionally implementation-focused:
 
 - define what needs to change

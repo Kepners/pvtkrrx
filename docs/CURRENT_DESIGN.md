@@ -20,7 +20,7 @@ PVTKRRX is one codebase with three active runtime pieces:
 2. Local runtime on the Windows host:
    - serves `PC Local` manifests and config-backed addon routes
    - exposes built-in `/file` and `/playback` endpoints
-   - provides local admin routes such as `/local-config`, `/auto-provision`, `/network-info`, and local qBit control
+   - provides local admin routes such as `/local-config`, `/auto-provision`, `/network-info`, `/local/qbit/preferences`, `/local/qbit/download-path`, and `/local/qbit/auto-extract`
    - reads completed files directly from the host download path when available
 3. Electron desktop wrapper:
    - launches and packages the local runtime on Windows
@@ -36,8 +36,11 @@ PVTKRRX is one codebase with three active runtime pieces:
 - The desktop popup mirrors the same route split and tells the user to install/sign in to Stremio on the host PC before using `LAN Bridge`.
 - The desktop popup also exposes:
   - current runtime status
-  - qBittorrent download path controls
+  - qBittorrent save-path controls
+  - qBittorrent packed-release extraction-hook controls
   - runtime log copy/open actions
+  - explicit `Minimize`, `Send To Tray`, and `Exit App` actions
+- The configure page now mirrors that local-runtime visibility with a live qBittorrent status panel that shows the effective save path, incomplete path, fallback storage roots, and whether PVTKRRX currently manages the qBit completion hook.
 
 ## Route Model
 
@@ -85,13 +88,16 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 - `LAN Bridge` requests 307-redirect to the host's local runtime before hitting `/file` or `/playback`, so after redirect all local playback capabilities apply.
 - Local `/file` serves bytes with HTTP Range support when the file is locally accessible on disk.
 - Local progressive playback now waits for a safer initial readable buffer and keeps qBittorrent first+last piece priority enabled by default while a file is still incomplete, so Stremio can stay on the player page instead of bouncing back to source selection during early range probes.
+- Local `/file` now also waits on the specific requested qBittorrent piece window for seek-like range probes, so footer/skip requests can return `206` as soon as that piece window is locally readable instead of timing out after the initial head buffer succeeds.
 - Local `/file` can continue serving a known absolute local file path even after qBittorrent no longer reports the torrent row, as long as the file still exists on disk.
 - Local `/playback` is the queued-download path for tracker content that is not yet ready. It fetches the `.torrent` payload, adds it to qBittorrent, and as soon as qBittorrent exposes the target file on a built-in playback-capable runtime it 302-redirects into `/file`, letting the shared file route hold the HTTP connection open while bytes arrive. When built-in buffering is not possible, `/playback` still waits for ready-file thresholds before redirecting.
 - Completed-file playback correctly checks torrent completion state before redirecting into `/file`.
+- Stream rows now expose explicit state + format badges in the addon `name` (`[Q&B]`, `[BUF]`, `[DL]`, `[EXTRACTED]`, plus the detected container like `[MKV]` or `[MP4]`) and switch the description from `Queue and buffer` to `Downloaded` once the file is actually ready.
 - Packed RAR releases (`.rar/.r00/.r01/...`):
   - Official Stremio archive-source support is real: `rarUrls` is part of the addon/core contract and is routed through the client's local streaming server.
   - Completed archive sets now trigger background extraction on the host when the archive volumes are locally reachable.
   - If extraction has already finished, PVTKRRX prefers the extracted direct video file for playback.
+  - When the local runtime enables the qBittorrent completion hook, qBit only calls back into PVTKRRX after completion; PVTKRRX remains the single extraction owner.
   - If extraction is still running or unavailable, the packed source stays hidden by default instead of being advertised as normal playback.
   - Native `rarUrls` emission is now an explicit manual-testing override (`PVTKRRX_EXPERIMENTAL_RAR_STREAMS=true`), not part of the supported default playback contract.
   - Emitting `rarUrls` still means the addon is using the official archive payload shape; it does not count as end-to-end real-client sign-off for PVTKRRX archive playback.
@@ -109,6 +115,8 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 - On every cold boot, the splash window opens before the main desktop shell.
 - The splash is pinned `alwaysOnTop`, brought to the front, and kept visible for a minimum startup window before the main shell replaces it.
 - The desktop shell starts hidden and only appears after the local runtime is reachable.
+- Closing the main desktop shell now hides it to the Windows system tray unless the user explicitly exits.
+- The tray exposes restore/open/exit behavior so the local runtime can keep serving while the window is hidden intentionally.
 - The desktop wrapper now starts a Windows power blocker by default (`prevent-app-suspension`) so the host can stay alive through lock-screen and display-off states while serving local/LAN traffic.
 - Startup still runs:
   - local server boot

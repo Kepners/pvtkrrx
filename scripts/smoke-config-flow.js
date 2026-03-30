@@ -221,6 +221,9 @@ async function run() {
     assert.match(configureHtml, /Auto Setup \(Home LAN\)/, 'configure page should render auto setup action')
     assert.match(configureHtml, /id="quickInstallLanBtn"/, 'configure page should render quick install button')
     assert.match(configureHtml, /auth\/stremio\/local-status/, 'configure page should check local Stremio status')
+    assert.match(configureHtml, /id="qbitRuntimeStatus"/, 'configure page should render live qBittorrent runtime status')
+    assert.match(configureHtml, /id="qbitAutoExtractEnabled"/, 'configure page should render the qBittorrent extraction-hook toggle')
+    assert.match(configureHtml, /Change the actual qBittorrent save path/i, 'configure page should explain where to change the live qBittorrent save path')
     assert.match(configureHtml, /href="\/runbooks"/, 'configure page should link to runbooks')
     assert.match(configureHtml, /route-parity\.js/, 'configure page should load shared parity helper')
 

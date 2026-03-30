@@ -45,6 +45,11 @@ These items are verified in the current workspace or by direct client/log proof:
 - Supercars, V8, NASCAR, WSBK, WEC, Formula E, Darts, and expanded Golf coverage added to sport detection
 - local `/playback` now fails fast for incomplete multi-volume RAR releases after queueing the torrent, instead of timing out behind a false progressive-playback promise
 - completed packed RAR releases now start background extraction into a managed `.pvtkrrx-extracted/<hash>` folder when the local host can reach the archive volumes, and direct extracted playback is the supported path once ready
+- local `/file` now waits for the specific requested qBittorrent piece window during seek/skip range probes, so already-downloaded later ranges return `206` instead of dropping out after the initial buffer
+- local qBittorrent control can now manage a PVTKRRX-owned completion hook for packed-release extraction without silently overwriting a different existing qBit post-process program
+- stream labels now show explicit download state + format badges (`[Q&B]`, `[BUF]`, `[DL]`, `[EXTRACTED]`, plus container badges like `[MKV]` / `[MP4]`)
+- the desktop shell now has explicit `Minimize`, `Send To Tray`, and `Exit App` controls, hides to tray on close, and uses a larger no-scroll default layout
+- the configure page now shows the live qBittorrent save path, incomplete path, fallback storage roots, and extraction-hook state when opened on the Windows host runtime
 - official Stremio sources were re-checked on 2026-03-30: `rarUrls` is a real archive source, tuple-style `ArchiveUrl` is the correct payload shape, and archive sources are routed through the local streaming server at `rar/create`
 - the repo-local `behaviorHints.sourceContainer = 'rar'` hint is not part of the official Stremio archive contract and should not be treated as proof that clients honor the stream
 - `npm run smoke:pipeline` and `npm run smoke:playback` both passed again on 2026-03-30 during the documentation audit; these prove the supported direct-play packed-release behavior and keep the experimental native archive payload path covered
@@ -96,6 +101,15 @@ These items are verified in the current workspace or by direct client/log proof:
 14. Native packed-RAR fallback still lacked one real PVTKRRX client pass:
    - Root cause: the repo had a spec-aligned `rarUrls` payload path, but neither the local runtime logs nor the Stremio-side data on this machine contained a captured end-to-end native archive success, so the addon was still advertising an unproven playback mode.
    - Fix: completed packed releases now stay hidden by default until archive extraction can surface a normal direct-play video file; native `rarUrls` emission remains available only behind `PVTKRRX_EXPERIMENTAL_RAR_STREAMS=true` for manual testing.
+15. Local skip/seek probes could still time out a few seconds into buffering playback:
+   - Root cause: `/file` knew how many head bytes were readable, but it did not map later seek probes to qBittorrent piece availability, so Stremio footer/range requests outside that initial head window still failed too early.
+   - Fix: `/file` now queries qBit torrent properties + piece states, maps file offsets to torrent pieces, and waits for the requested piece window before answering late-range probes.
+16. qBittorrent extraction ownership was unclear and settings could not manage it cleanly:
+   - Root cause: PVTKRRX already owned archive extraction, but the UI did not expose whether qBit should trigger that flow on completion and there was no managed completion-hook path.
+   - Fix: the local runtime now exposes qBit preference/readback routes for extraction state, can install a PVTKRRX-managed qBit completion hook, and refuses to overwrite a different external qBit completion program silently.
+17. The desktop shell still behaved like a single close-only window and clipped the current content:
+   - Root cause: the Electron shell had no tray lifecycle, no minimize/hide actions, and the fixed `920 x 660` layout plus popup overflow styling produced the persistent scrollbar.
+   - Fix: the desktop window now ships larger, removes the normal scrollbar, exposes `Minimize`, `Send To Tray`, and `Exit App`, and restores cleanly from a real tray menu/click path.
 
 ## Still Needs Real-Client Proof
 

@@ -1642,6 +1642,13 @@
             <input type="password" id="qbitPassword" placeholder="password">
           </div>
         </div>
+        <div class="status info" id="qbitRuntimeStatus">Local qBittorrent save path and extraction status will appear here when you open this page on the Windows host runtime.</div>
+        <p class="hint">Change the actual qBittorrent save path in the desktop server window or qBittorrent WebUI. This page shows the live runtime path here so you can confirm what PVTKRRX is currently using.</p>
+        <label style="display:flex;align-items:flex-start;gap:0.6rem;margin-top:0.9rem;">
+          <input type="checkbox" id="qbitAutoExtractEnabled" style="width:auto;transform:scale(1.15);margin-top:0.15rem;">
+          <span>Use qBittorrent's completion hook to trigger PVTKRRX extraction for packed releases. PVTKRRX stays the extractor; qBittorrent only triggers the post-process call when the download finishes.</span>
+        </label>
+        <p class="hint">If qBittorrent already has a different completion program configured, PVTKRRX will refuse to overwrite it silently.</p>
       </div>
 
       <div class="service-card" id="serviceCard-storage" data-service-visible="pc lan">
@@ -1650,6 +1657,7 @@
         <textarea id="additionalStorageRoots" placeholder="Z:\Media&#10;\\NAS\TV&#10;D:\Archive"></textarea>
         <p class="hint">One path per line. PVTKRRX will try qBittorrent's save path first, then these extra local or mounted network locations if the file was moved after download.</p>
         <p class="hint">Use paths the Windows host PC can already read directly, including mapped drives, NAS shares, and extra HDD folders.</p>
+        <div class="status info" id="storageRuntimeStatus">PVTKRRX checks qBittorrent's save path first, then these fallback roots. Open this page on the Windows host runtime to see the live qBit paths here.</div>
       </div>
 
       <div class="service-card mode-hidden" id="serviceCard-files" data-service-visible="seedbox">
@@ -3661,6 +3669,13 @@
     document.getElementById('fileServerAuth').addEventListener('input', function() {
       markSecretFieldDirty('fileServerAuth');
     });
+    const qbitAutoExtractToggle = document.getElementById('qbitAutoExtractEnabled');
+    if (qbitAutoExtractToggle) {
+      qbitAutoExtractToggle.dataset.userTouched = 'false';
+      qbitAutoExtractToggle.addEventListener('change', function() {
+        this.dataset.userTouched = 'true';
+      });
+    }
     document.getElementById('localHostname').addEventListener('blur', function() {
       setActiveLocalHostname(this.value);
       setInstallModeHint();
@@ -3691,6 +3706,7 @@
     document.getElementById('localInstall').style.display = 'none';
     document.getElementById('hostedInstall').style.display = 'none';
     maybePrefillFromToken();
+    refreshLocalQbitRuntimeStatus();
     refreshLocalStremioStatus();
     updateQuickSetupStatus();
     window.addEventListener('beforeunload', stopStremioAuthKeyPolling);
@@ -3767,6 +3783,107 @@
         if (second >= 16 && second <= 31) return true;
       }
       return false;
+    }
+
+    function setRuntimeStatus(id, type, message) {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.className = `status ${type || 'info'}`.trim();
+      el.textContent = message;
+    }
+
+    async function refreshLocalQbitRuntimeStatus(options = {}) {
+      const preserveCheckbox = options.preserveCheckbox === true;
+      const autoExtractToggle = document.getElementById('qbitAutoExtractEnabled');
+
+      if (!canQueryLocalRuntime()) {
+        setRuntimeStatus(
+          'qbitRuntimeStatus',
+          'info',
+          'Open this page on the Windows host runtime to read qBittorrent\'s live save path and extraction-hook status.'
+        );
+        setRuntimeStatus(
+          'storageRuntimeStatus',
+          'info',
+          'PVTKRRX checks qBittorrent\'s live save path first, then the fallback roots listed here.'
+        );
+        return null;
+      }
+
+      try {
+        const res = await fetch('/local/qbit/preferences', { cache: 'no-store' });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error) {
+          throw new Error(data.error || `Failed to read qBittorrent runtime state (${res.status})`);
+        }
+
+        const savePath = String(data.savePath || '').trim() || 'Not configured yet';
+        const tempPath = data.incompletePathEnabled
+          ? (String(data.tempPath || '').trim() || 'Enabled without a separate incomplete path')
+          : 'Disabled';
+        const fallbackRoots = Array.isArray(data.additionalStorageRoots)
+          ? data.additionalStorageRoots.map((value) => String(value || '').trim()).filter(Boolean)
+          : [];
+        const fallbackSummary = fallbackRoots.length ? fallbackRoots.join(' | ') : 'No fallback roots configured';
+        const extractLabel = String(data.autoExtractLabel || 'PVTKRRX on-demand extraction only').trim();
+        const qbitStatusType = data.autoExtractManagedByPvtkrrx ? 'ok' : 'info';
+        const storageStatusType = fallbackRoots.length ? 'ok' : 'info';
+
+        setRuntimeStatus(
+          'qbitRuntimeStatus',
+          qbitStatusType,
+          `Live qBittorrent save path: ${savePath}. Incomplete path: ${tempPath}. Extraction: ${extractLabel}.`
+        );
+        setRuntimeStatus(
+          'storageRuntimeStatus',
+          storageStatusType,
+          `PVTKRRX checks the qBittorrent save path first (${savePath}), then fallback roots: ${fallbackSummary}.`
+        );
+
+        if (autoExtractToggle) {
+          autoExtractToggle.dataset.runtimeManaged = data.autoExtractManagedByPvtkrrx ? 'true' : 'false';
+          autoExtractToggle.dataset.runtimeEnabled = data.autoExtractEnabled ? 'true' : 'false';
+        }
+
+        if (autoExtractToggle && !preserveCheckbox) {
+          autoExtractToggle.checked = Boolean(data.autoExtractManagedByPvtkrrx);
+          autoExtractToggle.dataset.userTouched = 'false';
+        }
+
+        return data;
+      } catch (err) {
+        setRuntimeStatus(
+          'qbitRuntimeStatus',
+          'err',
+          err?.message || 'Failed to read qBittorrent runtime state.'
+        );
+        setRuntimeStatus(
+          'storageRuntimeStatus',
+          'err',
+          'Live qBittorrent path lookup failed. Check the local runtime and qBittorrent WebUI settings.'
+        );
+        return null;
+      }
+    }
+
+    function hasPendingLocalQbitRuntimePreferenceChange() {
+      const autoExtractToggle = document.getElementById('qbitAutoExtractEnabled');
+      return Boolean(autoExtractToggle && autoExtractToggle.dataset.userTouched === 'true');
+    }
+
+    async function applyLocalQbitRuntimePreferences(enabled) {
+      if (!canQueryLocalRuntime()) return null;
+
+      const res = await fetch('/local/qbit/auto-extract', {
+        method: 'POST',
+        headers: buildJsonHeaders(),
+        body: JSON.stringify({ enabled: Boolean(enabled) })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.error) {
+        throw new Error(data.error || `Failed to update qBittorrent extraction hook (${res.status})`);
+      }
+      return data;
     }
 
     async function getNetworkInfo() {
@@ -3964,6 +4081,10 @@
           setActiveLocalHostname(data.localHostname);
           setInstallModeHint();
         }
+        if (hasPendingLocalQbitRuntimePreferenceChange()) {
+          await applyLocalQbitRuntimePreferences(Boolean(document.getElementById('qbitAutoExtractEnabled')?.checked));
+        }
+        await refreshLocalQbitRuntimeStatus();
 
         const net = await getNetworkInfo();
         await fillLocalInstallLinks(net);
@@ -4101,6 +4222,7 @@
         if (!token && lanPair.pairId) {
           startLanPairStatusPolling();
         }
+        await refreshLocalQbitRuntimeStatus();
       } catch (err) {
         // keep form usable if prefill fails
       }
@@ -4253,6 +4375,10 @@
             setActiveLocalHostname(saveData.localHostname);
             setInstallModeHint();
           }
+          if (hasPendingLocalQbitRuntimePreferenceChange()) {
+            await applyLocalQbitRuntimePreferences(Boolean(document.getElementById('qbitAutoExtractEnabled')?.checked));
+          }
+          await refreshLocalQbitRuntimeStatus();
 
           const net = await getNetworkInfo();
           await fillLocalInstallLinks(net);

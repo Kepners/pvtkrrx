@@ -2,7 +2,7 @@ const fs = require('fs')
 const path = require('path')
 const crypto = require('crypto')
 const { spawn } = require('child_process')
-const { app, BrowserWindow, ipcMain, shell, clipboard, screen, powerMonitor, powerSaveBlocker } = require('electron')
+const { app, BrowserWindow, Tray, Menu, ipcMain, shell, clipboard, screen, powerMonitor, powerSaveBlocker } = require('electron')
 const pkg = require('../package.json')
 const { deriveDefaultLocalHostname, normalizeLocalHostname } = require('../src/utils/lanAlias')
 const { buildLocalModeUrls } = require('../src/utils/localInstallUrls')
@@ -20,8 +20,10 @@ const runtimeDir = resolveRuntimeDir()
 const logsDir = path.join(runtimeDir, 'logs')
 const localConfigPath = path.join(runtimeDir, 'local-config.json')
 const appIconPath = path.join(__dirname, 'assets', 'logo.ico')
-const WINDOW_WIDTH = 920
-const WINDOW_HEIGHT = 660
+const WINDOW_WIDTH = 1320
+const WINDOW_HEIGHT = 960
+const MIN_WINDOW_WIDTH = 1200
+const MIN_WINDOW_HEIGHT = 900
 const MIN_SPLASH_MS = Math.max(1500, parseInt(process.env.PVTKRRX_MIN_SPLASH_MS || '2600', 10) || 2600)
 const PROVISION_ONLY_ARG = '--pvtkrrx-provision-only'
 const NETWORK_ACCESS_ONLY_ARG = '--pvtkrrx-network-access-only'
@@ -361,6 +363,8 @@ let stremioWasRunning = false
 let stremioLaunchWatchFailureCount = 0
 let splashShownAt = 0
 let powerBlockerId = null
+let tray = null
+let isQuitting = false
 
 function normalizePowerBlockerMode(value) {
   const normalized = String(value || '').trim().toLowerCase()
@@ -841,6 +845,50 @@ function bringWindowToFront(targetWindow) {
   try { targetWindow.focus() } catch (_) {}
 }
 
+function showMainWindow(reason = 'tray') {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  if (mainWindow.isMinimized()) {
+    try { mainWindow.restore() } catch (_) {}
+  }
+  console.log(`[desktop-ui] show main window (${reason})`)
+  bringWindowToFront(mainWindow)
+}
+
+function hideMainWindowToTray(reason = 'close') {
+  if (!mainWindow || mainWindow.isDestroyed()) return
+  console.log(`[desktop-ui] hide to tray (${reason})`)
+  try { mainWindow.hide() } catch (_) {}
+}
+
+function createTray() {
+  if (tray || !appIconPath || !fs.existsSync(appIconPath)) return
+
+  tray = new Tray(appIconPath)
+  tray.setToolTip('PVTKRRX')
+  tray.setContextMenu(Menu.buildFromTemplate([
+    {
+      label: 'Open PVTKRRX',
+      click: () => showMainWindow('tray-menu')
+    },
+    {
+      label: 'Open Configure',
+      click: () => {
+        shell.openExternal(`http://127.0.0.1:${port}/configure`).catch(() => {})
+      }
+    },
+    { type: 'separator' },
+    {
+      label: 'Exit',
+      click: () => {
+        isQuitting = true
+        app.quit()
+      }
+    }
+  ]))
+  tray.on('click', () => showMainWindow('tray-click'))
+  tray.on('double-click', () => showMainWindow('tray-double-click'))
+}
+
 function pinSplashToFront() {
   if (!splashWindow || splashWindow.isDestroyed()) return
   try {
@@ -903,6 +951,8 @@ function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: WINDOW_WIDTH,
     height: WINDOW_HEIGHT,
+    minWidth: MIN_WINDOW_WIDTH,
+    minHeight: MIN_WINDOW_HEIGHT,
     resizable: true,
     maximizable: true,
     minimizable: true,
@@ -922,6 +972,11 @@ function createMainWindow() {
   mainWindow.loadFile(path.join(__dirname, 'popup.html'))
   mainWindow.webContents.on('did-finish-load', () => {
     pushStatus()
+  })
+  mainWindow.on('close', (event) => {
+    if (isQuitting) return
+    event.preventDefault()
+    hideMainWindowToTray('window-close')
   })
 }
 
@@ -1058,13 +1113,11 @@ app.on('second-instance', () => {
     pinSplashToFront()
     return
   }
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    if (mainWindow.isMinimized()) mainWindow.restore()
-    bringWindowToFront(mainWindow)
-  }
+  showMainWindow('second-instance')
 })
 
 app.whenReady().then(async () => {
+  isQuitting = false
   if (provisionOnlyMode) {
     const ok = await runProvisionOnlyMode()
     if (!ok) process.exitCode = 1
@@ -1088,6 +1141,7 @@ app.whenReady().then(async () => {
   }
 
   createSplashWindow()
+  createTray()
   startAddonServer()
   createMainWindow()
 
@@ -1114,7 +1168,16 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
 
+app.on('activate', () => {
+  showMainWindow('activate')
+})
+
 app.on('before-quit', () => {
+  isQuitting = true
+  if (tray) {
+    try { tray.destroy() } catch (_) {}
+    tray = null
+  }
   releaseDesktopPowerBlocker('before-quit')
   stopStremioLaunchWatch()
   stopLanPairHeartbeatLoop()
@@ -1177,16 +1240,31 @@ ipcMain.handle('get-download-path', async () => {
     const prefs = await fetchJson(`http://127.0.0.1:${port}/local/qbit/preferences`)
     return {
       available: true,
+      ...prefs,
       savePath: String(prefs?.savePath || ''),
       tempPath: String(prefs?.tempPath || ''),
-      incompletePathEnabled: Boolean(prefs?.incompletePathEnabled)
+      incompletePathEnabled: Boolean(prefs?.incompletePathEnabled),
+      additionalStorageRoots: Array.isArray(prefs?.additionalStorageRoots) ? prefs.additionalStorageRoots : [],
+      autoExtractEnabled: Boolean(prefs?.autoExtractEnabled),
+      autoExtractManagedByPvtkrrx: Boolean(prefs?.autoExtractManagedByPvtkrrx),
+      autoExtractMode: String(prefs?.autoExtractMode || ''),
+      autoExtractLabel: String(prefs?.autoExtractLabel || 'PVTKRRX on-demand extraction only'),
+      autoExtractProgram: String(prefs?.autoExtractProgram || ''),
+      autoExtractScriptPath: String(prefs?.autoExtractScriptPath || '')
     }
   } catch (_) {
     return {
       available: false,
       savePath: '',
       tempPath: '',
-      incompletePathEnabled: false
+      incompletePathEnabled: false,
+      additionalStorageRoots: [],
+      autoExtractEnabled: false,
+      autoExtractManagedByPvtkrrx: false,
+      autoExtractMode: '',
+      autoExtractLabel: 'Unavailable',
+      autoExtractProgram: '',
+      autoExtractScriptPath: ''
     }
   }
 })
@@ -1218,6 +1296,29 @@ ipcMain.handle('set-download-path', async (_event, savePath) => {
   return { savePath: String(updated?.savePath || value) }
 })
 
+ipcMain.handle('save-qbit-settings', async (_event, payload = {}) => {
+  const value = String(payload?.savePath || '').trim()
+  const autoExtractEnabled = payload?.autoExtractEnabled
+
+  if (!value) throw new Error('Download path cannot be empty')
+
+  await fetchJson(`http://127.0.0.1:${port}/local/qbit/download-path`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ savePath: value })
+  })
+
+  if (typeof autoExtractEnabled === 'boolean') {
+    await fetchJson(`http://127.0.0.1:${port}/local/qbit/auto-extract`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled: autoExtractEnabled })
+    })
+  }
+
+  return fetchJson(`http://127.0.0.1:${port}/local/qbit/preferences`)
+})
+
 ipcMain.handle('open-download-folder', async (_event, folderPath) => {
   const value = String(folderPath || '').trim()
   if (!value) throw new Error('No folder path available')
@@ -1226,6 +1327,18 @@ ipcMain.handle('open-download-folder', async (_event, folderPath) => {
   return { ok: true }
 })
 
+ipcMain.handle('minimize-app', () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return { ok: false }
+  mainWindow.minimize()
+  return { ok: true }
+})
+
+ipcMain.handle('hide-to-tray', () => {
+  hideMainWindowToTray('ipc')
+  return { ok: true }
+})
+
 ipcMain.handle('quit-app', () => {
+  isQuitting = true
   app.quit()
 })

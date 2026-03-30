@@ -707,7 +707,8 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
         w: parsedSportsEvent?.awayTeam || '',
         v: String(sportsArtwork?.eventId || '').trim(),
         a: carriedPosterUrl || '',
-        b: backgroundUrl
+        b: backgroundUrl,
+        z: String(sportsArtwork?.logo || '').trim()
       }, {
         compress: true,
         compact: 'sports'
@@ -931,7 +932,8 @@ async function libraryCatalog(config, extra) {
       type: resolvedType,
       name: displayName,
       description: formatSize(t.size),
-      poster
+      poster,
+      background: background || undefined
     }
   })
 

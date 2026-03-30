@@ -22,6 +22,8 @@ const ORIGINALS = {
   torrents: QBitClient.prototype.torrents,
   torrentsByHashes: QBitClient.prototype.torrentsByHashes,
   files: QBitClient.prototype.files,
+  properties: QBitClient.prototype.properties,
+  pieceStates: QBitClient.prototype.pieceStates,
   setFilePriority: QBitClient.prototype.setFilePriority,
   toggleSequentialDownload: QBitClient.prototype.toggleSequentialDownload,
   toggleFirstLastPiecePrio: QBitClient.prototype.toggleFirstLastPiecePrio,
@@ -32,19 +34,22 @@ function restoreMocks() {
   QBitClient.prototype.torrents = ORIGINALS.torrents
   QBitClient.prototype.torrentsByHashes = ORIGINALS.torrentsByHashes
   QBitClient.prototype.files = ORIGINALS.files
+  QBitClient.prototype.properties = ORIGINALS.properties
+  QBitClient.prototype.pieceStates = ORIGINALS.pieceStates
   QBitClient.prototype.setFilePriority = ORIGINALS.setFilePriority
   QBitClient.prototype.toggleSequentialDownload = ORIGINALS.toggleSequentialDownload
   QBitClient.prototype.toggleFirstLastPiecePrio = ORIGINALS.toggleFirstLastPiecePrio
   global.fetch = ORIGINALS.fetch
 }
 
-function request(port, reqPath) {
+function request(port, reqPath, options = {}) {
   return new Promise((resolve, reject) => {
     const req = http.request({
       host: '127.0.0.1',
       port,
       method: 'GET',
-      path: reqPath
+      path: reqPath,
+      headers: options.headers || {}
     }, (res) => {
       const chunks = []
       res.on('data', chunk => chunks.push(Buffer.from(chunk)))
@@ -118,7 +123,7 @@ async function run() {
   const priorityCalls = []
   const firstLastToggleCalls = []
   const payload = Buffer.from('smoke playback bytes', 'utf8')
-  const partialPayload = Buffer.alloc(3 * 1024 * 1024, 7)
+  const partialPayload = Buffer.alloc(30 * 1024 * 1024, 7)
   const archivePayload = Buffer.from('smoke rar bytes', 'utf8')
   const extractedPayload = Buffer.from('smoke extracted bytes', 'utf8')
   const torrent = {
@@ -151,7 +156,8 @@ async function run() {
     name: 'buffering/Formula1.2026.Japanese.Grand.Prix.Qualifying.1080p.mkv',
     size: 30 * 1024 * 1024,
     progress: 0.25,
-    index: 0
+    index: 0,
+    piece_range: [0, 5]
   }
   const packedTorrent = {
     hash: packedHash,
@@ -262,6 +268,20 @@ async function run() {
     if (normalized === readyPackedHash) return readyPackedFiles
     return []
   }
+  QBitClient.prototype.properties = async (inputHash) => {
+    const normalized = String(inputHash || '').toLowerCase()
+    if (normalized === incompleteHash) {
+      return { piece_size: 5 * 1024 * 1024 }
+    }
+    return { piece_size: payload.length || 1 }
+  }
+  QBitClient.prototype.pieceStates = async (inputHash) => {
+    const normalized = String(inputHash || '').toLowerCase()
+    if (normalized === incompleteHash) {
+      return [2, 2, 0, 0, 2, 2]
+    }
+    return []
+  }
   QBitClient.prototype.setFilePriority = async (_hash, ids, priority) => {
     priorityCalls.push({ ids: [...ids], priority })
     return 'Ok.'
@@ -329,6 +349,18 @@ async function run() {
     const incompleteFileResponse = await request(server.address().port, String(incompleteResponse.headers.location || ''))
     assert.equal(incompleteFileResponse.status, 206, 'shared file route should keep Stremio on the player with a partial-content response while bytes continue downloading')
     assert.match(String(incompleteFileResponse.headers['content-range'] || ''), /^bytes 0-\d+\/31457280$/)
+
+    const seekRangeResponse = await request(
+      server.address().port,
+      String(incompleteResponse.headers.location || ''),
+      {
+        headers: {
+          Range: 'bytes=20971520-22020095'
+        }
+      }
+    )
+    assert.equal(seekRangeResponse.status, 206, 'seek-like range probes should stay on the player when qBit has already downloaded the requested piece window')
+    assert.match(String(seekRangeResponse.headers['content-range'] || ''), /^bytes 20971520-\d+\/31457280$/)
 
     const packedResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(packedPlaybackToken)}`)
     assert.equal(packedResponse.status, 422, 'incomplete packed archives should fail fast with a truthful packed-release message instead of stalling')

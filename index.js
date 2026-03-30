@@ -7,6 +7,14 @@ const express = require('express')
 const shared = require('./src/lib/shared')
 const { isCompletedTorrent } = require('./src/utils/torrentState')
 const { inspectTorrentPayload } = require('./src/utils/torrentPayload')
+const { ensurePackedArchiveExtracted } = require('./src/utils/archiveExtraction')
+const {
+  getQbitPostProcessScriptPath,
+  ensureQbitPostProcessScript,
+  buildQbitAutorunProgram,
+  describeQbitAutorunMode,
+  findTorrentForPostProcess
+} = require('./src/utils/qbitAutomation')
 
 // Destructure everything routes need from the shared module.
 // Shared module initializes env, console redaction, stores, and rate limiters at load time.
@@ -1082,10 +1090,18 @@ app.get('/:config/qbit/preferences', withConfig, requireLocalQbitControl, async 
   try {
     const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
     const prefs = await qbit.preferences()
+    const autorun = describeQbitAutorunMode(prefs)
     res.json({
       savePath: String(prefs?.save_path || ''),
       tempPath: String(prefs?.temp_path || ''),
-      incompletePathEnabled: Boolean(prefs?.temp_path_enabled)
+      incompletePathEnabled: Boolean(prefs?.temp_path_enabled),
+      additionalStorageRoots: normalizeLocalStorageRoots(req.config.additionalStorageRoots),
+      autoExtractEnabled: autorun.autorunEnabled,
+      autoExtractManagedByPvtkrrx: autorun.managedByPvtkrrx,
+      autoExtractMode: autorun.mode,
+      autoExtractLabel: autorun.label,
+      autoExtractProgram: autorun.autorunProgram,
+      autoExtractScriptPath: getQbitPostProcessScriptPath()
     })
   } catch (err) {
     res.status(500).json({ error: 'Failed to read qBit preferences', detail: err.message })
@@ -1100,12 +1116,119 @@ app.post('/:config/qbit/download-path', withConfig, requireLocalQbitControl, asy
     const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
     await qbit.setPreferences({ save_path: savePath })
     const prefs = await qbit.preferences()
+    const autorun = describeQbitAutorunMode(prefs)
     res.json({
       ok: true,
-      savePath: String(prefs?.save_path || '')
+      savePath: String(prefs?.save_path || ''),
+      tempPath: String(prefs?.temp_path || ''),
+      incompletePathEnabled: Boolean(prefs?.temp_path_enabled),
+      autoExtractEnabled: autorun.autorunEnabled,
+      autoExtractManagedByPvtkrrx: autorun.managedByPvtkrrx,
+      autoExtractMode: autorun.mode,
+      autoExtractLabel: autorun.label
     })
   } catch (err) {
     res.status(500).json({ error: 'Failed to update qBit download path', detail: err.message })
+  }
+})
+
+function getLocalQbitAutomationBaseUrl(req) {
+  try {
+    const current = new URL(getPublicBaseUrl(req))
+    const port = String(current.port || process.env.PORT || '7000').trim() || '7000'
+    return `http://127.0.0.1:${port}`
+  } catch (_) {
+    return `http://127.0.0.1:${String(process.env.PORT || '7000').trim() || '7000'}`
+  }
+}
+
+app.post('/:config/qbit/auto-extract', withConfig, requireLocalQbitControl, async (req, res) => {
+  try {
+    const rawEnabled = req.body?.enabled
+    const enableAutoExtract = rawEnabled === true || rawEnabled === 1 || String(rawEnabled).trim().toLowerCase() === 'true'
+    const disableAutoExtract = rawEnabled === false || rawEnabled === 0 || String(rawEnabled).trim().toLowerCase() === 'false'
+    if (!enableAutoExtract && !disableAutoExtract) {
+      return res.status(400).json({ error: 'enabled must be true or false' })
+    }
+
+    const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
+    const currentPrefs = await qbit.preferences()
+    const currentAutorun = describeQbitAutorunMode(currentPrefs)
+
+    if (!currentAutorun.managedByPvtkrrx && String(currentAutorun.autorunProgram || '').trim()) {
+      return res.status(409).json({
+        error: 'qBittorrent already has a different completion program configured. Clear that external completion program in qBittorrent before letting PVTKRRX manage packed-release extraction.'
+      })
+    }
+
+    if (enableAutoExtract) {
+      const baseUrl = getLocalQbitAutomationBaseUrl(req)
+      const scriptPath = ensureQbitPostProcessScript(baseUrl)
+      await qbit.setPreferences({
+        autorun_enabled: true,
+        autorun_program: buildQbitAutorunProgram(scriptPath, baseUrl)
+      })
+    } else {
+      await qbit.setPreferences({
+        autorun_enabled: false,
+        autorun_program: ''
+      })
+    }
+
+    const updatedPrefs = await qbit.preferences()
+    const autorun = describeQbitAutorunMode(updatedPrefs)
+    res.json({
+      ok: true,
+      autoExtractEnabled: autorun.autorunEnabled,
+      autoExtractManagedByPvtkrrx: autorun.managedByPvtkrrx,
+      autoExtractMode: autorun.mode,
+      autoExtractLabel: autorun.label,
+      autoExtractProgram: autorun.autorunProgram,
+      autoExtractScriptPath: getQbitPostProcessScriptPath()
+    })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to update qBit packed-release extraction hook', detail: err.message })
+  }
+})
+
+app.post('/:config/qbit/postprocess', withConfig, requireLocalQbitControl, async (req, res) => {
+  try {
+    const completedPath = String(req.body?.completedPath || '').trim()
+    const torrentName = String(req.body?.torrentName || '').trim()
+    if (!completedPath && !torrentName) {
+      return res.status(400).json({ error: 'completedPath or torrentName is required' })
+    }
+
+    const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
+    const torrents = await qbit.torrents('completed')
+    const torrent = findTorrentForPostProcess(torrents, completedPath, torrentName)
+    if (!torrent?.hash) {
+      return res.json({
+        ok: true,
+        status: 'ignored',
+        reason: 'torrent-not-found'
+      })
+    }
+
+    const files = await qbit.files(torrent.hash)
+    if (!hasPackedArchiveFiles(files)) {
+      return res.json({
+        ok: true,
+        status: 'ignored',
+        reason: 'not-packed-archive',
+        hash: String(torrent.hash || '').slice(0, 8)
+      })
+    }
+
+    const extraction = await ensurePackedArchiveExtracted(torrent, files, req.config.additionalStorageRoots)
+    res.json({
+      ok: true,
+      status: String(extraction?.status || 'unknown'),
+      hash: String(torrent.hash || '').slice(0, 8),
+      extractedPath: String(extraction?.path || '')
+    })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to post-process completed qBit torrent', detail: err.message })
   }
 })
 
@@ -1149,7 +1272,7 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
     }
 
     let torrent = playback?.torrent || { hash: h, progress: 1 }
-    const files = playback?.files || []
+    let files = playback?.files || []
     let file = playback?.file || null
     let resolvedFilePath = playback?.resolvedFilePath || (isOrphanFile ? path.normalize(p) : '')
     const torrentHash = String(torrent?.hash || h || '').toLowerCase()
@@ -1174,10 +1297,12 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
     let readableBytes = isOrphanFile ? fileSize : Number(playback.readableBytes || 0)
     let isComplete = isOrphanFile || Number(file?.progress || torrent.progress || 0) >= 0.999
     let maxReadable = isComplete ? fileSize : Math.max(0, Math.min(fileSize, readableBytes))
+    let pieceRangeContext = null
 
     const applyRefreshedPlayback = (refreshed) => {
       if (!refreshed?.torrent || !refreshed?.file) return false
       torrent = refreshed.torrent
+      files = Array.isArray(refreshed.files) ? refreshed.files : files
       file = refreshed.file
       resolvedFilePath = refreshed.resolvedFilePath || ''
       fileExists = Boolean(refreshed.fileExists && resolvedFilePath)
@@ -1185,6 +1310,7 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
       readableBytes = Number(refreshed.readableBytes || 0)
       isComplete = Number(refreshed.file?.progress || refreshed.torrent.progress || 0) >= 0.999
       maxReadable = isComplete ? fileSize : Math.max(0, Math.min(fileSize, readableBytes))
+      pieceRangeContext = null
       return true
     }
 
@@ -1201,6 +1327,94 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
         if (predicate()) return true
       }
       return false
+    }
+
+    const getRequestedPieceWindowEnd = async (startByte) => {
+      if (isOrphanFile || isComplete) return fileSize - 1
+      if (!Number.isFinite(startByte) || startByte < 0 || startByte >= fileSize) return -1
+      if (startByte < maxReadable) return maxReadable - 1
+
+      const filePieceRange = Array.isArray(file?.piece_range) ? file.piece_range : null
+      if (!filePieceRange || filePieceRange.length < 2) return -1
+
+      const filePieceStart = Number(filePieceRange[0])
+      const filePieceEnd = Number(filePieceRange[1])
+      if (!Number.isFinite(filePieceStart) || !Number.isFinite(filePieceEnd)) return -1
+
+      let pieceSize = Number(pieceRangeContext?.pieceSize || 0)
+      let pieceStates = Array.isArray(pieceRangeContext?.pieceStates) ? pieceRangeContext.pieceStates : null
+      if (!pieceSize || !pieceStates) {
+        try {
+          const [properties, states] = await Promise.all([
+            qbit.properties(torrentHash),
+            qbit.pieceStates(torrentHash)
+          ])
+          pieceSize = Math.max(0, Number(properties?.piece_size || 0))
+          pieceStates = Array.isArray(states) ? states.map(value => Number(value)) : null
+          pieceRangeContext = { pieceSize, pieceStates }
+        } catch (_) {
+          pieceRangeContext = { pieceSize: 0, pieceStates: null }
+          return -1
+        }
+      }
+      if (!pieceSize || !Array.isArray(pieceStates) || pieceStates.length === 0) return -1
+
+      let fileOffset = 0
+      const activeFileIndex = Number.isInteger(file?.index) ? file.index : null
+      const targetPathKey = normalizeTorrentPath(file?.name || p)
+      for (const entry of Array.isArray(files) ? files : []) {
+        const entryIndex = Number.isInteger(entry?.index) ? entry.index : null
+        const entryPathKey = normalizeTorrentPath(entry?.name || '')
+        if ((activeFileIndex !== null && entryIndex === activeFileIndex) || (activeFileIndex === null && entryPathKey === targetPathKey)) {
+          break
+        }
+        fileOffset += Math.max(0, Number(entry?.size || 0))
+      }
+
+      const requestedStartInTorrent = fileOffset + startByte
+      const requestedStartPiece = Math.floor(requestedStartInTorrent / pieceSize)
+      if (requestedStartPiece < filePieceStart || requestedStartPiece > filePieceEnd) return -1
+      if (Number(pieceStates[requestedStartPiece]) !== 2) return -1
+
+      let lastDownloadedPiece = requestedStartPiece
+      while (lastDownloadedPiece + 1 <= filePieceEnd && Number(pieceStates[lastDownloadedPiece + 1]) === 2) {
+        lastDownloadedPiece += 1
+      }
+
+      const fileEndInTorrent = fileOffset + Math.max(0, fileSize - 1)
+      const lastDownloadedByteInTorrent = Math.min(fileEndInTorrent, ((lastDownloadedPiece + 1) * pieceSize) - 1)
+      return Math.max(startByte, lastDownloadedByteInTorrent - fileOffset)
+    }
+
+    let seekPriorityRequested = false
+    const waitForRequestedRange = async (startByte) => {
+      let availableRangeEnd = await getRequestedPieceWindowEnd(startByte)
+      if (availableRangeEnd >= startByte) return availableRangeEnd
+      if (isOrphanFile) return -1
+
+      // When seeking to an unavailable range, request qBit to enable sequential
+      // download so pieces near the seek point are prioritized.
+      if (!seekPriorityRequested && torrentHash) {
+        seekPriorityRequested = true
+        try {
+          await qbit.toggleSequentialDownload(torrentHash)
+          console.log(`[file-route] enabled sequential download for seek at byte ${startByte}`)
+        } catch (_) {}
+      }
+
+      const waitUntil = Date.now() + STREAM_RANGE_WAIT_TIMEOUT_MS
+      while (Date.now() < waitUntil) {
+        await sleep(STREAM_RANGE_WAIT_INTERVAL_MS)
+        const refreshed = await loadTorrentPlaybackState(qbit, torrentHash, file?.name || p, req.config.additionalStorageRoots)
+        if (!applyRefreshedPlayback(refreshed)) {
+          if (!refreshed?.torrent) break
+          continue
+        }
+        availableRangeEnd = await getRequestedPieceWindowEnd(startByte)
+        if (availableRangeEnd >= startByte) return availableRangeEnd
+      }
+
+      return -1
     }
 
     if ((!isOrphanFile && !fileExists) || !resolvedFilePath) {
@@ -1232,6 +1446,7 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
     res.setHeader('Accept-Ranges', 'bytes')
     res.setHeader('Content-Type', contentType)
     res.setHeader('Cache-Control', 'no-store')
+    res.setHeader('Connection', 'keep-alive')
     res.setHeader('X-PVTKRRX-Progress', String(Math.round(Number(file?.progress || torrent.progress || 0) * 100)))
 
     if (range) {
@@ -1242,30 +1457,29 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
       // Support suffix-byte ranges: "bytes=-500000"
       if (!Number.isFinite(start) && Number.isFinite(requestedEnd) && requestedEnd > 0) {
         const suffixLen = requestedEnd
-        start = Math.max(0, maxReadable - suffixLen)
-        requestedEnd = maxReadable - 1
+        start = Math.max(0, fileSize - suffixLen)
+        requestedEnd = fileSize - 1
       }
 
-      if (!Number.isFinite(start) || start < 0 || start >= maxReadable) {
-        // Stremio can request ranges ahead of currently downloaded bytes.
-        // Avoid immediate hard failure: wait briefly for the needed range.
-        if (!isComplete && !isOrphanFile && Number.isFinite(start) && start >= 0) {
-          await waitForFileState(() => start < maxReadable || isComplete)
-        }
-
-        if (start >= maxReadable) {
-          // Return a retryable status for progressive playback instead of a hard 416.
-          res.setHeader('Content-Range', `bytes */${fileSize}`)
-          res.setHeader('Retry-After', '2')
-          return res.status(503).json({
-            error: 'Requested byte range not available yet',
-            progress: Number(file?.progress || torrent.progress || 0),
-            retryAfterSeconds: 2
-          })
-        }
+      if (!Number.isFinite(start) || start < 0 || start >= fileSize) {
+        res.setHeader('Content-Range', `bytes */${fileSize}`)
+        res.setHeader('Retry-After', '2')
+        return res.sendStatus(416)
       }
 
-      const end = Math.min(requestedEnd, maxReadable - 1)
+      let availableRangeEnd = isComplete ? (fileSize - 1) : await waitForRequestedRange(start)
+      if (availableRangeEnd < start) {
+        // Return a retryable status for progressive playback instead of a hard 416.
+        res.setHeader('Content-Range', `bytes */${fileSize}`)
+        res.setHeader('Retry-After', '2')
+        return res.status(503).json({
+          error: 'Requested byte range not available yet',
+          progress: Number(file?.progress || torrent.progress || 0),
+          retryAfterSeconds: 2
+        })
+      }
+
+      const end = Math.min(requestedEnd, availableRangeEnd)
       if (end < start) {
         res.setHeader('Content-Range', `bytes */${fileSize}`)
         res.setHeader('Retry-After', '2')

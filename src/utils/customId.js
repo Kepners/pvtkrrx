@@ -33,9 +33,19 @@ function compactSportsPayload(payload = {}) {
   const eventDate = String(payload.e || '').trim()
   const league = String(payload.g || '').trim()
   const eventId = String(payload.v || '').trim()
+  const leagueCode = String(payload.u || '').trim()
+  const homeTeam = String(payload.o || '').trim()
+  const awayTeam = String(payload.w || '').trim()
+  const background = String(payload.b || '').trim()
+  const logo = String(payload.z || '').trim()
   if (eventDate) compact.e = eventDate
   if (league) compact.g = league
   if (eventId) compact.v = eventId
+  if (leagueCode) compact.u = leagueCode
+  if (homeTeam) compact.o = homeTeam
+  if (awayTeam) compact.w = awayTeam
+  if (background) compact.b = background
+  if (logo) compact.z = logo
   return compact
 }
 
@@ -50,9 +60,15 @@ function compactLibraryPayload(payload = {}) {
   const seeders = Number(payload.d || 0) || 0
   const imdbId = String(payload.m || '').trim()
   const filePath = String(payload.f || '').trim()
+  const poster = String(payload.a || '').trim()
+  const background = String(payload.b || '').trim()
+  const logo = String(payload.z || '').trim()
   if (seeders > 0) compact.d = seeders
   if (imdbId) compact.m = imdbId
   if (filePath) compact.f = filePath
+  if (poster) compact.a = poster
+  if (background) compact.b = background
+  if (logo) compact.z = logo
   return compact
 }
 

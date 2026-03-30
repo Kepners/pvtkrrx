@@ -189,7 +189,7 @@ function buildExtractedArchiveStream(config, configToken, addonUrl, matched, ite
   })
   if (!fileUrl) return null
 
-  return buildOnSeedboxStream(item, fileUrl, fileName, stat.size, config, parsed)
+  return buildOnSeedboxStream(item, fileUrl, fileName, stat.size, config, parsed, { extracted: true })
 }
 
 async function buildMatchedArchiveCompatibleStream(config, configToken, addonUrl, matched, files, item, parsed) {

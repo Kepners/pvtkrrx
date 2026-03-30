@@ -1,5 +1,6 @@
 // Build Stremio stream objects - two patterns: on-seedbox and on-tracker
 
+const PVTKRRX_LOGO_URL = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.ico'
 const VIDEO_EXTENSIONS = ['.mkv', '.mp4', '.avi', '.wmv', '.ts', '.m4v']
 const SAMPLE_HINT_RE = /(^|[\\/.\-_ ])[sS]ample([\\/.\-_ ]|$)|(^|[\\/.\-_ ])[tT]railer([\\/.\-_ ]|$)|(^|[\\/.\-_ ])[pP]review([\\/.\-_ ]|$)|(^|[\\/.\-_ ])[pP]roof([\\/.\-_ ]|$)/
 const ARCHIVE_EXT_RE = /\.(?:rar|r\d{2,3}|zip|7z|001)$/i
@@ -60,20 +61,44 @@ function formatPeerLabel(seeders, mode) {
   return count > 0 ? `Peers: ${count}` : 'ZERO PEERS'
 }
 
-function buildStreamName(parsed, mode) {
-  const badge = mode === 'seedbox'
-    ? '[SB]'
-    : mode === 'buffering'
-      ? '[BUF]'
-      : '[DL]'
+function detectContainerLabel(...values) {
+  for (const value of values) {
+    const match = String(value || '').toLowerCase().match(/\.(mkv|mp4|avi|wmv|ts|m4v|mov|rar|zip|7z|001|r\d{2,3})(?:$|[^\w])/i)
+    if (!match) continue
+    const normalized = String(match[1] || '').toLowerCase()
+    if (normalized === '001') return 'ARCHIVE'
+    return normalized.toUpperCase()
+  }
+  return 'VIDEO'
+}
+
+function buildStateBadge(mode, options = {}) {
+  if (options.extracted === true) return '📦'
+  if (mode === 'seedbox') return '✅'
+  if (mode === 'buffering') return '⏳'
+  return '⬇️'
+}
+
+function buildStateLabel(mode, options = {}, progressPercent = null) {
+  if (options.extracted === true) return 'Downloaded and extracted'
+  if (mode === 'seedbox') return 'Downloaded — ready to play'
+  if (mode === 'buffering') return `Buffering ${Number.isFinite(progressPercent) ? progressPercent : 0}%`
+  return 'Download and play'
+}
+
+function buildStreamName(parsed, mode, fileName = '', options = {}) {
+  const badge = buildStateBadge(mode, options)
+  const container = detectContainerLabel(fileName, parsed?.container, parsed?.titleHint, parsed?.title)
   const quality = parsed?.quality || 'AUTO'
   const shortSource = parsed?.source || ''
   const shortCodec = parsed?.codec || ''
   const tech = uniqueNonEmpty([shortSource, shortCodec]).join(' ')
-  return tech ? `PVTKRRX ${badge} ${quality} ${tech}` : `PVTKRRX ${badge} ${quality}`
+  return tech
+    ? `PVTKRRX ${badge} ${quality} ${tech} 🎬${container}`
+    : `PVTKRRX ${badge} ${quality} 🎬${container}`
 }
 
-function buildDescription(item, parsed, mode, progressPercent = null) {
+function buildDescription(item, parsed, mode, progressPercent = null, fileName = '', options = {}) {
   const title = truncateTitle(item.title)
   const tech = uniqueNonEmpty([parsed.codec, parsed.hdr, parsed.bitDepth]).join(' • ')
   const source = uniqueNonEmpty([
@@ -82,9 +107,7 @@ function buildDescription(item, parsed, mode, progressPercent = null) {
     parsed.audio ? `🔊 ${parsed.audio}` : ''
   ]).join(' • ')
 
-  let modeLabel = 'Queue and buffer'
-  if (mode === 'seedbox') modeLabel = 'Ready file'
-  else if (mode === 'buffering') modeLabel = `Buffering ${Number.isFinite(progressPercent) ? progressPercent : 0}%`
+  const modeLabel = buildStateLabel(mode, options, progressPercent)
 
   const peerLabel = formatPeerLabel(item.seeders, mode)
   const stats = uniqueNonEmpty([
@@ -94,17 +117,27 @@ function buildDescription(item, parsed, mode, progressPercent = null) {
     item.indexer ? `🛰 ${item.indexer}` : '',
     parsed.languages ? `🌐 ${parsed.languages}` : ''
   ]).join(' | ')
+  const enrichedStats = uniqueNonEmpty([
+    modeLabel,
+    `Format: ${detectContainerLabel(fileName, parsed?.container, parsed?.titleHint, parsed?.title)}`,
+    peerLabel,
+    `Size: ${formatSize(item.size)}`,
+    item.indexer ? `Indexer: ${item.indexer}` : '',
+    parsed.languages ? `Lang: ${parsed.languages}` : ''
+  ]).join(' | ')
 
   const detailLine = uniqueNonEmpty([tech, source]).join(' | ')
-  if (!title) return detailLine ? `${detailLine}\n${stats}` : stats
-  return detailLine ? `${title}\n${detailLine}\n${stats}` : `${title}\n${stats}`
+  if (!title) return detailLine ? `${detailLine}\n${enrichedStats}` : enrichedStats
+  return detailLine ? `${title}\n${detailLine}\n${enrichedStats}` : `${title}\n${enrichedStats}`
 }
 
-function buildOnSeedboxStream(item, fileUrl, fileName, videoSize, config, parsed) {
+function buildOnSeedboxStream(item, fileUrl, fileName, videoSize, config, parsed, options = {}) {
+  const containerLabel = detectContainerLabel(fileName, parsed?.container, parsed?.titleHint, parsed?.title)
   const stream = {
-    name: buildStreamName(parsed, 'seedbox'),
-    description: buildDescription(item, parsed, 'seedbox'),
+    name: buildStreamName(parsed, 'seedbox', fileName, options),
+    description: buildDescription(item, parsed, 'seedbox', null, fileName, options),
     url: fileUrl,
+    thumbnail: PVTKRRX_LOGO_URL,
     behaviorHints: {
       notWebReady: true,
       bingeGroup: buildBingeGroup(item, parsed, 'seedbox'),
@@ -114,7 +147,8 @@ function buildOnSeedboxStream(item, fileUrl, fileName, videoSize, config, parsed
       sourceHdr: String(parsed?.hdr || ''),
       sourceQuality: String(parsed?.quality || ''),
       sourceSize: Math.max(0, Number(videoSize || item?.size || 0)),
-      sourceMode: 'seedbox'
+      sourceMode: 'seedbox',
+      sourceContainer: containerLabel.toLowerCase()
     }
   }
 
@@ -130,11 +164,13 @@ function buildOnSeedboxStream(item, fileUrl, fileName, videoSize, config, parsed
   return stream
 }
 
-function buildOnBufferingStream(item, fileUrl, fileName, videoSize, config, parsed, progressPercent) {
+function buildOnBufferingStream(item, fileUrl, fileName, videoSize, config, parsed, progressPercent, options = {}) {
+  const containerLabel = detectContainerLabel(fileName, parsed?.container, parsed?.titleHint, parsed?.title)
   const stream = {
-    name: buildStreamName(parsed, 'buffering'),
-    description: buildDescription(item, parsed, 'buffering', progressPercent),
+    name: buildStreamName(parsed, 'buffering', fileName, options),
+    description: buildDescription(item, parsed, 'buffering', progressPercent, fileName, options),
     url: fileUrl,
+    thumbnail: PVTKRRX_LOGO_URL,
     behaviorHints: {
       notWebReady: true,
       bingeGroup: buildBingeGroup(item, parsed, 'buffering'),
@@ -144,7 +180,8 @@ function buildOnBufferingStream(item, fileUrl, fileName, videoSize, config, pars
       sourceHdr: String(parsed?.hdr || ''),
       sourceQuality: String(parsed?.quality || ''),
       sourceSize: Math.max(0, Number(videoSize || item?.size || 0)),
-      sourceMode: 'buffering'
+      sourceMode: 'buffering',
+      sourceContainer: containerLabel.toLowerCase()
     }
   }
 
@@ -159,21 +196,24 @@ function buildOnBufferingStream(item, fileUrl, fileName, videoSize, config, pars
   return stream
 }
 
-function buildOnTrackerStream(item, playbackUrl, parsed) {
+function buildOnTrackerStream(item, playbackUrl, parsed, options = {}) {
   const safeName = (item.title || 'download').replace(/[^\w.\-()[\] ]/g, '')
+  const fileName = `${safeName}.torrent`
   return {
-    name: buildStreamName(parsed, 'tracker'),
-    description: buildDescription(item, parsed, 'tracker'),
+    name: buildStreamName(parsed, 'tracker', fileName, options),
+    description: buildDescription(item, parsed, 'tracker', null, fileName, options),
     url: playbackUrl,
+    thumbnail: PVTKRRX_LOGO_URL,
     behaviorHints: {
       notWebReady: true,
-      filename: safeName + '.mkv',
+      filename: fileName,
       sourceSeeders: Math.max(0, Number(item.seeders || 0)),
       sourceCodec: String(parsed?.codec || ''),
       sourceHdr: String(parsed?.hdr || ''),
       sourceQuality: String(parsed?.quality || ''),
       sourceSize: Math.max(0, Number(item?.size || 0)),
-      sourceMode: 'tracker'
+      sourceMode: 'tracker',
+      sourceContainer: detectContainerLabel(item?.title || safeName).toLowerCase()
     }
   }
 }
@@ -182,12 +222,13 @@ function buildOnArchiveStream(item, rarUrls, fileName, totalBytes, parsed, progr
   const buffering = Number.isFinite(progressPercent) && progressPercent < 100
   const mode = buffering ? 'buffering' : 'seedbox'
   return {
-    name: `${buildStreamName(parsed, mode)} RAR`,
+    name: buildStreamName(parsed, mode, fileName),
     description: withExtraDescription(
-      buildDescription(item, parsed, mode, progressPercent),
+      buildDescription(item, parsed, mode, progressPercent, fileName),
       ['Multi-part RAR archive stream']
     ),
     rarUrls,
+    thumbnail: PVTKRRX_LOGO_URL,
     fileMustInclude: [...ARCHIVE_VIDEO_INCLUDE_PATTERNS],
     behaviorHints: {
       notWebReady: true,
@@ -468,7 +509,7 @@ function sortStreams(streams) {
     if (mode === 'tracker') return 2
     if (mode === 'notice') return 3
     const streamName = String(stream?.name || '')
-    if (streamName.includes('[SB]')) return 0
+    if (streamName.includes('[EXTRACTED]') || streamName.includes('[DL]') || streamName.includes('[SB]')) return 0
     if (streamName.includes('[BUF]')) return 1
     return 2
   }

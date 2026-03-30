@@ -128,6 +128,14 @@ class QBitClient {
     return this.request(`/api/v2/torrents/files?hash=${encodeURIComponent(hash)}`)
   }
 
+  async properties(hash) {
+    return this.request(`/api/v2/torrents/properties?hash=${encodeURIComponent(hash)}`)
+  }
+
+  async pieceStates(hash) {
+    return this.request(`/api/v2/torrents/pieceStates?hash=${encodeURIComponent(hash)}`)
+  }
+
   async add(magnetOrUrl, options = {}) {
     const params = new URLSearchParams()
     params.set('urls', String(magnetOrUrl || ''))

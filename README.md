@@ -25,6 +25,8 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 - **No debrid needed** — Your seedbox IS the streaming server
 - **Free hosted option** — Canonical hosted setup is available at `https://www.pvtkrrx.cc`
 
+- **Desktop host controls** - The Windows shell now exposes qBit save-path visibility, packed-release extraction-hook control, tray restore, minimize, and explicit exit actions
+
 ## Route Framework
 
 PVTKRRX is one runtime with three install routes:
@@ -102,6 +104,7 @@ Auto Setup also attempts to:
 - open Windows Firewall ports `7000/7001` and UDP `5353` for LAN devices
 
 Windows desktop install/startup now also re-checks those LAN firewall rules automatically on each boot.
+When you open the configure page on the Windows host runtime, it now also shows the live qBittorrent save path, incomplete path, fallback storage roots, and whether PVTKRRX currently manages the qBit completion hook for packed-release extraction.
 
 ## Requirements
 
@@ -149,6 +152,8 @@ Playback/file state links are also issued as opaque encrypted tokens (instead of
 Hosted relay routes do not proxy video bytes, and hosted `/file` or `/playback` requests fail fast when playback still depends on the local runtime.
 
 ### Stream Types
+
+PVTKRRX stream rows now show explicit state + format badges in the stream `name`: `[Q&B]`, `[BUF]`, `[DL]`, `[EXTRACTED]`, plus the detected container such as `[MKV]` or `[MP4]`. The description also switches from `Queue and buffer` to `Downloaded` once the file is actually ready.
 
 **⚡ On Seedbox** — File is already downloaded. Plays immediately.
 

@@ -362,6 +362,8 @@ async function run() {
 
       assert.equal(result.streams.length, 1, '#4 local playback-capable route should still emit tracker playback stream')
       assert.match(String(result.streams[0]?.url || ''), /\/local\/playback\//)
+      assert.match(String(result.streams[0]?.name || ''), /\[Q&B\]/, '#4 tracker stream should keep the queue-and-buffer badge before the file is downloaded')
+      assert.match(String(result.streams[0]?.description || ''), /Queue and buffer/i, '#4 tracker stream description should say queue and buffer while it is not downloaded yet')
     })
 
     await withScenario(async () => {
@@ -382,6 +384,10 @@ async function run() {
       assert.equal(result.streams.length, 1, '#4b local buffering flow should remain intact')
       assert.match(String(result.streams[0]?.url || ''), /\/local\/file\//)
       assert.equal(String(result.streams[0]?.behaviorHints?.sourceMode || ''), 'buffering')
+      assert.match(String(result.streams[0]?.name || ''), /\[BUF\]/, '#4b buffering stream should show the buffering badge')
+      assert.match(String(result.streams[0]?.name || ''), /\[MKV\]/, '#4b buffering stream should show the detected file format badge')
+      assert.match(String(result.streams[0]?.description || ''), /Buffering/i, '#4b buffering stream description should say buffering')
+      assert.match(String(result.streams[0]?.description || ''), /Format: MKV/i, '#4b buffering stream description should surface the file format')
     })
 
     await withScenario(async () => {
@@ -522,6 +528,8 @@ async function run() {
       assert.equal(Array.isArray(result.streams[0]?.rarUrls), false, '#4d2 extracted packed archive should prefer a normal direct file stream over rarUrls')
       assert.match(String(result.streams[0]?.url || ''), /\/file\//, '#4d2 extracted packed archive should still use the shared file route')
       assert.match(decodeOpaqueFilePath(result.streams[0]?.url || ''), /release-extracted\.mp4/i, '#4d2 extracted packed archive should point at the extracted video file')
+      assert.match(String(result.streams[0]?.name || ''), /\[EXTRACTED\]/, '#4d2 extracted archive stream should show that the release was extracted after download')
+      assert.match(String(result.streams[0]?.description || ''), /Downloaded and extracted/i, '#4d2 extracted archive stream description should make the extracted state explicit')
     })
 
     await withScenario(async () => {
@@ -728,6 +736,10 @@ async function run() {
         '#4j completed direct-video streams should carry the resolved absolute file path so playback survives if the torrent row disappears later'
       )
       assert.ok(result.streams.every(stream => String(stream?.name || '').startsWith('PVTKRRX ') || !stream?.name), '#4j stream names should start with PVTKRRX so Stremio can group them under the addon source')
+      assert.match(String(result.streams[0]?.name || ''), /\[DL\]/, '#4j completed direct-video stream should show the downloaded badge')
+      assert.match(String(result.streams[0]?.name || ''), /\[MP4\]/, '#4j completed direct-video stream should show the detected file format badge')
+      assert.match(String(result.streams[0]?.description || ''), /Downloaded/i, '#4j completed direct-video stream description should replace queue-and-buffer with downloaded')
+      assert.match(String(result.streams[0]?.description || ''), /Format: MP4/i, '#4j completed direct-video stream description should surface the file format')
     })
 
     await withScenario(async () => {
