@@ -120,8 +120,8 @@ This batch covers desktop app usability, stream labelling, player reliability, a
 **Problem:** The desktop server window (1180×860) was too small, causing content overflow and scroll bars.
 
 **What changed:**
-- Window dimensions increased from 1180×860 to **1320×960**.
-- Minimum dimensions increased from 1100×820 to **1200×900**.
+- Window dimensions increased from 1180×860 to **1320×1107**.
+- Minimum dimensions increased from 1100×820 to **1320×1107**.
 - Left panel switched from rigid `grid-template-rows` to `flex-direction: column` so the shell console fills available space.
 - Right panel switched to flex layout so the path card fills remaining space.
 - Shell console `max-height` removed — it now grows to fill available space via `flex: 1`.
