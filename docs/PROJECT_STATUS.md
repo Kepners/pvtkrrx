@@ -109,7 +109,7 @@ These items should still be treated as open until captured on real clients:
    - The current simple flow now has route-aware primary install links and keeps manual addon URLs as fallback instead of the main path.
 3. ~~Trace the exact seedbox playback model end to end.~~ **Done 2026-03-29.**
    - Full code trace confirmed route detection (`getInstallMode` + `getManifest` profile assignment), stream emission per route, 307 LAN redirect mechanics, and `/file`/`/playback` route guards.
-   - All three routes expose the same four catalogs (sports, movies, tv, library) — no per-route catalog filtering.
+   - All three routes expose the same sports-first discovery catalog family plus movies, tv, and library — no per-route catalog filtering.
    - LAN Bridge 307-redirects rewrite the token path to `/local/...?mode=local`, giving LAN devices full PC Local playback after redirect.
    - Remote Seedbox on Vercel: `/file` and `/playback` return 403 for non-local tokens; ready-file-first via `fileServerUrl`.
    - Auth-protected file servers: tracker `/playback` suppressed on non-local routes because redirect can't forward `proxyHeaders`.

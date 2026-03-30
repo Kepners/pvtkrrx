@@ -466,6 +466,14 @@ async function run() {
     assert.equal(localManifest.behaviorHints?.configurationRequired, false)
     assert.deepEqual(localManifest.types, ['movie', 'series', 'tv'], 'local manifest should keep the legacy Stremio type contract')
     assert.ok(Array.isArray(localManifest.catalogs) && localManifest.catalogs.some((catalog) => catalog?.id === 'pvtkrrx-sports' && catalog?.type === 'movie'), 'local manifest should expose sports through the legacy movie catalog contract')
+    const localMovieCatalogIds = localManifest.catalogs.filter((catalog) => catalog?.type === 'movie').map((catalog) => catalog?.id)
+    assert.deepEqual(
+      localMovieCatalogIds.slice(0, 4),
+      ['pvtkrrx-sports', 'pvtkrrx-sports-football', 'pvtkrrx-sports-motorsport', 'pvtkrrx-sports-mma'],
+      'local manifest should promote sports families to the front of movie discovery'
+    )
+    const footballCatalog = localManifest.catalogs.find((catalog) => catalog?.id === 'pvtkrrx-sports-football')
+    assert.ok(footballCatalog?.extra?.some((extra) => extra?.name === 'genre' && extra?.options?.includes('Premier League') && extra?.options?.includes('Arsenal')), 'football discovery catalog should expose league/team detail filters')
 
     const bootstrapManifestRes = await fetch(`${base}/manifest.json`)
     assert.equal(bootstrapManifestRes.status, 200, 'GET /manifest.json should return 200')
@@ -600,6 +608,12 @@ async function run() {
     assert.deepEqual(tokenManifest.types, ['movie', 'series', 'tv'], 'hosted manifest should keep the legacy Stremio type contract')
     assert.ok(tokenManifest.resources?.some((resource) => resource?.name === 'stream' && Array.isArray(resource.types) && !resource.types.includes('sports')), 'hosted manifest stream resource should keep sports behind the legacy movie contract')
     assert.ok(tokenManifest.catalogs?.some((catalog) => catalog?.id === 'pvtkrrx-sports' && catalog?.type === 'movie'), 'hosted manifest should register sports through the legacy movie catalog contract')
+    const hostedMovieCatalogIds = tokenManifest.catalogs.filter((catalog) => catalog?.type === 'movie').map((catalog) => catalog?.id)
+    assert.deepEqual(
+      hostedMovieCatalogIds.slice(0, 4),
+      ['pvtkrrx-sports', 'pvtkrrx-sports-football', 'pvtkrrx-sports-motorsport', 'pvtkrrx-sports-mma'],
+      'hosted manifest should keep sports families at the front of movie discovery'
+    )
 
     const tokenManifestLocalRes = await fetch(`${base}/${token}/manifest.json?mode=local`)
     assert.equal(tokenManifestLocalRes.status, 200, 'GET /:token/manifest.json?mode=local should return 200')

@@ -8,6 +8,8 @@ const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-sports-smoke-'
 process.env.PVTKRRX_RUNTIME_DIR = runtimeDir
 
 const { mapLeague } = require('../src/utils/leagueMap')
+const manifest = require('../src/config/manifest')
+const { findSportsDiscoveryCatalog } = require('../src/config/sportsCatalogs')
 const { parseSportsTitle, parseSportsEventTitle } = require('../src/utils/sportsTitleParser')
 const { resolveSportHint, scoreSportsEventSignals, isLikelySportsEventTitle } = require('../src/utils/sportsRules')
 const { detectSport } = require('../src/utils/sportClassifier')
@@ -52,6 +54,23 @@ function testCacheHeadersIncludeStaleIfError() {
     headers['Cache-Control'],
     'public, max-age=0, s-maxage=300, stale-while-revalidate=900, stale-if-error=7200'
   )
+}
+
+function testSportsDiscoveryCatalogLayout() {
+  const movieCatalogIds = manifest.catalogs
+    .filter((catalog) => catalog?.type === 'movie')
+    .map((catalog) => catalog?.id)
+
+  assert.deepEqual(
+    movieCatalogIds.slice(0, 4),
+    ['pvtkrrx-sports', 'pvtkrrx-sports-football', 'pvtkrrx-sports-motorsport', 'pvtkrrx-sports-mma'],
+    'sports families should lead movie discovery catalogs'
+  )
+
+  const footballCatalog = findSportsDiscoveryCatalog('pvtkrrx-sports-football')
+  assert.ok(footballCatalog, 'expected football discovery catalog definition')
+  assert.ok(footballCatalog.detailOptions.includes('Premier League'), 'football discovery should expose league filters')
+  assert.ok(footballCatalog.detailOptions.includes('Arsenal'), 'football discovery should expose team filters')
 }
 
 function testParserAndLeagueMap() {
@@ -177,6 +196,74 @@ async function testOrderAgnosticSportsGrouping() {
     ].includes(decoded.t),
     'expected compressed sports id to preserve one of the grouped source titles'
   )
+}
+
+async function testSportSpecificCatalogDetailFiltering() {
+  class FakeProwlarrClient {
+    async search() {
+      return [
+        {
+          title: 'EPL.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-A',
+          indexer: 'GeneralA',
+          size: 1_000_000_000,
+          seeders: 20,
+          pubDate: '2026-03-15T09:00:00Z'
+        },
+        {
+          title: 'UFC.Fight.Night.270.Main.Card.1080p.WEB.h264-GROUP',
+          indexer: 'GeneralB',
+          size: 1_200_000_000,
+          seeders: 30,
+          pubDate: '2026-03-15T10:00:00Z'
+        },
+        {
+          title: 'UEFA.Champions.League.2026.03.15.Liverpool.vs.Real.Madrid.1080p.HDTV.x264-B',
+          indexer: 'GeneralC',
+          size: 1_100_000_000,
+          seeders: 18,
+          pubDate: '2026-03-15T11:00:00Z'
+        }
+      ]
+    }
+  }
+
+  class FakeSportsDbClient {
+    async getEventArtwork() {
+      return {
+        poster: 'https://example.com/football-portrait.jpg',
+        landscapeImage: 'https://example.com/football-landscape.jpg',
+        backgroundImage: 'https://example.com/football-background.jpg',
+        image: 'https://example.com/football-landscape.jpg',
+        eventId: 'football-event-1',
+        eventDate: '2026-03-15',
+        league: 'English Premier League'
+      }
+    }
+  }
+
+  const { handleCatalog } = loadCatalogWithStubs({
+    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient },
+    '../clients/sportsdb': { SportsDbClient: FakeSportsDbClient }
+  })
+
+  const result = await handleCatalog(
+    {
+      jackettUrl: 'http://127.0.0.1:9696',
+      jackettApiKey: 'smoke-api-key',
+      sportsDbApiKey: 'smoke-sports-key',
+      maxResults: '10'
+    },
+    'movie',
+    'pvtkrrx-sports-football',
+    'genre=Arsenal',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  )
+
+  assert.equal(result.metas.length, 1, 'football discovery detail filter should narrow results to the requested team')
+  assert.match(result.metas[0].name, /Arsenal vs Chelsea/i)
+  assert.match(String(result.metas[0].description || ''), /English Premier League/i)
+  const decoded = decodeCustomId(result.metas[0].id)
+  assert.equal(decoded.r, 'football', 'football discovery catalog should stamp the football sport hint into the custom id')
 }
 
 async function testLibraryCustomIdsStayCompact() {
@@ -453,11 +540,13 @@ async function testArtworkFallbackBehavior() {
 async function main() {
   try {
     testCacheHeadersIncludeStaleIfError()
+    testSportsDiscoveryCatalogLayout()
     testParserAndLeagueMap()
     testEventTitleParser()
     testSportDisambiguation()
     await testStructuredFallbackToFuzzyLookup()
     await testOrderAgnosticSportsGrouping()
+    await testSportSpecificCatalogDetailFiltering()
     await testEventTitleCatalogGrouping()
     await testLibraryCustomIdsStayCompact()
     await testSportsMetaIncludesGenres()

@@ -1,6 +1,6 @@
 # PVTKRRX Route Framework
 
-Updated: 2026-03-29
+Updated: 2026-03-30
 
 ## Purpose
 
@@ -31,16 +31,16 @@ For the broader runtime and storage model, see `docs/CURRENT_DESIGN.md`.
 
 ### Catalogs (Same On All Routes)
 
-All three routes expose the same four catalogs:
+All three routes expose the same sports-first discovery layout:
 
-| Catalog | Type | Source |
+| Catalog family | Type | Source |
 |---|---|---|
-| Sports | movie | Prowlarr search with sports filtering |
+| All Sports + sport-family catalogs (`Football`, `Motorsport`, `MMA`, `American Football`, etc.) | movie | Prowlarr search with sports filtering |
 | Movies | movie | Prowlarr search with Cinemeta enrichment |
 | TV | series | Prowlarr search with Cinemeta enrichment |
 | Library | movie | Completed qBittorrent downloads |
 
-There is no per-route catalog filtering. The Library catalog queries qBittorrent directly on every route.
+There is no per-route catalog filtering. The Library catalog queries qBittorrent directly on every route, and the sports-family catalogs are the same on every route.
 
 ### PC Local
 

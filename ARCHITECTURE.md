@@ -1,6 +1,6 @@
 # PVTKRRX Architecture
 
-Updated: 2026-03-29
+Updated: 2026-03-30
 
 ## Canonical Sources
 
@@ -104,8 +104,10 @@ Stremio client
 1. Sports catalog items use internal `pvtkrrx:` ids.
 2. Meta and stream handlers decode those ids at request time.
 3. TheSportsDB is used for posters, landscape art, and backgrounds where configured.
-4. Sports catalog tiles now prefer landscape event art when available.
-5. Library items expose completed qBittorrent content through the same addon surface.
+4. The manifest now exposes a sports-first discovery catalog family: `All Sports` plus sport-family catalogs such as `Football`, `Motorsport`, and `MMA`, all under the supported `movie` type.
+5. Each sport-family catalog uses the third-column `genre` dropdown for narrower league/team filters.
+6. Sports catalog tiles now prefer landscape event art when available.
+7. Library items expose completed qBittorrent content through the same addon surface.
 
 ## Storage Model
 

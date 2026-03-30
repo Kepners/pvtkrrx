@@ -1,4 +1,5 @@
 const pkg = require('../../package.json')
+const { buildSportsCatalogManifestEntries } = require('./sportsCatalogs')
 
 const manifest = {
   id: 'com.kepners.pvtkrrx',
@@ -13,20 +14,7 @@ const manifest = {
   ],
   types: ['movie', 'series', 'tv'],
   catalogs: [
-    {
-      type: 'movie',
-      id: 'pvtkrrx-sports',
-      name: 'Sports',
-      extra: [
-        {
-          name: 'genre',
-          options: ['Football', 'F1', 'UFC', 'NBA', 'Cricket', 'Rugby', 'Tennis', 'Boxing', 'Golf', 'Baseball', 'Cycling', 'Darts', 'Snooker'],
-          isRequired: false
-        },
-        { name: 'search', isRequired: false },
-        { name: 'skip', isRequired: false }
-      ]
-    },
+    ...buildSportsCatalogManifestEntries(),
     {
       type: 'movie',
       id: 'pvtkrrx-movies',

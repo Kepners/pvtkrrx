@@ -3,8 +3,9 @@ const { QBitClient } = require('../clients/qbittorrent')
 const { CinemetaClient } = require('../clients/cinemeta')
 const { SportsDbClient } = require('../clients/sportsdb')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
+const { findSportsDiscoveryCatalog, getSportsSearchSeedTerms } = require('../config/sportsCatalogs')
 const { cleanTitle, isLikelyPackedReleaseTitle } = require('../utils/parser')
-const { resolveSportHint, isSportsNoiseTitle, isLikelySportsEventTitle } = require('../utils/sportsRules')
+const { normalizeSportKey, resolveSportHint, isSportsNoiseTitle, isLikelySportsEventTitle } = require('../utils/sportsRules')
 const { isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { formatSize } = require('../utils/streams')
 const { makeSportsThumbUrl } = require('../utils/sportsThumb')
@@ -443,16 +444,74 @@ function parseExtra(extraStr) {
   return result
 }
 
+function normalizeSearchValue(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function compactSearchValue(value) {
+  return normalizeSearchValue(value).replace(/\s+/g, '')
+}
+
+function abbreviateSearchValue(value) {
+  const tokens = normalizeSearchValue(value)
+    .split(' ')
+    .filter(Boolean)
+  if (tokens.length === 0) return ''
+  return tokens.map((token) => token[0]).join('')
+}
+
+function anyFieldMatchesDetail(fields, detailFilter = '') {
+  const normalizedFilter = normalizeSearchValue(detailFilter)
+  const compactFilter = compactSearchValue(detailFilter)
+  const abbreviatedFilter = abbreviateSearchValue(detailFilter)
+  if (!normalizedFilter && !compactFilter) return true
+
+  return (fields || []).some((field) => {
+    const normalizedField = normalizeSearchValue(field)
+    if (!normalizedField) return false
+    if (normalizedFilter && normalizedField.includes(normalizedFilter)) return true
+    if (compactFilter && compactSearchValue(field).includes(compactFilter)) return true
+    if (!abbreviatedFilter) return false
+    return abbreviateSearchValue(field) === abbreviatedFilter
+  })
+}
+
+function itemMatchesSportsCatalog(item, sportHint = '') {
+  const expectedHint = normalizeSportKey(sportHint)
+  if (!expectedHint) return true
+  return normalizeSportKey(item?.sportHint) === expectedHint
+}
+
+function itemMatchesSportsDetail(item, detailFilter = '') {
+  if (!String(detailFilter || '').trim()) return true
+  return anyFieldMatchesDetail([
+    item?.title,
+    item?.mappedLeague,
+    item?.parsedSportsEvent?.league,
+    item?.parsedSportsEvent?.homeTeam,
+    item?.parsedSportsEvent?.awayTeam,
+    item?.parsedEvent?.league,
+    item?.parsedEvent?.eventName,
+    item?.indexer
+  ], detailFilter)
+}
+
 async function handleCatalog(config, type, id, extraStr, context = {}) {
   try {
     const extra = parseExtra(extraStr)
     const opts = {
       baseUrl: String(context.baseUrl || '').replace(/\/+$/, '')
     }
+    const sportsCatalogDefinition = findSportsDiscoveryCatalog(id)
+    if (sportsCatalogDefinition) {
+      return await sportsCatalog(config, extra, opts, type, sportsCatalogDefinition)
+    }
 
     switch (id) {
-      case 'pvtkrrx-sports':
-        return await sportsCatalog(config, extra, opts, type)
       case 'pvtkrrx-movies':
         return await moviesCatalog(config, extra, opts)
       case 'pvtkrrx-tv':
@@ -468,13 +527,16 @@ async function handleCatalog(config, type, id, extraStr, context = {}) {
   }
 }
 
-async function sportsCatalog(config, extra, options = {}, catalogType = 'movie') {
+async function sportsCatalog(config, extra, options = {}, catalogType = 'movie', catalogDefinition = null) {
   const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
   const sportsDb = new SportsDbClient(config.sportsDbApiKey, {
     cacheHours: config.sportsDbCacheHours
   })
   const mediaType = String(catalogType || 'movie').trim().toLowerCase() || 'movie'
-  const query = extra.genre || extra.search || ''
+  const requestedDetail = String(extra.genre || extra.search || '').trim()
+  const catalogSportHint = normalizeSportKey(catalogDefinition?.sportHint || '')
+  const requestedSportHint = catalogSportHint || resolveSportHint({ explicitHint: requestedDetail })
+  const query = requestedDetail
   const limit = getCatalogLimit(config)
   const strictItems = await cachedProwlarrSearch(
     config,
@@ -510,7 +572,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
     if (browseItems.length > 0) {
       items = browseItems
     } else {
-      const SEED_TERMS = ['UFC', 'Premier League', 'F1', 'NBA', 'WWE', 'Boxing']
+      const SEED_TERMS = getSportsSearchSeedTerms(catalogSportHint)
       const seedBatches = await Promise.all(
         SEED_TERMS.map(term => cachedProwlarrSearch(config, torznab, term, SPORT_CATS))
       )
@@ -526,7 +588,6 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
     }
   }
 
-  const requestedSportHint = resolveSportHint({ explicitHint: extra.genre })
   const normalizedItems = items.map(item => {
     const parsedSportsEvent = parseSportsTitle(item?.title || '')
     const parsedEvent = !parsedSportsEvent ? parseSportsEventTitle(item?.title || '') : null
@@ -546,6 +607,8 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
 
   const strictFiltered = normalizedItems.filter(item =>
     (isSportsOnlyIndexer(item.indexer) || Boolean(item.sportHint)) &&
+    itemMatchesSportsCatalog(item, catalogSportHint) &&
+    itemMatchesSportsDetail(item, requestedDetail) &&
     isLikelySportsEventTitle(item.title, item.sportHint) &&
     !isLikelyPackedReleaseTitle(item.title)
   )
@@ -556,11 +619,13 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie')
     // genre/search results
     filtered = normalizedItems.filter(item =>
       (isSportsOnlyIndexer(item.indexer) || Boolean(item.sportHint)) &&
+      itemMatchesSportsCatalog(item, catalogSportHint) &&
+      itemMatchesSportsDetail(item, requestedDetail) &&
       !isSportsNoiseTitle(item.title) &&
       !isLikelyPackedReleaseTitle(item.title)
     )
   }
-  console.log(`[sports-catalog] query="${query}" prowlarr=${items.length} normalized=${normalizedItems.length} strict=${strictFiltered.length} filtered=${filtered.length}`)
+  console.log(`[sports-catalog] catalog="${catalogDefinition?.id || 'pvtkrrx-sports'}" query="${query}" prowlarr=${items.length} normalized=${normalizedItems.length} strict=${strictFiltered.length} filtered=${filtered.length}`)
 
   const grouped = groupSportsItems(filtered.sort((a, b) => compareItems(a, b, query)), query)
 

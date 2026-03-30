@@ -16,6 +16,7 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 ## Key Features
 
 - **Sports** — Browse and search private tracker sports content (EPL, F1, UFC) directly in Stremio
+- **Sports-first discovery** — `All Sports` plus sport-family catalogs now lead the movie discovery column, with the third-column filter used for league/team detail
 - **Sports artwork enrichment** — Optional TheSportsDB portrait, landscape, and background artwork with cache-aware lookups; sports catalog tiles now prefer landscape art when available
 - **Movies & TV** — IMDb-matched content from your private trackers
 - **Seedbox Library** — Browse everything already downloaded on your seedbox
@@ -39,7 +40,7 @@ See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the exact LAN B
 
 | Feature | Status |
 |---------|--------|
-| Sports catalog (EPL, F1, UFC tiles) | Working |
+| Sports discovery catalogs (All Sports, Football, Motorsport, MMA, etc.) | Working |
 | Sports artwork enrichment | Working (landscape art preferred for sports tiles when available) |
 | Movie/TV streams from private trackers | Working |
 | Sports contamination filter | Working (SportsCult excluded from movie searches) |
