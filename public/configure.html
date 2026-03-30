@@ -1492,7 +1492,7 @@
             <button class="btn-copy" type="button" id="simpleCheckStremioBtn" onclick="checkAndLinkStremioOnThisPc(this)">Check Stremio Login On This PC</button>
             <button class="btn-test" type="button" id="simpleAutoSetupBtn" onclick="autoSetup()">Auto Setup</button>
             <button class="btn-install" type="button" id="simpleGenerateBtn" onclick="install()">Save And Generate URL</button>
-            <button class="btn-install" type="button" id="simpleInstallBtn" onclick="triggerLanInstall()">Install Or Refresh In Stremio</button>
+            <button class="btn-install" type="button" id="simpleInstallBtn" onclick="triggerPrimaryInstall()">Install Or Refresh In Stremio</button>
             <button class="btn-copy" type="button" id="simpleCopyBtn" onclick="copySimplePrimaryLink(this)">Copy Primary Link</button>
             <button class="btn-copy" type="button" id="simpleAdvancedBtn" onclick="openAdvancedTools()">Open Hidden Setup Tab</button>
           </div>
@@ -1736,6 +1736,7 @@
         <div id="localInstall">
           <div id="installPanelPc" class="install-target-panel active">
             <p class="install-section-title">PC Local Notes</p>
+            <a id="stremioLinkPc" class="is-disabled" href="#" aria-disabled="true">Open PC Local In Stremio</a>
             <div class="url-row">
               <button class="btn-copy" id="copyLocalInstallBtn" onclick="copyPrivateLink('localLoopback', this)">Copy PC Local URL</button>
             </div>
@@ -1825,6 +1826,7 @@
     };
     const privateInstallLinks = {
       localLoopback: '',
+      localStremio: '',
       localLanHostname: '',
       localLanIp: '',
       pairHostedManifest: '',
@@ -2161,6 +2163,26 @@
       const link = document.getElementById('stremioLinkLan');
       if (!link || link.getAttribute('aria-disabled') === 'true' || !link.href || link.href === '#') {
         setStatus('autoStatus', 'err', 'LAN Bridge is not ready yet. Run Auto Setup first.');
+        return;
+      }
+      window.location.href = link.href;
+    }
+
+    function triggerPrimaryInstall() {
+      const target = getInstallTarget();
+      const elementId = target === 'pc'
+        ? 'stremioLinkPc'
+        : target === 'lan'
+          ? 'stremioLinkLan'
+          : 'stremioLinkHosted';
+      const link = document.getElementById(elementId);
+      if (!link || link.getAttribute('aria-disabled') === 'true' || !link.href || link.href === '#') {
+        const message = target === 'pc'
+          ? 'PC Local is not ready yet. Save and generate the PC Local URL first.'
+          : target === 'lan'
+            ? 'LAN Bridge is not ready yet. Run Auto Setup first.'
+            : 'Remote Seedbox is not ready yet. Generate the hosted URL first.';
+        setStatus('autoStatus', 'err', message);
         return;
       }
       window.location.href = link.href;
@@ -2931,6 +2953,7 @@
     }
 
     function getCurrentQuickInstallUrl(target = getInstallTarget()) {
+      if (target === 'pc') return String(privateInstallLinks.localStremio || '').trim();
       if (target === 'lan') return String(privateInstallLinks.pairHostedStremio || '').trim();
       if (target === 'seedbox') return String(privateInstallLinks.hostedStremio || '').trim();
       return '';
@@ -2940,8 +2963,8 @@
       if (target === 'pc') {
         return {
           title: 'PC Local Addon URL',
-          lead: 'Paste this URL into Stremio Desktop on this same Windows PC.',
-          hint: 'This is the real same-PC addon route. Paste the loopback URL manually into Stremio Desktop on this machine.',
+          lead: 'Use the one-click Stremio install link below, or paste this URL manually into Stremio Desktop on this same Windows PC.',
+          hint: 'This is the real same-PC addon route. The primary action is the stremio:// deep link; the loopback URL remains the manual fallback.',
           placeholder: 'Click Save And Generate to create the PC Local addon URL.'
         };
       }
@@ -3016,18 +3039,28 @@
       const quickAddonNote = document.getElementById('quickAddonUrlNote');
       const quickAddonCopyBtn = document.getElementById('quickCopyAddonUrlBtn');
       if (quickAddonValue) {
-        quickAddonValue.value = target === 'lan' ? quickValue : '';
-        quickAddonValue.placeholder = 'Run Auto Setup first to generate the stremio:// LAN Bridge install link';
+        quickAddonValue.value = (target === 'pc' || target === 'lan' || target === 'seedbox') ? quickValue : '';
+        quickAddonValue.placeholder = target === 'pc'
+          ? 'Save and generate first to create the stremio:// PC Local install link'
+          : target === 'seedbox'
+            ? 'Generate first to create the stremio:// Remote Seedbox install link'
+            : 'Run Auto Setup first to generate the stremio:// LAN Bridge install link';
       }
       if (quickAddonCopyBtn) {
-        quickAddonCopyBtn.disabled = !(target === 'lan' && quickValue);
+        quickAddonCopyBtn.disabled = !quickValue;
       }
       if (quickAddonNote) {
-        quickAddonNote.textContent = target === 'lan'
+        quickAddonNote.textContent = target === 'pc'
           ? (quickValue
-              ? 'This primary install link should start with stremio://. Only use the manual HTTPS addon URL below if Stremio explicitly asks for Add Addon URL.'
-              : 'Run Auto Setup first to generate the stremio:// LAN Bridge install link. The HTTPS addon URL below is fallback only.')
-          : 'LAN Bridge is the home-device route when you want one addon across your home network.';
+              ? 'This primary PC Local install link starts with stremio://. Use the loopback addon URL below only if you need to paste it manually into Stremio Desktop on this PC.'
+              : 'Save and generate first to create the stremio:// PC Local install link. The loopback addon URL below is the manual fallback.')
+          : target === 'seedbox'
+            ? (quickValue
+                ? 'This primary Remote Seedbox install link starts with stremio://. Use the HTTPS addon URL below only if Stremio explicitly asks for Add Addon URL.'
+                : 'Generate first to create the stremio:// Remote Seedbox install link. The HTTPS addon URL below is fallback only.')
+            : (quickValue
+                ? 'This primary install link should start with stremio://. Only use the manual HTTPS addon URL below if Stremio explicitly asks for Add Addon URL.'
+                : 'Run Auto Setup first to generate the stremio:// LAN Bridge install link. The HTTPS addon URL below is fallback only.');
       }
 
       updateSimpleFlowCard();
@@ -3375,13 +3408,13 @@
         if (kicker) kicker.textContent = 'Desktop only';
         if (title) title.textContent = 'PC Local';
         if (lead) lead.textContent = 'PC Local is the real addon for this Windows machine. Keep LAN Bridge for your other home devices.';
-        if (copy) copy.textContent = 'Make sure Stremio Desktop is installed and signed in here, then save and generate the loopback addon URL for this PC.';
+        if (copy) copy.textContent = 'Make sure Stremio Desktop is installed and signed in here, then save and generate the one-click PC Local install link for this PC.';
         if (hint) hint.textContent = 'Need to change service URLs, storage roots, or manual fallback details? Open the hidden setup tabs below.';
 
         toggle(checkBtn, true);
         toggle(autoBtn, true);
         toggle(generateBtn, true);
-        toggle(installBtn, false);
+        toggle(installBtn, true);
         toggle(copyBtn, true);
 
         if (checkBtn) checkBtn.disabled = !canUseLocal;
@@ -3393,6 +3426,10 @@
           generateBtn.textContent = localReady ? 'Rebuild PC Local URL' : 'Save And Generate PC Local URL';
           generateBtn.disabled = false;
         }
+        if (installBtn) {
+          installBtn.textContent = 'Open PC Local In Stremio';
+          installBtn.disabled = !Boolean(getCurrentQuickInstallUrl('pc'));
+        }
         if (copyBtn) {
           copyBtn.textContent = 'Copy PC Local URL';
           copyBtn.disabled = !localReady;
@@ -3403,11 +3440,11 @@
         } else if (localStremioStatus.checked && !localStremioStatus.installed) {
           setSimpleFlowStatus('err', 'Install Stremio Desktop on this Windows PC first, then come back and generate the PC Local addon URL.');
         } else if (localReady) {
-          setSimpleFlowStatus('ok', 'PC Local URL is ready. Install it in Stremio Desktop on this Windows PC for direct same-machine browsing and playback.');
+          setSimpleFlowStatus('ok', 'PC Local install link is ready. Open it in Stremio Desktop on this Windows PC for direct same-machine browsing and playback.');
         } else if (localStremioStatus.signedInSessionFound) {
-          setSimpleFlowStatus('info', 'Stremio is already signed in on this PC. Save and generate the PC Local URL next.');
+          setSimpleFlowStatus('info', 'Stremio is already signed in on this PC. Save and generate the PC Local install link next.');
         } else {
-          setSimpleFlowStatus('info', 'Sign in to Stremio Desktop on this PC, then save and generate the PC Local URL.');
+          setSimpleFlowStatus('info', 'Sign in to Stremio Desktop on this PC, then save and generate the PC Local install link.');
         }
         return;
       }
@@ -3761,6 +3798,17 @@
       }
     }
 
+    function buildStremioDeepLink(manifestUrl) {
+      const target = String(manifestUrl || '').trim();
+      if (!target) return '';
+      try {
+        const parsed = new URL(target);
+        return `stremio://${parsed.host}${parsed.pathname}${parsed.search}`;
+      } catch (_) {
+        return '';
+      }
+    }
+
     async function fillLocalInstallLinks(networkInfo) {
       const info = networkInfo || fallbackNetworkInfo();
       const fallback = fallbackNetworkInfo();
@@ -3774,9 +3822,14 @@
       const openNote = document.getElementById('openLinkNote');
       const primaryCopyBtn = document.getElementById('copyLocalInstallBtn');
 
-      setPrivateLink('localLoopback', loopback.httpManifest || '');
+      const loopbackManifest = String(loopback?.httpManifest || '').trim();
+      const loopbackStremio = buildStremioDeepLink(loopbackManifest);
+
+      setPrivateLink('localLoopback', loopbackManifest);
+      setPrivateLink('localStremio', loopbackStremio);
+      setInstallAnchorState('stremioLinkPc', loopbackStremio, 'Open PC Local In Stremio');
       if (primaryCopyBtn) {
-        primaryCopyBtn.disabled = !loopback?.httpManifest;
+        primaryCopyBtn.disabled = !loopbackManifest;
       }
 
       if (mdns && mdns.httpManifest) {
@@ -3798,7 +3851,7 @@
       }
 
       if (openNote) {
-        openNote.textContent = 'Use the PC Local URL on this Windows host when you want PVTKRRX to show up as a real local addon source in Stremio Desktop. Use LAN Bridge for your phone, TV, web, and Apple TV.';
+        openNote.textContent = 'Use Open PC Local In Stremio on this Windows host when you want PVTKRRX to show up as a real local addon source in Stremio Desktop. The copied loopback URL remains the manual fallback. Use LAN Bridge for your phone, TV, web, and Apple TV.';
       }
     }
 

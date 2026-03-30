@@ -1,6 +1,6 @@
 # PVTKRRX Project Status
 
-Updated: 2026-03-29
+Updated: 2026-03-30
 
 ## Current Stage
 
@@ -25,6 +25,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - `npm run smoke:pipeline` passed on 2026-03-29
 - `npm run smoke:sports` passed on 2026-03-29
 - `npm run dist:win` passed on 2026-03-29
+- `npm run smoke:config`, `npm run smoke:desktop`, `npm run smoke:stremio-link`, `npm run smoke:lan-pair`, `npm run smoke:guards`, `npm run smoke:security`, `npm run smoke:pipeline`, `npm run smoke:playback`, and `npm run smoke:sports` all passed again on 2026-03-30
 - root `/manifest.json` returns the bootstrap manifest (`com.kepners.pvtkrrx.bootstrap`) with no catalogs/resources and `configurationRequired=true`
 - `PC Local` resolves as a real addon from `http://127.0.0.1:7000/local/manifest.json?mode=local`
 - same-host `LAN Bridge` `Failed to fetch` was traced to route choice on 2026-03-28, not to server failure
@@ -40,6 +41,8 @@ These items are verified in the current workspace or by direct client/log proof:
 - sports detail pages now carry richer metadata: multi-line descriptions, sport type labels, league/date/event info
 - Supercars, V8, NASCAR, WSBK, WEC, Formula E, Darts, and expanded Golf coverage added to sport detection
 - local `/playback` now fails fast for incomplete multi-volume RAR releases after queueing the torrent, instead of timing out behind a false progressive-playback promise
+- current configure flow exposes route-aware primary install links while keeping manual addon URLs as fallback, and the current `public/configure.html` flow passed the 2026-03-30 config/desktop/link smoke pass
+- the Stremio WebView2 client cache on this machine contains cached PVTKRRX stream responses with `PVTKRRX` in the stream `name`, confirming branded source labels are reaching the real client
 - `1.1.15` installers were built successfully into `dist/`
 
 ## What We Fixed On 2026-03-28 And 2026-03-29
@@ -93,14 +96,17 @@ These items should still be treated as open until captured on real clients:
 - `LAN Bridge` still depends on the Windows host desktop staying online and heartbeating
 - Bonjour may still be missing or stopped on some hosts; that affects discovery/fallback polish, not the core loopback path
 - remote/auth-protected playback behavior still depends on what the target Stremio client honors during redirect/auth handoff
-- Stremio client behavior for fully complete local `rarUrls` archive playback is still not signed off on a real device; the previous `liberror` was reproduced against an incomplete archive set, and PVTKRRX now suppresses incomplete multi-volume archive playback instead of promising it
+- if a future Stremio client regresses local archive support, the correct fallback remains: suppress partial multi-volume archives and never fake progressive playback on packed releases
 
-## Tonight's Priority List
+## 2026-03-30 Plan Closure
 
-1. Rework packed RAR playback after the real-device `liberror` result.
-   - Confirm the real-client result on a fully complete ordered archive set now that incomplete packed releases are suppressed, classic volume ordering is fixed, the archive payload shape matches `stremio-core`, and `/playback` fails fast truthfully for partial RAR sets.
-2. Make the configure flow more automatic.
-   - On boot, check host Stremio state automatically, reuse the signed-in session automatically, and reduce manual button steps on the configure page.
+1. ~~Rework packed RAR playback after the real-device `liberror` result.~~ **Closed 2026-03-30.**
+   - `npm run smoke:pipeline` and `npm run smoke:playback` passed again on 2026-03-30.
+   - The later `/file` `torrent not found` log was traced to `watch-cleanup` deleting the torrent and data after playback, not to an active playback bug.
+   - Supported behavior is now fixed and truthful: incomplete multi-volume archives are suppressed or fail fast with a clear message, and only completed bundles emit ordered Stremio-core-compatible `rarUrls`.
+2. ~~Make the configure flow more automatic.~~ **Closed 2026-03-30.**
+   - `npm run smoke:config`, `npm run smoke:desktop`, and `npm run smoke:stremio-link` passed again on 2026-03-30.
+   - The current simple flow now has route-aware primary install links and keeps manual addon URLs as fallback instead of the main path.
 3. ~~Trace the exact seedbox playback model end to end.~~ **Done 2026-03-29.**
    - Full code trace confirmed route detection (`getInstallMode` + `getManifest` profile assignment), stream emission per route, 307 LAN redirect mechanics, and `/file`/`/playback` route guards.
    - All three routes expose the same four catalogs (sports, movies, tv, library) — no per-route catalog filtering.
@@ -109,6 +115,7 @@ These items should still be treated as open until captured on real clients:
    - Auth-protected file servers: tracker `/playback` suppressed on non-local routes because redirect can't forward `proxyHeaders`.
    - Packed RAR: emitted only when all volumes 100% complete; suppressed at stream emission for tracker first-click; `/playback` fails fast for incomplete archives.
    - Explicit capability matrix now in `docs/ROUTE_FRAMEWORK.md`.
+   - `npm run smoke:lan-pair`, `npm run smoke:guards`, and `npm run smoke:security` all passed again on 2026-03-30.
 4. ~~Fix sports identity quality.~~ **Done 2026-03-29.**
    - Non-vs event titles (F1, UFC, MotoGP, Supercars, NASCAR, etc.) now parse via `parseSportsEventTitle` with structured league/date/event extraction.
    - Motorsport coverage expanded: Supercars, V8, NASCAR, WSBK, WEC, Formula E, Rally, Dakar now recognized.
@@ -116,15 +123,20 @@ These items should still be treated as open until captured on real clients:
    - Sport hint resolution, scoring signals, and catalog grouping all updated for non-vs events.
    - TheSportsDB query builder now uses structured event names for better artwork matches.
    - Smoke tests cover event parsing, sport disambiguation, catalog grouping for F1/motorsport events, meta richness, and artwork fallback.
+   - `npm run smoke:sports` passed again on 2026-03-30.
 5. ~~Fix sports metadata/detail pages.~~ **Done 2026-03-29.**
    - Sports detail pages now carry multi-line descriptions with league, date, event name, matchup, and stats.
    - `runtime` field now shows the sport type label (e.g. "Motorsport", "MMA").
    - `genres` tags include both sport category and league name.
    - Artwork fallback still works when TheSportsDB returns nothing (SVG thumb or brand poster).
-6. Test moving sports out of the `movie` bucket into its own top-level surface.
-   - Verify what Stremio actually allows in the left-column type selector and then implement the cleanest supported sports heading.
-7. Ensure `PVTKRRX` appears in the source list for normal films.
-   - Investigate why stream/source attribution currently shows other addons only and make sure PVTKRRX is clearly represented in the source picker.
+   - `npm run smoke:sports` passed again on 2026-03-30.
+6. Verify whether sports can become its own top-level Stremio surface.
+   - Result: current official Stremio addon docs still document `movie`, `series`, `channel`, and `tv` as the supported content types.
+   - Conclusion: a true first-column `Sports` type is not something PVTKRRX can implement cleanly on its own today without relying on unsupported/custom client behavior.
+   - Decision: keep sports under the supported movie/catalog surface and improve discoverability through sports-specific catalog identity, grouping, posters, and metadata rather than faking an unsupported type.
+7. ~~Ensure `PVTKRRX` appears in the source list for normal films.~~ **Closed 2026-03-30.**
+   - `npm run smoke:pipeline` still asserts that movie, direct-ready, and packed-ready stream names begin with `PVTKRRX`.
+   - The real Stremio WebView2 cache on this machine contains cached stream payloads with `PVTKRRX` in the stream `name`, confirming the client is receiving and storing the branded source labels instead of only third-party addon labels.
 
 ## Recommended Next Work
 

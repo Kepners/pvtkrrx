@@ -1,6 +1,6 @@
 # PVTKRRX Implementation Plan
 
-Updated: 2026-03-29
+Updated: 2026-03-30
 
 ## Working Rule
 
@@ -127,9 +127,30 @@ For every item:
 
 ## Current Active Item
 
-Item 1: packed-release playback (`liberror` on RAR-based torrents).
+None. This plan was closed on 2026-03-30 after a full verification pass across all seven items.
 
-Latest proven findings:
+## 2026-03-30 Closure Notes
+
+1. Item 1 closed.
+   - `npm run smoke:pipeline` and `npm run smoke:playback` both passed on 2026-03-30.
+   - The later `/file` `torrent not found` log was traced to `watch-cleanup` deleting the torrent and data after playback, not to an active playback bug.
+   - Supported behavior remains: suppress partial multi-volume archives truthfully, and only emit ordered Stremio-core-compatible `rarUrls` once the full bundle is ready.
+2. Item 2 closed.
+   - `npm run smoke:config`, `npm run smoke:desktop`, and `npm run smoke:stremio-link` all passed on 2026-03-30.
+   - The current configure flow now exposes route-aware primary install links and keeps manual URLs as fallback instead of the main path.
+3. Item 3 re-verified.
+   - `npm run smoke:lan-pair`, `npm run smoke:guards`, and `npm run smoke:security` all passed on 2026-03-30.
+4. Item 4 re-verified.
+   - `npm run smoke:sports` passed on 2026-03-30.
+5. Item 5 re-verified.
+   - `npm run smoke:sports` passed on 2026-03-30.
+6. Item 6 closed by capability decision.
+   - Official Stremio addon content types remain `movie`, `series`, `channel`, and `tv`, so sports stays under the supported `movie` surface.
+7. Item 7 closed.
+   - `npm run smoke:pipeline` still asserts that movie, direct-ready, and packed-ready stream names begin with `PVTKRRX`.
+   - The real Stremio WebView2 cache on this machine contains cached stream payloads with `PVTKRRX` in the stream `name`, confirming the client is receiving and storing the branded source labels.
+
+## Archived Item 1 Findings
 
 - Incomplete archive sets were being surfaced too early and can trigger real Stremio `liberror`.
 - Classic archive ordering needed to be `.rar`, `.r00`, `.r01`, ... instead of lexical order.

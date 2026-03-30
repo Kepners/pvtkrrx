@@ -60,6 +60,7 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 
 - Top-level addon types remain `movie`, `series`, and `tv`.
 - Sports stays under the `movie` surface for Stremio compatibility.
+- A true top-level `sports` type is not currently a supported Stremio addon content type in the official SDK docs, which still document `movie`, `series`, `channel`, and `tv` as the supported surfaces. Until Stremio adds native sports-type support, the correct dynamic implementation is to keep sports under the supported movie/catalog surface and improve identity, artwork, and metadata there instead of faking a custom first-column type.
 - Sports artwork can now carry three distinct shapes from TheSportsDB:
   - `poster`
   - `landscapeImage`
