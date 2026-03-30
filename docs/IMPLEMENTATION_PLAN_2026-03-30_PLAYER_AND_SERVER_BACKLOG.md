@@ -4,7 +4,7 @@ Updated: 2026-03-30
 
 ## Purpose
 
-This file captures the next user-requested work for playback UX, archive handling, and server settings clarity.
+This file captures the next user-requested work for playback UX, archive handling, server settings clarity, and desktop shell polish.
 
 It is intentionally implementation-focused:
 
@@ -89,6 +89,32 @@ Required outcome:
 - ensure the local playback path can wait for the requested range instead of failing too early
 - prioritize download pieces in a way that supports both start-of-file playback and later seek probes
 - stop the current failure where the player waits briefly, times out, and bounces back
+
+### 6. Add proper desktop window controls: minimize, close to system tray, and explicit exit
+
+User intent:
+- the desktop app should have clear window actions instead of forcing the current awkward close behavior
+
+Required outcome:
+- the desktop shell exposes:
+  - minimize window
+  - close/hide to system tray
+  - explicit exit app
+- tray behavior is consistent and obvious:
+  - closing the window does not accidentally kill the local server if the intended action is "keep running in tray"
+  - exit really shuts the app down cleanly
+- the tray menu and any close button copy make the behavior clear
+
+### 7. Make the server window larger and remove the scrollbar
+
+User intent:
+- the server window should be big enough that all text fits without the current vertical scrollbar
+
+Required outcome:
+- increase the desktop shell window dimensions to fit the current content properly
+- remove the current unnecessary scrollbar in the normal desktop state
+- if true no-scroll is impossible at some screen sizes, make the layout responsive so the common desktop size shows everything without scrolling
+- avoid clipping important controls or log/status text
 
 ## Build Order
 
@@ -177,7 +203,46 @@ Done means:
 - a user can see and change the save location without guessing
 - the UI no longer hides the path flow behind vague server wording
 
-### Phase 5. Extraction ownership and qBittorrent unrar integration
+### Phase 5. Desktop shell controls and tray behavior
+
+Why fifth:
+- this is a pure desktop usability issue and should be solved before tuning the final shell layout
+
+Scope:
+- add visible controls for minimize, close to tray, and exit
+- wire tray behavior so the local server can keep running intentionally
+- ensure app shutdown is explicit and clean
+
+Primary areas likely touched:
+- `electron/main.js`
+- `electron/preload.js`
+- `electron/popup.html`
+
+Done means:
+- the window can minimize
+- the window can hide to tray without killing the server
+- the user has an explicit exit action that fully closes the app
+
+### Phase 6. Desktop shell sizing and no-scroll layout
+
+Why sixth:
+- once the shell controls are settled, the layout can be resized around the final chrome
+
+Scope:
+- enlarge the popup/server window
+- remove the normal-state scrollbar
+- rebalance spacing/panels so the common desktop layout fits without clipping
+
+Primary areas likely touched:
+- `electron/main.js`
+- `electron/popup.html`
+- desktop sizing/style smoke coverage if added
+
+Done means:
+- the common desktop view shows the shell without the current scrollbar
+- all main text and controls fit cleanly
+
+### Phase 7. Extraction ownership and qBittorrent unrar integration
 
 Why last:
 - this depends on the save-path and playback-path truth being clear first
@@ -256,6 +321,23 @@ Done means:
 3. Wire the configuration path.
 4. Validate extraction success end to end on a real packed release.
 
+### Item F. Desktop tray and exit controls
+
+1. Define the exact desktop window behavior:
+   - minimize
+   - close to tray
+   - explicit exit
+2. Add visible shell controls and tray menu actions.
+3. Ensure server/runtime shutdown only happens on explicit exit.
+4. Verify the app can be restored from the tray reliably.
+
+### Item G. Larger no-scroll desktop shell
+
+1. Measure the current popup content height and overflow behavior.
+2. Increase the initial window size to fit the normal desktop content.
+3. Remove the default scrollbar in the normal layout.
+4. Verify the layout still behaves sensibly on smaller screens.
+
 ## Acceptance Criteria
 
 This backlog is complete only when all of the following are true:
@@ -265,6 +347,8 @@ This backlog is complete only when all of the following are true:
 - file/container format is visible in the stream row
 - sports and custom PVTKRRX sources show the intended logo/background/title flash in the player wait state
 - the settings UI makes the save location obvious and editable
+- the desktop shell has working minimize, tray, and exit controls
+- the normal desktop shell no longer shows the current scrollbar and fits the main text cleanly
 - extraction/unrar ownership is clear and automated on supported setups
 
 ## Documentation To Update When Work Starts
