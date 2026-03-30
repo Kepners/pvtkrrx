@@ -9,6 +9,8 @@ process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'local-smoke-se
 process.env.PVTKRRX_RUNTIME_DIR = runtimeDir
 process.env.STREAM_WAIT_TIMEOUT_MS = '50'
 process.env.STREAM_WAIT_INTERVAL_MS = '10'
+process.env.STREAM_RANGE_WAIT_TIMEOUT_MS = '100'
+process.env.STREAM_RANGE_WAIT_INTERVAL_MS = '10'
 delete process.env.VERCEL
 
 const { encrypt } = require('../src/utils/crypto')
@@ -122,10 +124,13 @@ async function run() {
   const readyPackedHash = 'e1287d13cccccccccccccccccccccccccccccccc'
   const priorityCalls = []
   const firstLastToggleCalls = []
+  const sequentialToggleCalls = []
   const payload = Buffer.from('smoke playback bytes', 'utf8')
   const partialPayload = Buffer.alloc(30 * 1024 * 1024, 7)
   const archivePayload = Buffer.from('smoke rar bytes', 'utf8')
   const extractedPayload = Buffer.from('smoke extracted bytes', 'utf8')
+  let incompletePieceStates = [2, 2, 0, 0, 2, 2]
+  let promoteIncompleteSeekWindow = false
   const torrent = {
     hash,
     name: 'UFC Fight Night 270 Main Card 21 03 26 Z3R0 1080p',
@@ -278,7 +283,12 @@ async function run() {
   QBitClient.prototype.pieceStates = async (inputHash) => {
     const normalized = String(inputHash || '').toLowerCase()
     if (normalized === incompleteHash) {
-      return [2, 2, 0, 0, 2, 2]
+      const states = [...incompletePieceStates]
+      if (promoteIncompleteSeekWindow) {
+        incompletePieceStates = [2, 2, 0, 2, 2, 2]
+        promoteIncompleteSeekWindow = false
+      }
+      return states
     }
     return []
   }
@@ -286,7 +296,10 @@ async function run() {
     priorityCalls.push({ ids: [...ids], priority })
     return 'Ok.'
   }
-  QBitClient.prototype.toggleSequentialDownload = async () => 'Ok.'
+  QBitClient.prototype.toggleSequentialDownload = async (inputHash) => {
+    sequentialToggleCalls.push(String(inputHash || '').toLowerCase())
+    return 'Ok.'
+  }
   QBitClient.prototype.toggleFirstLastPiecePrio = async (inputHash) => {
     firstLastToggleCalls.push(String(inputHash || '').toLowerCase())
     return 'Ok.'
@@ -361,6 +374,25 @@ async function run() {
     )
     assert.equal(seekRangeResponse.status, 206, 'seek-like range probes should stay on the player when qBit has already downloaded the requested piece window')
     assert.match(String(seekRangeResponse.headers['content-range'] || ''), /^bytes 20971520-\d+\/31457280$/)
+
+    const sequentialToggleCountBeforeUnavailableSeek = sequentialToggleCalls.length
+    promoteIncompleteSeekWindow = true
+    const unavailableSeekResponse = await request(
+      server.address().port,
+      String(incompleteResponse.headers.location || ''),
+      {
+        headers: {
+          Range: 'bytes=15728640-16777215'
+        }
+      }
+    )
+    assert.equal(unavailableSeekResponse.status, 206, 'seek retries should recover once the requested piece window arrives')
+    assert.match(String(unavailableSeekResponse.headers['content-range'] || ''), /^bytes 15728640-\d+\/31457280$/)
+    assert.equal(
+      sequentialToggleCalls.length,
+      sequentialToggleCountBeforeUnavailableSeek,
+      'seek retries should not toggle sequential download back off when qBit is already in sequential mode'
+    )
 
     const packedResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(packedPlaybackToken)}`)
     assert.equal(packedResponse.status, 422, 'incomplete packed archives should fail fast with a truthful packed-release message instead of stalling')

@@ -1392,14 +1392,17 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
       if (availableRangeEnd >= startByte) return availableRangeEnd
       if (isOrphanFile) return -1
 
-      // When seeking to an unavailable range, request qBit to enable sequential
-      // download so pieces near the seek point are prioritized.
+      // When seeking to an unavailable range, ensure qBit stays in sequential
+      // mode so pieces near the seek point are prioritized.
       if (!seekPriorityRequested && torrentHash) {
         seekPriorityRequested = true
-        try {
-          await qbit.toggleSequentialDownload(torrentHash)
-          console.log(`[file-route] enabled sequential download for seek at byte ${startByte}`)
-        } catch (_) {}
+        if (torrent?.seq_dl !== true) {
+          try {
+            await qbit.toggleSequentialDownload(torrentHash)
+            torrent = { ...torrent, seq_dl: true }
+            console.log(`[file-route] enabled sequential download for seek at byte ${startByte}`)
+          } catch (_) {}
+        }
       }
 
       const waitUntil = Date.now() + STREAM_RANGE_WAIT_TIMEOUT_MS
