@@ -517,6 +517,15 @@
       grid-template-columns: 1fr;
     }
 
+    body.selfhost-seedbox-only [data-install-target="pc"],
+    body.selfhost-seedbox-only [data-install-target="lan"] {
+      display: none !important;
+    }
+
+    body.selfhost-seedbox-only #installTargetSwitcher {
+      grid-template-columns: 1fr;
+    }
+
     .mode-option {
       width: 100%;
       min-height: 136px;
@@ -2871,11 +2880,16 @@
     function syncInstallTargetOptions() {
       const allowedTargets = getAllowedInstallTargets();
       const switcher = document.getElementById('installTargetSwitcher');
+      const selfHostSeedboxOnly = serverRuntime.selfHostServerMode && !getConfigTokenFromPath();
       let visibleCount = 0;
+
+      document.body.classList.toggle('selfhost-seedbox-only', selfHostSeedboxOnly);
 
       document.querySelectorAll('[data-install-target]').forEach((button) => {
         const allowed = allowedTargets.includes(button.dataset.installTarget);
         button.classList.toggle('mode-hidden', !allowed);
+        button.hidden = !allowed;
+        button.setAttribute('aria-hidden', allowed ? 'false' : 'true');
         if (allowed) visibleCount += 1;
       });
 
@@ -2894,8 +2908,8 @@
 
       const lead = document.getElementById('installTargetLead');
       if (!lead) return;
-      if (serverRuntime.selfHostServerMode && !getConfigTokenFromPath()) {
-        lead.textContent = 'This self-hosted server configures the Remote Seedbox route. PC Local and LAN Bridge belong to the Windows desktop runtime.';
+      if (selfHostSeedboxOnly) {
+        lead.textContent = 'This self-hosted server configures the Remote Seedbox route only. PC Local and LAN Bridge belong to the Windows desktop runtime.';
         return;
       }
       if (isDesktopLocalOnlyRuntime()) {
