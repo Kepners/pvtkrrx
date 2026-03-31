@@ -587,6 +587,97 @@
       border-color: rgba(255, 0, 212, 0.55);
     }
 
+    .route-callout {
+      margin-bottom: 12px;
+      padding: 12px 14px;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 246, 255, 0.18);
+      background: rgba(3, 16, 32, 0.52);
+      color: #d6ecff;
+      line-height: 1.6;
+    }
+
+    .route-callout strong {
+      color: #f0f7ff;
+    }
+
+    .runbook-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .field-card {
+      border: 1px solid rgba(0, 246, 255, 0.16);
+      border-radius: 10px;
+      padding: 12px;
+      background: rgba(4, 8, 18, 0.68);
+    }
+
+    .field-label {
+      display: block;
+      margin-bottom: 6px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #8ce1ff;
+    }
+
+    .field-value {
+      display: block;
+      margin-bottom: 6px;
+      color: #f0f7ff;
+      line-height: 1.5;
+      white-space: normal;
+      overflow-wrap: anywhere;
+    }
+
+    .field-copy {
+      color: var(--muted);
+      line-height: 1.55;
+    }
+
+    .provider-subsection {
+      margin-bottom: 12px;
+    }
+
+    .provider-subsection:last-child {
+      margin-bottom: 0;
+    }
+
+    .provider-subsection h4 {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #8ce1ff;
+      margin-bottom: 8px;
+    }
+
+    .source-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .source-links a {
+      color: #8ce1ff;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(0, 246, 255, 0.35);
+    }
+
+    .source-links a:hover {
+      color: #fff;
+      border-color: rgba(255, 0, 212, 0.55);
+    }
+
+    .matrix-note {
+      margin-top: 10px;
+    }
+
     footer {
       margin-top: 12px;
       border: 1px solid rgba(0, 246, 255, 0.2);
@@ -746,6 +837,10 @@
       .brand-text {
         font-size: 11px;
         letter-spacing: 0.8px;
+      }
+
+      .runbook-grid {
+        grid-template-columns: 1fr;
       }
     }
 
