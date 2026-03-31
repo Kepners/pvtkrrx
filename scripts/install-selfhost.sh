@@ -136,8 +136,9 @@ main() {
   export PVTKRRX_NODE_PATH="$node_bin"
   export PVTKRRX_SERVICE_USER="$SERVICE_USER_DEFAULT"
 
+  local node_dir="$INSTALL_DIR/.node/node-v${NODE_VERSION}-linux-${arch}"
   echo "Installing production dependencies..."
-  run_root "$INSTALL_DIR/.node/node-v${NODE_VERSION}-linux-${arch}/bin/npm" install --omit=dev --prefix "$INSTALL_DIR"
+  run_root env "PATH=${node_dir}/bin:$PATH" "${node_dir}/bin/npm" install --omit=dev --prefix "$INSTALL_DIR"
 
   echo ""
   echo "Launching the PVTKRRX server installer..."
