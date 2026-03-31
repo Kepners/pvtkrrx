@@ -3,7 +3,6 @@ const { contextBridge, ipcRenderer } = require('electron')
 contextBridge.exposeInMainWorld('electronAPI', {
   openConfigure: () => ipcRenderer.invoke('open-configure'),
   openConfigureLan: () => ipcRenderer.invoke('open-configure-lan'),
-  openConfigureSeedbox: () => ipcRenderer.invoke('open-configure-seedbox'),
   openProwlarr: () => ipcRenderer.invoke('open-prowlarr'),
   openQbit: () => ipcRenderer.invoke('open-qbit'),
   getLocalInstallUrl: () => ipcRenderer.invoke('get-local-install-url'),

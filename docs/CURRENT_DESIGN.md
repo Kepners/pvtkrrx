@@ -42,17 +42,19 @@ PVTKRRX is one codebase with three active runtime pieces:
 
 ## Current UX Model
 
-- `/configure` starts with three route cards: `PC Local`, `LAN Bridge`, and `Remote Seedbox`.
+- Hosted `/configure` keeps three route cards: `PC Local`, `LAN Bridge`, and `Remote Seedbox`.
+- Desktop-local `/configure` on the Windows EXE now exposes only `PC Local` and `LAN Bridge`; `Remote Seedbox` belongs to the separate server/cloud runtime.
 - The top of the page focuses on the next action for the selected route.
 - Noisy fallback tools are hidden by default behind `Hidden Setup Tabs`.
 - When explicit self-host server mode is active, the configure page detects it through `/app-config.json`, defaults to `Remote Seedbox`, and exposes a browser-stored server admin token field for remote seedbox administration.
+- `/app-config.json` now also tells the shared configure UI when the runtime is desktop-local-only, so the shared page can hide the seedbox route inside the EXE without forking the whole UI.
 - The advanced Stremio account tools now also expose a `Server Link Session` flow:
   - create a one-time session from the target runtime
   - copy a browser link or addon URL
   - let any signed-in Stremio browser/device session complete the proof
   - poll status until the runtime reports `install-seen` or `linked`
 - Pasting the generated addon URL into Stremio is only a bootstrap step. It marks that the session was seen by Stremio, but the real account link still completes through browser-side AuthKey proof.
-- The desktop popup mirrors the same route split and tells the user to install/sign in to Stremio on the host PC before using `LAN Bridge`.
+- The desktop popup now exposes only `PC Local` and `LAN Bridge`, and tells the user to install/sign in to Stremio on the host PC before using `LAN Bridge`.
 - The desktop popup also exposes:
   - current runtime status
   - qBittorrent save-path controls

@@ -68,7 +68,9 @@ Self-hosted server mode uses the same Express runtime on a VPS/seedbox, but with
 ### Configure And Save
 
 1. User opens `/configure`.
-2. User selects a route card: `PC Local`, `LAN Bridge`, or `Remote Seedbox`.
+2. User selects a route card:
+   - Windows desktop/local runtime: `PC Local` or `LAN Bridge`
+   - Hosted/self-host server surfaces: `PC Local`, `LAN Bridge`, or `Remote Seedbox`
 3. The page focuses on the next action for that route.
 4. Manual/fallback controls stay hidden in `Hidden Setup Tabs`.
 5. Local route saves config into the runtime `local-config.json`.
@@ -81,11 +83,12 @@ Self-hosted server mode uses the same Express runtime on a VPS/seedbox, but with
 2. The splash stays frontmost while the local runtime comes up.
 3. The main popup appears only after the local runtime is reachable.
 4. The popup then exposes:
-   - route launchers
+   - route launchers for `PC Local` and `LAN Bridge`
    - Stremio preflight guidance for `LAN Bridge`
    - Windows startup auto-launch and tray lifecycle controls
    - qBittorrent download path controls
    - recent runtime logs and clipboard export
+5. `Remote Seedbox` is intentionally not surfaced in the Windows EXE anymore; it belongs to the hosted/self-host server runtime.
 
 ### LAN Bridge Resolve
 

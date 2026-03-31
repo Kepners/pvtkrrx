@@ -11,6 +11,7 @@ The practical reading of the project today is:
 
 - `PC Local` is the real host-desktop route and is working
 - `LAN Bridge` is the same-account home-device route and the host desktop should not use it for local browsing
+- the packaged Windows EXE is now treated as Windows-local only: `PC Local` plus `LAN Bridge`; `Remote Seedbox` belongs to the hosted/self-host server surfaces
 - explicit self-host server mode now exists for VPS/seedbox installs, with disk-backed `/selfhost` manifests, browser-admin auth for private service URLs, and optional `systemd` boot automation
 - completed-file playback on the local runtime is working again after the `/playback` and `/file` path fixes
 - official Stremio archive-source support for `rarUrls` is real and was re-verified against upstream SDK/core sources on 2026-03-30
@@ -32,6 +33,7 @@ The practical reading of the project today is:
 - `2d3175a` added the sports artwork byte cache/proxy layer so posters, wallpapers, landscape art, and logos can be served from the active local/hosted runtime after the first fetch instead of being hotlinked every time.
 - 2026-03-31 Apple TV strict-client fix: meta responses no longer emit `meta: null`; unsupported or offline-meta paths now return a real placeholder `MetaItem` so tvOS clients do not fail deserialization on missing metadata.
 - 2026-03-31 server-agnostic Stremio account link sessions: hosted-token and disk-backed `local` / `selfhost` configs can now create a short-lived browser/addon pairing session, observe addon install hits, and finish account linking from any signed-in browser device without the server scraping a Stremio password.
+- 2026-03-31 desktop-local split: the Electron runtime and shared configure surface now advertise `desktopLocalOnly`, hide `Remote Seedbox` inside the Windows EXE, and keep the desktop app focused on `PC Local` plus `LAN Bridge`.
 
 ## Verified Working Now
 

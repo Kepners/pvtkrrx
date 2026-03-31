@@ -556,7 +556,7 @@
 
     .route-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 8px;
     }
 
@@ -578,11 +578,6 @@
     .route-card.lan {
       border-color: rgba(0, 128, 255, 0.22);
       box-shadow: inset 0 0 0 1px rgba(0, 128, 255, 0.05);
-    }
-
-    .route-card.seedbox {
-      border-color: rgba(255, 0, 64, 0.18);
-      box-shadow: inset 0 0 0 1px rgba(255, 0, 64, 0.04);
     }
 
     .route-kicker {
@@ -619,10 +614,6 @@
       margin-right: 6px;
     }
 
-    .route-card.seedbox .route-points span::before {
-      color: #ff6a8a;
-    }
-
     .route-card.lan .route-points span::before {
       color: #65bcff;
     }
@@ -655,16 +646,6 @@
 
     .route-card.lan .route-action:hover {
       box-shadow: 0 0 16px rgba(0, 128, 255, 0.18);
-    }
-
-    .route-card.seedbox .route-action {
-      border-color: rgba(255, 0, 64, 0.24);
-      background: rgba(255, 0, 64, 0.08);
-      color: #ffd7e1;
-    }
-
-    .route-card.seedbox .route-action:hover {
-      box-shadow: 0 0 16px rgba(255, 0, 64, 0.16);
     }
 
     .route-status {
@@ -866,7 +847,7 @@
         <div class="shell-note" id="shellNote"></div>
 
         <div class="sidebar-note">
-          One runtime. Three separate Stremio routes. PC Local is a real same-PC addon on this Windows machine, and LAN Bridge is the home-device route for phone, TV, and web.
+          Windows local runtime. PC Local is the real same-PC addon on this machine, and LAN Bridge is the home-device route for phone, TV, and web.
         </div>
 
         <div class="credit">
@@ -879,7 +860,7 @@
         <div class="route-panel">
           <div class="panel-heading">
             <div class="panel-title">Stremio Routes</div>
-            <div class="panel-subtitle">Pick the route that matches playback. PC Local is the real addon for this Windows machine. LAN Bridge is the route for your other home devices.</div>
+            <div class="panel-subtitle">Pick the route that matches playback. This EXE handles PC Local on this machine and LAN Bridge for your other home devices.</div>
           </div>
 
           <div class="stremio-alert" id="stremioAlert">
@@ -912,17 +893,6 @@
               <button class="route-action" onclick="openLanInstall()">Open LAN Bridge Setup</button>
             </article>
 
-            <article class="route-card seedbox">
-              <div class="route-kicker">Public HTTPS endpoints</div>
-              <div class="route-name">Remote Seedbox</div>
-              <div class="route-copy">Public qBit, Prowlarr, and file serving for away-from-home playback. Hosted relay playback is ready-file-first unless you self-host playback support.</div>
-              <div class="route-points">
-                <span>Hosted relay is ready-file-first</span>
-                <span>Works beyond the LAN</span>
-                <span>Needs public playback URLs</span>
-              </div>
-              <button class="route-action" onclick="openSeedboxInstall()">Open Seedbox Setup</button>
-            </article>
           </div>
 
           <div class="route-status" id="installCopyNote"></div>
@@ -987,14 +957,6 @@
         window.electronAPI.openConfigureLan();
       } else {
         window.open('/configure?target=lan', '_blank');
-      }
-    }
-
-    function openSeedboxInstall() {
-      if (window.electronAPI && window.electronAPI.openConfigureSeedbox) {
-        window.electronAPI.openConfigureSeedbox();
-      } else {
-        window.open('/configure?target=seedbox', '_blank');
       }
     }
 

@@ -204,7 +204,8 @@ app.get('/app-config.json', (req, res) => {
     serverConfigAlias: SELF_HOST_SERVER_MODE ? 'selfhost' : '',
     serverConfigConfigured: SELF_HOST_SERVER_MODE ? Boolean(loadLocalConfigFile()) : false,
     publicBaseUrl: getPublicBaseUrl(req),
-    stremioLinkingAvailable: authSecretAvailable()
+    stremioLinkingAvailable: authSecretAvailable(),
+    desktopLocalOnly: parseBooleanLoose(process.env.PVTKRRX_DESKTOP_LOCAL_ONLY)
   })
 })
 
@@ -1191,6 +1192,7 @@ app.post('/pair/status', async (req, res) => {
 app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
   const port = parseInt(process.env.PORT || '7000', 10)
   const httpsPort = parseInt(process.env.HTTPS_PORT || '7001', 10)
+  const desktopLocalOnly = parseBooleanLoose(process.env.PVTKRRX_DESKTOP_LOCAL_ONLY)
   const loopbackUrls = buildLocalModeUrls('127.0.0.1', port, httpsPort)
   const requestedHost = sanitizeHostForUrl(req.query.host)
   const headerHost = sanitizeHostForUrl(String(req.get('host') || '').split(':')[0])
@@ -1201,6 +1203,29 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
   const pcConfigureUrl = `http://127.0.0.1:${port}/configure?target=pc`
   const lanConfigureUrl = `http://127.0.0.1:${port}/configure?target=lan`
   const seedboxConfigureUrl = `http://127.0.0.1:${port}/configure?target=seedbox`
+  const routeLead = desktopLocalOnly
+    ? 'The Windows EXE now exposes the two local routes only. Use PC Local on this machine, and LAN Bridge for your other home devices while this PC stays online.'
+    : 'PVTKRRX is one runtime with three separate Stremio routes. PC Local is now a real same-PC addon for browsing and playback on this Windows machine. LAN Bridge remains the route for your other home devices.'
+  const desktopLocalNote = desktopLocalOnly
+    ? '<p class="route-note">Remote Seedbox has moved out of the Windows EXE. Use the separate server/cloud runtime for away-from-home playback.</p>'
+    : ''
+  const remoteSeedboxCard = desktopLocalOnly
+    ? ''
+    : `
+        <section class="route-card">
+          <div class="route-kicker">Public HTTPS endpoints</div>
+          <h3>Remote Seedbox</h3>
+          <p class="route-copy">Use this when Prowlarr, qBittorrent, and file serving are reachable over public authenticated URLs. On the hosted site this is not a generic tracker-buffering route: it is ready-file / public-playback only unless you self-host playback support.</p>
+          <ul class="route-list">
+            <li>Not a generic tracker-buffering route</li>
+            <li>Works away from home LAN</li>
+            <li>Requires public HTTPS playback path</li>
+          </ul>
+          <div class="actions">
+            <a class="btn" href="${seedboxConfigureUrl}">Open Remote Seedbox Setup</a>
+          </div>
+          <p class="route-note">This is the right route for seedbox-first playback, not the LAN Bridge. On the hosted relay it is intentionally ready-file / public-playback only and fails closed when the path cannot actually be served.</p>
+        </section>`
 
   res.setHeader('Cache-Control', 'no-store')
   res.setHeader('Content-Type', 'text/html; charset=utf-8')
@@ -1215,7 +1240,7 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
     .shell { max-width: 1040px; margin: 0 auto; }
     .card { padding: 18px; border: 1px solid #2a2a3a; border-radius: 12px; background: #151526; box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18); }
     .lead { max-width: 760px; line-height: 1.55; color: #c9d4f8; }
-    .route-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
+    .route-grid { display: grid; grid-template-columns: repeat(${desktopLocalOnly ? 2 : 3}, minmax(0, 1fr)); gap: 14px; margin-top: 18px; }
     .route-card { padding: 16px; border: 1px solid #2d3958; border-radius: 10px; background: linear-gradient(180deg, #131c2b, #101725); }
     .route-card h3 { margin: 0 0 6px; font-size: 18px; }
     .route-kicker { font-size: 11px; text-transform: uppercase; letter-spacing: 1.3px; color: #7dd3fc; margin-bottom: 10px; }
@@ -1235,7 +1260,8 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
   <div class="shell">
     <div class="card">
       <h2>PVTKRRX Install Routes</h2>
-      <p class="lead">PVTKRRX is one runtime with three separate Stremio routes. PC Local is now a real same-PC addon for browsing and playback on this Windows machine. LAN Bridge remains the route for your other home devices.</p>
+      <p class="lead">${routeLead}</p>
+      ${desktopLocalNote}
       <div class="route-grid">
         <section class="route-card">
           <div class="route-kicker">Same Windows machine</div>
@@ -1271,21 +1297,7 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
           </div>
           <p class="route-note">This is the route that should sync across your Stremio account on phone, TV, web, and Apple TV while the host PC stays online.</p>
         </section>
-
-        <section class="route-card">
-          <div class="route-kicker">Public HTTPS endpoints</div>
-          <h3>Remote Seedbox</h3>
-          <p class="route-copy">Use this when Prowlarr, qBittorrent, and file serving are reachable over public authenticated URLs. On the hosted site this is not a generic tracker-buffering route: it is ready-file / public-playback only unless you self-host playback support.</p>
-          <ul class="route-list">
-            <li>Not a generic tracker-buffering route</li>
-            <li>Works away from home LAN</li>
-            <li>Requires public HTTPS playback path</li>
-          </ul>
-          <div class="actions">
-            <a class="btn" href="${seedboxConfigureUrl}">Open Remote Seedbox Setup</a>
-          </div>
-          <p class="route-note">This is the right route for seedbox-first playback, not the LAN Bridge. On the hosted relay it is intentionally ready-file / public-playback only and fails closed when the path cannot actually be served.</p>
-        </section>
+        ${remoteSeedboxCard}
       </div>
     </div>
   </div>

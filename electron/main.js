@@ -15,6 +15,9 @@ const { redactSensitiveArgs, redactSensitiveText } = require('../src/utils/logRe
 if (!process.env.PVTKRRX_RUNTIME_DIR) {
   process.env.PVTKRRX_RUNTIME_DIR = resolveRuntimeDir()
 }
+if (!process.env.PVTKRRX_DESKTOP_LOCAL_ONLY) {
+  process.env.PVTKRRX_DESKTOP_LOCAL_ONLY = 'true'
+}
 
 const runtimeDir = resolveRuntimeDir()
 const logsDir = path.join(runtimeDir, 'logs')
@@ -1290,10 +1293,6 @@ ipcMain.handle('open-configure', async () => {
 
 ipcMain.handle('open-configure-lan', async () => {
   await shell.openExternal(`http://127.0.0.1:${port}/configure?target=lan`)
-})
-
-ipcMain.handle('open-configure-seedbox', async () => {
-  await shell.openExternal(`http://127.0.0.1:${port}/configure?target=seedbox`)
 })
 
 ipcMain.handle('get-local-install-url', async () => {

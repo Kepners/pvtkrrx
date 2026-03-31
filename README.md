@@ -35,6 +35,8 @@ PVTKRRX is one runtime with three install routes:
 - **LAN Bridge** — Home-network route for your phone, TV, web, and Apple TV on the same Stremio account. Primary install uses the hosted `stremio://...` LAN Bridge link, while the plain hosted `https://.../manifest.json` value is manual fallback only if Stremio explicitly asks for an addon URL.
 - **Remote Seedbox** — Public HTTPS route for away-from-home or seedbox-first playback. Requires public qBittorrent, Prowlarr, and file serving endpoints, and is ready-file-first on the hosted relay unless you self-host playback support.
 
+The packaged Windows EXE now exposes only the Windows-local routes: `PC Local` and `LAN Bridge`. `Remote Seedbox` now belongs to the hosted/self-host server surfaces instead of the desktop app.
+
 See [docs/CURRENT_DESIGN.md](docs/CURRENT_DESIGN.md) for the canonical current design, [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) for the route model, and [docs/STREMIO_INSTALL_TRACKER.md](docs/STREMIO_INSTALL_TRACKER.md) for current client install behavior.
 See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the exact LAN Bridge lifecycle, pair generation rules, and empty-content troubleshooting.
 

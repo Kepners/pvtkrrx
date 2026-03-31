@@ -509,6 +509,14 @@
       margin-bottom: 0.9rem;
     }
 
+    .mode-grid.target-count-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .mode-grid.target-count-1 {
+      grid-template-columns: 1fr;
+    }
+
     .mode-option {
       width: 100%;
       min-height: 136px;
@@ -1658,8 +1666,8 @@
 
     <div class="card">
       <h2>Install Target</h2>
-      <p class="section-lead">Pick where you want to watch. PC Local is the real addon for this Windows machine. LAN Bridge is the home-network route for your phone, TV, web, and Apple TV.</p>
-      <div class="mode-grid" id="installTargetSwitcher">
+      <p class="section-lead" id="installTargetLead">Pick where you want to watch. PC Local is the real addon for this Windows machine. LAN Bridge is the home-network route for your phone, TV, web, and Apple TV.</p>
+      <div class="mode-grid target-count-3" id="installTargetSwitcher">
         <button type="button" class="mode-option" data-install-target="pc" onclick="setInstallTarget('pc')">
           <span class="mode-kicker">Desktop only</span>
           <span class="mode-title">PC Local</span>
@@ -2132,7 +2140,8 @@
       serverConfigConfigured: false,
       serverConfigLoaded: false,
       publicBaseUrl: '',
-      stremioLinkingAvailable: false
+      stremioLinkingAvailable: false,
+      desktopLocalOnly: false
     };
     const accountLinkState = {
       accountUserId: '',
@@ -2820,6 +2829,82 @@
       }
     }
 
+    function isDesktopLocalOnlyRuntime() {
+      return serverRuntime.desktopLocalOnly === true;
+    }
+
+    function getAllowedInstallTargets() {
+      if (serverRuntime.selfHostServerMode && !getConfigTokenFromPath()) {
+        return ['seedbox'];
+      }
+      if (isDesktopLocalOnlyRuntime()) {
+        return ['pc', 'lan'];
+      }
+      return ['pc', 'lan', 'seedbox'];
+    }
+
+    function getDefaultInstallTarget() {
+      const allowedTargets = getAllowedInstallTargets();
+      if (isDesktopLocalOnlyRuntime() && allowedTargets.includes('pc')) {
+        return 'pc';
+      }
+      if (allowedTargets.includes('lan')) return 'lan';
+      if (allowedTargets.includes('pc')) return 'pc';
+      return allowedTargets[0] || 'lan';
+    }
+
+    function normalizeInstallTarget(target) {
+      const normalized = String(target || '').trim();
+      const allowedTargets = getAllowedInstallTargets();
+      return allowedTargets.includes(normalized) ? normalized : getDefaultInstallTarget();
+    }
+
+    function getRequestedInstallTargetFromUrl() {
+      try {
+        const requestedTarget = new URLSearchParams(window.location.search).get('target');
+        return String(requestedTarget || '').trim();
+      } catch (_) {
+        return '';
+      }
+    }
+
+    function syncInstallTargetOptions() {
+      const allowedTargets = getAllowedInstallTargets();
+      const switcher = document.getElementById('installTargetSwitcher');
+      let visibleCount = 0;
+
+      document.querySelectorAll('[data-install-target]').forEach((button) => {
+        const allowed = allowedTargets.includes(button.dataset.installTarget);
+        button.classList.toggle('mode-hidden', !allowed);
+        if (allowed) visibleCount += 1;
+      });
+
+      if (switcher) {
+        switcher.classList.remove('target-count-1', 'target-count-2', 'target-count-3');
+        switcher.classList.add(`target-count-${Math.max(1, Math.min(3, visibleCount || 1))}`);
+      }
+
+      const installMode = document.getElementById('installMode');
+      const hostedOption = installMode ? installMode.querySelector('option[value="hosted"]') : null;
+      if (hostedOption) {
+        const allowHosted = allowedTargets.includes('seedbox');
+        hostedOption.hidden = !allowHosted;
+        hostedOption.disabled = !allowHosted;
+      }
+
+      const lead = document.getElementById('installTargetLead');
+      if (!lead) return;
+      if (serverRuntime.selfHostServerMode && !getConfigTokenFromPath()) {
+        lead.textContent = 'This self-hosted server configures the Remote Seedbox route. PC Local and LAN Bridge belong to the Windows desktop runtime.';
+        return;
+      }
+      if (isDesktopLocalOnlyRuntime()) {
+        lead.textContent = 'Pick where you want to watch on this Windows host. This EXE now handles PC Local and LAN Bridge only. Remote Seedbox lives in the separate server/cloud runtime.';
+        return;
+      }
+      lead.textContent = 'Pick where you want to watch. PC Local is the real addon for this Windows machine. LAN Bridge is the home-network route for your phone, TV, web, and Apple TV.';
+    }
+
     function applyServerRuntimeConfig(data) {
       const payload = data && typeof data === 'object' ? data : {};
       serverRuntime.selfHostServerMode = payload.selfHostServerMode === true;
@@ -2830,14 +2915,15 @@
       serverRuntime.serverConfigLoaded = false;
       serverRuntime.publicBaseUrl = String(payload.publicBaseUrl || '').trim();
       serverRuntime.stremioLinkingAvailable = payload.stremioLinkingAvailable === true;
+      serverRuntime.desktopLocalOnly = payload.desktopLocalOnly === true;
       updateServerAdminUi();
       updateServerLinkUi();
-
-      if (serverRuntime.selfHostServerMode && !getConfigTokenFromPath()) {
-        setInstallTarget('seedbox');
-        document.getElementById('installMode').value = 'hosted';
-        setInstallModeHint();
-      }
+      syncInstallTargetOptions();
+      const requestedTarget = getRequestedInstallTargetFromUrl();
+      const nextTarget = serverRuntime.selfHostServerMode && !getConfigTokenFromPath()
+        ? 'seedbox'
+        : (requestedTarget ? normalizeInstallTarget(activeInstallTarget) : getDefaultInstallTarget());
+      setInstallTarget(nextTarget);
     }
 
     async function loadServerRuntimeConfig() {
@@ -4286,6 +4372,7 @@
       const mode = getDerivedInstallMode(target);
       const installLinkVisible = document.getElementById('installLink').style.display === 'block';
       document.getElementById('installMode').value = mode;
+      syncInstallTargetOptions();
 
       document.querySelectorAll('[data-install-target]').forEach((button) => {
         button.classList.toggle('active', button.dataset.installTarget === target);
@@ -4356,7 +4443,7 @@
     }
 
     function setInstallTarget(target) {
-      activeInstallTarget = ['pc', 'lan', 'seedbox'].includes(target) ? target : 'lan';
+      activeInstallTarget = normalizeInstallTarget(target);
       syncInstallTargetUi();
       setInstallModeHint();
     }
@@ -4456,7 +4543,9 @@
     });
 
     document.getElementById('installMode').addEventListener('change', function() {
-      const nextTarget = this.value === 'hosted' ? 'seedbox' : getInstallTarget();
+      const nextTarget = this.value === 'hosted'
+        ? 'seedbox'
+        : (getInstallTarget() === 'seedbox' ? getDefaultInstallTarget() : getInstallTarget());
       setInstallTarget(nextTarget);
     });
     document.addEventListener('focusin', (event) => {
@@ -4963,7 +5052,7 @@
 
     function fillConfig(config) {
       if (!config || typeof config !== 'object') return;
-      if (config.lanPairEnabled === false) {
+      if (config.lanPairEnabled === false && !isDesktopLocalOnlyRuntime()) {
         setInstallTarget('seedbox');
       }
       setLanPairStateFromConfig(config);
