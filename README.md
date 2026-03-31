@@ -283,7 +283,7 @@ ENCRYPTION_SECRET=your-secret-here npm start
 npm run dist:win
 ```
 
-This now builds in the system temp directory first, then copies the finished `1.1.19` artifacts back into `dist/` and `dist/releases/<version>/`. That avoids the Windows `rcedit` failure we were hitting when building directly inside the OneDrive-backed repo output folder.
+This now builds in the system temp directory first, then copies the finished current-version artifacts back into `dist/` and `dist/releases/<version>/`. That avoids the Windows `rcedit` failure we were hitting when building directly inside the OneDrive-backed repo output folder.
 
 ## Environment Variables
 
@@ -358,7 +358,7 @@ Configure page now supports optional Stremio AuthKey linking:
 4. Desktop app should auto-ensure inbound TCP `7000/7001` + UDP `5353` on install/startup; if Windows still blocks it, run the installed app once as Administrator
 5. If pair shows offline in configure page, restart the desktop app and re-check pair status; the host page now asks the relay directly instead of guessing from stale local state
 6. If the relay rejects a stale `lanPairId`/`lanPairKey` combo, the desktop app now repairs the local LAN identity automatically; after that, refresh `LAN Bridge` once in Stremio on the other home devices
-7. `1.1.19` now starts a Windows power blocker by default so the host can stay alive through lock-screen and display-off states; if the host still vanishes, check that Windows is not forcing full sleep or hibernate from the power plan
+7. The current desktop build starts a Windows power blocker by default so the host can stay alive through lock-screen and display-off states; if the host still vanishes, check that Windows is not forcing full sleep or hibernate from the power plan
 
 ### Host PC desktop shows `Failed to fetch` on LAN Bridge
 
