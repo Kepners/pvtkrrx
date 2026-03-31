@@ -31,7 +31,11 @@ function runAsRoot(command, args, options = {}) {
 function buildServiceFile(options = {}) {
   const repoRoot = path.resolve(options.repoRoot || path.join(__dirname, '..'))
   const serviceName = String(options.serviceName || 'pvtkrrx').trim() || 'pvtkrrx'
-  const nodePath = String(options.nodePath || process.execPath).trim() || process.execPath
+  const nodePath = String(
+    options.nodePath ||
+    process.env.PVTKRRX_NODE_PATH ||
+    process.execPath
+  ).trim() || process.execPath
   const user = String(
     options.user ||
     process.env.SUDO_USER ||
@@ -103,7 +107,11 @@ function installSystemdService(options = {}) {
       process.env.USER ||
       os.userInfo().username
     ).trim(),
-    nodePath: String(options.nodePath || process.execPath).trim() || process.execPath
+    nodePath: String(
+      options.nodePath ||
+      process.env.PVTKRRX_NODE_PATH ||
+      process.execPath
+    ).trim() || process.execPath
   }
 }
 

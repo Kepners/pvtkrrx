@@ -86,22 +86,28 @@ For `LAN Bridge`, the primary install action should start with `stremio://`; the
 ### Self-Host (Free)
 
 ```bash
-git clone https://github.com/Kepners/pvtkrrx.git
-cd pvtkrrx
-npm install
-npm run server:setup
+curl -fsSL https://raw.githubusercontent.com/Kepners/pvtkrrx/main/scripts/install-selfhost.sh | sudo bash
 ```
 
-`npm run server:setup` prompts for the seedbox details PVTKRRX cannot auto-discover, writes `ENCRYPTION_SECRET` plus `PVTKRRX_SELF_HOST_MODE=true` into `.env`, saves the working config locally, creates a server admin token file in the runtime directory, and can install a Linux `systemd` service for auto-start on boot.
+The Linux installer now bootstraps a dedicated self-host server in one flow:
+- downloads the app into `/opt/pvtkrrx` by default
+- installs a bundled Node runtime under `/opt/pvtkrrx/.node`
+- installs production dependencies
+- prompts for your public HTTPS base URL plus the seedbox connection details
+- writes `.env` with `ENCRYPTION_SECRET`, `AUTH_TOKEN_SECRET`, `PVTKRRX_SELF_HOST_MODE=true`, `PVTKRRX_RUNTIME_DIR`, and `PVTKRRX_PUBLIC_BASE_URL`
+- saves the disk-backed self-host config into the runtime directory
+- creates the server admin token file
+- can install/start a Linux `systemd` service for auto-boot
 
-If you want to install the service later:
+If you are already inside a checked-out repo on the server, run the same installer directly:
 
 ```bash
-npm run server:install-service
+npm run server:setup
 ```
 
 The self-hosted server route keeps a stable disk-backed manifest at `/selfhost/manifest.json?mode=hosted`.
 Open `/configure` in a browser to review or edit the saved config at any time.
+For remote Stremio installs, give the installer a real public `https://` origin. Raw public `http://IP:7000/...` addon URLs are not a valid self-host install target for Stremio.
 
 Use the configure page to prepare the route you actually want to use:
 - **PC Local** for this Windows host (`127.0.0.1`)
@@ -298,6 +304,8 @@ This now builds in the system temp directory first, then copies the finished cur
 |----------|----------|---------|
 | ENCRYPTION_SECRET | Yes | Key for encrypting/decrypting user configs |
 | AUTH_TOKEN_SECRET | Recommended | Key for signing account auth tokens (falls back to ENCRYPTION_SECRET) |
+| PVTKRRX_RUNTIME_DIR | Recommended for self-host | Stable runtime/config directory. The server installer now defaults this to `<repo>/data/pvtkrrx` so saved config and admin-token state do not depend on whichever user launched the process |
+| PVTKRRX_PUBLIC_BASE_URL | Recommended for self-host | Public `https://` origin used when generating self-host install/config links. Set this to the real reverse-proxied host you want Stremio and browsers to use |
 | KV_REST_API_URL | Recommended | Persist LAN pair heartbeat state for the hosted relay across restarts/redeploys |
 | KV_REST_API_TOKEN | Recommended | Auth token for KV REST API |
 | PVTKRRX_PAIR_RELAY_URL | Optional | Hosted relay base URL (default https://www.pvtkrrx.cc) |

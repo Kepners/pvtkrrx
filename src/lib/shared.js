@@ -1217,6 +1217,10 @@ function requireLocalQbitControl(req, res, next) {
 }
 
 function getPublicBaseUrl(req) {
+  const configured = parseUrlCandidate(process.env.PVTKRRX_PUBLIC_BASE_URL || '')
+  if (configured && (configured.protocol === 'http:' || configured.protocol === 'https:')) {
+    return normalizeBaseUrl(configured.origin)
+  }
   const forwardedProto = String(req.headers['x-forwarded-proto'] || '').split(',')[0].trim()
   const protocol = forwardedProto || req.protocol || 'http'
   return `${protocol}://${req.get('host')}`
@@ -1418,11 +1422,17 @@ function getManifest(req) {
     ? defaultLogoUrl
     : String(manifest.logo || defaultLogoUrl)
 
+  const sourceTag = profile === 'local' ? '🖥️'
+    : profile === 'lan' ? '🖥️'
+    : SELF_HOST_SERVER_MODE ? '☁️'
+    : ''
+  const displayName = sourceTag ? `PVTKRRX ${sourceTag}` : 'PVTKRRX'
+
   const nextManifest = {
     ...manifest,
     behaviorHints: { ...(manifest.behaviorHints || {}) },
     id: `com.kepners.pvtkrrx.${idSuffix}`,
-    name: 'PVTKRRX',
+    name: displayName,
     logo: logoUrl
   }
 
@@ -1442,7 +1452,9 @@ function getManifest(req) {
 
   return {
     ...nextManifest,
-    description: 'Remote Seedbox addon for ready-file playback away from home. Browse movies, TV, sports, and library through your configured public file server.'
+    description: SELF_HOST_SERVER_MODE
+      ? 'Self-hosted server addon. Browse movies, TV, sports, and library, and stream directly from your seedbox.'
+      : 'Remote Seedbox addon for ready-file playback away from home. Browse movies, TV, sports, and library through your configured public file server.'
   }
 }
 

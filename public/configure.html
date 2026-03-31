@@ -2131,6 +2131,7 @@
       serverConfigAlias: '',
       serverConfigConfigured: false,
       serverConfigLoaded: false,
+      publicBaseUrl: '',
       stremioLinkingAvailable: false
     };
     const accountLinkState = {
@@ -2784,7 +2785,8 @@
     }
 
     function resolveSelfHostedInstallBase() {
-      const currentOrigin = getCurrentAppOrigin();
+      const preferredOrigin = String(serverRuntime.publicBaseUrl || '').trim();
+      const currentOrigin = preferredOrigin || getCurrentAppOrigin();
       if (!currentOrigin) {
         return {
           ok: false,
@@ -2826,6 +2828,7 @@
         : '';
       serverRuntime.serverConfigConfigured = payload.serverConfigConfigured === true;
       serverRuntime.serverConfigLoaded = false;
+      serverRuntime.publicBaseUrl = String(payload.publicBaseUrl || '').trim();
       serverRuntime.stremioLinkingAvailable = payload.stremioLinkingAvailable === true;
       updateServerAdminUi();
       updateServerLinkUi();

@@ -24,6 +24,8 @@ PVTKRRX is one codebase with three active runtime pieces:
    - exposes a stable `/selfhost/manifest.json?mode=hosted`
    - can mint short-lived Stremio link sessions that persist the linked `stremioUserId` back into the disk-backed `selfhost` config
    - can validate localhost/private Prowlarr and qBittorrent URLs only for same-host requests or browser sessions that present the server admin token
+   - now has a one-command Linux installer that bootstraps the app directory, bundled Node runtime, `.env`, stable runtime dir, saved self-host config, admin token, and optional `systemd` service
+   - self-host install links should come from a configured public HTTPS base URL (`PVTKRRX_PUBLIC_BASE_URL`) rather than a raw public `http://IP:port` origin
    - can install optional Linux `systemd` startup through `npm run server:setup` / `npm run server:install-service`
 3. Local runtime on the Windows host:
    - serves `PC Local` manifests and config-backed addon routes

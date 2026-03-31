@@ -7,6 +7,7 @@ const path = require('node:path')
 process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'selfhost-smoke-secret-12345678901234567890'
 process.env.AUTH_TOKEN_SECRET = process.env.AUTH_TOKEN_SECRET || 'selfhost-auth-secret-12345678901234567890'
 process.env.PVTKRRX_SELF_HOST_MODE = 'true'
+process.env.PVTKRRX_PUBLIC_BASE_URL = 'https://seedbox.example.com'
 delete process.env.VERCEL
 process.env.PVTKRRX_RUNTIME_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-selfhost-'))
 
@@ -175,6 +176,7 @@ async function run() {
     assert.equal(appConfigBefore.json?.selfHostServerMode, true)
     assert.equal(appConfigBefore.json?.serverConfigAlias, 'selfhost')
     assert.equal(appConfigBefore.json?.serverConfigConfigured, false)
+    assert.equal(appConfigBefore.json?.publicBaseUrl, 'https://seedbox.example.com')
 
     const configureRes = await request(port, 'GET', '/configure')
     assert.equal(configureRes.status, 200)
@@ -234,6 +236,7 @@ async function run() {
     const appConfigAfter = await request(port, 'GET', '/app-config.json')
     assert.equal(appConfigAfter.status, 200)
     assert.equal(appConfigAfter.json?.serverConfigConfigured, true)
+    assert.equal(appConfigAfter.json?.publicBaseUrl, 'https://seedbox.example.com')
 
     const readbackRes = await request(
       port,

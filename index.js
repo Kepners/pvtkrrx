@@ -203,6 +203,7 @@ app.get('/app-config.json', (req, res) => {
     selfHostServerMode: SELF_HOST_SERVER_MODE,
     serverConfigAlias: SELF_HOST_SERVER_MODE ? 'selfhost' : '',
     serverConfigConfigured: SELF_HOST_SERVER_MODE ? Boolean(loadLocalConfigFile()) : false,
+    publicBaseUrl: getPublicBaseUrl(req),
     stremioLinkingAvailable: authSecretAvailable()
   })
 })
