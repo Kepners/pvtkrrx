@@ -15,6 +15,8 @@ assert.match(source, /app\.getLoginItemSettings\(/, 'desktop runtime should be a
 assert.match(source, /app\.setLoginItemSettings\(/, 'desktop runtime should be able to toggle the Windows startup setting')
 assert.match(source, /const startupLaunchMode = process\.argv\.includes\(STARTUP_LAUNCH_ARG\)/, 'desktop runtime should detect Windows startup launches')
 assert.match(source, /hideMainWindowToTray\('startup-launch'\)/, 'desktop runtime should boot hidden in the tray for startup launches')
+assert.match(source, /PVTKRRX_DESKTOP_LOCAL_ONLY\s*=\s*'true'/, 'desktop runtime should force the Windows EXE into local-only mode')
+assert.match(source, /PVTKRRX_SELF_HOST_MODE\s*=\s*'false'/, 'desktop runtime should not inherit self-host server mode from ambient env')
 
 assert.doesNotMatch(
   source,

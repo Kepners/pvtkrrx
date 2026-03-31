@@ -15,9 +15,9 @@ const { redactSensitiveArgs, redactSensitiveText } = require('../src/utils/logRe
 if (!process.env.PVTKRRX_RUNTIME_DIR) {
   process.env.PVTKRRX_RUNTIME_DIR = resolveRuntimeDir()
 }
-if (!process.env.PVTKRRX_DESKTOP_LOCAL_ONLY) {
-  process.env.PVTKRRX_DESKTOP_LOCAL_ONLY = 'true'
-}
+// The Windows EXE must never inherit server/cloud runtime mode from ambient env.
+process.env.PVTKRRX_DESKTOP_LOCAL_ONLY = 'true'
+process.env.PVTKRRX_SELF_HOST_MODE = 'false'
 
 const runtimeDir = resolveRuntimeDir()
 const logsDir = path.join(runtimeDir, 'logs')
