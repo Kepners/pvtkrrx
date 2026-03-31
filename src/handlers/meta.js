@@ -5,9 +5,10 @@ const { makeSportsThumbUrl, makeSportsPosterUrl } = require('../utils/sportsThum
 const { resolveSportHint } = require('../utils/sportsRules')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { decodeCustomId } = require('../utils/customId')
+const { BRAND_ARTWORK, buildMetaPlaceholder } = require('../utils/metaPlaceholder')
 const { proxySportsImageUrl } = require('../utils/sportsImageCache')
-const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
-const BRAND_LOGO = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
+const BRAND_POSTER = BRAND_ARTWORK
+const BRAND_LOGO = BRAND_ARTWORK
 
 function formatSportGenreLabel(value) {
   const normalized = String(value || '').trim().toLowerCase()
@@ -69,10 +70,22 @@ async function handleMeta(config, type, id, context = {}) {
       return { meta }
     }
 
-    return { meta: null }
+    return {
+      meta: buildMetaPlaceholder({
+        id,
+        type,
+        description: 'PVTKRRX could not resolve metadata for this item.'
+      })
+    }
   } catch (err) {
     console.error(`[meta] ERROR type=${type} id=${id}: ${err.message}`)
-    return { meta: null }
+    return {
+      meta: buildMetaPlaceholder({
+        id,
+        type,
+        description: 'PVTKRRX hit a metadata error while loading this item.'
+      })
+    }
   }
 }
 

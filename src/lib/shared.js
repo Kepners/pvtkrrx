@@ -39,6 +39,7 @@ const {
 } = require('../utils/accountStore')
 const { createAuthToken, verifyAuthToken, parseBearerToken } = require('../utils/authToken')
 const { loadSecureJsonFile, saveSecureJsonFile } = require('../utils/secureJsonFile')
+const { buildMetaPlaceholder } = require('../utils/metaPlaceholder')
 const {
   redactSensitiveText,
   createRedactingLogger,
@@ -1937,7 +1938,16 @@ function lanPairOfflineResponse(req, res, routeKind) {
 
   if (routeKind === 'catalog') return res.json({ metas: [], cacheMaxAge: 0 })
   if (routeKind === 'stream') return res.json({ streams: [], cacheMaxAge: 0 })
-  if (routeKind === 'meta') return res.json({ meta: null })
+  if (routeKind === 'meta') {
+    return res.json({
+      meta: buildMetaPlaceholder({
+        id: req.params?.id,
+        type: req.params?.type,
+        name: 'PVTKRRX host offline',
+        description: 'LAN pair offline. Open PVTKRRX desktop on the host PC and retry.'
+      })
+    })
+  }
   return res.status(503).json({
     error: 'LAN pair offline. Open PVTKRRX desktop on the host PC.'
   })

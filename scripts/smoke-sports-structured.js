@@ -872,6 +872,30 @@ async function testSportsImageCacheReusesDownloadedBytes() {
   }
 }
 
+async function testMetaFallbackNeverReturnsNull() {
+  const { handleMeta } = require('../src/handlers/meta')
+
+  const unsupported = await handleMeta({}, 'movie', 'unsupported-meta-id', {
+    baseUrl: 'http://127.0.0.1:7000'
+  })
+  assert.ok(unsupported.meta, 'expected unsupported meta ids to return a placeholder object')
+  assert.equal(unsupported.meta.id, 'unsupported-meta-id')
+  assert.equal(unsupported.meta.type, 'movie')
+  assert.equal(unsupported.meta.name, 'Item unavailable')
+
+  const malformedCustom = await handleMeta({}, 'movie', 'pvtkrrx:bad', {
+    baseUrl: 'http://127.0.0.1:7000'
+  })
+  assert.ok(malformedCustom.meta, 'expected malformed custom ids to return a placeholder object')
+  assert.equal(malformedCustom.meta.id, 'pvtkrrx:bad')
+  assert.equal(malformedCustom.meta.type, 'movie')
+  assert.match(
+    String(malformedCustom.meta.description || ''),
+    /metadata error/i,
+    'expected malformed custom ids to explain the meta failure'
+  )
+}
+
 async function main() {
   try {
     testCacheHeadersIncludeStaleIfError()
@@ -892,6 +916,7 @@ async function main() {
     await testSportsCatalogUsesImageProxyUrls()
     await testSportsMetaUsesImageProxyUrls()
     await testSportsImageCacheReusesDownloadedBytes()
+    await testMetaFallbackNeverReturnsNull()
     console.log('Smoke sports structured flow passed')
   } finally {
     fs.rmSync(runtimeDir, { recursive: true, force: true })

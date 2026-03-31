@@ -252,6 +252,22 @@ async function run() {
     assert.equal(String(offlineCatalog.headers['x-pvtkrrx-lan-pair'] || ''), 'offline')
     assert.deepEqual(offlineCatalog.json, { metas: [], cacheMaxAge: 0 })
 
+    const offlineMeta = await requestWithHostHeader(
+      port,
+      `/${badToken}/meta/movie/tt1234567.json`,
+      `tv.device.example:${port}`
+    )
+    assert.equal(offlineMeta.status, 200, 'offline meta fallback should return 200')
+    assert.equal(String(offlineMeta.headers['x-pvtkrrx-lan-pair'] || ''), 'offline')
+    assert.equal(offlineMeta.json?.meta?.id, 'tt1234567')
+    assert.equal(offlineMeta.json?.meta?.type, 'movie')
+    assert.equal(offlineMeta.json?.meta?.name, 'PVTKRRX host offline')
+    assert.match(
+      String(offlineMeta.json?.meta?.description || ''),
+      /LAN pair offline/i,
+      'offline meta placeholder should explain the host-offline state'
+    )
+
     // No heartbeat record for the requested pair should also fail closed.
     const missingPairConfig = {
       ...hostedConfig,
