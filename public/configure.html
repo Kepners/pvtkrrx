@@ -939,6 +939,98 @@
       border-bottom-color: rgba(0, 246, 255, 0.85);
     }
 
+    .provider-preset-panel {
+      margin: -0.2rem 0 0.9rem;
+      padding: 0.95rem;
+      border-radius: 12px;
+      border: 1px solid rgba(0, 246, 255, 0.18);
+      background: linear-gradient(180deg, rgba(8, 18, 34, 0.82), rgba(9, 15, 28, 0.72));
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+
+    .provider-preset-panel[hidden] {
+      display: none;
+    }
+
+    .provider-preset-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 0.8rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .provider-preset-title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.8rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #f1f7ff;
+      margin-bottom: 0.35rem;
+    }
+
+    .provider-preset-route {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.64rem;
+      line-height: 1.55;
+      color: var(--text-dim);
+    }
+
+    .provider-preset-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.65rem;
+    }
+
+    .provider-preset-item {
+      padding: 0.8rem;
+      border-radius: 10px;
+      border: 1px solid rgba(0, 246, 255, 0.16);
+      background: rgba(5, 14, 28, 0.66);
+    }
+
+    .provider-preset-label {
+      display: block;
+      margin-bottom: 0.35rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.6rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--accent);
+    }
+
+    .provider-preset-value {
+      display: block;
+      margin-bottom: 0.45rem;
+      padding: 0.45rem 0.55rem;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 246, 255, 0.18);
+      background: rgba(0, 0, 0, 0.18);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.65rem;
+      line-height: 1.45;
+      color: #d9f7ff;
+      word-break: break-word;
+    }
+
+    .provider-preset-copy {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.63rem;
+      line-height: 1.55;
+      color: var(--text-dim);
+    }
+
+    .provider-preset-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      margin-top: 0.8rem;
+    }
+
+    .provider-preset-actions .secondary-link {
+      margin: 0;
+    }
+
     .action-row {
       display: flex;
       gap: 0.6rem;
@@ -1504,6 +1596,10 @@
       .advanced-summary-toggle { width: 100%; min-width: 0; }
       .advanced-tabs { flex-direction: column; }
       .advanced-tab { width: 100%; }
+      .provider-preset-head { flex-direction: column; }
+      .provider-preset-grid { grid-template-columns: 1fr; }
+      .provider-preset-actions { flex-direction: column; }
+      .provider-preset-actions .secondary-link { width: 100%; text-align: center; }
       .quick-step-head { flex-direction: column; }
       .quick-step-badge { min-width: 0; width: 100%; }
       .quick-step-actions { flex-direction: column; }
@@ -1801,7 +1897,41 @@
           <option value="swizzin">Swizzin</option>
         </select>
         <p class="hint" id="providerPresetInfo">Preset applies path mapping defaults and links to matching runbook steps.</p>
-        <label for="fileServerUrl">HTTP File Server URL</label>
+        <div class="provider-preset-panel" id="providerPresetPanel">
+          <div class="provider-preset-head">
+            <div>
+              <div class="provider-preset-title" id="providerPresetTitle">Provider helper</div>
+              <div class="provider-preset-route" id="providerPresetRoute">Choose a provider to see route guidance, URL patterns, and mapping notes.</div>
+            </div>
+            <a class="secondary-link" id="providerRunbookLink" href="/runbooks#other" target="_blank" rel="noopener">Open Matching Runbook</a>
+          </div>
+          <div class="provider-preset-grid">
+            <div class="provider-preset-item">
+              <span class="provider-preset-label">qBittorrent URL</span>
+              <code class="provider-preset-value" id="providerPresetQbitValue">Use the exact public qBittorrent URL from your provider.</code>
+              <div class="provider-preset-copy" id="providerPresetQbitCopy">Include the full app path if your provider mounts qBittorrent below the root.</div>
+            </div>
+            <div class="provider-preset-item">
+              <span class="provider-preset-label">Prowlarr URL</span>
+              <code class="provider-preset-value" id="providerPresetProwlarrValue">Use the exact public Prowlarr URL from your provider.</code>
+              <div class="provider-preset-copy" id="providerPresetProwlarrCopy">Avoid loopback, LAN-only, and raw internal app ports in hosted mode.</div>
+            </div>
+            <div class="provider-preset-item">
+              <span class="provider-preset-label">File Server URL</span>
+              <code class="provider-preset-value" id="providerPresetFileValue">Use the public file/download base URL that reaches completed files.</code>
+              <div class="provider-preset-copy" id="providerPresetFileCopy">Hosted Remote Seedbox on www.pvtkrrx.cc needs trusted HTTPS here.</div>
+            </div>
+            <div class="provider-preset-item">
+              <span class="provider-preset-label">Path Mapping + Auth</span>
+              <code class="provider-preset-value" id="providerPresetMappingValue">Map the qBittorrent filesystem root to the published web root.</code>
+              <div class="provider-preset-copy" id="providerPresetAuthCopy">If your file area uses Basic Auth, add File Server Auth as user:password.</div>
+            </div>
+          </div>
+          <div class="provider-preset-actions">
+            <a class="secondary-link" href="/runbooks" target="_blank" rel="noopener">Open Full Runbooks</a>
+          </div>
+        </div>
+        <label for="fileServerUrl">Public File Server URL</label>
         <input type="url" id="fileServerUrl" placeholder="https://username.seedbox.com/files">
         <label for="fileServerAuth">Basic Auth (optional)</label>
         <input type="text" id="fileServerAuth" placeholder="user:password">
@@ -1933,6 +2063,7 @@
     </footer>
   </div>
 
+  <script src="/provider-presets.js"></script>
   <script src="/route-parity.js"></script>
   <script>
     const routeParity = window.PVTKRRXRouteParity;
@@ -2073,127 +2204,106 @@
       return Boolean(String(value || '').trim() || getRetainedSecretFields()[field]);
     }
 
-    const providers = {
-      custom: {
+    const fallbackProvider = {
+      id: 'custom',
+      label: 'Custom / Other',
+      route: {
+        label: 'Depends on your provider',
+        reason: 'Use the exact public URLs from your provider panel.'
+      },
+      preset: {
         from: '',
         to: '',
-        qbitPlaceholder: 'https://qbit.seedbox.com:8080',
-        prowlarrPlaceholder: 'https://prowlarr.seedbox.com:9696',
-        fileServerPlaceholder: 'https://username.seedbox.com/files',
-        authNote: 'Check your provider panel for file server auth requirements.',
-        runbookAnchor: '#other',
-        note: 'Custom profile. Use the exact HTTPS endpoints from your provider panel.'
-      },
-      whatbox: {
-        from: '/home/',
-        to: '/',
-        qbitPlaceholder: 'https://<server>.whatbox.ca/qbittorrent',
-        prowlarrPlaceholder: 'https://<server>.whatbox.ca/prowlarr',
-        fileServerPlaceholder: 'https://<server>.whatbox.ca/files',
-        authNote: 'Managed Links use your Whatbox login. File server auth uses the same credentials as user:password.',
-        runbookAnchor: '#whatbox',
-        note: 'Use Whatbox Managed Links HTTPS endpoints for qBit, Prowlarr, and files.'
-      },
-      ultra: {
-        from: '/home/',
-        to: '/',
-        qbitPlaceholder: 'https://<slot>.ultra.cc/qbittorrent',
-        prowlarrPlaceholder: 'https://<slot>.ultra.cc/prowlarr',
-        fileServerPlaceholder: 'https://<slot>.ultra.cc',
-        authNote: 'Ultra apps are behind your slot login. File server uses the same credentials.',
-        runbookAnchor: '#ultra',
-        note: 'Use your Ultra.cc slot HTTPS app URLs.'
-      },
-      seedhost: {
-        from: '/home/',
-        to: '/',
-        qbitPlaceholder: 'https://<box>.seedhost.eu/qbittorrent',
-        prowlarrPlaceholder: 'https://<box>.seedhost.eu/prowlarr',
-        fileServerPlaceholder: 'https://<box>.seedhost.eu',
-        authNote: 'SeedHost apps use your slot credentials. File server typically needs Basic Auth.',
-        runbookAnchor: '#seedhost',
-        note: 'Use your SeedHost slot HTTPS app endpoints.'
-      },
-      feral: {
-        from: '/media/',
-        to: '/',
-        qbitPlaceholder: 'https://<username>.feralhosting.com/qbittorrent',
-        prowlarrPlaceholder: 'https://<username>.feralhosting.com/prowlarr',
-        fileServerPlaceholder: 'https://<username>.feralhosting.com',
-        authNote: 'Feral file access uses HTTP auth. Set user:password in the Basic Auth field.',
-        runbookAnchor: '#feral',
-        note: 'Feral uses /media/ save paths. HTTPS needs proxypass setup.'
-      },
-      rapid: {
-        from: '/home/',
-        to: '/',
-        qbitPlaceholder: 'https://<box>.rapidseedbox.com/qbittorrent',
-        prowlarrPlaceholder: 'https://<box>.rapidseedbox.com/prowlarr',
-        fileServerPlaceholder: 'https://<box>.rapidseedbox.com',
-        authNote: 'RapidSeedbox apps use your dashboard credentials for HTTPS access.',
-        runbookAnchor: '#rapid',
-        note: 'Lean: no SSH, use Remote Seedbox route. Premium: SSH available for direct hosting.'
-      },
-      bytesized: {
-        from: '/home/',
-        to: '/',
-        qbitPlaceholder: 'https://<appbox>.bytesized-hosting.com/qbittorrent',
-        prowlarrPlaceholder: 'https://<appbox>.bytesized-hosting.com/prowlarr',
-        fileServerPlaceholder: 'https://<appbox>.bytesized-hosting.com',
-        authNote: 'Bytesized apps are behind your appbox login.',
-        runbookAnchor: '#bytesized',
-        note: 'Use Remote Seedbox route unless Connect prerequisites (Docker + root) are met.'
-      },
-      hbd: {
-        from: '/home/',
-        to: '/',
-        qbitPlaceholder: 'https://<slot>.hostingby.design/qbittorrent',
-        prowlarrPlaceholder: 'https://<slot>.hostingby.design/prowlarr',
-        fileServerPlaceholder: 'https://<slot>.hostingby.design',
-        authNote: 'HBD apps are behind your slot login. Keep HTTPS enabled.',
-        runbookAnchor: '#hbd',
-        note: 'Use your HBD app slot HTTPS URLs.'
-      },
-      swizzin: {
-        from: '/home/',
-        to: '/',
         qbitPlaceholder: 'https://seedbox.example.com/qbittorrent',
         prowlarrPlaceholder: 'https://seedbox.example.com/prowlarr',
         fileServerPlaceholder: 'https://seedbox.example.com/files',
-        authNote: 'Auth depends on your Nginx/reverse proxy config.',
-        runbookAnchor: '#swizzin',
-        note: 'Swizzin works best when you control root + reverse proxy + domain routing.'
-      }
+        note: 'Use the exact public URLs from your provider panel.'
+      },
+      fields: [
+        {
+          label: 'qBittorrent URL',
+          value: 'Exact public qBittorrent URL',
+          detail: 'Include the full subpath if your provider mounts qBittorrent below the root.'
+        },
+        {
+          label: 'Prowlarr URL',
+          value: 'Exact public Prowlarr URL',
+          detail: 'Avoid loopback, LAN-only, and raw internal app ports in hosted mode.'
+        },
+        {
+          label: 'File Server URL',
+          value: 'Exact public file/download URL',
+          detail: 'Hosted Remote Seedbox on www.pvtkrrx.cc needs trusted HTTPS here.'
+        }
+      ],
+      pathMappingNote: 'Map the qBittorrent filesystem root to the web root your file server exposes.',
+      authNote: 'If the file area uses Basic Auth, set File Server Auth as user:password.'
     };
+
+    const providerCatalog = window.PVTKRRX_PROVIDER_PRESETS || {
+      providers: [fallbackProvider],
+      byId: { custom: fallbackProvider },
+      defaultId: 'custom',
+      remoteRule: 'Hosted Remote Seedbox on https://www.pvtkrrx.cc needs trusted public HTTPS file access.'
+    };
+    const providers = providerCatalog.byId || { custom: fallbackProvider };
 
     function getProviderPreset(providerId) {
       const key = String(providerId || '').trim().toLowerCase();
-      return providers[key] || providers.custom;
+      return providers[key] || providers[providerCatalog.defaultId] || providers.custom || fallbackProvider;
+    }
+
+    function getProviderField(preset, label) {
+      return (preset?.fields || []).find((field) => field && field.label === label) || null;
     }
 
     function renderProviderPresetInfo(providerId) {
       const preset = getProviderPreset(providerId);
       const infoEl = document.getElementById('providerPresetInfo');
+      const panelEl = document.getElementById('providerPresetPanel');
+      if (panelEl) panelEl.hidden = false;
       if (!infoEl) return;
       infoEl.textContent = '';
 
-      const textNode = document.createTextNode(`Preset loaded: ${preset.note} `);
-      infoEl.appendChild(textNode);
-      if (preset.authNote) {
-        const authSpan = document.createElement('span');
-        authSpan.style.display = 'block';
-        authSpan.style.marginTop = '0.3rem';
-        authSpan.style.opacity = '0.8';
-        authSpan.textContent = `Auth: ${preset.authNote}`;
-        infoEl.appendChild(authSpan);
+      const qbitField = getProviderField(preset, 'qBittorrent URL') || fallbackProvider.fields[0];
+      const prowlarrField = getProviderField(preset, 'Prowlarr URL') || fallbackProvider.fields[1];
+      const fileField = getProviderField(preset, 'File Server URL') || fallbackProvider.fields[2];
+      const mappingFrom = String(preset?.preset?.from || '');
+      const mappingTo = String(preset?.preset?.to || '');
+      const mappingSummary = (mappingFrom || mappingTo)
+        ? `Path mapping: ${mappingFrom || '(custom)'} -> ${mappingTo || '(custom)'}`
+        : 'Path mapping: set this manually for your provider';
+      const routeCopy = preset?.route?.label
+        ? `Best fit: ${preset.route.label}. ${String(preset.route.reason || '').trim()}`
+        : 'Choose a provider to see route guidance.';
+      const authParts = [preset?.pathMappingNote, preset?.authNote].filter(Boolean);
+      const runbookAnchor = `#${preset?.id || providerCatalog.defaultId || 'custom'}`;
+
+      document.getElementById('providerPresetTitle').textContent = `${preset.label || 'Provider'} helper`;
+      document.getElementById('providerPresetRoute').textContent = routeCopy;
+      document.getElementById('providerPresetQbitValue').textContent = qbitField.value;
+      document.getElementById('providerPresetQbitCopy').textContent = qbitField.detail;
+      document.getElementById('providerPresetProwlarrValue').textContent = prowlarrField.value;
+      document.getElementById('providerPresetProwlarrCopy').textContent = prowlarrField.detail;
+      document.getElementById('providerPresetFileValue').textContent = fileField.value;
+      document.getElementById('providerPresetFileCopy').textContent = fileField.detail;
+      document.getElementById('providerPresetMappingValue').textContent = mappingSummary;
+      document.getElementById('providerPresetAuthCopy').textContent = authParts.join(' ');
+
+      const runbookLink = document.getElementById('providerRunbookLink');
+      if (runbookLink) {
+        runbookLink.href = `/runbooks${runbookAnchor}`;
+        runbookLink.textContent = `Open ${preset.label || 'provider'} Runbook`;
       }
+
+      const textNode = document.createTextNode(`Preset loaded: ${String(preset?.preset?.note || '').trim()} Configure shortcut: select ${preset.label || 'this provider'} to auto-fill path mapping and field examples. `);
+      infoEl.appendChild(textNode);
+
       const link = document.createElement('a');
-      link.href = `/runbooks${preset.runbookAnchor || '#other'}`;
+      link.href = `/runbooks${runbookAnchor}`;
       link.target = '_blank';
       link.rel = 'noopener noreferrer';
       link.textContent = 'Open matching runbook';
-      link.style.display = 'inline-block';
-      link.style.marginTop = '0.3rem';
       infoEl.appendChild(link);
     }
 
@@ -2201,21 +2311,21 @@
       const { applyMapping = true } = options;
       const preset = getProviderPreset(providerId);
       if (applyMapping) {
-        document.getElementById('pathFrom').value = preset.from;
-        document.getElementById('pathTo').value = preset.to;
+        document.getElementById('pathFrom').value = preset?.preset?.from || '';
+        document.getElementById('pathTo').value = preset?.preset?.to || '';
       }
 
       const fileServerInput = document.getElementById('fileServerUrl');
-      if (fileServerInput && preset.fileServerPlaceholder) {
-        fileServerInput.placeholder = preset.fileServerPlaceholder;
+      if (fileServerInput && preset?.preset?.fileServerPlaceholder) {
+        fileServerInput.placeholder = preset.preset.fileServerPlaceholder;
       }
       const qbitInput = document.getElementById('qbitUrl');
-      if (qbitInput && preset.qbitPlaceholder) {
-        qbitInput.placeholder = preset.qbitPlaceholder;
+      if (qbitInput && preset?.preset?.qbitPlaceholder) {
+        qbitInput.placeholder = preset.preset.qbitPlaceholder;
       }
       const prowlarrInput = document.getElementById('jackettUrl');
-      if (prowlarrInput && preset.prowlarrPlaceholder) {
-        prowlarrInput.placeholder = preset.prowlarrPlaceholder;
+      if (prowlarrInput && preset?.preset?.prowlarrPlaceholder) {
+        prowlarrInput.placeholder = preset.preset.prowlarrPlaceholder;
       }
       renderProviderPresetInfo(providerId);
     }
@@ -4406,6 +4516,13 @@
     function validateReachability(config, installMode) {
       if (installMode === 'local') return null;
 
+      // Detect self-hosted: page served via HTTP/private address, or this
+      // server IS the relay (origin matches relay URL).  Self-hosted seedbox
+      // installs can legitimately use localhost/LAN Prowlarr & qBit URLs.
+      const publicCurrentOrigin = getCurrentPublicOrigin();
+      const relayBase = normalizeRelayUrl(config.lanPairRelayUrl || lanPair.relayUrl || '');
+      const selfHosted = !publicCurrentOrigin || relayBase === publicCurrentOrigin;
+
       const checks = [
         ['Prowlarr URL', config.jackettUrl],
         ['qBittorrent URL', config.qbitUrl]
@@ -4417,7 +4534,7 @@
       for (const [label, value] of checks) {
         try {
           const u = new URL(value);
-          if (isPrivateHostname(u.hostname)) {
+          if (!selfHosted && isPrivateHostname(u.hostname)) {
             return `${label} uses ${u.hostname}. Remote Seedbox needs public URLs. Use PC Local or LAN Bridge instead.`;
           }
         } catch (e) {
@@ -4425,10 +4542,8 @@
         }
       }
 
-      const relayBase = normalizeRelayUrl(config.lanPairRelayUrl || lanPair.relayUrl || '');
-      const publicCurrentOrigin = getCurrentPublicOrigin();
       const usingExternalHostedRelay = !publicCurrentOrigin || relayBase !== publicCurrentOrigin;
-      if (usingExternalHostedRelay && !config.fileServerUrl) {
+      if (!selfHosted && usingExternalHostedRelay && !config.fileServerUrl) {
         return 'Remote Seedbox on the hosted relay needs an HTTPS File Server URL for completed-file playback. Hosted relay playback is effectively ready-file / public-playback only here, so add your seedbox file server URL or self-host PVTKRRX directly on the seedbox.';
       }
 

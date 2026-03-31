@@ -894,7 +894,10 @@ app.post('/test-connection', requireCsrfToken, async (req, res) => {
   const trustedLocalCaller = isSameHostRequest(req)
 
   try {
-    if (!trustedLocalCaller) {
+    // Self-hosted servers (non-Vercel) can connect to any target including
+    // localhost/LAN — the operator IS the admin.  The private-target guard
+    // only protects the public hosted relay from being used as a proxy.
+    if (!trustedLocalCaller && IS_VERCEL_RUNTIME) {
       for (const target of [parsedJackettUrl, parsedQbitUrl]) {
         await validateHostedConnectionTarget(target)
       }
