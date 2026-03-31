@@ -116,10 +116,62 @@ async function run() {
     })
     assert.equal(badRes.status, 401, 'invalid stremio auth key should be rejected')
 
+    const encryptRes = await fetch(`${base}/encrypt`, {
+      method: 'POST',
+      headers: withCsrf(csrf, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        jackettUrl: 'https://seedbox.example:9696',
+        jackettApiKey: 'seedbox-key',
+        qbitUrl: 'https://seedbox.example:8080',
+        qbitUsername: 'demo',
+        qbitPassword: 'secret',
+        provider: 'custom',
+        fileServerUrl: 'https://files.example',
+        fileServerAuth: '',
+        sportsDbApiKey: '123',
+        sportsDbCacheHours: 24,
+        maxResults: 50,
+        lanPairEnabled: false,
+        lanPairRequired: false
+      })
+    })
+    assert.equal(encryptRes.status, 200, 'encrypt should create a hosted token for link-session testing')
+    const encryptData = await encryptRes.json()
+    assert.ok(String(encryptData?.token || '').length > 20, 'encrypt should return a token')
+
+    const sessionRes = await fetch(`${base}/auth/stremio/link-session`, {
+      method: 'POST',
+      headers: withCsrf(csrf, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        sourceConfigToken: String(encryptData.token || ''),
+        installMode: 'hosted',
+        installTarget: 'seedbox'
+      })
+    })
+    assert.equal(sessionRes.status, 200, 'server link session should be created for token configs')
+    const sessionData = await sessionRes.json()
+    assert.equal(Boolean(sessionData?.ok), true)
+    assert.ok(String(sessionData?.sessionToken || '').length > 16)
+    assert.ok(String(sessionData?.install?.addonUrl || '').includes('/manifest.json?mode=hosted&linkSession='), 'session should expose a hosted addon url with link session marker')
+
+    const seenManifestRes = await fetch(String(sessionData.install.addonUrl || ''))
+    assert.equal(seenManifestRes.status, 200, 'link-session addon url should resolve a manifest')
+    const seenManifest = await seenManifestRes.json()
+    assert.ok(String(seenManifest?.id || '').length > 3, 'manifest should still resolve normally through the session url')
+
+    const seenStatusRes = await fetch(`${base}/auth/stremio/link-session/${encodeURIComponent(String(sessionData.sessionToken || ''))}`)
+    assert.equal(seenStatusRes.status, 200, 'link-session status should be readable')
+    const seenStatusData = await seenStatusRes.json()
+    assert.equal(String(seenStatusData?.status || ''), 'install-seen', 'manifest hit should mark the session install as seen')
+    assert.equal(Boolean(seenStatusData?.stremio?.linked), false, 'install-seen should not imply account-linked')
+
     const linkRes = await fetch(`${base}/auth/stremio/link-authkey`, {
       method: 'POST',
       headers: withCsrf(csrf, { 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ authKey: GOOD_AUTH_KEY })
+      body: JSON.stringify({
+        authKey: GOOD_AUTH_KEY,
+        linkSessionToken: String(sessionData.sessionToken || '')
+      })
     })
     assert.equal(linkRes.status, 200, 'valid stremio auth key should link successfully')
     const linkData = await linkRes.json()
@@ -133,6 +185,17 @@ async function run() {
       expectedPairId,
       'recommended pair id should be deterministic from stremio user id'
     )
+    assert.equal(String(linkData?.linkSession?.status || ''), 'linked', 'link-session should complete once auth key is verified')
+    assert.equal(String(linkData?.linkSession?.stremio?.userId || ''), LINKED_STREMIO_USER_ID)
+    assert.ok(String(linkData?.linkSession?.linkedInstall?.addonUrl || '').includes('/manifest.json?mode=hosted'), 'completed link-session should expose a refreshed addon url')
+    assert.ok(!String(linkData?.linkSession?.linkedInstall?.addonUrl || '').includes('linkSession='), 'refreshed linked addon url should not keep the one-time link session query')
+
+    const linkedTokenMatch = String(linkData?.linkSession?.linkedInstall?.addonUrl || '').match(/\/([^/?]+)\/manifest\.json/i)
+    assert.ok(linkedTokenMatch, 'linked addon url should contain a token config path')
+    const linkedTokenConfigRes = await fetch(`${base}/${encodeURIComponent(String(linkedTokenMatch[1] || ''))}/config.json`)
+    assert.equal(linkedTokenConfigRes.status, 200, 'linked token config should be readable')
+    const linkedTokenConfig = await linkedTokenConfigRes.json()
+    assert.equal(String(linkedTokenConfig?.stremioUserId || ''), LINKED_STREMIO_USER_ID, 'linked token config should carry the stremio user id')
 
     let rawTokenText = ''
     let parsedToken = null

@@ -30,6 +30,7 @@ const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require(
 const { buildPlaybackFileUrl } = require('../utils/fileServing')
 const { normalizeLocalStorageRoots, findExistingLocalFilePath } = require('../utils/localStorageRoots')
 const { PairStore } = require('../utils/pairStore')
+const { StremioLinkStore } = require('../utils/stremioLinkStore')
 const { RateLimiter } = require('../utils/rateLimiter')
 const {
   AccountStore,
@@ -182,6 +183,9 @@ const lanPairStore = new PairStore({
 })
 const accountStore = new AccountStore({
   filePath: process.env.PVTKRRX_ACCOUNT_STORE_FILE || path.join(runtimeDir, 'accounts-store.json')
+})
+const stremioLinkStore = new StremioLinkStore({
+  filePath: process.env.PVTKRRX_STREMIO_LINK_STORE_FILE || path.join(runtimeDir, 'stremio-link-store.json')
 })
 let bootLanAccessPromise = null
 let localProviderWarmupPromise = null
@@ -2003,6 +2007,7 @@ module.exports = {
   localConfigPath,
   lanPairStore,
   accountStore,
+  stremioLinkStore,
   rateLimiters,
   watchedDeleteTimers,
   watchedDeleteInFlight,

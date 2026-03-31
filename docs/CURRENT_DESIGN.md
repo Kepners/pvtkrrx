@@ -16,11 +16,13 @@ PVTKRRX is one codebase with three active runtime pieces:
    - encrypts hosted config tokens
    - stores LAN pair state and account data when KV-backed storage is configured
    - handles Stremio AuthKey linking and account-scoped access checks
+   - can mint short-lived Stremio link sessions so any signed-in browser device can link a hosted config token to a Stremio account
    - may test only public HTTP/HTTPS endpoints from the hosted configure flow
 2. Self-hosted server mode on a VPS/seedbox (`PVTKRRX_SELF_HOST_MODE=true`):
    - serves its own `/configure` page and static UI
    - saves a disk-backed server config into the runtime directory
    - exposes a stable `/selfhost/manifest.json?mode=hosted`
+   - can mint short-lived Stremio link sessions that persist the linked `stremioUserId` back into the disk-backed `selfhost` config
    - can validate localhost/private Prowlarr and qBittorrent URLs only for same-host requests or browser sessions that present the server admin token
    - can install optional Linux `systemd` startup through `npm run server:setup` / `npm run server:install-service`
 3. Local runtime on the Windows host:
@@ -28,6 +30,7 @@ PVTKRRX is one codebase with three active runtime pieces:
    - exposes built-in `/file` and `/playback` endpoints
    - provides local admin routes such as `/local-config`, `/auto-provision`, `/network-info`, `/local/qbit/preferences`, `/local/qbit/download-path`, and `/local/qbit/auto-extract`
    - reads completed files directly from the host download path when available
+   - can mint short-lived Stremio link sessions for the disk-backed `local` config when the request comes from the same host
 4. Electron desktop wrapper:
    - launches and packages the local runtime on Windows
    - shows the startup splash and desktop shell
@@ -41,6 +44,12 @@ PVTKRRX is one codebase with three active runtime pieces:
 - The top of the page focuses on the next action for the selected route.
 - Noisy fallback tools are hidden by default behind `Hidden Setup Tabs`.
 - When explicit self-host server mode is active, the configure page detects it through `/app-config.json`, defaults to `Remote Seedbox`, and exposes a browser-stored server admin token field for remote seedbox administration.
+- The advanced Stremio account tools now also expose a `Server Link Session` flow:
+  - create a one-time session from the target runtime
+  - copy a browser link or addon URL
+  - let any signed-in Stremio browser/device session complete the proof
+  - poll status until the runtime reports `install-seen` or `linked`
+- Pasting the generated addon URL into Stremio is only a bootstrap step. It marks that the session was seen by Stremio, but the real account link still completes through browser-side AuthKey proof.
 - The desktop popup mirrors the same route split and tells the user to install/sign in to Stremio on the host PC before using `LAN Bridge`.
 - The desktop popup also exposes:
   - current runtime status
@@ -173,6 +182,7 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 - Hosted sensitive routes use the browser-origin allowlist.
 - Hosted `/test-connection` is rate limited and only allows public HTTP/HTTPS targets.
 - `/pair/status` returns chosen endpoint metadata only to callers that present both `pairId` and `pairKey`.
+- Stremio link sessions are short-lived, random server-issued tokens; Stremio install hits can mark them as `install-seen`, but account linking still requires a verified AuthKey proof before PVTKRRX stores linked identity.
 
 ## Design Rules
 

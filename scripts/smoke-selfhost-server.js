@@ -5,15 +5,54 @@ const os = require('node:os')
 const path = require('node:path')
 
 process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'selfhost-smoke-secret-12345678901234567890'
+process.env.AUTH_TOKEN_SECRET = process.env.AUTH_TOKEN_SECRET || 'selfhost-auth-secret-12345678901234567890'
 process.env.PVTKRRX_SELF_HOST_MODE = 'true'
 delete process.env.VERCEL
 process.env.PVTKRRX_RUNTIME_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-selfhost-'))
 
-delete require.cache[require.resolve('../src/lib/shared')]
-delete require.cache[require.resolve('../index')]
+const GOOD_AUTH_KEY = 'good-authkey-1234567890'
+const LINKED_STREMIO_USER_ID = 'stremio_user_abc123'
 
-const shared = require('../src/lib/shared')
-const app = require('../index')
+function startMockStremioApi() {
+  const server = http.createServer((req, res) => {
+    if (req.method !== 'POST' || req.url !== '/api/getUser') {
+      res.statusCode = 404
+      res.end('Not found')
+      return
+    }
+
+    const chunks = []
+    req.on('data', (chunk) => chunks.push(Buffer.from(chunk)))
+    req.on('end', () => {
+      let body = {}
+      try {
+        body = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}')
+      } catch (_) {
+        body = {}
+      }
+
+      if (String(body.authKey || '') !== GOOD_AUTH_KEY) {
+        res.statusCode = 401
+        res.setHeader('Content-Type', 'application/json')
+        res.end(JSON.stringify({ error: 'unauthorized' }))
+        return
+      }
+
+      res.statusCode = 200
+      res.setHeader('Content-Type', 'application/json')
+      res.end(JSON.stringify({
+        result: {
+          _id: LINKED_STREMIO_USER_ID,
+          email: 'linked-user@example.com'
+        }
+      }))
+    })
+  })
+
+  return new Promise((resolve) => {
+    server.listen(0, () => resolve(server))
+  })
+}
 
 function request(port, method, reqPath, body = null, headers = {}) {
   return new Promise((resolve, reject) => {
@@ -78,6 +117,17 @@ function makeMockRes() {
 }
 
 async function run() {
+  const mockServer = await startMockStremioApi()
+  const mockPort = mockServer.address().port
+  process.env.PVTKRRX_STREMIO_API_BASE_URL = `http://127.0.0.1:${mockPort}`
+  process.env.PVTKRRX_STREMIO_API_TIMEOUT_MS = '5000'
+
+  delete require.cache[require.resolve('../src/lib/shared')]
+  delete require.cache[require.resolve('../index')]
+
+  const shared = require('../src/lib/shared')
+  const app = require('../index')
+
   const adminTokenPath = path.join(process.env.PVTKRRX_RUNTIME_DIR, 'server-admin-token')
   const adminToken = String(fs.readFileSync(adminTokenPath, 'utf8') || '').trim()
   assert.ok(adminToken, 'self-host mode should create a server admin token file')
@@ -213,9 +263,72 @@ async function run() {
     assert.equal(manifestRes.json?.behaviorHints?.configurationRequired, false)
     assert.equal(String(manifestRes.headers['cache-control'] || '').toLowerCase(), 'no-store')
 
+    const linkSessionRes = await request(
+      port,
+      'POST',
+      '/auth/stremio/link-session',
+      {
+        configAlias: 'selfhost',
+        installMode: 'hosted',
+        installTarget: 'seedbox'
+      },
+      {
+        Cookie: csrf.cookie,
+        Host: 'seedbox.example',
+        'X-PVTKRRX-CSRF': csrf.token,
+        'X-PVTKRRX-Admin-Token': adminToken
+      }
+    )
+    assert.equal(linkSessionRes.status, 200, 'remote self-host should create a server link session when admin token is present')
+    assert.equal(Boolean(linkSessionRes.json?.ok), true)
+    assert.ok(String(linkSessionRes.json?.install?.addonUrl || '').includes('/selfhost/manifest.json?mode=hosted&linkSession='), 'self-host link session should expose a stable selfhost addon url')
+
+    const linkSessionAddonUrl = new URL(String(linkSessionRes.json?.install?.addonUrl || ''))
+    const installSeenRes = await request(
+      port,
+      'GET',
+      `${linkSessionAddonUrl.pathname}${linkSessionAddonUrl.search}`,
+      null,
+      {
+        Host: 'seedbox.example'
+      }
+    )
+    assert.equal(installSeenRes.status, 200, 'self-host link-session addon url should resolve')
+
+    const linkAuthRes = await request(
+      port,
+      'POST',
+      '/auth/stremio/link-authkey',
+      {
+        authKey: GOOD_AUTH_KEY,
+        linkSessionToken: String(linkSessionRes.json?.sessionToken || '')
+      },
+      {
+        Cookie: csrf.cookie,
+        Host: 'seedbox.example',
+        'X-PVTKRRX-CSRF': csrf.token
+      }
+    )
+    assert.equal(linkAuthRes.status, 200, 'self-host auth link should complete the link session')
+    assert.equal(String(linkAuthRes.json?.linkSession?.status || ''), 'linked')
+    assert.equal(Boolean(linkAuthRes.json?.linkSession?.persistedConfigSaved), true, 'self-host link session should persist disk-backed config state')
+
+    const linkedReadbackRes = await request(
+      port,
+      'GET',
+      '/selfhost/config.json',
+      null,
+      {
+        Host: `127.0.0.1:${port}`
+      }
+    )
+    assert.equal(linkedReadbackRes.status, 200)
+    assert.equal(String(linkedReadbackRes.json?.stremioUserId || ''), LINKED_STREMIO_USER_ID, 'self-host config readback should expose the linked stremio user id')
+
     console.log('Smoke self-host server passed')
   } finally {
     await new Promise(resolve => server.close(resolve))
+    mockServer.close()
   }
 }
 

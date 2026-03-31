@@ -232,6 +232,7 @@ This validates:
 - explicit self-host server mode advertises `/selfhost`
 - remote self-host admin requests need the server admin token
 - same-host self-host runtime can save disk-backed server config and read it back
+- remote/browser-driven Stremio link sessions can persist a linked `stremioUserId` into the disk-backed self-host config
 - `/selfhost/manifest.json?mode=hosted` resolves with no-store caching
 
 Route-capability stream pipeline smoke check:
@@ -263,6 +264,12 @@ Stremio AuthKey linking smoke check (uses a local mock Stremio API):
 ```bash
 npm run smoke:stremio-link
 ```
+
+This now validates the server-agnostic link-session flow as well:
+- the server can create a short-lived `/auth/stremio/link-session`
+- the generated addon URL marks the session as `install-seen` when Stremio fetches the manifest
+- the browser-side AuthKey proof completes the link without exposing a Stremio password to the server
+- token-backed configs receive a refreshed linked install URL that omits the one-time session token after completion
 
 ## Deployment
 
@@ -316,6 +323,7 @@ This now builds in the system temp directory first, then copies the finished cur
 | STREAM_PRIORITIZE_LAST_PIECES | Optional | Keep qBittorrent first+last piece priority enabled for incomplete playback so Stremio footer/range probes do not bounce back to source selection (default true) |
 | PVTKRRX_STREMIO_API_BASE_URL | Optional | Stremio API base URL for AuthKey verification (default https://api.strem.io) |
 | PVTKRRX_STREMIO_API_TIMEOUT_MS | Optional | Timeout for Stremio AuthKey verification calls (default 10000) |
+| PVTKRRX_STREMIO_LINK_SESSION_TTL_SECONDS | Optional | TTL for one-time Stremio server link sessions in seconds (default 900) |
 | PVTKRRX_OPAQUE_STATE_SECRET | Optional | Secret for stream/file opaque state tokens (defaults to `ENCRYPTION_SECRET`) |
 | PVTKRRX_PLAYBACK_STATE_TTL_SECONDS | Optional | TTL for `/playback/:info` opaque tokens in seconds (default 86400) |
 | PVTKRRX_FILE_STATE_TTL_SECONDS | Optional | TTL for `/file/:info` opaque tokens in seconds (default 86400) |
@@ -339,6 +347,16 @@ Configure page now supports optional Stremio AuthKey linking:
 - GET `/auth/me` returns linked account profile from bearer token
 - addon access is currently free for all users
 - billing/trial env flags are kept for future rollout but are not enforced right now
+
+The configure page and server API now also support a short-lived one-time link-session flow that works across machines:
+- POST `/auth/stremio/link-session` creates a temporary link session for either a hosted token config or a disk-backed `local` / `selfhost` config
+- the response includes a browser link plus an addon URL that can be pasted into Stremio locally on any signed-in device
+- Stremio opening that addon URL only proves "this install saw the session" and marks the session as `install-seen`
+- the actual account link still completes in browser context when the user reuses an existing Stremio session or runs the existing `Login + Fetch AuthKey` helper
+- for disk-backed configs, completing the link persists `stremioUserId` into the saved config
+- for hosted token configs, completing the link returns a refreshed linked addon/config token instead of mutating server disk state
+
+Practical answer to "can I set this up on my PC and use the same Stremio login on the cloud?": yes, if your local signed-in device completes the one-time browser/AuthKey proof against the cloud server. No raw Stremio password needs to live on the cloud host.
 
 ## Troubleshooting
 

@@ -1822,6 +1822,25 @@
           </div>
           <p class="hint">Fallback only: if local signed-in session detection misses, Auto Find opens Stremio Web and watches clipboard for 2 minutes. Only use the console snippet if the automatic scan still cannot pick up the signed-in session.</p>
           <div id="stremioLinkStatus" class="status"></div>
+          <div class="install-debug-section">
+            <div class="install-section-title">Server Link Session</div>
+            <p class="hint">Works on any PVTKRRX server shape. The addon URL only proves Stremio saw this server; you still finish the account proof here with Auto Find or Login + Fetch AuthKey.</p>
+            <div class="action-row">
+              <button class="btn-copy" type="button" id="serverLinkStartBtn" onclick="startServerLinkSession(this)">Start Server Link</button>
+              <button class="btn-copy" type="button" id="serverLinkRefreshBtn" onclick="refreshActiveServerLinkSession(true)">Refresh Link Status</button>
+            </div>
+            <label for="serverLinkBrowserUrl">Browser Link</label>
+            <div class="url-row">
+              <input type="text" id="serverLinkBrowserUrl" readonly placeholder="Start a server link session first">
+              <button class="btn-copy" type="button" id="copyServerLinkBrowserBtn" onclick="copyServerLinkBrowserUrl(this)">Copy Browser Link</button>
+            </div>
+            <label for="serverLinkAddonUrl">Addon URL To Paste Into Stremio</label>
+            <div class="url-row">
+              <input type="text" id="serverLinkAddonUrl" readonly placeholder="Start a server link session first">
+              <button class="btn-copy" type="button" id="copyServerLinkAddonBtn" onclick="copyServerLinkAddonUrl(this)">Copy Addon URL</button>
+            </div>
+            <div id="serverLinkStatus" class="status"></div>
+          </div>
         </div>
       </details>
       <p class="hint" id="accountSyncModeHint">LAN Bridge is the addon that should sync to your phone, TV, and web clients on the same Stremio account. This Windows PC itself should use PC Local for browsing and playback. Manual tools are only here as fallback.</p>
@@ -2084,6 +2103,7 @@
     let activeServiceTab = 'prowlarr';
     let activeAdvancedTab = 'connections';
     let pairStatusTimer = null;
+    let selfHostConfigPrefillTimer = null;
     let pairStatusPollCount = 0;
     let pairStatusOnlineStreak = 0;
     const pairStatusPollEveryMs = 30000;
@@ -2109,7 +2129,9 @@
     const serverRuntime = {
       selfHostServerMode: false,
       serverConfigAlias: '',
-      serverConfigConfigured: false
+      serverConfigConfigured: false,
+      serverConfigLoaded: false,
+      stremioLinkingAvailable: false
     };
     const accountLinkState = {
       accountUserId: '',
@@ -2125,6 +2147,18 @@
       lastAuthKey: '',
       autoDetectAttempted: false,
       sourceLabel: ''
+    };
+    const serverLinkState = {
+      sessionToken: '',
+      status: '',
+      browserLinkUrl: '',
+      configureUrl: '',
+      addonUrl: '',
+      linkedAddonUrl: '',
+      linkedStremioUrl: '',
+      installSeenAt: 0,
+      linkedAt: 0,
+      pollTimer: null
     };
     const localStremioStatus = {
       checked: false,
@@ -2248,6 +2282,250 @@
 
       hint.textContent = 'Paste the token from your self-hosted server to load the saved server config and use localhost/private service URLs from this browser.';
       setServerAdminStatus('info', 'Server admin token required for remote self-host setup.');
+    }
+
+    function getQueryParam(name) {
+      try {
+        return String(new URLSearchParams(window.location.search).get(name) || '').trim();
+      } catch (_) {
+        return '';
+      }
+    }
+
+    function setServerLinkStatus(type, message) {
+      const el = document.getElementById('serverLinkStatus');
+      if (!el) return;
+      if (!message) {
+        el.className = 'status';
+        el.textContent = '';
+        return;
+      }
+      el.className = 'status ' + type;
+      el.textContent = message;
+    }
+
+    function stopServerLinkStatusPolling() {
+      if (serverLinkState.pollTimer) {
+        clearInterval(serverLinkState.pollTimer);
+        serverLinkState.pollTimer = null;
+      }
+    }
+
+    function getServerLinkSessionTokenFromUrl() {
+      return getQueryParam('linkSession');
+    }
+
+    function resolveServerLinkConfigAlias() {
+      if (getConfigTokenFromPath()) return '';
+      if (serverRuntime.selfHostServerMode && serverRuntime.serverConfigAlias) {
+        return serverRuntime.serverConfigAlias;
+      }
+      if (canQueryLocalRuntime() && getInstallTarget() !== 'seedbox') return 'local';
+      return '';
+    }
+
+    function buildServerLinkRequestPayload() {
+      const payload = {
+        installTarget: getInstallTarget()
+      };
+      const sourceConfigToken = getConfigTokenFromPath();
+      if (sourceConfigToken) {
+        payload.installMode = 'hosted';
+        payload.sourceConfigToken = sourceConfigToken;
+        return payload;
+      }
+      const configAlias = resolveServerLinkConfigAlias();
+      if (configAlias) {
+        payload.installMode = configAlias === 'local' ? 'local' : 'hosted';
+        payload.configAlias = configAlias;
+        return payload;
+      }
+      payload.installMode = 'hosted';
+      return payload;
+    }
+
+    function applyLinkedAccountFromServerLink(data) {
+      const stremioUserId = String(data?.stremio?.userId || '').trim();
+      if (!stremioUserId) return;
+      accountLinkState.accountProvider = 'stremio-authkey';
+      accountLinkState.accountLinkedAt = Number(data?.linkedAt || Date.now());
+      accountLinkState.stremioUserId = stremioUserId;
+      stremioLinkSession.stremioUserId = stremioUserId;
+      stremioLinkSession.recommendedPairId = String(data?.stremio?.recommendedPairId || '').trim();
+      applyRecommendedLanPairId();
+      updateLanBridgeInstallMessaging();
+    }
+
+    function getActiveServerLinkAddonUrl() {
+      return String(serverLinkState.linkedAddonUrl || serverLinkState.addonUrl || '').trim();
+    }
+
+    function updateServerLinkUi() {
+      const browserInput = document.getElementById('serverLinkBrowserUrl');
+      const addonInput = document.getElementById('serverLinkAddonUrl');
+      const startBtn = document.getElementById('serverLinkStartBtn');
+      const refreshBtn = document.getElementById('serverLinkRefreshBtn');
+
+      if (browserInput) {
+        browserInput.value = String(serverLinkState.browserLinkUrl || serverLinkState.configureUrl || '').trim();
+      }
+      if (addonInput) {
+        addonInput.value = getActiveServerLinkAddonUrl();
+      }
+      if (startBtn) {
+        startBtn.disabled = serverRuntime.stremioLinkingAvailable !== true;
+      }
+      if (refreshBtn) {
+        refreshBtn.disabled = !serverLinkState.sessionToken;
+      }
+
+      if (!serverRuntime.stremioLinkingAvailable) {
+        setServerLinkStatus('err', 'Server-side Stremio linking is unavailable because AUTH_TOKEN_SECRET is not configured.');
+        return;
+      }
+      if (!serverLinkState.sessionToken) {
+        setServerLinkStatus('info', 'Create a one-time link session, then paste the addon URL into Stremio and finish the account proof here.');
+        return;
+      }
+      if (serverLinkState.status === 'linked') {
+        const linkedMessage = serverLinkState.linkedAddonUrl
+          ? 'Account linked. Use the refreshed linked addon URL below for this linked profile.'
+          : 'Account linked and saved into this server/profile.';
+        setServerLinkStatus('ok', linkedMessage);
+        return;
+      }
+      if (serverLinkState.status === 'install-seen') {
+        setServerLinkStatus('info', 'Stremio has already hit this session. Finish the account proof here with Auto Find or Login + Fetch AuthKey.');
+        return;
+      }
+      if (getActiveServerLinkAddonUrl()) {
+        setServerLinkStatus('info', 'Paste the addon URL into Stremio. That only marks the session as seen; you still finish the account link here.');
+        return;
+      }
+      setServerLinkStatus('info', 'This session is active, but this page is not currently tied to a saved config/token with a pasteable addon URL yet.');
+    }
+
+    function applyServerLinkSessionState(data) {
+      const payload = data && typeof data === 'object' ? data : {};
+      serverLinkState.sessionToken = String(payload.sessionToken || serverLinkState.sessionToken || '').trim();
+      serverLinkState.status = String(payload.status || '').trim();
+      serverLinkState.browserLinkUrl = String(payload.browserLinkUrl || '').trim();
+      serverLinkState.configureUrl = String(payload.configureUrl || '').trim();
+      serverLinkState.addonUrl = String(payload.install?.addonUrl || '').trim();
+      serverLinkState.linkedAddonUrl = String(payload.linkedInstall?.addonUrl || '').trim();
+      serverLinkState.linkedStremioUrl = String(payload.linkedInstall?.stremioUrl || '').trim();
+      serverLinkState.installSeenAt = Number(payload.installSeenAt || 0);
+      serverLinkState.linkedAt = Number(payload.linkedAt || 0);
+      applyLinkedAccountFromServerLink(payload);
+      updateServerLinkUi();
+      updateQuickSetupStatus();
+    }
+
+    async function refreshActiveServerLinkSession(forceMessage = false) {
+      const sessionToken = String(serverLinkState.sessionToken || getServerLinkSessionTokenFromUrl() || '').trim();
+      if (!sessionToken) {
+        if (forceMessage) {
+          setServerLinkStatus('info', 'Start a server link session first.');
+        }
+        return null;
+      }
+
+      try {
+        const res = await fetch(`/auth/stremio/link-session/${encodeURIComponent(sessionToken)}`, {
+          cache: 'no-store',
+          headers: buildServerAdminHeaders()
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error) {
+          throw new Error(data.error || `Server link status failed (${res.status})`);
+        }
+        applyServerLinkSessionState(data);
+        return data;
+      } catch (err) {
+        if (forceMessage) {
+          setServerLinkStatus('err', err?.message || 'Server link status failed.');
+        }
+        return null;
+      }
+    }
+
+    function startServerLinkStatusPolling() {
+      stopServerLinkStatusPolling();
+      if (!serverLinkState.sessionToken) return;
+      serverLinkState.pollTimer = setInterval(() => {
+        refreshActiveServerLinkSession(false).catch(() => {});
+      }, 3000);
+    }
+
+    async function startServerLinkSession(triggerBtn = null) {
+      if (!serverRuntime.stremioLinkingAvailable) {
+        setServerLinkStatus('err', 'Server-side Stremio linking is unavailable because AUTH_TOKEN_SECRET is not configured.');
+        return null;
+      }
+
+      const activeBtn = triggerBtn || document.getElementById('serverLinkStartBtn');
+      if (activeBtn && typeof activeBtn.textContent === 'string') {
+        activeBtn.dataset.defaultText = activeBtn.textContent;
+        activeBtn.disabled = true;
+        activeBtn.textContent = 'Creating Link...';
+      }
+
+      try {
+        const res = await fetch('/auth/stremio/link-session', {
+          method: 'POST',
+          headers: buildJsonHeaders(),
+          body: JSON.stringify(buildServerLinkRequestPayload())
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error) {
+          if (res.status === 401) {
+            setServerAdminStatus('err', 'Server admin token required for this link session source.');
+          }
+          throw new Error(data.error || `Server link session failed (${res.status})`);
+        }
+
+        applyServerLinkSessionState(data);
+        startServerLinkStatusPolling();
+
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.set('linkSession', serverLinkState.sessionToken);
+          url.searchParams.set('target', getInstallTarget());
+          window.history.replaceState({}, '', url.toString());
+        } catch (_) {}
+
+        return data;
+      } catch (err) {
+        setServerLinkStatus('err', err?.message || 'Server link session failed.');
+        return null;
+      } finally {
+        if (activeBtn && typeof activeBtn.textContent === 'string') {
+          activeBtn.disabled = false;
+          activeBtn.textContent = activeBtn.dataset.defaultText || 'Start Server Link';
+        }
+      }
+    }
+
+    async function maybeLoadServerLinkSessionFromUrl() {
+      const sessionToken = getServerLinkSessionTokenFromUrl();
+      if (!sessionToken) {
+        updateServerLinkUi();
+        return null;
+      }
+      serverLinkState.sessionToken = sessionToken;
+      const details = document.getElementById('accountLinkDetails');
+      if (details) details.open = true;
+      const data = await refreshActiveServerLinkSession(true);
+      startServerLinkStatusPolling();
+      return data;
+    }
+
+    async function copyServerLinkBrowserUrl(btn) {
+      await copyTextValue(serverLinkState.browserLinkUrl || serverLinkState.configureUrl, btn);
+    }
+
+    async function copyServerLinkAddonUrl(btn) {
+      await copyTextValue(getActiveServerLinkAddonUrl(), btn);
     }
 
     function buildServerAdminHeaders() {
@@ -2505,6 +2783,41 @@
       }
     }
 
+    function resolveSelfHostedInstallBase() {
+      const currentOrigin = getCurrentAppOrigin();
+      if (!currentOrigin) {
+        return {
+          ok: false,
+          origin: '',
+          error: 'Could not determine the current self-hosted server URL.'
+        };
+      }
+
+      try {
+        const url = new URL(currentOrigin);
+        const normalizedHost = String(url.hostname || '').trim().toLowerCase();
+        if (url.protocol === 'https:' || (url.protocol === 'http:' && normalizedHost === '127.0.0.1')) {
+          return {
+            ok: true,
+            origin: `${url.protocol}//${url.host}`,
+            error: ''
+          };
+        }
+
+        return {
+          ok: false,
+          origin: `${url.protocol}//${url.host}`,
+          error: `Saved self-hosted server config, but Stremio will not install directly from ${url.origin}. Self-hosted Remote Seedbox needs a public HTTPS origin. Put this server behind a real HTTPS hostname, then reopen /configure from that HTTPS URL.`
+        };
+      } catch (_) {
+        return {
+          ok: false,
+          origin: '',
+          error: 'Could not determine the current self-hosted server URL.'
+        };
+      }
+    }
+
     function applyServerRuntimeConfig(data) {
       const payload = data && typeof data === 'object' ? data : {};
       serverRuntime.selfHostServerMode = payload.selfHostServerMode === true;
@@ -2512,7 +2825,10 @@
         ? String(payload.serverConfigAlias || 'selfhost').trim() || 'selfhost'
         : '';
       serverRuntime.serverConfigConfigured = payload.serverConfigConfigured === true;
+      serverRuntime.serverConfigLoaded = false;
+      serverRuntime.stremioLinkingAvailable = payload.stremioLinkingAvailable === true;
       updateServerAdminUi();
+      updateServerLinkUi();
 
       if (serverRuntime.selfHostServerMode && !getConfigTokenFromPath()) {
         setInstallTarget('seedbox');
@@ -2905,6 +3221,9 @@
       accountLinkState.stremioUserId = stremioLinkSession.stremioUserId;
       applyRecommendedLanPairId();
       updateLanBridgeInstallMessaging();
+      if (data?.linkSession) {
+        applyServerLinkSessionState(data.linkSession);
+      }
 
       if (options.statusMessage !== false) {
         setStremioLinkStatus('ok', String(options.statusMessage || 'Stremio account linked successfully.'));
@@ -3351,7 +3670,8 @@
       const authKey = String(inputEl?.value || '').trim();
       if (!authKey) return null;
 
-      if (!force && stremioLinkSession.token && stremioLinkSession.lastAuthKey === authKey) {
+      const needsServerLinkCompletion = Boolean(serverLinkState.sessionToken && serverLinkState.status !== 'linked');
+      if (!force && !needsServerLinkCompletion && stremioLinkSession.token && stremioLinkSession.lastAuthKey === authKey) {
         return {
           token: stremioLinkSession.token,
           stremioUserId: stremioLinkSession.stremioUserId,
@@ -3363,7 +3683,10 @@
       const res = await fetch('/auth/stremio/link-authkey', {
         method: 'POST',
         headers: buildJsonHeaders(),
-        body: JSON.stringify({ authKey })
+        body: JSON.stringify({
+          authKey,
+          linkSessionToken: String(serverLinkState.sessionToken || '').trim()
+        })
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.ok || !data?.token || !data?.stremio?.userId) {
@@ -4018,6 +4341,7 @@
 
       syncAdvancedUi();
       updateAddonUrlUi();
+      updateServerLinkUi();
 
       setActiveServiceTab(activeServiceTab);
       if (target === 'lan') {
@@ -4117,6 +4441,15 @@
         setServerAdminStatus('', '');
       }
       updateServerAdminUi();
+      if (selfHostConfigPrefillTimer) {
+        window.clearTimeout(selfHostConfigPrefillTimer);
+        selfHostConfigPrefillTimer = null;
+      }
+      if (normalized && shouldLoadSavedSelfHostConfig()) {
+        selfHostConfigPrefillTimer = window.setTimeout(() => {
+          maybeLoadSavedSelfHostConfig({ force: true, setLoadedStatus: true }).catch(() => {});
+        }, 150);
+      }
     });
 
     document.getElementById('installMode').addEventListener('change', function() {
@@ -4144,9 +4477,11 @@
     document.getElementById('localInstall').style.display = 'none';
     document.getElementById('hostedInstall').style.display = 'none';
     window.addEventListener('beforeunload', stopStremioAuthKeyPolling);
+    window.addEventListener('beforeunload', stopServerLinkStatusPolling);
     updateLanBridgeInstallMessaging();
     loadServerRuntimeConfig()
       .then(() => maybePrefillFromToken())
+      .then(() => maybeLoadServerLinkSessionFromUrl())
       .finally(() => {
         refreshLocalQbitRuntimeStatus();
         refreshLocalStremioStatus();
@@ -4246,6 +4581,7 @@
       if (input) input.value = normalized;
       setServerAdminStatus('ok', 'Server admin token stored in this browser.');
       updateServerAdminUi();
+      await maybeLoadSavedSelfHostConfig({ force: true, setLoadedStatus: true });
       return true;
     }
 
@@ -4674,17 +5010,47 @@
       return null;
     }
 
-    async function maybePrefillFromToken() {
+    function hasServerConnectionDetailsFilled() {
+      return Boolean(
+        String(document.getElementById('jackettUrl')?.value || '').trim() &&
+        String(document.getElementById('qbitUrl')?.value || '').trim()
+      );
+    }
+
+    function shouldLoadSavedSelfHostConfig() {
+      return (
+        serverRuntime.selfHostServerMode === true &&
+        serverRuntime.serverConfigConfigured === true &&
+        !getConfigTokenFromPath()
+      );
+    }
+
+    async function maybeLoadSavedSelfHostConfig(options = {}) {
+      const {
+        force = false,
+        setLoadedStatus = false
+      } = options;
+      if (!shouldLoadSavedSelfHostConfig()) return false;
+      if (!force && (serverRuntime.serverConfigLoaded || hasServerConnectionDetailsFilled())) {
+        return false;
+      }
+      return await maybePrefillFromToken({ setLoadedStatus });
+    }
+
+    async function maybePrefillFromToken(options = {}) {
+      const { setLoadedStatus = false } = options;
       const token = getConfigTokenFromPath();
       let path = '';
+      let loadingServerConfig = false;
       if (token) {
         path = `/${encodeURIComponent(token)}/config.json`;
       } else if (serverRuntime.selfHostServerMode && serverRuntime.serverConfigAlias) {
         path = `/${encodeURIComponent(serverRuntime.serverConfigAlias)}/config.json`;
+        loadingServerConfig = true;
       } else if (canQueryLocalRuntime()) {
         path = '/local/config.json';
       } else {
-        return;
+        return false;
       }
       try {
         const res = await fetch(path, {
@@ -4692,18 +5058,35 @@
           headers: buildServerAdminHeaders()
         });
         if (res.status === 401 && serverRuntime.selfHostServerMode) {
-          updateServerAdminUi();
-          return;
+          serverRuntime.serverConfigLoaded = false;
+          if (getServerAdminToken()) {
+            setServerAdminStatus('err', 'Server admin token rejected. Could not load the saved self-host config.');
+          } else {
+            updateServerAdminUi();
+          }
+          return false;
         }
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (loadingServerConfig) serverRuntime.serverConfigLoaded = false;
+          return false;
+        }
         const data = await res.json();
         fillConfig(data);
+        if (loadingServerConfig) {
+          serverRuntime.serverConfigLoaded = true;
+          if (setLoadedStatus && getServerAdminToken()) {
+            setServerAdminStatus('ok', 'Server admin token stored in this browser. Saved self-host config loaded.');
+          }
+        }
         if (!token && lanPair.pairId) {
           startLanPairStatusPolling();
         }
         await refreshLocalQbitRuntimeStatus();
+        return true;
       } catch (err) {
+        if (loadingServerConfig) serverRuntime.serverConfigLoaded = false;
         // keep form usable if prefill fails
+        return false;
       }
     }
 
@@ -4726,8 +5109,17 @@
       }
 
       for (const [label, value] of checks) {
+        const text = String(value || '').trim();
+        if (!text) {
+          if (selfHosted && serverRuntime.serverConfigConfigured && !serverRuntime.serverConfigLoaded && !getConfigTokenFromPath()) {
+            return getServerAdminToken()
+              ? 'Saved self-hosted server config has not loaded into this page yet. Wait a moment, or check that the server admin token is correct.'
+              : 'Enter the server admin token to load the saved self-hosted server config into this page, or fill in the service URLs manually.';
+          }
+          return `${label} is required`;
+        }
         try {
-          const u = new URL(value);
+          const u = new URL(text);
           if (isPrivateHostname(u.hostname) && !canUsePrivateTargets) {
             return selfHosted
               ? `${label} uses ${u.hostname}. Enter the server admin token or open this page on the server itself to use localhost/private service URLs.`
@@ -4756,6 +5148,7 @@
     }
 
     async function testConnection() {
+      await maybeLoadSavedSelfHostConfig({ setLoadedStatus: true });
       const config = getConfig();
       const installMode = getInstallMode();
       const modeValidationError = validateReachability(config, installMode);
@@ -4797,6 +5190,7 @@
     }
 
     async function install() {
+      await maybeLoadSavedSelfHostConfig({ setLoadedStatus: true });
       let config = getConfig();
       const installMode = getInstallMode();
       const modeValidationError = validateReachability(config, installMode);
@@ -4884,10 +5278,6 @@
           const hostedPayload = routeParity.stripRemoteSeedboxLanFields(config, { keepRelayUrl: true });
 
           if (serverRuntime.selfHostServerMode) {
-            const selfHostBase = getCurrentAppOrigin();
-            if (!selfHostBase) {
-              return setStatus('installStatus', 'err', 'Could not determine the current self-hosted server URL.');
-            }
             if (!(await ensureSelfHostAdminAccess('save this self-hosted server config'))) {
               return setStatus('installStatus', 'err', 'Server admin token required to save the self-hosted server config.');
             }
@@ -4907,11 +5297,23 @@
 
             updateSavedSecretState(saveData.savedSecrets || {});
             serverRuntime.serverConfigConfigured = true;
+            serverRuntime.serverConfigLoaded = true;
             const configAlias = String(saveData.configAlias || serverRuntime.serverConfigAlias || 'selfhost').trim() || 'selfhost';
-            const relayHost = new URL(selfHostBase).host;
+            const installBase = resolveSelfHostedInstallBase();
             const modeQuery = '?mode=' + encodeURIComponent(installMode);
             const manifestPath = '/' + encodeURIComponent(configAlias) + '/manifest.json' + modeQuery;
-            const manifestUrl = selfHostBase + manifestPath;
+            if (!installBase.ok) {
+              setPrivateLink('hostedManifest', '');
+              setPrivateLink('hostedStremio', '');
+              setInstallAnchorState('stremioLinkHosted', '', 'Install PVTKRRX (Remote Seedbox)');
+              document.getElementById('hostedUrlDisplay').textContent = '';
+              document.getElementById('installLink').style.display = 'block';
+              syncInstallTargetUi();
+              return setStatus('installStatus', 'err', installBase.error);
+            }
+
+            const relayHost = new URL(installBase.origin).host;
+            const manifestUrl = installBase.origin + manifestPath;
             const stremioUrl = 'stremio://' + relayHost + manifestPath;
             setPrivateLink('hostedManifest', manifestUrl);
             setPrivateLink('hostedStremio', stremioUrl);

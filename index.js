@@ -1,4 +1,5 @@
 const fs = require('fs')
+const crypto = require('crypto')
 const http = require('http')
 const https = require('https')
 const path = require('path')
@@ -21,7 +22,7 @@ const { resolveSportsImageRequest } = require('./src/utils/sportsImageCache')
 // Shared module initializes env, console redaction, stores, and rate limiters at load time.
 const {
   // State & singletons
-  lanPairStore, accountStore, rateLimiters,
+  lanPairStore, accountStore, stremioLinkStore, rateLimiters,
   watchedDeleteTimers, watchedDeleteInFlight,
   IS_VERCEL_RUNTIME, SELF_HOST_SERVER_MODE, DEFAULT_LOCAL_HOSTNAME,
   STREAM_WAIT_TIMEOUT_MS, STREAM_WAIT_INTERVAL_MS,
@@ -166,6 +167,7 @@ const publicDir = path.join(__dirname, 'public')
 const configPage = path.join(publicDir, 'configure.html')
 const runbooksPage = path.join(publicDir, 'runbooks.html')
 const healthPage = path.join(publicDir, 'health.html')
+const STREMIO_LINK_SESSION_TTL_SECONDS = Math.max(300, parseInt(process.env.PVTKRRX_STREMIO_LINK_SESSION_TTL_SECONDS || '1800', 10))
 app.use(express.static(publicDir, {
   maxAge: '1d',
   setHeaders: (res, filePath) => {
@@ -200,8 +202,372 @@ app.get('/app-config.json', (req, res) => {
   res.json({
     selfHostServerMode: SELF_HOST_SERVER_MODE,
     serverConfigAlias: SELF_HOST_SERVER_MODE ? 'selfhost' : '',
-    serverConfigConfigured: SELF_HOST_SERVER_MODE ? Boolean(loadLocalConfigFile()) : false
+    serverConfigConfigured: SELF_HOST_SERVER_MODE ? Boolean(loadLocalConfigFile()) : false,
+    stremioLinkingAvailable: authSecretAvailable()
   })
+})
+
+function sanitizeStremioLinkSessionToken(value) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  if (!/^[A-Za-z0-9_-]{16,160}$/.test(text)) return ''
+  return text
+}
+
+function makeStremioLinkSessionToken() {
+  return crypto.randomBytes(24).toString('base64url')
+}
+
+function normalizeStremioLinkInstallMode(value) {
+  return String(value || '').trim().toLowerCase() === 'local' ? 'local' : 'hosted'
+}
+
+function normalizeStremioLinkInstallTarget(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  return normalized === 'pc' || normalized === 'lan' || normalized === 'seedbox'
+    ? normalized
+    : 'seedbox'
+}
+
+function normalizeStremioLinkConfigAlias(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (normalized === 'local' || normalized === 'selfhost') return normalized
+  return ''
+}
+
+function resolveStremioLinkSource(body = {}) {
+  const sourceConfigToken = String(body?.sourceConfigToken || '').trim()
+  if (sourceConfigToken) {
+    return {
+      kind: 'token',
+      sourceConfigToken,
+      configAlias: ''
+    }
+  }
+
+  const configAlias = normalizeStremioLinkConfigAlias(body?.configAlias)
+  if (configAlias) {
+    return {
+      kind: 'disk',
+      sourceConfigToken: '',
+      configAlias
+    }
+  }
+
+  return {
+    kind: 'none',
+    sourceConfigToken: '',
+    configAlias: ''
+  }
+}
+
+function stremioLinkSourceMatchesConfig(session = {}, configValue = '') {
+  const expectedToken = String(session?.sourceConfigToken || '').trim()
+  const expectedAlias = normalizeStremioLinkConfigAlias(session?.configAlias)
+  const actual = String(configValue || '').trim()
+  if (expectedToken) return actual === expectedToken
+  if (expectedAlias) return actual === expectedAlias
+  return false
+}
+
+function canAccessStremioLinkSource(req, source = {}) {
+  if (source.kind !== 'disk') return true
+  if (source.configAlias === 'local') return isSameHostRequest(req)
+  if (source.configAlias === 'selfhost') {
+    return SELF_HOST_SERVER_MODE && (isSameHostRequest(req) || hasServerAdminToken(req))
+  }
+  return true
+}
+
+function getStremioLinkSourceError(req, source = {}) {
+  if (source.kind !== 'disk') return null
+  if (source.configAlias === 'local') {
+    return {
+      statusCode: 403,
+      payload: { error: 'Open configure on the Windows host PC to link the local addon profile.' }
+    }
+  }
+  if (source.configAlias === 'selfhost') {
+    if (!SELF_HOST_SERVER_MODE) {
+      return {
+        statusCode: 404,
+        payload: { error: 'Self-host server mode is not enabled' }
+      }
+    }
+    return {
+      statusCode: 401,
+      payload: { error: 'Valid server admin token required' }
+    }
+  }
+  return null
+}
+
+function getStremioLinkSessionTtlSeconds(session = {}) {
+  const expiresAt = Number(session?.expiresAt || 0)
+  if (!expiresAt) return STREMIO_LINK_SESSION_TTL_SECONDS
+  return Math.max(30, Math.ceil((expiresAt - Date.now()) / 1000))
+}
+
+async function saveStremioLinkSession(session = {}) {
+  const sessionToken = sanitizeStremioLinkSessionToken(session?.sessionToken)
+  if (!sessionToken) return false
+  const next = {
+    ...session,
+    sessionToken
+  }
+  return stremioLinkStore.set(sessionToken, next, getStremioLinkSessionTtlSeconds(next))
+}
+
+function appendQueryParams(urlText, params = {}) {
+  const raw = String(urlText || '').trim()
+  if (!raw) return ''
+  try {
+    const url = new URL(raw)
+    for (const [key, value] of Object.entries(params)) {
+      const text = String(value || '').trim()
+      if (!text) continue
+      url.searchParams.set(key, text)
+    }
+    return url.toString()
+  } catch (_) {
+    return raw
+  }
+}
+
+function buildStremioLinkConfigureUrl(req, session = {}) {
+  const sourceConfigToken = String(session?.sourceConfigToken || '').trim()
+  const configAlias = normalizeStremioLinkConfigAlias(session?.configAlias)
+  const installTarget = normalizeStremioLinkInstallTarget(session?.installTarget)
+  const baseUrl = getPublicBaseUrl(req)
+  const pathName = sourceConfigToken
+    ? `/${encodeURIComponent(sourceConfigToken)}/configure`
+    : (configAlias ? `/${encodeURIComponent(configAlias)}/configure` : '/configure')
+  return appendQueryParams(`${baseUrl}${pathName}`, {
+    linkSession: sanitizeStremioLinkSessionToken(session?.sessionToken),
+    target: installTarget
+  })
+}
+
+function buildStremioLinkInstallUrls(req, session = {}, options = {}) {
+  const sourceConfigToken = String(session?.sourceConfigToken || '').trim()
+  const configAlias = normalizeStremioLinkConfigAlias(session?.configAlias)
+  const installMode = normalizeStremioLinkInstallMode(session?.installMode)
+  const sessionToken = sanitizeStremioLinkSessionToken(session?.sessionToken)
+  const includeLinkSession = options?.includeLinkSession !== false
+
+  if (configAlias === 'local') {
+    const port = parseInt(process.env.PORT || '7000', 10)
+    const httpsPort = parseInt(process.env.HTTPS_PORT || '7001', 10)
+    const loopback = buildLocalModeUrls('127.0.0.1', port, httpsPort)
+    const addonUrl = includeLinkSession
+      ? appendQueryParams(loopback.httpManifest, { linkSession: sessionToken })
+      : loopback.httpManifest
+    return {
+      mode: 'local',
+      addonUrl,
+      stremioUrl: ''
+    }
+  }
+
+  const configSegment = sourceConfigToken || configAlias
+  if (!configSegment) {
+    return {
+      mode: installMode,
+      addonUrl: '',
+      stremioUrl: ''
+    }
+  }
+
+  const baseUrl = getPublicBaseUrl(req)
+  const addonUrl = appendQueryParams(
+    `${baseUrl}/${encodeURIComponent(configSegment)}/manifest.json`,
+    includeLinkSession
+      ? {
+          mode: installMode,
+          linkSession: sessionToken
+        }
+      : {
+          mode: installMode
+        }
+  )
+  let stremioUrl = ''
+  try {
+    const parsed = new URL(addonUrl)
+    stremioUrl = `stremio://${parsed.host}${parsed.pathname}${parsed.search}`
+  } catch (_) {}
+
+  return {
+    mode: installMode,
+    addonUrl,
+    stremioUrl
+  }
+}
+
+function buildStremioLinkSessionResponse(req, session = {}) {
+  const install = buildStremioLinkInstallUrls(req, session)
+  const linkedInstall = String(session?.linkedConfigToken || '').trim()
+    ? buildStremioLinkInstallUrls(req, {
+        ...session,
+        sourceConfigToken: session.linkedConfigToken,
+        configAlias: ''
+      }, {
+        includeLinkSession: false
+      })
+    : null
+
+  return {
+    ok: true,
+    sessionToken: sanitizeStremioLinkSessionToken(session?.sessionToken),
+    status: String(session?.status || 'pending').trim() || 'pending',
+    createdAt: Number(session?.createdAt || 0),
+    expiresAt: Number(session?.expiresAt || 0),
+    installSeenAt: Number(session?.installSeenAt || 0),
+    linkedAt: Number(session?.linkedAt || 0),
+    configAlias: normalizeStremioLinkConfigAlias(session?.configAlias),
+    persistedConfigSaved: session?.persistedConfigSaved === true,
+    configureUrl: buildStremioLinkConfigureUrl(req, session),
+    browserLinkUrl: `${getPublicBaseUrl(req)}/auth/stremio/link/${encodeURIComponent(String(session?.sessionToken || '').trim())}`,
+    install,
+    linkedInstall,
+    stremio: {
+      linked: Boolean(String(session?.stremioUserId || '').trim()),
+      userId: String(session?.stremioUserId || '').trim(),
+      recommendedPairId: String(session?.recommendedPairId || '').trim()
+    }
+  }
+}
+
+async function persistStremioLinkSessionConfig(session = {}, linkPayload = {}) {
+  const stremioUserId = normalizeStremioUserId(linkPayload?.stremio?.userId || '')
+  if (!stremioUserId) {
+    return {
+      linkedConfigToken: '',
+      persistedConfigSaved: false
+    }
+  }
+
+  const accountLinkedAt = Date.now()
+  const baseLinkFields = {
+    accountProvider: 'stremio-authkey',
+    accountLinkedAt,
+    stremioUserId
+  }
+
+  let persistedConfigSaved = false
+  const configAlias = normalizeStremioLinkConfigAlias(session?.configAlias)
+  if (configAlias === 'local' || configAlias === 'selfhost') {
+    const existingDiskConfig = loadLocalConfigFile()
+    if (existingDiskConfig && typeof existingDiskConfig === 'object') {
+      const savedDiskConfig = await hydrateAccountLinkForConfig(normalizeAddonConfig({
+        ...existingDiskConfig,
+        ...baseLinkFields
+      }, configAlias === 'local'
+        ? { defaultEnabled: true, defaultRequired: true, includeLocalSecrets: true }
+        : { includeLocalSecrets: true }
+      ))
+      saveLocalConfigFile(savedDiskConfig)
+      persistedConfigSaved = true
+    }
+  }
+
+  let linkedConfigToken = ''
+  const sourceConfigToken = String(session?.sourceConfigToken || '').trim()
+  if (sourceConfigToken) {
+    const existingTokenConfig = loadConfigFromSourceToken(sourceConfigToken)
+    if (existingTokenConfig && typeof existingTokenConfig === 'object') {
+      const linkedTokenConfig = await hydrateAccountLinkForConfig(normalizeAddonConfig({
+        ...existingTokenConfig,
+        ...baseLinkFields
+      }))
+      const tokenPayload = linkedTokenConfig.lanPairEnabled === false
+        ? stripRemoteSeedboxLanFields(linkedTokenConfig)
+        : linkedTokenConfig
+      linkedConfigToken = encrypt(tokenPayload, process.env.ENCRYPTION_SECRET)
+    }
+  }
+
+  return {
+    linkedConfigToken,
+    persistedConfigSaved
+  }
+}
+
+async function observeStremioLinkManifestHit(req) {
+  const sessionToken = sanitizeStremioLinkSessionToken(req.query?.linkSession)
+  if (!sessionToken) return
+
+  const session = await stremioLinkStore.get(sessionToken)
+  if (!session || !stremioLinkSourceMatchesConfig(session, req.params?.config)) return
+
+  const next = {
+    ...session,
+    installSeenAt: Date.now(),
+    installSeenRoute: String(req.params?.config || '').trim(),
+    installSeenClient: requestClientLabel(req)
+  }
+  if (String(next.status || '').trim() !== 'linked') {
+    next.status = 'install-seen'
+  }
+  await saveStremioLinkSession(next)
+}
+
+app.get('/auth/stremio/link/:sessionToken', async (req, res) => {
+  const sessionToken = sanitizeStremioLinkSessionToken(req.params.sessionToken)
+  if (!sessionToken) return res.status(400).json({ error: 'Invalid link session token' })
+
+  const session = await stremioLinkStore.get(sessionToken)
+  if (!session) return res.status(404).json({ error: 'Link session not found or expired' })
+
+  res.redirect(302, buildStremioLinkConfigureUrl(req, session))
+})
+
+app.get('/auth/stremio/link-session/:sessionToken', async (req, res) => {
+  const sessionToken = sanitizeStremioLinkSessionToken(req.params.sessionToken)
+  if (!sessionToken) return res.status(400).json({ error: 'Invalid link session token' })
+
+  const session = await stremioLinkStore.get(sessionToken)
+  if (!session) return res.status(404).json({ error: 'Link session not found or expired' })
+
+  res.setHeader('Cache-Control', 'no-store')
+  res.json(buildStremioLinkSessionResponse(req, session))
+})
+
+app.post('/auth/stremio/link-session', requireCsrfToken, async (req, res) => {
+  if (!authSecretAvailable()) {
+    return res.status(500).json({ error: 'AUTH_TOKEN_SECRET not configured' })
+  }
+
+  const clientIp = getClientIp(req)
+  const limit = rateLimiters.auth.consume(clientIp || 'unknown')
+  if (!limit.allowed) {
+    res.setHeader('Retry-After', String(limit.retryAfterSeconds))
+    return res.status(429).json({ error: 'too many requests' })
+  }
+
+  const source = resolveStremioLinkSource(req.body)
+  if (!canAccessStremioLinkSource(req, source)) {
+    const denied = getStremioLinkSourceError(req, source)
+    return res.status(denied?.statusCode || 403).json(denied?.payload || { error: 'Link session denied' })
+  }
+
+  const session = {
+    sessionToken: makeStremioLinkSessionToken(),
+    createdAt: Date.now(),
+    expiresAt: Date.now() + STREMIO_LINK_SESSION_TTL_SECONDS * 1000,
+    status: 'pending',
+    sourceConfigToken: source.sourceConfigToken,
+    configAlias: source.configAlias,
+    installMode: normalizeStremioLinkInstallMode(req.body?.installMode),
+    installTarget: normalizeStremioLinkInstallTarget(req.body?.installTarget),
+    linkedConfigToken: '',
+    persistedConfigSaved: false,
+    stremioUserId: '',
+    recommendedPairId: ''
+  }
+
+  await saveStremioLinkSession(session)
+  res.setHeader('Cache-Control', 'no-store')
+  res.json(buildStremioLinkSessionResponse(req, session))
 })
 app.get(['/thumb/sports/:info.svg', '/thumb/sports/:variant/:info.svg'], (req, res) => {
   try {
@@ -552,6 +918,26 @@ app.post('/auth/stremio/link-authkey', requireCsrfToken, async (req, res) => {
     }
 
     const payload = await createLinkedStremioAuthSession(req.body?.authKey, authSecret)
+    const linkSessionToken = sanitizeStremioLinkSessionToken(req.body?.linkSessionToken)
+    if (linkSessionToken) {
+      const session = await stremioLinkStore.get(linkSessionToken)
+      if (!session) {
+        return res.status(404).json({ error: 'Link session not found or expired' })
+      }
+
+      const persisted = await persistStremioLinkSessionConfig(session, payload)
+      const linkedSession = {
+        ...session,
+        status: 'linked',
+        linkedAt: Date.now(),
+        stremioUserId: String(payload?.stremio?.userId || '').trim(),
+        recommendedPairId: String(payload?.stremio?.recommendedPairId || '').trim(),
+        linkedConfigToken: String(persisted?.linkedConfigToken || '').trim(),
+        persistedConfigSaved: persisted?.persistedConfigSaved === true
+      }
+      await saveStremioLinkSession(linkedSession)
+      payload.linkSession = buildStremioLinkSessionResponse(req, linkedSession)
+    }
     res.json(payload)
   } catch (err) {
     const statusCode = Number(err?.statusCode || 0) || 500
@@ -992,8 +1378,9 @@ app.post('/test-connection', requireCsrfToken, async (req, res) => {
 
 
 // ─── Stremio addon routes (config-authenticated) ────────────
-app.get('/:config/manifest.json', withConfig, (req, res) => {
+app.get('/:config/manifest.json', withConfig, async (req, res) => {
   console.log(`[stremio] ← manifest  config=${req.params.config === 'local' ? 'local' : 'token'} from=${req.ip || req.socket?.remoteAddress || '?'}`)
+  await observeStremioLinkManifestHit(req).catch(() => {})
   const m = getManifest(req)
   // Configured URL — user is already set up, show Install not Configure.
   // For /local without saved credentials, keep configurationRequired=true

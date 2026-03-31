@@ -31,6 +31,7 @@ The practical reading of the project today is:
 - `428b15b` changed stream source labels so users can see whether playback is coming from the host PC or the remote/server route.
 - `2d3175a` added the sports artwork byte cache/proxy layer so posters, wallpapers, landscape art, and logos can be served from the active local/hosted runtime after the first fetch instead of being hotlinked every time.
 - 2026-03-31 Apple TV strict-client fix: meta responses no longer emit `meta: null`; unsupported or offline-meta paths now return a real placeholder `MetaItem` so tvOS clients do not fail deserialization on missing metadata.
+- 2026-03-31 server-agnostic Stremio account link sessions: hosted-token and disk-backed `local` / `selfhost` configs can now create a short-lived browser/addon pairing session, observe addon install hits, and finish account linking from any signed-in browser device without the server scraping a Stremio password.
 
 ## Verified Working Now
 
@@ -38,6 +39,7 @@ These items are verified in the current workspace or by direct client/log proof:
 
 - `npm run smoke:config` passed on 2026-03-29
 - `npm run smoke:selfhost` passed on 2026-03-31 and now covers explicit self-host server mode, disk-backed `/selfhost` config, and server-admin token gates
+- `npm run smoke:selfhost` passed again on 2026-03-31 after adding browser-driven Stremio link-session persistence into the disk-backed self-host config
 - `npm run smoke:sports` passed on 2026-03-31 after the sports artwork byte-cache update, including proxy URL coverage and cache-hit reuse checks
 - `npm run smoke:sports` passed again on 2026-03-31 after the Apple TV-safe meta placeholder change
 - `npm run smoke:desktop` passed on 2026-03-29 and now guards the desktop auto-provision persistence path against writing redacted config readbacks back to disk
@@ -53,6 +55,8 @@ These items are verified in the current workspace or by direct client/log proof:
 - 2026-03-31 homepage rewrite landed locally in `public/index.html`: plain-English hero, route comparison, requirements section, sports proof section, and removal of the public `/local/install` CTA
 - explicit self-host server mode now exposes `/app-config.json`, disk-backed `/selfhost/config.json` + `/selfhost/manifest.json?mode=hosted`, and `POST /server-config` for persisted VPS/seedbox installs
 - `npm run server:setup` now writes `.env`, saves the runtime config locally, creates a server admin token file, and can install a Linux `systemd` service for auto-start on boot
+- `npm run smoke:stremio-link` passed on 2026-03-31 after the new link-session flow was added for hosted token configs: server-created session, install-seen manifest hit, browser AuthKey completion, and final linked install URL/token refresh
+- configure page now exposes a one-time `Server Link Session` flow so a local signed-in Stremio browser/device can link a remote/cloud server config without the server recovering raw login credentials
 - `PC Local` resolves as a real addon from `http://127.0.0.1:7000/local/manifest.json?mode=local`
 - same-host `LAN Bridge` `Failed to fetch` was traced to route choice on 2026-03-28, not to server failure
 - completed-file playback error `isCompletedTorrent is not defined` was fixed in the local playback path
