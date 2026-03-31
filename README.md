@@ -111,10 +111,11 @@ The self-hosted server route keeps a stable disk-backed manifest at `/selfhost/m
 Open `/configure` in a browser to review or edit the saved config at any time.
 For remote Stremio installs, give the installer a real public `https://` origin. Raw public `http://IP:7000/...` addon URLs are not a valid self-host install target for Stremio.
 
-Use the configure page to prepare the route you actually want to use:
-- **PC Local** for this Windows host (`127.0.0.1`)
-- **LAN Bridge** for Android TV / phone / web on the same network and Stremio account
-- **Remote Seedbox** when your playback endpoints are public over HTTPS
+On a self-hosted server, `/configure` is now the server app only:
+- **Remote Seedbox** is the only route exposed there
+- **PC Local** and **LAN Bridge** stay in the Windows desktop runtime
+- the server can keep its config on disk and use private/localhost backend URLs after server-admin authentication
+- only the browser-facing install origin still needs a real public `https://` hostname for Stremio
 
 When using `LAN Bridge` on Windows, install and sign into Stremio Desktop on the host PC first. On boot, the local runtime now scans the host Stremio Desktop WebView2 session automatically and links that account into startup auto-provision when a signed-in session is present. The configure page still exposes the host check as a manual fallback.
 

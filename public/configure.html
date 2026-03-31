@@ -1698,13 +1698,13 @@
           </div>
         </button>
         <button type="button" class="mode-option" data-install-target="seedbox" onclick="setInstallTarget('seedbox')">
-          <span class="mode-kicker">Public endpoints</span>
+          <span class="mode-kicker" id="installTargetSeedboxKicker">Public endpoints</span>
           <span class="mode-title">Remote Seedbox</span>
-          <span class="mode-copy">Use the hosted remote profile only when Prowlarr, qBittorrent, and file serving are reachable over public URLs. On the hosted site this is not a generic tracker-buffering path: it is effectively ready-file / public-playback only unless you self-host PVTKRRX on a runtime that can truly serve playback. Auth-protected file-server playback still needs real-device validation because client auth handling can vary.</span>
+          <span class="mode-copy" id="installTargetSeedboxCopy">Use the hosted remote profile only when Prowlarr, qBittorrent, and file serving are reachable over public URLs. On the hosted site this is not a generic tracker-buffering path: it is effectively ready-file / public-playback only unless you self-host PVTKRRX on a runtime that can truly serve playback. Auth-protected file-server playback still needs real-device validation because client auth handling can vary.</span>
           <div class="summary-points">
-            <span>Public HTTPS ready-file path required</span>
-            <span>Hosted site fails closed on local-only playback</span>
-            <span>Away-from-home playback route</span>
+            <span id="installTargetSeedboxPoint1">Public HTTPS ready-file path required</span>
+            <span id="installTargetSeedboxPoint2">Hosted site fails closed on local-only playback</span>
+            <span id="installTargetSeedboxPoint3">Away-from-home playback route</span>
           </div>
         </button>
       </div>
@@ -2109,6 +2109,7 @@
   <script src="/route-parity.js"></script>
   <script>
     const routeParity = window.PVTKRRXRouteParity;
+    const runtimeBootstrap = window.__PVTKRRX_RUNTIME_BOOTSTRAP__ || {};
     const defaultLocalHostname = 'pvtkrrx.local';
     const defaultLanPairRelayUrl = 'https://www.pvtkrrx.cc';
     const legacyRelayHosts = new Set([
@@ -2116,7 +2117,11 @@
       'www.pvtkrrx.vercel.app'
     ]);
     let activeLocalHostname = defaultLocalHostname;
-    let activeInstallTarget = 'lan';
+    let activeInstallTarget = runtimeBootstrap.selfHostServerMode === true
+      ? 'seedbox'
+      : runtimeBootstrap.desktopLocalOnly === true
+        ? 'pc'
+        : 'lan';
     let activeServiceTab = 'prowlarr';
     let activeAdvancedTab = 'connections';
     let pairStatusTimer = null;
@@ -2144,13 +2149,13 @@
     };
     const selfHostAdminStorageKey = 'pvtkrrx_selfhost_admin_token';
     const serverRuntime = {
-      selfHostServerMode: false,
-      serverConfigAlias: '',
-      serverConfigConfigured: false,
+      selfHostServerMode: runtimeBootstrap.selfHostServerMode === true,
+      serverConfigAlias: String(runtimeBootstrap.serverConfigAlias || '').trim(),
+      serverConfigConfigured: runtimeBootstrap.serverConfigConfigured === true,
       serverConfigLoaded: false,
-      publicBaseUrl: '',
-      stremioLinkingAvailable: false,
-      desktopLocalOnly: false
+      publicBaseUrl: String(runtimeBootstrap.publicBaseUrl || '').trim(),
+      stremioLinkingAvailable: runtimeBootstrap.stremioLinkingAvailable === true,
+      desktopLocalOnly: runtimeBootstrap.desktopLocalOnly === true
     };
     const accountLinkState = {
       accountUserId: '',
@@ -2842,8 +2847,31 @@
       return serverRuntime.desktopLocalOnly === true;
     }
 
+    function isSelfHostedServerRuntime() {
+      return serverRuntime.selfHostServerMode === true;
+    }
+
+    function isSelfHostSeedboxOnlyRuntime() {
+      return isSelfHostedServerRuntime() && !getConfigTokenFromPath();
+    }
+
+    function getSeedboxGenerateLabel(remoteReady = false) {
+      if (isSelfHostedServerRuntime()) {
+        return remoteReady ? 'Rebuild Server Install URL' : 'Generate Server Install URL';
+      }
+      return remoteReady ? 'Rebuild Remote Seedbox URL' : 'Generate Remote Seedbox URL';
+    }
+
+    function getSeedboxCopyLabel() {
+      return isSelfHostedServerRuntime() ? 'Copy Server Stremio URL' : 'Copy Remote Stremio URL';
+    }
+
+    function getSeedboxInstallAnchorLabel() {
+      return isSelfHostedServerRuntime() ? 'Install PVTKRRX Server' : 'Install PVTKRRX (Remote Seedbox)';
+    }
+
     function getAllowedInstallTargets() {
-      if (serverRuntime.selfHostServerMode && !getConfigTokenFromPath()) {
+      if (isSelfHostSeedboxOnlyRuntime()) {
         return ['seedbox'];
       }
       if (isDesktopLocalOnlyRuntime()) {
@@ -2880,7 +2908,7 @@
     function syncInstallTargetOptions() {
       const allowedTargets = getAllowedInstallTargets();
       const switcher = document.getElementById('installTargetSwitcher');
-      const selfHostSeedboxOnly = serverRuntime.selfHostServerMode && !getConfigTokenFromPath();
+      const selfHostSeedboxOnly = isSelfHostSeedboxOnlyRuntime();
       let visibleCount = 0;
 
       document.body.classList.toggle('selfhost-seedbox-only', selfHostSeedboxOnly);
@@ -2907,6 +2935,32 @@
       }
 
       const lead = document.getElementById('installTargetLead');
+      const seedboxKicker = document.getElementById('installTargetSeedboxKicker');
+      const seedboxCopy = document.getElementById('installTargetSeedboxCopy');
+      const seedboxPoint1 = document.getElementById('installTargetSeedboxPoint1');
+      const seedboxPoint2 = document.getElementById('installTargetSeedboxPoint2');
+      const seedboxPoint3 = document.getElementById('installTargetSeedboxPoint3');
+      if (seedboxKicker) {
+        seedboxKicker.textContent = isSelfHostedServerRuntime() ? 'Server app' : 'Public endpoints';
+      }
+      if (seedboxCopy) {
+        seedboxCopy.textContent = isSelfHostedServerRuntime()
+          ? 'This self-hosted server is the remote addon runtime. It stores config locally, survives reboot, and can use private or localhost backend service URLs once you authenticate as the server admin.'
+          : 'Use the hosted remote profile only when Prowlarr, qBittorrent, and file serving are reachable over public URLs. On the hosted site this is not a generic tracker-buffering path: it is effectively ready-file / public-playback only unless you self-host PVTKRRX on a runtime that can truly serve playback. Auth-protected file-server playback still needs real-device validation because client auth handling can vary.';
+      }
+      if (seedboxPoint1) {
+        seedboxPoint1.textContent = isSelfHostedServerRuntime()
+          ? 'Config saved on this server'
+          : 'Public HTTPS ready-file path required';
+      }
+      if (seedboxPoint2) {
+        seedboxPoint2.textContent = isSelfHostedServerRuntime()
+          ? 'Private backend URLs allowed with admin token'
+          : 'Hosted site fails closed on local-only playback';
+      }
+      if (seedboxPoint3) {
+        seedboxPoint3.textContent = 'Away-from-home playback route';
+      }
       if (!lead) return;
       if (selfHostSeedboxOnly) {
         lead.textContent = 'This self-hosted server configures the Remote Seedbox route only. PC Local and LAN Bridge belong to the Windows desktop runtime.';
@@ -2934,7 +2988,7 @@
       updateServerLinkUi();
       syncInstallTargetOptions();
       const requestedTarget = getRequestedInstallTargetFromUrl();
-      const nextTarget = serverRuntime.selfHostServerMode && !getConfigTokenFromPath()
+      const nextTarget = isSelfHostSeedboxOnlyRuntime()
         ? 'seedbox'
         : (requestedTarget ? normalizeInstallTarget(activeInstallTarget) : getDefaultInstallTarget());
       setInstallTarget(nextTarget);
@@ -3828,10 +3882,16 @@
       }
       if (target === 'seedbox') {
         return {
-          title: 'Remote Seedbox Addon URL',
-          lead: 'Paste this HTTPS URL into Stremio on the device you want to use remotely.',
-          hint: 'Remote Seedbox uses the hosted HTTPS manifest URL. Use this only when your public playback endpoints are ready.',
-          placeholder: 'Click Generate to create the Remote Seedbox addon URL.'
+          title: isSelfHostedServerRuntime() ? 'Server Addon URL' : 'Remote Seedbox Addon URL',
+          lead: isSelfHostedServerRuntime()
+            ? 'Paste this HTTPS URL into Stremio on the device that should use your self-hosted server runtime.'
+            : 'Paste this HTTPS URL into Stremio on the device you want to use remotely.',
+          hint: isSelfHostedServerRuntime()
+            ? 'This self-hosted server can keep its config on disk and use private backend URLs. Only the browser-facing install origin still needs public HTTPS.'
+            : 'Remote Seedbox uses the hosted HTTPS manifest URL. Use this only when your public playback endpoints are ready.',
+          placeholder: isSelfHostedServerRuntime()
+            ? 'Click Generate to create the server addon URL.'
+            : 'Click Generate to create the Remote Seedbox addon URL.'
         };
       }
       return {
@@ -3901,7 +3961,9 @@
         quickAddonValue.placeholder = target === 'pc'
           ? 'Save and generate first to create the stremio:// PC Local install link'
           : target === 'seedbox'
-            ? 'Generate first to create the stremio:// Remote Seedbox install link'
+            ? (isSelfHostedServerRuntime()
+                ? 'Generate first to create the stremio:// Server install link'
+                : 'Generate first to create the stremio:// Remote Seedbox install link')
             : 'Run Auto Setup first to generate the stremio:// LAN Bridge install link';
       }
       if (quickAddonCopyBtn) {
@@ -3913,9 +3975,13 @@
               ? 'This primary PC Local install link starts with stremio://. Use the loopback addon URL below only if you need to paste it manually into Stremio Desktop on this PC.'
               : 'Save and generate first to create the stremio:// PC Local install link. The loopback addon URL below is the manual fallback.')
           : target === 'seedbox'
-            ? (quickValue
-                ? 'This primary Remote Seedbox install link starts with stremio://. Use the HTTPS addon URL below only if Stremio explicitly asks for Add Addon URL.'
-                : 'Generate first to create the stremio:// Remote Seedbox install link. The HTTPS addon URL below is fallback only.')
+            ? (isSelfHostedServerRuntime()
+                ? (quickValue
+                    ? 'This primary server install link starts with stremio://. Use the HTTPS addon URL below only if Stremio explicitly asks for Add Addon URL.'
+                    : 'Generate first to create the stremio:// Server install link. The HTTPS addon URL below is fallback only.')
+                : (quickValue
+                    ? 'This primary Remote Seedbox install link starts with stremio://. Use the HTTPS addon URL below only if Stremio explicitly asks for Add Addon URL.'
+                    : 'Generate first to create the stremio:// Remote Seedbox install link. The HTTPS addon URL below is fallback only.'))
             : (quickValue
                 ? 'This primary install link should start with stremio://. Only use the manual HTTPS addon URL below if Stremio explicitly asks for Add Addon URL.'
                 : 'Run Auto Setup first to generate the stremio:// LAN Bridge install link. The HTTPS addon URL below is fallback only.');
@@ -4161,6 +4227,8 @@
           summaryMeta.textContent = 'Hidden by default. Open this only if Auto Setup needs the LAN checklist, service edits, or manual fallback URLs.';
         } else if (target === 'pc') {
           summaryMeta.textContent = 'Hidden by default. Open this only if you need to edit local service details or rebuild/copy the PC Local URL.';
+        } else if (isSelfHostedServerRuntime()) {
+          summaryMeta.textContent = 'Hidden by default. Open this only if you need to edit the server backend URLs, file access, path mapping, or the raw self-host install URLs.';
         } else {
           summaryMeta.textContent = 'Hidden by default. Open this only if you need to edit public endpoints, path mapping, or the raw hosted URLs.';
         }
@@ -4308,11 +4376,23 @@
       }
 
       if (target === 'seedbox') {
-        if (kicker) kicker.textContent = 'Public endpoints';
+        if (kicker) kicker.textContent = isSelfHostedServerRuntime() ? 'Server app' : 'Public endpoints';
         if (title) title.textContent = 'Remote Seedbox';
-        if (lead) lead.textContent = 'Use this only when Prowlarr, qBittorrent, and file serving are reachable publicly over HTTPS.';
-        if (copy) copy.textContent = 'This path is for away-from-home playback. The hosted relay expects public ready-file playback and public service URLs.';
-        if (hint) hint.textContent = 'Need to edit public URLs, path mapping, or the raw hosted manifest? Open the hidden setup tabs below.';
+        if (lead) {
+          lead.textContent = isSelfHostedServerRuntime()
+            ? 'This self-hosted server is the remote playback app. It keeps its own saved config and can talk to private backend services once you authenticate as the server admin.'
+            : 'Use this only when Prowlarr, qBittorrent, and file serving are reachable publicly over HTTPS.';
+        }
+        if (copy) {
+          copy.textContent = isSelfHostedServerRuntime()
+            ? 'Only the browser-facing install origin needs real public HTTPS for Stremio. Your Prowlarr, qBittorrent, and file paths can stay private if this server can reach them directly.'
+            : 'This path is for away-from-home playback. The hosted relay expects public ready-file playback and public service URLs.';
+        }
+        if (hint) {
+          hint.textContent = isSelfHostedServerRuntime()
+            ? 'Need to edit backend URLs, file serving, path mapping, or the raw self-host manifest? Open the hidden setup tabs below.'
+            : 'Need to edit public URLs, path mapping, or the raw hosted manifest? Open the hidden setup tabs below.';
+        }
 
         toggle(checkBtn, false);
         toggle(autoBtn, false);
@@ -4321,20 +4401,30 @@
         toggle(copyBtn, true);
 
         if (generateBtn) {
-          generateBtn.textContent = remoteReady ? 'Rebuild Remote Seedbox URL' : 'Generate Remote Seedbox URL';
+          generateBtn.textContent = getSeedboxGenerateLabel(remoteReady);
           generateBtn.disabled = false;
         }
         if (copyBtn) {
-          copyBtn.textContent = 'Copy Remote Stremio URL';
+          copyBtn.textContent = getSeedboxCopyLabel();
           copyBtn.disabled = !remoteReady;
         }
 
         if (remoteReady) {
-          setSimpleFlowStatus('ok', 'Remote Seedbox links are ready. Use them only on clients that should hit your public playback endpoints.');
+          setSimpleFlowStatus(
+            'ok',
+            isSelfHostedServerRuntime()
+              ? 'Server install links are ready. This self-hosted runtime will keep using the saved config after reboot.'
+              : 'Remote Seedbox links are ready. Use them only on clients that should hit your public playback endpoints.'
+          );
         } else if (installStatusText) {
           setSimpleFlowStatus('info', installStatusText);
         } else {
-          setSimpleFlowStatus('info', 'Enter or confirm the public service URLs in the hidden setup tabs, then generate the Remote Seedbox URL.');
+          setSimpleFlowStatus(
+            'info',
+            isSelfHostedServerRuntime()
+              ? 'Enter or confirm the server backend URLs in the hidden setup tabs, then generate the server install URL.'
+              : 'Enter or confirm the public service URLs in the hidden setup tabs, then generate the Remote Seedbox URL.'
+          );
         }
         return;
       }
@@ -4415,9 +4505,19 @@
         if (installActionBtn) installActionBtn.textContent = 'Save And Generate LAN Bridge Links';
         if (connectionSectionLead) connectionSectionLead.textContent = 'Home LAN mode uses built-in local file serving. Storage roots can point at NAS shares or extra HDD folders the Windows host can already read.';
       } else {
-        if (installActionLead) installActionLead.textContent = 'Generate the Remote Seedbox addon URL for Stremio. This route is separate from LAN Bridge and uses the hosted HTTPS manifest.';
-        if (installActionBtn) installActionBtn.textContent = 'Generate Remote Seedbox URL';
-        if (connectionSectionLead) connectionSectionLead.textContent = 'Remote Seedbox mode expects public qBittorrent, Prowlarr, and file server URLs. Hosted installs focus on ready files, and auth-protected external file-server playback still needs validation on the real Stremio clients you use.';
+        if (installActionLead) {
+          installActionLead.textContent = isSelfHostedServerRuntime()
+            ? 'Generate the self-hosted server addon URL for Stremio. This runtime stores its own config locally and can use private backend service URLs after server-admin authentication.'
+            : 'Generate the Remote Seedbox addon URL for Stremio. This route is separate from LAN Bridge and uses the hosted HTTPS manifest.';
+        }
+        if (installActionBtn) {
+          installActionBtn.textContent = getSeedboxGenerateLabel(Boolean(getCurrentQuickInstallUrl('seedbox') || getCurrentAddonUrl('seedbox')));
+        }
+        if (connectionSectionLead) {
+          connectionSectionLead.textContent = isSelfHostedServerRuntime()
+            ? 'This self-hosted server can reach private or localhost Prowlarr, qBittorrent, and file paths directly. Only the browser-facing install origin must be public HTTPS for Stremio.'
+            : 'Remote Seedbox mode expects public qBittorrent, Prowlarr, and file server URLs. Hosted installs focus on ready files, and auth-protected external file-server playback still needs validation on the real Stremio clients you use.';
+        }
       }
 
       const localInstall = document.getElementById('localInstall');
@@ -4475,7 +4575,7 @@
         hint.textContent = 'LAN Bridge selected. This is the normal home-device setup. The app checks Stremio on this Windows PC, reuses the signed-in Stremio account when possible, then prepares the hosted addon for your other home devices. For browsing and playback on this Windows host itself, switch to PC Local.';
       } else {
         hint.textContent = serverRuntime.selfHostServerMode
-          ? 'Remote Seedbox selected on a self-hosted server. This route can save the server config locally, reuse it after reboot, and use private localhost service URLs when you authenticate as the server admin.'
+          ? 'Remote Seedbox selected on a self-hosted server. This server app can save its config locally, reuse it after reboot, and use private localhost service URLs when you authenticate as the server admin.'
           : 'Remote Seedbox selected. Hosted playback is effectively ready-file-first here. Direct queue-and-buffer only appears when the runtime can safely serve it, and auth-protected file-server playback still needs real-device proof.';
       }
     }
@@ -5411,7 +5511,7 @@
             if (!installBase.ok) {
               setPrivateLink('hostedManifest', '');
               setPrivateLink('hostedStremio', '');
-              setInstallAnchorState('stremioLinkHosted', '', 'Install PVTKRRX (Remote Seedbox)');
+              setInstallAnchorState('stremioLinkHosted', '', getSeedboxInstallAnchorLabel());
               document.getElementById('hostedUrlDisplay').textContent = '';
               document.getElementById('installLink').style.display = 'block';
               syncInstallTargetUi();
@@ -5424,7 +5524,7 @@
             setPrivateLink('hostedManifest', manifestUrl);
             setPrivateLink('hostedStremio', stremioUrl);
 
-            setInstallAnchorState('stremioLinkHosted', stremioUrl, 'Install PVTKRRX (Remote Seedbox)');
+            setInstallAnchorState('stremioLinkHosted', stremioUrl, getSeedboxInstallAnchorLabel());
             document.getElementById('hostedUrlDisplay').textContent = manifestUrl;
 
             document.getElementById('installLink').style.display = 'block';
@@ -5452,7 +5552,7 @@
             setPrivateLink('hostedManifest', manifestUrl);
             setPrivateLink('hostedStremio', stremioUrl);
 
-            setInstallAnchorState('stremioLinkHosted', stremioUrl, 'Install PVTKRRX (Remote Seedbox)');
+            setInstallAnchorState('stremioLinkHosted', stremioUrl, getSeedboxInstallAnchorLabel());
             document.getElementById('hostedUrlDisplay').textContent = manifestUrl;
 
             document.getElementById('installLink').style.display = 'block';

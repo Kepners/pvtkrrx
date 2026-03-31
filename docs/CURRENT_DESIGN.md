@@ -46,7 +46,8 @@ PVTKRRX is one codebase with three active runtime pieces:
 - Desktop-local `/configure` on the Windows EXE now exposes only `PC Local` and `LAN Bridge`; `Remote Seedbox` belongs to the separate server/cloud runtime.
 - The top of the page focuses on the next action for the selected route.
 - Noisy fallback tools are hidden by default behind `Hidden Setup Tabs`.
-- When explicit self-host server mode is active, the configure page detects it through `/app-config.json`, defaults to `Remote Seedbox`, and exposes a browser-stored server admin token field for remote seedbox administration.
+- When explicit self-host server mode is active, `/configure` is now a server-only app surface: it exposes `Remote Seedbox` only, defaults there immediately, and exposes a browser-stored server admin token field for remote seedbox administration.
+- Self-host server copy now explains the real contract: private/localhost backend URLs are allowed once the server admin is authenticated, while only the browser-facing install origin still needs public HTTPS for Stremio.
 - `/app-config.json` now also tells the shared configure UI when the runtime is desktop-local-only, so the shared page can hide the seedbox route inside the EXE without forking the whole UI.
 - The advanced Stremio account tools now also expose a `Server Link Session` flow:
   - create a one-time session from the target runtime

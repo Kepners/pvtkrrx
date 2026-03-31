@@ -165,6 +165,7 @@ app.use((req, res, next) => {
 // ─── Static routes ──────────────────────────────────────────
 const publicDir = path.join(__dirname, 'public')
 const configPage = path.join(publicDir, 'configure.html')
+const configPageTemplate = fs.readFileSync(configPage, 'utf8')
 const runbooksPage = path.join(publicDir, 'runbooks.html')
 const healthPage = path.join(publicDir, 'health.html')
 const STREMIO_LINK_SESSION_TTL_SECONDS = Math.max(300, parseInt(process.env.PVTKRRX_STREMIO_LINK_SESSION_TTL_SECONDS || '1800', 10))
@@ -182,12 +183,12 @@ app.use(express.static(publicDir, {
 app.get('/configure', (req, res) => {
   ensureCsrfCookie(req, res)
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
-  res.sendFile(configPage)
+  sendConfigurePage(req, res)
 })
 app.get('/:config/configure', (req, res) => {
   ensureCsrfCookie(req, res)
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
-  res.sendFile(configPage)
+  sendConfigurePage(req, res)
 })
 app.get('/runbooks', (req, res) => {
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
@@ -199,15 +200,26 @@ app.get('/seedbox-runbooks', (req, res) => {
 })
 app.get('/app-config.json', (req, res) => {
   res.setHeader('Cache-Control', 'no-store')
-  res.json({
+  res.json(buildRuntimeAppConfig(req))
+})
+
+function buildRuntimeAppConfig(req) {
+  return {
     selfHostServerMode: SELF_HOST_SERVER_MODE,
     serverConfigAlias: SELF_HOST_SERVER_MODE ? 'selfhost' : '',
     serverConfigConfigured: SELF_HOST_SERVER_MODE ? Boolean(loadLocalConfigFile()) : false,
     publicBaseUrl: getPublicBaseUrl(req),
     stremioLinkingAvailable: authSecretAvailable(),
     desktopLocalOnly: parseBooleanLoose(process.env.PVTKRRX_DESKTOP_LOCAL_ONLY)
-  })
-})
+  }
+}
+
+function sendConfigurePage(req, res) {
+  const runtimeConfig = buildRuntimeAppConfig(req)
+  const runtimeBootstrapJson = JSON.stringify(runtimeConfig).replace(/</g, '\\u003c')
+  const bootstrapScript = `<script>window.__PVTKRRX_RUNTIME_BOOTSTRAP__=${runtimeBootstrapJson};</script>`
+  res.type('html').send(configPageTemplate.replace('</head>', `${bootstrapScript}</head>`))
+}
 
 function sanitizeStremioLinkSessionToken(value) {
   const text = String(value || '').trim()
@@ -1431,7 +1443,10 @@ app.get('/manifest.json', (req, res) => {
     staleWhileRevalidate: 900,
     staleIfError: 86400
   })
-  const m = manifest.createBootstrapManifest(getPublicBaseUrl(req))
+  const m = manifest.createBootstrapManifest(getPublicBaseUrl(req), {
+    selfHostServerMode: SELF_HOST_SERVER_MODE,
+    desktopLocalOnly: parseBooleanLoose(process.env.PVTKRRX_DESKTOP_LOCAL_ONLY)
+  })
   console.log(`[stremio] → manifest  id=${m.id} catalogs=${m.catalogs?.length || 0} configRequired=${m.behaviorHints?.configurationRequired}`)
   res.json(m)
 })

@@ -181,6 +181,23 @@ async function run() {
     const configureRes = await request(port, 'GET', '/configure')
     assert.equal(configureRes.status, 200)
     const csrf = readCsrf(configureRes.headers['set-cookie'])
+    assert.match(configureRes.text, /__PVTKRRX_RUNTIME_BOOTSTRAP__/)
+    assert.match(configureRes.text, /Generate Server Install URL/)
+    assert.match(configureRes.text, /This self-hosted server configures the Remote Seedbox route only/i)
+
+    const bootstrapManifestRes = await request(
+      port,
+      'GET',
+      '/manifest.json',
+      null,
+      {
+        Host: `127.0.0.1:${port}`
+      }
+    )
+    assert.equal(bootstrapManifestRes.status, 200)
+    assert.equal(bootstrapManifestRes.json?.id, 'com.kepners.pvtkrrx.bootstrap')
+    assert.equal(bootstrapManifestRes.json?.name, 'PVTKRRX Server (Configure)')
+    assert.match(String(bootstrapManifestRes.json?.description || ''), /self-hosted server Remote Seedbox route/i)
 
     const privateTest = await request(
       port,
@@ -263,6 +280,7 @@ async function run() {
     )
     assert.equal(manifestRes.status, 200)
     assert.equal(manifestRes.json?.id, 'com.kepners.pvtkrrx.online')
+    assert.equal(manifestRes.json?.name, 'PVTKRRX ☁️')
     assert.equal(manifestRes.json?.behaviorHints?.configurationRequired, false)
     assert.equal(String(manifestRes.headers['cache-control'] || '').toLowerCase(), 'no-store')
 

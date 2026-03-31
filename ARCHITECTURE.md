@@ -70,12 +70,13 @@ Self-hosted server mode uses the same Express runtime on a VPS/seedbox, but with
 1. User opens `/configure`.
 2. User selects a route card:
    - Windows desktop/local runtime: `PC Local` or `LAN Bridge`
-   - Hosted/self-host server surfaces: `PC Local`, `LAN Bridge`, or `Remote Seedbox`
+   - Hosted public relay: `PC Local`, `LAN Bridge`, or `Remote Seedbox`
+   - Explicit self-host server runtime: `Remote Seedbox` only
 3. The page focuses on the next action for that route.
 4. Manual/fallback controls stay hidden in `Hidden Setup Tabs`.
 5. Local route saves config into the runtime `local-config.json`.
 6. Public hosted routes call `POST /encrypt` and install a hosted manifest token.
-7. Explicit self-host server mode saves `Remote Seedbox` config into the same runtime `local-config.json` and serves it through `/selfhost/manifest.json?mode=hosted`.
+7. Explicit self-host server mode saves `Remote Seedbox` config into the same runtime `local-config.json`, serves it through `/selfhost/manifest.json?mode=hosted`, and keeps the server configure surface separate from the Windows-local app.
 
 ### Desktop Shell
 
