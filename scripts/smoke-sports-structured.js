@@ -6,6 +6,7 @@ const Module = require('node:module')
 
 const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-sports-smoke-'))
 process.env.PVTKRRX_RUNTIME_DIR = runtimeDir
+process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'pvtkrrx-sports-smoke-secret'
 
 const { mapLeague } = require('../src/utils/leagueMap')
 const manifest = require('../src/config/manifest')
@@ -16,6 +17,11 @@ const { detectSport } = require('../src/utils/sportClassifier')
 const { SportsDbClient } = require('../src/clients/sportsdb')
 const { encodeCustomId, decodeCustomId } = require('../src/utils/customId')
 const { setPublicCacheHeaders } = require('../src/lib/shared')
+const {
+  makeSportsImageProxyUrl,
+  decodeSportsImageToken,
+  resolveSportsImageRequest
+} = require('../src/utils/sportsImageCache')
 
 function loadCatalogWithStubs(stubs) {
   const catalogPath = path.resolve(__dirname, '../src/handlers/catalog.js')
@@ -50,6 +56,17 @@ async function withSportsDbPrototypePatches(patches, run) {
       SportsDbClient.prototype[name] = original
     }
   }
+}
+
+function assertSportsProxyUrl(url, variant, sourceUrl, message) {
+  const value = String(url || '')
+  assert.match(
+    value,
+    new RegExp(`^http://127\\.0\\.0\\.1:7000/image/sports/${variant}/`),
+    message || `expected sports image proxy variant ${variant}`
+  )
+  const token = value.split('/').pop()
+  assert.equal(decodeSportsImageToken(token), sourceUrl, 'expected proxied sports image token to resolve back to the original artwork URL')
 }
 
 function testCacheHeadersIncludeStaleIfError() {
@@ -203,9 +220,9 @@ async function testOrderAgnosticSportsGrouping() {
 
   assert.equal(result.metas.length, 1, 'expected reversed team order to dedupe into one sports meta')
   assert.ok(result.metas[0].id.length < 256, 'expected sports meta id to stay under common Stremio client limits')
-  assert.equal(result.metas[0].poster, 'https://example.com/portrait.jpg', 'expected sports catalog to prefer portrait artwork when available')
+  assertSportsProxyUrl(result.metas[0].poster, 'poster', 'https://example.com/portrait.jpg', 'expected sports catalog to prefer portrait artwork when available')
   assert.equal(result.metas[0].posterShape, 'poster', 'expected sports catalog to tag portrait artwork as poster-shaped')
-  assert.equal(result.metas[0].background, 'https://example.com/background.jpg')
+  assertSportsProxyUrl(result.metas[0].background, 'background', 'https://example.com/background.jpg')
   const decoded = decodeCustomId(result.metas[0].id)
   assert.equal(decoded.k, 'sports')
   assert.ok(
@@ -508,7 +525,7 @@ async function testEventTitleCatalogGrouping() {
   const names = result.metas.map(m => m.name)
   assert.ok(names.some(n => /qualifying/i.test(n)), 'expected a Qualifying entry')
   assert.ok(names.some(n => /race/i.test(n)), 'expected a Race entry')
-  assert.equal(result.metas[0].poster, 'https://example.com/f1-poster.jpg', 'expected sports catalog to prefer portrait poster art for F1 events')
+  assertSportsProxyUrl(result.metas[0].poster, 'poster', 'https://example.com/f1-poster.jpg', 'expected sports catalog to prefer portrait poster art for F1 events')
   assert.equal(result.metas[0].posterShape, 'poster', 'expected F1 catalog cards to declare poster-shaped artwork')
 }
 
@@ -538,8 +555,8 @@ async function testSportsMetaRichDescription() {
   assert.ok(result.meta.description.includes('Formula 1'), 'expected description to mention league')
   assert.ok(result.meta.genres.includes('Motorsport'), 'expected Motorsport genre')
   assert.equal(result.meta.releaseInfo, '2026-03-28')
-  assert.equal(result.meta.poster, 'https://example.com/f1-poster.jpg')
-  assert.equal(result.meta.background, 'https://example.com/f1-bg.jpg')
+  assertSportsProxyUrl(result.meta.poster, 'poster', 'https://example.com/f1-poster.jpg')
+  assertSportsProxyUrl(result.meta.background, 'background', 'https://example.com/f1-bg.jpg')
   assert.ok(result.meta.logo, 'expected sports meta to include a logo for the Stremio waiting screen')
   assert.ok(result.meta.runtime, 'expected runtime to carry sport type label')
 }
@@ -655,9 +672,9 @@ async function testCompactSportsIdMetaArtwork() {
   }, async () => handleMeta({ sportsDbApiKey: 'smoke-sports-key' }, 'movie', compactId, { baseUrl: 'http://127.0.0.1:7000' }))
 
   assert.ok(metaResult.meta, 'compact sports meta should still resolve a meta object')
-  assert.equal(metaResult.meta.poster, poster, 'meta should reuse the cached portrait poster from the catalog lookup')
-  assert.equal(metaResult.meta.background, background, 'meta should reuse the cached background from the catalog lookup')
-  assert.equal(metaResult.meta.logo, logo, 'meta should reuse the cached logo from the catalog lookup')
+  assertSportsProxyUrl(metaResult.meta.poster, 'poster', poster, 'meta should reuse the cached portrait poster from the catalog lookup')
+  assertSportsProxyUrl(metaResult.meta.background, 'background', background, 'meta should reuse the cached background from the catalog lookup')
+  assertSportsProxyUrl(metaResult.meta.logo, 'logo', logo, 'meta should reuse the cached logo from the catalog lookup')
 }
 
 async function testCompactSportsMetaUsesDirectEventLookup() {
@@ -723,10 +740,136 @@ async function testCompactSportsMetaUsesDirectEventLookup() {
   assert.equal(lookupCalls, 1, 'meta should perform a single direct event lookup when eventId is available')
   assert.equal(structuredCalls, 0, 'direct event lookup should avoid structured title parsing')
   assert.equal(titleSearchCalls, 0, 'direct event lookup should avoid fallback title searches')
-  assert.equal(result.meta.poster, poster)
-  assert.equal(result.meta.background, background)
-  assert.equal(result.meta.logo, logo)
+  assertSportsProxyUrl(result.meta.poster, 'poster', poster)
+  assertSportsProxyUrl(result.meta.background, 'background', background)
+  assertSportsProxyUrl(result.meta.logo, 'logo', logo)
   assert.deepEqual(result.meta.genres, ['Football', 'UEFA Champions League'])
+}
+
+async function testSportsCatalogUsesImageProxyUrls() {
+  class FakeProwlarrClient {
+    async search() {
+      return [{
+        title: 'EPL.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-A',
+        indexer: 'GeneralA',
+        size: 1_000_000_000,
+        seeders: 20,
+        pubDate: '2026-03-15T09:00:00Z'
+      }]
+    }
+  }
+
+  const poster = 'https://images.example.com/cache-proxy-poster.jpg'
+  const background = 'https://images.example.com/cache-proxy-background.jpg'
+  const logo = 'https://images.example.com/cache-proxy-logo.png'
+
+  const { handleCatalog } = loadCatalogWithStubs({
+    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient }
+  })
+
+  const result = await withSportsDbPrototypePatches({
+    getEventArtwork: async () => ({
+      poster,
+      image: 'https://images.example.com/cache-proxy-landscape.jpg',
+      backgroundImage: background,
+      logo,
+      eventId: 'catalog-image-proxy-event',
+      eventDate: '2026-03-15',
+      league: 'English Premier League'
+    })
+  }, async () => handleCatalog(
+    {
+      jackettUrl: 'http://127.0.0.1:9696',
+      jackettApiKey: 'smoke-api-key',
+      sportsDbApiKey: 'smoke-sports-key',
+      maxResults: '10'
+    },
+    'sports',
+    'pvtkrrx-sports',
+    'search=Arsenal',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  ))
+
+  assert.match(result.metas[0].poster, /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/poster\//, 'expected catalog poster to use local sports image proxy')
+  assert.match(result.metas[0].background, /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/background\//, 'expected catalog background to use local sports image proxy')
+  assert.match(String(result.metas[0].logo || ''), /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/logo\//, 'expected catalog logo to use local sports image proxy')
+}
+
+async function testSportsMetaUsesImageProxyUrls() {
+  const { handleMeta } = require('../src/handlers/meta')
+  const compactId = encodeCustomId({
+    y: 'movie',
+    k: 'sports',
+    n: 'Arsenal vs Chelsea',
+    t: 'EPL.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-A',
+    s: 1_000_000_000,
+    d: 20,
+    p: '2026-03-15T09:00:00Z',
+    r: 'football',
+    e: '2026-03-15',
+    g: 'English Premier League',
+    v: 'meta-image-proxy-event'
+  }, {
+    compress: true,
+    compact: 'sports'
+  })
+
+  const poster = 'https://images.example.com/meta-proxy-poster.jpg'
+  const background = 'https://images.example.com/meta-proxy-background.jpg'
+  const logo = 'https://images.example.com/meta-proxy-logo.png'
+
+  const result = await withSportsDbPrototypePatches({
+    getEventArtwork: async () => ({
+      poster,
+      image: 'https://images.example.com/meta-proxy-landscape.jpg',
+      backgroundImage: background,
+      logo,
+      eventDate: '2026-03-15',
+      league: 'English Premier League',
+      eventName: 'Arsenal vs Chelsea'
+    })
+  }, async () => handleMeta(
+    { sportsDbApiKey: 'smoke-sports-key' },
+    'movie',
+    compactId,
+    { baseUrl: 'http://127.0.0.1:7000' }
+  ))
+
+  assert.match(result.meta.poster, /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/poster\//, 'expected sports meta poster to use local sports image proxy')
+  assert.match(result.meta.background, /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/background\//, 'expected sports meta background to use local sports image proxy')
+  assert.match(String(result.meta.logo || ''), /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/logo\//, 'expected sports meta logo to use local sports image proxy')
+}
+
+async function testSportsImageCacheReusesDownloadedBytes() {
+  const sourceUrl = 'https://images.example.com/cache-hit-poster.png'
+  const proxyUrl = makeSportsImageProxyUrl('http://127.0.0.1:7000', sourceUrl, 'poster')
+  const token = proxyUrl.split('/').pop()
+  let fetchCalls = 0
+  const originalFetch = global.fetch
+
+  global.fetch = async () => {
+    fetchCalls += 1
+    if (fetchCalls > 1) throw new Error('sports image cache should reuse the first downloaded file')
+    return new Response(Buffer.from([0x89, 0x50, 0x4e, 0x47]), {
+      status: 200,
+      headers: {
+        'content-type': 'image/png'
+      }
+    })
+  }
+
+  try {
+    assert.equal(decodeSportsImageToken(token), sourceUrl)
+    const first = await resolveSportsImageRequest(token, 'poster')
+    assert.equal(first.cacheStatus, 'miss', 'expected first sports image request to download the image')
+    assert.ok(fs.existsSync(first.filePath), 'expected first sports image request to persist a cache file')
+
+    const second = await resolveSportsImageRequest(token, 'poster')
+    assert.equal(second.cacheStatus, 'hit', 'expected second sports image request to reuse cached bytes')
+    assert.equal(fetchCalls, 1, 'expected only one upstream image fetch for a cache hit path')
+  } finally {
+    global.fetch = originalFetch
+  }
 }
 
 async function main() {
@@ -746,6 +889,9 @@ async function main() {
     await testArtworkFallbackBehavior()
     await testCompactSportsIdMetaArtwork()
     await testCompactSportsMetaUsesDirectEventLookup()
+    await testSportsCatalogUsesImageProxyUrls()
+    await testSportsMetaUsesImageProxyUrls()
+    await testSportsImageCacheReusesDownloadedBytes()
     console.log('Smoke sports structured flow passed')
   } finally {
     fs.rmSync(runtimeDir, { recursive: true, force: true })

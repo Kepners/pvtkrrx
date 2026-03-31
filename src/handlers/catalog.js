@@ -15,6 +15,7 @@ const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { encodeCustomId } = require('../utils/customId')
 const { findExistingLocalFilePath } = require('../utils/localStorageRoots')
 const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
+const { proxySportsImageUrl } = require('../utils/sportsImageCache')
 
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 const cinemeta = new CinemetaClient()
@@ -689,9 +690,15 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     const generatedBackgroundUrl = makeSportsThumbUrl(options.baseUrl, generatedArtworkItem, 'background')
     const portraitPosterUrl = String(sportsArtwork?.poster || '').trim()
     const landscapePosterUrl = String(sportsArtwork?.image || sportsArtwork?.landscapeImage || '').trim()
-    const posterUrl = portraitPosterUrl || landscapePosterUrl || generatedPosterUrl
-    const backgroundUrl = String(sportsArtwork?.backgroundImage || '').trim() || landscapePosterUrl || generatedBackgroundUrl
+    const backgroundSourceUrl = String(sportsArtwork?.backgroundImage || '').trim() || landscapePosterUrl
+    const posterUrl = proxySportsImageUrl(
+      options.baseUrl,
+      portraitPosterUrl || landscapePosterUrl,
+      portraitPosterUrl ? 'poster' : 'landscape'
+    ) || generatedPosterUrl
+    const backgroundUrl = proxySportsImageUrl(options.baseUrl, backgroundSourceUrl, 'background') || generatedBackgroundUrl
     const posterShape = portraitPosterUrl || posterUrl === generatedPosterUrl ? 'poster' : 'landscape'
+    const logoUrl = proxySportsImageUrl(options.baseUrl, String(sportsArtwork?.logo || '').trim(), 'logo')
 
     return {
       id: encodeCustomId({
@@ -722,7 +729,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       description: descriptionParts.join(' | '),
       poster: posterUrl,
       background: backgroundUrl,
-      logo: String(sportsArtwork?.logo || '').trim() || undefined,
+      logo: logoUrl || undefined,
       releaseInfo: eventDate || undefined,
       posterShape
     }

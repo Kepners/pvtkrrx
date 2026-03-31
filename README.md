@@ -17,7 +17,7 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 
 - **Sports** — Browse and search private tracker sports content (EPL, F1, UFC) directly in Stremio
 - **Sports-first discovery** — `All Sports` plus sport-family catalogs now lead the movie discovery column, with the third-column filter used for league/team detail
-- **Sports artwork enrichment** — Optional TheSportsDB poster, landscape, background, and logo artwork with cache-aware lookups; sports catalog tiles now prefer portrait poster art while keeping separate background/logo loading art
+- **Sports artwork enrichment** — Optional TheSportsDB poster, landscape, background, and logo artwork with cache-aware lookups plus on-demand disk-backed image caching on the active runtime; sports catalog tiles now prefer portrait poster art while keeping separate background/logo loading art
 - **Movies & TV** — IMDb-matched content from your private trackers
 - **Seedbox Library** — Browse everything already downloaded on your seedbox
 - **Smart filtering** — Sports indexers never contaminate movie/TV searches
@@ -43,7 +43,7 @@ See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the exact LAN B
 | Feature | Status |
 |---------|--------|
 | Sports discovery catalogs (All Sports, Football, Motorsport, MMA, etc.) | Working |
-| Sports artwork enrichment | Working (portrait posters + sport-aware backdrops preferred when TheSportsDB provides them; sports meta also carries Stremio loading-screen background + logo artwork when available) |
+| Sports artwork enrichment | Working (portrait posters + sport-aware backdrops preferred when TheSportsDB provides them; sports meta also carries Stremio loading-screen background + logo artwork when available, and local/hosted runtimes now serve cached sports image URLs instead of hotlinking every request) |
 | Movie/TV streams from private trackers | Working |
 | Sports contamination filter | Working (SportsCult excluded from movie searches) |
 | Already-downloaded files | Working (built-in file server with Range support) |
@@ -137,7 +137,7 @@ That is enough for `PC Local` and `LAN Bridge`, where the local runtime can read
 | Prowlarr URL | Yes | e.g. `http://seedbox.example.com:9696` |
 | Prowlarr API Key | Yes | Found in Prowlarr → Settings → General |
 | TheSportsDB API Key | No | Defaults to free key `123`; add your own key for higher limits |
-| TheSportsDB Cache (hours) | No | How long sports artwork lookups are reused before refresh |
+| TheSportsDB Cache (hours) | No | How long sports artwork lookups are reused before refresh. Sports image bytes are also cached on demand by the active runtime |
 | qBittorrent URL | Yes | e.g. `http://seedbox.example.com:8080` |
 | qBittorrent Username | Yes | qBit WebUI credentials |
 | qBittorrent Password | Yes | qBit WebUI credentials |
@@ -158,7 +158,7 @@ Back-end services used by the chosen route:
    ├── Prowlarr search
    ├── qBittorrent WebUI
    ├── Optional external file server
-   └── Optional TheSportsDB artwork enrichment
+   └── Optional TheSportsDB artwork enrichment + on-demand sports image cache
 ```
 
 Hosted configs are AES-256-GCM encrypted into addon tokens. Local installs save their working config inside the runtime folder, and explicit self-hosted server installs reuse that disk-backed config through `/selfhost/manifest.json?mode=hosted` after every reboot. Hosted relay/account state can be persisted in KV-backed storage when enabled.

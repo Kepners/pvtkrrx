@@ -93,6 +93,7 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
   - `backgroundImage`
   - `logo`
 - Sports catalog tiles now prefer real portrait poster art first when available, while `backgroundImage` and `logo` stay separate for player-loading and wallpaper use.
+- When external sports art exists, addon responses now prefer signed `/image/sports/...` URLs so the active local or hosted runtime can cache poster, wallpaper, landscape, and logo bytes on disk instead of hotlinking every request back to the upstream art host.
 - Sports detail meta now exposes Stremio `genres` tags from the resolved sport classification when available.
 - Sports title parsing now handles both team-vs-team formats (`EPL.2026.03.15.Arsenal.vs.Chelsea`) and non-vs event formats (`Formula1.2026.03.28.Japanese.Grand.Prix.Qualifying`, `UFC.Fight.Night.270.Main.Card`).
 - Motorsport coverage now includes F1, MotoGP, NASCAR, IndyCar, WRC, Supercars/V8, WSBK, WEC, and Formula E.
@@ -106,6 +107,7 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 ## Playback Model
 
 - Hosted relay routes do not proxy video bytes.
+- Hosted/local runtimes may proxy and cache sports artwork bytes through `/image/sports/...`; that image path is intentional and separate from the no-video-proxy rule.
 - Hosted `/file` and `/playback` return 403 on the public hosted relay for non-local requests.
 - `LAN Bridge` requests 307-redirect to the host's local runtime before hitting `/file` or `/playback`, so after redirect all local playback capabilities apply.
 - Local `/file` serves bytes with HTTP Range support when the file is locally accessible on disk.

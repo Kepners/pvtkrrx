@@ -46,6 +46,7 @@ Self-hosted server mode uses the same Express runtime on a VPS/seedbox, but with
 | `index.js` | Main Express + SDK server, hosted + local routes, playback, file serving, account and pair APIs |
 | `src/handlers/*` | Catalog, stream, and meta generation |
 | `src/clients/*` | Prowlarr, qBittorrent, Cinemeta, and TheSportsDB integrations |
+| `src/utils/sportsImageCache.js` | Signed sports artwork proxy URLs plus runtime disk cache for poster, background, landscape, and logo bytes |
 | `src/utils/opaqueState.js` | Opaque state tokens for `/file` and `/playback` |
 | `src/utils/pairStore.js` | LAN pair persistence |
 | `src/utils/accountStore.js` | Stremio-linked account and billing/trial data store |
@@ -111,8 +112,9 @@ Self-hosted server mode uses the same Express runtime on a VPS/seedbox, but with
 3. TheSportsDB is used for poster, background, and logo enrichment where configured.
 4. The manifest now exposes a dedicated top-level `sports` surface with an `All Sports` catalog plus sport-family catalogs such as `Football`, `Motorsport`, and `MMA`.
 5. Each sport-family catalog uses the third-column `genre` dropdown for narrower league/team filters.
-6. Sports catalog tiles now prefer portrait poster art, while background/logo art is carried separately for player-loading and wallpaper use.
-7. Library items expose completed qBittorrent content through the same addon surface.
+6. When external sports art exists, local and hosted runtimes now hand Stremio stable `/image/sports/...` URLs backed by the runtime disk cache instead of hotlinking TheSportsDB on every request.
+7. Sports catalog tiles now prefer portrait poster art, while background/logo art is carried separately for player-loading and wallpaper use.
+8. Library items expose completed qBittorrent content through the same addon surface.
 
 ## Storage Model
 

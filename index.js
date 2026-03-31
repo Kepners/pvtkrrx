@@ -15,6 +15,7 @@ const {
   describeQbitAutorunMode,
   findTorrentForPostProcess
 } = require('./src/utils/qbitAutomation')
+const { resolveSportsImageRequest } = require('./src/utils/sportsImageCache')
 
 // Destructure everything routes need from the shared module.
 // Shared module initializes env, console redaction, stores, and rate limiters at load time.
@@ -212,6 +213,25 @@ app.get(['/thumb/sports/:info.svg', '/thumb/sports/:variant/:info.svg'], (req, r
     res.send(svg)
   } catch (_) {
     res.status(400).send('invalid thumbnail payload')
+  }
+})
+app.get('/image/sports/:variant/:token', async (req, res) => {
+  try {
+    const image = await resolveSportsImageRequest(req.params.token, req.params.variant)
+    res.setHeader('Content-Type', image.contentType)
+    if (Number.isFinite(Number(image.size)) && Number(image.size) > 0) {
+      res.setHeader('Content-Length', String(image.size))
+    }
+    res.setHeader('X-PVTKRRX-Sports-Image-Cache', String(image.cacheStatus || 'miss'))
+    setPublicCacheHeaders(res, 86400, {
+      sMaxAge: 604800,
+      staleWhileRevalidate: 2592000,
+      staleIfError: 2592000
+    })
+    res.sendFile(path.resolve(image.filePath))
+  } catch (err) {
+    console.warn('[sports-image-cache] Failed to serve sports image:', err.message)
+    res.status(404).send('sports image unavailable')
   }
 })
 

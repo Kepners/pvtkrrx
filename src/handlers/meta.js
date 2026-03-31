@@ -5,6 +5,7 @@ const { makeSportsThumbUrl, makeSportsPosterUrl } = require('../utils/sportsThum
 const { resolveSportHint } = require('../utils/sportsRules')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { decodeCustomId } = require('../utils/customId')
+const { proxySportsImageUrl } = require('../utils/sportsImageCache')
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 const BRAND_LOGO = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 
@@ -157,9 +158,18 @@ async function handleCustomMeta(config, id, context = {}) {
     : posterFallback
   const portraitPosterUrl = String(sportsArtwork?.poster || '').trim()
   const landscapePosterUrl = String(sportsArtwork?.image || sportsArtwork?.landscapeImage || '').trim()
-  const poster = carriedArtwork || portraitPosterUrl || landscapePosterUrl || posterFallback
-  const background = carriedBackground || String(sportsArtwork?.backgroundImage || sportsArtwork?.landscapeImage || sportsArtwork?.image || '').trim() || backgroundFallback || poster
-  const logo = carriedLogo || String(sportsArtwork?.logo || '').trim() || BRAND_LOGO
+  const posterSourceUrl = carriedArtwork || portraitPosterUrl || landscapePosterUrl
+  const backgroundSourceUrl = carriedBackground || String(sportsArtwork?.backgroundImage || sportsArtwork?.landscapeImage || sportsArtwork?.image || '').trim()
+  const logoSourceUrl = carriedLogo || String(sportsArtwork?.logo || '').trim()
+  const poster = (isSports
+    ? proxySportsImageUrl(baseUrl, posterSourceUrl, carriedArtwork || portraitPosterUrl ? 'poster' : 'landscape')
+    : '') || posterSourceUrl || posterFallback
+  const background = (isSports
+    ? proxySportsImageUrl(baseUrl, backgroundSourceUrl, 'background')
+    : '') || backgroundSourceUrl || backgroundFallback || poster
+  const logo = (isSports
+    ? proxySportsImageUrl(baseUrl, logoSourceUrl, 'logo')
+    : '') || logoSourceUrl || BRAND_LOGO
   const posterShape = isSports
     ? ((carriedArtwork || portraitPosterUrl || poster === posterFallback) ? 'poster' : 'landscape')
     : undefined
