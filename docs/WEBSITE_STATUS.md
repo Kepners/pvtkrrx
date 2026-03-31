@@ -35,7 +35,7 @@ Verified in the repo before changing anything:
 - `index.js` already defines `/configure`, `/:config/configure`, `/runbooks`, `/seedbox-runbooks`, `/health`, `/manifest.json`, `/:config/manifest.json`, and `/local/install`
 - `vercel.json` still maps `/configure` and `/runbooks`, but the old preview deployment is currently dead
 - `public/index.html` is the current landing page
-- No homepage rewrite has been implemented yet in this pass; this work stopped at audit + documentation handoff
+- A homepage rewrite was implemented locally on 2026-03-31 in `public/index.html`, but this pass has not deployed or browser-checked it yet
 
 ## Messaging Verdict
 
@@ -65,6 +65,16 @@ Main clarity gaps:
    - Windows host app for local/LAN routes
 5. Give sports its own section instead of leaving it in the badge strip.
 6. Reduce operator-facing nav noise on the homepage. `Manifest` and `Health` are useful, but they should not compete with the main user journey.
+
+## Implemented In This Pass
+
+- Hero copy rewritten in plain English around the actual product
+- Main CTA changed to `/configure`
+- Public `/local/install` CTA removed from the homepage
+- Added route comparison section
+- Added "What you need" section
+- Added dedicated sports proof section
+- Moved `Manifest` and `Health` links out of the main nav and into the footer utility area
 
 ## Suggested Homepage Shape
 
@@ -96,5 +106,5 @@ Main clarity gaps:
 - Route audit complete
 - Public host check complete
 - Canonical host vs dead preview host now documented
-- No homepage code changes made yet
-- Next pass should start in `public/index.html`, not by re-auditing the routes again
+- Homepage rewrite now exists locally in `public/index.html`
+- Next pass should browser-check the rewrite locally, then deploy it deliberately

@@ -56,16 +56,15 @@ Meaning:
 
 ## Not Done Yet
 
-- No homepage rewrite has been implemented yet
+- Homepage rewrite now exists locally in `public/index.html`
 - No configure-page copy pass yet
 - No deploy action taken
 
 ## Best Next Step
 
-Start with `public/index.html` and make the homepage do the real selling job:
+Start by browser-checking the new `public/index.html` pass, then deploy it when the layout is clean:
 
-1. clear hero sentence
-2. route comparison
-3. what-you-need section
-4. sports proof section
-5. remove or rework the public CTA that points at `/local/install`
+1. desktop + mobile browser pass
+2. tighten any spacing/layout issues
+3. deploy the homepage rewrite
+4. only then consider a configure-page copy pass

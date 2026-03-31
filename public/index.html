@@ -404,9 +404,86 @@
       transform: translateY(-2px);
     }
 
+    .hero-copy {
+      margin: 18px auto 10px;
+      max-width: 860px;
+      color: #ebf3ff;
+      font-size: clamp(18px, 2.5vw, 28px);
+      line-height: 1.42;
+      text-wrap: balance;
+    }
+
+    .hero-support {
+      margin: 0 auto 18px;
+      max-width: 900px;
+      color: #b5c8ea;
+      font-size: clamp(14px, 1.8vw, 18px);
+      line-height: 1.6;
+    }
+
+    .hero-chips {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 18px;
+    }
+
+    .hero-chip {
+      border: 1px solid rgba(0, 246, 255, 0.26);
+      border-radius: 999px;
+      padding: 7px 11px;
+      background: rgba(4, 8, 18, 0.66);
+      color: #cfe2ff;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .section-block {
+      margin-top: 12px;
+      border: 1px solid var(--line-soft);
+      border-radius: 11px;
+      padding: 14px 12px 12px;
+      background:
+        radial-gradient(420px 180px at 8% 0%, rgba(0, 246, 255, 0.08), transparent 70%),
+        rgba(4, 8, 18, 0.72);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+
+    .section-head {
+      margin-bottom: 12px;
+    }
+
+    .section-kicker {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+      color: #9bdcff;
+      margin-bottom: 5px;
+    }
+
+    .section-title {
+      font-family: "Orbitron", sans-serif;
+      font-size: clamp(24px, 4vw, 34px);
+      letter-spacing: 1px;
+      color: #f4f8ff;
+      margin-bottom: 8px;
+      text-shadow: 0 0 14px rgba(0, 246, 255, 0.2);
+    }
+
+    .section-copy {
+      max-width: 880px;
+      color: #bfd0ec;
+      font-size: 15px;
+      line-height: 1.58;
+    }
+
     .meta-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
       gap: 10px;
       margin-bottom: 12px;
     }
@@ -429,7 +506,7 @@
     .route-grid {
       margin-top: 12px;
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
       gap: 10px;
     }
 
@@ -538,6 +615,74 @@
       display: inline-block;
       padding-left: 100%;
       animation: ticker 18s linear infinite;
+    }
+
+    .needs-grid,
+    .sports-grid {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .needs-grid {
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    }
+
+    .sports-grid {
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    }
+
+    .need-card,
+    .sports-card {
+      border: 1px solid var(--line-soft);
+      border-radius: 11px;
+      padding: 14px 12px 12px;
+      background:
+        radial-gradient(360px 180px at 0% 0%, rgba(0, 246, 255, 0.08), transparent 68%),
+        rgba(4, 8, 18, 0.74);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+      transition: all 0.18s ease;
+    }
+
+    .need-card:hover,
+    .sports-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(0, 246, 255, 0.4);
+      box-shadow: 0 0 16px rgba(0, 168, 255, 0.18);
+    }
+
+    .need-name,
+    .sports-title {
+      font-family: "Orbitron", sans-serif;
+      font-size: 18px;
+      letter-spacing: 0.8px;
+      color: #f4f8ff;
+      margin-bottom: 8px;
+    }
+
+    .need-copy,
+    .sports-card p {
+      color: #c8dafa;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    footer a {
+      color: #bfd6ff;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(0, 246, 255, 0.28);
+      transition: color 0.18s ease, border-color 0.18s ease;
+    }
+
+    footer a:hover {
+      color: #fff;
+      border-color: rgba(255, 0, 212, 0.48);
     }
 
     .faq-section {
@@ -782,7 +927,9 @@
     }
 
     @media (max-width: 1000px) {
-      .meta-grid {
+      .meta-grid,
+      .needs-grid,
+      .sports-grid {
         grid-template-columns: 1fr;
       }
 
@@ -815,6 +962,14 @@
 
       .tagline {
         max-width: 96%;
+      }
+
+      .hero-copy {
+        font-size: 18px;
+      }
+
+      .hero-support {
+        font-size: 15px;
       }
 
       .cta-row {
@@ -866,170 +1021,251 @@
       </div>
       <nav class="nav">
         <a href="/configure">Configure</a>
+        <a href="#routes">Routes</a>
+        <a href="#requirements">What You Need</a>
+        <a href="#sports">Sports</a>
         <a href="/runbooks">Runbooks</a>
-        <a href="/#faq">FAQ</a>
-        <a href="/manifest.json">Manifest</a>
-        <a href="/health">Health</a>
+        <a href="#faq">FAQ</a>
       </nav>
     </header>
 
     <section class="hero">
       <div class="hero-core">
-        <p class="kicker">Digital Corruption Relay / Enter The Void</p>
+        <p class="kicker">Private Trackers To Stremio / No Debrid / Your Hardware</p>
         <div class="logo-frame">
           <h1 class="logo" data-text="PVTKRRX"><span>PVTKRRX</span></h1>
         </div>
         <div class="logo-grid"></div>
         <p class="tagline">
-          THREE EXPLICIT ROUTES.
-          PC LOCAL, LAN BRIDGE, REMOTE SEEDBOX.
+          PRIVATE TRACKERS IN STREMIO, THROUGH YOUR OWN SETUP.
         </p>
+        <p class="hero-copy">
+          Connect <strong>Prowlarr</strong> and <strong>qBittorrent</strong>, choose the route that fits your setup,
+          then browse <strong>sports</strong>, <strong>movies</strong>, <strong>TV</strong>, and your <strong>library</strong>
+          inside Stremio.
+        </p>
+        <p class="hero-support">
+          PVTKRRX is a Stremio addon for people who already run their own private tracker stack.
+          Use <strong>PC Local</strong> on the Windows host, <strong>LAN Bridge</strong> for the rest of your home devices,
+          and <strong>Remote Seedbox</strong> only when your playback endpoints are already public over HTTPS.
+        </p>
+        <div class="hero-chips" aria-label="Key features">
+          <span class="hero-chip">Sports</span>
+          <span class="hero-chip">Movies + TV</span>
+          <span class="hero-chip">Library</span>
+          <span class="hero-chip">No Debrid</span>
+          <span class="hero-chip">Your Own Hardware</span>
+          <span class="hero-chip">Three Routes</span>
+        </div>
         <div class="cta-row">
-          <a class="btn btn-primary" href="/configure?target=pc">PC Local</a>
-          <a class="btn btn-secondary" href="/configure?target=lan">LAN Bridge</a>
-          <a class="btn btn-secondary" href="/configure?target=seedbox">Remote Seedbox</a>
+          <a class="btn btn-primary" href="/configure">Open Configure</a>
+          <a class="btn btn-secondary" href="#routes">Compare Routes</a>
           <a class="btn btn-secondary" href="/runbooks">Seedbox Runbooks</a>
         </div>
       </div>
     </section>
 
-    <section class="route-grid">
-      <article class="route-card">
-        <div class="route-kicker">Desktop only</div>
-        <div class="route-name">PC Local</div>
-        <p class="route-copy">Real same-PC addon route on the Windows machine that runs the PVTKRRX desktop server.</p>
-        <ul class="route-list">
-          <li>Loopback install only</li>
-          <li>No heartbeat</li>
-          <li>Full browse addon on this host PC</li>
-        </ul>
-        <div class="route-actions">
-          <a class="btn btn-primary" href="/local/install">Open PC Local Setup</a>
-        </div>
+    <section class="meta-grid">
+      <article class="meta-card">
+        <div class="meta-title">What It Does</div>
+        <div class="meta-value">Search -> Download -> Stream</div>
+        <div class="meta-caption">Private trackers surfaced inside Stremio</div>
       </article>
-
-      <article class="route-card">
-        <div class="route-kicker">Home network sync</div>
-        <div class="route-name">LAN Bridge</div>
-        <p class="route-copy">Use this for mobile, web, Android TV, or Apple TV on the same LAN as the host PC.</p>
-        <ul class="route-list">
-          <li>Hosted LAN install URL</li>
-          <li>Heartbeat updates IP changes</li>
-          <li>Single browsable content addon on home devices</li>
-        </ul>
-        <div class="route-actions">
-          <a class="btn btn-primary" href="/configure?target=lan">Open LAN Bridge Setup</a>
-        </div>
+      <article class="meta-card">
+        <div class="meta-title">Content</div>
+        <div class="meta-value">Sports / Movies / TV / Library</div>
+        <div class="meta-caption">One addon surface, four real reasons to use it</div>
       </article>
-
-      <article class="route-card">
-        <div class="route-kicker">Public HTTPS endpoints</div>
-        <div class="route-name">Remote Seedbox</div>
-        <p class="route-copy">Use this when qBittorrent, Prowlarr, and file serving are intentionally public and authenticated. On the hosted site this is not a generic tracker-buffering route: it is ready-file / public-playback only unless you self-host playback support.</p>
-        <ul class="route-list">
-          <li>Not a generic tracker-buffering route</li>
-          <li>Works away from home</li>
-          <li>Needs public playback URLs</li>
-        </ul>
-        <div class="route-actions">
-          <a class="btn btn-primary" href="/configure?target=seedbox">Open Remote Seedbox Setup</a>
-        </div>
+      <article class="meta-card">
+        <div class="meta-title">Your Stack</div>
+        <div class="meta-value">Prowlarr + qBit</div>
+        <div class="meta-caption">No middleman, no third-party media host</div>
+      </article>
+      <article class="meta-card">
+        <div class="meta-title">Hosted Base</div>
+        <div class="meta-value">www.pvtkrrx.cc</div>
+        <div class="meta-caption">Canonical public host for configure + install links</div>
       </article>
     </section>
 
-    <section class="meta-grid">
-      <article class="meta-card">
-        <div class="meta-title">Route Split</div>
-        <div class="meta-value">PC / LAN / Seedbox</div>
-        <div class="meta-caption">Three explicit install products</div>
-      </article>
-      <article class="meta-card">
-        <div class="meta-title">Relay Endpoint</div>
-        <div class="meta-value">www.pvtkrrx.cc</div>
-        <div class="meta-caption">Current hosted base</div>
-      </article>
-      <article class="meta-card">
-        <div class="meta-title">Desktop Runtime</div>
-        <div class="meta-value">Setup + Portable EXE</div>
-        <div class="meta-caption">Windows host ready</div>
-      </article>
+    <section class="section-block" id="routes">
+      <div class="section-head">
+        <div class="section-kicker">Pick The Route</div>
+        <h2 class="section-title">Choose the install path that matches playback</h2>
+        <p class="section-copy">
+          PVTKRRX is one addon with three routes. The important rule is simple:
+          use <strong>PC Local</strong> on the Windows host itself, <strong>LAN Bridge</strong> for the rest of your home devices,
+          and <strong>Remote Seedbox</strong> only when your playback endpoints are already public over HTTPS.
+        </p>
+      </div>
+
+      <div class="route-grid">
+        <article class="route-card">
+          <div class="route-kicker">Same Windows PC</div>
+          <div class="route-name">PC Local</div>
+          <p class="route-copy">
+            Real same-PC addon route for the Windows machine that runs the PVTKRRX desktop server.
+            Install it from the host itself and use it as the main browsing + playback route on that machine.
+          </p>
+          <ul class="route-list">
+            <li>Install from the Windows host</li>
+            <li>Uses the copied <code>127.0.0.1</code> addon URL</li>
+            <li>Best route for playback on that PC</li>
+          </ul>
+          <div class="route-actions">
+            <a class="btn btn-primary" href="/configure?target=pc">Open PC Local Setup</a>
+          </div>
+        </article>
+
+        <article class="route-card">
+          <div class="route-kicker">Home devices</div>
+          <div class="route-name">LAN Bridge</div>
+          <p class="route-copy">
+            Use this for phone, web, Android TV, Apple TV, and other devices on the same home network and Stremio account.
+            The hosted install points back to your live Windows host while it stays online.
+          </p>
+          <ul class="route-list">
+            <li>Hosted install URL for home devices</li>
+            <li>Heartbeat updates IP changes automatically</li>
+            <li>Best route for the rest of your house</li>
+          </ul>
+          <div class="route-actions">
+            <a class="btn btn-primary" href="/configure?target=lan">Open LAN Bridge Setup</a>
+          </div>
+        </article>
+
+        <article class="route-card">
+          <div class="route-kicker">Public HTTPS playback</div>
+          <div class="route-name">Remote Seedbox</div>
+          <p class="route-copy">
+            Use this when qBittorrent, Prowlarr, and completed-file playback are already exposed intentionally over HTTPS.
+            On the hosted relay this is ready-file-first, not a generic public tracker-buffering route.
+          </p>
+          <ul class="route-list">
+            <li>For away-from-home playback</li>
+            <li>Needs public playback endpoints</li>
+            <li>Best when your remote setup is already internet-ready</li>
+          </ul>
+          <div class="route-actions">
+            <a class="btn btn-primary" href="/configure?target=seedbox">Open Remote Seedbox Setup</a>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="section-block" id="requirements">
+      <div class="section-head">
+        <div class="section-kicker">What You Need</div>
+        <h2 class="section-title">The setup requirements are simpler than the homepage used to imply</h2>
+        <p class="section-copy">
+          PVTKRRX works best when it says the quiet part out loud.
+          If you already run your own private tracker stack, the addon is mostly about connecting the right pieces and picking the route that matches where playback happens.
+        </p>
+      </div>
+
+      <div class="needs-grid">
+        <article class="need-card">
+          <div class="need-name">Prowlarr</div>
+          <p class="need-copy">Use Prowlarr or a Torznab-compatible search source to query your tracker side.</p>
+        </article>
+        <article class="need-card">
+          <div class="need-name">qBittorrent</div>
+          <p class="need-copy">qBittorrent WebUI is the download and library side of the flow.</p>
+        </article>
+        <article class="need-card">
+          <div class="need-name">Windows Host</div>
+          <p class="need-copy">Required for <code>PC Local</code> and <code>LAN Bridge</code>, because the local runtime serves those playback-capable routes.</p>
+        </article>
+        <article class="need-card">
+          <div class="need-name">Public File Server</div>
+          <p class="need-copy">Only needed for <code>Remote Seedbox</code> when completed-file playback must work away from home over public HTTPS.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section-block" id="sports">
+      <div class="section-head">
+        <div class="section-kicker">Sports Support</div>
+        <h2 class="section-title">Sports is not a badge here, it is part of the product</h2>
+        <p class="section-copy">
+          If your tracker setup already supports sports releases, PVTKRRX can surface them in Stremio alongside movies, TV, and your library.
+          That is one of the clearest differences between the product and the way the homepage used to describe it.
+        </p>
+      </div>
+
+      <div class="sports-grid">
+        <article class="sports-card">
+          <div class="sports-title">Sports In Stremio</div>
+          <p>Sports is treated as a real top-level discovery surface, not just a throwaway tag in a feature strip.</p>
+        </article>
+        <article class="sports-card">
+          <div class="sports-title">Tracker-Driven Results</div>
+          <p>Results only appear from the tracker side you already control, keeping the product honest about what your setup can actually play.</p>
+        </article>
+        <article class="sports-card">
+          <div class="sports-title">Artwork + Metadata</div>
+          <p>Sports metadata can carry posters, landscape art, background art, and logos so the Stremio surface feels like a real catalog, not a dump of filenames.</p>
+        </article>
+        <article class="sports-card">
+          <div class="sports-title">Library Next To Live Content</div>
+          <p>Already-downloaded files, sports releases, movies, and TV all live inside the same addon surface instead of being split into separate tools.</p>
+        </article>
+      </div>
     </section>
 
     <section class="status-strip">
       <div class="status-track">
-        [SPORTS + MOVIES + TV] [PRIVATE TRACKER STACK] [NO DEBRID REQUIRED] [SEQUENTIAL PLAYBACK CONTROL] [SELF-HOSTED FIRST] [LAN ROUTE HEARTBEAT]
+        [PRIVATE TRACKERS IN STREMIO] [SPORTS + MOVIES + TV + LIBRARY] [PROWLARR + QBITHORRENT] [NO DEBRID] [YOUR HARDWARE] [PC LOCAL / LAN BRIDGE / REMOTE SEEDBOX]
       </div>
     </section>
 
     <section class="faq-section" id="faq">
-      <div class="faq-title">FAQ / Route Selection + Sync</div>
-      <p class="faq-lead">Answers for picking the right route, account sync, and LAN behavior.</p>
+      <div class="faq-title">Quick Answers</div>
+      <p class="faq-lead">The high-signal questions new users need answered before they click into configure.</p>
       <div class="faq-list">
         <details class="faq-item" open>
+          <summary>What does PVTKRRX actually do?</summary>
+          <div class="faq-answer">
+            It connects your existing private tracker stack to Stremio.
+            You bring Prowlarr and qBittorrent, PVTKRRX handles the route-aware addon side so you can browse sports, movies, TV, and your library inside Stremio.
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary>Which route should I use?</summary>
+          <div class="faq-answer">
+            Use <code>PC Local</code> on the Windows host itself.
+            Use <code>LAN Bridge</code> for your other home devices on the same network and Stremio account.
+            Use <code>Remote Seedbox</code> only when your playback endpoints are already public over HTTPS.
+          </div>
+        </details>
+
+        <details class="faq-item">
           <summary>Do I need three different apps?</summary>
           <div class="faq-answer">
-            No. PVTKRRX is one runtime with three separate routes inside it:
-            <code>PC Local</code>, <code>LAN Bridge</code>, and <code>Remote Seedbox</code>.
-            The important rule is to install the route that matches the playback location.
+            No. PVTKRRX is one runtime with three route choices inside it.
+            The point is not to install everything everywhere, it is to pick the route that matches where playback happens.
           </div>
         </details>
 
         <details class="faq-item">
-          <summary>Where do I get the Stremio AuthKey?</summary>
+          <summary>What do I need to make it work?</summary>
           <div class="faq-answer">
-            Use <code>Login + Fetch AuthKey</code> first. If manual fallback is needed, open
-            <code>https://web.stremio.com/</code>, sign in, open browser dev tools console, run
-            <code>JSON.parse(localStorage.getItem('profile')).auth.key</code>, then copy the key.
-            Do not use <code>/#/settings/account</code> (that route returns Page not found).
-          </div>
-        </details>
-
-        <details class="faq-item">
-          <summary>Why does it still say popup blocked?</summary>
-          <div class="faq-answer">
-            Browser shields/extensions can still block scripted <code>window.open</code> calls.
-            Manual fallback always works: open <code>https://web.stremio.com/</code> yourself,
-            copy AuthKey, then click <code>Paste AuthKey From Clipboard</code>.
-          </div>
-        </details>
-
-        <details class="faq-item">
-          <summary>Does one-click setup install on phone and TV fully automatically?</summary>
-          <div class="faq-answer">
-            Not fully. LAN Bridge auto-setup creates the correct hosted route and pair token, but each
-            phone/TV still needs the addon installed once in Stremio. After that first install, routing
-            is automatic while the host PC stays online.
-          </div>
-        </details>
-
-        <details class="faq-item">
-          <summary>Why can't I find Add Addon URL or configure options on Apple TV?</summary>
-          <div class="faq-answer">
-            This is a Stremio-on-Apple platform limitation in some builds. Workaround: install PVTKRRX
-            from Stremio Web or desktop while logged into the same Stremio account, then reopen the
-            Apple TV app so addons sync to tvOS.
-          </div>
-        </details>
-
-        <details class="faq-item">
-          <summary>If my PC IP changes tomorrow, do phone/TV apps auto-sync?</summary>
-          <div class="faq-answer">
-            Yes, as long as the host PC desktop app/server is running. It sends a LAN heartbeat
-            immediately on startup and then periodically, and hosted LAN links redirect to the latest
-            active endpoint. Reinstall is not required for normal DHCP IP changes.
-          </div>
-        </details>
-
-        <details class="faq-item">
-          <summary>When auto-sync can fail, and why?</summary>
-          <div class="faq-answer">
-            Auto-sync can fail when:
+            At minimum:
             <ul>
-              <li>Desktop app is not running on the host PC (pair goes offline)</li>
-              <li>TV/phone is on a different network than the host PC</li>
-              <li>Firewall/router blocks local relay ports</li>
-              <li>Pair ID/key in config no longer matches active host state</li>
+              <li>Prowlarr or a Torznab-compatible search source</li>
+              <li>qBittorrent WebUI</li>
+              <li>The Windows host app for <code>PC Local</code> or <code>LAN Bridge</code></li>
+              <li>A public file server only if you want <code>Remote Seedbox</code> away-from-home playback</li>
             </ul>
+          </div>
+        </details>
+
+        <details class="faq-item">
+          <summary>Does this work on Apple TV, Android TV, phone, and web?</summary>
+          <div class="faq-answer">
+            Yes, through the route model.
+            <code>LAN Bridge</code> is the route meant for home devices on the same Stremio account, while <code>PC Local</code> remains the right route for the Windows host itself.
           </div>
         </details>
       </div>
@@ -1037,7 +1273,12 @@
 
     <footer>
       <span>PVTKRRX / Source Available / Operator Controlled</span>
-      <span>Use Runbooks Before Choosing A Seedbox Plan</span>
+      <div class="footer-links">
+        <a href="/configure">Configure</a>
+        <a href="/runbooks">Runbooks</a>
+        <a href="/manifest.json">Manifest</a>
+        <a href="/health">Health</a>
+      </div>
     </footer>
   </main>
 
