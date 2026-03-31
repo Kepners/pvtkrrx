@@ -35,6 +35,8 @@ Stremio client
                                                        +--> redirects back to live LAN host
                                                        or
                                                        +--> uses public remote playback path
+
+Self-hosted server mode uses the same Express runtime on a VPS/seedbox, but with `PVTKRRX_SELF_HOST_MODE=true` so the server can persist a disk-backed config, expose a stable `/selfhost/manifest.json?mode=hosted`, and accept authenticated private/localhost service URLs from the configure page.
 ```
 
 ## Components
@@ -43,7 +45,7 @@ Stremio client
 |---|---|
 | `index.js` | Main Express + SDK server, hosted + local routes, playback, file serving, account and pair APIs |
 | `src/handlers/*` | Catalog, stream, and meta generation |
-| `src/clients/*` | Prowlarr, Torznab-compatible search, qBittorrent, Cinemeta, and TheSportsDB integrations |
+| `src/clients/*` | Prowlarr, qBittorrent, Cinemeta, and TheSportsDB integrations |
 | `src/utils/opaqueState.js` | Opaque state tokens for `/file` and `/playback` |
 | `src/utils/pairStore.js` | LAN pair persistence |
 | `src/utils/accountStore.js` | Stremio-linked account and billing/trial data store |
@@ -68,8 +70,9 @@ Stremio client
 2. User selects a route card: `PC Local`, `LAN Bridge`, or `Remote Seedbox`.
 3. The page focuses on the next action for that route.
 4. Manual/fallback controls stay hidden in `Hidden Setup Tabs`.
-5. Local route saves config into the Windows runtime folder.
-6. Hosted routes call `POST /encrypt` and install a hosted manifest token.
+5. Local route saves config into the runtime `local-config.json`.
+6. Public hosted routes call `POST /encrypt` and install a hosted manifest token.
+7. Explicit self-host server mode saves `Remote Seedbox` config into the same runtime `local-config.json` and serves it through `/selfhost/manifest.json?mode=hosted`.
 
 ### Desktop Shell
 
@@ -94,7 +97,7 @@ Stremio client
 
 ### Playback
 
-1. Stream handler resolves content from Prowlarr/Torznab-compatible search plus qBittorrent state.
+1. Stream handler resolves content from Prowlarr search plus qBittorrent state.
 2. Completed local files prefer `/file/:info`.
 3. Not-ready content uses `/playback/:info` only on playback-capable runtimes such as `PC Local`, `LAN Bridge` after local redirect, or self-hosted installs that actually serve `/playback`; once qBittorrent exposes the target file on a built-in playback-capable runtime, `/playback` immediately hands off to `/file/:info` so the shared file route can keep the player request alive while bytes arrive.
 4. External `fileServerUrl` is optional and mainly used when the local runtime cannot read the file directly.
@@ -116,7 +119,7 @@ Stremio client
 | Data | Where it lives |
 |---|---|
 | Hosted addon config | Encrypted token in hosted manifest URL |
-| Local addon config | Runtime `local-config.json` on the Windows host |
+| Local addon config | Runtime `local-config.json` on the Windows host or self-hosted server |
 | Pair state | Memory or KV-backed pair store |
 | Stremio-linked account data | Memory, local file, or KV-backed account store depending on deployment |
 | Video bytes | Never proxied through the hosted relay |

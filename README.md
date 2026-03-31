@@ -9,9 +9,9 @@ PVTKRRX is a Stremio addon that bridges your existing seedbox infrastructure int
 - **Prowlarr URL + API key** — searches your private trackers
 - **qBittorrent WebUI URL** — manages downloads and streams your library
 
-The addon handles: search → download → stream. PVTKRRX has a **built-in file server** for playback-capable local routes, while hosted `Remote Seedbox` expects public ready-file playback endpoints.
+The addon handles: search → download → stream. PVTKRRX has a **built-in file server** for playback-capable runtimes, while the public hosted `Remote Seedbox` route expects public ready-file playback endpoints.
 
-Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS endpoints. If you want to validate loopback or LAN-only service URLs such as `http://127.0.0.1:9696`, use the local configure page on the Windows host runtime instead of the hosted site.
+Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS endpoints. Self-hosted server mode is different: the server can store a disk-backed `selfhost` config locally, reuse it on boot, and validate localhost/private service URLs once you authenticate as the server admin.
 
 ## Key Features
 
@@ -89,10 +89,19 @@ For `LAN Bridge`, the primary install action should start with `stremio://`; the
 git clone https://github.com/Kepners/pvtkrrx.git
 cd pvtkrrx
 npm install
-npm start
+npm run server:setup
 ```
 
-Then open `http://localhost:7000/configure` to enter your seedbox details.
+`npm run server:setup` prompts for the seedbox details PVTKRRX cannot auto-discover, writes `ENCRYPTION_SECRET` plus `PVTKRRX_SELF_HOST_MODE=true` into `.env`, saves the working config locally, creates a server admin token file in the runtime directory, and can install a Linux `systemd` service for auto-start on boot.
+
+If you want to install the service later:
+
+```bash
+npm run server:install-service
+```
+
+The self-hosted server route keeps a stable disk-backed manifest at `/selfhost/manifest.json?mode=hosted`.
+Open `/configure` in a browser to review or edit the saved config at any time.
 
 Use the configure page to prepare the route you actually want to use:
 - **PC Local** for this Windows host (`127.0.0.1`)
@@ -114,12 +123,12 @@ A 2026-03-31 real-device pass also confirmed the current Windows host flow plus 
 ## Requirements
 
 Your seedbox needs:
-1. **Prowlarr** with private trackers configured (or Jackett — same config page)
+1. **Prowlarr** with private trackers configured
 2. **qBittorrent** with WebUI enabled
 
 That is enough for `PC Local` and `LAN Bridge`, where the local runtime can read files directly from qBittorrent's download directory with the built-in file server.
 
-> `Remote Seedbox` is different: the hosted route needs a public HTTPS file-serving path for completed-file playback. Leave `File Server URL` blank only for local playback-capable routes or self-hosted runtimes that can actually serve `/file` and `/playback`.
+> `Remote Seedbox` is different: the public hosted route needs a public HTTPS file-serving path for completed-file playback. Leave `File Server URL` blank only for local playback-capable routes or self-hosted runtimes that can actually serve `/file` and `/playback`.
 
 ## Configuration Fields
 
@@ -146,13 +155,13 @@ PVTKRRX route selected in configure
    └── Remote Seedbox → hosted route with public ready-file playback endpoints
 
 Back-end services used by the chosen route:
-   ├── Prowlarr / Torznab-compatible search
+   ├── Prowlarr search
    ├── qBittorrent WebUI
    ├── Optional external file server
    └── Optional TheSportsDB artwork enrichment
 ```
 
-Hosted configs are AES-256-GCM encrypted into addon tokens. Local installs save their working config inside the Windows runtime folder, and hosted relay/account state can be persisted in KV-backed storage when enabled.
+Hosted configs are AES-256-GCM encrypted into addon tokens. Local installs save their working config inside the runtime folder, and explicit self-hosted server installs reuse that disk-backed config through `/selfhost/manifest.json?mode=hosted` after every reboot. Hosted relay/account state can be persisted in KV-backed storage when enabled.
 Playback/file state links are also issued as opaque encrypted tokens (instead of plain base64 JSON), so tracker endpoints and file hints are not directly readable from stream URLs.
 Hosted relay routes do not proxy video bytes, and hosted `/file` or `/playback` requests fail fast when playback still depends on the local runtime.
 
@@ -212,6 +221,18 @@ This validates:
 - `/pair/status` omits private endpoint metadata, and the auth-user surface stays off billing internals (the auth-model shape check is code-reviewed rather than a full authenticated round-trip)
 - legacy plain playback/file tokens are rejected
 - secure JSON storage stays read-legacy/write-secure and fails closed on writes without a configured secret
+
+Self-hosted server smoke check:
+
+```bash
+npm run smoke:selfhost
+```
+
+This validates:
+- explicit self-host server mode advertises `/selfhost`
+- remote self-host admin requests need the server admin token
+- same-host self-host runtime can save disk-backed server config and read it back
+- `/selfhost/manifest.json?mode=hosted` resolves with no-store caching
 
 Route-capability stream pipeline smoke check:
 

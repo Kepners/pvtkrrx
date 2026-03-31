@@ -92,12 +92,17 @@ function run() {
     'runtime dir override should win everywhere'
   )
   assert.equal(
-    resolveRuntimeDir({}, { platform: 'linux', cwd: '/tmp/pvtkrrx-dev' }),
-    path.normalize('/tmp/pvtkrrx-dev/.runtime'),
-    'non-Windows fallback should remain repo-local when no override exists'
+    resolveRuntimeDir({ HOME: '/home/demo' }, { platform: 'linux', cwd: '/tmp/pvtkrrx-dev' }),
+    path.normalize('/home/demo/.local/share/PVTKRRX/runtime'),
+    'default Linux runtime dir should resolve under XDG data home'
+  )
+  assert.equal(
+    resolveRuntimeDir({ HOME: '/home/demo', XDG_DATA_HOME: '/srv/pvtkrrx-data' }, { platform: 'linux', cwd: '/tmp/pvtkrrx-dev' }),
+    path.normalize('/srv/pvtkrrx-data/PVTKRRX/runtime'),
+    'Linux runtime dir should honor XDG_DATA_HOME'
   )
 
-  assert.match(read('index.js'), /resolveRuntimeDir/, 'server should use shared runtime dir helper')
+  assert.match(read('src/lib/shared.js'), /resolveRuntimeDir/, 'server shared runtime should use the runtime dir helper')
   assert.match(read('electron/main.js'), /resolveRuntimeDir/, 'Electron should use shared runtime dir helper')
   assert.match(read('src/clients/sportsdb.js'), /resolveRuntimeDir/, 'SportsDB cache should use shared runtime dir helper')
   assert.match(read('public/configure.html'), /route-parity\.js/, 'configure UI should load the shared route parity helper')

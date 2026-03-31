@@ -22,6 +22,7 @@ const { isBlockedPrivateTargetHost, isPrivateIpv4, isPrivateIpv6 } = require('..
 const { normalizeRelayUrl } = require('../utils/relayUrl')
 const { stripRemoteSeedboxLanFields } = require('../utils/remoteSeedboxConfig')
 const { resolveRuntimeDir } = require('../utils/runtimeDir')
+const { ensureServerAdminToken } = require('../utils/serverAdminToken')
 const { decodeSportsThumbToken, renderSportsThumbSvg } = require('../utils/sportsThumb')
 const { parseTorrentFileName, fetchTorrentPayload } = require('../utils/torrentPayload')
 const { findVideoFile, hasPackedArchiveFiles, isSampleVideoName, isArchiveFileName, findPackedArchiveFiles } = require('../utils/streams')
@@ -43,6 +44,8 @@ const {
   createRedactingLogger,
   installConsoleRedaction
 } = require('../utils/logRedaction')
+
+loadLocalEnv()
 
 const STREAM_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_WAIT_TIMEOUT_MS || '90000', 10)
 const STREAM_WAIT_INTERVAL_MS = parseInt(process.env.STREAM_WAIT_INTERVAL_MS || '2000', 10)
@@ -70,6 +73,10 @@ const STREMIO_AUTH_KEY_REGEX = /^[A-Za-z0-9._~+/=-]{16,1024}$/
 const STREMIO_AUTH_KEY_CAPTURE_PATTERN = '[A-Za-z0-9._~+/=-]{16,1024}'
 const STREMIO_AUTH_SCAN_DIRS_OVERRIDE = String(process.env.PVTKRRX_STREMIO_AUTH_SCAN_DIRS || '').trim()
 const IS_VERCEL_RUNTIME = Boolean(process.env.VERCEL)
+const SELF_HOST_SERVER_MODE = (
+  !IS_VERCEL_RUNTIME &&
+  /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_SELF_HOST_MODE || '').trim())
+)
 const SENSITIVE_WEB_ORIGINS = parseOriginAllowlist(
   process.env.PVTKRRX_ALLOWED_WEB_ORIGINS || 'https://www.pvtkrrx.cc'
 )
@@ -151,7 +158,6 @@ function loadLocalEnv() {
   }
 }
 
-loadLocalEnv()
 // Keep Node/server console output on the same redaction policy Electron already uses.
 installConsoleRedaction(console)
 
@@ -161,6 +167,14 @@ if (!process.env.ENCRYPTION_SECRET && process.env.NODE_ENV !== 'production') {
 }
 
 const runtimeDir = resolveRuntimeDir()
+const serverAdminState = SELF_HOST_SERVER_MODE
+  ? ensureServerAdminToken(runtimeDir, { env: process.env, createIfMissing: true })
+  : {
+      token: '',
+      created: false,
+      source: 'disabled',
+      path: ''
+    }
 const localConfigPath = path.join(runtimeDir, 'local-config.json')
 const lanPairStore = new PairStore({
   filePath: process.env.PVTKRRX_PAIR_STORE_FILE || path.join(runtimeDir, 'lan-pair-store.json')
@@ -171,6 +185,10 @@ const accountStore = new AccountStore({
 let bootLanAccessPromise = null
 let localProviderWarmupPromise = null
 let localConfigRepairPromise = null
+
+if (serverAdminState.created && serverAdminState.path) {
+  console.warn(`[self-host] Server admin token created at ${serverAdminState.path}`)
+}
 
 function loadLocalConfigFile() {
   try {
@@ -1066,6 +1084,7 @@ function isSensitiveCorsRoute(req) {
     pathName === '/encrypt' ||
     pathName === '/test-connection' ||
     pathName === '/local-config' ||
+    pathName === '/server-config' ||
     pathName === '/auto-provision' ||
     pathName === '/network-info' ||
     pathName === '/local/lan-token' ||
@@ -1121,6 +1140,29 @@ function timingSafeEqualText(a, b) {
   return crypto.timingSafeEqual(left, right)
 }
 
+function isDiskBackedConfigAlias(configValue) {
+  const normalized = String(configValue || '').trim().toLowerCase()
+  return normalized === 'local' || (SELF_HOST_SERVER_MODE && normalized === 'selfhost')
+}
+
+function isSelfHostConfigAlias(configValue) {
+  return SELF_HOST_SERVER_MODE && String(configValue || '').trim().toLowerCase() === 'selfhost'
+}
+
+function hasServerAdminToken(req) {
+  if (!SELF_HOST_SERVER_MODE) return false
+  const presented = String(req?.headers?.['x-pvtkrrx-admin-token'] || '').trim()
+  return timingSafeEqualText(presented, serverAdminState.token)
+}
+
+function requireServerAdminToken(req, res, next) {
+  if (!SELF_HOST_SERVER_MODE) {
+    return res.status(404).json({ error: 'Self-host server mode is not enabled' })
+  }
+  if (isSameHostRequest(req) || hasServerAdminToken(req)) return next()
+  return res.status(401).json({ error: 'Valid server admin token required' })
+}
+
 function ensureCsrfCookie(req, res) {
   const cookies = parseRequestCookies(req)
   const existing = String(cookies[CSRF_COOKIE_NAME] || '').trim()
@@ -1153,9 +1195,15 @@ function requireLocalNetworkRoute(req, res, next) {
 }
 
 function requireLocalConfigReadback(req, res, next) {
-  if (req.params.config !== 'local') return next()
-  if (isSameHostRequest(req)) return next()
-  return res.status(403).json({ error: 'Local config prefill is only available on the Windows host PC.' })
+  const configAlias = String(req.params?.config || '').trim().toLowerCase()
+  if (configAlias === 'local') {
+    if (isSameHostRequest(req)) return next()
+    return res.status(403).json({ error: 'Local config prefill is only available on the Windows host PC.' })
+  }
+  if (configAlias === 'selfhost') {
+    return requireServerAdminToken(req, res, next)
+  }
+  return next()
 }
 
 function requireLocalQbitControl(req, res, next) {
@@ -1175,11 +1223,12 @@ function getConfigIssues(config, options = {}) {
   const requestBaseUrl = normalizeBaseUrl(options.requestBaseUrl || '')
   const requestOrigin = normalizeOrigin(requestBaseUrl)
   const relayOrigin = normalizeOrigin(String(safeConfig.lanPairRelayUrl || '').trim())
+  const selfHostDiskConfig = options.selfHostDiskConfig === true
   const usingHostedProfile = safeConfig.lanPairEnabled === false
   const missingFileServerUrl = !String(safeConfig.fileServerUrl || '').trim()
   const relayTargetsDifferentOrigin = Boolean(requestOrigin && relayOrigin && relayOrigin !== requestOrigin)
 
-  if (usingHostedProfile && missingFileServerUrl && (IS_VERCEL_RUNTIME || relayTargetsDifferentOrigin)) {
+  if (usingHostedProfile && missingFileServerUrl && !selfHostDiskConfig && (IS_VERCEL_RUNTIME || relayTargetsDifferentOrigin)) {
     issues.push({
       code: 'HOSTED_FILE_SERVER_REQUIRED',
       message: 'Hosted profile needs an HTTPS File Server URL for completed-file playback. Add your seedbox file server URL or use a direct-host/LAN profile.'
@@ -1296,7 +1345,7 @@ function setPublicCacheHeaders(res, browserMaxAgeSeconds, options = {}) {
 }
 
 function applyHostedRouteCacheHeaders(req, res, browserMaxAgeSeconds, options = {}) {
-  if (String(req.params?.config || '').toLowerCase() === 'local' || req.localConfigMissing) {
+  if (isDiskBackedConfigAlias(req.params?.config) || req.localConfigMissing) {
     res.setHeader('Cache-Control', 'no-store')
     return
   }
@@ -1794,7 +1843,7 @@ async function mintHostedConfigToken(relayUrl, payload) {
 async function withConfig(req, res, next) {
   req.localConfigMissing = false
   req.configIssues = []
-  if (req.params.config === 'local') {
+  if (isDiskBackedConfigAlias(req.params.config)) {
     try {
       const localConfig = loadLocalConfigFile()
       if (!localConfig) {
@@ -1814,11 +1863,12 @@ async function withConfig(req, res, next) {
       }
       req.config = normalizedLocal
       req.configIssues = getConfigIssues(req.config, {
-        requestBaseUrl: getPublicBaseUrl(req)
+        requestBaseUrl: getPublicBaseUrl(req),
+        selfHostDiskConfig: isSelfHostConfigAlias(req.params.config)
       })
       return next()
     } catch (err) {
-      return res.status(500).json({ error: 'Failed to load local config' })
+      return res.status(500).json({ error: 'Failed to load disk-backed config' })
     }
   }
 
@@ -1968,6 +2018,7 @@ module.exports = {
   STREMIO_AUTH_KEY_CAPTURE_PATTERN,
   STREMIO_AUTH_SCAN_DIRS_OVERRIDE,
   IS_VERCEL_RUNTIME,
+  SELF_HOST_SERVER_MODE,
   SENSITIVE_WEB_ORIGINS,
   CSRF_COOKIE_NAME,
   SECRET_CONFIG_FIELDS,
@@ -2044,8 +2095,12 @@ module.exports = {
   isAllowedSensitiveOrigin,
   parseRequestCookies,
   timingSafeEqualText,
+  isDiskBackedConfigAlias,
+  isSelfHostConfigAlias,
+  hasServerAdminToken,
   ensureCsrfCookie,
   requireCsrfToken,
+  requireServerAdminToken,
   requireLocalNetworkRoute,
   requireLocalConfigReadback,
   requireLocalQbitControl,

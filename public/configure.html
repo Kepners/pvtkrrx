@@ -1965,6 +1965,12 @@
           <input type="text" id="localHostname" value="pvtkrrx.local" placeholder="pvtkrrx.local">
           <p class="hint">Used by TV/phone on LAN. Keep this stable so clients do not need reinstall.</p>
         </div>
+        <div id="serverAdminBlock" style="display:none;">
+          <label for="serverAdminToken">Server Admin Token</label>
+          <input type="password" id="serverAdminToken" placeholder="Paste the token from your self-hosted server">
+          <p class="hint" id="serverAdminHint">Only needed when this configure page is served by your own self-hosted server and you open it remotely. Stored in this browser only.</p>
+          <div id="serverAdminStatus" class="status"></div>
+        </div>
         <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.9rem;">
           <input type="checkbox" id="autoDeleteWatched" checked style="width:auto;transform:scale(1.15);">
           Auto-delete torrent + files after watched threshold
@@ -2099,6 +2105,12 @@
       hostedManifest: '',
       hostedStremio: ''
     };
+    const selfHostAdminStorageKey = 'pvtkrrx_selfhost_admin_token';
+    const serverRuntime = {
+      selfHostServerMode: false,
+      serverConfigAlias: '',
+      serverConfigConfigured: false
+    };
     const accountLinkState = {
       accountUserId: '',
       accountProvider: '',
@@ -2154,8 +2166,102 @@
         ?.slice(target.length) || '';
     }
 
+    function encodeStoredServerAdminToken(token) {
+      const text = String(token || '').trim();
+      return text ? `admin:${text}` : '';
+    }
+
+    function decodeStoredServerAdminToken(value) {
+      const raw = String(value || '').trim();
+      if (!raw.startsWith('admin:')) return '';
+      return raw.slice(6).trim();
+    }
+
+    function getServerAdminToken() {
+      const inputValue = String(document.getElementById('serverAdminToken')?.value || '').trim();
+      if (inputValue) return inputValue;
+      try {
+        return decodeStoredServerAdminToken(window.localStorage.getItem(selfHostAdminStorageKey));
+      } catch (_) {
+        return '';
+      }
+    }
+
+    function persistServerAdminToken(token) {
+      try {
+        const encoded = encodeStoredServerAdminToken(token);
+        if (encoded) {
+          window.localStorage.setItem(selfHostAdminStorageKey, encoded);
+        } else {
+          window.localStorage.removeItem(selfHostAdminStorageKey);
+        }
+      } catch (_) {
+        // Ignore storage failures and keep the current in-memory input value.
+      }
+    }
+
+    function setServerAdminStatus(type, message) {
+      const el = document.getElementById('serverAdminStatus');
+      if (!el) return;
+      if (!message) {
+        el.className = 'status';
+        el.textContent = '';
+        return;
+      }
+      el.className = 'status ' + type;
+      el.textContent = message;
+    }
+
+    function updateServerAdminUi() {
+      const block = document.getElementById('serverAdminBlock');
+      const input = document.getElementById('serverAdminToken');
+      const hint = document.getElementById('serverAdminHint');
+      if (!block || !input || !hint) return;
+
+      if (!serverRuntime.selfHostServerMode) {
+        block.style.display = 'none';
+        setServerAdminStatus('', '');
+        return;
+      }
+
+      block.style.display = 'block';
+      const storedToken = getServerAdminToken();
+      if (storedToken && input.value !== storedToken) {
+        input.value = storedToken;
+      }
+
+      if (canQueryLocalRuntime()) {
+        hint.textContent = 'Self-hosted server mode is active. Because you are opening this page on the same host/runtime, the admin token is optional here.';
+        if (!document.getElementById('serverAdminStatus')?.textContent) {
+          setServerAdminStatus('ok', 'Same-host access detected.');
+        }
+        return;
+      }
+
+      if (storedToken) {
+        hint.textContent = 'Stored in this browser only. PVTKRRX uses it to load and save the server config from this page.';
+        if (!document.getElementById('serverAdminStatus')?.textContent) {
+          setServerAdminStatus('ok', 'Server admin token stored in this browser.');
+        }
+        return;
+      }
+
+      hint.textContent = 'Paste the token from your self-hosted server to load the saved server config and use localhost/private service URLs from this browser.';
+      setServerAdminStatus('info', 'Server admin token required for remote self-host setup.');
+    }
+
+    function buildServerAdminHeaders() {
+      const headers = {};
+      const adminToken = getServerAdminToken();
+      if (adminToken) headers['X-PVTKRRX-Admin-Token'] = adminToken;
+      return headers;
+    }
+
     function buildJsonHeaders() {
-      const headers = { 'Content-Type': 'application/json' };
+      const headers = {
+        'Content-Type': 'application/json',
+        ...buildServerAdminHeaders()
+      };
       const csrf = getCookieValue('pvtkrrx_csrf');
       if (csrf) headers['X-PVTKRRX-CSRF'] = decodeURIComponent(csrf);
       return headers;
@@ -2386,6 +2492,43 @@
         return `${url.protocol}//${url.host}`;
       } catch (_) {
         return '';
+      }
+    }
+
+    function getCurrentAppOrigin() {
+      try {
+        const url = new URL(window.location.href);
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+        return `${url.protocol}//${url.host}`;
+      } catch (_) {
+        return '';
+      }
+    }
+
+    function applyServerRuntimeConfig(data) {
+      const payload = data && typeof data === 'object' ? data : {};
+      serverRuntime.selfHostServerMode = payload.selfHostServerMode === true;
+      serverRuntime.serverConfigAlias = serverRuntime.selfHostServerMode
+        ? String(payload.serverConfigAlias || 'selfhost').trim() || 'selfhost'
+        : '';
+      serverRuntime.serverConfigConfigured = payload.serverConfigConfigured === true;
+      updateServerAdminUi();
+
+      if (serverRuntime.selfHostServerMode && !getConfigTokenFromPath()) {
+        setInstallTarget('seedbox');
+        document.getElementById('installMode').value = 'hosted';
+        setInstallModeHint();
+      }
+    }
+
+    async function loadServerRuntimeConfig() {
+      try {
+        const res = await fetch('/app-config.json', { cache: 'no-store' });
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        applyServerRuntimeConfig(data);
+      } catch (_) {
+        updateServerAdminUi();
       }
     }
 
@@ -3903,7 +4046,9 @@
       } else if (target === 'lan') {
         hint.textContent = 'LAN Bridge selected. This is the normal home-device setup. The app checks Stremio on this Windows PC, reuses the signed-in Stremio account when possible, then prepares the hosted addon for your other home devices. For browsing and playback on this Windows host itself, switch to PC Local.';
       } else {
-        hint.textContent = 'Remote Seedbox selected. Hosted playback is effectively ready-file-first here. Direct queue-and-buffer only appears when the runtime can safely serve it, and auth-protected file-server playback still needs real-device proof.';
+        hint.textContent = serverRuntime.selfHostServerMode
+          ? 'Remote Seedbox selected on a self-hosted server. This route can save the server config locally, reuse it after reboot, and use private localhost service URLs when you authenticate as the server admin.'
+          : 'Remote Seedbox selected. Hosted playback is effectively ready-file-first here. Direct queue-and-buffer only appears when the runtime can safely serve it, and auth-protected file-server playback still needs real-device proof.';
       }
     }
 
@@ -3961,6 +4106,18 @@
       setActiveLocalHostname(this.value);
       setInstallModeHint();
     });
+    document.getElementById('serverAdminToken').addEventListener('input', function() {
+      const normalized = String(this.value || '').trim();
+      persistServerAdminToken(normalized);
+      if (normalized) {
+        setServerAdminStatus('ok', 'Server admin token stored in this browser.');
+      } else if (serverRuntime.selfHostServerMode && !canQueryLocalRuntime()) {
+        setServerAdminStatus('info', 'Server admin token required for remote self-host setup.');
+      } else {
+        setServerAdminStatus('', '');
+      }
+      updateServerAdminUi();
+    });
 
     document.getElementById('installMode').addEventListener('change', function() {
       const nextTarget = this.value === 'hosted' ? 'seedbox' : getInstallTarget();
@@ -3986,12 +4143,15 @@
     spawnDebridDots();
     document.getElementById('localInstall').style.display = 'none';
     document.getElementById('hostedInstall').style.display = 'none';
-    maybePrefillFromToken();
-    refreshLocalQbitRuntimeStatus();
-    refreshLocalStremioStatus();
-    updateQuickSetupStatus();
     window.addEventListener('beforeunload', stopStremioAuthKeyPolling);
     updateLanBridgeInstallMessaging();
+    loadServerRuntimeConfig()
+      .then(() => maybePrefillFromToken())
+      .finally(() => {
+        refreshLocalQbitRuntimeStatus();
+        refreshLocalStremioStatus();
+        updateQuickSetupStatus();
+      });
 
     function startPageFlicker() {
       if (window.innerWidth < 768) return;
@@ -4064,6 +4224,29 @@
         if (second >= 16 && second <= 31) return true;
       }
       return false;
+    }
+
+    function canAdministerSelfHostedServer() {
+      return serverRuntime.selfHostServerMode && (canQueryLocalRuntime() || Boolean(getServerAdminToken()));
+    }
+
+    async function ensureSelfHostAdminAccess(actionLabel = 'continue') {
+      if (!serverRuntime.selfHostServerMode || canQueryLocalRuntime() || getServerAdminToken()) {
+        return true;
+      }
+      const entered = window.prompt(`Enter the PVTKRRX server admin token to ${actionLabel}.`);
+      if (!entered) {
+        setServerAdminStatus('err', 'Server admin token required for remote self-host setup.');
+        updateServerAdminUi();
+        return false;
+      }
+      const normalized = String(entered || '').trim();
+      persistServerAdminToken(normalized);
+      const input = document.getElementById('serverAdminToken');
+      if (input) input.value = normalized;
+      setServerAdminStatus('ok', 'Server admin token stored in this browser.');
+      updateServerAdminUi();
+      return true;
     }
 
     function setRuntimeStatus(id, type, message) {
@@ -4493,10 +4676,25 @@
 
     async function maybePrefillFromToken() {
       const token = getConfigTokenFromPath();
-      if (!token && !canQueryLocalRuntime()) return;
-      const path = token ? `/${encodeURIComponent(token)}/config.json` : '/local/config.json';
+      let path = '';
+      if (token) {
+        path = `/${encodeURIComponent(token)}/config.json`;
+      } else if (serverRuntime.selfHostServerMode && serverRuntime.serverConfigAlias) {
+        path = `/${encodeURIComponent(serverRuntime.serverConfigAlias)}/config.json`;
+      } else if (canQueryLocalRuntime()) {
+        path = '/local/config.json';
+      } else {
+        return;
+      }
       try {
-        const res = await fetch(path, { cache: 'no-store' });
+        const res = await fetch(path, {
+          cache: 'no-store',
+          headers: buildServerAdminHeaders()
+        });
+        if (res.status === 401 && serverRuntime.selfHostServerMode) {
+          updateServerAdminUi();
+          return;
+        }
         if (!res.ok) return;
         const data = await res.json();
         fillConfig(data);
@@ -4516,12 +4714,8 @@
     function validateReachability(config, installMode) {
       if (installMode === 'local') return null;
 
-      // Detect self-hosted: page served via HTTP/private address, or this
-      // server IS the relay (origin matches relay URL).  Self-hosted seedbox
-      // installs can legitimately use localhost/LAN Prowlarr & qBit URLs.
-      const publicCurrentOrigin = getCurrentPublicOrigin();
-      const relayBase = normalizeRelayUrl(config.lanPairRelayUrl || lanPair.relayUrl || '');
-      const selfHosted = !publicCurrentOrigin || relayBase === publicCurrentOrigin;
+      const selfHosted = serverRuntime.selfHostServerMode === true;
+      const canUsePrivateTargets = canAdministerSelfHostedServer();
 
       const checks = [
         ['Prowlarr URL', config.jackettUrl],
@@ -4534,16 +4728,17 @@
       for (const [label, value] of checks) {
         try {
           const u = new URL(value);
-          if (!selfHosted && isPrivateHostname(u.hostname)) {
-            return `${label} uses ${u.hostname}. Remote Seedbox needs public URLs. Use PC Local or LAN Bridge instead.`;
+          if (isPrivateHostname(u.hostname) && !canUsePrivateTargets) {
+            return selfHosted
+              ? `${label} uses ${u.hostname}. Enter the server admin token or open this page on the server itself to use localhost/private service URLs.`
+              : `${label} uses ${u.hostname}. Remote Seedbox needs public URLs. Use PC Local or LAN Bridge instead.`;
           }
         } catch (e) {
           return `${label} is not a valid URL`;
         }
       }
 
-      const usingExternalHostedRelay = !publicCurrentOrigin || relayBase !== publicCurrentOrigin;
-      if (!selfHosted && usingExternalHostedRelay && !config.fileServerUrl) {
+      if (!selfHosted && !config.fileServerUrl) {
         return 'Remote Seedbox on the hosted relay needs an HTTPS File Server URL for completed-file playback. Hosted relay playback is effectively ready-file / public-playback only here, so add your seedbox file server URL or self-host PVTKRRX directly on the seedbox.';
       }
 
@@ -4687,33 +4882,75 @@
           clearLanPairInstallFields();
           setPairStatusNote('LAN Bridge status: idle (Remote Seedbox selected).');
           const hostedPayload = routeParity.stripRemoteSeedboxLanFields(config, { keepRelayUrl: true });
-          const res = await fetch('/encrypt', {
-            method: 'POST',
-            headers: buildJsonHeaders(),
-            body: JSON.stringify(hostedPayload)
-          });
-          const data = await res.json();
 
-          if (data.error) {
-            return setStatus('installStatus', 'err', data.error);
+          if (serverRuntime.selfHostServerMode) {
+            const selfHostBase = getCurrentAppOrigin();
+            if (!selfHostBase) {
+              return setStatus('installStatus', 'err', 'Could not determine the current self-hosted server URL.');
+            }
+            if (!(await ensureSelfHostAdminAccess('save this self-hosted server config'))) {
+              return setStatus('installStatus', 'err', 'Server admin token required to save the self-hosted server config.');
+            }
+
+            const saveRes = await fetch('/server-config', {
+              method: 'POST',
+              headers: buildJsonHeaders(),
+              body: JSON.stringify(hostedPayload)
+            });
+            const saveData = await saveRes.json().catch(() => ({}));
+            if (!saveRes.ok || saveData.error) {
+              if (saveRes.status === 401) {
+                setServerAdminStatus('err', 'Server admin token rejected.');
+              }
+              return setStatus('installStatus', 'err', saveData.error || 'Failed to save self-hosted server config');
+            }
+
+            updateSavedSecretState(saveData.savedSecrets || {});
+            serverRuntime.serverConfigConfigured = true;
+            const configAlias = String(saveData.configAlias || serverRuntime.serverConfigAlias || 'selfhost').trim() || 'selfhost';
+            const relayHost = new URL(selfHostBase).host;
+            const modeQuery = '?mode=' + encodeURIComponent(installMode);
+            const manifestPath = '/' + encodeURIComponent(configAlias) + '/manifest.json' + modeQuery;
+            const manifestUrl = selfHostBase + manifestPath;
+            const stremioUrl = 'stremio://' + relayHost + manifestPath;
+            setPrivateLink('hostedManifest', manifestUrl);
+            setPrivateLink('hostedStremio', stremioUrl);
+
+            setInstallAnchorState('stremioLinkHosted', stremioUrl, 'Install PVTKRRX (Remote Seedbox)');
+            document.getElementById('hostedUrlDisplay').textContent = manifestUrl;
+
+            document.getElementById('installLink').style.display = 'block';
+            syncInstallTargetUi();
+            setStatus('installStatus', 'ok', 'Remote Seedbox route ready on this self-hosted server. The saved config is now stored locally and will be reused on every server boot.');
+          } else {
+            const res = await fetch('/encrypt', {
+              method: 'POST',
+              headers: buildJsonHeaders(),
+              body: JSON.stringify(hostedPayload)
+            });
+            const data = await res.json();
+
+            if (data.error) {
+              return setStatus('installStatus', 'err', data.error);
+            }
+
+            const relayBase = normalizeRelayUrl(config.lanPairRelayUrl || lanPair.relayUrl || resolveDefaultRelayBaseUrl());
+            const relayHost = new URL(relayBase).host;
+            const token = encodeURIComponent(data.token);
+            const modeQuery = '?mode=' + encodeURIComponent(installMode);
+            const manifestPath = '/' + token + '/manifest.json' + modeQuery;
+            const manifestUrl = relayBase + manifestPath;
+            const stremioUrl = 'stremio://' + relayHost + manifestPath;
+            setPrivateLink('hostedManifest', manifestUrl);
+            setPrivateLink('hostedStremio', stremioUrl);
+
+            setInstallAnchorState('stremioLinkHosted', stremioUrl, 'Install PVTKRRX (Remote Seedbox)');
+            document.getElementById('hostedUrlDisplay').textContent = manifestUrl;
+
+            document.getElementById('installLink').style.display = 'block';
+            syncInstallTargetUi();
+            setStatus('installStatus', 'ok', 'Remote Seedbox route ready. Hosted playback is effectively ready-file-first here, and auth-protected file-server playback still needs real-device validation.');
           }
-
-          const relayBase = normalizeRelayUrl(config.lanPairRelayUrl || lanPair.relayUrl || resolveDefaultRelayBaseUrl());
-          const relayHost = new URL(relayBase).host;
-          const token = encodeURIComponent(data.token);
-          const modeQuery = '?mode=' + encodeURIComponent(installMode);
-          const manifestPath = '/' + token + '/manifest.json' + modeQuery;
-          const manifestUrl = relayBase + manifestPath;
-          const stremioUrl = 'stremio://' + relayHost + manifestPath;
-          setPrivateLink('hostedManifest', manifestUrl);
-          setPrivateLink('hostedStremio', stremioUrl);
-
-          setInstallAnchorState('stremioLinkHosted', stremioUrl, 'Install PVTKRRX (Remote Seedbox)');
-          document.getElementById('hostedUrlDisplay').textContent = manifestUrl;
-
-          document.getElementById('installLink').style.display = 'block';
-          syncInstallTargetUi();
-          setStatus('installStatus', 'ok', 'Remote Seedbox route ready. Hosted playback is effectively ready-file-first here, and auth-protected file-server playback still needs real-device validation.');
         }
       } catch (err) {
         setStatus('installStatus', 'err', 'Install failed: ' + err.message);

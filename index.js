@@ -22,7 +22,7 @@ const {
   // State & singletons
   lanPairStore, accountStore, rateLimiters,
   watchedDeleteTimers, watchedDeleteInFlight,
-  IS_VERCEL_RUNTIME, DEFAULT_LOCAL_HOSTNAME,
+  IS_VERCEL_RUNTIME, SELF_HOST_SERVER_MODE, DEFAULT_LOCAL_HOSTNAME,
   STREAM_WAIT_TIMEOUT_MS, STREAM_WAIT_INTERVAL_MS,
   STREAM_RANGE_WAIT_TIMEOUT_MS, STREAM_RANGE_WAIT_INTERVAL_MS,
   STREAM_READY_START_FRACTION, STREAM_PRIORITIZE_LAST_PIECES,
@@ -62,11 +62,11 @@ const {
   isSensitiveCorsRoute, isAllowedSensitiveOrigin, normalizeOrigin,
   ensureCsrfCookie, requestHostname, isLoopbackHost, getInstallMode,
   shouldRejectPcLocalManifestRequest, parseHttpUrlCandidate,
-  sanitizeHostForUrl, validateHostedConnectionTarget,
+  sanitizeHostForUrl, validateHostedConnectionTarget, hasServerAdminToken,
   isLocalNetworkRequest, parseBooleanLoose,
   // Middleware
   requireCsrfToken, requireLocalNetworkRoute, requireLocalConfigReadback,
-  requireLocalQbitControl, requireAuthUser, requireConfigSubscription,
+  requireLocalQbitControl, requireServerAdminToken, requireAuthUser, requireConfigSubscription,
   withConfig, withLegacyRootLocalConfig,
   // Auth
   getAuthTokenSecret, authSecretAvailable, isValidEmail, publicUserModel,
@@ -194,6 +194,14 @@ app.get('/seedbox-runbooks', (req, res) => {
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
   res.sendFile(runbooksPage)
 })
+app.get('/app-config.json', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  res.json({
+    selfHostServerMode: SELF_HOST_SERVER_MODE,
+    serverConfigAlias: SELF_HOST_SERVER_MODE ? 'selfhost' : '',
+    serverConfigConfigured: SELF_HOST_SERVER_MODE ? Boolean(loadLocalConfigFile()) : false
+  })
+})
 app.get(['/thumb/sports/:info.svg', '/thumb/sports/:variant/:info.svg'], (req, res) => {
   try {
     const payload = decodeSportsThumbToken(req.params.info)
@@ -278,6 +286,32 @@ app.post('/local-config', requireLocalNetworkRoute, async (req, res) => {
     })
   } catch (err) {
     res.status(500).json({ error: 'Failed to save local config' })
+  }
+})
+
+// Save self-hosted server config to disk so the server keeps a stable /selfhost manifest URL.
+app.post('/server-config', requireCsrfToken, requireServerAdminToken, async (req, res) => {
+  const cfg = req.body && typeof req.body === 'object' && !Array.isArray(req.body)
+    ? req.body
+    : {}
+
+  try {
+    const existingConfig = resolveExistingConfigForBody(cfg, { preferLocal: true })
+    const mergedConfig = mergeRetainedSecrets(cfg, existingConfig)
+    const saved = await hydrateAccountLinkForConfig(normalizeAddonConfig(mergedConfig, {
+      includeLocalSecrets: true
+    }))
+    saveLocalConfigFile(saved)
+    scheduleLocalProviderWarmup(saved, console, 'server-config-save').catch(err => {
+      console.warn('[server-config-save] Provider warmup failed:', err.message)
+    })
+    res.json({
+      ok: true,
+      configAlias: 'selfhost',
+      ...buildConfigReadback(saved)
+    })
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save server config' })
   }
 })
 
@@ -892,12 +926,10 @@ app.post('/test-connection', requireCsrfToken, async (req, res) => {
   const parsedJackettUrl = parseHttpUrlCandidate(jackettUrl)
   const parsedQbitUrl = parseHttpUrlCandidate(qbitUrl)
   const trustedLocalCaller = isSameHostRequest(req)
+  const trustedServerAdminCaller = trustedLocalCaller || hasServerAdminToken(req)
 
   try {
-    // Self-hosted servers (non-Vercel) can connect to any target including
-    // localhost/LAN — the operator IS the admin.  The private-target guard
-    // only protects the public hosted relay from being used as a proxy.
-    if (!trustedLocalCaller && IS_VERCEL_RUNTIME) {
+    if (!trustedServerAdminCaller) {
       for (const target of [parsedJackettUrl, parsedQbitUrl]) {
         await validateHostedConnectionTarget(target)
       }

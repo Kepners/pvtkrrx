@@ -13,7 +13,14 @@ function resolveRuntimeDir(env = process.env, options = {}) {
     return path.join(baseDir, 'PVTKRRX', 'runtime')
   }
 
-  return path.join(cwd, '.runtime')
+  const homeDir = String(env?.HOME || env?.USERPROFILE || '').trim()
+  if (platform === 'darwin') {
+    return path.join(homeDir || cwd, 'Library', 'Application Support', 'PVTKRRX', 'runtime')
+  }
+
+  const xdgDataHome = String(env?.XDG_DATA_HOME || '').trim()
+  const baseDir = xdgDataHome || path.join(homeDir || cwd, '.local', 'share')
+  return path.join(baseDir, 'PVTKRRX', 'runtime')
 }
 
 module.exports = {

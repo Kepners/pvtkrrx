@@ -6,9 +6,12 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
+    "server:setup": "node scripts/server-setup.js",
+    "server:install-service": "node scripts/install-systemd-service.js",
     "smoke:parity": "node scripts/smoke-parity-helpers.js",
     "smoke:config": "node scripts/smoke-config-flow.js",
     "smoke:guards": "node scripts/smoke-runtime-guards.js",
+    "smoke:selfhost": "node scripts/smoke-selfhost-server.js",
     "smoke:lan-pair": "node scripts/smoke-lan-pair-flow.js",
     "smoke:pipeline": "node scripts/smoke-stream-pipeline.js",
     "smoke:stremio-link": "node scripts/smoke-stremio-link.js",

@@ -11,6 +11,7 @@ The practical reading of the project today is:
 
 - `PC Local` is the real host-desktop route and is working
 - `LAN Bridge` is the same-account home-device route and the host desktop should not use it for local browsing
+- explicit self-host server mode now exists for VPS/seedbox installs, with disk-backed `/selfhost` manifests, browser-admin auth for private service URLs, and optional `systemd` boot automation
 - completed-file playback on the local runtime is working again after the `/playback` and `/file` path fixes
 - official Stremio archive-source support for `rarUrls` is real and was re-verified against upstream SDK/core sources on 2026-03-30
 - PVTKRRX now treats extracted direct video as the only supported packed-RAR playback path by default, and keeps native `rarUrls` behind an explicit experimental override
@@ -25,6 +26,7 @@ The practical reading of the project today is:
 These items are verified in the current workspace or by direct client/log proof:
 
 - `npm run smoke:config` passed on 2026-03-29
+- `npm run smoke:selfhost` passed on 2026-03-31 and now covers explicit self-host server mode, disk-backed `/selfhost` config, and server-admin token gates
 - `npm run smoke:desktop` passed on 2026-03-29 and now guards the desktop auto-provision persistence path against writing redacted config readbacks back to disk
 - `npm run smoke:playback` passed on 2026-03-29 and now covers redirect plus byte-serving on the shared `/file` route
 - `npm run smoke:pipeline` passed on 2026-03-29
@@ -35,6 +37,8 @@ These items are verified in the current workspace or by direct client/log proof:
 - 2026-03-31 public host check: `https://www.pvtkrrx.cc/`, `/configure`, `/runbooks`, `/manifest.json`, and `/health` all returned `200` from the live public host; `/local/install` returned `403` as expected for a local-only helper route
 - 2026-03-31 preview-host check: `https://pvtkrrx.vercel.app/` returned `404` with `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`, so treat it as stale and non-canonical
 - 2026-03-31 homepage rewrite landed locally in `public/index.html`: plain-English hero, route comparison, requirements section, sports proof section, and removal of the public `/local/install` CTA
+- explicit self-host server mode now exposes `/app-config.json`, disk-backed `/selfhost/config.json` + `/selfhost/manifest.json?mode=hosted`, and `POST /server-config` for persisted VPS/seedbox installs
+- `npm run server:setup` now writes `.env`, saves the runtime config locally, creates a server admin token file, and can install a Linux `systemd` service for auto-start on boot
 - `PC Local` resolves as a real addon from `http://127.0.0.1:7000/local/manifest.json?mode=local`
 - same-host `LAN Bridge` `Failed to fetch` was traced to route choice on 2026-03-28, not to server failure
 - completed-file playback error `isCompletedTorrent is not defined` was fixed in the local playback path
