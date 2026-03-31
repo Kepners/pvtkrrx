@@ -345,6 +345,30 @@ async function run() {
 
     await withScenario(async () => {
       process.env.VERCEL = '1'
+      ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent().hash, link: '' })]
+      QBitClient.prototype.torrents = async () => [matchedTorrent({ progress: 1 })]
+      QBitClient.prototype.files = async () => [matchedFile({ progress: 1 })]
+      CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({
+          pathMapping: { from: '/downloads/complete', to: 'media' }
+        }),
+        'movie',
+        'tt1234567',
+        'https://pvtkrrx.vercel.app',
+        'remote-token'
+      )
+
+      assert.equal(result.streams.length, 1, '#3d hosted remote ready-file flow should still emit a direct stream when the file is already complete')
+      assert.equal(String(result.streams[0]?.url || ''), 'https://files.example/media/Movie.Name.2026.1080p.WEB-DL.x264.mkv', '#3d hosted remote ready-file stream should point at the external file server')
+      assert.match(String(result.streams[0]?.name || ''), /\[SERVER\]/, '#3d hosted remote ready-file stream should show the server origin badge')
+      assert.match(String(result.streams[0]?.description || ''), /Source: Remote Server/i, '#3d hosted remote ready-file stream description should say the server is serving the file')
+      assert.equal(String(result.streams[0]?.behaviorHints?.sourceOrigin || ''), 'server', '#3d hosted remote ready-file stream should expose the server origin hint')
+    })
+
+    await withScenario(async () => {
+      process.env.VERCEL = '1'
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem()]
       QBitClient.prototype.torrents = async () => []
       CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
@@ -362,8 +386,11 @@ async function run() {
 
       assert.equal(result.streams.length, 1, '#4 local playback-capable route should still emit tracker playback stream')
       assert.match(String(result.streams[0]?.url || ''), /\/local\/playback\//)
+      assert.match(String(result.streams[0]?.name || ''), /\[PC\]/, '#4 tracker stream should show the PC origin badge')
       assert.match(String(result.streams[0]?.name || ''), /⬇️/, '#4 tracker stream should show the download-and-play badge before the file is downloaded')
       assert.match(String(result.streams[0]?.description || ''), /Download and play/i, '#4 tracker stream description should say download and play while it is not downloaded yet')
+      assert.match(String(result.streams[0]?.description || ''), /Source: Host PC/i, '#4 tracker stream description should say the host PC will do the work')
+      assert.equal(String(result.streams[0]?.behaviorHints?.sourceOrigin || ''), 'pc', '#4 tracker stream should expose the PC origin hint')
     })
 
     await withScenario(async () => {
@@ -384,9 +411,12 @@ async function run() {
       assert.equal(result.streams.length, 1, '#4b local buffering flow should remain intact')
       assert.match(String(result.streams[0]?.url || ''), /\/local\/file\//)
       assert.equal(String(result.streams[0]?.behaviorHints?.sourceMode || ''), 'buffering')
+      assert.equal(String(result.streams[0]?.behaviorHints?.sourceOrigin || ''), 'pc', '#4b buffering stream should expose the PC origin hint')
+      assert.match(String(result.streams[0]?.name || ''), /\[PC\]/, '#4b buffering stream should show the PC origin badge')
       assert.match(String(result.streams[0]?.name || ''), /⏳/, '#4b buffering stream should show the buffering badge')
       assert.match(String(result.streams[0]?.name || ''), /🎬MKV/, '#4b buffering stream should show the detected file format badge')
       assert.match(String(result.streams[0]?.description || ''), /Buffering/i, '#4b buffering stream description should say buffering')
+      assert.match(String(result.streams[0]?.description || ''), /Source: Host PC/i, '#4b buffering stream description should say the host PC is serving the stream')
       assert.match(String(result.streams[0]?.description || ''), /Format: MKV/i, '#4b buffering stream description should surface the file format')
     })
 
@@ -736,9 +766,11 @@ async function run() {
         '#4j completed direct-video streams should carry the resolved absolute file path so playback survives if the torrent row disappears later'
       )
       assert.ok(result.streams.every(stream => String(stream?.name || '').startsWith('PVTKRRX ') || !stream?.name), '#4j stream names should start with PVTKRRX so Stremio can group them under the addon source')
+      assert.match(String(result.streams[0]?.name || ''), /\[PC\]/, '#4j completed direct-video stream should show the PC origin badge')
       assert.match(String(result.streams[0]?.name || ''), /✅/, '#4j completed direct-video stream should show the downloaded badge')
       assert.match(String(result.streams[0]?.name || ''), /🎬MP4/, '#4j completed direct-video stream should show the detected file format badge')
       assert.match(String(result.streams[0]?.description || ''), /Downloaded/i, '#4j completed direct-video stream description should replace queue-and-buffer with downloaded')
+      assert.match(String(result.streams[0]?.description || ''), /Source: Host PC/i, '#4j completed direct-video stream description should say the host PC already has the file')
       assert.match(String(result.streams[0]?.description || ''), /Format: MP4/i, '#4j completed direct-video stream description should surface the file format')
     })
 

@@ -93,9 +93,11 @@ function buildStreamName(parsed, mode, fileName = '', options = {}) {
   const shortSource = parsed?.source || ''
   const shortCodec = parsed?.codec || ''
   const tech = uniqueNonEmpty([shortSource, shortCodec]).join(' ')
+  const tag = String(options.sourceTag || '').trim()
+  const tagSegment = tag ? ` ${tag}` : ''
   return tech
-    ? `PVTKRRX ${badge} ${quality} ${tech} 🎬${container}`
-    : `PVTKRRX ${badge} ${quality} 🎬${container}`
+    ? `PVTKRRX ${badge}${tagSegment} ${quality} ${tech} 🎬${container}`
+    : `PVTKRRX ${badge}${tagSegment} ${quality} 🎬${container}`
 }
 
 function buildDescription(item, parsed, mode, progressPercent = null, fileName = '', options = {}) {
@@ -119,6 +121,7 @@ function buildDescription(item, parsed, mode, progressPercent = null, fileName =
   ]).join(' | ')
   const enrichedStats = uniqueNonEmpty([
     modeLabel,
+    options.sourceLabel ? `Source: ${options.sourceLabel}` : '',
     `Format: ${detectContainerLabel(fileName, parsed?.container, parsed?.titleHint, parsed?.title)}`,
     peerLabel,
     `Size: ${formatSize(item.size)}`,
@@ -148,7 +151,9 @@ function buildOnSeedboxStream(item, fileUrl, fileName, videoSize, config, parsed
       sourceQuality: String(parsed?.quality || ''),
       sourceSize: Math.max(0, Number(videoSize || item?.size || 0)),
       sourceMode: 'seedbox',
-      sourceContainer: containerLabel.toLowerCase()
+      sourceContainer: containerLabel.toLowerCase(),
+      sourceOrigin: String(options.sourceOrigin || ''),
+      sourceOriginLabel: String(options.sourceLabel || '')
     }
   }
 
@@ -181,7 +186,9 @@ function buildOnBufferingStream(item, fileUrl, fileName, videoSize, config, pars
       sourceQuality: String(parsed?.quality || ''),
       sourceSize: Math.max(0, Number(videoSize || item?.size || 0)),
       sourceMode: 'buffering',
-      sourceContainer: containerLabel.toLowerCase()
+      sourceContainer: containerLabel.toLowerCase(),
+      sourceOrigin: String(options.sourceOrigin || ''),
+      sourceOriginLabel: String(options.sourceLabel || '')
     }
   }
 
@@ -213,18 +220,20 @@ function buildOnTrackerStream(item, playbackUrl, parsed, options = {}) {
       sourceQuality: String(parsed?.quality || ''),
       sourceSize: Math.max(0, Number(item?.size || 0)),
       sourceMode: 'tracker',
-      sourceContainer: detectContainerLabel(item?.title || safeName).toLowerCase()
+      sourceContainer: detectContainerLabel(item?.title || safeName).toLowerCase(),
+      sourceOrigin: String(options.sourceOrigin || ''),
+      sourceOriginLabel: String(options.sourceLabel || '')
     }
   }
 }
 
-function buildOnArchiveStream(item, rarUrls, fileName, totalBytes, parsed, progressPercent = null) {
+function buildOnArchiveStream(item, rarUrls, fileName, totalBytes, parsed, progressPercent = null, options = {}) {
   const buffering = Number.isFinite(progressPercent) && progressPercent < 100
   const mode = buffering ? 'buffering' : 'seedbox'
   return {
-    name: buildStreamName(parsed, mode, fileName),
+    name: buildStreamName(parsed, mode, fileName, options),
     description: withExtraDescription(
-      buildDescription(item, parsed, mode, progressPercent, fileName),
+      buildDescription(item, parsed, mode, progressPercent, fileName, options),
       ['Multi-part RAR archive stream']
     ),
     rarUrls,
@@ -240,7 +249,9 @@ function buildOnArchiveStream(item, rarUrls, fileName, totalBytes, parsed, progr
       sourceQuality: String(parsed?.quality || ''),
       sourceSize: Math.max(0, Number(totalBytes || item?.size || 0)),
       sourceMode: mode,
-      sourceContainer: 'rar'
+      sourceContainer: 'rar',
+      sourceOrigin: String(options.sourceOrigin || ''),
+      sourceOriginLabel: String(options.sourceLabel || '')
     }
   }
 }
@@ -573,5 +584,3 @@ module.exports = {
   findEpisodeFile,
   sortStreams
 }
-
-

@@ -167,7 +167,7 @@ Hosted relay routes do not proxy video bytes, and hosted `/file` or `/playback` 
 
 ### Stream Types
 
-PVTKRRX stream rows now show explicit state + format badges in the stream `name`: `[Q&B]`, `[BUF]`, `[DL]`, `[EXTRACTED]`, plus the detected container such as `[MKV]` or `[MP4]`. The description also switches from `Queue and buffer` to `Downloaded` once the file is actually ready.
+PVTKRRX stream rows now show a visible source badge plus explicit state + format badges in the stream `name`: `PVTKRRX ✅ [PC] ...` for host-PC playback and `PVTKRRX ✅ [SERVER] ...` for remote/server playback, plus the detected container such as `🎬MKV` or `🎬MP4`. The description also switches from `Download and play` / `Buffering` to `Downloaded` once the file is actually ready and now states whether the host PC or remote server is serving it.
 
 **⚡ On Seedbox** — File is already downloaded. Plays immediately.
 

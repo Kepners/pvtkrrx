@@ -15,6 +15,7 @@ const { decodeCustomId } = require('../utils/customId')
 const { isCompletedTorrent } = require('../utils/torrentState')
 const { fetchTorrentPayload, inspectTorrentPayload } = require('../utils/torrentPayload')
 const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
+
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '7000', 10))
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '5000', 10))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '20', 10))
@@ -39,6 +40,12 @@ function buildConfigureHelpUrl(addonUrl, target = 'seedbox') {
   return `${base}/configure?target=${encodeURIComponent(target)}`
 }
 
+function getStreamSourceOptions(configToken) {
+  return String(configToken || '').trim().toLowerCase() === 'local'
+    ? { sourceTag: '[PC]', sourceLabel: 'Host PC', sourceOrigin: 'pc' }
+    : { sourceTag: '[SERVER]', sourceLabel: 'Remote Server', sourceOrigin: 'server' }
+}
+
 function canServeBuiltinFileRoute(configToken) {
   return String(configToken || '') === 'local' || !process.env.VERCEL
 }
@@ -57,6 +64,7 @@ function buildDirectLocalFileUrl(addonUrl, configToken, hash, filePath) {
 
 function buildOrphanedCustomFileStream(config, configToken, addonUrl, info, parsed) {
   if (!canServeBuiltinFileRoute(configToken)) return null
+  const streamSourceOptions = getStreamSourceOptions(configToken)
 
   const infoHash = String(info?.h || '').toLowerCase()
   const filePath = String(info?.f || '').trim()
@@ -80,7 +88,8 @@ function buildOrphanedCustomFileStream(config, configToken, addonUrl, info, pars
     path.basename(filePath),
     stat.size,
     config,
-    parsed
+    parsed,
+    streamSourceOptions
   )
 }
 
@@ -143,7 +152,7 @@ function experimentalNativeRarStreamsEnabled() {
   return /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS || '').trim())
 }
 
-function buildMatchedArchiveStream(config, configToken, addonUrl, matched, files, item, parsed) {
+function buildMatchedArchiveStream(config, configToken, addonUrl, matched, files, item, parsed, streamSourceOptions = {}) {
   const archiveFiles = findPackedArchiveFiles(files)
   if (archiveFiles.length === 0) return null
   if (!arePackedArchiveFilesReady(archiveFiles)) return null
@@ -166,11 +175,12 @@ function buildMatchedArchiveStream(config, configToken, addonUrl, matched, files
     buildArchiveDisplayFilename(item?.title || matched?.name || ''),
     totalBytes,
     parsed,
-    100
+    100,
+    streamSourceOptions
   )
 }
 
-function buildExtractedArchiveStream(config, configToken, addonUrl, matched, item, parsed, extractedFilePath) {
+function buildExtractedArchiveStream(config, configToken, addonUrl, matched, item, parsed, extractedFilePath, streamSourceOptions = {}) {
   const absolutePath = path.normalize(String(extractedFilePath || '').trim())
   if (!absolutePath || !fs.existsSync(absolutePath)) return null
 
@@ -189,13 +199,16 @@ function buildExtractedArchiveStream(config, configToken, addonUrl, matched, ite
   })
   if (!fileUrl) return null
 
-  return buildOnSeedboxStream(item, fileUrl, fileName, stat.size, config, parsed, { extracted: true })
+  return buildOnSeedboxStream(item, fileUrl, fileName, stat.size, config, parsed, {
+    ...streamSourceOptions,
+    extracted: true
+  })
 }
 
-async function buildMatchedArchiveCompatibleStream(config, configToken, addonUrl, matched, files, item, parsed) {
+async function buildMatchedArchiveCompatibleStream(config, configToken, addonUrl, matched, files, item, parsed, streamSourceOptions = {}) {
   let extractedFilePath = findExtractedArchiveVideoPath(matched)
   if (extractedFilePath) {
-    const extractedStream = buildExtractedArchiveStream(config, configToken, addonUrl, matched, item, parsed, extractedFilePath)
+    const extractedStream = buildExtractedArchiveStream(config, configToken, addonUrl, matched, item, parsed, extractedFilePath, streamSourceOptions)
     if (extractedStream) {
       return { stream: extractedStream, extractionStatus: 'ready', streamKind: 'direct' }
     }
@@ -207,7 +220,7 @@ async function buildMatchedArchiveCompatibleStream(config, configToken, addonUrl
     extractionStatus = String(extraction?.status || '')
     if (extractionStatus === 'ready' && extraction?.path) {
       extractedFilePath = extraction.path
-      const extractedStream = buildExtractedArchiveStream(config, configToken, addonUrl, matched, item, parsed, extractedFilePath)
+      const extractedStream = buildExtractedArchiveStream(config, configToken, addonUrl, matched, item, parsed, extractedFilePath, streamSourceOptions)
       if (extractedStream) {
         return { stream: extractedStream, extractionStatus, streamKind: 'direct' }
       }
@@ -217,7 +230,7 @@ async function buildMatchedArchiveCompatibleStream(config, configToken, addonUrl
     extractionStatus = 'failed'
   }
 
-  const archiveStream = buildMatchedArchiveStream(config, configToken, addonUrl, matched, files, item, parsed)
+  const archiveStream = buildMatchedArchiveStream(config, configToken, addonUrl, matched, files, item, parsed, streamSourceOptions)
   if (archiveStream && experimentalNativeRarStreamsEnabled()) {
     return { stream: archiveStream, extractionStatus, streamKind: 'native-archive' }
   }
@@ -447,6 +460,7 @@ async function buildSupplementalSportsStreams({
   addonUrl,
   configToken,
   config,
+  streamSourceOptions,
   seenKeys,
   noticeCounts,
   trackerPlaybackEnabled,
@@ -530,7 +544,8 @@ async function buildSupplementalSportsStreams({
           streams.push(buildOnTrackerStream(
         item,
         `${addonUrl}/${configToken}/playback/${playbackInfo}`,
-        parse(item.title || searchQuery)
+        parse(item.title || searchQuery),
+        streamSourceOptions
       ))
     } catch (_) {
       // Skip invalid playback payloads instead of leaking raw tracker URLs.
@@ -632,6 +647,7 @@ function titleRelevant(resultTitle, queryTitle) {
 async function handleImdbStream(config, type, id, addonUrl, configToken) {
   const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
   const qbit = new QBitClient(config.qbitUrl, config.qbitUsername, config.qbitPassword)
+  const streamSourceOptions = getStreamSourceOptions(configToken)
   const trackerPlaybackRestriction = getTrackerPlaybackRestriction(config, configToken)
   const trackerPlaybackEnabled = !trackerPlaybackRestriction
   const noticeCounts = createNoticeCounts()
@@ -755,7 +771,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
           ? findEpisodeFile(files, season, episode)
           : findVideoFile(files)
         if (!videoFile?.name) {
-          const archiveResult = await buildMatchedArchiveCompatibleStream(config, configToken, addonUrl, matched, files, item, parsed)
+          const archiveResult = await buildMatchedArchiveCompatibleStream(config, configToken, addonUrl, matched, files, item, parsed, streamSourceOptions)
           if (archiveResult.stream) {
             streams.push(archiveResult.stream)
           } else if (findPackedArchiveFiles(files).length > 0) {
@@ -776,10 +792,10 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
           continue
         }
         if (isCompletedTorrent(matched, videoProgress)) {
-          streams.push(buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed))
+          streams.push(buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed, streamSourceOptions))
         } else {
           const percent = Math.max(0, Math.min(99, Math.floor(videoProgress * 100)))
-          streams.push(buildOnBufferingStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed, percent))
+          streams.push(buildOnBufferingStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed, percent, streamSourceOptions))
         }
       } catch (e) {
         // File listing failed, skip this stream
@@ -804,7 +820,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken) {
             h: item.infohash || inspection.infoHash || '',
             l: item.link
           })
-          streams.push(buildOnTrackerStream(item, `${addonUrl}/${configToken}/playback/${info}`, parsed))
+          streams.push(buildOnTrackerStream(item, `${addonUrl}/${configToken}/playback/${info}`, parsed, streamSourceOptions))
         } catch (_) {
           // Skip invalid playback payloads instead of leaking raw tracker URLs.
         }
@@ -828,6 +844,7 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
 
   const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
   const qbit = new QBitClient(config.qbitUrl, config.qbitUsername, config.qbitPassword)
+  const streamSourceOptions = getStreamSourceOptions(configToken)
   const trackerPlaybackRestriction = getTrackerPlaybackRestriction(config, configToken)
   const trackerPlaybackEnabled = !trackerPlaybackRestriction
   const noticeCounts = createNoticeCounts()
@@ -864,7 +881,8 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
           matched,
           files,
           { title: info.t, size: info.s, seeders: info.d, indexer: info.i || '' },
-          parsed
+          parsed,
+          streamSourceOptions
         )
         if (archiveResult.stream) {
           streams.push(archiveResult.stream)
@@ -889,10 +907,10 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
         }
         const item = { title: info.t, size: info.s, seeders: info.d }
         if (isCompletedTorrent(matched, videoProgress)) {
-          streams.push(buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed))
+          streams.push(buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed, streamSourceOptions))
         } else {
           const percent = Math.max(0, Math.min(99, Math.floor(videoProgress * 100)))
-          streams.push(buildOnBufferingStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed, percent))
+          streams.push(buildOnBufferingStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed, percent, streamSourceOptions))
         }
       }
     } catch (e) {
@@ -925,7 +943,8 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
         streams.push(buildOnTrackerStream(
           { title: info.t, size: info.s, seeders: info.d, indexer: info.i || '' },
           `${addonUrl}/${configToken}/playback/${playbackInfo}`,
-          parsed
+          parsed,
+          streamSourceOptions
         ))
       } catch (_) {
         // Skip invalid playback payloads instead of leaking raw tracker URLs.
@@ -942,6 +961,7 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
       addonUrl,
       configToken,
       config,
+      streamSourceOptions,
       seenKeys: seenSourceKeys,
       noticeCounts,
       trackerPlaybackEnabled,
@@ -1001,7 +1021,8 @@ async function handleCustomStream(config, id, addonUrl, configToken) {
           streams.push(buildOnTrackerStream(
             item,
             `${addonUrl}/${configToken}/playback/${playbackInfo}`,
-            parse(item.title || info.t)
+            parse(item.title || info.t),
+            streamSourceOptions
           ))
         } catch (_) {
           // Skip invalid playback payloads instead of leaking raw tracker URLs.
