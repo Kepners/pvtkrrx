@@ -9,6 +9,8 @@ One runtime. Three install routes. Use the route that matches where playback hap
 
 For the broader runtime and storage model, see `docs/CURRENT_DESIGN.md`.
 
+If you want the app to keep running without ongoing dependence on PVTKRRX infrastructure after setup, use explicit self-hosted server mode with a user-owned HTTPS origin. The hosted relay is optional convenience, not part of the self-host contract.
+
 ## Hosted Base
 
 - The canonical public host is `https://www.pvtkrrx.cc`.
@@ -35,8 +37,8 @@ For the broader runtime and storage model, see `docs/CURRENT_DESIGN.md`.
 1. `PC Local` is a real addon, not a helper-only route.
 2. The Windows host desktop must use `PC Local` for browsing and playback.
 3. `LAN Bridge` is the synced home-device addon for the user's other home devices.
-4. `Remote Seedbox` is separate from LAN pairing and expects public HTTPS playback infrastructure on the public hosted relay.
-5. Explicit self-hosted server mode (`PVTKRRX_SELF_HOST_MODE=true`) is different from the public hosted relay: it stores a disk-backed server config, exposes `/selfhost/manifest.json?mode=hosted`, and can use localhost/private service URLs after server-admin authentication.
+4. `Remote Seedbox` is separate from LAN pairing and expects public HTTPS playback infrastructure on the public hosted relay unless it is explicitly self-hosted.
+5. Explicit self-hosted server mode (`PVTKRRX_SELF_HOST_MODE=true`) is the independent path: it stores a disk-backed server config, exposes `/selfhost/manifest.json?mode=hosted`, can use localhost/private service URLs after server-admin authentication, and no longer depends on the hosted relay once bootstrap is complete.
 6. Raw `192.168.x.x:7000` addon installs are still not a stable Stremio path.
 7. `http://127.0.0.1:7000/...` remains the reliable manual install path for same-PC local use.
 8. `LAN Bridge` installs should be refreshed after meaningful pair/token/route changes because Stremio can keep stale hosted URLs.

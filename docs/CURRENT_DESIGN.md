@@ -11,7 +11,7 @@ If another document disagrees with this file, this file wins unless that documen
 
 PVTKRRX is one codebase with three active runtime pieces:
 
-1. Hosted relay on the public site (`https://www.pvtkrrx.cc` today, fronted by Caddy into the Express app):
+1. Optional hosted relay on the public site (`https://www.pvtkrrx.cc` today, fronted by Caddy into the Express app):
    - serves hosted manifests and the hosted configure UI
    - serves `/version-status.json` so the public site can compare the live build against the latest GitHub release
    - encrypts hosted config tokens
@@ -31,6 +31,7 @@ PVTKRRX is one codebase with three active runtime pieces:
    - auto-discovers existing Prowlarr/qBittorrent configs when the services are already installed, then fills the self-host config from the recovered URLs, API keys, usernames, and ports instead of forcing a blank slate
    - if those providers are missing on a direct `npm run server:setup` run, it can hand off to the full Linux bootstrap so the installer can install them instead of silently continuing with empty defaults
    - self-host install links should come from a configured public HTTPS base URL (`PVTKRRX_PUBLIC_BASE_URL`) rather than a raw public `http://IP:port` origin
+   - this is the independence path: after bootstrap, the runtime and config stay on the user's hardware and the hosted PVTKRRX site is no longer in the request path unless the user explicitly chooses the hosted relay
    - can install optional Linux `systemd` startup through `npm run server:setup` / `npm run server:install-service`
 3. Local runtime on the Windows host:
    - serves `PC Local` manifests and config-backed addon routes
@@ -205,6 +206,7 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 5. Root `/manifest.json` must remain a bootstrap manifest, not a real catalog-bearing route manifest.
 6. The repo contains historical planning docs from February 2026; they are useful for project history, not as the live architecture.
 7. Use `https://www.pvtkrrx.cc` as the canonical hosted base; the old `https://pvtkrrx.vercel.app` hostname is not part of the supported install surface.
+8. If the goal is to keep PVTKRRX out of the request path after setup, use explicit self-hosted server mode and a user-owned HTTPS origin.
 
 ## Documentation Canon
 

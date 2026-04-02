@@ -2,6 +2,8 @@
 
 **Connect your private tracker seedbox to Stremio. No debrid. No third-party media host. Your hardware, your trackers.**
 
+The self-hosted runtime is the independence path: install once, then the app runs from your own hardware and does not need PVTKRRX in the request path afterward.
+
 ## What This Does
 
 PVTKRRX is a Stremio addon that bridges your existing seedbox infrastructure into Stremio. You configure it with your own:
@@ -23,7 +25,7 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 - **Smart filtering** — Sports indexers never contaminate movie/TV searches
 - **Hosted tokens stay encrypted** — Hosted configs are AES-256-GCM encrypted in addon URLs; local installs save config only on the host PC runtime
 - **No debrid needed** — Your seedbox IS the streaming server
-- **Free hosted option** — Canonical hosted setup is available at `https://www.pvtkrrx.cc`
+- **Self-hosted runtime** - install on your own hardware and keep operating without our infrastructure in the middle after setup
 
 - **Desktop host controls** - The Windows shell now exposes qBit save-path visibility, packed-release extraction-hook control, tray restore, minimize, explicit exit, and Windows sign-in auto-launch
 
@@ -77,15 +79,17 @@ The February 2026 planning docs under `docs/` are kept as project history and ar
 
 ## Quick Start
 
-### Use the Hosted Service (Currently Free)
+If you want the app to be independent from PVTKRRX after setup, use the self-host path below. The hosted bootstrap is optional convenience, not the default contract.
 
-Visit **[www.pvtkrrx.cc](https://www.pvtkrrx.cc)** to configure your addon in 60 seconds.
-Use the canonical hosted base only: `https://www.pvtkrrx.cc`.
+### Optional Hosted Bootstrap
+
+Visit **[www.pvtkrrx.cc](https://www.pvtkrrx.cc)** if you want the hosted launcher or relay.
+Use the canonical hosted base only for bootstrap and hosted relay flows: `https://www.pvtkrrx.cc`.
 Do not use the old preview host `https://pvtkrrx.vercel.app`; on 2026-03-31 it returned Vercel `DEPLOYMENT_NOT_FOUND`.
 Hosted install links should resolve under `https://www.pvtkrrx.cc/{token}/manifest.json?...`.
 For `LAN Bridge`, the primary install action should start with `stremio://`; the hosted HTTPS manifest is manual fallback only when Stremio shows an `Add Addon URL` box.
 
-### Self-Host (Free)
+### Self-Host on Your Own Hardware
 
 ```bash
 curl -fsSL https://www.pvtkrrx.cc/install-selfhost.sh | sudo bash
@@ -107,6 +111,8 @@ The Linux installer now bootstraps a dedicated self-host server in one flow:
 - saves the disk-backed self-host config into the runtime directory
 - creates the server admin token file
 - can install/start a Linux `systemd` service for auto-boot
+
+After this first install, the runtime is yours. The hosted site is only the download/bootstrap source.
 
 If you are already inside a checked-out repo on the server, run the same installer directly:
 

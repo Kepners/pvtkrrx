@@ -3,9 +3,7 @@
 ## Problem
 Stremio requires HTTPS for any addon URL that is not `127.0.0.1`. A user can install PVTKRRX on a seedbox or VPS and have everything work internally, but they still need a public HTTPS URL to install it in Stremio.
 
-The current installer handles qBit, Prowlarr, Node, PVTKRRX, and systemd, but it does not finish the HTTPS part for self-hosted servers.
-
-Important: the `pvtkrrx.cc` relay is cloud-hosted only. The self-host installer should not try to register against it. Self-host HTTPS needs a direct public URL for the user's own server.
+The current installer handles qBit, Prowlarr, Node, PVTKRRX, and systemd, but it does not finish the HTTPS part for self-hosted servers. This plan is for user-owned installs; the hosted pvtkrrx.cc relay is a separate path and should not be required here.
 
 ## Self-Host Options
 
@@ -13,7 +11,7 @@ Important: the `pvtkrrx.cc` relay is cloud-hosted only. The self-host installer 
 How should Stremio reach this server?
 1) Cloudflare Tunnel (free random HTTPS URL)
 2) I have my own domain
-3) Skip - I will set this up later
+3) Skip - I'll set this up later
 ```
 
 ### Option 1: Cloudflare Tunnel
@@ -22,9 +20,11 @@ How should Stremio reach this server?
 - Gets an instant random `https://*.trycloudflare.com` URL
 - Install as a systemd service for persistence
 - No Cloudflare account needed for quick tunnels
+- Works behind NAT — no ports need to be open
 
-Pros: Zero config, no domain, direct connection, free
-Cons: Random URL changes on restart unless configured with an account, depends on the `cloudflared` binary
+Pros: Zero config, no domain, works behind NAT, free
+Cons: Random URL changes on restart unless configured with an account, depends on cloudflared binary
+- For a persistent URL, use a named Cloudflare Tunnel or your own domain instead of a quick tunnel.
 
 ### Option 2: Own Domain
 
@@ -43,41 +43,23 @@ Cons: Requires DNS setup and domain ownership
 - User configures it manually later
 - Shows clear instructions for what is still needed
 
-## Cloud Relay Note
-
-The hosted cloud version already uses `https://www.pvtkrrx.cc/{token}/manifest.json` for its relay-backed install flow. That is separate from self-hosting and does not belong in the self-host installer.
+Important: the self-host installer should not try to register against the pvtkrrx.cc relay. Self-host HTTPS needs a direct public URL for the user's own server.
 
 ## Traffic Model
 
 The HTTPS URL is not proxying video streams. It handles:
-- Manifest fetch
-- Catalog queries
-- Search queries
-- Stream lookups
+- Manifest fetch (once on install)
+- Catalog queries (JSON)
+- Search queries (JSON)
+- Stream lookups (JSON, returns redirect URLs)
 
-Video playback goes direct to the qBit file server URL. The tunnel or reverse proxy sees light JSON traffic only.
-
-## Implementation Notes
-
-### For Cloudflare Tunnel
-
-- Install the `cloudflared` binary
-- Create a systemd service for `cloudflared tunnel --url http://localhost:7000`
-- Parse the assigned URL from `cloudflared` output
-- Set `PVTKRRX_PUBLIC_BASE_URL` to the tunnel URL
-- Consider named tunnels with a Cloudflare account for persistence
-
-### For Own Domain
-
-- Install Caddy via the package manager
-- Write a Caddyfile such as `domain.com { reverse_proxy localhost:7000 }`
-- Let Caddy handle SSL via Let's Encrypt
-- Set `PVTKRRX_PUBLIC_BASE_URL`
+Video playback goes direct to the qBit file server URL. The relay/tunnel sees light JSON traffic only.
 
 ## Priority
 
-Build the self-host HTTPS options first: Cloudflare Tunnel, then own domain, then skip.
-The cloud relay path is already part of the hosted version.
+1. Cloudflare Tunnel — simplest to implement, works for everyone including behind NAT
+2. Own domain — power users
+3. Skip — always available
 
 ---
 
