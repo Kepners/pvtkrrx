@@ -31,24 +31,8 @@ resolve_repo_tarball_url() {
     return 0
   fi
 
-  local manifest_json=""
-  if manifest_json="$(curl -fsSL "$RELEASE_MANIFEST_URL" 2>/dev/null)"; then
-    local tarball_url
-    tarball_url="$(printf '%s\n' "$manifest_json" | grep -oE '"tarball_url":[[:space:]]*"[^"]+"' | head -1 | sed -E 's/^"tarball_url":[[:space:]]*"([^"]+)".*$/\1/')"
-    if [ -n "$tarball_url" ]; then
-      echo "$tarball_url"
-      return 0
-    fi
-
-    local tag_name
-    tag_name="$(printf '%s\n' "$manifest_json" | grep -oE '"tag_name":[[:space:]]*"[^"]+"' | head -1 | sed -E 's/^"tag_name":[[:space:]]*"([^"]+)".*$/\1/')"
-    if [ -n "$tag_name" ]; then
-      echo "https://codeload.github.com/${GITHUB_OWNER}/${GITHUB_REPO}/tar.gz/refs/tags/${tag_name}"
-      return 0
-    fi
-  fi
-
-  echo "No release manifest found at ${RELEASE_MANIFEST_URL}; falling back to branch ${REPO_BRANCH}." >&2
+  # Default: always pull from the configured branch (main).
+  # Set PVTKRRX_RELEASE_TAG to pin to a specific tagged release instead.
   echo "https://codeload.github.com/${GITHUB_OWNER}/${GITHUB_REPO}/tar.gz/refs/heads/${REPO_BRANCH}"
 }
 
