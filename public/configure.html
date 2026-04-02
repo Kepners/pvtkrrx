@@ -2184,6 +2184,7 @@
       stremioLinkingAvailable: runtimeBootstrap.stremioLinkingAvailable === true,
       desktopLocalOnly: runtimeBootstrap.desktopLocalOnly === true
     };
+    let serverAdminTokenAttentionRequested = false;
     const accountLinkState = {
       accountUserId: '',
       accountProvider: '',
@@ -2320,6 +2321,7 @@
         if (!document.getElementById('serverAdminStatus')?.textContent) {
           setServerAdminStatus('ok', 'Same-host access detected.');
         }
+        serverAdminTokenAttentionRequested = false;
         return;
       }
 
@@ -2328,11 +2330,25 @@
         if (!document.getElementById('serverAdminStatus')?.textContent) {
           setServerAdminStatus('ok', 'Server admin token stored in this browser.');
         }
+        serverAdminTokenAttentionRequested = false;
         return;
       }
 
       hint.textContent = 'Paste the token from your self-hosted server to load the saved server config and use localhost/private service URLs from this browser.';
       setServerAdminStatus('info', 'Server admin token required for remote self-host setup.');
+      if (!serverAdminTokenAttentionRequested) {
+        serverAdminTokenAttentionRequested = true;
+        window.requestAnimationFrame(() => {
+          try {
+            block.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            input.focus({ preventScroll: true });
+          } catch (_) {
+            try {
+              input.focus();
+            } catch (_) {}
+          }
+        });
+      }
     }
 
     function getQueryParam(name) {
