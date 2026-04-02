@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ─── configuration ──────────────────────────────────────────────────
 INSTALL_DIR="${PVTKRRX_INSTALL_DIR:-/opt/pvtkrrx}"
 REPO_TARBALL_URL="${PVTKRRX_REPO_TARBALL_URL:-https://codeload.github.com/Kepners/pvtkrrx/tar.gz/refs/heads/main}"
 NODE_VERSION="${PVTKRRX_NODE_VERSION:-22.14.0}"
 SERVICE_USER_DEFAULT="${PVTKRRX_SERVICE_USER:-${SUDO_USER:-${USER:-root}}}"
+PROWLARR_DATA="${PVTKRRX_PROWLARR_DATA:-/var/lib/prowlarr}"
+QBIT_USER="${PVTKRRX_QBIT_USER:-qbittorrent}"
+QBIT_PORT="${PVTKRRX_QBIT_WEBUI_PORT:-8080}"
+DOWNLOADS_DIR="${PVTKRRX_DOWNLOADS_DIR:-$INSTALL_DIR/downloads}"
 
-have_command() {
-  command -v "$1" >/dev/null 2>&1
-}
+# ─── helpers ────────────────────────────────────────────────────────
+have_command() { command -v "$1" >/dev/null 2>&1; }
 
 run_root() {
-  if [ "$(id -u)" -eq 0 ]; then
-    "$@"
-    return
-  fi
+  if [ "$(id -u)" -eq 0 ]; then "$@"; return; fi
   if ! have_command sudo; then
     echo "Root access is required to run: $*" >&2
     exit 1
@@ -26,52 +27,208 @@ detect_arch() {
   case "$(uname -m)" in
     x86_64|amd64) echo "x64" ;;
     aarch64|arm64) echo "arm64" ;;
-    *)
-      echo "Unsupported architecture: $(uname -m)" >&2
-      exit 1
-      ;;
+    *) echo "Unsupported architecture: $(uname -m)" >&2; exit 1 ;;
   esac
 }
 
-install_packages() {
-  if have_command apt-get; then
-    run_root apt-get update
-    run_root apt-get install -y ca-certificates tar xz-utils
-    return
-  fi
-  if have_command dnf; then
-    run_root dnf install -y ca-certificates tar xz
-    return
-  fi
-  if have_command yum; then
-    run_root yum install -y ca-certificates tar xz
-    return
-  fi
-  if have_command zypper; then
-    run_root zypper install -y ca-certificates tar xz
-    return
-  fi
-  if have_command pacman; then
-    run_root pacman -Sy --noconfirm ca-certificates tar xz
-    return
-  fi
-  if have_command apk; then
-    run_root apk add --no-cache ca-certificates tar xz
-    return
-  fi
-  echo "Missing required packages and no supported package manager was found." >&2
-  exit 1
+detect_pkg_manager() {
+  for pm in apt-get dnf yum zypper pacman apk; do
+    if have_command "$pm"; then echo "$pm"; return; fi
+  done
+  echo ""
+}
+
+install_system_packages() {
+  local pm="$1"
+  shift
+  case "$pm" in
+    apt-get)  run_root apt-get update -qq && run_root apt-get install -y -qq "$@" ;;
+    dnf)      run_root dnf install -y -q "$@" ;;
+    yum)      run_root yum install -y -q "$@" ;;
+    zypper)   run_root zypper install -y "$@" ;;
+    pacman)   run_root pacman -Sy --noconfirm "$@" ;;
+    apk)      run_root apk add --no-cache "$@" ;;
+    *) echo "No supported package manager found." >&2; exit 1 ;;
+  esac
 }
 
 ensure_base_tools() {
   local missing=0
-  have_command tar || missing=1
-  have_command xz || missing=1
+  have_command tar  || missing=1
+  have_command xz   || missing=1
+  have_command curl || missing=1
   if [ "$missing" -eq 1 ]; then
-    install_packages
+    local pm; pm="$(detect_pkg_manager)"
+    install_system_packages "$pm" ca-certificates tar xz-utils curl
   fi
 }
 
+# ─── qBittorrent ────────────────────────────────────────────────────
+install_qbittorrent() {
+  if have_command qbittorrent-nox; then
+    echo "✓ qBittorrent-nox already installed: $(qbittorrent-nox --version 2>/dev/null || echo 'unknown')"
+    return 0
+  fi
+
+  echo "Installing qBittorrent-nox..."
+  local pm; pm="$(detect_pkg_manager)"
+  install_system_packages "$pm" qbittorrent-nox
+
+  # Create service user if needed
+  if ! id "$QBIT_USER" >/dev/null 2>&1; then
+    run_root useradd -r -s /usr/sbin/nologin -m -d "/var/lib/$QBIT_USER" "$QBIT_USER"
+  fi
+
+  echo "✓ qBittorrent-nox installed"
+}
+
+setup_qbittorrent_service() {
+  local unit_path="/etc/systemd/system/qbittorrent-nox.service"
+  if [ -f "$unit_path" ] && systemctl is-active --quiet qbittorrent-nox 2>/dev/null; then
+    echo "✓ qBittorrent service already running"
+    return 0
+  fi
+
+  # Create downloads dir
+  run_root mkdir -p "$DOWNLOADS_DIR"
+  run_root chown "$QBIT_USER:$QBIT_USER" "$DOWNLOADS_DIR"
+
+  cat > /tmp/qbittorrent-nox.service << EOF
+[Unit]
+Description=qBittorrent-nox Daemon
+After=network.target
+
+[Service]
+User=$QBIT_USER
+Group=$QBIT_USER
+Type=simple
+ExecStart=/usr/bin/qbittorrent-nox --webui-port=$QBIT_PORT
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  run_root install -m 0644 /tmp/qbittorrent-nox.service "$unit_path"
+  rm -f /tmp/qbittorrent-nox.service
+  run_root systemctl daemon-reload
+  run_root systemctl enable qbittorrent-nox
+  run_root systemctl start qbittorrent-nox
+
+  # Wait for WebUI to come up
+  echo "Waiting for qBittorrent WebUI..."
+  local attempts=0
+  while [ "$attempts" -lt 15 ]; do
+    if curl -s -o /dev/null "http://127.0.0.1:$QBIT_PORT/" 2>/dev/null; then
+      break
+    fi
+    sleep 1
+    attempts=$((attempts + 1))
+  done
+
+  # Read the temp password from journal and configure
+  local temp_pass
+  temp_pass="$(journalctl -u qbittorrent-nox --no-pager -n 20 2>/dev/null | grep -oP 'temporary password.*: \K\S+' | tail -1 || true)"
+  if [ -n "$temp_pass" ]; then
+    # Login and set download path + disable CSRF for local access
+    local cookie_jar; cookie_jar="$(mktemp)"
+    if curl -s "http://127.0.0.1:$QBIT_PORT/api/v2/auth/login" \
+         -d "username=admin&password=$temp_pass" \
+         -c "$cookie_jar" 2>/dev/null | grep -q "Ok"; then
+      curl -s -b "$cookie_jar" "http://127.0.0.1:$QBIT_PORT/api/v2/app/setPreferences" \
+        -d "json={\"bypass_local_auth\":true,\"web_ui_csrf_protection_enabled\":false,\"web_ui_host_header_validation_enabled\":false,\"save_path\":\"$DOWNLOADS_DIR\",\"queueing_enabled\":false}" \
+        >/dev/null 2>&1
+      echo "✓ qBittorrent configured (bypass_local_auth=true, save_path=$DOWNLOADS_DIR)"
+    fi
+    rm -f "$cookie_jar"
+  fi
+
+  echo "✓ qBittorrent service started on port $QBIT_PORT"
+}
+
+# ─── Prowlarr ───────────────────────────────────────────────────────
+install_prowlarr() {
+  if [ -x /opt/Prowlarr/Prowlarr ]; then
+    echo "✓ Prowlarr already installed"
+    return 0
+  fi
+
+  local arch; arch="$(detect_arch)"
+  local prowlarr_arch
+  case "$arch" in
+    x64) prowlarr_arch="x64" ;;
+    arm64) prowlarr_arch="arm64" ;;
+  esac
+
+  echo "Installing Prowlarr..."
+  local tmp; tmp="$(mktemp -d)"
+  curl -fsSL "https://prowlarr.servarr.com/v1/update/master/updatefile?os=linux&runtime=netcore&arch=$prowlarr_arch" \
+    -o "$tmp/prowlarr.tar.gz"
+  run_root mkdir -p /opt/Prowlarr
+  run_root tar -xzf "$tmp/prowlarr.tar.gz" -C /opt/Prowlarr --strip-components=1
+  rm -rf "$tmp"
+
+  # Create prowlarr user if needed
+  if ! id prowlarr >/dev/null 2>&1; then
+    run_root useradd -r -s /usr/sbin/nologin -d "$PROWLARR_DATA" prowlarr
+  fi
+  run_root mkdir -p "$PROWLARR_DATA"
+  run_root chown -R prowlarr:prowlarr "$PROWLARR_DATA" /opt/Prowlarr
+
+  echo "✓ Prowlarr installed"
+}
+
+setup_prowlarr_service() {
+  local unit_path="/etc/systemd/system/prowlarr.service"
+  if [ -f "$unit_path" ] && systemctl is-active --quiet prowlarr 2>/dev/null; then
+    echo "✓ Prowlarr service already running"
+    return 0
+  fi
+
+  cat > /tmp/prowlarr.service << EOF
+[Unit]
+Description=Prowlarr Daemon
+After=network.target
+
+[Service]
+User=prowlarr
+Group=prowlarr
+Type=simple
+ExecStart=/opt/Prowlarr/Prowlarr -nobrowser -data=$PROWLARR_DATA
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  run_root install -m 0644 /tmp/prowlarr.service "$unit_path"
+  rm -f /tmp/prowlarr.service
+  run_root systemctl daemon-reload
+  run_root systemctl enable prowlarr
+  run_root systemctl start prowlarr
+
+  # Wait for Prowlarr to write its config.xml (contains the API key)
+  echo "Waiting for Prowlarr to start..."
+  local attempts=0
+  while [ "$attempts" -lt 20 ]; do
+    if [ -f "$PROWLARR_DATA/config.xml" ]; then
+      # Check API is responding
+      local api_key
+      api_key="$(grep -oP '<ApiKey>\K[^<]+' "$PROWLARR_DATA/config.xml" 2>/dev/null || true)"
+      if [ -n "$api_key" ] && curl -s -o /dev/null "http://localhost:9696/api/v1/health" -H "X-Api-Key: $api_key" 2>/dev/null; then
+        break
+      fi
+    fi
+    sleep 1
+    attempts=$((attempts + 1))
+  done
+
+  echo "✓ Prowlarr service started on port 9696"
+}
+
+# ─── Node.js ────────────────────────────────────────────────────────
 download_node() {
   local arch="$1"
   local node_root="$INSTALL_DIR/.node"
@@ -83,22 +240,20 @@ download_node() {
     return
   fi
 
-  local tmp
-  tmp="$(mktemp -d)"
+  local tmp; tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' RETURN
 
   local archive="node-v${NODE_VERSION}-linux-${arch}.tar.xz"
-  local url="https://nodejs.org/dist/v${NODE_VERSION}/${archive}"
-  echo "Downloading Node.js ${NODE_VERSION} (${arch})..."
-  curl -fsSL "$url" -o "$tmp/$archive"
+  echo "Downloading Node.js ${NODE_VERSION} (${arch})..." >&2
+  curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/${archive}" -o "$tmp/$archive"
   run_root mkdir -p "$node_root"
   run_root tar -xJf "$tmp/$archive" -C "$node_root"
   echo "$node_bin"
 }
 
+# ─── PVTKRRX source ────────────────────────────────────────────────
 sync_repo() {
-  local tmp
-  tmp="$(mktemp -d)"
+  local tmp; tmp="$(mktemp -d)"
   trap 'rm -rf "$tmp"' RETURN
 
   echo "Downloading PVTKRRX source..."
@@ -117,33 +272,70 @@ sync_repo() {
   run_root cp -a "$src_dir"/. "$INSTALL_DIR"/
 }
 
+# ─── main ───────────────────────────────────────────────────────────
 main() {
-  if ! have_command curl; then
-    echo "curl is required to run this installer." >&2
+  echo ""
+  echo "╔══════════════════════════════════════════╗"
+  echo "║       PVTKRRX Self-Host Installer        ║"
+  echo "╚══════════════════════════════════════════╝"
+  echo ""
+
+  if [ "$(uname -s)" != "Linux" ]; then
+    echo "This installer only runs on Linux." >&2
     exit 1
   fi
 
   ensure_base_tools
-  local arch
-  arch="$(detect_arch)"
+  local arch; arch="$(detect_arch)"
 
-  local node_bin
-  node_bin="$(download_node "$arch")"
+  # ── Step 1: qBittorrent ──
+  echo ""
+  echo "── Step 1/5: qBittorrent ──"
+  install_qbittorrent
+  setup_qbittorrent_service
 
+  # ── Step 2: Prowlarr ──
+  echo ""
+  echo "── Step 2/5: Prowlarr ──"
+  install_prowlarr
+  setup_prowlarr_service
+
+  # ── Step 3: Node.js ──
+  echo ""
+  echo "── Step 3/5: Node.js runtime ──"
+  local node_bin; node_bin="$(download_node "$arch")"
+  echo "✓ Node.js ready at $node_bin"
+
+  # ── Step 4: PVTKRRX source + deps ──
+  echo ""
+  echo "── Step 4/5: PVTKRRX application ──"
   sync_repo
 
-  export PATH="$(dirname "$node_bin"):$PATH"
+  local node_dir="$INSTALL_DIR/.node/node-v${NODE_VERSION}-linux-${arch}"
+  export PATH="${node_dir}/bin:$PATH"
   export PVTKRRX_NODE_PATH="$node_bin"
   export PVTKRRX_SERVICE_USER="$SERVICE_USER_DEFAULT"
 
-  local node_dir="$INSTALL_DIR/.node/node-v${NODE_VERSION}-linux-${arch}"
   echo "Installing production dependencies..."
-  run_root env "PATH=${node_dir}/bin:$PATH" "${node_dir}/bin/npm" install --omit=dev --prefix "$INSTALL_DIR"
+  run_root env "PATH=${node_dir}/bin:$PATH" "${node_dir}/bin/npm" install --omit=dev --prefix "$INSTALL_DIR" 2>&1 | tail -3
+
+  # ── Step 5: Auto-configure PVTKRRX ──
+  echo ""
+  echo "── Step 5/5: Auto-configuring PVTKRRX ──"
+
+  # Export detection hints for the Node installer
+  export PVTKRRX_PROWLARR_DATA="$PROWLARR_DATA"
+  export PVTKRRX_QBIT_WEBUI_PORT="$QBIT_PORT"
+  export PVTKRRX_DOWNLOADS_DIR="$DOWNLOADS_DIR"
+
+  cd "$INSTALL_DIR"
+  "$node_bin" scripts/server-installer.js --auto
 
   echo ""
-  echo "Launching the PVTKRRX server installer..."
-  cd "$INSTALL_DIR"
-  "$node_bin" scripts/server-installer.js
+  echo "╔══════════════════════════════════════════╗"
+  echo "║       PVTKRRX install complete!          ║"
+  echo "╚══════════════════════════════════════════╝"
+  echo ""
 }
 
 main "$@"

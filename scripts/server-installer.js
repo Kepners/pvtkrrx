@@ -500,8 +500,219 @@ async function run() {
   }
 }
 
+// ─── Auto-detection ────────────────────────────────────────────────
+
+function findProwlarrConfig() {
+  const prowlarrDataDir = String(process.env.PVTKRRX_PROWLARR_DATA || '').trim()
+  const candidates = [
+    prowlarrDataDir ? path.join(prowlarrDataDir, 'config.xml') : null,
+    '/var/lib/prowlarr/config.xml',
+    path.join(os.homedir(), '.config', 'Prowlarr', 'config.xml'),
+    '/opt/Prowlarr/config.xml'
+  ].filter(Boolean)
+
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p
+  }
+  return null
+}
+
+function parseProwlarrConfigXml(configPath) {
+  const xml = fs.readFileSync(configPath, 'utf8')
+  const apiKey = (xml.match(/<ApiKey>([^<]+)<\/ApiKey>/) || [])[1] || ''
+  const port = (xml.match(/<Port>([^<]+)<\/Port>/) || [])[1] || '9696'
+  return { apiKey: apiKey.trim(), port: Number.parseInt(port.trim(), 10) || 9696 }
+}
+
+function findQbitConfig() {
+  const qbitUser = String(process.env.PVTKRRX_QBIT_USER || 'qbittorrent').trim()
+  const candidates = [
+    `/var/lib/${qbitUser}/.config/qBittorrent/qBittorrent.conf`,
+    path.join(os.homedir(), '.config', 'qBittorrent', 'qBittorrent.conf'),
+    `/home/${qbitUser}/.config/qBittorrent/qBittorrent.conf`
+  ]
+
+  for (const p of candidates) {
+    if (fs.existsSync(p)) return p
+  }
+  return null
+}
+
+function parseQbitConfig(configPath) {
+  const ini = fs.readFileSync(configPath, 'utf8')
+  const portMatch = ini.match(/WebUI\\Port=(\d+)/) || ini.match(/web_ui_port=(\d+)/i)
+  const usernameMatch = ini.match(/WebUI\\Username=(.+)/)
+  const savePathMatch = ini.match(/Session\\DefaultSavePath=(.+)/)
+
+  return {
+    port: portMatch ? Number.parseInt(portMatch[1], 10) : null,
+    username: usernameMatch ? usernameMatch[1].trim() : '',
+    savePath: savePathMatch ? savePathMatch[1].trim() : ''
+  }
+}
+
+async function runAuto() {
+  const repoRoot = path.resolve(__dirname, '..')
+  const envPath = path.join(repoRoot, '.env')
+  const envFromFile = parseDotEnvFile(envPath)
+  const defaultRuntimeDir = String(
+    envFromFile.PVTKRRX_RUNTIME_DIR ||
+    process.env.PVTKRRX_RUNTIME_DIR ||
+    path.join(repoRoot, 'data', 'pvtkrrx')
+  ).trim()
+  const mergedEnv = { ...envFromFile, ...process.env, PVTKRRX_RUNTIME_DIR: defaultRuntimeDir }
+  const existingSecret = String(mergedEnv.ENCRYPTION_SECRET || '').trim()
+  const existingAuthSecret = String(mergedEnv.AUTH_TOKEN_SECRET || '').trim()
+  const existingConfig = loadExistingServerConfig(defaultRuntimeDir, existingSecret)
+  const bundledNodePath = String(process.env.PVTKRRX_NODE_PATH || process.execPath).trim() || process.execPath
+  const httpPort = Number.parseInt(String(mergedEnv.PORT || '7000').trim(), 10) || 7000
+  const httpsPort = Number.parseInt(String(mergedEnv.HTTPS_PORT || '7001').trim(), 10) || 7001
+  const existingPublicBaseUrl = normalizeBaseUrl(mergedEnv.PVTKRRX_PUBLIC_BASE_URL || '')
+
+  console.log('PVTKRRX auto-configuration')
+  console.log('')
+
+  // ── Detect Prowlarr ──
+  let jackettUrl = String(existingConfig?.jackettUrl || '').trim()
+  let jackettApiKey = String(existingConfig?.jackettApiKey || '').trim()
+
+  const prowlarrConfigPath = findProwlarrConfig()
+  if (prowlarrConfigPath) {
+    const prowlarr = parseProwlarrConfigXml(prowlarrConfigPath)
+    jackettUrl = jackettUrl || `http://localhost:${prowlarr.port}`
+    jackettApiKey = jackettApiKey || prowlarr.apiKey
+    console.log(`✓ Prowlarr detected at ${prowlarrConfigPath}`)
+    console.log(`  URL: ${jackettUrl}`)
+    console.log(`  API key: ${jackettApiKey.slice(0, 8)}...`)
+  } else {
+    jackettUrl = jackettUrl || 'http://localhost:9696'
+    console.log('⚠ Prowlarr config not found, using default URL. Configure later via /configure.')
+  }
+
+  // ── Detect qBittorrent ──
+  let qbitUrl = String(existingConfig?.qbitUrl || '').trim()
+  let qbitUsername = String(existingConfig?.qbitUsername || '').trim()
+  let qbitPassword = String(existingConfig?.qbitPassword || '').trim()
+
+  const qbitConfigPath = findQbitConfig()
+  const envQbitPort = String(process.env.PVTKRRX_QBIT_WEBUI_PORT || '').trim()
+  if (qbitConfigPath) {
+    const qbit = parseQbitConfig(qbitConfigPath)
+    const detectedPort = qbit.port || (envQbitPort ? Number.parseInt(envQbitPort, 10) : 8080)
+    qbitUrl = qbitUrl || `http://localhost:${detectedPort}`
+    qbitUsername = qbitUsername || qbit.username
+    console.log(`✓ qBittorrent detected at ${qbitConfigPath}`)
+    console.log(`  URL: ${qbitUrl}`)
+    if (qbitUsername) console.log(`  Username: ${qbitUsername}`)
+    if (qbit.savePath) console.log(`  Save path: ${qbit.savePath}`)
+  } else {
+    const fallbackPort = envQbitPort || '8080'
+    qbitUrl = qbitUrl || `http://localhost:${fallbackPort}`
+    console.log('⚠ qBittorrent config not found, using default URL. Configure later via /configure.')
+  }
+
+  // ── Secrets ──
+  const encryptionSecret = existingSecret || randomSecret()
+  const authTokenSecret = existingAuthSecret || randomSecret()
+
+  // ── Write .env ──
+  const allowedWebOrigins = normalizeOriginList(
+    String(mergedEnv.PVTKRRX_ALLOWED_WEB_ORIGINS || '').trim() ||
+    buildDefaultAllowedOrigins(existingPublicBaseUrl, httpPort, httpsPort)
+  )
+
+  updateDotEnvFile(envPath, {
+    ENCRYPTION_SECRET: encryptionSecret,
+    AUTH_TOKEN_SECRET: authTokenSecret,
+    PVTKRRX_SELF_HOST_MODE: 'true',
+    PVTKRRX_RUNTIME_DIR: defaultRuntimeDir,
+    PVTKRRX_PUBLIC_BASE_URL: existingPublicBaseUrl,
+    PVTKRRX_ALLOWED_WEB_ORIGINS: allowedWebOrigins,
+    PORT: String(httpPort),
+    HTTPS_PORT: String(httpsPort)
+  })
+
+  // ── Set process env for normalizeAddonConfig ──
+  process.env.ENCRYPTION_SECRET = encryptionSecret
+  process.env.AUTH_TOKEN_SECRET = authTokenSecret
+  process.env.PVTKRRX_SELF_HOST_MODE = 'true'
+  process.env.PVTKRRX_RUNTIME_DIR = defaultRuntimeDir
+  process.env.PORT = String(httpPort)
+  process.env.HTTPS_PORT = String(httpsPort)
+
+  // ── Write local config ──
+  const { normalizeAddonConfig } = require('../src/lib/shared')
+
+  const nextConfig = normalizeAddonConfig({
+    ...(existingConfig && typeof existingConfig === 'object' ? existingConfig : {}),
+    jackettUrl,
+    jackettApiKey,
+    qbitUrl,
+    qbitUsername,
+    qbitPassword,
+    provider: String(existingConfig?.provider || 'custom').trim() || 'custom',
+    fileServerUrl: String(existingConfig?.fileServerUrl || '').trim(),
+    fileServerAuth: String(existingConfig?.fileServerAuth || '').trim(),
+    sportsDbApiKey: String(existingConfig?.sportsDbApiKey || '123').trim(),
+    sportsDbCacheHours: existingConfig?.sportsDbCacheHours || 24,
+    maxResults: existingConfig?.maxResults || 50,
+    autoDeleteWatched: existingConfig?.autoDeleteWatched !== false,
+    watchedDeleteGraceSeconds: existingConfig?.watchedDeleteGraceSeconds ?? 300,
+    lanPairEnabled: false,
+    lanPairRequired: false
+  }, { includeLocalSecrets: true })
+
+  fs.mkdirSync(defaultRuntimeDir, { recursive: true })
+  const localConfigPath = path.join(defaultRuntimeDir, 'local-config.json')
+  saveSecureJsonFile(localConfigPath, nextConfig, { secret: encryptionSecret })
+  const adminState = ensureServerAdminToken(defaultRuntimeDir, {
+    env: process.env,
+    createIfMissing: true
+  })
+
+  console.log('')
+  console.log(`✓ Config saved to ${localConfigPath}`)
+  console.log(`✓ Admin token: ${fs.readFileSync(adminState.path, 'utf8').trim()}`)
+
+  // ── systemd service ──
+  let serviceResult = null
+  if (process.platform === 'linux') {
+    const serviceName = defaultServiceName()
+    const serviceUser = defaultServiceUser()
+    ensureOwnership(defaultRuntimeDir, serviceUser, repoRoot)
+    try {
+      serviceResult = installSystemdService({
+        repoRoot,
+        nodePath: bundledNodePath,
+        serviceName,
+        user: serviceUser
+      })
+      console.log(`✓ systemd service: ${serviceResult.serviceName}.service (${serviceResult.unitPath})`)
+    } catch (error) {
+      console.warn(`⚠ systemd install skipped: ${error.message}`)
+    }
+  }
+
+  const displayOrigin = deriveDisplayOrigin(existingPublicBaseUrl, httpPort)
+  console.log('')
+  console.log('─── Summary ───')
+  console.log(`Prowlarr:    ${jackettUrl}`)
+  console.log(`qBittorrent: ${qbitUrl}`)
+  console.log(`Configure:   ${displayOrigin}/configure`)
+  console.log(`Manifest:    ${displayOrigin}/selfhost/manifest.json?mode=hosted`)
+  console.log(`HTTP port:   ${httpPort}`)
+  console.log(`Node binary: ${bundledNodePath}`)
+  if (existingPublicBaseUrl) {
+    console.log(`Public URL:  ${existingPublicBaseUrl}`)
+  } else {
+    console.log('Public URL:  not set (add PVTKRRX_PUBLIC_BASE_URL to .env for Stremio HTTPS installs)')
+  }
+}
+
 if (require.main === module) {
-  run().catch((error) => {
+  const isAuto = process.argv.includes('--auto')
+  const entry = isAuto ? runAuto : run
+  entry().catch((error) => {
     console.error(error.message)
     process.exit(1)
   })
