@@ -203,6 +203,18 @@ app.get('/app-config.json', (req, res) => {
   res.json(buildRuntimeAppConfig(req))
 })
 
+app.get(['/install-selfhost.sh', '/install.sh'], (req, res) => {
+  const scriptPath = path.join(__dirname, 'scripts', 'install-selfhost.sh')
+  if (!fs.existsSync(scriptPath)) {
+    return res.status(404).type('text/plain').send('install launcher not found')
+  }
+
+  res.setHeader('Cache-Control', 'no-store')
+  res.setHeader('Content-Disposition', 'inline; filename="install-selfhost.sh"')
+  res.type('text/x-shellscript')
+  res.send(fs.readFileSync(scriptPath, 'utf8'))
+})
+
 function buildRuntimeAppConfig(req) {
   return {
     selfHostServerMode: SELF_HOST_SERVER_MODE,

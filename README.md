@@ -88,10 +88,10 @@ For `LAN Bridge`, the primary install action should start with `stremio://`; the
 ### Self-Host (Free)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Kepners/pvtkrrx/main/scripts/install-selfhost.sh | sudo bash
+curl -fsSL https://www.pvtkrrx.cc/install-selfhost.sh | sudo bash
 ```
 
-That launcher just starts the install. The actual app payload now comes from the latest published GitHub Release unless you pin a specific version or point at a custom release manifest.
+That launcher comes from the canonical hosted site. The actual app payload now comes from the latest published GitHub Release unless you pin a specific version or point at a custom release manifest.
 
 The Linux installer now bootstraps a dedicated self-host server in one flow:
 - downloads the app into `/opt/pvtkrrx` by default

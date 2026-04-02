@@ -1,6 +1,6 @@
 # PVTKRRX Website Status
 
-Updated: 2026-03-31
+Updated: 2026-04-02
 
 ## Purpose
 
@@ -32,7 +32,7 @@ Interpretation:
 
 Verified in the repo before changing anything:
 
-- `index.js` already defines `/configure`, `/:config/configure`, `/runbooks`, `/seedbox-runbooks`, `/health`, `/manifest.json`, `/:config/manifest.json`, and `/local/install`
+- `index.js` already defines `/configure`, `/:config/configure`, `/runbooks`, `/seedbox-runbooks`, `/health`, `/manifest.json`, `/:config/manifest.json`, `/local/install`, and the hosted self-host launcher route at `/install-selfhost.sh` plus `/install.sh`
 - `vercel.json` still maps `/configure` and `/runbooks`, but the old preview deployment is currently dead
 - `public/index.html` is the current landing page
 - A homepage rewrite was implemented locally on 2026-03-31 in `public/index.html`, but this pass has not deployed or browser-checked it yet

@@ -234,6 +234,12 @@ async function run() {
     assert.match(runbooksHtml, /Whatbox Runbook/, 'runbooks page should include Whatbox runbook')
     assert.match(runbooksHtml, /Ultra\.cc Runbook/, 'runbooks page should include Ultra.cc runbook')
 
+    const installLauncherRes = await fetch(`${base}/install-selfhost.sh`)
+    assert.equal(installLauncherRes.status, 200, 'GET /install-selfhost.sh should return 200')
+    const installLauncherText = await installLauncherRes.text()
+    assert.match(installLauncherText, /^#!\/usr\/bin\/env bash/m, 'install launcher should serve the shell script payload')
+    assert.match(installLauncherText, /RELEASE_MANIFEST_URL|PVTKRRX_RELEASE_MANIFEST_URL/, 'install launcher should include the release-manifest bootstrap logic')
+
     const networkInfoRes = await fetch(`${base}/network-info`)
     assert.equal(networkInfoRes.status, 200, 'GET /network-info should return 200')
     const networkInfo = await networkInfoRes.json()

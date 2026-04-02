@@ -25,6 +25,7 @@ PVTKRRX is one codebase with three active runtime pieces:
    - can mint short-lived Stremio link sessions that persist the linked `stremioUserId` back into the disk-backed `selfhost` config
    - can validate localhost/private Prowlarr and qBittorrent URLs only for same-host requests or browser sessions that present the server admin token
    - now has a one-command Linux installer that bootstraps the app directory, bundled Node runtime, `.env`, stable runtime dir, saved self-host config, admin token, and optional `systemd` service
+   - exposes a hosted launcher script at `https://www.pvtkrrx.cc/install-selfhost.sh` so the first curl can come from the canonical site instead of the moving GitHub branch tip
    - pulls the app source from the latest GitHub Release by default, with optional pinning via `PVTKRRX_RELEASE_TAG` or a custom release manifest URL
    - auto-discovers existing Prowlarr/qBittorrent configs when the services are already installed, then fills the self-host config from the recovered URLs, API keys, usernames, and ports instead of forcing a blank slate
    - if those providers are missing on a direct `npm run server:setup` run, it can hand off to the full Linux bootstrap so the installer can install them instead of silently continuing with empty defaults
