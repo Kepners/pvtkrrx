@@ -1048,6 +1048,25 @@
       margin: 0;
     }
 
+    .service-launch-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.65rem;
+      margin-top: 0.9rem;
+    }
+
+    .service-launch-actions .secondary-link {
+      flex: 1 1 180px;
+      justify-content: center;
+      min-height: 44px;
+    }
+
+    .service-launch-actions .secondary-link.is-disabled,
+    .service-launch-actions .secondary-link[aria-disabled="true"] {
+      opacity: 0.58;
+      pointer-events: none;
+    }
+
     .action-row {
       display: flex;
       gap: 0.6rem;
@@ -1884,6 +1903,10 @@
         <p class="hint">Paste the base URL only. Legacy Torznab/API URLs are auto-normalized.</p>
         <label for="jackettApiKey">API Key</label>
         <input type="text" id="jackettApiKey" placeholder="Your Prowlarr API key">
+        <div class="service-launch-actions">
+          <a class="secondary-link is-disabled" id="openProwlarrLink" href="#" aria-disabled="true" target="_blank" rel="noopener noreferrer">Open Prowlarr</a>
+        </div>
+        <p class="hint">The link becomes active when the saved URL is public, or when this browser can reach the private Prowlarr host from the server or same network.</p>
       </div>
 
       <div class="service-card" id="serviceCard-qbit" data-service-visible="pc lan seedbox">
@@ -1907,6 +1930,10 @@
           <span>Use qBittorrent's completion hook to trigger PVTKRRX extraction for packed releases. PVTKRRX stays the extractor; qBittorrent only triggers the post-process call when the download finishes.</span>
         </label>
         <p class="hint">If qBittorrent already has a different completion program configured, PVTKRRX will refuse to overwrite it silently.</p>
+        <div class="service-launch-actions">
+          <a class="secondary-link is-disabled" id="openQbitLink" href="#" aria-disabled="true" target="_blank" rel="noopener noreferrer">Open qBittorrent</a>
+        </div>
+        <p class="hint">The link becomes active when the saved URL is public, or when this browser can reach the private qBittorrent host from the server or same network.</p>
       </div>
 
       <div class="service-card" id="serviceCard-storage" data-service-visible="pc lan">
@@ -2986,6 +3013,7 @@
       serverRuntime.desktopLocalOnly = payload.desktopLocalOnly === true;
       updateServerAdminUi();
       updateServerLinkUi();
+      updateServiceLaunchLinks();
       syncInstallTargetOptions();
       const requestedTarget = getRequestedInstallTargetFromUrl();
       const nextTarget = isSelfHostSeedboxOnlyRuntime()
@@ -4610,10 +4638,17 @@
 
     document.getElementById('jackettUrl').addEventListener('blur', function() {
       this.value = normalizeProwlarrBaseUrl(this.value);
+      updateServiceLaunchLinks();
     });
+    document.getElementById('jackettUrl').addEventListener('input', updateServiceLaunchLinks);
     document.getElementById('jackettApiKey').addEventListener('input', function() {
       markSecretFieldDirty('jackettApiKey');
     });
+    document.getElementById('qbitUrl').addEventListener('blur', function() {
+      this.value = String(this.value || '').replace(/\/+$/, '');
+      updateServiceLaunchLinks();
+    });
+    document.getElementById('qbitUrl').addEventListener('input', updateServiceLaunchLinks);
     document.getElementById('qbitUsername').addEventListener('input', function() {
       markSecretFieldDirty('qbitUsername');
     });
@@ -4796,6 +4831,56 @@
       if (!el) return;
       el.className = `status ${type || 'info'}`.trim();
       el.textContent = message;
+    }
+
+    function normalizeServiceLaunchUrl(raw, kind) {
+      const text = String(raw || '').trim();
+      if (!text) return '';
+      try {
+        const normalized = String(kind || '').toLowerCase() === 'prowlarr'
+          ? normalizeProwlarrBaseUrl(text)
+          : text.replace(/\/+$/, '');
+        if (!normalized) return '';
+        const url = new URL(normalized);
+        if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+        return `${url.origin}${String(url.pathname || '').replace(/\/+$/, '')}${url.search}${url.hash}`;
+      } catch (_) {
+        return '';
+      }
+    }
+
+    function updateServiceLaunchLink(linkId, rawUrl, label, kind) {
+      const link = document.getElementById(linkId);
+      if (!link) return;
+
+      const safeUrl = normalizeServiceLaunchUrl(rawUrl, kind);
+      const isReachable = Boolean(safeUrl) && (() => {
+        try {
+          const parsed = new URL(safeUrl);
+          return !isPrivateInstallHost(parsed.hostname) || canQueryLocalRuntime() || canAdministerSelfHostedServer();
+        } catch (_) {
+          return false;
+        }
+      })();
+
+      if (isReachable) {
+        link.hidden = false;
+        link.classList.remove('is-disabled');
+        link.removeAttribute('aria-disabled');
+        link.setAttribute('href', safeUrl);
+        link.textContent = label;
+      } else {
+        link.hidden = false;
+        link.classList.add('is-disabled');
+        link.setAttribute('aria-disabled', 'true');
+        link.setAttribute('href', '#');
+        link.textContent = label;
+      }
+    }
+
+    function updateServiceLaunchLinks() {
+      updateServiceLaunchLink('openProwlarrLink', document.getElementById('jackettUrl')?.value, 'Open Prowlarr', 'prowlarr');
+      updateServiceLaunchLink('openQbitLink', document.getElementById('qbitUrl')?.value, 'Open qBittorrent', 'qbit');
     }
 
     async function refreshLocalQbitRuntimeStatus(options = {}) {
@@ -5208,6 +5293,7 @@
         setInstallModeHint();
       }
       applyProviderPreset(document.getElementById('provider').value, { applyMapping: false });
+      updateServiceLaunchLinks();
     }
 
     function getConfigTokenFromPath() {

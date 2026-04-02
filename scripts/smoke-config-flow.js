@@ -223,6 +223,8 @@ async function run() {
     assert.match(configureHtml, /auth\/stremio\/local-status/, 'configure page should check local Stremio status')
     assert.match(configureHtml, /id="qbitRuntimeStatus"/, 'configure page should render live qBittorrent runtime status')
     assert.match(configureHtml, /id="qbitAutoExtractEnabled"/, 'configure page should render the qBittorrent extraction-hook toggle')
+    assert.match(configureHtml, /id="openProwlarrLink"/, 'configure page should render a direct Prowlarr launch link')
+    assert.match(configureHtml, /id="openQbitLink"/, 'configure page should render a direct qBittorrent launch link')
     assert.match(configureHtml, /Change the actual qBittorrent save path/i, 'configure page should explain where to change the live qBittorrent save path')
     assert.match(configureHtml, /href="\/runbooks"/, 'configure page should link to runbooks')
     assert.match(configureHtml, /route-parity\.js/, 'configure page should load shared parity helper')
