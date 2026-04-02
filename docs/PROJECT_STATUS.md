@@ -23,6 +23,11 @@ The practical reading of the project today is:
 - the homepage rewrite now exists locally in `public/index.html`, but it still needs a browser pass and deliberate deploy before the live site can be treated as updated
 - the remaining work is real-device coverage, remote/auth playback sign-off, and performance tuning, not a reset/rebuild
 
+## Work Carried Out On 2026-04-02
+
+- LAN Bridge offline meta no longer injects the host-offline sentence into every detail page. Meta requests now fall through to hosted metadata when the pair is offline, while catalogs and streams still fail closed.
+- `npm run smoke:lan-pair` passed on 2026-04-02 after the silent-offline-meta change.
+
 ## Work Carried Out On 2026-04-01
 
 - `9b46cbb` narrowed self-host `/configure` to the `Remote Seedbox` route and hides `PC Local` / `LAN Bridge` there, matching the current runtime split.
@@ -37,7 +42,7 @@ The practical reading of the project today is:
 - `d174bd2` added provider-specific runbook presets to the runbooks/configure surface.
 - `428b15b` changed stream source labels so users can see whether playback is coming from the host PC or the remote/server route.
 - `2d3175a` added the sports artwork byte cache/proxy layer so posters, wallpapers, landscape art, and logos can be served from the active local/hosted runtime after the first fetch instead of being hotlinked every time.
-- 2026-03-31 Apple TV strict-client fix: meta responses no longer emit `meta: null`; unsupported or offline-meta paths now return a real placeholder `MetaItem` so tvOS clients do not fail deserialization on missing metadata.
+- 2026-03-31 Apple TV strict-client fix: meta responses no longer emit `meta: null`; unsupported meta paths now return a real placeholder `MetaItem` so tvOS clients do not fail deserialization on missing metadata.
 - 2026-03-31 server-agnostic Stremio account link sessions: hosted-token and disk-backed `local` / `selfhost` configs can now create a short-lived browser/addon pairing session, observe addon install hits, and finish account linking from any signed-in browser device without the server scraping a Stremio password.
 - 2026-03-31 desktop-local split: the Electron runtime and shared configure surface now advertise `desktopLocalOnly`, hide `Remote Seedbox` inside the Windows EXE, and keep the desktop app focused on `PC Local` plus `LAN Bridge`.
 
@@ -58,7 +63,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - `npm run smoke:pipeline` passed on 2026-03-29
 - `npm run smoke:sports` passed on 2026-03-29
 - `npm run dist:win` passed on 2026-03-29, again on 2026-03-30 for the `1.1.16` desktop release build, again on 2026-03-30 for the `1.1.17` bug-fix desktop release build, again on 2026-03-30 for the `1.1.18` archive-extraction desktop release build, again on 2026-03-30 for the `1.1.19` desktop power-policy build, again on 2026-03-31 for the `1.1.20` sports-image-cache build, again on 2026-03-31 for the `1.1.21` Apple TV metadata-serialization fix build, again on 2026-04-01 for the `1.1.22` Stremio link-session desktop release build, and again on 2026-04-02 for the `1.1.23` release-status build
-- `npm run smoke:lan-pair` passed again on 2026-03-31 after the Apple TV-safe LAN offline meta placeholder change
+- `npm run smoke:lan-pair` passed again on 2026-04-02 after the silent LAN offline meta pass-through change
 - `npm run smoke:config`, `npm run smoke:desktop`, `npm run smoke:stremio-link`, `npm run smoke:lan-pair`, `npm run smoke:guards`, `npm run smoke:security`, `npm run smoke:pipeline`, `npm run smoke:playback`, and `npm run smoke:sports` all passed again on 2026-03-30
 - root `/manifest.json` returns the bootstrap manifest (`com.kepners.pvtkrrx.bootstrap`) with no catalogs/resources and `configurationRequired=true`
 - 2026-03-31 public host check: `https://www.pvtkrrx.cc/`, `/configure`, `/runbooks`, `/manifest.json`, and `/health` all returned `200` from the live public host; `/local/install` returned `403` as expected for a local-only helper route

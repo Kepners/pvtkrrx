@@ -75,7 +75,7 @@ There is no per-route catalog filtering. The Library catalog queries qBittorrent
 - The redirect rewrites the token path to `/local/...?mode=local`, so the LAN device effectively hits PC Local on the host
 - After redirect, all PC Local capabilities apply (queue, buffer, file serve, packed RAR), with extracted direct video still the supported packed-release path
 - A real Apple TV pass on 2026-03-31 confirmed that this route still works while the Windows host stays locked, as long as the desktop runtime remains running
-- If the pair is offline and `lanPairRequired` is true, requests fail with an offline notice instead of falling through to hosted behavior
+- If the pair is offline and `lanPairRequired` is true, catalog and stream requests fail closed, while meta requests fall through to hosted metadata so tvOS clients do not get the host-offline text on every item page
 - If the pair is offline and `lanPairRequired` is false, requests fall through to hosted behavior (ready-file-first, no `/playback`)
 
 ### Remote Seedbox

@@ -258,14 +258,14 @@ async function run() {
       `tv.device.example:${port}`
     )
     assert.equal(offlineMeta.status, 200, 'offline meta fallback should return 200')
-    assert.equal(String(offlineMeta.headers['x-pvtkrrx-lan-pair'] || ''), 'offline')
+    assert.notEqual(String(offlineMeta.headers['x-pvtkrrx-lan-pair'] || ''), 'offline')
     assert.equal(offlineMeta.json?.meta?.id, 'tt1234567')
     assert.equal(offlineMeta.json?.meta?.type, 'movie')
-    assert.equal(offlineMeta.json?.meta?.name, 'PVTKRRX host offline')
-    assert.match(
+    assert.notEqual(offlineMeta.json?.meta?.name, 'PVTKRRX host offline')
+    assert.doesNotMatch(
       String(offlineMeta.json?.meta?.description || ''),
       /LAN pair offline/i,
-      'offline meta placeholder should explain the host-offline state'
+      'offline meta should not leak the host-offline notice into the description'
     )
 
     // No heartbeat record for the requested pair should also fail closed.

@@ -1981,6 +1981,12 @@ function maybeLanPairRedirect(routeKind) {
       if (!resolution.enabled) return next()
 
       if (!resolution.online) {
+        if (routeKind === 'meta') {
+          console.log(
+            `[lan-pair] ${routeKind} fallback reason=${resolution.reason || 'unknown'} from=${requestClientLabel(req)}`
+          )
+          return next()
+        }
         console.log(
           `[lan-pair] ${routeKind} offline reason=${resolution.reason || 'unknown'} from=${requestClientLabel(req)}`
         )
