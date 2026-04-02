@@ -26,7 +26,7 @@ PVTKRRX is one codebase with three active runtime pieces:
    - can validate localhost/private Prowlarr and qBittorrent URLs only for same-host requests or browser sessions that present the server admin token
    - now has a one-command Linux installer that bootstraps the app directory, bundled Node runtime, `.env`, stable runtime dir, saved self-host config, admin token, and optional `systemd` service
    - exposes a hosted launcher script at `https://www.pvtkrrx.cc/install-selfhost.sh` so the first curl can come from the canonical site instead of the moving GitHub branch tip
-   - pulls the app source from the latest GitHub Release by default, with optional pinning via `PVTKRRX_RELEASE_TAG` or a custom release manifest URL
+   - pulls the app source from the branch payload by default, with optional pinning via `PVTKRRX_RELEASE_TAG` or a custom release manifest URL; if a pinned release is too old to include `scripts/server-installer.js`, it retries from `main`
    - auto-discovers existing Prowlarr/qBittorrent configs when the services are already installed, then fills the self-host config from the recovered URLs, API keys, usernames, and ports instead of forcing a blank slate
    - if those providers are missing on a direct `npm run server:setup` run, it can hand off to the full Linux bootstrap so the installer can install them instead of silently continuing with empty defaults
    - self-host install links should come from a configured public HTTPS base URL (`PVTKRRX_PUBLIC_BASE_URL`) rather than a raw public `http://IP:port` origin

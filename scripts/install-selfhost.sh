@@ -36,6 +36,31 @@ resolve_repo_tarball_url() {
   echo "https://codeload.github.com/${GITHUB_OWNER}/${GITHUB_REPO}/tar.gz/refs/heads/${REPO_BRANCH}"
 }
 
+branch_tarball_url() {
+  echo "https://codeload.github.com/${GITHUB_OWNER}/${GITHUB_REPO}/tar.gz/refs/heads/${REPO_BRANCH}"
+}
+
+sync_repo_from_url() {
+  local source_url="$1"
+  local tmp; tmp="$(mktemp -d)"
+  trap "rm -rf '$tmp'" RETURN
+
+  echo "Downloading PVTKRRX source from ${source_url}"
+  curl -fsSL "$source_url" -o "$tmp/pvtkrrx.tar.gz"
+  tar -xzf "$tmp/pvtkrrx.tar.gz" -C "$tmp"
+
+  local src_dir
+  src_dir="$(find "$tmp" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+  if [ -z "$src_dir" ] || [ ! -d "$src_dir" ]; then
+    echo "Could not unpack the PVTKRRX source archive." >&2
+    exit 1
+  fi
+
+  run_root mkdir -p "$INSTALL_DIR"
+  run_root rm -rf "$INSTALL_DIR/node_modules"
+  run_root cp -a "$src_dir"/. "$INSTALL_DIR"/
+}
+
 write_ini_value() {
   local file="$1"
   local key="$2"
@@ -317,24 +342,19 @@ download_node() {
 
 # ─── PVTKRRX source ────────────────────────────────────────────────
 sync_repo() {
-  local tmp; tmp="$(mktemp -d)"
-  trap "rm -rf '$tmp'" RETURN
-
   local source_url; source_url="$(resolve_repo_tarball_url)"
-  echo "Downloading PVTKRRX source from ${source_url}"
-  curl -fsSL "$source_url" -o "$tmp/pvtkrrx.tar.gz"
-  tar -xzf "$tmp/pvtkrrx.tar.gz" -C "$tmp"
+  local branch_url; branch_url="$(branch_tarball_url)"
 
-  local src_dir
-  src_dir="$(find "$tmp" -mindepth 1 -maxdepth 1 -type d | head -n 1)"
-  if [ -z "$src_dir" ] || [ ! -d "$src_dir" ]; then
-    echo "Could not unpack the PVTKRRX source archive." >&2
-    exit 1
+  sync_repo_from_url "$source_url"
+  if [ ! -f "$INSTALL_DIR/scripts/server-installer.js" ] && [ "$source_url" != "$branch_url" ]; then
+    echo "Release payload is missing scripts/server-installer.js; retrying with branch ${REPO_BRANCH}." >&2
+    sync_repo_from_url "$branch_url"
   fi
 
-  run_root mkdir -p "$INSTALL_DIR"
-  run_root rm -rf "$INSTALL_DIR/node_modules"
-  run_root cp -a "$src_dir"/. "$INSTALL_DIR"/
+  if [ ! -f "$INSTALL_DIR/scripts/server-installer.js" ]; then
+    echo "The self-host source bundle is incomplete: scripts/server-installer.js is still missing after sync." >&2
+    exit 1
+  fi
 }
 
 # ─── main ───────────────────────────────────────────────────────────

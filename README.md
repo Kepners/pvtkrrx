@@ -91,7 +91,7 @@ For `LAN Bridge`, the primary install action should start with `stremio://`; the
 curl -fsSL https://www.pvtkrrx.cc/install-selfhost.sh | sudo bash
 ```
 
-That launcher comes from the canonical hosted site. The actual app payload now comes from the latest published GitHub Release unless you pin a specific version or point at a custom release manifest.
+That launcher comes from the canonical hosted site. The installer pulls the branch payload by default, and if a pinned release is too old to include the self-host bootstrap script it falls back to `main` instead of crashing on a missing file.
 
 The Linux installer now bootstraps a dedicated self-host server in one flow:
 - downloads the app into `/opt/pvtkrrx` by default
@@ -100,7 +100,7 @@ The Linux installer now bootstraps a dedicated self-host server in one flow:
 - auto-discovers existing Prowlarr/qBittorrent configs when they are already installed, then prompts only for the values it cannot recover
 - configures qBittorrent for localhost addon access when it has to stand up the service itself
 - if Prowlarr or qBittorrent are missing on a direct `npm run server:setup` run, it can offer to hand off to the full bootstrap and install them automatically
-- pulls the app source from the latest GitHub Release by default, with a branch fallback only when no published release exists yet
+- pulls the app source from the branch payload by default, with an automatic retry from `main` if a pinned release is too old to include `scripts/server-installer.js`
 - can be pinned to a specific release with `PVTKRRX_RELEASE_TAG` or pointed at a Contabo-hosted release manifest with `PVTKRRX_RELEASE_MANIFEST_URL`
 - prompts for your public HTTPS base URL plus any remaining seedbox connection details
 - writes `.env` with `ENCRYPTION_SECRET`, `AUTH_TOKEN_SECRET`, `PVTKRRX_SELF_HOST_MODE=true`, `PVTKRRX_RUNTIME_DIR`, and `PVTKRRX_PUBLIC_BASE_URL`

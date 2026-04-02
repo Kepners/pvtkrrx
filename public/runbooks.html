@@ -914,7 +914,7 @@
         <a class="chip" href="#other">Other Providers</a>
       </div>
       <p class="note">Hard rule: Stremio install is HTTPS-first for remote hosts. HTTP loopback (<code>127.0.0.1</code>) is only for same-device local installs.</p>
-      <p class="note">For the one-command self-host installer, use <code>curl -fsSL https://www.pvtkrrx.cc/install-selfhost.sh | sudo bash</code>. That launcher stays on the hosted site and installs the latest published release payload behind the scenes.</p>
+      <p class="note">For the one-command self-host installer, use <code>curl -fsSL https://www.pvtkrrx.cc/install-selfhost.sh | sudo bash</code>. That launcher stays on the hosted site, installs the branch payload behind the scenes, and falls back to <code>main</code> if a pinned release is too old for the self-host bootstrap script.</p>
     </section>
 
     <section class="panel">
