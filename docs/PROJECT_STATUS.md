@@ -100,6 +100,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - `1.1.21` installers were built successfully into `dist/` on 2026-03-31 for the Apple TV metadata-serialization fix
 - `1.1.22` installers were built successfully into `dist/` on 2026-04-01 for the one-time Stremio server link-session update and self-host configure route cleanup
 - `1.1.23` installers were built successfully into `dist/` on 2026-04-02 for the GitHub release-status update
+- `1.1.23` GitHub release was published on 2026-04-02 with the matching `latest.yml`, portable EXE, and setup installer assets
 - the packaged Windows desktop app is working on the current host build, including the route-first setup flow and desktop shell controls shown in the live app UI
 - a real Apple TV LAN Bridge playback pass succeeded on 2026-03-31 after desktop/web install; while the Windows host stayed locked, playback started normally, the client reported the video as local, and forward/back seek worked
 
