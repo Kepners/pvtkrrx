@@ -241,7 +241,7 @@ download_node() {
   fi
 
   local tmp; tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' RETURN
+  trap "rm -rf '$tmp'" RETURN
 
   local archive="node-v${NODE_VERSION}-linux-${arch}.tar.xz"
   echo "Downloading Node.js ${NODE_VERSION} (${arch})..." >&2
@@ -254,7 +254,7 @@ download_node() {
 # ─── PVTKRRX source ────────────────────────────────────────────────
 sync_repo() {
   local tmp; tmp="$(mktemp -d)"
-  trap 'rm -rf "$tmp"' RETURN
+  trap "rm -rf '$tmp'" RETURN
 
   echo "Downloading PVTKRRX source..."
   curl -fsSL "$REPO_TARBALL_URL" -o "$tmp/pvtkrrx.tar.gz"
