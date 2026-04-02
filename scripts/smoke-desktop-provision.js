@@ -17,6 +17,11 @@ assert.match(source, /const startupLaunchMode = process\.argv\.includes\(STARTUP
 assert.match(source, /hideMainWindowToTray\('startup-launch'\)/, 'desktop runtime should boot hidden in the tray for startup launches')
 assert.match(source, /PVTKRRX_DESKTOP_LOCAL_ONLY\s*=\s*'true'/, 'desktop runtime should force the Windows EXE into local-only mode')
 assert.match(source, /PVTKRRX_SELF_HOST_MODE\s*=\s*'false'/, 'desktop runtime should not inherit self-host server mode from ambient env')
+assert.match(source, /version-status\.json/, 'desktop runtime should proxy the release-status route from the local server')
+
+const preloadPath = path.join(__dirname, '..', 'electron', 'preload.js')
+const preloadSource = fs.readFileSync(preloadPath, 'utf8')
+assert.match(preloadSource, /getVersionStatus/, 'desktop preload should expose the release-status IPC bridge')
 
 assert.doesNotMatch(
   source,
@@ -34,5 +39,7 @@ const popupPath = path.join(__dirname, '..', 'electron', 'popup.html')
 const popupSource = fs.readFileSync(popupPath, 'utf8')
 assert.match(popupSource, /id="startupToggle"/, 'desktop popup should expose a startup toggle')
 assert.match(popupSource, /Launch PVTKRRX when Windows starts/i, 'desktop popup should explain the startup toggle')
+assert.match(popupSource, /id="releaseCard"/, 'desktop popup should render release status')
+assert.match(popupSource, /id="releaseLink"/, 'desktop popup should render a release link')
 
 console.log('Smoke desktop provision flow passed')

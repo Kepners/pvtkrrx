@@ -503,6 +503,58 @@
       box-shadow: 0 0 16px rgba(0, 168, 255, 0.24);
     }
 
+    .meta-card.release-card {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .meta-card.release-card.up-to-date {
+      border-color: rgba(0, 255, 102, 0.3);
+      box-shadow: 0 0 16px rgba(0, 255, 102, 0.14);
+    }
+
+    .meta-card.release-card.update-available {
+      border-color: rgba(255, 19, 79, 0.35);
+      box-shadow: 0 0 16px rgba(255, 19, 79, 0.16);
+    }
+
+    .meta-card.release-card.unavailable {
+      border-color: rgba(255, 196, 0, 0.26);
+      box-shadow: 0 0 16px rgba(255, 196, 0, 0.12);
+    }
+
+    .release-status-copy {
+      color: #b9cbe8;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .release-status-link {
+      display: inline-flex;
+      align-items: center;
+      align-self: flex-start;
+      min-height: 34px;
+      padding: 0 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 246, 255, 0.24);
+      background: rgba(0, 246, 255, 0.07);
+      color: #b9ecff;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      text-decoration: none;
+      transition: all 0.18s ease;
+    }
+
+    .release-status-link:hover {
+      border-color: rgba(255, 0, 212, 0.45);
+      background: rgba(255, 0, 212, 0.08);
+      box-shadow: 0 0 14px rgba(0, 246, 255, 0.18);
+      color: #fff;
+    }
+
     .route-grid {
       margin-top: 12px;
       display: grid;
@@ -1086,6 +1138,13 @@
         <div class="meta-value">www.pvtkrrx.cc</div>
         <div class="meta-caption">Canonical public host for configure + install links</div>
       </article>
+      <article class="meta-card release-card unavailable" id="siteReleaseCard">
+        <div class="meta-title">Release</div>
+        <div class="meta-value" id="siteReleaseValue">Checking GitHub...</div>
+        <div class="meta-caption" id="siteReleaseCaption">Comparing the live site against the latest public release.</div>
+        <div class="release-status-copy" id="siteReleaseCopy">The hosted site and Windows EXE both read the same release source.</div>
+        <a class="release-status-link" id="siteReleaseLink" href="https://github.com/Kepners/pvtkrrx/releases" target="_blank" rel="noopener noreferrer">Open Release Page</a>
+      </article>
     </section>
 
     <section class="section-block" id="routes">
@@ -1285,6 +1344,11 @@
   <script>
     const particles = document.querySelector('.particles');
     const hueSet = [190, 203, 136, 345, 302];
+    const siteReleaseState = {
+      key: '',
+      currentVersion: '',
+      latestVersion: ''
+    };
 
     for (let i = 0; i < 46; i += 1) {
       const node = document.createElement('span');
@@ -1304,6 +1368,65 @@
       particles.appendChild(node);
     }
 
+    function renderSiteReleaseStatus(data) {
+      const card = document.getElementById('siteReleaseCard');
+      const value = document.getElementById('siteReleaseValue');
+      const caption = document.getElementById('siteReleaseCaption');
+      const copy = document.getElementById('siteReleaseCopy');
+      const link = document.getElementById('siteReleaseLink');
+      if (!card || !value || !caption || !copy || !link) return;
+
+      const currentVersion = String(data && data.currentVersion ? data.currentVersion : siteReleaseState.currentVersion || '0.0.0').trim() || '0.0.0';
+      const latestVersion = String(data && data.latestVersion ? data.latestVersion : currentVersion).trim() || currentVersion;
+      const status = String(data && data.status ? data.status : 'unavailable').trim() || 'unavailable';
+      const updateAvailable = Boolean(data && data.updateAvailable);
+      const latestReleaseUrl = String(data && data.latestReleaseUrl ? data.latestReleaseUrl : 'https://github.com/Kepners/pvtkrrx/releases').trim();
+      const message = String(data && data.message ? data.message : '').trim();
+      const key = [currentVersion, latestVersion, status, latestReleaseUrl, message, updateAvailable].join('|');
+      if (key === siteReleaseState.key) return;
+      siteReleaseState.key = key;
+      siteReleaseState.currentVersion = currentVersion;
+      siteReleaseState.latestVersion = latestVersion;
+
+      card.className = `meta-card release-card ${status}`.trim();
+      value.textContent = message || (updateAvailable ? 'Update available' : (status === 'up-to-date' ? 'Up to date' : 'Release check unavailable'));
+      caption.textContent = updateAvailable
+        ? `Current v${currentVersion} · Latest v${latestVersion}`
+        : (status === 'up-to-date'
+          ? `Current v${currentVersion} · Latest v${latestVersion}`
+          : `Current v${currentVersion} · Release check unavailable`);
+      copy.textContent = updateAvailable
+        ? 'Download the latest public release or review the notes before opening the desktop build.'
+        : (status === 'up-to-date'
+          ? 'The hosted site and Windows EXE are on the same public release.'
+          : (String(data && data.error ? data.error : '').trim() || 'GitHub release check is temporarily unavailable.'));
+      link.href = latestReleaseUrl;
+      link.textContent = updateAvailable ? 'Open Latest Release' : 'Open Release Page';
+    }
+
+    async function refreshSiteReleaseStatus() {
+      try {
+        const response = await fetch('/version-status.json', {
+          cache: 'no-store',
+          headers: {
+            'Accept': 'application/json'
+          }
+        });
+        const data = await response.json();
+        renderSiteReleaseStatus(data || {});
+      } catch (err) {
+        renderSiteReleaseStatus({
+          status: 'unavailable',
+          message: 'Release check unavailable',
+          error: err && err.message ? err.message : 'Failed to load release status',
+          currentVersion: siteReleaseState.currentVersion || '0.0.0',
+          latestVersion: siteReleaseState.latestVersion || siteReleaseState.currentVersion || '0.0.0',
+          latestReleaseUrl: 'https://github.com/Kepners/pvtkrrx/releases',
+          updateAvailable: false
+        });
+      }
+    }
+
     function scheduleBurst() {
       const wait = 8000 + Math.random() * 7000;
       window.setTimeout(() => {
@@ -1316,6 +1439,10 @@
     }
 
     scheduleBurst();
+    document.addEventListener('DOMContentLoaded', () => {
+      refreshSiteReleaseStatus();
+      setInterval(refreshSiteReleaseStatus, 600000);
+    });
   </script>
 </body>
 </html>

@@ -13,6 +13,7 @@ PVTKRRX is one codebase with three active runtime pieces:
 
 1. Hosted relay on the public site (`https://www.pvtkrrx.cc` today, fronted by Caddy into the Express app):
    - serves hosted manifests and the hosted configure UI
+   - serves `/version-status.json` so the public site can compare the live build against the latest GitHub release
    - encrypts hosted config tokens
    - stores LAN pair state and account data when KV-backed storage is configured
    - handles Stremio AuthKey linking and account-scoped access checks
@@ -40,6 +41,7 @@ PVTKRRX is one codebase with three active runtime pieces:
 4. Electron desktop wrapper:
    - launches and packages the local runtime on Windows
    - shows the startup splash and desktop shell
+   - reads the same `/version-status.json` release check so the popup can flag when the desktop EXE is behind GitHub Releases
    - performs startup checks, provider warm-up, and local auto-provision helpers
    - can register/unregister itself with Windows sign-in startup from the desktop shell
    - sends LAN pair heartbeat updates and Stremio launch pulses
@@ -69,6 +71,7 @@ PVTKRRX is one codebase with three active runtime pieces:
   - explicit `Minimize`, `Send To Tray`, and `Exit App` actions
 - The configure page now mirrors that local-runtime visibility with a live qBittorrent status panel that shows the effective save path, incomplete path, fallback storage roots, and whether PVTKRRX currently manages the qBit completion hook.
 - The current public landing page visual system is on-brand, but the copy still undersells the product compared with the README; keep the rewrite backlog in `docs/WEBSITE_STATUS.md`.
+- The public homepage now shows a live release-status card driven by `/version-status.json`, and the Windows desktop shell shows the same release check in the popup.
 
 ## Public Host Truth Table
 

@@ -1316,6 +1316,24 @@ ipcMain.handle('get-local-stremio-status', async () => {
   }
 })
 
+ipcMain.handle('get-version-status', async () => {
+  try {
+    return await fetchJson(`http://127.0.0.1:${port}/version-status.json`)
+  } catch (err) {
+    return {
+      ok: false,
+      status: 'unavailable',
+      updateAvailable: false,
+      currentVersion: String(pkg.version || '0.0.0'),
+      latestVersion: String(pkg.version || '0.0.0'),
+      latestTag: `v${String(pkg.version || '0.0.0')}`,
+      latestReleaseName: `v${String(pkg.version || '0.0.0')}`,
+      latestReleaseUrl: 'https://github.com/Kepners/pvtkrrx/releases',
+      message: String(err?.message || 'Release status unavailable')
+    }
+  }
+})
+
 ipcMain.handle('copy-local-install-url', async () => {
   const url = getLocalInstallManifestUrl()
   clipboard.writeText(url)

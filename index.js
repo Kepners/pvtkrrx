@@ -3,6 +3,7 @@ const crypto = require('crypto')
 const http = require('http')
 const https = require('https')
 const path = require('path')
+const pkg = require('./package.json')
 const selfsigned = require('selfsigned')
 const express = require('express')
 const shared = require('./src/lib/shared')
@@ -169,6 +170,15 @@ const configPageTemplate = fs.readFileSync(configPage, 'utf8')
 const runbooksPage = path.join(publicDir, 'runbooks.html')
 const healthPage = path.join(publicDir, 'health.html')
 const STREMIO_LINK_SESSION_TTL_SECONDS = Math.max(300, parseInt(process.env.PVTKRRX_STREMIO_LINK_SESSION_TTL_SECONDS || '1800', 10))
+const GITHUB_OWNER = 'Kepners'
+const GITHUB_REPO = 'pvtkrrx'
+const GITHUB_RELEASES_LATEST_URL = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`
+const VERSION_STATUS_CACHE_MS = Math.max(60000, parseInt(process.env.PVTKRRX_VERSION_STATUS_CACHE_MS || '300000', 10))
+let versionStatusCache = {
+  fetchedAt: 0,
+  data: null,
+  promise: null
+}
 app.use(express.static(publicDir, {
   maxAge: '1d',
   setHeaders: (res, filePath) => {
@@ -203,6 +213,16 @@ app.get('/app-config.json', (req, res) => {
   res.json(buildRuntimeAppConfig(req))
 })
 
+app.get(['/version-status.json', '/version.json'], async (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  try {
+    res.json(await getVersionStatus())
+  } catch (err) {
+    const fallback = buildVersionStatusPayload(null, err?.message || 'Unable to check release status')
+    res.status(200).json(fallback)
+  }
+})
+
 app.get(['/install-selfhost.sh', '/install.sh'], (req, res) => {
   const scriptPath = path.join(__dirname, 'scripts', 'install-selfhost.sh')
   if (!fs.existsSync(scriptPath)) {
@@ -231,6 +251,113 @@ function sendConfigurePage(req, res) {
   const runtimeBootstrapJson = JSON.stringify(runtimeConfig).replace(/</g, '\\u003c')
   const bootstrapScript = `<script>window.__PVTKRRX_RUNTIME_BOOTSTRAP__=${runtimeBootstrapJson};</script>`
   res.type('html').send(configPageTemplate.replace('</head>', `${bootstrapScript}</head>`))
+}
+
+function normalizeVersionString(value) {
+  return String(value || '').trim().replace(/^v/i, '').split('+')[0].split('-')[0]
+}
+
+function parseVersionParts(value) {
+  return normalizeVersionString(value)
+    .split('.')
+    .map(part => Number.parseInt(part, 10))
+    .filter(part => Number.isFinite(part))
+}
+
+function compareVersionStrings(left, right) {
+  const leftParts = parseVersionParts(left)
+  const rightParts = parseVersionParts(right)
+  const totalParts = Math.max(leftParts.length, rightParts.length)
+  for (let index = 0; index < totalParts; index += 1) {
+    const leftValue = Number.isFinite(leftParts[index]) ? leftParts[index] : 0
+    const rightValue = Number.isFinite(rightParts[index]) ? rightParts[index] : 0
+    if (leftValue !== rightValue) {
+      return leftValue > rightValue ? 1 : -1
+    }
+  }
+  return 0
+}
+
+function buildVersionStatusPayload(release = null, error = '') {
+  const currentVersion = normalizeVersionString(pkg.version || '0.0.0') || '0.0.0'
+  const latestVersion = normalizeVersionString(release?.tag_name || release?.name || currentVersion) || currentVersion
+  const latestReleaseUrl = String(release?.html_url || `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases`).trim()
+  const latestReleaseName = String(release?.name || release?.tag_name || `v${latestVersion}`).trim()
+  const latestTag = String(release?.tag_name || `v${latestVersion}`).trim()
+  const updateAvailable = !error && compareVersionStrings(currentVersion, latestVersion) < 0
+  const status = error
+    ? 'unavailable'
+    : (updateAvailable ? 'update-available' : 'up-to-date')
+  const message = error
+    ? `Release check unavailable: ${error}`
+    : (updateAvailable
+      ? `Update available: v${latestVersion}`
+      : `Up to date: v${currentVersion}`)
+
+  return {
+    ok: !error,
+    source: 'github',
+    status,
+    message,
+    currentVersion,
+    currentTag: `v${currentVersion}`,
+    latestVersion,
+    latestTag,
+    latestReleaseName,
+    latestReleaseUrl,
+    latestPublishedAt: String(release?.published_at || ''),
+    releaseAssetCount: Array.isArray(release?.assets) ? release.assets.length : 0,
+    updateAvailable,
+    checkedAt: new Date().toISOString(),
+    error: error || ''
+  }
+}
+
+async function getVersionStatus() {
+  const now = Date.now()
+  if (versionStatusCache.data && (now - versionStatusCache.fetchedAt) < VERSION_STATUS_CACHE_MS) {
+    return versionStatusCache.data
+  }
+  if (versionStatusCache.promise) {
+    return versionStatusCache.promise
+  }
+
+  versionStatusCache.promise = (async () => {
+    let payload
+    try {
+      const response = await fetch(GITHUB_RELEASES_LATEST_URL, {
+        headers: {
+          'Accept': 'application/vnd.github+json',
+          'User-Agent': 'PVTKRRX'
+        },
+        signal: AbortSignal.timeout(6000)
+      })
+      if (!response.ok) {
+        throw new Error(`GitHub release check returned HTTP ${response.status}`)
+      }
+      const release = await response.json()
+      payload = buildVersionStatusPayload(release)
+    } catch (err) {
+      payload = buildVersionStatusPayload(null, String(err?.message || err || 'Unknown release check error'))
+      if (versionStatusCache.data) {
+        payload = {
+          ...versionStatusCache.data,
+          status: 'unavailable',
+          ok: false,
+          error: payload.error,
+          message: payload.message,
+          checkedAt: payload.checkedAt
+        }
+      }
+    }
+
+    versionStatusCache.data = payload
+    versionStatusCache.fetchedAt = Date.now()
+    versionStatusCache.promise = null
+    return payload
+  })()
+
+  return versionStatusCache.promise
 }
 
 function sanitizeStremioLinkSessionToken(value) {

@@ -229,6 +229,21 @@ async function run() {
     assert.match(configureHtml, /href="\/runbooks"/, 'configure page should link to runbooks')
     assert.match(configureHtml, /route-parity\.js/, 'configure page should load shared parity helper')
 
+    const versionStatusRes = await fetch(`${base}/version-status.json`)
+    assert.equal(versionStatusRes.status, 200, 'GET /version-status.json should return 200')
+    const versionStatus = await versionStatusRes.json()
+    assert.equal(typeof versionStatus.ok, 'boolean')
+    assert.equal(typeof versionStatus.currentVersion, 'string')
+    assert.equal(typeof versionStatus.latestVersion, 'string')
+    assert.equal(typeof versionStatus.updateAvailable, 'boolean')
+    assert.equal(typeof versionStatus.latestReleaseUrl, 'string')
+
+    const homeRes = await fetch(`${base}/`)
+    assert.equal(homeRes.status, 200, 'GET / should return 200')
+    const homeHtml = await homeRes.text()
+    assert.match(homeHtml, /id="siteReleaseCard"/, 'homepage should render a release status card')
+    assert.match(homeHtml, /id="siteReleaseLink"/, 'homepage should render a release link')
+
     const runbooksRes = await fetch(`${base}/runbooks`)
     assert.equal(runbooksRes.status, 200, 'GET /runbooks should return 200')
     const runbooksHtml = await runbooksRes.text()

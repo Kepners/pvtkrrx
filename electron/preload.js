@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openConfigureLan: () => ipcRenderer.invoke('open-configure-lan'),
   openProwlarr: () => ipcRenderer.invoke('open-prowlarr'),
   openQbit: () => ipcRenderer.invoke('open-qbit'),
+  getVersionStatus: () => ipcRenderer.invoke('get-version-status'),
   getLocalInstallUrl: () => ipcRenderer.invoke('get-local-install-url'),
   getLocalInstallUrls: () => ipcRenderer.invoke('get-local-install-urls'),
   getLocalStremioStatus: () => ipcRenderer.invoke('get-local-stremio-status'),

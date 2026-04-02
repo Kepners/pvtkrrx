@@ -4,7 +4,7 @@ Updated: 2026-04-02
 
 ## Current Stage
 
-PVTKRRX is in a working `1.1.22` state on the main Windows/local route set.
+PVTKRRX is in a working `1.1.23` state on the main Windows/local route set.
 The current packaged Windows app is now verified as the real host runtime, and a live Apple TV LAN Bridge pass has been captured against it.
 
 The practical reading of the project today is:
@@ -49,13 +49,15 @@ These items are verified in the current workspace or by direct client/log proof:
 - `npm run smoke:selfhost` passed on 2026-03-31 and now covers explicit self-host server mode, disk-backed `/selfhost` config, and server-admin token gates
 - `npm run smoke:selfhost` passed again on 2026-03-31 after adding browser-driven Stremio link-session persistence into the disk-backed self-host config
 - `npm run smoke:provider-discovery` passed on 2026-04-02 after broadening the shared provider discovery helpers for existing Prowlarr/qBittorrent installs
+- `npm run smoke:config` passed on 2026-04-02 after the release-status endpoint and homepage release card were added
+- `npm run smoke:desktop` passed on 2026-04-02 after the desktop popup gained its release-status panel and preload bridge
 - `npm run smoke:sports` passed on 2026-03-31 after the sports artwork byte-cache update, including proxy URL coverage and cache-hit reuse checks
 - `npm run smoke:sports` passed again on 2026-03-31 after the Apple TV-safe meta placeholder change
 - `npm run smoke:desktop` passed on 2026-03-29 and now guards the desktop auto-provision persistence path against writing redacted config readbacks back to disk
 - `npm run smoke:playback` passed on 2026-03-29 and now covers redirect plus byte-serving on the shared `/file` route
 - `npm run smoke:pipeline` passed on 2026-03-29
 - `npm run smoke:sports` passed on 2026-03-29
-- `npm run dist:win` passed on 2026-03-29, again on 2026-03-30 for the `1.1.16` desktop release build, again on 2026-03-30 for the `1.1.17` bug-fix desktop release build, again on 2026-03-30 for the `1.1.18` archive-extraction desktop release build, again on 2026-03-30 for the `1.1.19` desktop power-policy build, again on 2026-03-31 for the `1.1.20` sports-image-cache build, again on 2026-03-31 for the `1.1.21` Apple TV metadata-serialization fix build, and again on 2026-04-01 for the `1.1.22` Stremio link-session desktop release build
+- `npm run dist:win` passed on 2026-03-29, again on 2026-03-30 for the `1.1.16` desktop release build, again on 2026-03-30 for the `1.1.17` bug-fix desktop release build, again on 2026-03-30 for the `1.1.18` archive-extraction desktop release build, again on 2026-03-30 for the `1.1.19` desktop power-policy build, again on 2026-03-31 for the `1.1.20` sports-image-cache build, again on 2026-03-31 for the `1.1.21` Apple TV metadata-serialization fix build, again on 2026-04-01 for the `1.1.22` Stremio link-session desktop release build, and again on 2026-04-02 for the `1.1.23` release-status build
 - `npm run smoke:lan-pair` passed again on 2026-03-31 after the Apple TV-safe LAN offline meta placeholder change
 - `npm run smoke:config`, `npm run smoke:desktop`, `npm run smoke:stremio-link`, `npm run smoke:lan-pair`, `npm run smoke:guards`, `npm run smoke:security`, `npm run smoke:pipeline`, `npm run smoke:playback`, and `npm run smoke:sports` all passed again on 2026-03-30
 - root `/manifest.json` returns the bootstrap manifest (`com.kepners.pvtkrrx.bootstrap`) with no catalogs/resources and `configurationRequired=true`
@@ -97,6 +99,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - `1.1.20` installers were built successfully into `dist/` on 2026-03-31 for the sports image-cache update
 - `1.1.21` installers were built successfully into `dist/` on 2026-03-31 for the Apple TV metadata-serialization fix
 - `1.1.22` installers were built successfully into `dist/` on 2026-04-01 for the one-time Stremio server link-session update and self-host configure route cleanup
+- `1.1.23` installers were built successfully into `dist/` on 2026-04-02 for the GitHub release-status update
 - the packaged Windows desktop app is working on the current host build, including the route-first setup flow and desktop shell controls shown in the live app UI
 - a real Apple TV LAN Bridge playback pass succeeded on 2026-03-31 after desktop/web install; while the Windows host stayed locked, playback started normally, the client reported the video as local, and forward/back seek worked
 
@@ -158,7 +161,7 @@ These items are verified in the current workspace or by direct client/log proof:
 
 These items should still be treated as open until captured on real clients:
 
-- one extra non-tvOS `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.22` desktop build for cross-client parity
+- one extra non-tvOS `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.23` desktop build for cross-client parity
 - one real public `Remote Seedbox` ready-file playback success on a remote client
 - one auth-protected external file-server playback success on a real Stremio client
 - long-session playback/performance tuning after qBittorrent download-speed adjustments
