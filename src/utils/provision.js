@@ -1,4 +1,5 @@
 const fs = require('fs')
+const os = require('os')
 const path = require('path')
 const { spawn } = require('child_process')
 const { deriveDefaultLocalHostname, normalizeLocalHostname } = require('./lanAlias')
@@ -29,6 +30,98 @@ function readFirstExisting(paths) {
     }
   }
   return null
+}
+
+function uniquePaths(paths) {
+  return [...new Set(
+    Array.isArray(paths) ? paths : []
+  )].map(value => String(value || '').trim()).filter(Boolean)
+}
+
+function getHomeDir(env = process.env) {
+  const candidates = [
+    env?.HOME,
+    env?.USERPROFILE
+  ]
+  for (const candidate of candidates) {
+    const text = String(candidate || '').trim()
+    if (text) return text
+  }
+  try {
+    return String(os.homedir() || '').trim()
+  } catch (_) {
+    return ''
+  }
+}
+
+function getProwlarrConfigCandidates(env = process.env) {
+  const home = getHomeDir(env)
+  const dataHint = String(env.PVTKRRX_PROWLARR_DATA || env.PROWLARR_DATA || '').trim()
+  const hintedPaths = dataHint ? [
+    path.join(dataHint, 'config.xml'),
+    path.join(dataHint, '.config', 'Prowlarr', 'config.xml'),
+    path.join(dataHint, '.config', 'prowlarr', 'config.xml')
+  ] : []
+  if (process.platform === 'win32') {
+    return uniquePaths([
+      ...hintedPaths,
+      path.join(env.ProgramData || 'C:\\ProgramData', 'Prowlarr', 'config.xml'),
+      path.join(env.LOCALAPPDATA || '', 'Prowlarr', 'config.xml'),
+      path.join(env.APPDATA || '', 'Prowlarr', 'config.xml'),
+      path.join(home || '', 'AppData', 'Local', 'Prowlarr', 'config.xml')
+    ])
+  }
+
+  return uniquePaths([
+    ...hintedPaths,
+    home && path.join(home, '.config', 'Prowlarr', 'config.xml'),
+    home && path.join(home, '.config', 'prowlarr', 'config.xml'),
+    home && path.join(home, '.local', 'share', 'Prowlarr', 'config.xml'),
+    home && path.join(home, '.local', 'share', 'prowlarr', 'config.xml'),
+    '/var/lib/prowlarr/.config/Prowlarr/config.xml',
+    '/var/lib/prowlarr/.config/prowlarr/config.xml',
+    '/var/lib/prowlarr/config.xml'
+  ])
+}
+
+function getQbitConfigCandidates(env = process.env) {
+  const home = getHomeDir(env)
+  const dataHint = String(env.PVTKRRX_QBIT_DATA || '').trim()
+  const userHint = String(env.PVTKRRX_QBIT_USER || env.QBIT_USER || '').trim()
+  const hintedRoots = uniquePaths([
+    dataHint,
+    userHint && process.platform !== 'win32' ? path.join('/var/lib', userHint) : '',
+    userHint && process.platform !== 'win32' ? path.join('/home', userHint) : ''
+  ])
+  const hintedPaths = uniquePaths(hintedRoots.flatMap((root) => [
+    path.join(root, '.config', 'qBittorrent', 'qBittorrent.conf'),
+    path.join(root, '.config', 'qBittorrent', 'qBittorrent.ini'),
+    path.join(root, '.local', 'share', 'qBittorrent', 'qBittorrent.conf'),
+    path.join(root, '.local', 'share', 'qBittorrent', 'qBittorrent.ini'),
+    path.join(root, 'qBittorrent.conf'),
+    path.join(root, 'qBittorrent.ini')
+  ]))
+  if (process.platform === 'win32') {
+    return uniquePaths([
+      ...hintedPaths,
+      path.join(env.APPDATA || '', 'qBittorrent', 'qBittorrent.ini'),
+      path.join(env.LOCALAPPDATA || '', 'qBittorrent', 'qBittorrent.ini'),
+      path.join(home || '', 'AppData', 'Roaming', 'qBittorrent', 'qBittorrent.ini'),
+      path.join(home || '', 'AppData', 'Local', 'qBittorrent', 'qBittorrent.ini')
+    ])
+  }
+
+  return uniquePaths([
+    ...hintedPaths,
+    home && path.join(home, '.config', 'qBittorrent', 'qBittorrent.conf'),
+    home && path.join(home, '.config', 'qBittorrent', 'qBittorrent.ini'),
+    home && path.join(home, '.local', 'share', 'qBittorrent', 'qBittorrent.conf'),
+    home && path.join(home, '.local', 'share', 'qBittorrent', 'qBittorrent.ini'),
+    '/var/lib/qbittorrent-nox/.config/qBittorrent/qBittorrent.conf',
+    '/var/lib/qbittorrent-nox/.config/qBittorrent/qBittorrent.ini',
+    '/var/lib/qbittorrent/.config/qBittorrent/qBittorrent.conf',
+    '/var/lib/qbittorrent/.config/qBittorrent/qBittorrent.ini'
+  ])
 }
 
 function parseXmlValue(xml, tag) {
@@ -326,22 +419,13 @@ async function ensureBonjourMdns(installIfMissing, startIfStopped, notes) {
 }
 
 async function ensureProwlarrRunning(installIfMissing, startIfStopped, notes) {
-  const hintsBefore = await getProwlarrHints()
-  const cfgCandidates = [
-    ...normalizePathList(hintsBefore?.paths),
-    ...PROWLARR_CONFIG_PATHS
-  ]
-  let cfg = readFirstExisting(cfgCandidates)
-  let installed = Boolean(cfg || hintsBefore?.serviceExists || (hintsBefore?.exePaths || []).length)
+  let discovered = await discoverProwlarrConfig()
+  let installed = Boolean(discovered.installed)
 
   if (!installed && installIfMissing) {
     await tryInstallWinget('Prowlarr.Prowlarr', notes)
-    const hintsAfterInstall = await getProwlarrHints()
-    cfg = readFirstExisting([
-      ...normalizePathList(hintsAfterInstall?.paths),
-      ...PROWLARR_CONFIG_PATHS
-    ])
-    installed = Boolean(cfg || hintsAfterInstall?.serviceExists || (hintsAfterInstall?.exePaths || []).length)
+    discovered = await discoverProwlarrConfig()
+    installed = Boolean(discovered.installed)
   }
 
   if (startIfStopped) {
@@ -366,76 +450,72 @@ async function ensureProwlarrRunning(installIfMissing, startIfStopped, notes) {
     if (started.code === 0) notes.push('Prowlarr start attempted')
   }
 
-  const hintsAfter = await getProwlarrHints()
-  cfg = readFirstExisting([
-    ...normalizePathList(hintsAfter?.paths),
-    ...cfgCandidates
-  ]) || cfg
-  const xml = cfg ? cfg.content : ''
-  const apiKey = parseXmlValue(xml, 'ApiKey')
-  const port = parseInt(parseXmlValue(xml, 'Port') || '9696', 10)
-  const url = `http://127.0.0.1:${Number.isFinite(port) ? port : 9696}`
-  const ready = Boolean(apiKey && (hintsAfter?.running || hintsBefore?.running || installed))
+  discovered = await discoverProwlarrConfig()
+  const apiKey = String(discovered.apiKey || '').trim()
+  const url = String(discovered.url || '').trim() || 'http://127.0.0.1:9696'
+  const ready = Boolean(apiKey && (discovered.running || installed))
 
   if (ready) notes.push('Prowlarr config + API key detected')
   else notes.push('Prowlarr API key not found (open Prowlarr once if newly installed)')
 
   return {
     installed,
-    running: Boolean(hintsAfter?.running || hintsBefore?.running || ready),
+    running: Boolean(discovered.running || ready),
     url,
     apiKey
   }
 }
 
-async function discoverProwlarrConfig() {
-  const hints = await getProwlarrHints()
-  const cfg = readFirstExisting([
+async function discoverProwlarrConfig(options = {}) {
+  const useHints = options.useHints !== false
+  const hints = useHints ? await getProwlarrHints() : null
+  const cfg = readFirstExisting(uniquePaths([
     ...normalizePathList(hints?.paths),
-    ...PROWLARR_CONFIG_PATHS
-  ])
+    ...getProwlarrConfigCandidates()
+  ]))
   const xml = cfg ? cfg.content : ''
   const apiKey = parseXmlValue(xml, 'ApiKey')
   const port = parseInt(parseXmlValue(xml, 'Port') || '9696', 10)
-  const url = `http://127.0.0.1:${Number.isFinite(port) ? port : 9696}`
+  const urlBase = parseXmlValue(xml, 'UrlBase')
+  const url = `http://127.0.0.1:${Number.isFinite(port) ? port : 9696}${urlBase ? `/${String(urlBase).replace(/^\/+/, '')}` : ''}`.replace(/\/+$/, '')
 
   return {
     installed: Boolean(cfg || hints?.serviceExists || (hints?.exePaths || []).length),
     running: Boolean(hints?.running),
     url,
-    apiKey
+    apiKey,
+    configPath: cfg?.path || '',
+    port: Number.isFinite(port) ? port : 9696
   }
 }
 
 async function ensureQbitRunning(installIfMissing, startIfStopped, configureLocalNoAuth, notes) {
-  const hintsBefore = await getQbitHints()
-  const iniCandidates = [
-    ...normalizePathList(hintsBefore?.paths),
-    ...QBIT_CONFIG_PATHS
-  ]
-  let ini = readFirstExisting(iniCandidates)
-  let installed = Boolean(
-    ini ||
-    (hintsBefore?.exePaths || []).some(p => fs.existsSync(p)) ||
-    hintsBefore?.running
-  )
+  let discovered = await discoverQbitConfig()
+  let installed = Boolean(discovered.installed)
 
   if (!installed && installIfMissing) {
     await tryInstallWinget('qBittorrent.qBittorrent', notes)
-    const hintsAfterInstall = await getQbitHints()
-    ini = readFirstExisting([
-      ...normalizePathList(hintsAfterInstall?.paths),
-      ...QBIT_CONFIG_PATHS
-    ])
-    installed = Boolean(
-      ini ||
-      (hintsAfterInstall?.exePaths || []).some(p => fs.existsSync(p)) ||
-      hintsAfterInstall?.running
-    )
+    discovered = await discoverQbitConfig()
+    installed = Boolean(discovered.installed)
   }
 
-  let iniText = ini ? ini.content : ''
+  const wasRunning = Boolean(discovered.running)
+  const configPath = String(discovered.configPath || '').trim()
+  const initialIni = configPath ? readFirstExisting([configPath])?.content || '' : ''
   let settingsPatched = false
+
+  if (configureLocalNoAuth && configPath && initialIni) {
+    let patched = initialIni
+    patched = upsertIniValue(patched, 'WebUI\\LocalHostAuth', 'false')
+    patched = upsertIniValue(patched, 'WebUI\\AuthSubnetWhitelistEnabled', 'true')
+    patched = upsertIniValue(patched, 'WebUI\\AuthSubnetWhitelist', '127.0.0.1/32,::1/128')
+
+    if (patched !== initialIni) {
+      fs.writeFileSync(configPath, patched, 'utf8')
+      settingsPatched = true
+      notes.push('qBittorrent localhost auth updated for zero-config addon access')
+    }
+  }
 
   if (startIfStopped) {
     const startScript = `
@@ -456,62 +536,32 @@ async function ensureQbitRunning(installIfMissing, startIfStopped, configureLoca
     if (started.code === 0) notes.push('qBittorrent start attempted')
   }
 
-  const hintsAfterStart = await getQbitHints()
-  ini = readFirstExisting([
-    ...normalizePathList(hintsAfterStart?.paths),
-    ...iniCandidates
-  ]) || ini
-  iniText = ini ? ini.content : iniText
-
-  if (configureLocalNoAuth && ini && iniText) {
-    let patched = iniText
-    patched = upsertIniValue(patched, 'WebUI\\LocalHostAuth', 'false')
-    patched = upsertIniValue(patched, 'WebUI\\AuthSubnetWhitelistEnabled', 'true')
-    patched = upsertIniValue(patched, 'WebUI\\AuthSubnetWhitelist', '127.0.0.1/32,::1/128')
-
-    if (patched !== iniText) {
-      fs.writeFileSync(ini.path, patched, 'utf8')
-      iniText = patched
-      settingsPatched = true
-      notes.push('qBittorrent localhost auth updated for zero-config addon access')
+  if (settingsPatched && startIfStopped && wasRunning) {
+    const hintsAfterPatch = await getQbitHints()
+    const preferredExe = [...normalizePathList(hintsAfterPatch?.exePaths), ...QBIT_EXE_PATHS]
+      .find(p => fs.existsSync(p))
+    if (preferredExe) {
+      const escaped = preferredExe.replace(/'/g, "''")
+      const restartScript = `
+        Stop-Process -Name qbittorrent -Force -ErrorAction SilentlyContinue
+        Start-Sleep -Seconds 2
+        Start-Process -FilePath '${escaped}'
+        Start-Sleep -Seconds 2
+        Write-Output 'restarted'
+      `
+      const restarted = await runPowerShell(restartScript, 120000)
+      if (restarted.code === 0) notes.push('qBittorrent restarted to apply localhost auth settings')
     }
   }
 
-  let runningCheck = await runPowerShell(`if (Get-Process -Name qbittorrent -ErrorAction SilentlyContinue) { "yes" } else { "no" }`)
-  let running = /yes/i.test(runningCheck.stdout || '') || Boolean(hintsAfterStart?.running)
-
-  const preferredExe = [...normalizePathList(hintsAfterStart?.exePaths), ...QBIT_EXE_PATHS]
-    .find(p => fs.existsSync(p))
-
-  if (settingsPatched && running && startIfStopped && preferredExe) {
-    const escaped = preferredExe.replace(/'/g, "''")
-    const restartScript = `
-      Stop-Process -Name qbittorrent -Force -ErrorAction SilentlyContinue
-      Start-Sleep -Seconds 2
-      Start-Process -FilePath '${escaped}'
-      Start-Sleep -Seconds 2
-      Write-Output 'restarted'
-    `
-    const restarted = await runPowerShell(restartScript, 120000)
-    if (restarted.code === 0) notes.push('qBittorrent restarted to apply localhost auth settings')
-  }
-
-  const hintsAfter = await getQbitHints()
-  ini = readFirstExisting([
-    ...normalizePathList(hintsAfter?.paths),
-    ...iniCandidates
-  ]) || ini
-  iniText = ini ? ini.content : iniText
-
-  const port = parseInt(parseIniValue(iniText, 'WebUI\\Port') || '8080', 10)
-  const username = parseIniValue(iniText, 'WebUI\\Username')
-  const localHostAuth = parseIniValue(iniText, 'WebUI\\LocalHostAuth')
-
-  const url = `http://127.0.0.1:${Number.isFinite(port) ? port : 8080}`
-  runningCheck = await runPowerShell(`if (Get-Process -Name qbittorrent -ErrorAction SilentlyContinue) { "yes" } else { "no" }`)
-  running = /yes/i.test(runningCheck.stdout || '') || Boolean(hintsAfter?.running)
+  discovered = await discoverQbitConfig()
+  const url = String(discovered.url || '').trim() || 'http://127.0.0.1:8080'
+  const username = String(discovered.username || '').trim()
+  const localHostAuthDisabled = Boolean(discovered.localHostAuthDisabled)
+  let running = Boolean(discovered.running)
 
   if (!running && startIfStopped) {
+    const hintsAfter = await getQbitHints()
     for (const exe of [...normalizePathList(hintsAfter?.exePaths), ...QBIT_EXE_PATHS]) {
       try {
         if (fs.existsSync(exe)) {
@@ -522,14 +572,15 @@ async function ensureQbitRunning(installIfMissing, startIfStopped, configureLoca
         // ignore
       }
     }
+    discovered = await discoverQbitConfig()
+    running = Boolean(discovered.running)
   }
 
-  const localhostAuthDisabled = String(localHostAuth || '').toLowerCase() === 'false'
-
   let localhostApiReady = false
-  if (configureLocalNoAuth && localhostAuthDisabled) {
+  if (configureLocalNoAuth && localHostAuthDisabled) {
     localhostApiReady = await canAccessQbitWithoutAuth(url)
     if (!localhostApiReady && startIfStopped) {
+      const hintsAfter = await getQbitHints()
       const retryExe = [...normalizePathList(hintsAfter?.exePaths), ...QBIT_EXE_PATHS]
         .find(p => fs.existsSync(p))
       if (retryExe) {
@@ -550,7 +601,7 @@ async function ensureQbitRunning(installIfMissing, startIfStopped, configureLoca
     }
   }
 
-  if (!localhostAuthDisabled) {
+  if (!localHostAuthDisabled) {
     notes.push('qBittorrent may still require WebUI credentials')
   } else if (!localhostApiReady && configureLocalNoAuth) {
     notes.push('qBittorrent localhost auth is disabled in config, but API is still refusing anonymous access')
@@ -562,9 +613,36 @@ async function ensureQbitRunning(installIfMissing, startIfStopped, configureLoca
     installed,
     running,
     url,
-    username: (localhostAuthDisabled && localhostApiReady) ? '' : (username || ''),
-    localHostAuthDisabled: localhostAuthDisabled,
-    localApiReady: localhostApiReady
+    username: (localHostAuthDisabled && localhostApiReady) ? '' : (username || ''),
+    localHostAuthDisabled,
+    localApiReady: localhostApiReady,
+    savePath: String(discovered.savePath || '').trim(),
+    configPath
+  }
+}
+
+async function discoverQbitConfig(options = {}) {
+  const useHints = options.useHints !== false
+  const hints = useHints ? await getQbitHints() : null
+  const cfg = readFirstExisting(uniquePaths([
+    ...normalizePathList(hints?.paths),
+    ...getQbitConfigCandidates()
+  ]))
+  const iniText = cfg ? cfg.content : ''
+  const port = parseInt(parseIniValue(iniText, 'WebUI\\Port') || '8080', 10)
+  const username = parseIniValue(iniText, 'WebUI\\Username')
+  const savePath = parseIniValue(iniText, 'Session\\DefaultSavePath')
+  const localHostAuth = parseIniValue(iniText, 'WebUI\\LocalHostAuth')
+
+  return {
+    installed: Boolean(cfg || (hints?.exePaths || []).length || hints?.running),
+    running: Boolean(hints?.running),
+    url: `http://127.0.0.1:${Number.isFinite(port) ? port : 8080}`,
+    username,
+    savePath,
+    localHostAuthDisabled: String(localHostAuth || '').toLowerCase() === 'false',
+    configPath: cfg?.path || '',
+    port: Number.isFinite(port) ? port : 8080
   }
 }
 
@@ -630,5 +708,6 @@ async function autoProvisionWindows(options = {}) {
 module.exports = {
   autoProvisionWindows,
   ensureWindowsLanAccess,
-  discoverProwlarrConfig
+  discoverProwlarrConfig,
+  discoverQbitConfig
 }

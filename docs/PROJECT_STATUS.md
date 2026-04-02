@@ -1,6 +1,6 @@
 # PVTKRRX Project Status
 
-Updated: 2026-04-01
+Updated: 2026-04-02
 
 ## Current Stage
 
@@ -48,6 +48,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - `npm run smoke:config` passed on 2026-03-29
 - `npm run smoke:selfhost` passed on 2026-03-31 and now covers explicit self-host server mode, disk-backed `/selfhost` config, and server-admin token gates
 - `npm run smoke:selfhost` passed again on 2026-03-31 after adding browser-driven Stremio link-session persistence into the disk-backed self-host config
+- `npm run smoke:provider-discovery` passed on 2026-04-02 after broadening the shared provider discovery helpers for existing Prowlarr/qBittorrent installs
 - `npm run smoke:sports` passed on 2026-03-31 after the sports artwork byte-cache update, including proxy URL coverage and cache-hit reuse checks
 - `npm run smoke:sports` passed again on 2026-03-31 after the Apple TV-safe meta placeholder change
 - `npm run smoke:desktop` passed on 2026-03-29 and now guards the desktop auto-provision persistence path against writing redacted config readbacks back to disk
@@ -62,7 +63,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - 2026-03-31 preview-host check: `https://pvtkrrx.vercel.app/` returned `404` with `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`, so treat it as stale and non-canonical
 - 2026-03-31 homepage rewrite landed locally in `public/index.html`: plain-English hero, route comparison, requirements section, sports proof section, and removal of the public `/local/install` CTA
 - explicit self-host server mode now exposes `/app-config.json`, disk-backed `/selfhost/config.json` + `/selfhost/manifest.json?mode=hosted`, and `POST /server-config` for persisted VPS/seedbox installs
-- the self-host installer path has now been rebuilt around a dedicated Linux bootstrap script plus a new `npm run server:setup` installer flow that writes a stable `PVTKRRX_RUNTIME_DIR`, generates `AUTH_TOKEN_SECRET`, supports `PVTKRRX_PUBLIC_BASE_URL`, saves the runtime config locally, creates the server admin token file, and can install a Linux `systemd` service for auto-start on boot
+- the self-host installer path has now been rebuilt around a dedicated Linux bootstrap script plus a new `npm run server:setup` installer flow that writes a stable `PVTKRRX_RUNTIME_DIR`, generates `AUTH_TOKEN_SECRET`, supports `PVTKRRX_PUBLIC_BASE_URL`, auto-discovers existing Prowlarr/qBittorrent configs when present, saves the runtime config locally, creates the server admin token file, and can install a Linux `systemd` service for auto-start on boot
 - `npm run smoke:stremio-link` passed on 2026-03-31 after the new link-session flow was added for hosted token configs: server-created session, install-seen manifest hit, browser AuthKey completion, and final linked install URL/token refresh
 - configure page now exposes a one-time `Server Link Session` flow so a local signed-in Stremio browser/device can link a remote/cloud server config without the server recovering raw login credentials
 - `PC Local` resolves as a real addon from `http://127.0.0.1:7000/local/manifest.json?mode=local`

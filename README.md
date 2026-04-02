@@ -95,7 +95,9 @@ The Linux installer now bootstraps a dedicated self-host server in one flow:
 - downloads the app into `/opt/pvtkrrx` by default
 - installs a bundled Node runtime under `/opt/pvtkrrx/.node`
 - installs production dependencies
-- prompts for your public HTTPS base URL plus the seedbox connection details
+- auto-discovers existing Prowlarr/qBittorrent configs when they are already installed, then prompts only for the values it cannot recover
+- configures qBittorrent for localhost addon access when it has to stand up the service itself
+- prompts for your public HTTPS base URL plus any remaining seedbox connection details
 - writes `.env` with `ENCRYPTION_SECRET`, `AUTH_TOKEN_SECRET`, `PVTKRRX_SELF_HOST_MODE=true`, `PVTKRRX_RUNTIME_DIR`, and `PVTKRRX_PUBLIC_BASE_URL`
 - saves the disk-backed self-host config into the runtime directory
 - creates the server admin token file
@@ -243,6 +245,17 @@ This validates:
 - same-host self-host runtime can save disk-backed server config and read it back
 - remote/browser-driven Stremio link sessions can persist a linked `stremioUserId` into the disk-backed self-host config
 - `/selfhost/manifest.json?mode=hosted` resolves with no-store caching
+
+Provider discovery smoke check:
+
+```bash
+npm run smoke:provider-discovery
+```
+
+This validates:
+- existing Prowlarr `config.xml` discovery
+- existing qBittorrent config discovery
+- auto-filled URL/API key/username/save-path values from the recovered provider configs
 
 Route-capability stream pipeline smoke check:
 

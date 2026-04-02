@@ -465,7 +465,7 @@ async function run() {
     assert.equal(localManifestRes.status, 200, 'GET /local/manifest.json should return 200 after local config save')
     const localManifest = await localManifestRes.json()
     assert.equal(localManifest.id, 'com.kepners.pvtkrrx.local')
-    assert.equal(localManifest.name, 'PVTKRRX')
+    assert.match(String(localManifest.name || ''), /^PVTKRRX(?:\s|$)/, 'local manifest should keep the PVTKRRX prefix')
     assert.equal(localManifest.behaviorHints?.configurationRequired, false)
     assert.deepEqual(localManifest.types, ['movie', 'series', 'sports'], 'local manifest should expose sports as a first-class type')
     assert.ok(Array.isArray(localManifest.catalogs) && localManifest.catalogs.some((catalog) => catalog?.id === 'pvtkrrx-sports' && catalog?.type === 'sports'), 'local manifest should expose sports through the sports catalog contract')

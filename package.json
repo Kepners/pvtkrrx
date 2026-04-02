@@ -20,6 +20,7 @@
     "smoke:playback": "node scripts/smoke-playback-route.js",
     "smoke:sports": "node scripts/smoke-sports-structured.js",
     "smoke:desktop": "node scripts/smoke-desktop-provision.js",
+    "smoke:provider-discovery": "node scripts/smoke-provider-discovery.js",
     "desktop:dev": "electron electron/main.js",
     "dist:win": "node scripts/build-win.js"
   },

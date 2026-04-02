@@ -8,6 +8,7 @@ const { stdin: input, stdout: output } = require('node:process')
 
 const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJsonFile')
 const { ensureServerAdminToken } = require('../src/utils/serverAdminToken')
+const { discoverProwlarrConfig, discoverQbitConfig } = require('../src/utils/provision')
 const { installSystemdService } = require('./install-systemd-service')
 
 function parseDotEnvFile(filePath) {
@@ -572,42 +573,30 @@ async function runAuto() {
   console.log('PVTKRRX auto-configuration')
   console.log('')
 
-  // ── Detect Prowlarr ──
-  let jackettUrl = String(existingConfig?.jackettUrl || '').trim()
-  let jackettApiKey = String(existingConfig?.jackettApiKey || '').trim()
+  const prowlarr = await discoverProwlarrConfig()
+  const qbit = await discoverQbitConfig()
 
-  const prowlarrConfigPath = findProwlarrConfig()
-  if (prowlarrConfigPath) {
-    const prowlarr = parseProwlarrConfigXml(prowlarrConfigPath)
-    jackettUrl = jackettUrl || `http://localhost:${prowlarr.port}`
-    jackettApiKey = jackettApiKey || prowlarr.apiKey
-    console.log(`✓ Prowlarr detected at ${prowlarrConfigPath}`)
+  let jackettUrl = String(existingConfig?.jackettUrl || prowlarr.url || 'http://localhost:9696').trim()
+  let jackettApiKey = String(existingConfig?.jackettApiKey || prowlarr.apiKey || '').trim()
+  let qbitUrl = String(existingConfig?.qbitUrl || qbit.url || 'http://localhost:8080').trim()
+  let qbitUsername = String(existingConfig?.qbitUsername || qbit.username || '').trim()
+  let qbitPassword = String(existingConfig?.qbitPassword || '').trim()
+
+  if (prowlarr.configPath) {
+    console.log(`✓ Prowlarr detected at ${prowlarr.configPath}`)
     console.log(`  URL: ${jackettUrl}`)
-    console.log(`  API key: ${jackettApiKey.slice(0, 8)}...`)
+    if (jackettApiKey) console.log(`  API key: ${jackettApiKey.slice(0, 8)}...`)
   } else {
-    jackettUrl = jackettUrl || 'http://localhost:9696'
     console.log('⚠ Prowlarr config not found, using default URL. Configure later via /configure.')
   }
 
-  // ── Detect qBittorrent ──
-  let qbitUrl = String(existingConfig?.qbitUrl || '').trim()
-  let qbitUsername = String(existingConfig?.qbitUsername || '').trim()
-  let qbitPassword = String(existingConfig?.qbitPassword || '').trim()
-
-  const qbitConfigPath = findQbitConfig()
-  const envQbitPort = String(process.env.PVTKRRX_QBIT_WEBUI_PORT || '').trim()
-  if (qbitConfigPath) {
-    const qbit = parseQbitConfig(qbitConfigPath)
-    const detectedPort = qbit.port || (envQbitPort ? Number.parseInt(envQbitPort, 10) : 8080)
-    qbitUrl = qbitUrl || `http://localhost:${detectedPort}`
-    qbitUsername = qbitUsername || qbit.username
-    console.log(`✓ qBittorrent detected at ${qbitConfigPath}`)
+  if (qbit.configPath) {
+    console.log(`✓ qBittorrent detected at ${qbit.configPath}`)
     console.log(`  URL: ${qbitUrl}`)
     if (qbitUsername) console.log(`  Username: ${qbitUsername}`)
     if (qbit.savePath) console.log(`  Save path: ${qbit.savePath}`)
+    if (qbit.localHostAuthDisabled) console.log('  Localhost auth: disabled')
   } else {
-    const fallbackPort = envQbitPort || '8080'
-    qbitUrl = qbitUrl || `http://localhost:${fallbackPort}`
     console.log('⚠ qBittorrent config not found, using default URL. Configure later via /configure.')
   }
 

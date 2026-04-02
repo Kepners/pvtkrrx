@@ -8,11 +8,42 @@ NODE_VERSION="${PVTKRRX_NODE_VERSION:-22.14.0}"
 SERVICE_USER_DEFAULT="${PVTKRRX_SERVICE_USER:-${SUDO_USER:-${USER:-root}}}"
 PROWLARR_DATA="${PVTKRRX_PROWLARR_DATA:-/var/lib/prowlarr}"
 QBIT_USER="${PVTKRRX_QBIT_USER:-qbittorrent}"
+QBIT_DATA_DIR="${PVTKRRX_QBIT_DATA:-/var/lib/$QBIT_USER}"
 QBIT_PORT="${PVTKRRX_QBIT_WEBUI_PORT:-8080}"
 DOWNLOADS_DIR="${PVTKRRX_DOWNLOADS_DIR:-$INSTALL_DIR/downloads}"
 
 # ─── helpers ────────────────────────────────────────────────────────
 have_command() { command -v "$1" >/dev/null 2>&1; }
+
+write_ini_value() {
+  local file="$1"
+  local key="$2"
+  local value="$3"
+  local tmp; tmp="$(mktemp)"
+  awk -v key="$key" -v value="$value" '
+    BEGIN { found = 0; inserted = 0 }
+    {
+      if (substr($0, 1, length(key) + 1) == key "=") {
+        print key "=" value
+        found = 1
+        next
+      }
+      if (!inserted && $0 ~ /^\[Preferences\]/) {
+        print $0
+        print key "=" value
+        inserted = 1
+        next
+      }
+      print $0
+    }
+    END {
+      if (!found && !inserted) {
+        print "[Preferences]"
+        print key "=" value
+      }
+    }
+  ' "$file" > "$tmp" && mv "$tmp" "$file"
+}
 
 run_root() {
   if [ "$(id -u)" -eq 0 ]; then "$@"; return; fi
@@ -84,16 +115,16 @@ install_qbittorrent() {
 
 setup_qbittorrent_service() {
   local unit_path="/etc/systemd/system/qbittorrent-nox.service"
+  local service_was_active=0
   if [ -f "$unit_path" ] && systemctl is-active --quiet qbittorrent-nox 2>/dev/null; then
+    service_was_active=1
     echo "✓ qBittorrent service already running"
-    return 0
-  fi
+  else
+    # Create downloads dir
+    run_root mkdir -p "$DOWNLOADS_DIR"
+    run_root chown "$QBIT_USER:$QBIT_USER" "$DOWNLOADS_DIR"
 
-  # Create downloads dir
-  run_root mkdir -p "$DOWNLOADS_DIR"
-  run_root chown "$QBIT_USER:$QBIT_USER" "$DOWNLOADS_DIR"
-
-  cat > /tmp/qbittorrent-nox.service << EOF
+    cat > /tmp/qbittorrent-nox.service << EOF
 [Unit]
 Description=qBittorrent-nox Daemon
 After=network.target
@@ -110,11 +141,12 @@ TimeoutStopSec=20
 [Install]
 WantedBy=multi-user.target
 EOF
-  run_root install -m 0644 /tmp/qbittorrent-nox.service "$unit_path"
-  rm -f /tmp/qbittorrent-nox.service
-  run_root systemctl daemon-reload
-  run_root systemctl enable qbittorrent-nox
-  run_root systemctl start qbittorrent-nox
+    run_root install -m 0644 /tmp/qbittorrent-nox.service "$unit_path"
+    rm -f /tmp/qbittorrent-nox.service
+    run_root systemctl daemon-reload
+    run_root systemctl enable qbittorrent-nox
+    run_root systemctl start qbittorrent-nox
+  fi
 
   # Wait for WebUI to come up
   echo "Waiting for qBittorrent WebUI..."
@@ -142,6 +174,17 @@ EOF
       echo "✓ qBittorrent configured (bypass_local_auth=true, save_path=$DOWNLOADS_DIR)"
     fi
     rm -f "$cookie_jar"
+  fi
+
+  if [ -z "${temp_pass:-}" ] && [ -f "$QBIT_DATA_DIR/.config/qBittorrent/qBittorrent.conf" ]; then
+    write_ini_value "$QBIT_DATA_DIR/.config/qBittorrent/qBittorrent.conf" 'WebUI\LocalHostAuth' 'false'
+    write_ini_value "$QBIT_DATA_DIR/.config/qBittorrent/qBittorrent.conf" 'WebUI\AuthSubnetWhitelistEnabled' 'true'
+    write_ini_value "$QBIT_DATA_DIR/.config/qBittorrent/qBittorrent.conf" 'WebUI\AuthSubnetWhitelist' '127.0.0.1/32,::1/128'
+    echo "✓ qBittorrent existing config patched for localhost API access"
+    if [ "$service_was_active" -eq 1 ] || systemctl is-active --quiet qbittorrent-nox 2>/dev/null; then
+      run_root systemctl restart qbittorrent-nox
+      sleep 2
+    fi
   fi
 
   echo "✓ qBittorrent service started on port $QBIT_PORT"
@@ -325,6 +368,8 @@ main() {
 
   # Export detection hints for the Node installer
   export PVTKRRX_PROWLARR_DATA="$PROWLARR_DATA"
+  export PVTKRRX_QBIT_USER="$QBIT_USER"
+  export PVTKRRX_QBIT_DATA="$QBIT_DATA_DIR"
   export PVTKRRX_QBIT_WEBUI_PORT="$QBIT_PORT"
   export PVTKRRX_DOWNLOADS_DIR="$DOWNLOADS_DIR"
 
