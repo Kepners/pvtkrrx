@@ -240,6 +240,19 @@ function loadExistingServerConfig(runtimeDir, secret) {
   }
 }
 
+function runFullBootstrap(repoRoot) {
+  const scriptPath = path.join(repoRoot, 'scripts', 'install-selfhost.sh')
+  const result = spawnSync('bash', [scriptPath], {
+    cwd: repoRoot,
+    env: process.env,
+    stdio: 'inherit'
+  })
+  if (result.error) throw result.error
+  if (Number(result.status || 0) !== 0) {
+    throw new Error(`Self-host bootstrap exited with code ${Number(result.status || 1)}`)
+  }
+}
+
 function defaultServiceUser() {
   return String(
     process.env.PVTKRRX_SERVICE_USER ||
@@ -290,6 +303,24 @@ async function run() {
     console.log('This installer writes a stable self-host config, server admin token, and optional systemd service.')
     console.log('Press Enter to keep an existing/default value. Use "-" to clear an optional field.')
     console.log('')
+
+    const prowlarr = await discoverProwlarrConfig({ useHints: false })
+    const qbit = await discoverQbitConfig({ useHints: false })
+    const missingProviders = !prowlarr.installed || !prowlarr.apiKey || !qbit.installed
+    if (process.platform === 'linux' && missingProviders) {
+      const installBootstrap = await promptBoolean(
+        rl,
+        'Prowlarr and/or qBittorrent are missing. Run the full bootstrap now to install them automatically?',
+        true
+      )
+      if (installBootstrap) {
+        rl.close()
+        runFullBootstrap(repoRoot)
+        return
+      }
+      console.log('Continuing with manual values. Install Prowlarr and qBittorrent first if you want automatic detection.')
+      console.log('')
+    }
 
     const encryptionSecret = await promptValue(
       rl,
@@ -573,8 +604,8 @@ async function runAuto() {
   console.log('PVTKRRX auto-configuration')
   console.log('')
 
-  const prowlarr = await discoverProwlarrConfig()
-  const qbit = await discoverQbitConfig()
+  const prowlarr = await discoverProwlarrConfig({ useHints: false })
+  const qbit = await discoverQbitConfig({ useHints: false })
 
   let jackettUrl = String(existingConfig?.jackettUrl || prowlarr.url || 'http://localhost:9696').trim()
   let jackettApiKey = String(existingConfig?.jackettApiKey || prowlarr.apiKey || '').trim()

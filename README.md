@@ -97,6 +97,7 @@ The Linux installer now bootstraps a dedicated self-host server in one flow:
 - installs production dependencies
 - auto-discovers existing Prowlarr/qBittorrent configs when they are already installed, then prompts only for the values it cannot recover
 - configures qBittorrent for localhost addon access when it has to stand up the service itself
+- if Prowlarr or qBittorrent are missing on a direct `npm run server:setup` run, it can offer to hand off to the full bootstrap and install them automatically
 - prompts for your public HTTPS base URL plus any remaining seedbox connection details
 - writes `.env` with `ENCRYPTION_SECRET`, `AUTH_TOKEN_SECRET`, `PVTKRRX_SELF_HOST_MODE=true`, `PVTKRRX_RUNTIME_DIR`, and `PVTKRRX_PUBLIC_BASE_URL`
 - saves the disk-backed self-host config into the runtime directory
