@@ -477,6 +477,23 @@
       opacity: 0.95;
     }
 
+    .self-host-unlock {
+      border-color: rgba(0, 255, 102, 0.32);
+      box-shadow: 0 24px 44px -32px rgba(0, 255, 102, 0.26);
+    }
+
+    .unlock-action {
+      background: linear-gradient(135deg, rgba(0, 255, 102, 0.94), rgba(0, 246, 255, 0.82));
+      color: #041f19;
+      border-color: rgba(0, 255, 102, 0.72);
+      box-shadow: 0 12px 26px -18px rgba(0, 255, 102, 0.72);
+    }
+
+    .unlock-action:hover {
+      border-color: rgba(0, 255, 102, 0.88);
+      box-shadow: 0 0 0 3px rgba(0, 255, 102, 0.18);
+    }
+
     .card h2 {
       font-family: 'IBM Plex Mono', monospace;
       color: #a9d4ff;
@@ -1726,6 +1743,18 @@
       <p class="subtitle">Connect your private tracker seedbox to Stremio</p>
     </div>
 
+    <div class="card self-host-unlock" id="serverAdminBlock" style="display:none;">
+      <h2>Unlock Self-Host</h2>
+      <p class="section-lead">This server keeps the saved config on disk. Paste the self-host password to unlock this browser, load the private service URLs, and reuse the config after reboot.</p>
+      <label for="serverAdminToken">Self-host Password</label>
+      <div class="url-row">
+        <input type="password" id="serverAdminToken" placeholder="Paste the self-host password from your server" autocomplete="current-password" enterkeyhint="go">
+        <button class="btn-copy unlock-action" type="button" id="serverAdminUnlockBtn" onclick="unlockSelfHostBrowser()">Unlock Here</button>
+      </div>
+      <p class="hint" id="serverAdminHint">Only needed when this configure page is served by your own self-hosted server and you open it remotely. Stored in this browser only.</p>
+      <div id="serverAdminStatus" class="status"></div>
+    </div>
+
     <div class="card">
       <h2>Install Target</h2>
       <p class="section-lead" id="installTargetLead">Pick where you want to watch. PC Local is the real addon for this Windows machine. LAN Bridge is the home-network route for your phone, TV, web, and Apple TV.</p>
@@ -2062,12 +2091,6 @@
           <input type="text" id="localHostname" value="pvtkrrx.local" placeholder="pvtkrrx.local">
           <p class="hint">Used by TV/phone on LAN. Keep this stable so clients do not need reinstall.</p>
         </div>
-        <div id="serverAdminBlock" style="display:none;">
-          <label for="serverAdminToken">Self-host Password</label>
-          <input type="password" id="serverAdminToken" placeholder="Paste the self-host password from your server">
-          <p class="hint" id="serverAdminHint">Only needed when this configure page is served by your own self-hosted server and you open it remotely. Stored in this browser only.</p>
-          <div id="serverAdminStatus" class="status"></div>
-        </div>
         <label style="display:flex;align-items:center;gap:0.5rem;margin-top:0.9rem;">
           <input type="checkbox" id="autoDeleteWatched" checked style="width:auto;transform:scale(1.15);">
           Auto-delete torrent + files after watched threshold
@@ -2359,6 +2382,29 @@
       }
     }
 
+    async function unlockSelfHostBrowser() {
+      const input = document.getElementById('serverAdminToken');
+      const normalized = String(input?.value || '').trim();
+      if (!normalized) {
+        setServerAdminStatus('err', 'Paste the self-host password to unlock this page.');
+        try {
+          input?.focus({ preventScroll: true });
+        } catch (_) {
+          try { input?.focus(); } catch (_) {}
+        }
+        return false;
+      }
+
+      persistServerAdminToken(normalized);
+      if (input && input.value !== normalized) {
+        input.value = normalized;
+      }
+      setServerAdminStatus('ok', 'Self-host password stored in this browser. Loading the saved config...');
+      updateServerAdminUi();
+      await maybeLoadSavedSelfHostConfig({ force: true, setLoadedStatus: true });
+      return true;
+    }
+
     async function bootstrapServerAdminTokenFromUrl() {
       if (!serverRuntime.selfHostServerMode) return false;
 
@@ -2446,8 +2492,8 @@
         return;
       }
 
-      hint.textContent = 'Enter the self-host password from your server to load the saved server config and use localhost/private service URLs from this browser.';
-      setServerAdminStatus('info', 'Self-host password required for remote self-host setup.');
+      hint.textContent = 'Unlock here with the self-host password to load the saved server config and use localhost/private service URLs from this browser.';
+      setServerAdminStatus('info', 'Unlock required for remote self-host setup.');
       if (!serverAdminTokenAttentionRequested) {
         serverAdminTokenAttentionRequested = true;
         window.requestAnimationFrame(() => {
@@ -4820,6 +4866,12 @@
         }, 150);
       }
     });
+    document.getElementById('serverAdminToken').addEventListener('keydown', function(event) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        unlockSelfHostBrowser().catch(() => {});
+      }
+    });
 
     document.getElementById('installMode').addEventListener('change', function() {
       const nextTarget = this.value === 'hosted'
@@ -4941,6 +4993,17 @@
       if (!serverRuntime.selfHostServerMode || canQueryLocalRuntime() || getServerAdminToken()) {
         return true;
       }
+      const input = document.getElementById('serverAdminToken');
+      if (input) {
+        setServerAdminStatus('err', `Unlock the page to ${actionLabel}.`);
+        try {
+          input.focus({ preventScroll: true });
+        } catch (_) {
+          try { input.focus(); } catch (_) {}
+        }
+        updateServerAdminUi();
+        return false;
+      }
       const entered = window.prompt(`Enter the PVTKRRX self-host password to ${actionLabel}.`);
       if (!entered) {
         setServerAdminStatus('err', 'Self-host password required for remote self-host setup.');
@@ -4949,8 +5012,8 @@
       }
       const normalized = String(entered || '').trim();
       persistServerAdminToken(normalized);
-      const input = document.getElementById('serverAdminToken');
-      if (input) input.value = normalized;
+      const promptInput = document.getElementById('serverAdminToken');
+      if (promptInput) promptInput.value = normalized;
       setServerAdminStatus('ok', 'Self-host password stored in this browser.');
       updateServerAdminUi();
       await maybeLoadSavedSelfHostConfig({ force: true, setLoadedStatus: true });
@@ -5444,7 +5507,8 @@
       return (
         serverRuntime.selfHostServerMode === true &&
         serverRuntime.serverConfigConfigured === true &&
-        !getConfigTokenFromPath()
+        !getConfigTokenFromPath() &&
+        (canQueryLocalRuntime() || Boolean(getServerAdminToken()))
       );
     }
 
