@@ -111,6 +111,7 @@ The Linux installer now bootstraps a dedicated self-host server in one flow:
 - saves the disk-backed self-host config into the runtime directory
 - creates the server admin token file
 - can install/start a Linux `systemd` service for auto-boot
+- prints a one-time `Configure` bootstrap URL with `#serverAdminToken=...` so the first browser open can load the saved self-host config automatically
 
 After this first install, the runtime is yours. The hosted site is only the download/bootstrap source.
 

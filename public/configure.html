@@ -2030,7 +2030,7 @@
         </div>
         <div id="serverAdminBlock" style="display:none;">
           <label for="serverAdminToken">Server Admin Token</label>
-          <input type="password" id="serverAdminToken" placeholder="Paste the token from your self-hosted server">
+          <input type="password" id="serverAdminToken" placeholder="Paste the server admin token from your self-hosted server">
           <p class="hint" id="serverAdminHint">Only needed when this configure page is served by your own self-hosted server and you open it remotely. Stored in this browser only.</p>
           <div id="serverAdminStatus" class="status"></div>
         </div>
@@ -2252,22 +2252,45 @@
         ?.slice(target.length) || '';
     }
 
-    function encodeStoredServerAdminToken(token) {
-      const text = String(token || '').trim();
-      return text ? `admin:${text}` : '';
+    function getHashParam(name) {
+      try {
+        return String(new URLSearchParams(String(window.location.hash || '').replace(/^#/, '')).get(name) || '').trim();
+      } catch (_) {
+        return '';
+      }
     }
 
-    function decodeStoredServerAdminToken(value) {
-      const raw = String(value || '').trim();
-      if (!raw.startsWith('admin:')) return '';
-      return raw.slice(6).trim();
+    function removeServerAdminTokenFromUrl() {
+      try {
+        const url = new URL(window.location.href);
+        let changed = false;
+
+        if (url.searchParams.has('serverAdminToken')) {
+          url.searchParams.delete('serverAdminToken');
+          changed = true;
+        }
+
+        const hashText = String(url.hash || '').replace(/^#/, '');
+        if (hashText) {
+          const hashParams = new URLSearchParams(hashText);
+          if (hashParams.has('serverAdminToken')) {
+            hashParams.delete('serverAdminToken');
+            url.hash = hashParams.toString() ? `#${hashParams.toString()}` : '';
+            changed = true;
+          }
+        }
+
+        if (changed) {
+          window.history.replaceState({}, document.title, `${url.pathname}${url.search}${url.hash}`);
+        }
+      } catch (_) {}
     }
 
     function getServerAdminToken() {
       const inputValue = String(document.getElementById('serverAdminToken')?.value || '').trim();
       if (inputValue) return inputValue;
       try {
-        return decodeStoredServerAdminToken(window.localStorage.getItem(selfHostAdminStorageKey));
+        return String(window.localStorage.getItem(selfHostAdminStorageKey) || '').trim();
       } catch (_) {
         return '';
       }
@@ -2275,7 +2298,7 @@
 
     function persistServerAdminToken(token) {
       try {
-        const encoded = encodeStoredServerAdminToken(token);
+        const encoded = String(token || '').trim();
         if (encoded) {
           window.localStorage.setItem(selfHostAdminStorageKey, encoded);
         } else {
@@ -2284,6 +2307,24 @@
       } catch (_) {
         // Ignore storage failures and keep the current in-memory input value.
       }
+    }
+
+    async function bootstrapServerAdminTokenFromUrl() {
+      if (!serverRuntime.selfHostServerMode) return false;
+
+      const token = getHashParam('serverAdminToken') || getQueryParam('serverAdminToken');
+      const normalized = String(token || '').trim();
+      if (!normalized) return false;
+
+      persistServerAdminToken(normalized);
+      const input = document.getElementById('serverAdminToken');
+      if (input && input.value !== normalized) {
+        input.value = normalized;
+      }
+      setServerAdminStatus('ok', 'Server admin token loaded from the setup link.');
+      updateServerAdminUi();
+      removeServerAdminTokenFromUrl();
+      return true;
     }
 
     function setServerAdminStatus(type, message) {
@@ -2315,6 +2356,15 @@
       if (storedToken && input.value !== storedToken) {
         input.value = storedToken;
       }
+      const bootstrapToken = getHashParam('serverAdminToken') || getQueryParam('serverAdminToken');
+      if (!storedToken && bootstrapToken) {
+        hint.textContent = 'Loading the server admin token from the setup link...';
+        if (!document.getElementById('serverAdminStatus')?.textContent) {
+          setServerAdminStatus('info', 'Loading server bootstrap token...');
+        }
+        serverAdminTokenAttentionRequested = false;
+        return;
+      }
 
       if (canQueryLocalRuntime()) {
         hint.textContent = 'Self-hosted server mode is active. Because you are opening this page on the same host/runtime, the admin token is optional here.';
@@ -2326,7 +2376,7 @@
       }
 
       if (storedToken) {
-        hint.textContent = 'Stored in this browser only. PVTKRRX uses it to load and save the server config from this page.';
+        hint.textContent = 'Stored in this browser only. PVTKRRX uses the admin token to load and save the server config from this page.';
         if (!document.getElementById('serverAdminStatus')?.textContent) {
           setServerAdminStatus('ok', 'Server admin token stored in this browser.');
         }
@@ -2334,7 +2384,7 @@
         return;
       }
 
-      hint.textContent = 'Paste the token from your self-hosted server to load the saved server config and use localhost/private service URLs from this browser.';
+      hint.textContent = 'Enter the server admin token from your self-hosted server to load the saved server config and use localhost/private service URLs from this browser.';
       setServerAdminStatus('info', 'Server admin token required for remote self-host setup.');
       if (!serverAdminTokenAttentionRequested) {
         serverAdminTokenAttentionRequested = true;
@@ -4737,6 +4787,7 @@
     window.addEventListener('beforeunload', stopServerLinkStatusPolling);
     updateLanBridgeInstallMessaging();
     loadServerRuntimeConfig()
+      .then(() => bootstrapServerAdminTokenFromUrl())
       .then(() => maybePrefillFromToken())
       .then(() => maybeLoadServerLinkSessionFromUrl())
       .finally(() => {

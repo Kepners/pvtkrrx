@@ -243,6 +243,7 @@ async function run() {
       env: process.env,
       createIfMissing: true
     })
+    const configureBootstrapUrl = `http://localhost:${process.env.PORT || '7000'}/configure#serverAdminToken=${encodeURIComponent(adminState.token)}`
 
     let serviceResult = null
     if (installService) {
@@ -259,6 +260,7 @@ async function run() {
     console.log(`Saved config: ${localConfigPath}`)
     console.log(`Server admin token file: ${adminState.path || path.join(runtimeDir, 'server-admin-token')}`)
     console.log(`Configure page: http://localhost:${process.env.PORT || '7000'}/configure`)
+    console.log(`Bootstrap page: ${configureBootstrapUrl}`)
     console.log('Stable self-host manifest: /selfhost/manifest.json?mode=hosted')
     if (serviceResult) {
       console.log(`systemd service: ${serviceResult.serviceName}.service`)

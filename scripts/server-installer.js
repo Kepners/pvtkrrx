@@ -420,6 +420,13 @@ function deriveDisplayOrigin(publicBaseUrl, port) {
   return `http://localhost:${port}`
 }
 
+function buildServerAdminBootstrapUrl(displayOrigin, token) {
+  const origin = normalizeOrigin(displayOrigin)
+  const adminToken = String(token || '').trim()
+  if (!origin || !adminToken) return ''
+  return `${origin}/configure#serverAdminToken=${encodeURIComponent(adminToken)}`
+}
+
 async function run() {
   const repoRoot = path.resolve(__dirname, '..')
   const envPath = path.join(repoRoot, '.env')
@@ -647,6 +654,7 @@ async function run() {
     }
 
     const displayOrigin = deriveDisplayOrigin(publicBaseUrl, httpPort)
+    const configureBootstrapUrl = buildServerAdminBootstrapUrl(displayOrigin, adminState.token)
     console.log('')
     console.log('PVTKRRX server install complete')
     console.log(`App directory: ${repoRoot}`)
@@ -654,6 +662,9 @@ async function run() {
     console.log(`Saved config: ${localConfigPath}`)
     console.log(`Server admin token file: ${adminState.path || path.join(runtimeDir, 'server-admin-token')}`)
     console.log(`Configure URL: ${displayOrigin}/configure`)
+    if (configureBootstrapUrl) {
+      console.log(`Bootstrap URL: ${configureBootstrapUrl}`)
+    }
     console.log(`Self-host manifest: ${displayOrigin}/selfhost/manifest.json?mode=hosted`)
     if (publicBaseUrl) {
       console.log(`Public install base: ${publicBaseUrl}`)
@@ -868,11 +879,15 @@ async function runAuto() {
   }
 
   const displayOrigin = deriveDisplayOrigin(publicBaseUrl, httpPort)
+  const configureBootstrapUrl = buildServerAdminBootstrapUrl(displayOrigin, adminState.token)
   console.log('')
   console.log('─── Summary ───')
   console.log(`Prowlarr:    ${jackettUrl}`)
   console.log(`qBittorrent: ${qbitUrl}`)
   console.log(`Configure:   ${displayOrigin}/configure`)
+  if (configureBootstrapUrl) {
+    console.log(`Bootstrap:   ${configureBootstrapUrl}`)
+  }
   console.log(`Manifest:    ${displayOrigin}/selfhost/manifest.json?mode=hosted`)
   console.log(`HTTP port:   ${httpPort}`)
   console.log(`Node binary: ${bundledNodePath}`)
