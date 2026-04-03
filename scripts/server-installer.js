@@ -932,7 +932,7 @@ async function runAuto() {
 
   console.log('')
   console.log(`✓ Config saved to ${localConfigPath}`)
-  console.log(`✓ Self-host password: ${fs.readFileSync(adminState.path, 'utf8').trim()}`)
+  console.log(`✓ Self-host password: ${adminState.path ? fs.readFileSync(adminState.path, 'utf8').trim() : adminState.token}`)
 
   // ── systemd service ──
   let serviceResult = null
