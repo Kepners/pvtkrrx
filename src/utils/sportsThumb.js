@@ -1,5 +1,8 @@
 const { cleanTitle } = require('./parser')
 
+// Bump this when the generated sports poster art changes so cached poster URLs refresh.
+const SPORTS_THUMB_VERSION = 2
+
 const THEMES = {
   football: { accent: '#00ff41', bgA: '#0d1d14', bgB: '#07110c', chip: 'FOOTBALL' },
   epl: { accent: '#7af542', bgA: '#08150d', bgB: '#040b06', chip: 'PREMIER LEAGUE' },
@@ -119,6 +122,7 @@ function wrapTitleLines(title, maxChars = 34, maxLines = 2) {
 
 function encodeSportsThumbToken(payload) {
   return Buffer.from(JSON.stringify({
+    v: SPORTS_THUMB_VERSION,
     t: normalizeSpace(payload?.t || ''),
     d: normalizeSpace(payload?.d || ''),
     s: normalizeSpace(payload?.s || ''),
@@ -152,6 +156,21 @@ function makeSportsThumbUrl(baseUrl, item, variant = 'landscape') {
 
 function makeSportsPosterUrl(baseUrl, item) {
   return makeSportsThumbUrl(baseUrl, item, 'poster')
+}
+
+function isFightPosterTheme(payload) {
+  const text = `${payload?.t || ''} ${payload?.l || ''} ${payload?.s || ''}`.toLowerCase()
+  return /\b(ufc|mma|bellator|pfl|one championship|one fc|fight night|cage warriors|strikeforce|rizin|muay thai|kickboxing)\b/.test(text)
+}
+
+function getFightBadge(title) {
+  const text = String(title || '').toLowerCase()
+  if (/\bearly[\s.\-_]*prelims?\b/.test(text)) return 'EARLY PRELIMS'
+  if (/\bprelims?\b/.test(text)) return 'PRELIMS'
+  if (/\bmain[\s.\-_]*card\b/.test(text)) return 'MAIN CARD'
+  if (/\bfight[\s.\-_]*night\b/.test(text)) return 'FIGHT NIGHT'
+  if (/\bone[\s.\-_]*championship\b/.test(text)) return 'ONE CHAMPIONSHIP'
+  return 'FIGHT CARD'
 }
 
 function renderLandscapeSvg(payload, variant = 'landscape') {
@@ -196,7 +215,75 @@ function renderLandscapeSvg(payload, variant = 'landscape') {
   </svg>`
 }
 
+function renderFightPosterSvg(payload) {
+  const theme = resolveTheme(payload)
+  const titleLines = wrapTitleLines(payload?.t || '', 18, 3)
+  const dateLabel = formatDateLabel(payload?.d)
+  const leagueLabel = truncateLabel(payload?.l || theme.chip, 24).toUpperCase()
+  const badge = getFightBadge(payload?.t)
+  const accent = theme.accent
+  const bgA = '#1f1009'
+  const bgB = '#07070b'
+  const titleFont = 'Arial Black, Arial, sans-serif'
+  const labelFont = 'IBM Plex Mono, monospace'
+  const lineCount = Math.max(1, titleLines.length)
+  const baseY = 520
+  const lineGap = lineCount === 1 ? 0 : lineCount === 2 ? 86 : 76
+
+  const titleMarkup = titleLines.map((line, index) => {
+    const y = baseY + (index * lineGap)
+    const fontSize = lineCount === 1 ? 82 : (index === 0 ? 72 : 64)
+    return `<text x="86" y="${y}" fill="#fff8f0" font-size="${fontSize}" font-family="${titleFont}" font-weight="900" letter-spacing="${lineCount === 1 ? '0.5' : '0.2'}" paint-order="stroke fill" stroke="rgba(0,0,0,0.72)" stroke-width="7">${escapeXml(line)}</text>`
+  }).join('')
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="1350" viewBox="0 0 900 1350" role="img" aria-label="${escapeXml(titleLines[0] || 'PVTKRRX Sports')}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="${bgA}" />
+      <stop offset="100%" stop-color="${bgB}" />
+    </linearGradient>
+    <radialGradient id="glowA" cx="76%" cy="22%" r="52%">
+      <stop offset="0%" stop-color="${accent}" stop-opacity="0.38" />
+      <stop offset="100%" stop-color="${accent}" stop-opacity="0" />
+    </radialGradient>
+    <radialGradient id="glowB" cx="16%" cy="88%" r="44%">
+      <stop offset="0%" stop-color="${accent}" stop-opacity="0.18" />
+      <stop offset="100%" stop-color="${accent}" stop-opacity="0" />
+    </radialGradient>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="${accent}" stroke-opacity="0.16" stroke-width="1" />
+    </pattern>
+  </defs>
+  <rect width="900" height="1350" fill="url(#bg)" />
+  <rect width="900" height="1350" fill="url(#glowA)" />
+  <rect width="900" height="1350" fill="url(#glowB)" />
+  <rect width="900" height="1350" fill="url(#grid)" opacity="0.18" />
+  <g opacity="0.45">
+    <path d="M-150 220 L170 90 L290 90 L-30 220 Z" fill="${accent}" fill-opacity="0.14" />
+    <path d="M620 1330 L980 1210 L1100 1210 L740 1330 Z" fill="${accent}" fill-opacity="0.12" />
+  </g>
+  <rect x="28" y="28" width="844" height="1294" rx="34" fill="none" stroke="${accent}" stroke-opacity="0.34" stroke-width="3" />
+  <rect x="66" y="68" width="500" height="58" rx="29" fill="${accent}" fill-opacity="0.2" stroke="${accent}" stroke-opacity="0.55" />
+  <text x="94" y="106" fill="#fff9f4" font-size="29" font-family="${labelFont}" font-weight="700" letter-spacing="1.7">${escapeXml(leagueLabel)}</text>
+  <text x="824" y="106" fill="${accent}" font-size="22" font-family="${labelFont}" font-weight="700" text-anchor="end" letter-spacing="2">${escapeXml(badge)}</text>
+  <g transform="translate(626 500)">
+    <polygon points="0,-154 110,-92 154,0 110,92 0,154 -110,92 -154,0 -110,-92" fill="none" stroke="${accent}" stroke-opacity="0.84" stroke-width="10" />
+    <polygon points="0,-118 84,-70 118,0 84,70 0,118 -84,70 -118,0 -84,-70" fill="none" stroke="#fff8f0" stroke-opacity="0.18" stroke-width="6" />
+    <circle cx="0" cy="0" r="92" fill="${accent}" fill-opacity="0.12" />
+    <circle cx="0" cy="0" r="54" fill="${accent}" fill-opacity="0.22" />
+    <text x="0" y="14" fill="#fff8f0" font-size="78" font-family="${titleFont}" font-weight="900" text-anchor="middle" letter-spacing="2">FIGHT</text>
+  </g>
+  ${titleMarkup}
+  <text x="86" y="956" fill="${accent}" font-size="24" font-family="${labelFont}" font-weight="700" letter-spacing="1.7">${escapeXml(badge)}</text>
+  <text x="86" y="1010" fill="#e9d7c4" font-size="24" font-family="${labelFont}" font-weight="600" letter-spacing="1.2">${escapeXml(dateLabel || 'LIVE FIGHT CARD')}</text>
+  <rect x="86" y="1052" width="232" height="4" rx="2" fill="${accent}" fill-opacity="0.95" />
+  <text x="86" y="1124" fill="#d8c1a5" font-size="22" font-family="${labelFont}" font-weight="500" letter-spacing="1.1">PRIVATE TRACKER SPORTS</text>
+  <text x="86" y="1170" fill="#f5efe8" font-size="18" font-family="${labelFont}" font-weight="500" letter-spacing="1.3">${escapeXml('THUMBNAIL ART BY PVTKRRX')}</text>
+  </svg>`
+}
+
 function renderPosterSvg(payload) {
+  if (isFightPosterTheme(payload)) return renderFightPosterSvg(payload)
   const theme = resolveTheme(payload)
   const titleLines = wrapTitleLines(payload?.t || '', 18, 3)
   const dateLabel = formatDateLabel(payload?.d)
