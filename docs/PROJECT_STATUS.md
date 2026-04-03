@@ -1,6 +1,6 @@
 # PVTKRRX Project Status
 
-Updated: 2026-04-02
+Updated: 2026-04-03
 
 ## Current Stage
 
@@ -106,6 +106,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - `1.1.22` installers were built successfully into `dist/` on 2026-04-01 for the one-time Stremio server link-session update and self-host configure route cleanup
 - `1.1.23` installers were built successfully into `dist/` on 2026-04-02 for the GitHub release-status update
 - `1.1.23` GitHub release was published on 2026-04-02 with the matching `latest.yml`, portable EXE, and setup installer assets
+- `1.1.23-selfhost` GitHub release was published on 2026-04-03 for the cloud/self-host password UX update; the Windows desktop line remains on `1.1.23`
 - the packaged Windows desktop app is working on the current host build, including the route-first setup flow and desktop shell controls shown in the live app UI
 - a real Apple TV LAN Bridge playback pass succeeded on 2026-03-31 after desktop/web install; while the Windows host stayed locked, playback started normally, the client reported the video as local, and forward/back seek worked
 

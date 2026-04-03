@@ -183,7 +183,7 @@ async function run() {
     const csrf = readCsrf(configureRes.headers['set-cookie'])
     assert.match(configureRes.text, /__PVTKRRX_RUNTIME_BOOTSTRAP__/)
     assert.match(configureRes.text, /Generate Server Install URL/)
-    assert.match(configureRes.text, /This self-hosted server configures the Remote Seedbox route only/i)
+    assert.match(configureRes.text, /Self-hosted server mode is Remote Seedbox only/i)
 
     const bootstrapManifestRes = await request(
       port,

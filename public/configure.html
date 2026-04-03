@@ -526,6 +526,40 @@
       grid-template-columns: 1fr;
     }
 
+    body.selfhost-seedbox-only .section-lead,
+    body.selfhost-seedbox-only .hint,
+    body.selfhost-seedbox-only .install-note,
+    body.selfhost-seedbox-only .quick-step-copy,
+    body.selfhost-seedbox-only .quick-step-note,
+    body.selfhost-seedbox-only .provider-preset-panel,
+    body.selfhost-seedbox-only #serviceTabHint,
+    body.selfhost-seedbox-only #installModeHint,
+    body.selfhost-seedbox-only #simpleFlowLead,
+    body.selfhost-seedbox-only #simpleFlowHint,
+    body.selfhost-seedbox-only #quickSetupLead,
+    body.selfhost-seedbox-only #accountSyncModeHint,
+    body.selfhost-seedbox-only #connectionSectionLead,
+    body.selfhost-seedbox-only #installActionLead,
+    body.selfhost-seedbox-only #addonUrlLead,
+    body.selfhost-seedbox-only #addonUrlHint,
+    body.selfhost-seedbox-only #providerPresetInfo {
+      display: none !important;
+    }
+
+    body.selfhost-seedbox-only #hostedUrlDisplay.install-note {
+      display: block !important;
+    }
+
+    body.selfhost-seedbox-only #serviceCard-options label[for="maxResults"],
+    body.selfhost-seedbox-only #serviceCard-options #maxResults,
+    body.selfhost-seedbox-only #serviceCard-options label[for="sportsDbApiKey"],
+    body.selfhost-seedbox-only #serviceCard-options #sportsDbApiKey,
+    body.selfhost-seedbox-only #serviceCard-options label[for="sportsDbCacheHours"],
+    body.selfhost-seedbox-only #serviceCard-options #sportsDbCacheHours,
+    body.selfhost-seedbox-only #serviceCard-options #localHostnameBlock {
+      display: none !important;
+    }
+
     .mode-option {
       width: 100%;
       min-height: 136px;
@@ -3066,25 +3100,27 @@
       }
       if (seedboxCopy) {
         seedboxCopy.textContent = isSelfHostedServerRuntime()
-          ? 'This self-hosted server is the remote addon runtime. It stores config locally, survives reboot, and can use private or localhost backend service URLs once you authenticate as the server admin.'
+          ? 'Self-hosted server mode is Remote Seedbox only. Save the config here, reuse it after reboot, and keep the public URL for Stremio.'
           : 'Use the hosted remote profile only when Prowlarr, qBittorrent, and file serving are reachable over public URLs. On the hosted site this is not a generic tracker-buffering path: it is effectively ready-file / public-playback only unless you self-host PVTKRRX on a runtime that can truly serve playback. Auth-protected file-server playback still needs real-device validation because client auth handling can vary.';
       }
       if (seedboxPoint1) {
         seedboxPoint1.textContent = isSelfHostedServerRuntime()
-          ? 'Config saved on this server'
+          ? 'Saved on this server'
           : 'Public HTTPS ready-file path required';
       }
       if (seedboxPoint2) {
         seedboxPoint2.textContent = isSelfHostedServerRuntime()
-          ? 'Private backend URLs allowed with self-host password'
+          ? 'Private URLs after password'
           : 'Hosted site fails closed on local-only playback';
       }
       if (seedboxPoint3) {
-        seedboxPoint3.textContent = 'Away-from-home playback route';
+        seedboxPoint3.textContent = isSelfHostedServerRuntime()
+          ? 'Public HTTPS still required for the browser-facing URL'
+          : 'Away-from-home playback route';
       }
       if (!lead) return;
       if (selfHostSeedboxOnly) {
-        lead.textContent = 'This self-hosted server configures the Remote Seedbox route only. PC Local and LAN Bridge belong to the Windows desktop runtime.';
+        lead.textContent = 'Self-hosted server mode is Remote Seedbox only.';
         return;
       }
       if (isDesktopLocalOnlyRuntime()) {
