@@ -102,6 +102,7 @@ The Linux installer now bootstraps a dedicated self-host server in one flow:
 - installs a bundled Node runtime under `/opt/pvtkrrx/.node`
 - installs production dependencies
 - auto-discovers existing Prowlarr/qBittorrent configs when they are already installed, then prompts only for the values it cannot recover
+- asks how Stremio should reach the server: Cloudflare Tunnel, a user-owned `https://` origin, or skip for later manual setup
 - configures qBittorrent for localhost addon access when it has to stand up the service itself
 - if Prowlarr or qBittorrent are missing on a direct `npm run server:setup` run, it can offer to hand off to the full bootstrap and install them automatically
 - pulls the app source from the branch payload by default, with an automatic retry from `main` if a pinned release is too old to include `scripts/server-installer.js`
@@ -109,9 +110,9 @@ The Linux installer now bootstraps a dedicated self-host server in one flow:
 - prompts for your public HTTPS base URL plus any remaining seedbox connection details
 - writes `.env` with `ENCRYPTION_SECRET`, `AUTH_TOKEN_SECRET`, `PVTKRRX_SELF_HOST_MODE=true`, `PVTKRRX_RUNTIME_DIR`, and `PVTKRRX_PUBLIC_BASE_URL`
 - saves the disk-backed self-host config into the runtime directory
-- creates the server admin token file
+- creates the self-host password file
 - can install/start a Linux `systemd` service for auto-boot
-- prints a one-time `Configure` bootstrap URL with `#serverAdminToken=...` so the first browser open can load the saved self-host config automatically
+- prints a one-time `Configure` bootstrap URL with `#serverPassword=...` so the first browser open can load the saved self-host config automatically
 
 After this first install, the runtime is yours. The hosted site is only the download/bootstrap source.
 
@@ -253,7 +254,7 @@ npm run smoke:selfhost
 
 This validates:
 - explicit self-host server mode advertises `/selfhost`
-- remote self-host admin requests need the server admin token
+- remote self-host admin requests need the self-host password
 - same-host self-host runtime can save disk-backed server config and read it back
 - remote/browser-driven Stremio link sessions can persist a linked `stremioUserId` into the disk-backed self-host config
 - `/selfhost/manifest.json?mode=hosted` resolves with no-store caching
@@ -332,8 +333,9 @@ This now builds in the system temp directory first, then copies the finished cur
 |----------|----------|---------|
 | ENCRYPTION_SECRET | Yes | Key for encrypting/decrypting user configs |
 | AUTH_TOKEN_SECRET | Recommended | Key for signing account auth tokens (falls back to ENCRYPTION_SECRET) |
-| PVTKRRX_RUNTIME_DIR | Recommended for self-host | Stable runtime/config directory. The server installer now defaults this to `<repo>/data/pvtkrrx` so saved config and admin-token state do not depend on whichever user launched the process |
+| PVTKRRX_RUNTIME_DIR | Recommended for self-host | Stable runtime/config directory. The server installer now defaults this to `<repo>/data/pvtkrrx` so saved config and password state do not depend on whichever user launched the process |
 | PVTKRRX_PUBLIC_BASE_URL | Recommended for self-host | Public `https://` origin used when generating self-host install/config links. Set this to the real reverse-proxied host you want Stremio and browsers to use |
+| PVTKRRX_SELF_HOST_HTTPS_MODE | Recommended for self-host | HTTPS bootstrap mode for the installer: `cloudflare`, `domain`, or `skip` |
 | KV_REST_API_URL | Recommended | Persist LAN pair heartbeat state for the hosted relay across restarts/redeploys |
 | KV_REST_API_TOKEN | Recommended | Auth token for KV REST API |
 | PVTKRRX_PAIR_RELAY_URL | Optional | Hosted relay base URL (default https://www.pvtkrrx.cc) |

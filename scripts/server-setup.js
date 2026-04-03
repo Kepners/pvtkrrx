@@ -110,6 +110,11 @@ async function run() {
   }
   const runtimeDir = resolveRuntimeDir(mergedEnv)
   const existingSecret = String(mergedEnv.ENCRYPTION_SECRET || '').trim()
+  const existingSelfHostPassword = String(
+    mergedEnv.PVTKRRX_SELF_HOST_PASSWORD ||
+    mergedEnv.PVTKRRX_SERVER_ADMIN_TOKEN ||
+    ''
+  ).trim()
   const existingConfig = loadExistingServerConfig(runtimeDir, existingSecret)
 
   const rl = readline.createInterface({ input, output })
@@ -122,6 +127,11 @@ async function run() {
       rl,
       'ENCRYPTION_SECRET',
       existingSecret || randomSecret()
+    )
+    const selfHostPassword = await promptValue(
+      rl,
+      'Self-host config password',
+      existingSelfHostPassword || randomSecret()
     )
     const jackettUrl = await promptValue(
       rl,
@@ -203,10 +213,14 @@ async function run() {
 
     updateDotEnvFile(envPath, {
       ENCRYPTION_SECRET: encryptionSecret,
+      PVTKRRX_SELF_HOST_PASSWORD: selfHostPassword,
+      PVTKRRX_SERVER_ADMIN_TOKEN: selfHostPassword,
       PVTKRRX_SELF_HOST_MODE: 'true'
     })
 
     process.env.ENCRYPTION_SECRET = encryptionSecret
+    process.env.PVTKRRX_SELF_HOST_PASSWORD = selfHostPassword
+    process.env.PVTKRRX_SERVER_ADMIN_TOKEN = selfHostPassword
     process.env.PVTKRRX_SELF_HOST_MODE = 'true'
     if (mergedEnv.PVTKRRX_RUNTIME_DIR) {
       process.env.PVTKRRX_RUNTIME_DIR = mergedEnv.PVTKRRX_RUNTIME_DIR
@@ -243,7 +257,7 @@ async function run() {
       env: process.env,
       createIfMissing: true
     })
-    const configureBootstrapUrl = `http://localhost:${process.env.PORT || '7000'}/configure#serverAdminToken=${encodeURIComponent(adminState.token)}`
+    const configureBootstrapUrl = `http://localhost:${process.env.PORT || '7000'}/configure#serverPassword=${encodeURIComponent(adminState.token)}&serverAdminToken=${encodeURIComponent(adminState.token)}`
 
     let serviceResult = null
     if (installService) {
@@ -258,7 +272,7 @@ async function run() {
     console.log('PVTKRRX server setup complete')
     console.log(`Runtime directory: ${runtimeDir}`)
     console.log(`Saved config: ${localConfigPath}`)
-    console.log(`Server admin token file: ${adminState.path || path.join(runtimeDir, 'server-admin-token')}`)
+    console.log(`Self-host password file: ${adminState.path || path.join(runtimeDir, 'server-admin-token')}`)
     console.log(`Configure page: http://localhost:${process.env.PORT || '7000'}/configure`)
     console.log(`Bootstrap page: ${configureBootstrapUrl}`)
     console.log('Stable self-host manifest: /selfhost/manifest.json?mode=hosted')

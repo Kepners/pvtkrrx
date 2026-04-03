@@ -129,9 +129,9 @@ async function run() {
   const shared = require('../src/lib/shared')
   const app = require('../index')
 
-  const adminTokenPath = path.join(process.env.PVTKRRX_RUNTIME_DIR, 'server-admin-token')
-  const adminToken = String(fs.readFileSync(adminTokenPath, 'utf8') || '').trim()
-  assert.ok(adminToken, 'self-host mode should create a server admin token file')
+  const selfHostPasswordPath = path.join(process.env.PVTKRRX_RUNTIME_DIR, 'server-admin-token')
+  const selfHostPassword = String(fs.readFileSync(selfHostPasswordPath, 'utf8') || '').trim()
+  assert.ok(selfHostPassword, 'self-host mode should create a self-host password file')
 
   let nextCalled = false
   const deniedReq = {
@@ -144,13 +144,13 @@ async function run() {
   shared.requireServerAdminToken(deniedReq, deniedRes, () => {
     nextCalled = true
   })
-  assert.equal(nextCalled, false, 'remote self-host request without admin token should not pass middleware')
+  assert.equal(nextCalled, false, 'remote self-host request without self-host password should not pass middleware')
   assert.equal(deniedRes.statusCode, 401)
-  assert.equal(String(deniedRes.body?.error || ''), 'Valid server admin token required')
+  assert.equal(String(deniedRes.body?.error || ''), 'Valid self-host password required')
 
   nextCalled = false
   const allowedReq = {
-    headers: { 'x-pvtkrrx-admin-token': adminToken },
+    headers: { 'x-pvtkrrx-admin-token': selfHostPassword },
     socket: { remoteAddress: '203.0.113.10' },
     connection: { remoteAddress: '203.0.113.10' },
     get: () => 'seedbox.example'
@@ -159,7 +159,7 @@ async function run() {
   shared.requireServerAdminToken(allowedReq, allowedRes, () => {
     nextCalled = true
   })
-  assert.equal(nextCalled, true, 'remote self-host request with admin token should pass middleware')
+  assert.equal(nextCalled, true, 'remote self-host request with self-host password should pass middleware')
 
   await assert.rejects(
     shared.validateHostedConnectionTarget(new URL('http://127.0.0.1:9696')),
@@ -297,10 +297,10 @@ async function run() {
         Cookie: csrf.cookie,
         Host: 'seedbox.example',
         'X-PVTKRRX-CSRF': csrf.token,
-        'X-PVTKRRX-Admin-Token': adminToken
+        'X-PVTKRRX-Admin-Token': selfHostPassword
       }
     )
-    assert.equal(linkSessionRes.status, 200, 'remote self-host should create a server link session when admin token is present')
+    assert.equal(linkSessionRes.status, 200, 'remote self-host should create a server link session when self-host password is present')
     assert.equal(Boolean(linkSessionRes.json?.ok), true)
     assert.ok(String(linkSessionRes.json?.install?.addonUrl || '').includes('/selfhost/manifest.json?mode=hosted&linkSession='), 'self-host link session should expose a stable selfhost addon url')
 

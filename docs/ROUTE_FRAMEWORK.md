@@ -90,7 +90,7 @@ There is no per-route catalog filtering. The Library catalog queries qBittorrent
   - No queue-and-buffer capability unless PVTKRRX is self-hosted on a runtime that can actually serve `/playback`
 - On an explicit self-hosted server:
   - the configure page can save the server config locally and reuse it across reboots
-  - remote configure sessions must present the server admin token before they can use localhost/private Prowlarr or qBittorrent URLs
+  - remote configure sessions must present the self-host password before they can use localhost/private Prowlarr or qBittorrent URLs
   - `npm run server:setup` can auto-discover existing Prowlarr/qBittorrent configs, prompt only for the missing values, hand off to the full bootstrap when those providers are missing, and optionally install a Linux `systemd` service for auto-start on boot
 - Tracker `/playback` streams are **suppressed** at stream emission time (not just blocked at the route)
 - If `fileServerAuth` is configured, tracker playback is also suppressed on any non-local route because Stremio cannot forward `proxyHeaders` through a redirect chain
@@ -139,7 +139,7 @@ When `fileServerAuth` is configured:
 - `/configure` leads with three route cards.
 - Each route has a simplified next-step panel.
 - Advanced/manual connection tools live under `Hidden Setup Tabs`.
-- In explicit self-host server mode, `/configure` also exposes a browser-stored server admin token field so remote browser sessions can administer the saved server config safely.
+- In explicit self-host server mode, `/configure` also exposes a browser-stored self-host password field so remote browser sessions can administer the saved server config safely.
 - The desktop popup mirrors the same route split and warns that `LAN Bridge` depends on Stremio Desktop being installed and signed in on the host PC first.
 
 ## Install Guidance

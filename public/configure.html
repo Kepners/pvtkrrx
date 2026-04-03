@@ -2029,8 +2029,8 @@
           <p class="hint">Used by TV/phone on LAN. Keep this stable so clients do not need reinstall.</p>
         </div>
         <div id="serverAdminBlock" style="display:none;">
-          <label for="serverAdminToken">Server Admin Token</label>
-          <input type="password" id="serverAdminToken" placeholder="Paste the server admin token from your self-hosted server">
+          <label for="serverAdminToken">Self-host Password</label>
+          <input type="password" id="serverAdminToken" placeholder="Paste the self-host password from your server">
           <p class="hint" id="serverAdminHint">Only needed when this configure page is served by your own self-hosted server and you open it remotely. Stored in this browser only.</p>
           <div id="serverAdminStatus" class="status"></div>
         </div>
@@ -2174,7 +2174,8 @@
       hostedManifest: '',
       hostedStremio: ''
     };
-    const selfHostAdminStorageKey = 'pvtkrrx_selfhost_admin_token';
+    const selfHostPasswordStorageKey = 'pvtkrrx_selfhost_password';
+    const legacySelfHostAdminStorageKey = 'pvtkrrx_selfhost_admin_token';
     const serverRuntime = {
       selfHostServerMode: runtimeBootstrap.selfHostServerMode === true,
       serverConfigAlias: String(runtimeBootstrap.serverConfigAlias || '').trim(),
@@ -2264,19 +2265,28 @@
       try {
         const url = new URL(window.location.href);
         let changed = false;
+        const secretParams = ['serverPassword', 'selfHostPassword', 'serverAdminToken'];
 
-        if (url.searchParams.has('serverAdminToken')) {
-          url.searchParams.delete('serverAdminToken');
-          changed = true;
+        for (const paramName of secretParams) {
+          if (url.searchParams.has(paramName)) {
+            url.searchParams.delete(paramName);
+            changed = true;
+          }
         }
 
         const hashText = String(url.hash || '').replace(/^#/, '');
         if (hashText) {
           const hashParams = new URLSearchParams(hashText);
-          if (hashParams.has('serverAdminToken')) {
-            hashParams.delete('serverAdminToken');
-            url.hash = hashParams.toString() ? `#${hashParams.toString()}` : '';
-            changed = true;
+          for (const paramName of secretParams) {
+            if (hashParams.has(paramName)) {
+              hashParams.delete(paramName);
+              changed = true;
+            }
+          }
+          if (hashParams.toString()) {
+            url.hash = `#${hashParams.toString()}`;
+          } else {
+            url.hash = '';
           }
         }
 
@@ -2290,7 +2300,11 @@
       const inputValue = String(document.getElementById('serverAdminToken')?.value || '').trim();
       if (inputValue) return inputValue;
       try {
-        return String(window.localStorage.getItem(selfHostAdminStorageKey) || '').trim();
+        return String(
+          window.localStorage.getItem(selfHostPasswordStorageKey) ||
+          window.localStorage.getItem(legacySelfHostAdminStorageKey) ||
+          ''
+        ).trim();
       } catch (_) {
         return '';
       }
@@ -2300,9 +2314,11 @@
       try {
         const encoded = String(token || '').trim();
         if (encoded) {
-          window.localStorage.setItem(selfHostAdminStorageKey, encoded);
+          window.localStorage.setItem(selfHostPasswordStorageKey, encoded);
+          window.localStorage.removeItem(legacySelfHostAdminStorageKey);
         } else {
-          window.localStorage.removeItem(selfHostAdminStorageKey);
+          window.localStorage.removeItem(selfHostPasswordStorageKey);
+          window.localStorage.removeItem(legacySelfHostAdminStorageKey);
         }
       } catch (_) {
         // Ignore storage failures and keep the current in-memory input value.
@@ -2312,7 +2328,13 @@
     async function bootstrapServerAdminTokenFromUrl() {
       if (!serverRuntime.selfHostServerMode) return false;
 
-      const token = getHashParam('serverAdminToken') || getQueryParam('serverAdminToken');
+      const token =
+        getHashParam('serverPassword') ||
+        getHashParam('selfHostPassword') ||
+        getHashParam('serverAdminToken') ||
+        getQueryParam('serverPassword') ||
+        getQueryParam('selfHostPassword') ||
+        getQueryParam('serverAdminToken');
       const normalized = String(token || '').trim();
       if (!normalized) return false;
 
@@ -2321,7 +2343,7 @@
       if (input && input.value !== normalized) {
         input.value = normalized;
       }
-      setServerAdminStatus('ok', 'Server admin token loaded from the setup link.');
+      setServerAdminStatus('ok', 'Self-host password loaded from the setup link.');
       updateServerAdminUi();
       removeServerAdminTokenFromUrl();
       return true;
@@ -2356,18 +2378,24 @@
       if (storedToken && input.value !== storedToken) {
         input.value = storedToken;
       }
-      const bootstrapToken = getHashParam('serverAdminToken') || getQueryParam('serverAdminToken');
+      const bootstrapToken =
+        getHashParam('serverPassword') ||
+        getHashParam('selfHostPassword') ||
+        getHashParam('serverAdminToken') ||
+        getQueryParam('serverPassword') ||
+        getQueryParam('selfHostPassword') ||
+        getQueryParam('serverAdminToken');
       if (!storedToken && bootstrapToken) {
-        hint.textContent = 'Loading the server admin token from the setup link...';
+        hint.textContent = 'Loading the self-host password from the setup link...';
         if (!document.getElementById('serverAdminStatus')?.textContent) {
-          setServerAdminStatus('info', 'Loading server bootstrap token...');
+          setServerAdminStatus('info', 'Loading self-host bootstrap password...');
         }
         serverAdminTokenAttentionRequested = false;
         return;
       }
 
       if (canQueryLocalRuntime()) {
-        hint.textContent = 'Self-hosted server mode is active. Because you are opening this page on the same host/runtime, the admin token is optional here.';
+        hint.textContent = 'Self-hosted server mode is active. Because you are opening this page on the same host/runtime, the password is optional here.';
         if (!document.getElementById('serverAdminStatus')?.textContent) {
           setServerAdminStatus('ok', 'Same-host access detected.');
         }
@@ -2376,16 +2404,16 @@
       }
 
       if (storedToken) {
-        hint.textContent = 'Stored in this browser only. PVTKRRX uses the admin token to load and save the server config from this page.';
+        hint.textContent = 'Stored in this browser only. PVTKRRX uses the password to load and save the server config from this page.';
         if (!document.getElementById('serverAdminStatus')?.textContent) {
-          setServerAdminStatus('ok', 'Server admin token stored in this browser.');
+          setServerAdminStatus('ok', 'Self-host password stored in this browser.');
         }
         serverAdminTokenAttentionRequested = false;
         return;
       }
 
-      hint.textContent = 'Enter the server admin token from your self-hosted server to load the saved server config and use localhost/private service URLs from this browser.';
-      setServerAdminStatus('info', 'Server admin token required for remote self-host setup.');
+      hint.textContent = 'Enter the self-host password from your server to load the saved server config and use localhost/private service URLs from this browser.';
+      setServerAdminStatus('info', 'Self-host password required for remote self-host setup.');
       if (!serverAdminTokenAttentionRequested) {
         serverAdminTokenAttentionRequested = true;
         window.requestAnimationFrame(() => {
@@ -2596,7 +2624,7 @@
         const data = await res.json().catch(() => ({}));
         if (!res.ok || data.error) {
           if (res.status === 401) {
-            setServerAdminStatus('err', 'Server admin token required for this link session source.');
+            setServerAdminStatus('err', 'Self-host password required for this link session source.');
           }
           throw new Error(data.error || `Server link session failed (${res.status})`);
         }
@@ -3048,7 +3076,7 @@
       }
       if (seedboxPoint2) {
         seedboxPoint2.textContent = isSelfHostedServerRuntime()
-          ? 'Private backend URLs allowed with admin token'
+          ? 'Private backend URLs allowed with self-host password'
           : 'Hosted site fails closed on local-only playback';
       }
       if (seedboxPoint3) {
@@ -4739,9 +4767,9 @@
       const normalized = String(this.value || '').trim();
       persistServerAdminToken(normalized);
       if (normalized) {
-        setServerAdminStatus('ok', 'Server admin token stored in this browser.');
+        setServerAdminStatus('ok', 'Self-host password stored in this browser.');
       } else if (serverRuntime.selfHostServerMode && !canQueryLocalRuntime()) {
-        setServerAdminStatus('info', 'Server admin token required for remote self-host setup.');
+        setServerAdminStatus('info', 'Self-host password required for remote self-host setup.');
       } else {
         setServerAdminStatus('', '');
       }
@@ -4877,9 +4905,9 @@
       if (!serverRuntime.selfHostServerMode || canQueryLocalRuntime() || getServerAdminToken()) {
         return true;
       }
-      const entered = window.prompt(`Enter the PVTKRRX server admin token to ${actionLabel}.`);
+      const entered = window.prompt(`Enter the PVTKRRX self-host password to ${actionLabel}.`);
       if (!entered) {
-        setServerAdminStatus('err', 'Server admin token required for remote self-host setup.');
+        setServerAdminStatus('err', 'Self-host password required for remote self-host setup.');
         updateServerAdminUi();
         return false;
       }
@@ -4887,7 +4915,7 @@
       persistServerAdminToken(normalized);
       const input = document.getElementById('serverAdminToken');
       if (input) input.value = normalized;
-      setServerAdminStatus('ok', 'Server admin token stored in this browser.');
+      setServerAdminStatus('ok', 'Self-host password stored in this browser.');
       updateServerAdminUi();
       await maybeLoadSavedSelfHostConfig({ force: true, setLoadedStatus: true });
       return true;
@@ -5419,7 +5447,7 @@
         if (res.status === 401 && serverRuntime.selfHostServerMode) {
           serverRuntime.serverConfigLoaded = false;
           if (getServerAdminToken()) {
-            setServerAdminStatus('err', 'Server admin token rejected. Could not load the saved self-host config.');
+            setServerAdminStatus('err', 'Self-host password rejected. Could not load the saved self-host config.');
           } else {
             updateServerAdminUi();
           }
@@ -5434,7 +5462,7 @@
         if (loadingServerConfig) {
           serverRuntime.serverConfigLoaded = true;
           if (setLoadedStatus && getServerAdminToken()) {
-            setServerAdminStatus('ok', 'Server admin token stored in this browser. Saved self-host config loaded.');
+            setServerAdminStatus('ok', 'Self-host password stored in this browser. Saved self-host config loaded.');
           }
         }
         if (!token && lanPair.pairId) {
@@ -5472,8 +5500,8 @@
         if (!text) {
           if (selfHosted && serverRuntime.serverConfigConfigured && !serverRuntime.serverConfigLoaded && !getConfigTokenFromPath()) {
             return getServerAdminToken()
-              ? 'Saved self-hosted server config has not loaded into this page yet. Wait a moment, or check that the server admin token is correct.'
-              : 'Enter the server admin token to load the saved self-hosted server config into this page, or fill in the service URLs manually.';
+              ? 'Saved self-hosted server config has not loaded into this page yet. Wait a moment, or check that the password is correct.'
+              : 'Enter the self-host password to load the saved self-hosted server config into this page, or fill in the service URLs manually.';
           }
           return `${label} is required`;
         }
@@ -5481,7 +5509,7 @@
           const u = new URL(text);
           if (isPrivateHostname(u.hostname) && !canUsePrivateTargets) {
             return selfHosted
-              ? `${label} uses ${u.hostname}. Enter the server admin token or open this page on the server itself to use localhost/private service URLs.`
+              ? `${label} uses ${u.hostname}. Enter the self-host password or open this page on the server itself to use localhost/private service URLs.`
               : `${label} uses ${u.hostname}. Remote Seedbox needs public URLs. Use PC Local or LAN Bridge instead.`;
           }
         } catch (e) {
@@ -5637,8 +5665,8 @@
           const hostedPayload = routeParity.stripRemoteSeedboxLanFields(config, { keepRelayUrl: true });
 
           if (serverRuntime.selfHostServerMode) {
-            if (!(await ensureSelfHostAdminAccess('save this self-hosted server config'))) {
-              return setStatus('installStatus', 'err', 'Server admin token required to save the self-hosted server config.');
+          if (!(await ensureSelfHostAdminAccess('save this self-hosted server config'))) {
+              return setStatus('installStatus', 'err', 'Self-host password required to save the self-hosted server config.');
             }
 
             const saveRes = await fetch('/server-config', {
@@ -5649,7 +5677,7 @@
             const saveData = await saveRes.json().catch(() => ({}));
             if (!saveRes.ok || saveData.error) {
               if (saveRes.status === 401) {
-                setServerAdminStatus('err', 'Server admin token rejected.');
+                setServerAdminStatus('err', 'Self-host password rejected.');
               }
               return setStatus('installStatus', 'err', saveData.error || 'Failed to save self-hosted server config');
             }

@@ -38,7 +38,7 @@ The practical reading of the project today is:
 
 - `169a2e4` documented the live public-host truth table, dead preview-host status, and website audit state across the main docs set.
 - `e50a6b0` rewrote the homepage around clearer product positioning, route comparison, requirements, and sports proofing.
-- `9c18996` and `9b93f03` added explicit self-hosted server setup: localhost/private service validation for self-host installs, browser-admin token flow, disk-backed `/selfhost` manifests, server setup scripts, and optional `systemd` install support.
+- `9c18996` and `9b93f03` added explicit self-hosted server setup: localhost/private service validation for self-host installs, browser password flow, disk-backed `/selfhost` manifests, server setup scripts, and optional `systemd` install support.
 - `d174bd2` added provider-specific runbook presets to the runbooks/configure surface.
 - `428b15b` changed stream source labels so users can see whether playback is coming from the host PC or the remote/server route.
 - `2d3175a` added the sports artwork byte cache/proxy layer so posters, wallpapers, landscape art, and logos can be served from the active local/hosted runtime after the first fetch instead of being hotlinked every time.
@@ -51,7 +51,7 @@ The practical reading of the project today is:
 These items are verified in the current workspace or by direct client/log proof:
 
 - `npm run smoke:config` passed on 2026-03-29
-- `npm run smoke:selfhost` passed on 2026-03-31 and now covers explicit self-host server mode, disk-backed `/selfhost` config, and server-admin token gates
+- `npm run smoke:selfhost` passed on 2026-03-31 and now covers explicit self-host server mode, disk-backed `/selfhost` config, and self-host password gates
 - `npm run smoke:selfhost` passed again on 2026-03-31 after adding browser-driven Stremio link-session persistence into the disk-backed self-host config
 - `npm run smoke:provider-discovery` passed on 2026-04-02 after broadening the shared provider discovery helpers for existing Prowlarr/qBittorrent installs
 - `npm run smoke:config` passed on 2026-04-02 after the release-status endpoint and homepage release card were added
@@ -70,7 +70,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - 2026-03-31 preview-host check: `https://pvtkrrx.vercel.app/` returned `404` with `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`, so treat it as stale and non-canonical
 - 2026-03-31 homepage rewrite landed locally in `public/index.html`: plain-English hero, route comparison, requirements section, sports proof section, and removal of the public `/local/install` CTA
 - explicit self-host server mode now exposes `/app-config.json`, disk-backed `/selfhost/config.json` + `/selfhost/manifest.json?mode=hosted`, and `POST /server-config` for persisted VPS/seedbox installs
-- the self-host installer path has now been rebuilt around a dedicated Linux bootstrap script plus a new `npm run server:setup` installer flow that writes a stable `PVTKRRX_RUNTIME_DIR`, generates `AUTH_TOKEN_SECRET`, supports `PVTKRRX_PUBLIC_BASE_URL`, auto-discovers existing Prowlarr/qBittorrent configs when present, can hand off to the full bootstrap when those providers are missing, now exposes a hosted launcher at `https://www.pvtkrrx.cc/install-selfhost.sh`, pulls the app source from the branch payload by default with optional tag/manifest pinning and an automatic retry from `main` if a pinned release is too old for `scripts/server-installer.js`, saves the runtime config locally, creates the server admin token file, and can install a Linux `systemd` service for auto-start on boot
+- the self-host installer path has now been rebuilt around a dedicated Linux bootstrap script plus a new `npm run server:setup` installer flow that writes a stable `PVTKRRX_RUNTIME_DIR`, generates `AUTH_TOKEN_SECRET`, supports `PVTKRRX_PUBLIC_BASE_URL`, auto-discovers existing Prowlarr/qBittorrent configs when present, can hand off to the full bootstrap when those providers are missing, now exposes a hosted launcher at `https://www.pvtkrrx.cc/install-selfhost.sh`, pulls the app source from the branch payload by default with optional tag/manifest pinning and an automatic retry from `main` if a pinned release is too old for `scripts/server-installer.js`, saves the runtime config locally, creates the self-host password file, and can install a Linux `systemd` service for auto-start on boot
 - `npm run smoke:stremio-link` passed on 2026-03-31 after the new link-session flow was added for hosted token configs: server-created session, install-seen manifest hit, browser AuthKey completion, and final linked install URL/token refresh
 - configure page now exposes a one-time `Server Link Session` flow so a local signed-in Stremio browser/device can link a remote/cloud server config without the server recovering raw login credentials
 - `PC Local` resolves as a real addon from `http://127.0.0.1:7000/local/manifest.json?mode=local`

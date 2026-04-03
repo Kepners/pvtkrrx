@@ -150,6 +150,80 @@ normalize_cloudflared_arch() {
   esac
 }
 
+normalize_https_mode() {
+  local value
+  value="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
+  case "$value" in
+    cloudflare|cloudflare-tunnel|tunnel|cf) echo "cloudflare" ;;
+    domain|custom-domain|own-domain|custom|https-domain) echo "domain" ;;
+    skip|later|manual|none|off) echo "skip" ;;
+    *) echo "" ;;
+  esac
+}
+
+prompt_https_mode() {
+  local default_mode
+  default_mode="$(normalize_https_mode "${PVTKRRX_SELF_HOST_HTTPS_MODE:-}")"
+  if [ -z "$default_mode" ]; then
+    if [ -n "${PVTKRRX_PUBLIC_BASE_URL:-}" ]; then
+      default_mode="domain"
+    else
+      default_mode="cloudflare"
+    fi
+  fi
+
+  if [ ! -r /dev/tty ]; then
+    echo "$default_mode"
+    return 0
+  fi
+
+  local choice=""
+  printf '\nHow should Stremio reach this server?\n' > /dev/tty
+  printf '  1) Cloudflare Tunnel - free HTTPS URL, no domain needed (recommended)\n' > /dev/tty
+  printf '  2) I have my own domain - I will configure HTTPS myself\n' > /dev/tty
+  printf '  3) Skip - I will set this up later\n' > /dev/tty
+  printf 'Choose [1-3] [%s]: ' "$default_mode" > /dev/tty
+  IFS= read -r choice < /dev/tty || choice=""
+  choice="$(normalize_https_mode "$choice")"
+  if [ -z "$choice" ]; then
+    choice="$default_mode"
+  fi
+
+  case "$choice" in
+    cloudflare|domain|skip) echo "$choice" ;;
+    *) echo "$default_mode" ;;
+  esac
+}
+
+prompt_https_url() {
+  local default_value="${1:-}"
+  local value=""
+  if [ ! -r /dev/tty ]; then
+    echo "$default_value"
+    return 0
+  fi
+
+  while true; do
+    printf 'Public HTTPS URL for Stremio install links' > /dev/tty
+    if [ -n "$default_value" ]; then
+      printf ' [%s]' "$default_value" > /dev/tty
+    fi
+    printf ': ' > /dev/tty
+    IFS= read -r value < /dev/tty || value=""
+    value="${value:-$default_value}"
+    value="$(printf '%s' "$value" | tr -d '\r' | sed 's:/*$::')"
+    case "$value" in
+      https://*) echo "$value"; return 0 ;;
+      "")
+        printf 'Enter a valid https:// URL.\n' > /dev/tty
+        ;;
+      *)
+        printf 'Public HTTPS URL must start with https://.\n' > /dev/tty
+        ;;
+    esac
+  done
+}
+
 install_cloudflared() {
   if have_command cloudflared; then
     echo "✓ cloudflared already installed: $(cloudflared --version 2>/dev/null | head -n 1 || echo 'unknown')"
@@ -467,9 +541,33 @@ main() {
 
   # ── Step 1: Cloudflare Tunnel ──
   echo ""
-  echo "── Step 1/6: Cloudflare Tunnel ──"
-  install_cloudflared
-  setup_cloudflared_service "$PVTKRRX_HTTP_PORT"
+  echo "── Step 1/6: HTTPS front door ──"
+  local https_mode
+  https_mode="$(prompt_https_mode)"
+  export PVTKRRX_SELF_HOST_HTTPS_MODE="$https_mode"
+
+  local public_base_url="${PVTKRRX_PUBLIC_BASE_URL:-}"
+  case "$https_mode" in
+    cloudflare)
+      if [ -n "$public_base_url" ]; then
+        echo "✓ Using existing public HTTPS URL: $public_base_url"
+      else
+        install_cloudflared
+        setup_cloudflared_service "$PVTKRRX_HTTP_PORT"
+        public_base_url="${PVTKRRX_PUBLIC_BASE_URL:-}"
+      fi
+      ;;
+    domain)
+      public_base_url="$(prompt_https_url "$public_base_url")"
+      echo "✓ Using custom domain: $public_base_url"
+      ;;
+    skip)
+      public_base_url=""
+      echo "✓ Skipping public HTTPS setup for now"
+      ;;
+  esac
+
+  export PVTKRRX_PUBLIC_BASE_URL="$public_base_url"
 
   # ── Step 2: qBittorrent ──
   echo ""

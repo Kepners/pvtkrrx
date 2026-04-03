@@ -256,6 +256,8 @@ async function run() {
     const installLauncherText = await installLauncherRes.text()
     assert.match(installLauncherText, /^#!\/usr\/bin\/env bash/m, 'install launcher should serve the shell script payload')
     assert.match(installLauncherText, /RELEASE_MANIFEST_URL|PVTKRRX_RELEASE_MANIFEST_URL/, 'install launcher should include the release-manifest bootstrap logic')
+    assert.match(installLauncherText, /PVTKRRX_SELF_HOST_HTTPS_MODE/, 'install launcher should expose the HTTPS mode selector')
+    assert.match(installLauncherText, /Cloudflare Tunnel/i, 'install launcher should describe the Cloudflare Tunnel option')
     assert.match(installLauncherText, /scripts\/server-installer\.js/, 'install launcher should validate the extracted source contains the self-host installer')
     assert.match(installLauncherText, /retrying with branch/i, 'install launcher should retry from main when a pinned release is too old')
 

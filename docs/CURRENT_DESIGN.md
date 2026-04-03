@@ -24,8 +24,9 @@ PVTKRRX is one codebase with three active runtime pieces:
    - saves a disk-backed server config into the runtime directory
    - exposes a stable `/selfhost/manifest.json?mode=hosted`
    - can mint short-lived Stremio link sessions that persist the linked `stremioUserId` back into the disk-backed `selfhost` config
-   - can validate localhost/private Prowlarr and qBittorrent URLs only for same-host requests or browser sessions that present the server admin token
-   - now has a one-command Linux installer that bootstraps the app directory, bundled Node runtime, `.env`, stable runtime dir, saved self-host config, admin token, and optional `systemd` service
+   - can validate localhost/private Prowlarr and qBittorrent URLs only for same-host requests or browser sessions that present the self-host password
+   - now has a one-command Linux installer that bootstraps the app directory, bundled Node runtime, `.env`, stable runtime dir, saved self-host config, password, and optional `systemd` service
+   - can choose the self-host HTTPS front door as Cloudflare Tunnel, a user-owned `https://` origin, or skip for later manual setup, and persists that choice in `PVTKRRX_SELF_HOST_HTTPS_MODE`
    - exposes a hosted launcher script at `https://www.pvtkrrx.cc/install-selfhost.sh` so the first curl can come from the canonical site instead of the moving GitHub branch tip
    - pulls the app source from the branch payload by default, with optional pinning via `PVTKRRX_RELEASE_TAG` or a custom release manifest URL; if a pinned release is too old to include `scripts/server-installer.js`, it retries from `main`
    - auto-discovers existing Prowlarr/qBittorrent configs when the services are already installed, then fills the self-host config from the recovered URLs, API keys, usernames, and ports instead of forcing a blank slate
@@ -54,8 +55,8 @@ PVTKRRX is one codebase with three active runtime pieces:
 - Desktop-local `/configure` on the Windows EXE now exposes only `PC Local` and `LAN Bridge`; `Remote Seedbox` belongs to the separate server/cloud runtime.
 - The top of the page focuses on the next action for the selected route.
 - Noisy fallback tools are hidden by default behind `Hidden Setup Tabs`.
-- When explicit self-host server mode is active, `/configure` is now a server-only app surface: it exposes `Remote Seedbox` only, defaults there immediately, and exposes a browser-stored server admin token field for remote seedbox administration.
-- Self-host server copy now explains the real contract: private/localhost backend URLs are allowed once the server admin is authenticated, while only the browser-facing install origin still needs public HTTPS for Stremio.
+- When explicit self-host server mode is active, `/configure` is now a server-only app surface: it exposes `Remote Seedbox` only, defaults there immediately, and exposes a browser-stored self-host password field for remote seedbox administration.
+- Self-host server copy now explains the real contract: private/localhost backend URLs are allowed once the server password is authenticated, while only the browser-facing install origin still needs public HTTPS for Stremio.
 - `/app-config.json` now also tells the shared configure UI when the runtime is desktop-local-only, so the shared page can hide the seedbox route inside the EXE without forking the whole UI.
 - The advanced Stremio account tools now also expose a `Server Link Session` flow:
   - create a one-time session from the target runtime

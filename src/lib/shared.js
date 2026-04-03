@@ -192,7 +192,7 @@ let localProviderWarmupPromise = null
 let localConfigRepairPromise = null
 
 if (serverAdminState.created && serverAdminState.path) {
-  console.warn(`[self-host] Server admin token created at ${serverAdminState.path}`)
+  console.warn(`[self-host] Self-host password created at ${serverAdminState.path}`)
 }
 
 function loadLocalConfigFile() {
@@ -1165,7 +1165,7 @@ function requireServerAdminToken(req, res, next) {
     return res.status(404).json({ error: 'Self-host server mode is not enabled' })
   }
   if (isSameHostRequest(req) || hasServerAdminToken(req)) return next()
-  return res.status(401).json({ error: 'Valid server admin token required' })
+  return res.status(401).json({ error: 'Valid self-host password required' })
 }
 
 function ensureCsrfCookie(req, res) {

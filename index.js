@@ -449,7 +449,7 @@ function getStremioLinkSourceError(req, source = {}) {
     }
     return {
       statusCode: 401,
-      payload: { error: 'Valid server admin token required' }
+      payload: { error: 'Valid self-host password required' }
     }
   }
   return null

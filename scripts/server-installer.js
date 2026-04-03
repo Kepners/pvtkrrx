@@ -75,6 +75,28 @@ function normalizeBaseUrl(input) {
   return String(input || '').trim().replace(/\/+$/, '')
 }
 
+function normalizeSelfHostHttpsMode(input) {
+  const text = String(input || '').trim().toLowerCase()
+  if (!text) return ''
+  if (['cloudflare', 'cloudflare-tunnel', 'tunnel', 'cf'].includes(text)) return 'cloudflare'
+  if (['domain', 'custom-domain', 'own-domain', 'custom', 'https-domain'].includes(text)) return 'domain'
+  if (['skip', 'later', 'manual', 'none', 'off'].includes(text)) return 'skip'
+  return ''
+}
+
+function describeSelfHostHttpsMode(mode) {
+  switch (normalizeSelfHostHttpsMode(mode)) {
+    case 'cloudflare':
+      return 'Cloudflare Tunnel'
+    case 'domain':
+      return 'custom domain'
+    case 'skip':
+      return 'skip for now'
+    default:
+      return 'unknown'
+  }
+}
+
 function parseHttpUrl(input, options = {}) {
   const {
     allowEmpty = false,
@@ -424,7 +446,7 @@ function buildServerAdminBootstrapUrl(displayOrigin, token) {
   const origin = normalizeOrigin(displayOrigin)
   const adminToken = String(token || '').trim()
   if (!origin || !adminToken) return ''
-  return `${origin}/configure#serverAdminToken=${encodeURIComponent(adminToken)}`
+  return `${origin}/configure#serverPassword=${encodeURIComponent(adminToken)}&serverAdminToken=${encodeURIComponent(adminToken)}`
 }
 
 async function run() {
@@ -443,16 +465,22 @@ async function run() {
   }
   const existingSecret = String(mergedEnv.ENCRYPTION_SECRET || '').trim()
   const existingAuthSecret = String(mergedEnv.AUTH_TOKEN_SECRET || '').trim()
+  const existingSelfHostPassword = String(
+    mergedEnv.PVTKRRX_SELF_HOST_PASSWORD ||
+    mergedEnv.PVTKRRX_SERVER_ADMIN_TOKEN ||
+    ''
+  ).trim()
   const existingPort = Number.parseInt(String(mergedEnv.PORT || '7000').trim(), 10) || 7000
   const existingHttpsPort = Number.parseInt(String(mergedEnv.HTTPS_PORT || '7001').trim(), 10) || 7001
   const existingPublicBaseUrl = normalizeBaseUrl(mergedEnv.PVTKRRX_PUBLIC_BASE_URL || '')
+  const existingHttpsMode = normalizeSelfHostHttpsMode(mergedEnv.PVTKRRX_SELF_HOST_HTTPS_MODE || '')
   const existingConfig = loadExistingServerConfig(defaultRuntimeDir, existingSecret)
   const bundledNodePath = String(process.env.PVTKRRX_NODE_PATH || process.execPath).trim() || process.execPath
 
   const rl = readline.createInterface({ input, output })
   try {
     console.log('PVTKRRX server installer')
-    console.log('This installer writes a stable self-host config, server admin token, and optional systemd service.')
+    console.log('This installer writes a stable self-host config, a self-host password, and optional systemd service.')
     console.log('Press Enter to keep an existing/default value. Use "-" to clear an optional field.')
     console.log('')
 
@@ -484,18 +512,44 @@ async function run() {
       'AUTH_TOKEN_SECRET',
       existingAuthSecret || randomSecret()
     )
+    const selfHostPassword = await promptValue(
+      rl,
+      'Self-host config password',
+      existingSelfHostPassword || randomSecret()
+    )
     const httpPort = await promptInteger(rl, 'HTTP port', existingPort, { min: 1, max: 65535 })
     const httpsPort = await promptInteger(rl, 'HTTPS port', existingHttpsPort, { min: 1, max: 65535 })
     const runtimeDir = await promptValue(rl, 'Runtime directory', defaultRuntimeDir)
-    const publicBaseUrl = await promptHttpUrl(
-      rl,
-      'Public HTTPS URL for Stremio install links (optional)',
-      existingPublicBaseUrl,
-      {
-        allowEmpty: true,
-        requireHttps: true
-      }
+    const defaultHttpsMode = existingHttpsMode || (existingPublicBaseUrl ? 'domain' : 'cloudflare')
+    let selfHostHttpsMode = normalizeSelfHostHttpsMode(
+      await promptValue(
+        rl,
+        'HTTPS front door mode (cloudflare/domain/skip)',
+        defaultHttpsMode
+      )
     )
+    if (!selfHostHttpsMode) selfHostHttpsMode = defaultHttpsMode
+
+    let publicBaseUrl = existingPublicBaseUrl
+    if (selfHostHttpsMode === 'cloudflare') {
+      const tunnelResult = await ensureCloudflaredTunnel(repoRoot, httpPort, publicBaseUrl)
+      if (tunnelResult && tunnelResult.publicBaseUrl) {
+        publicBaseUrl = normalizeBaseUrl(tunnelResult.publicBaseUrl)
+      }
+    } else if (selfHostHttpsMode === 'domain') {
+      publicBaseUrl = await promptHttpUrl(
+        rl,
+        'Public HTTPS URL for Stremio install links',
+        existingPublicBaseUrl,
+        {
+          allowEmpty: false,
+          requireHttps: true
+        }
+      )
+    } else {
+      publicBaseUrl = ''
+    }
+
     const allowedWebOrigins = normalizeOriginList(await promptValue(
       rl,
       'Allowed browser origins (comma separated, optional)',
@@ -591,7 +645,10 @@ async function run() {
     updateDotEnvFile(envPath, {
       ENCRYPTION_SECRET: encryptionSecret,
       AUTH_TOKEN_SECRET: authTokenSecret,
+      PVTKRRX_SELF_HOST_PASSWORD: selfHostPassword,
+      PVTKRRX_SERVER_ADMIN_TOKEN: selfHostPassword,
       PVTKRRX_SELF_HOST_MODE: 'true',
+      PVTKRRX_SELF_HOST_HTTPS_MODE: selfHostHttpsMode,
       PVTKRRX_RUNTIME_DIR: runtimeDir,
       PVTKRRX_PUBLIC_BASE_URL: publicBaseUrl,
       PVTKRRX_ALLOWED_WEB_ORIGINS: allowedWebOrigins,
@@ -601,7 +658,10 @@ async function run() {
 
     process.env.ENCRYPTION_SECRET = encryptionSecret
     process.env.AUTH_TOKEN_SECRET = authTokenSecret
+    process.env.PVTKRRX_SELF_HOST_PASSWORD = selfHostPassword
+    process.env.PVTKRRX_SERVER_ADMIN_TOKEN = selfHostPassword
     process.env.PVTKRRX_SELF_HOST_MODE = 'true'
+    process.env.PVTKRRX_SELF_HOST_HTTPS_MODE = selfHostHttpsMode
     process.env.PVTKRRX_RUNTIME_DIR = runtimeDir
     process.env.PVTKRRX_PUBLIC_BASE_URL = publicBaseUrl
     process.env.PVTKRRX_ALLOWED_WEB_ORIGINS = allowedWebOrigins
@@ -659,8 +719,9 @@ async function run() {
     console.log('PVTKRRX server install complete')
     console.log(`App directory: ${repoRoot}`)
     console.log(`Runtime directory: ${runtimeDir}`)
+    console.log(`HTTPS mode: ${describeSelfHostHttpsMode(selfHostHttpsMode)}`)
     console.log(`Saved config: ${localConfigPath}`)
-    console.log(`Server admin token file: ${adminState.path || path.join(runtimeDir, 'server-admin-token')}`)
+    console.log(`Self-host password file: ${adminState.path || path.join(runtimeDir, 'server-admin-token')}`)
     console.log(`Configure URL: ${displayOrigin}/configure`)
     if (configureBootstrapUrl) {
       console.log(`Bootstrap URL: ${configureBootstrapUrl}`)
@@ -751,21 +812,35 @@ async function runAuto() {
   const mergedEnv = { ...envFromFile, ...process.env, PVTKRRX_RUNTIME_DIR: defaultRuntimeDir }
   const existingSecret = String(mergedEnv.ENCRYPTION_SECRET || '').trim()
   const existingAuthSecret = String(mergedEnv.AUTH_TOKEN_SECRET || '').trim()
+  const existingSelfHostPassword = String(
+    mergedEnv.PVTKRRX_SELF_HOST_PASSWORD ||
+    mergedEnv.PVTKRRX_SERVER_ADMIN_TOKEN ||
+    ''
+  ).trim()
   const existingConfig = loadExistingServerConfig(defaultRuntimeDir, existingSecret)
   const bundledNodePath = String(process.env.PVTKRRX_NODE_PATH || process.execPath).trim() || process.execPath
   const httpPort = Number.parseInt(String(mergedEnv.PORT || '7000').trim(), 10) || 7000
   const httpsPort = Number.parseInt(String(mergedEnv.HTTPS_PORT || '7001').trim(), 10) || 7001
   const existingPublicBaseUrl = normalizeBaseUrl(mergedEnv.PVTKRRX_PUBLIC_BASE_URL || '')
+  const existingHttpsMode = normalizeSelfHostHttpsMode(mergedEnv.PVTKRRX_SELF_HOST_HTTPS_MODE || '')
+  const selfHostHttpsMode = existingHttpsMode || (existingPublicBaseUrl ? 'domain' : 'cloudflare')
   let publicBaseUrl = existingPublicBaseUrl
 
-  if (process.platform === 'linux') {
+  if (selfHostHttpsMode === 'domain' && !publicBaseUrl) {
+    throw new Error('PVTKRRX_SELF_HOST_HTTPS_MODE=domain requires PVTKRRX_PUBLIC_BASE_URL to be set')
+  }
+
+  if (process.platform === 'linux' && selfHostHttpsMode === 'cloudflare' && !publicBaseUrl) {
     const tunnelResult = await ensureCloudflaredTunnel(repoRoot, httpPort, publicBaseUrl)
     if (tunnelResult && tunnelResult.publicBaseUrl) {
       publicBaseUrl = normalizeBaseUrl(tunnelResult.publicBaseUrl)
     }
+  } else if (selfHostHttpsMode === 'skip') {
+    publicBaseUrl = ''
   }
 
   console.log('PVTKRRX auto-configuration')
+  console.log(`HTTPS mode: ${describeSelfHostHttpsMode(selfHostHttpsMode)}`)
   console.log('')
 
   const prowlarr = await discoverProwlarrConfig({ useHints: false })
@@ -798,6 +873,7 @@ async function runAuto() {
   // ── Secrets ──
   const encryptionSecret = existingSecret || randomSecret()
   const authTokenSecret = existingAuthSecret || randomSecret()
+  const selfHostPassword = existingSelfHostPassword || randomSecret()
 
   // ── Write .env ──
   const allowedWebOrigins = normalizeOriginList(
@@ -808,7 +884,10 @@ async function runAuto() {
   updateDotEnvFile(envPath, {
     ENCRYPTION_SECRET: encryptionSecret,
     AUTH_TOKEN_SECRET: authTokenSecret,
+    PVTKRRX_SELF_HOST_PASSWORD: selfHostPassword,
+    PVTKRRX_SERVER_ADMIN_TOKEN: selfHostPassword,
     PVTKRRX_SELF_HOST_MODE: 'true',
+    PVTKRRX_SELF_HOST_HTTPS_MODE: selfHostHttpsMode,
     PVTKRRX_RUNTIME_DIR: defaultRuntimeDir,
     PVTKRRX_PUBLIC_BASE_URL: publicBaseUrl,
     PVTKRRX_ALLOWED_WEB_ORIGINS: allowedWebOrigins,
@@ -819,7 +898,10 @@ async function runAuto() {
   // ── Set process env for normalizeAddonConfig ──
   process.env.ENCRYPTION_SECRET = encryptionSecret
   process.env.AUTH_TOKEN_SECRET = authTokenSecret
+  process.env.PVTKRRX_SELF_HOST_PASSWORD = selfHostPassword
+  process.env.PVTKRRX_SERVER_ADMIN_TOKEN = selfHostPassword
   process.env.PVTKRRX_SELF_HOST_MODE = 'true'
+  process.env.PVTKRRX_SELF_HOST_HTTPS_MODE = selfHostHttpsMode
   process.env.PVTKRRX_RUNTIME_DIR = defaultRuntimeDir
   process.env.PVTKRRX_PUBLIC_BASE_URL = publicBaseUrl
   process.env.PORT = String(httpPort)
@@ -857,7 +939,7 @@ async function runAuto() {
 
   console.log('')
   console.log(`✓ Config saved to ${localConfigPath}`)
-  console.log(`✓ Admin token: ${fs.readFileSync(adminState.path, 'utf8').trim()}`)
+  console.log(`✓ Self-host password: ${fs.readFileSync(adminState.path, 'utf8').trim()}`)
 
   // ── systemd service ──
   let serviceResult = null
@@ -882,6 +964,7 @@ async function runAuto() {
   const configureBootstrapUrl = buildServerAdminBootstrapUrl(displayOrigin, adminState.token)
   console.log('')
   console.log('─── Summary ───')
+  console.log(`HTTPS mode: ${describeSelfHostHttpsMode(selfHostHttpsMode)}`)
   console.log(`Prowlarr:    ${jackettUrl}`)
   console.log(`qBittorrent: ${qbitUrl}`)
   console.log(`Configure:   ${displayOrigin}/configure`)

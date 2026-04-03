@@ -10,7 +10,7 @@ function getServerAdminTokenFilePath(runtimeDir, env = process.env) {
 
 function writeTokenFile(filePath, token) {
   const target = String(filePath || '').trim()
-  if (!target) throw new Error('server admin token file path is required')
+  if (!target) throw new Error('self-host password file path is required')
   const dir = path.dirname(target)
   if (dir && !fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true })
   fs.writeFileSync(target, `${String(token || '').trim()}\n`, { encoding: 'utf8', mode: 0o600 })
@@ -21,7 +21,11 @@ function writeTokenFile(filePath, token) {
 
 function ensureServerAdminToken(runtimeDir, options = {}) {
   const env = options.env || process.env
-  const explicit = String(env?.PVTKRRX_SERVER_ADMIN_TOKEN || '').trim()
+  const explicit = String(
+    env?.PVTKRRX_SELF_HOST_PASSWORD ||
+    env?.PVTKRRX_SERVER_ADMIN_TOKEN ||
+    ''
+  ).trim()
   if (explicit) {
     return {
       token: explicit,
