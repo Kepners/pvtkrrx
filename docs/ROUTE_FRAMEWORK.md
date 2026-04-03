@@ -91,7 +91,7 @@ There is no per-route catalog filtering. The Library catalog queries qBittorrent
 - On an explicit self-hosted server:
   - the configure page can save the server config locally and reuse it across reboots
   - remote configure sessions must present the self-host password before they can use localhost/private Prowlarr or qBittorrent URLs
-  - `npm run server:setup` can auto-discover existing Prowlarr/qBittorrent configs, prompt only for the missing values, hand off to the full bootstrap when those providers are missing, and optionally install a Linux `systemd` service for auto-start on boot
+  - `npm run server:setup` can auto-discover existing Prowlarr/qBittorrent configs, prompt only for the missing values, and automatically hand off to the full bootstrap when those providers are missing before optionally installing a Linux `systemd` service for auto-start on boot
 - Tracker `/playback` streams are **suppressed** at stream emission time (not just blocked at the route)
 - If `fileServerAuth` is configured, tracker playback is also suppressed on any non-local route because Stremio cannot forward `proxyHeaders` through a redirect chain
 - Completed packed releases prefer the extracted direct video when `fileServerUrl` can reach it; otherwise the packed source stays hidden by default unless the experimental native archive override is enabled for manual testing

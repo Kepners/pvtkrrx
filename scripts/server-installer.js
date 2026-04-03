@@ -488,18 +488,11 @@ async function run() {
     const qbit = await discoverQbitConfig({ useHints: false })
     const missingProviders = !prowlarr.installed || !prowlarr.apiKey || !qbit.installed
     if (process.platform === 'linux' && missingProviders) {
-      const installBootstrap = await promptBoolean(
-        rl,
-        'Prowlarr and/or qBittorrent are missing. Run the full bootstrap now to install them automatically?',
-        true
-      )
-      if (installBootstrap) {
-        rl.close()
-        runFullBootstrap(repoRoot)
-        return
-      }
-      console.log('Continuing with manual values. Install Prowlarr and qBittorrent first if you want automatic detection.')
+      console.log('Prowlarr and/or qBittorrent are missing. Running the full bootstrap now so they are installed automatically.')
       console.log('')
+      rl.close()
+      runFullBootstrap(repoRoot)
+      return
     }
 
     const encryptionSecret = await promptValue(
@@ -994,6 +987,7 @@ module.exports = {
   buildDefaultAllowedOrigins,
   defaultServiceName,
   defaultServiceUser,
+  runFullBootstrap,
   normalizeOrigin,
   normalizeOriginList,
   parseDotEnvFile,

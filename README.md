@@ -104,7 +104,7 @@ The Linux installer now bootstraps a dedicated self-host server in one flow:
 - auto-discovers existing Prowlarr/qBittorrent configs when they are already installed, then prompts only for the values it cannot recover
 - asks how Stremio should reach the server: Cloudflare Tunnel, a user-owned `https://` origin, or skip for later manual setup
 - configures qBittorrent for localhost addon access when it has to stand up the service itself
-- if Prowlarr or qBittorrent are missing on a direct `npm run server:setup` run, it can offer to hand off to the full bootstrap and install them automatically
+- if Prowlarr or qBittorrent are missing on a direct `npm run server:setup` run, it immediately hands off to the full bootstrap and installs them automatically before continuing
 - pulls the app source from the branch payload by default, with an automatic retry from `main` if a pinned release is too old to include `scripts/server-installer.js`
 - can be pinned to a specific release with `PVTKRRX_RELEASE_TAG` or pointed at a Contabo-hosted release manifest with `PVTKRRX_RELEASE_MANIFEST_URL`
 - prompts for your public HTTPS base URL plus any remaining seedbox connection details

@@ -7,6 +7,8 @@ const { stdin: input, stdout: output } = require('node:process')
 const { resolveRuntimeDir } = require('../src/utils/runtimeDir')
 const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJsonFile')
 const { ensureServerAdminToken } = require('../src/utils/serverAdminToken')
+const { discoverProwlarrConfig, discoverQbitConfig } = require('../src/utils/provision')
+const { runFullBootstrap } = require('./server-installer')
 const { installSystemdService } = require('./install-systemd-service')
 
 function parseDotEnvFile(filePath) {
@@ -122,6 +124,17 @@ async function run() {
     console.log('PVTKRRX server setup')
     console.log('Press Enter to keep an existing/default value. Use "-" to clear an optional field.')
     console.log('')
+
+    const prowlarr = await discoverProwlarrConfig({ useHints: false })
+    const qbit = await discoverQbitConfig({ useHints: false })
+    const missingProviders = !prowlarr.installed || !prowlarr.apiKey || !qbit.installed
+    if (process.platform === 'linux' && missingProviders) {
+      console.log('Prowlarr and/or qBittorrent are missing. Running the full bootstrap now so they are installed automatically.')
+      console.log('')
+      rl.close()
+      runFullBootstrap(repoRoot)
+      return
+    }
 
     const encryptionSecret = await promptValue(
       rl,
