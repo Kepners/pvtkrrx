@@ -16,6 +16,8 @@ QBIT_USER="${PVTKRRX_QBIT_USER:-qbittorrent}"
 QBIT_DATA_DIR="${PVTKRRX_QBIT_DATA:-/var/lib/$QBIT_USER}"
 QBIT_PORT="${PVTKRRX_QBIT_WEBUI_PORT:-8080}"
 DOWNLOADS_DIR="${PVTKRRX_DOWNLOADS_DIR:-$INSTALL_DIR/downloads}"
+PVTKRRX_HTTP_PORT="${PVTKRRX_HTTP_PORT:-7000}"
+PVTKRRX_HTTPS_PORT="${PVTKRRX_HTTPS_PORT:-7001}"
 
 # ─── helpers ────────────────────────────────────────────────────────
 have_command() { command -v "$1" >/dev/null 2>&1; }
@@ -138,6 +140,96 @@ ensure_base_tools() {
     local pm; pm="$(detect_pkg_manager)"
     install_system_packages "$pm" ca-certificates tar xz-utils curl
   fi
+}
+
+normalize_cloudflared_arch() {
+  case "$(uname -m)" in
+    x86_64|amd64) echo "amd64" ;;
+    aarch64|arm64) echo "arm64" ;;
+    *) echo "Unsupported architecture for cloudflared: $(uname -m)" >&2; exit 1 ;;
+  esac
+}
+
+install_cloudflared() {
+  if have_command cloudflared; then
+    echo "✓ cloudflared already installed: $(cloudflared --version 2>/dev/null | head -n 1 || echo 'unknown')"
+    return 0
+  fi
+
+  local arch; arch="$(normalize_cloudflared_arch)"
+  local download_url="https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}"
+  local target_path="/usr/local/bin/cloudflared"
+
+  echo "Installing cloudflared..."
+  run_root mkdir -p /usr/local/bin
+  run_root curl -fsSL "$download_url" -o "$target_path"
+  run_root chmod 0755 "$target_path"
+  echo "✓ cloudflared installed"
+}
+
+wait_for_cloudflared_url() {
+  local service_name="$1"
+  local attempts=0
+  local url=""
+
+  echo "Waiting for Cloudflare Tunnel URL..."
+  while [ "$attempts" -lt 45 ]; do
+    url="$(journalctl -u "${service_name}.service" --no-pager -n 100 2>/dev/null | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -1 || true)"
+    if [ -n "$url" ]; then
+      echo "$url"
+      return 0
+    fi
+    sleep 1
+    attempts=$((attempts + 1))
+  done
+
+  echo "Could not find a Cloudflare Tunnel URL in the service logs." >&2
+  return 1
+}
+
+setup_cloudflared_service() {
+  local http_port="$1"
+  local service_name="pvtkrrx-tunnel"
+  local unit_path="/etc/systemd/system/${service_name}.service"
+  local binary_path
+
+  binary_path="$(command -v cloudflared || echo /usr/local/bin/cloudflared)"
+  if [ ! -x "$binary_path" ]; then
+    echo "cloudflared binary not found at $binary_path" >&2
+    exit 1
+  fi
+
+  if [ -f "$unit_path" ] && systemctl is-active --quiet "$service_name" 2>/dev/null; then
+    echo "✓ Cloudflare Tunnel service already running"
+  else
+    cat > /tmp/pvtkrrx-tunnel.service << EOF
+[Unit]
+Description=PVTKRRX Cloudflare Tunnel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=$binary_path tunnel --url http://localhost:${http_port} --no-autoupdate
+Restart=always
+RestartSec=10
+KillSignal=SIGINT
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
+EOF
+    run_root install -m 0644 /tmp/pvtkrrx-tunnel.service "$unit_path"
+    rm -f /tmp/pvtkrrx-tunnel.service
+    run_root systemctl daemon-reload
+    run_root systemctl enable "$service_name"
+    run_root systemctl restart "$service_name"
+  fi
+
+  local public_url
+  public_url="$(wait_for_cloudflared_url "$service_name")"
+  export PVTKRRX_PUBLIC_BASE_URL="$public_url"
+  echo "✓ Tunnel URL: $public_url"
 }
 
 # ─── qBittorrent ────────────────────────────────────────────────────
@@ -373,40 +465,49 @@ main() {
   ensure_base_tools
   local arch; arch="$(detect_arch)"
 
-  # ── Step 1: qBittorrent ──
+  # ── Step 1: Cloudflare Tunnel ──
   echo ""
-  echo "── Step 1/5: qBittorrent ──"
+  echo "── Step 1/6: Cloudflare Tunnel ──"
+  install_cloudflared
+  setup_cloudflared_service "$PVTKRRX_HTTP_PORT"
+
+  # ── Step 2: qBittorrent ──
+  echo ""
+  echo "── Step 2/6: qBittorrent ──"
   install_qbittorrent
   setup_qbittorrent_service
 
-  # ── Step 2: Prowlarr ──
+  # ── Step 3: Prowlarr ──
   echo ""
-  echo "── Step 2/5: Prowlarr ──"
+  echo "── Step 3/6: Prowlarr ──"
   install_prowlarr
   setup_prowlarr_service
 
-  # ── Step 3: Node.js ──
+  # ── Step 4: Node.js ──
   echo ""
-  echo "── Step 3/5: Node.js runtime ──"
+  echo "── Step 4/6: Node.js runtime ──"
   local node_bin; node_bin="$(download_node "$arch")"
   echo "✓ Node.js ready at $node_bin"
 
-  # ── Step 4: PVTKRRX source + deps ──
+  # ── Step 5: PVTKRRX source + deps ──
   echo ""
-  echo "── Step 4/5: PVTKRRX application ──"
+  echo "── Step 5/6: PVTKRRX application ──"
   sync_repo
 
   local node_dir="$INSTALL_DIR/.node/node-v${NODE_VERSION}-linux-${arch}"
   export PATH="${node_dir}/bin:$PATH"
   export PVTKRRX_NODE_PATH="$node_bin"
   export PVTKRRX_SERVICE_USER="$SERVICE_USER_DEFAULT"
+  export PORT="$PVTKRRX_HTTP_PORT"
+  export HTTPS_PORT="$PVTKRRX_HTTPS_PORT"
+  export PVTKRRX_PUBLIC_BASE_URL="${PVTKRRX_PUBLIC_BASE_URL:-}"
 
   echo "Installing production dependencies..."
   run_root env "PATH=${node_dir}/bin:$PATH" "${node_dir}/bin/npm" install --omit=dev --prefix "$INSTALL_DIR" 2>&1 | tail -3
 
-  # ── Step 5: Auto-configure PVTKRRX ──
+  # ── Step 6: Auto-configure PVTKRRX ──
   echo ""
-  echo "── Step 5/5: Auto-configuring PVTKRRX ──"
+  echo "── Step 6/6: Auto-configuring PVTKRRX ──"
 
   # Export detection hints for the Node installer
   export PVTKRRX_PROWLARR_DATA="$PROWLARR_DATA"

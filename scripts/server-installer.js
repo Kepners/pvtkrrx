@@ -191,6 +191,17 @@ function commandExists(command) {
   return probe.status === 0
 }
 
+function resolveCommandPath(command) {
+  const probe = process.platform === 'win32'
+    ? spawnSync('where', [command], { encoding: 'utf8' })
+    : spawnSync('which', [command], { encoding: 'utf8' })
+  if (probe.status !== 0) return ''
+  return String(probe.stdout || '')
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .find(Boolean) || ''
+}
+
 function runAsRoot(command, args, options = {}) {
   const execOptions = {
     stdio: options.stdio || 'inherit',
@@ -207,6 +218,140 @@ function runAsRoot(command, args, options = {}) {
   }
 
   execFileSync('sudo', [command, ...args], execOptions)
+}
+
+function normalizeArchForCloudflared() {
+  switch (process.arch) {
+    case 'x64':
+      return 'amd64'
+    case 'arm64':
+      return 'arm64'
+    default:
+      throw new Error(`Unsupported architecture for cloudflared: ${process.arch}`)
+  }
+}
+
+async function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+function readCloudflaredTunnelUrl(serviceName) {
+  const result = spawnSync('journalctl', [
+    '-u',
+    `${serviceName}.service`,
+    '--no-pager',
+    '-n',
+    '100'
+  ], {
+    encoding: 'utf8'
+  })
+  const text = `${result.stdout || ''}\n${result.stderr || ''}`
+  const matches = text.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/gi) || []
+  return matches.length ? matches[matches.length - 1] : ''
+}
+
+function installCloudflaredBinary(repoRoot) {
+  const existingBinary = resolveCommandPath('cloudflared')
+  if (existingBinary) {
+    return existingBinary
+  }
+
+  if (!commandExists('curl')) {
+    throw new Error('curl is required to install cloudflared')
+  }
+
+  const arch = normalizeArchForCloudflared()
+  const downloadUrl = `https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${arch}`
+  const targetPath = '/usr/local/bin/cloudflared'
+
+  console.log('Downloading cloudflared...')
+  runAsRoot('mkdir', ['-p', '/usr/local/bin'], { cwd: repoRoot })
+  runAsRoot('curl', ['-fsSL', downloadUrl, '-o', targetPath], { cwd: repoRoot })
+  runAsRoot('chmod', ['0755', targetPath], { cwd: repoRoot })
+  console.log('✓ cloudflared installed')
+
+  return targetPath
+}
+
+async function ensureCloudflaredTunnel(repoRoot, httpPort, existingPublicBaseUrl) {
+  const configuredBase = normalizeBaseUrl(existingPublicBaseUrl || '')
+  if (process.platform !== 'linux') {
+    return {
+      installed: false,
+      publicBaseUrl: configuredBase,
+      serviceName: '',
+      unitPath: '',
+      binaryPath: resolveCommandPath('cloudflared') || ''
+    }
+  }
+
+  const binaryPath = installCloudflaredBinary(repoRoot)
+  if (configuredBase) {
+    return {
+      installed: true,
+      publicBaseUrl: configuredBase,
+      serviceName: '',
+      unitPath: '',
+      binaryPath
+    }
+  }
+
+  const serviceName = 'pvtkrrx-tunnel'
+  const unitPath = `/etc/systemd/system/${serviceName}.service`
+  const activeServiceProbe = spawnSync('systemctl', ['is-active', '--quiet', `${serviceName}.service`], { stdio: 'ignore' })
+
+  if (activeServiceProbe.status !== 0) {
+    const unitBody = `[Unit]
+Description=PVTKRRX Cloudflare Tunnel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=${binaryPath} tunnel --url http://localhost:${httpPort} --no-autoupdate
+Restart=always
+RestartSec=10
+KillSignal=SIGINT
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
+`
+
+    const tempPath = path.join(os.tmpdir(), `${serviceName}.service`)
+    fs.writeFileSync(tempPath, unitBody, 'utf8')
+    try {
+      runAsRoot('install', ['-m', '0644', tempPath, unitPath], { cwd: repoRoot })
+      runAsRoot('systemctl', ['daemon-reload'], { cwd: repoRoot })
+      runAsRoot('systemctl', ['enable', `${serviceName}.service`], { cwd: repoRoot })
+      runAsRoot('systemctl', ['restart', `${serviceName}.service`], { cwd: repoRoot })
+    } finally {
+      try {
+        fs.unlinkSync(tempPath)
+      } catch (_) {}
+    }
+  }
+
+  console.log('Waiting for Cloudflare Tunnel URL...')
+  let publicBaseUrl = ''
+  for (let attempts = 0; attempts < 45; attempts += 1) {
+    publicBaseUrl = readCloudflaredTunnelUrl(serviceName)
+    if (publicBaseUrl) break
+    await sleep(1000)
+  }
+
+  if (!publicBaseUrl) {
+    throw new Error('Cloudflare Tunnel started, but the public URL was not found in the service logs')
+  }
+
+  console.log(`✓ Tunnel URL: ${publicBaseUrl}`)
+  return {
+    installed: true,
+    publicBaseUrl,
+    serviceName,
+    unitPath,
+    binaryPath
+  }
 }
 
 function lookupUserGroup(user) {
@@ -600,6 +745,14 @@ async function runAuto() {
   const httpPort = Number.parseInt(String(mergedEnv.PORT || '7000').trim(), 10) || 7000
   const httpsPort = Number.parseInt(String(mergedEnv.HTTPS_PORT || '7001').trim(), 10) || 7001
   const existingPublicBaseUrl = normalizeBaseUrl(mergedEnv.PVTKRRX_PUBLIC_BASE_URL || '')
+  let publicBaseUrl = existingPublicBaseUrl
+
+  if (process.platform === 'linux') {
+    const tunnelResult = await ensureCloudflaredTunnel(repoRoot, httpPort, publicBaseUrl)
+    if (tunnelResult && tunnelResult.publicBaseUrl) {
+      publicBaseUrl = normalizeBaseUrl(tunnelResult.publicBaseUrl)
+    }
+  }
 
   console.log('PVTKRRX auto-configuration')
   console.log('')
@@ -638,7 +791,7 @@ async function runAuto() {
   // ── Write .env ──
   const allowedWebOrigins = normalizeOriginList(
     String(mergedEnv.PVTKRRX_ALLOWED_WEB_ORIGINS || '').trim() ||
-    buildDefaultAllowedOrigins(existingPublicBaseUrl, httpPort, httpsPort)
+    buildDefaultAllowedOrigins(publicBaseUrl, httpPort, httpsPort)
   )
 
   updateDotEnvFile(envPath, {
@@ -646,7 +799,7 @@ async function runAuto() {
     AUTH_TOKEN_SECRET: authTokenSecret,
     PVTKRRX_SELF_HOST_MODE: 'true',
     PVTKRRX_RUNTIME_DIR: defaultRuntimeDir,
-    PVTKRRX_PUBLIC_BASE_URL: existingPublicBaseUrl,
+    PVTKRRX_PUBLIC_BASE_URL: publicBaseUrl,
     PVTKRRX_ALLOWED_WEB_ORIGINS: allowedWebOrigins,
     PORT: String(httpPort),
     HTTPS_PORT: String(httpsPort)
@@ -657,6 +810,7 @@ async function runAuto() {
   process.env.AUTH_TOKEN_SECRET = authTokenSecret
   process.env.PVTKRRX_SELF_HOST_MODE = 'true'
   process.env.PVTKRRX_RUNTIME_DIR = defaultRuntimeDir
+  process.env.PVTKRRX_PUBLIC_BASE_URL = publicBaseUrl
   process.env.PORT = String(httpPort)
   process.env.HTTPS_PORT = String(httpsPort)
 
@@ -713,7 +867,7 @@ async function runAuto() {
     }
   }
 
-  const displayOrigin = deriveDisplayOrigin(existingPublicBaseUrl, httpPort)
+  const displayOrigin = deriveDisplayOrigin(publicBaseUrl, httpPort)
   console.log('')
   console.log('─── Summary ───')
   console.log(`Prowlarr:    ${jackettUrl}`)
@@ -722,8 +876,8 @@ async function runAuto() {
   console.log(`Manifest:    ${displayOrigin}/selfhost/manifest.json?mode=hosted`)
   console.log(`HTTP port:   ${httpPort}`)
   console.log(`Node binary: ${bundledNodePath}`)
-  if (existingPublicBaseUrl) {
-    console.log(`Public URL:  ${existingPublicBaseUrl}`)
+  if (publicBaseUrl) {
+    console.log(`Public URL:  ${publicBaseUrl}`)
   } else {
     console.log('Public URL:  not set (add PVTKRRX_PUBLIC_BASE_URL to .env for Stremio HTTPS installs)')
   }
