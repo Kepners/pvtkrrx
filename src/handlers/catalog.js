@@ -448,6 +448,30 @@ function sportsEventKey(input) {
   return unique.join(' ')
 }
 
+function canonicalizeSportsMatchupOrder(parsedSportsEvent, query = '') {
+  if (!parsedSportsEvent?.homeTeam || !parsedSportsEvent?.awayTeam) return parsedSportsEvent
+
+  const homeTeam = String(parsedSportsEvent.homeTeam || '').trim()
+  const awayTeam = String(parsedSportsEvent.awayTeam || '').trim()
+  if (!homeTeam || !awayTeam) return parsedSportsEvent
+
+  const homeRelevance = relevanceScore(homeTeam, query)
+  const awayRelevance = relevanceScore(awayTeam, query)
+  if (homeRelevance !== awayRelevance) {
+    return homeRelevance > awayRelevance
+      ? parsedSportsEvent
+      : { ...parsedSportsEvent, homeTeam: awayTeam, awayTeam: homeTeam }
+  }
+
+  const orderedTeams = [homeTeam, awayTeam].sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))
+  if (orderedTeams[0] === homeTeam && orderedTeams[1] === awayTeam) return parsedSportsEvent
+  return {
+    ...parsedSportsEvent,
+    homeTeam: orderedTeams[0],
+    awayTeam: orderedTeams[1]
+  }
+}
+
 function getSportsVariantTag(title) {
   const t = String(title || '').toLowerCase()
   if (/\bearly[\s.\-_]*prelims?\b/.test(t)) return 'early-prelims'
@@ -461,9 +485,10 @@ function groupSportsItems(items, query = '') {
   for (const item of items || []) {
     // Reuse pre-computed parsedSportsEvent, parsedEvent, and mappedLeague from normalization step
     const parsedSportsEvent = item?.parsedSportsEvent || null
+    const displaySportsEvent = canonicalizeSportsMatchupOrder(parsedSportsEvent, query)
     const parsedEvent = item?.parsedEvent || null
     const itemMappedLeague = item?.mappedLeague || ''
-    const display = normalizeSportsEventTitle(item.title, parsedSportsEvent, parsedEvent) || cleanTitle(item.title) || String(item.title || '').trim()
+    const display = normalizeSportsEventTitle(item.title, displaySportsEvent, parsedEvent) || cleanTitle(item.title) || String(item.title || '').trim()
     if (!display) continue
     const baseKey = sportsEventKey({ title: item.title, parsedSportsEvent, parsedEvent })
     const hasStructuredKey = (parsedSportsEvent?.league && parsedSportsEvent?.date && parsedSportsEvent?.homeTeam && parsedSportsEvent?.awayTeam) ||
@@ -479,6 +504,7 @@ function groupSportsItems(items, query = '') {
         best: item,
         count: 1,
         parsedSportsEvent,
+        displaySportsEvent,
         parsedEvent,
         mappedLeague: itemMappedLeague
       })
@@ -487,6 +513,7 @@ function groupSportsItems(items, query = '') {
     current.count += 1
     if (!current.parsedSportsEvent && parsedSportsEvent) {
       current.parsedSportsEvent = parsedSportsEvent
+      current.displaySportsEvent = current.displaySportsEvent || displaySportsEvent
       current.mappedLeague = itemMappedLeague || current.mappedLeague
     }
     if (!current.parsedEvent && parsedEvent) {
@@ -498,6 +525,7 @@ function groupSportsItems(items, query = '') {
       current.display = display || current.display
       if (parsedSportsEvent) {
         current.parsedSportsEvent = parsedSportsEvent
+        current.displaySportsEvent = displaySportsEvent
         current.mappedLeague = itemMappedLeague || current.mappedLeague
       }
       if (parsedEvent) {
@@ -734,10 +762,11 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
   const metas = await mapLimit(pageGroups, 6, async (group, index) => {
     const item = group.best
     const parsedSportsEvent = group.parsedSportsEvent || item.parsedSportsEvent || null
+    const displaySportsEvent = group.displaySportsEvent || parsedSportsEvent || null
     const parsedEvent = group.parsedEvent || item.parsedEvent || null
-    const effectiveLeagueCode = parsedSportsEvent?.league || parsedEvent?.league || ''
+    const effectiveLeagueCode = parsedSportsEvent?.league || displaySportsEvent?.league || parsedEvent?.league || ''
     const mappedLeague = group.mappedLeague || item.mappedLeague || mapLeague(effectiveLeagueCode) || ''
-    const displayTitle = group.display || normalizeSportsEventTitle(item.title, parsedSportsEvent, parsedEvent) || cleanTitle(item.title) || item.title
+    const displayTitle = group.display || normalizeSportsEventTitle(item.title, displaySportsEvent, parsedEvent) || cleanTitle(item.title) || item.title
     const resolvedSportHint = resolveSportHint({
       explicitHint: effectiveLeagueCode ? (sportHintFromLeagueCode(effectiveLeagueCode) || item?.sportHint) : item?.sportHint,
       categoryHint: requestedSportHint,
@@ -784,8 +813,8 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       sportHint: resolvedSportHint,
       league,
       eventName: parsedEvent?.eventName || sportsArtwork?.eventName || '',
-      homeTeam: parsedSportsEvent?.homeTeam || sportsArtwork?.homeTeam || '',
-      awayTeam: parsedSportsEvent?.awayTeam || sportsArtwork?.awayTeam || '',
+      homeTeam: displaySportsEvent?.homeTeam || sportsArtwork?.homeTeam || '',
+      awayTeam: displaySportsEvent?.awayTeam || sportsArtwork?.awayTeam || '',
       sportsArtwork
     }
     const generatedPosterUrl = makeSportsPosterUrl(options.baseUrl, {
@@ -815,8 +844,8 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
         g: league,
         r: resolvedSportHint,
         u: parsedSportsEvent?.league || parsedEvent?.league || '',
-        o: parsedSportsEvent?.homeTeam || '',
-        w: parsedSportsEvent?.awayTeam || '',
+        o: displaySportsEvent?.homeTeam || '',
+        w: displaySportsEvent?.awayTeam || '',
         v: String(sportsArtwork?.eventId || '').trim()
       }, {
         compress: true,

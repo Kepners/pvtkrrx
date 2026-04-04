@@ -210,15 +210,15 @@ async function run() {
     assert.equal(configureRes.status, 200, 'GET /configure should return 200')
     const csrf = readCsrf(configureRes.headers.get('set-cookie'))
     const configureHtml = await configureRes.text()
-    assert.match(configureHtml, /<h2>LAN Bridge Quick Setup<\/h2>/, 'configure page should render LAN quick setup section')
+    assert.match(configureHtml, /<h2>Hybrid Home Quick Setup<\/h2>/, 'configure page should render Hybrid Home quick setup section')
     assert.match(configureHtml, /<h2>Addon URL<\/h2>/, 'configure page should render addon url section')
     assert.match(configureHtml, /id="installActionBtn"/, 'configure page should render install action button')
     assert.match(configureHtml, /Copy Addon URL/, 'configure page should render a primary addon url copy action')
-    assert.match(configureHtml, /Copy Stremio Install Link/, 'configure page should render a dedicated Stremio install link copy action for LAN Bridge')
-    assert.match(configureHtml, /primary install link should start with stremio:\/\//i, 'configure page should explain that the primary LAN Bridge install link must start with stremio://')
+    assert.match(configureHtml, /Copy Stremio Install Link/, 'configure page should render a dedicated Stremio install link copy action for Hybrid Home')
+    assert.match(configureHtml, /primary install link should start with stremio:\/\//i, 'configure page should explain that the primary Hybrid Home install link must start with stremio://')
     assert.match(configureHtml, /Copy PC Local URL/, 'configure page should render same-PC local install action')
     assert.match(configureHtml, /testConnection\(\)/, 'configure page should expose test connection action')
-    assert.match(configureHtml, /Auto Setup \(Home LAN\)/, 'configure page should render auto setup action')
+    assert.match(configureHtml, /Auto Setup Hybrid Home/, 'configure page should render auto setup action')
     assert.match(configureHtml, /id="quickInstallLanBtn"/, 'configure page should render quick install button')
     assert.match(configureHtml, /auth\/stremio\/local-status/, 'configure page should check local Stremio status')
     assert.match(configureHtml, /id="qbitRuntimeStatus"/, 'configure page should render live qBittorrent runtime status')
@@ -411,7 +411,11 @@ async function run() {
     const localLanTokenRes = await fetch(`${base}/local/lan-token`, {
       method: 'POST',
       headers: withCsrf(csrf, { 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ pairId: expectedLinkedPairId })
+      body: JSON.stringify({
+        pairId: expectedLinkedPairId,
+        routeProfile: 'hybrid',
+        lanPairRequired: false
+      })
     })
     assert.equal(localLanTokenRes.status, 200, 'local lan token helper should return 200')
     const localLanTokenPayload = await localLanTokenRes.json()
@@ -425,8 +429,11 @@ async function run() {
     assert.equal(String(relayEncryptPayload.qbitUsername || ''), sampleConfig.qbitUsername, 'relay mint should include saved qBit username from local config')
     assert.equal(String(relayEncryptPayload.qbitPassword || ''), sampleConfig.qbitPassword, 'relay mint should include saved qBit password from local config')
     assert.equal(String(relayEncryptPayload.lanPairRelayUrl || ''), relayBase, 'relay mint should target the configured relay')
+    assert.equal(String(relayEncryptPayload.routeProfile || ''), 'hybrid', 'relay mint should request the hybrid hosted profile')
+    assert.equal(relayEncryptPayload.lanPairRequired, false, 'relay mint should keep hybrid LAN fallback optional')
     assert.throws(() => decrypt(localLanTokenPayload.token, LOCAL_SMOKE_SECRET), 'LAN Bridge token should no longer be encrypted with the local runtime secret')
     const lanBridgeTokenConfig = decrypt(localLanTokenPayload.token, RELAY_SMOKE_SECRET)
+    assert.equal(String(lanBridgeTokenConfig.routeProfile || ''), 'hybrid', 'local hosted token should use the hybrid route profile')
     assert.equal(String(lanBridgeTokenConfig.lanPairId || ''), expectedLinkedPairId, 'LAN Bridge token should retain pair id')
     assert.equal(Boolean(String(lanBridgeTokenConfig.lanPairKey || '').trim()), true, 'LAN Bridge token should retain pair key')
     assert.equal(String(lanBridgeTokenConfig.localHostname || ''), 'pvtkrrx.local', 'LAN Bridge token should retain local hostname for the paired host')

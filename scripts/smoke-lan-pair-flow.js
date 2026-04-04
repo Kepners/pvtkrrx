@@ -9,6 +9,7 @@ const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-lan-pair-'))
 process.env.PVTKRRX_RUNTIME_DIR = runtimeDir
 
 const app = require('../index')
+const { lanPairStore, hashPairKey } = require('../src/lib/shared')
 const { encodePlaybackStateToken, decodePlaybackStateToken } = require('../src/utils/opaqueState')
 const pairStorePath = path.join(runtimeDir, 'lan-pair-store.json')
 
@@ -229,6 +230,29 @@ async function run() {
       `${endpointBaseUrl}/local/catalog/movie/pvtkrrx-movies.json?mode=local`
     )
 
+    const hostedManifestRes = await fetch(`${base}/${hostedToken}/manifest.json?mode=hosted`)
+    assert.equal(hostedManifestRes.status, 200, 'legacy LAN manifest should resolve')
+    const hostedManifest = await hostedManifestRes.json()
+    assert.equal(hostedManifest?.id, 'com.kepners.pvtkrrx.lan', 'legacy LAN token should keep LAN manifest id')
+
+    const legacyImplicitHostedConfig = {
+      ...hostedConfig
+    }
+    delete legacyImplicitHostedConfig.lanPairEnabled
+    delete legacyImplicitHostedConfig.lanPairRequired
+    const legacyImplicitEncryptRes = await fetch(`${base}/encrypt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(legacyImplicitHostedConfig)
+    })
+    assert.equal(legacyImplicitEncryptRes.status, 200, 'legacy LAN token without explicit pair booleans should still encrypt')
+    const legacyImplicitPayload = await legacyImplicitEncryptRes.json()
+    const legacyImplicitToken = encodeURIComponent(String(legacyImplicitPayload?.token || ''))
+    const legacyImplicitManifestRes = await fetch(`${base}/${legacyImplicitToken}/manifest.json?mode=hosted`)
+    assert.equal(legacyImplicitManifestRes.status, 200, 'legacy LAN manifest without explicit pair booleans should resolve')
+    const legacyImplicitManifest = await legacyImplicitManifestRes.json()
+    assert.equal(legacyImplicitManifest?.id, 'com.kepners.pvtkrrx.lan', 'legacy LAN token without explicit pair booleans should still resolve as LAN')
+
     // Wrong key in token should fail closed when LAN pair is required.
     const badHostedConfig = {
       ...hostedConfig,
@@ -290,6 +314,59 @@ async function run() {
     assert.equal(missingPairCatalog.status, 200, 'missing-heartbeat pair should return offline fallback')
     assert.equal(String(missingPairCatalog.headers['x-pvtkrrx-lan-pair'] || ''), 'offline')
     assert.deepEqual(missingPairCatalog.json, { metas: [], cacheMaxAge: 0 })
+
+    const hybridPairId = 'hybridpair99'
+    const hybridPairKey = 'HYBRIDPAIRKEYABCDEFGHIJKLMNOP'
+    const hybridOwnerId = 'hybridownerABCDEFGHIJKLMNOP'
+    await lanPairStore.set(hybridPairId, {
+      pairId: hybridPairId,
+      keyHash: hashPairKey(hybridPairKey),
+      ownerHash: hashPairKey(hybridOwnerId),
+      clientIpHash: 'nonmatching-network-hash',
+      endpoints: [
+        { baseUrl: endpointBaseUrl, source: 'lan-ip' }
+      ],
+      localHostname: 'pvtkrrx.local',
+      relayUrl: base,
+      appVersion: 'smoke',
+      updatedAt: Date.now(),
+      expiresAt: Date.now() + 60_000
+    }, 3600)
+
+    const hybridConfig = {
+      ...hostedConfig,
+      lanPairRequired: false,
+      routeProfile: 'hybrid',
+      lanPairId: hybridPairId,
+      lanPairKey: hybridPairKey,
+      fileServerUrl: 'https://files.seedbox.example'
+    }
+    const encryptHybridRes = await fetch(`${base}/encrypt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(hybridConfig)
+    })
+    assert.equal(encryptHybridRes.status, 200, 'hybrid /encrypt should succeed')
+    const hybridPayload = await encryptHybridRes.json()
+    const hybridToken = encodeURIComponent(String(hybridPayload?.token || ''))
+
+    const hybridManifestRes = await fetch(`${base}/${hybridToken}/manifest.json?mode=hosted`)
+    assert.equal(hybridManifestRes.status, 200, 'hybrid manifest should resolve')
+    const hybridManifest = await hybridManifestRes.json()
+    assert.equal(hybridManifest?.id, 'com.kepners.pvtkrrx.hybrid', 'hybrid token should use dedicated hybrid manifest id')
+
+    const hybridCatalog = await requestWithHostHeader(
+      port,
+      `/${hybridToken}/catalog/movie/pvtkrrx-movies.json`,
+      `tv.device.example:${port}`
+    )
+    assert.equal(hybridCatalog.status, 200, 'hybrid catalog should fall through to hosted/cloud')
+    assert.equal(String(hybridCatalog.headers['x-pvtkrrx-lan-pair'] || ''), 'fallback')
+    assert.equal(String(hybridCatalog.headers['x-pvtkrrx-route-decision'] || ''), 'cloud')
+    assert.ok(
+      hybridCatalog.json?.metas || hybridCatalog.json?.error || hybridCatalog.text,
+      'hybrid cloud fallback should produce a non-empty HTTP response'
+    )
 
     const localConfigRes = await fetch(`${base}/local-config`, {
       method: 'POST',

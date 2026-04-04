@@ -1757,7 +1757,7 @@
 
     <div class="card">
       <h2>Install Target</h2>
-      <p class="section-lead" id="installTargetLead">Pick where you want to watch. PC Local is the real addon for this Windows machine. LAN Bridge is the home-network route for your phone, TV, web, and Apple TV.</p>
+      <p class="section-lead" id="installTargetLead">Pick where you want to watch. PC Local is the real addon for this Windows machine. Hybrid Home is the main synced route for your phone, TV, web, and Apple TV.</p>
       <div class="mode-grid target-count-3" id="installTargetSwitcher">
         <button type="button" class="mode-option" data-install-target="pc" onclick="setInstallTarget('pc')">
           <span class="mode-kicker">Desktop only</span>
@@ -1770,13 +1770,13 @@
           </div>
         </button>
         <button type="button" class="mode-option active" data-install-target="lan" onclick="setInstallTarget('lan')">
-          <span class="mode-kicker">Home network sync</span>
-          <span class="mode-title">LAN Bridge</span>
-          <span class="mode-copy">Use this when the Windows host stays online and you want one PVTKRRX addon across home devices.</span>
+          <span class="mode-kicker">Home + away sync</span>
+          <span class="mode-title">Hybrid Home</span>
+          <span class="mode-copy">Use one hosted addon on the same Stremio account. It uses the Windows host on your home network, then falls back to cloud playback away from home.</span>
           <div class="summary-points">
-            <span>Hosted install with LAN redirect</span>
-            <span>Same-account sync for home devices</span>
-            <span>Auto Setup checks signed-in Stremio here</span>
+            <span>LAN redirect at home</span>
+            <span>Cloud fallback away from home</span>
+            <span>Same-account sync across devices</span>
           </div>
         </button>
         <button type="button" class="mode-option" data-install-target="seedbox" onclick="setInstallTarget('seedbox')">
@@ -1793,11 +1793,11 @@
       <div class="hidden-select">
         <label for="installMode">Internal profile mode</label>
         <select id="installMode">
-          <option value="local">PC Local + LAN Bridge</option>
+          <option value="local">PC Local + Hybrid Home</option>
           <option value="hosted">Remote Seedbox</option>
         </select>
       </div>
-      <p class="hint" id="installModeHint">LAN Bridge selected. This is the normal home setup. The app checks Stremio on this Windows PC, reuses the signed-in Stremio account when possible, then prepares the addon install for your home devices.</p>
+      <p class="hint" id="installModeHint">Hybrid Home selected. This is the main synced setup. The app checks Stremio on this Windows PC, reuses the signed-in Stremio account when possible, then prepares one hosted addon for home and away use.</p>
     </div>
 
     <div class="card" id="simpleFlowCard">
@@ -1805,9 +1805,9 @@
       <p class="section-lead" id="simpleFlowLead">Pick a route above. PVTKRRX will keep the main install path short and leave fallback tools hidden unless you need them.</p>
       <div class="simple-flow-grid">
         <section class="simple-flow-panel">
-          <div class="simple-flow-kicker" id="simpleFlowKicker">Home route</div>
-          <div class="simple-flow-title" id="simpleFlowTitle">LAN Bridge</div>
-          <p class="simple-flow-copy" id="simpleFlowCopy">Sign in to Stremio on this Windows PC first. PVTKRRX then checks the local Stremio session, prepares the right URLs, and keeps the noisy manual tools hidden below.</p>
+          <div class="simple-flow-kicker" id="simpleFlowKicker">Unified hosted route</div>
+          <div class="simple-flow-title" id="simpleFlowTitle">Hybrid Home</div>
+          <p class="simple-flow-copy" id="simpleFlowCopy">Sign in to Stremio on this Windows PC first. PVTKRRX checks the local Stremio session, keeps the host pairing alive for home use, and prepares one hosted install link for the whole account.</p>
           <div class="simple-flow-status info" id="simpleFlowStatus">Checking this PC so the simple install path can stay short.</div>
           <div class="simple-flow-actions">
             <button class="btn-copy" type="button" id="simpleCheckStremioBtn" onclick="checkAndLinkStremioOnThisPc(this)">Check Stremio Login On This PC</button>
@@ -1832,15 +1832,15 @@
       </summary>
       <div class="advanced-shell-body">
         <div class="advanced-tabs" role="tablist" aria-label="Advanced setup tabs">
-          <button type="button" class="advanced-tab" data-advanced-tab="checklist" data-advanced-visible="lan" onclick="setAdvancedTab('checklist')">LAN Checklist</button>
+          <button type="button" class="advanced-tab" data-advanced-tab="checklist" data-advanced-visible="lan" onclick="setAdvancedTab('checklist')">Hybrid Checklist</button>
           <button type="button" class="advanced-tab active" data-advanced-tab="connections" onclick="setAdvancedTab('connections')">Connections</button>
           <button type="button" class="advanced-tab" data-advanced-tab="manual" onclick="setAdvancedTab('manual')">Manual URLs</button>
         </div>
 
         <div class="advanced-panel" id="advancedPanel-checklist" data-advanced-visible="lan">
           <div class="card mode-hidden" id="accountLinkCard">
-      <h2>LAN Bridge Quick Setup</h2>
-      <p class="section-lead" id="quickSetupLead">Follow the glow. Only the next required button pulses. When all three steps are green, install or refresh LAN Bridge in Stremio for your other home devices. On this Windows PC itself, browse with PC Local.</p>
+      <h2>Hybrid Home Quick Setup</h2>
+      <p class="section-lead" id="quickSetupLead">Follow the glow. Only the next required button pulses. When all three steps are green, install or refresh Hybrid Home in Stremio for your other home devices. On this Windows PC itself, browse with PC Local.</p>
       <div class="quick-setup-grid">
         <section class="quick-step" id="quickStepStremioDesktop">
           <div class="quick-step-head">
@@ -1865,7 +1865,7 @@
             </div>
             <span class="quick-step-badge" id="authLinkBadge">Checking</span>
           </div>
-          <p class="quick-step-copy" id="authLinkMeta">Checking whether the signed-in Stremio session on this PC can be reused for LAN Bridge sync.</p>
+          <p class="quick-step-copy" id="authLinkMeta">Checking whether the signed-in Stremio session on this PC can be reused for Hybrid Home sync.</p>
           <div class="quick-step-actions">
             <button class="btn-copy" type="button" id="stremioQuickAutoBtn" onclick="launchStremioAuthKeyHelper(this)">Auto Find AuthKey</button>
             <button class="btn-copy" type="button" id="stremioManualToolsBtn" onclick="openManualAccountTools()">Open Advanced Fallback Tools</button>
@@ -1880,20 +1880,20 @@
             </div>
             <span class="quick-step-badge" id="lanInstallBadge">Waiting</span>
           </div>
-          <p class="quick-step-copy" id="lanInstallMeta">Run Auto Setup once. When this step turns ready, install or refresh LAN Bridge in Stremio for your other home devices. On this Windows PC itself, use PC Local.</p>
+          <p class="quick-step-copy" id="lanInstallMeta">Run Auto Setup once. When this step turns ready, install or refresh Hybrid Home in Stremio for your other home devices. On this Windows PC itself, use PC Local.</p>
           <div class="quick-step-actions">
-            <button class="btn-test" type="button" id="lanAutoSetupBtn" onclick="autoSetup()">Auto Setup (Home LAN)</button>
-            <button class="btn-install" type="button" id="quickInstallLanBtn" onclick="triggerLanInstall()" disabled>Install Or Refresh LAN Bridge In Stremio</button>
+            <button class="btn-test" type="button" id="lanAutoSetupBtn" onclick="autoSetup()">Auto Setup Hybrid Home</button>
+            <button class="btn-install" type="button" id="quickInstallLanBtn" onclick="triggerLanInstall()" disabled>Install Or Refresh Hybrid Home In Stremio</button>
           </div>
           <div class="quick-addon-url">
             <div class="install-section-title">Primary Stremio Install Link</div>
             <div class="url-row">
-              <input type="text" id="quickAddonUrlValue" readonly placeholder="Run Auto Setup first to generate the stremio:// LAN Bridge install link">
+              <input type="text" id="quickAddonUrlValue" readonly placeholder="Run Auto Setup first to generate the stremio:// Hybrid Home install link">
               <button class="btn-copy" type="button" id="quickCopyAddonUrlBtn" onclick="copyCurrentQuickInstallUrl(this)">Copy Stremio Install Link</button>
             </div>
             <p class="quick-step-note" id="quickAddonUrlNote">This primary install link should start with stremio://. Only use the HTTPS addon URL below if Stremio explicitly asks for Add Addon URL.</p>
           </div>
-          <p class="quick-step-note" id="quickSetupHint">Auto Setup also checks Prowlarr, qBittorrent, local storage, and the signed-in Stremio session on this PC. If Stremio already has an older LAN Bridge URL, clicking Install again refreshes it for your other home devices. On this Windows PC itself, use Copy PC Local URL below.</p>
+          <p class="quick-step-note" id="quickSetupHint">Auto Setup also checks Prowlarr, qBittorrent, local storage, and the signed-in Stremio session on this PC. If Stremio already has an older Hybrid Home URL, clicking Install again refreshes it for your other home devices. On this Windows PC itself, use Copy PC Local URL below.</p>
         </section>
       </div>
       <div id="autoStatus" class="status"></div>
@@ -1942,7 +1942,7 @@
           </div>
         </div>
       </details>
-      <p class="hint" id="accountSyncModeHint">LAN Bridge is the addon that should sync to your phone, TV, and web clients on the same Stremio account. This Windows PC itself should use PC Local for browsing and playback. Manual tools are only here as fallback.</p>
+      <p class="hint" id="accountSyncModeHint">Hybrid Home is the addon that should sync to your phone, TV, and web clients on the same Stremio account. This Windows PC itself should use PC Local for browsing and playback. Manual tools are only here as fallback.</p>
           </div>
         </div>
 
@@ -1954,7 +1954,7 @@
         <button type="button" class="service-tab active" data-service-tab="prowlarr" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('prowlarr')">Prowlarr</button>
         <button type="button" class="service-tab" data-service-tab="qbit" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('qbit')">qBittorrent</button>
         <button type="button" class="service-tab" data-service-tab="storage" data-service-visible="pc lan" onclick="setActiveServiceTab('storage')">Storage</button>
-        <button type="button" class="service-tab mode-hidden" data-service-tab="files" data-service-visible="seedbox" onclick="setActiveServiceTab('files')">File Server</button>
+        <button type="button" class="service-tab mode-hidden" data-service-tab="files" data-service-visible="lan seedbox" onclick="setActiveServiceTab('files')">File Server</button>
         <button type="button" class="service-tab" data-service-tab="options" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('options')">Settings</button>
       </div>
       <p class="hint" id="serviceTabHint">Prowlarr settings are open.</p>
@@ -2008,7 +2008,7 @@
         <div class="status info" id="storageRuntimeStatus">PVTKRRX checks qBittorrent's save path first, then these fallback roots. Open this page on the Windows host runtime to see the live qBit paths here.</div>
       </div>
 
-      <div class="service-card mode-hidden" id="serviceCard-files" data-service-visible="seedbox">
+      <div class="service-card mode-hidden" id="serviceCard-files" data-service-visible="lan seedbox">
         <h2>File Server</h2>
         <label for="provider">Seedbox Provider</label>
         <select id="provider">
@@ -2134,11 +2134,11 @@
           </div>
 
           <div id="installPanelLan" class="install-target-panel">
-            <p class="install-section-title">LAN Bridge Troubleshooting</p>
-            <a id="stremioLinkLan" class="is-disabled" href="#" aria-disabled="true">Install LAN Bridge In Stremio</a>
+            <p class="install-section-title">Hybrid Home Notes</p>
+            <a id="stremioLinkLan" class="is-disabled" href="#" aria-disabled="true">Install Hybrid Home In Stremio</a>
             <p class="install-note" id="pairRelayNote">Use Open In Stremio here only if you need the deep link. The HTTPS addon URL above is the plain value to paste manually.</p>
             <p class="install-note" id="pairSyncNote">The normal flow is Auto Setup above, then either Open In Stremio or paste the HTTPS addon URL shown above.</p>
-            <p class="install-note" id="pairStatusNote">LAN Bridge status: waiting for local save.</p>
+            <p class="install-note" id="pairStatusNote">Hybrid Home status: waiting for local save.</p>
 
             <details class="install-debug">
               <summary>Show raw URLs and LAN diagnostics</summary>
@@ -2149,7 +2149,7 @@
                 <div class="url-row">
                   <button class="btn-copy" onclick="copyPrivateLink('pairHostedStremio', this)">Copy Hosted Stremio URL</button>
                 </div>
-                <p class="install-note">Apple TV note: if tvOS does not show Add Addon URL or configure controls, install LAN Bridge once from Stremio Web or desktop while logged into the same account, then reopen Apple TV.</p>
+                <p class="install-note">Apple TV note: if tvOS does not show Add Addon URL or configure controls, install Hybrid Home once from Stremio Web or desktop while logged into the same account, then reopen Apple TV.</p>
                 <p class="install-section-title">LAN Hostname Test</p>
                 <div class="url-row">
                   <button class="btn-copy" onclick="copyPrivateLink('localLanHostname', this)">Copy LAN Hostname URL</button>
@@ -2216,7 +2216,7 @@
     const pairStatusMaxPolls = 8;
     const lanPair = {
       enabled: true,
-      required: true,
+      required: false,
       pairId: '',
       pairKey: '',
       relayUrl: defaultLanPairRelayUrl
@@ -3170,10 +3170,10 @@
         return;
       }
       if (isDesktopLocalOnlyRuntime()) {
-        lead.textContent = 'Pick where you want to watch on this Windows host. This EXE now handles PC Local and LAN Bridge only. Remote Seedbox lives in the separate server/cloud runtime.';
+        lead.textContent = 'Pick where you want to watch on this Windows host. This EXE now handles PC Local and Hybrid Home. Remote Seedbox lives in the separate server/cloud runtime.';
         return;
       }
-      lead.textContent = 'Pick where you want to watch. PC Local is the real addon for this Windows machine. LAN Bridge is the home-network route for your phone, TV, web, and Apple TV.';
+      lead.textContent = 'Pick where you want to watch. PC Local is the real addon for this Windows machine. Hybrid Home is the synced route for your phone, TV, web, and Apple TV.';
     }
 
     function applyServerRuntimeConfig(data) {
@@ -3271,7 +3271,7 @@
     function triggerLanInstall() {
       const link = document.getElementById('stremioLinkLan');
       if (!link || link.getAttribute('aria-disabled') === 'true' || !link.href || link.href === '#') {
-        setStatus('autoStatus', 'err', 'LAN Bridge is not ready yet. Run Auto Setup first.');
+        setStatus('autoStatus', 'err', 'Hybrid Home is not ready yet. Run Auto Setup first.');
         return;
       }
       window.location.href = link.href;
@@ -3289,7 +3289,7 @@
         const message = target === 'pc'
           ? 'PC Local is not ready yet. Save and generate the PC Local URL first.'
           : target === 'lan'
-            ? 'LAN Bridge is not ready yet. Run Auto Setup first.'
+            ? 'Hybrid Home is not ready yet. Run Auto Setup first.'
             : 'Remote Seedbox is not ready yet. Generate the hosted URL first.';
         setStatus('autoStatus', 'err', message);
         return;
@@ -3360,7 +3360,7 @@
       if (hasLinkedAccount()) {
         const sourceText = stremioLinkSession.sourceLabel ? ` via ${stremioLinkSession.sourceLabel}` : '';
         setQuickStepBadge('authLinkBadge', 'ready', 'Ready');
-        document.getElementById('authLinkMeta').textContent = `The server checked the Stremio account link${sourceText} and is ready to install LAN Bridge for secured same-account sync on your other home devices.`;
+        document.getElementById('authLinkMeta').textContent = `The server checked the Stremio account link${sourceText} and is ready to install Hybrid Home for secured same-account sync on your other home devices.`;
       } else if (!canQueryLocalRuntime()) {
         setQuickStepBadge('authLinkBadge', 'error', 'Host PC Only');
         document.getElementById('authLinkMeta').textContent = 'Open this page on the Windows host PC so Auto Find can reuse the signed-in Stremio session.';
@@ -3389,13 +3389,13 @@
         setQuickStepBadge('lanInstallBadge', 'ready', 'Ready');
         document.getElementById('lanInstallMeta').textContent = pairStatusText
           ? `${pairStatusText} On this Windows PC itself, use PC Local.`
-          : 'LAN Bridge is prepared for your other home devices. Install it in Stremio now, or copy the HTTPS addon URL below if Stremio asks for a URL. On this Windows PC itself, use PC Local.';
+          : 'Hybrid Home is prepared for your other home devices. Install it in Stremio now, or copy the HTTPS addon URL below if Stremio asks for a URL. On this Windows PC itself, use PC Local.';
       } else if (!canQueryLocalRuntime()) {
         setQuickStepBadge('lanInstallBadge', 'error', 'Host PC Only');
-        document.getElementById('lanInstallMeta').textContent = 'Run this on the Windows host PC so PVTKRRX can prepare the hosted LAN Bridge URL for your other home devices in Stremio.';
+        document.getElementById('lanInstallMeta').textContent = 'Run this on the Windows host PC so PVTKRRX can prepare the hosted Hybrid Home URL for your other home devices in Stremio.';
       } else {
         setQuickStepBadge('lanInstallBadge', 'checking', 'Waiting');
-        document.getElementById('lanInstallMeta').textContent = 'Run Auto Setup once. PVTKRRX will check services, reuse the signed-in Stremio session on this PC when available, secure the account link, and then prepare the hosted LAN Bridge URL for your other home devices.';
+        document.getElementById('lanInstallMeta').textContent = 'Run Auto Setup once. PVTKRRX will check services, reuse the signed-in Stremio session on this PC when available, secure the account link, and then prepare the hosted Hybrid Home URL for your other home devices.';
       }
 
       if (checkBtn) {
@@ -3438,11 +3438,11 @@
       } else if (!lanInstallReady) {
         setGuidedButtonState('lanAutoSetupBtn', true, false);
         if (quickLead) quickLead.textContent = hasLinkedAccount()
-          ? 'Step 3 next. Click Auto Setup once so PVTKRRX checks Prowlarr, qBittorrent, storage, and the LAN Bridge install URL.'
-          : 'Step 3 next. Click Auto Setup once. PVTKRRX will reuse the signed-in Stremio session on this PC, secure the account link, check services, and build the LAN Bridge install URL.';
+          ? 'Step 3 next. Click Auto Setup once so PVTKRRX checks Prowlarr, qBittorrent, storage, and the Hybrid Home install URL.'
+          : 'Step 3 next. Click Auto Setup once. PVTKRRX will reuse the signed-in Stremio session on this PC, secure the account link, check services, and build the Hybrid Home install URL.';
       } else {
         setGuidedButtonState('quickInstallLanBtn', true, false);
-        if (quickLead) quickLead.textContent = 'All three steps are green. Install LAN Bridge in Stremio now so your other home devices can sync. On this Windows PC itself, use PC Local.';
+        if (quickLead) quickLead.textContent = 'All three steps are green. Install Hybrid Home in Stremio now so your other home devices can sync. On this Windows PC itself, use PC Local.';
       }
 
       updateSimpleFlowCard();
@@ -4099,10 +4099,10 @@
         };
       }
       return {
-        title: 'LAN Bridge Manual Addon URL',
+        title: 'Hybrid Home Manual Addon URL',
         lead: 'Only use this HTTPS URL if Stremio explicitly asks for Add Addon URL.',
-        hint: 'LAN Bridge primary install should use the stremio:// link in Step 3. This HTTPS manifest is fallback/manual only.',
-        placeholder: 'Run Auto Setup or Save And Generate to create the LAN Bridge HTTPS fallback URL.'
+        hint: 'Hybrid Home primary install should use the stremio:// link in Step 3. This HTTPS manifest is fallback/manual only.',
+        placeholder: 'Run Auto Setup or Save And Generate to create the Hybrid Home HTTPS fallback URL.'
       };
     }
 
@@ -4168,7 +4168,7 @@
             ? (isSelfHostedServerRuntime()
                 ? 'Generate first to create the stremio:// Server install link'
                 : 'Generate first to create the stremio:// Remote Seedbox install link')
-            : 'Run Auto Setup first to generate the stremio:// LAN Bridge install link';
+            : 'Run Auto Setup first to generate the stremio:// Hybrid Home install link';
       }
       if (quickAddonCopyBtn) {
         quickAddonCopyBtn.disabled = !quickValue;
@@ -4188,7 +4188,7 @@
                     : 'Generate first to create the stremio:// Remote Seedbox install link. The HTTPS addon URL below is fallback only.'))
             : (quickValue
                 ? 'This primary install link should start with stremio://. Only use the manual HTTPS addon URL below if Stremio explicitly asks for Add Addon URL.'
-                : 'Run Auto Setup first to generate the stremio:// LAN Bridge install link. The HTTPS addon URL below is fallback only.');
+                : 'Run Auto Setup first to generate the stremio:// Hybrid Home install link. The HTTPS addon URL below is fallback only.');
       }
 
       updateSimpleFlowCard();
@@ -4205,7 +4205,7 @@
     function clearLanPairInstallFields() {
       privateInstallLinks.pairHostedManifest = '';
       privateInstallLinks.pairHostedStremio = '';
-      setInstallAnchorState('stremioLinkLan', '', 'Install LAN Bridge In Stremio');
+      setInstallAnchorState('stremioLinkLan', '', 'Install Hybrid Home In Stremio');
       updateAddonUrlUi();
       updateQuickSetupStatus();
     }
@@ -4256,7 +4256,7 @@
 
     async function refreshLanPairStatus() {
       if (!lanPair.enabled || !lanPair.pairId) {
-        setPairStatusNote('LAN Bridge status: local config not saved yet.');
+        setPairStatusNote('Hybrid Home status: local config not saved yet.');
         return;
       }
       pairStatusPollCount += 1;
@@ -4273,19 +4273,19 @@
             });
         if (!res.ok) {
           if (res.status === 429) {
-            setPairStatusNote('LAN Bridge status temporarily rate-limited. Retrying shortly.', true);
+            setPairStatusNote('Hybrid Home status temporarily rate-limited. Retrying shortly.', true);
             return;
           }
-          setPairStatusNote(`LAN Bridge status unavailable (${res.status}).`, true);
+          setPairStatusNote(`Hybrid Home status unavailable (${res.status}).`, true);
           return;
         }
         const data = await res.json();
         if (!data || data.online !== true) {
           pairStatusOnlineStreak = 0;
-          setPairStatusNote('LAN Bridge offline - open PVTKRRX desktop on the host PC.', true);
+          setPairStatusNote('Hybrid Home home-route offline - open PVTKRRX desktop on the host PC.', true);
           if (pairStatusPollCount >= pairStatusMaxPolls) {
             stopLanPairStatusPolling();
-            setPairStatusNote('LAN Bridge still offline. Status checks paused (save/install to retry).', true);
+            setPairStatusNote('Hybrid Home home-route still offline. Status checks paused (save/install to retry).', true);
           }
           return;
         }
@@ -4293,17 +4293,17 @@
         const lastSeen = formatRelativeTime(data.updatedAt);
         const suffix = lastSeen ? ` (${lastSeen})` : '';
         const endpointText = data.endpointSource ? ` via ${String(data.endpointSource).trim()}` : '';
-        setPairStatusNote(`LAN Bridge online${endpointText}${suffix}.`);
+        setPairStatusNote(`Hybrid Home home-route online${endpointText}${suffix}.`);
         if (pairStatusOnlineStreak >= 2) {
           stopLanPairStatusPolling();
-          setPairStatusNote(`LAN Bridge online${endpointText}${suffix}. Status checks paused.`);
+          setPairStatusNote(`Hybrid Home home-route online${endpointText}${suffix}. Status checks paused.`);
         }
       } catch (_) {
         pairStatusOnlineStreak = 0;
-        setPairStatusNote('LAN Bridge status check failed - relay unreachable.', true);
+        setPairStatusNote('Hybrid Home status check failed - relay unreachable.', true);
         if (pairStatusPollCount >= pairStatusMaxPolls) {
           stopLanPairStatusPolling();
-          setPairStatusNote('LAN Bridge status check failed repeatedly. Checks paused.', true);
+          setPairStatusNote('Hybrid Home status check failed repeatedly. Checks paused.', true);
         }
       }
     }
@@ -4357,26 +4357,26 @@
 
       if (relayNote) {
         relayNote.textContent = linked
-          ? `Linked Stremio account detected${sourceText}. The LAN Bridge addon URL is ready for your other home devices. Open it in Stremio or paste the HTTPS URL above if Stremio asks for a URL. On this Windows PC itself, use PC Local.`
-          : 'Use the HTTPS LAN Bridge addon URL above if you need to paste it manually into Stremio.';
+          ? `Linked Stremio account detected${sourceText}. The Hybrid Home addon URL is ready for your other home devices. Open it in Stremio or paste the HTTPS URL above if Stremio asks for a URL. On this Windows PC itself, use PC Local.`
+          : 'Use the HTTPS Hybrid Home addon URL above if you need to paste it manually into Stremio.';
       }
 
       if (syncNote) {
         syncNote.textContent = linked
-          ? 'LAN Bridge is the synced addon for your same-account home devices. If content still looks stale there, remove the older LAN Bridge entry and install again. On this Windows PC itself, browse via PC Local.'
+          ? 'Hybrid Home is the synced addon for your same-account home devices. If content still looks stale there, remove the older Hybrid Home entry and install again. On this Windows PC itself, browse via PC Local.'
           : 'No Stremio account is linked yet. Auto Find AuthKey is still the normal home-device step if you want this addon to sync to your other devices.';
       }
 
       if (accountSyncModeHint) {
         accountSyncModeHint.textContent = linked
-          ? `Stremio account linked${sourceText}. LAN Bridge is now the addon that should sync across your other home devices on this account. This Windows PC itself should use PC Local.`
-          : 'LAN Bridge is the addon that should sync to your other home devices. This Windows PC itself should use PC Local. Auto Find first tries to reuse the signed-in Stremio session from this Windows host.';
+          ? `Stremio account linked${sourceText}. Hybrid Home is now the addon that should sync across your other home devices on this account. This Windows PC itself should use PC Local.`
+          : 'Hybrid Home is the addon that should sync to your other home devices. This Windows PC itself should use PC Local. Auto Find first tries to reuse the signed-in Stremio session from this Windows host.';
       }
 
       if (quickSetupHint) {
         quickSetupHint.textContent = linked
-          ? `The server has already checked the Stremio account${sourceText}. Run Auto Setup if the install button is not ready yet, then install or refresh LAN Bridge once in Stremio for your other home devices. On this Windows PC itself, use PC Local.`
-          : 'Auto Setup checks Prowlarr, qBittorrent, local storage, and the signed-in Stremio session on this PC. LAN Bridge is for your other home devices, while this Windows PC itself should use PC Local. Manual tools stay below as fallback only.';
+          ? `The server has already checked the Stremio account${sourceText}. Run Auto Setup if the install button is not ready yet, then install or refresh Hybrid Home once in Stremio for your other home devices. On this Windows PC itself, use PC Local.`
+          : 'Auto Setup checks Prowlarr, qBittorrent, local storage, and the signed-in Stremio session on this PC. Hybrid Home is for your other home devices, while this Windows PC itself should use PC Local. Manual tools stay below as fallback only.';
       }
 
       updateQuickSetupStatus();
@@ -4537,7 +4537,7 @@
       if (target === 'pc') {
         if (kicker) kicker.textContent = 'Desktop only';
         if (title) title.textContent = 'PC Local';
-        if (lead) lead.textContent = 'PC Local is the real addon for this Windows machine. Keep LAN Bridge for your other home devices.';
+        if (lead) lead.textContent = 'PC Local is the real addon for this Windows machine. Keep Hybrid Home for your other home devices.';
         if (copy) copy.textContent = 'Make sure Stremio Desktop is installed and signed in here, then save and generate the one-click PC Local install link for this PC.';
         if (hint) hint.textContent = 'Need to change service URLs, storage roots, or manual fallback details? Open the hidden setup tabs below.';
 
@@ -4633,10 +4633,10 @@
         return;
       }
 
-      if (kicker) kicker.textContent = 'Home network sync';
-      if (title) title.textContent = 'LAN Bridge';
-      if (lead) lead.textContent = 'PVTKRRX checks for signed-in Stremio on this Windows PC automatically. Auto Setup reuses that session, builds the hosted install link, and keeps the advanced tools out of the way.';
-      if (copy) copy.textContent = 'This route is for your phone, TV, web, and Apple TV on the same Stremio account. This Windows PC itself should use PC Local. Auto Setup is the normal one-click path.';
+      if (kicker) kicker.textContent = 'Home + away sync';
+      if (title) title.textContent = 'Hybrid Home';
+      if (lead) lead.textContent = 'PVTKRRX checks for signed-in Stremio on this Windows PC automatically. Auto Setup reuses that session, keeps the home host pair alive, builds the hosted install link, and keeps the advanced tools out of the way.';
+      if (copy) copy.textContent = 'This route is for your phone, TV, web, and Apple TV on the same Stremio account. It uses the Windows host at home and falls back to cloud playback away from home. This Windows PC itself should use PC Local.';
       if (hint) hint.textContent = 'Need the old checklist, service tabs, or raw URLs? Open the hidden setup tabs below.';
 
       toggle(checkBtn, false);
@@ -4646,7 +4646,7 @@
       toggle(copyBtn, true);
 
       if (autoBtn) {
-        autoBtn.textContent = 'Auto Setup Home LAN';
+        autoBtn.textContent = 'Auto Setup Hybrid Home';
         autoBtn.disabled = !(canUseLocal && localStremioStatus.installed);
       }
       if (installBtn) {
@@ -4654,24 +4654,24 @@
         installBtn.disabled = !lanReady;
       }
       if (copyBtn) {
-        copyBtn.textContent = 'Copy LAN Install Link';
+        copyBtn.textContent = 'Copy Hybrid Home Install Link';
         copyBtn.disabled = !lanReady;
       }
 
       if (!canUseLocal) {
-        setSimpleFlowStatus('err', 'Open this configure page on the Windows host PC. LAN Bridge setup needs to inspect local Stremio there first.');
+        setSimpleFlowStatus('err', 'Open this configure page on the Windows host PC. Hybrid Home setup needs to inspect local Stremio there first.');
       } else if (localStremioStatus.checked && !localStremioStatus.installed) {
-        setSimpleFlowStatus('err', 'Install Stremio Desktop on this Windows PC first. LAN Bridge setup depends on the host Stremio app being present here.');
+        setSimpleFlowStatus('err', 'Install Stremio Desktop on this Windows PC first. Hybrid Home setup depends on the host Stremio app being present here.');
       } else if (!hasLinkedAccount() && !localStremioStatus.signedInSessionFound) {
-        setSimpleFlowStatus('info', 'Sign in to Stremio Desktop on this PC first, then click Auto Setup Home LAN. PVTKRRX will do the Stremio check and secure the account link for you.');
+        setSimpleFlowStatus('info', 'Sign in to Stremio Desktop on this PC first, then click Auto Setup Hybrid Home. PVTKRRX will do the Stremio check and secure the account link for you.');
       } else if (!hasLinkedAccount() && localStremioStatus.signedInSessionFound) {
-        setSimpleFlowStatus('info', 'Stremio is already signed in on this PC. Click Auto Setup Home LAN and PVTKRRX will reuse that session automatically.');
+        setSimpleFlowStatus('info', 'Stremio is already signed in on this PC. Click Auto Setup Hybrid Home and PVTKRRX will reuse that session automatically.');
       } else if (lanReady) {
-        setSimpleFlowStatus('ok', pairStatusText || 'LAN Bridge is ready. Install or refresh it in Stremio for your other home devices.');
+        setSimpleFlowStatus('ok', pairStatusText || 'Hybrid Home is ready. Install or refresh it in Stremio for your other home devices.');
       } else if (autoStatusText) {
         setSimpleFlowStatus('info', autoStatusText);
       } else {
-        setSimpleFlowStatus('info', 'Click Auto Setup Home LAN. PVTKRRX will check Stremio, services, local storage, and build the correct install link for your home devices without the old manual checkpoint steps.');
+        setSimpleFlowStatus('info', 'Click Auto Setup Hybrid Home. PVTKRRX will check Stremio, services, local storage, and build the correct install link for your home and away devices without the old manual checkpoint steps.');
       }
     }
 
@@ -4705,14 +4705,14 @@
         if (installActionBtn) installActionBtn.textContent = 'Save And Generate PC Local URL';
         if (connectionSectionLead) connectionSectionLead.textContent = 'Home mode uses built-in local file serving. Use the Storage tab if completed files may live on NAS shares or extra drives.';
       } else if (target === 'lan') {
-        if (installActionLead) installActionLead.textContent = 'Generate the LAN Bridge Stremio install link plus the manual HTTPS fallback URL. The main install should start with stremio://.';
-        if (installActionBtn) installActionBtn.textContent = 'Save And Generate LAN Bridge Links';
-        if (connectionSectionLead) connectionSectionLead.textContent = 'Home LAN mode uses built-in local file serving. Storage roots can point at NAS shares or extra HDD folders the Windows host can already read.';
+        if (installActionLead) installActionLead.textContent = 'Generate the Hybrid Home Stremio install link plus the manual HTTPS fallback URL. At home it redirects to the Windows host; away from home it falls back to the hosted cloud path.';
+        if (installActionBtn) installActionBtn.textContent = 'Save And Generate Hybrid Home Links';
+        if (connectionSectionLead) connectionSectionLead.textContent = 'Hybrid Home uses built-in local file serving on the Windows host at home, plus the public file-server path away from home. Storage roots can point at NAS shares or extra HDD folders the Windows host can already read.';
       } else {
         if (installActionLead) {
           installActionLead.textContent = isSelfHostedServerRuntime()
             ? 'Generate the self-hosted server addon URL for Stremio. This runtime stores its own config locally and can use private backend service URLs after server-admin authentication.'
-            : 'Generate the Remote Seedbox addon URL for Stremio. This route is separate from LAN Bridge and uses the hosted HTTPS manifest.';
+            : 'Generate the Remote Seedbox addon URL for Stremio. This route is separate from Hybrid Home and uses the hosted HTTPS manifest.';
         }
         if (installActionBtn) {
           installActionBtn.textContent = getSeedboxGenerateLabel(Boolean(getCurrentQuickInstallUrl('seedbox') || getCurrentAddonUrl('seedbox')));
@@ -4774,9 +4774,9 @@
       const target = getInstallTarget();
       const hint = document.getElementById('installModeHint');
       if (target === 'pc') {
-        hint.textContent = 'PC Local selected. This route works on this Windows host and installs a real same-PC addon for browsing and playback. LAN Bridge is the route for your other home devices.';
+        hint.textContent = 'PC Local selected. This route works on this Windows host and installs a real same-PC addon for browsing and playback. Hybrid Home is the route for your other home devices.';
       } else if (target === 'lan') {
-        hint.textContent = 'LAN Bridge selected. This is the normal home-device setup. The app checks Stremio on this Windows PC, reuses the signed-in Stremio account when possible, then prepares the hosted addon for your other home devices. For browsing and playback on this Windows host itself, switch to PC Local.';
+        hint.textContent = 'Hybrid Home selected. This is the main synced setup. The app checks Stremio on this Windows PC, reuses the signed-in Stremio account when possible, then prepares one hosted addon that uses LAN playback at home and cloud playback away from home. For browsing and playback on this Windows host itself, switch to PC Local.';
       } else {
         hint.textContent = serverRuntime.selfHostServerMode
           ? 'Remote Seedbox selected on a self-hosted server. This server app can save its config locally, reuse it after reboot, and use private localhost service URLs when you authenticate as the server admin.'
@@ -4933,7 +4933,7 @@
       setInstallModeHint();
       setActiveLocalHostname(defaultLocalHostname);
       lanPair.enabled = true;
-      lanPair.required = true;
+      lanPair.required = false;
       if (!lanPair.relayUrl) lanPair.relayUrl = resolveDefaultRelayBaseUrl();
       if (!document.getElementById('jackettUrl').value.trim()) {
         document.getElementById('jackettUrl').value = 'http://localhost:9696';
@@ -5253,7 +5253,7 @@
       }
 
       if (openNote) {
-        openNote.textContent = 'Use Open PC Local In Stremio on this Windows host when you want PVTKRRX to show up as a real local addon source in Stremio Desktop. The copied loopback URL remains the manual fallback. Use LAN Bridge for your phone, TV, web, and Apple TV.';
+        openNote.textContent = 'Use Open PC Local In Stremio on this Windows host when you want PVTKRRX to show up as a real local addon source in Stremio Desktop. The copied loopback URL remains the manual fallback. Use Hybrid Home for your phone, TV, web, and Apple TV.';
       }
     }
 
@@ -5264,14 +5264,14 @@
         return;
       }
       if (!lanPair.pairId) {
-        setPairStatusNote('LAN Bridge status: local pair identity missing.', true);
+        setPairStatusNote('Hybrid Home status: local pair identity missing.', true);
         return;
       }
 
       const relayBase = normalizeRelayUrl(lanPair.relayUrl);
       const noteEl = document.getElementById('pairRelayNote');
       if (noteEl) {
-        noteEl.textContent = 'LAN Bridge relay configured.';
+        noteEl.textContent = 'Hybrid Home relay configured.';
       }
       updateLanBridgeInstallMessaging();
 
@@ -5280,7 +5280,11 @@
           ? await fetch('/local/lan-token', {
               method: 'POST',
               headers: buildJsonHeaders(),
-              body: JSON.stringify({ pairId: lanPair.pairId })
+              body: JSON.stringify({
+                pairId: lanPair.pairId,
+                routeProfile: 'hybrid',
+                lanPairRequired: false
+              })
             })
           : await fetch(`${relayBase}/encrypt`, {
               method: 'POST',
@@ -5288,19 +5292,20 @@
               body: JSON.stringify({
                 ...config,
                 lanPairEnabled: true,
-                lanPairRequired: true,
+                lanPairRequired: false,
+                routeProfile: 'hybrid',
                 lanPairId: lanPair.pairId,
                 lanPairKey: lanPair.pairKey,
                 lanPairRelayUrl: relayBase
               })
             });
         if (!res.ok) {
-          setPairStatusNote(`LAN Bridge token failed (${res.status}).`, true);
+          setPairStatusNote(`Hybrid Home token failed (${res.status}).`, true);
           return;
         }
         const data = await res.json();
         if (!data || !data.token) {
-          setPairStatusNote('LAN Bridge token response was invalid.', true);
+          setPairStatusNote('Hybrid Home token response was invalid.', true);
           return;
         }
 
@@ -5316,18 +5321,18 @@
           'stremioLinkLan',
           hostedStremioUrl,
           hasLinkedAccount()
-            ? 'Install Or Refresh LAN Bridge In Stremio (Sync Account)'
-            : 'Install Or Refresh LAN Bridge In Stremio'
+            ? 'Install Or Refresh Hybrid Home In Stremio (Sync Account)'
+            : 'Install Or Refresh Hybrid Home In Stremio'
         );
 
         startLanPairStatusPolling();
       } catch (_) {
-        setPairStatusNote('LAN Bridge token request failed - check relay URL/connectivity.', true);
+        setPairStatusNote('Hybrid Home token request failed - check relay URL/connectivity.', true);
       }
     }
 
     async function autoSetup() {
-      setStatus('autoStatus', 'info', 'Checking Stremio on this PC, securing the account link if possible, then preparing LAN Bridge...');
+      setStatus('autoStatus', 'info', 'Checking Stremio on this PC, securing the account link if possible, then preparing Hybrid Home...');
       applyLocalDefaults();
       try {
         const authKey = String(document.getElementById('stremioAuthKey')?.value || '').trim();
@@ -5382,9 +5387,9 @@
           const target = getInstallTarget();
           const message = target === 'lan'
             ? (linkedDuringSetup
-              ? 'Auto setup complete. The server checked your Stremio account and LAN Bridge is ready to install or refresh in Stremio for your other home devices. On this Windows PC itself, use PC Local for browsing and playback.'
-              : 'Auto setup complete. LAN Bridge is ready for your other home devices. If the account step is not green yet, use Auto Find AuthKey once and then install or refresh the addon in Stremio. On this Windows PC itself, use PC Local for browsing and playback.')
-            : 'Auto setup complete. PC Local is ready on this Windows host, and LAN Bridge remains ready for your other home devices.';
+              ? 'Auto setup complete. The server checked your Stremio account and Hybrid Home is ready to install or refresh in Stremio for your other home devices. On this Windows PC itself, use PC Local for browsing and playback.'
+              : 'Auto setup complete. Hybrid Home is ready for your other home devices. If the account step is not green yet, use Auto Find AuthKey once and then install or refresh the addon in Stremio. On this Windows PC itself, use PC Local for browsing and playback.')
+            : 'Auto setup complete. PC Local is ready on this Windows host, and Hybrid Home remains ready for your other home devices.';
           setStatus('autoStatus', 'ok', message);
         } else {
           const note = Array.isArray(data?.notes) && data.notes.length ? data.notes[0] : (data?.message || 'Provisioning incomplete');
@@ -5404,6 +5409,7 @@
     }
 
     function getConfig() {
+      const installTarget = getInstallTarget();
       const fileServerUrlInput = document.getElementById('fileServerUrl').value.trim();
       const localHostnameInput = document.getElementById('localHostname').value.trim();
       const localHostname = normalizeLocalHostname(localHostnameInput || activeLocalHostname);
@@ -5433,6 +5439,11 @@
         localHostnameCustom,
         lanPairEnabled: lanPair.enabled,
         lanPairRequired: lanPair.required,
+        routeProfile: installTarget === 'pc'
+          ? 'local'
+          : installTarget === 'seedbox'
+            ? 'online'
+            : 'hybrid',
         lanPairId: lanPair.pairId,
         lanPairKey: lanPair.pairKey,
         lanPairRelayUrl: normalizeRelayUrl(lanPair.relayUrl)
@@ -5610,7 +5621,7 @@
           if (isPrivateHostname(u.hostname) && !canUsePrivateTargets) {
             return selfHosted
               ? `${label} uses ${u.hostname}. Enter the self-host password or open this page on the server itself to use localhost/private service URLs.`
-              : `${label} uses ${u.hostname}. Remote Seedbox needs public URLs. Use PC Local or LAN Bridge instead.`;
+              : `${label} uses ${u.hostname}. Remote Seedbox needs public URLs. Use PC Local or Hybrid Home instead.`;
           }
         } catch (e) {
           return `${label} is not a valid URL`;
@@ -5690,7 +5701,7 @@
 
       const installTarget = getInstallTarget();
       setStatus('installStatus', 'info', installMode === 'local'
-        ? (installTarget === 'pc' ? 'Saving PC Local profile...' : 'Saving LAN Bridge profile...')
+        ? (installTarget === 'pc' ? 'Saving PC Local profile...' : 'Saving Hybrid Home profile...')
         : 'Preparing Remote Seedbox...');
 
       try {
@@ -5718,7 +5729,7 @@
         }
 
         setStatus('installStatus', 'info', installMode === 'local'
-          ? (installTarget === 'pc' ? 'Saving PC Local profile...' : 'Saving LAN Bridge profile...')
+          ? (installTarget === 'pc' ? 'Saving PC Local profile...' : 'Saving Hybrid Home profile...')
           : 'Preparing Remote Seedbox...');
 
         if (installMode === 'local') {
@@ -5754,14 +5765,14 @@
             'ok',
             target === 'lan'
               ? (hasLinkedAccount()
-                  ? 'Saved. LAN Bridge is ready. Install or refresh it once in Stremio and let your linked home devices sync. On this Windows PC itself, use PC Local for browsing and playback.'
-                  : 'Saved. LAN Bridge is prepared for your other home devices. If the account step is not green yet, run Auto Find AuthKey once before installing or refreshing it in Stremio. On this Windows PC itself, use PC Local for browsing and playback.')
-              : 'Saved. PC Local URL is ready for Stremio Desktop on this Windows host. LAN Bridge remains the route for your other home devices.'
+                  ? 'Saved. Hybrid Home is ready. Install or refresh it once in Stremio and let your linked home devices sync. On this Windows PC itself, use PC Local for browsing and playback.'
+                  : 'Saved. Hybrid Home is prepared for your other home devices. If the account step is not green yet, run Auto Find AuthKey once before installing or refreshing it in Stremio. On this Windows PC itself, use PC Local for browsing and playback.')
+              : 'Saved. PC Local URL is ready for Stremio Desktop on this Windows host. Hybrid Home remains the route for your other home devices.'
           );
         } else {
           stopLanPairStatusPolling();
           clearLanPairInstallFields();
-          setPairStatusNote('LAN Bridge status: idle (Remote Seedbox selected).');
+          setPairStatusNote('Hybrid Home status: idle (Remote Seedbox selected).');
           const hostedPayload = routeParity.stripRemoteSeedboxLanFields(config, { keepRelayUrl: true });
 
           if (serverRuntime.selfHostServerMode) {

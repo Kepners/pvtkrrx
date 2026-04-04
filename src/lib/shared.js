@@ -872,22 +872,76 @@ function ensureLanPairConfig(config = {}, options = {}) {
   }
 }
 
+function normalizeRouteProfile(value) {
+  const profile = String(value || '').trim().toLowerCase()
+  if (profile === 'local' || profile === 'lan' || profile === 'online' || profile === 'hybrid') {
+    return profile
+  }
+  return ''
+}
+
+function resolveHostedProfile(config = {}) {
+  const explicit = normalizeRouteProfile(config?.routeProfile)
+  if (explicit === 'lan' || explicit === 'online' || explicit === 'hybrid') return explicit
+
+  const hasLegacyLanPairState = Boolean(config?.lanPairId || config?.lanPairKey || config?.lanPairRelayUrl)
+  const lanEnabled = typeof config?.lanPairEnabled === 'boolean'
+    ? config.lanPairEnabled
+    : hasLegacyLanPairState
+  if (!lanEnabled) return 'online'
+  if (typeof config?.lanPairRequired === 'boolean') {
+    return config.lanPairRequired ? 'lan' : 'hybrid'
+  }
+  return hasLegacyLanPairState ? 'lan' : 'hybrid'
+}
+
+function shouldBindLanPairToRequest(config = {}) {
+  return LAN_PAIR_BIND_PUBLIC_IP || resolveHostedProfile(config) === 'hybrid'
+}
+
 function normalizeAddonConfig(config = {}, options = {}) {
   const normalized = {
     ...config,
     additionalStorageRoots: normalizeLocalStorageRoots(config.additionalStorageRoots)
   }
-  const lanPairExplicitlyDisabled = normalized.lanPairEnabled === false || normalized.lanPairRequired === false
-  if (lanPairExplicitlyDisabled && options.defaultEnabled !== true) {
+  const explicitProfile = normalizeRouteProfile(normalized.routeProfile)
+  const localProfile = explicitProfile === 'local'
+  const callerControlsLanPairDefaults =
+    typeof options.defaultEnabled === 'boolean' ||
+    typeof options.defaultRequired === 'boolean'
+  const hasHostedProfileSignal = (
+    explicitProfile === 'lan' ||
+    explicitProfile === 'online' ||
+    explicitProfile === 'hybrid' ||
+    typeof normalized.lanPairEnabled === 'boolean' ||
+    typeof normalized.lanPairRequired === 'boolean' ||
+    (!callerControlsLanPairDefaults && (
+      Boolean(normalized.lanPairId) ||
+      Boolean(normalized.lanPairKey) ||
+      Boolean(normalized.lanPairRelayUrl)
+    ))
+  )
+  const hostedProfile = localProfile || !hasHostedProfileSignal ? '' : resolveHostedProfile(normalized)
+  normalized.routeProfile = localProfile
+    ? 'local'
+    : (hostedProfile || explicitProfile || '')
+
+  const lanPairExplicitlyDisabled = normalized.lanPairEnabled === false ||
+    (normalized.lanPairRequired === false && hostedProfile !== 'hybrid')
+  if (hostedProfile === 'online' && lanPairExplicitlyDisabled && options.defaultEnabled !== true) {
     return stripRemoteSeedboxLanFields({
       ...normalized,
+      routeProfile: 'online',
       lanPairEnabled: false,
       lanPairRequired: false
     }, {
-      keepRelayUrl: true
+      keepRelayUrl: true,
+      keepRouteProfile: true
     })
   }
   const shouldNormalizeLanPair = (
+    hostedProfile === 'lan' ||
+    hostedProfile === 'hybrid' ||
     typeof options.defaultEnabled === 'boolean' ||
     typeof options.defaultRequired === 'boolean' ||
     typeof normalized.lanPairEnabled === 'boolean' ||
@@ -897,9 +951,24 @@ function normalizeAddonConfig(config = {}, options = {}) {
     Boolean(normalized.lanPairRelayUrl) ||
     Boolean(normalized.stremioUserId)
   )
-  return shouldNormalizeLanPair
-    ? ensureLanPairConfig(normalized, options)
-    : normalized
+  if (!shouldNormalizeLanPair) return normalized
+
+  const defaultEnabled = hostedProfile === 'online'
+    ? false
+    : (hostedProfile === 'hybrid' || hostedProfile === 'lan')
+      ? true
+      : options.defaultEnabled
+  const defaultRequired = hostedProfile === 'hybrid'
+    ? false
+    : hostedProfile === 'lan'
+      ? true
+      : options.defaultRequired
+
+  return ensureLanPairConfig(normalized, {
+    ...options,
+    defaultEnabled,
+    defaultRequired
+  })
 }
 
 function normalizeRetainedSecretFields(value) {
@@ -1233,7 +1302,8 @@ function getConfigIssues(config, options = {}) {
   const requestOrigin = normalizeOrigin(requestBaseUrl)
   const relayOrigin = normalizeOrigin(String(safeConfig.lanPairRelayUrl || '').trim())
   const selfHostDiskConfig = options.selfHostDiskConfig === true
-  const usingHostedProfile = safeConfig.lanPairEnabled === false
+  const hostedProfile = resolveHostedProfile(safeConfig)
+  const usingHostedProfile = hostedProfile === 'online' || hostedProfile === 'hybrid'
   const missingFileServerUrl = !String(safeConfig.fileServerUrl || '').trim()
   const relayTargetsDifferentOrigin = Boolean(requestOrigin && relayOrigin && relayOrigin !== requestOrigin)
 
@@ -1406,13 +1476,15 @@ function getManifest(req) {
   let profile = 'online'
   if (mode === 'local') {
     profile = 'local'
-  } else if (req?.params?.config && req.params.config !== 'local' && parseBooleanLoose(req?.config?.lanPairEnabled, false)) {
-    profile = 'lan'
+  } else if (req?.params?.config && req.params.config !== 'local') {
+    profile = resolveHostedProfile(req?.config || {})
   }
 
   const idSuffix = profile
   const nameLabel = profile === 'local'
     ? 'PC Local'
+    : profile === 'hybrid'
+      ? 'Hybrid Home'
     : profile === 'lan'
       ? 'LAN Bridge'
       : 'Remote Seedbox'
@@ -1447,6 +1519,13 @@ function getManifest(req) {
     return {
       ...nextManifest,
       description: 'LAN Bridge addon for your other home devices. Browse movies, TV, sports, and library, then redirect playback into the paired Windows host.'
+    }
+  }
+
+  if (profile === 'hybrid') {
+    return {
+      ...nextManifest,
+      description: 'Hybrid Home addon for one synced Stremio account. Use LAN playback automatically at home, then fall back to your hosted cloud endpoints away from home.'
     }
   }
 
@@ -1929,7 +2008,7 @@ async function resolveLanPair(config, req) {
   if (hashPairKey(pairKey) !== String(state.keyHash || '')) {
     return { enabled: true, online: false, reason: 'key-mismatch' }
   }
-  if (LAN_PAIR_BIND_PUBLIC_IP) {
+  if (shouldBindLanPairToRequest(config)) {
     const stateIpHash = String(state.clientIpHash || '')
     const requestIpHash = hashClientIp(req)
     if (stateIpHash && requestIpHash && stateIpHash !== requestIpHash) {
@@ -1977,6 +2056,8 @@ function maybeLanPairRedirect(routeKind) {
 
       const resolution = await resolveLanPair(req.config || {}, req)
       req.lanPair = resolution
+      const hostedProfile = resolveHostedProfile(req.config || {})
+      const hybridProfile = hostedProfile === 'hybrid'
 
       if (!resolution.enabled) return next()
 
@@ -1985,6 +2066,11 @@ function maybeLanPairRedirect(routeKind) {
           console.log(
             `[lan-pair] ${routeKind} fallback reason=${resolution.reason || 'unknown'} from=${requestClientLabel(req)}`
           )
+          if (hybridProfile) {
+            res.setHeader('X-PVTKRRX-LAN-Pair', 'fallback')
+            res.setHeader('X-PVTKRRX-Route-Decision', 'cloud')
+            res.setHeader('X-PVTKRRX-Route-Reason', String(resolution.reason || 'offline'))
+          }
           return next()
         }
         console.log(
@@ -1992,6 +2078,11 @@ function maybeLanPairRedirect(routeKind) {
         )
         if (parseBooleanLoose(req.config?.lanPairRequired, false)) {
           return lanPairOfflineResponse(req, res, routeKind)
+        }
+        if (hybridProfile) {
+          res.setHeader('X-PVTKRRX-LAN-Pair', 'fallback')
+          res.setHeader('X-PVTKRRX-Route-Decision', 'cloud')
+          res.setHeader('X-PVTKRRX-Route-Reason', String(resolution.reason || 'offline'))
         }
         return next()
       }
@@ -2001,11 +2092,18 @@ function maybeLanPairRedirect(routeKind) {
         if (parseBooleanLoose(req.config?.lanPairRequired, false)) {
           return lanPairOfflineResponse(req, res, routeKind)
         }
+        if (hybridProfile) {
+          res.setHeader('X-PVTKRRX-LAN-Pair', 'fallback')
+          res.setHeader('X-PVTKRRX-Route-Decision', 'cloud')
+          res.setHeader('X-PVTKRRX-Route-Reason', 'no-redirect-url')
+        }
         return next()
       }
 
       res.setHeader('Cache-Control', 'no-store')
       res.setHeader('X-PVTKRRX-LAN-Pair', 'redirect')
+      res.setHeader('X-PVTKRRX-Route-Decision', 'lan')
+      res.setHeader('X-PVTKRRX-Route-Reason', 'online')
       console.log(
         `[lan-pair] ${routeKind} redirect source=${String(resolution.endpoint?.source || 'unknown')} from=${requestClientLabel(req)}`
       )
@@ -2013,6 +2111,11 @@ function maybeLanPairRedirect(routeKind) {
     } catch (err) {
       if (parseBooleanLoose(req.config?.lanPairRequired, false)) {
         return lanPairOfflineResponse(req, res, routeKind)
+      }
+      if (resolveHostedProfile(req.config || {}) === 'hybrid') {
+        res.setHeader('X-PVTKRRX-LAN-Pair', 'fallback')
+        res.setHeader('X-PVTKRRX-Route-Decision', 'cloud')
+        res.setHeader('X-PVTKRRX-Route-Reason', 'resolve-error')
       }
       next()
     }

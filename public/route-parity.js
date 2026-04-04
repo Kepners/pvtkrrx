@@ -73,8 +73,19 @@
     }
   }
 
+  function normalizeRouteProfile(value) {
+    const profile = String(value || '').trim().toLowerCase()
+    if (profile === 'local' || profile === 'lan' || profile === 'online' || profile === 'hybrid') {
+      return profile
+    }
+    return ''
+  }
+
   function stripRemoteSeedboxLanFields(config = {}, options = {}) {
     const next = config && typeof config === 'object' ? { ...config } : {}
+    next.routeProfile = options.keepRouteProfile === true
+      ? (normalizeRouteProfile(next.routeProfile) || 'online')
+      : 'online'
     next.lanPairEnabled = false
     next.lanPairRequired = false
     delete next.lanPairId
@@ -94,6 +105,7 @@
     isBlockedPrivateTargetHost,
     isPrivateIpv4,
     isPrivateIpv6,
+    normalizeRouteProfile,
     stripRemoteSeedboxLanFields
   }
 })

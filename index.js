@@ -1137,7 +1137,7 @@ app.get('/network-info', requireLocalNetworkRoute, (req, res) => {
 })
 
 
-// LAN Bridge is a hosted route, so the same-host helper must ask the relay to mint
+// Hybrid Home is a hosted route, so the same-host helper must ask the relay to mint
 // the token with the relay's secret instead of encrypting it with the local runtime secret.
 app.post('/local/lan-token', requireLocalNetworkRoute, requireCsrfToken, async (req, res) => {
   const localConfig = loadLocalConfigFile()
@@ -1161,7 +1161,7 @@ app.post('/local/lan-token', requireLocalNetworkRoute, requireCsrfToken, async (
     const pairId = sanitizePairId(normalized.lanPairId)
     const pairKey = sanitizePairKey(normalized.lanPairKey)
     if (!pairId || !pairKey || normalized.lanPairEnabled === false) {
-      return res.status(400).json({ error: 'LAN Bridge is not configured yet' })
+      return res.status(400).json({ error: 'Hybrid Home is not configured yet' })
     }
 
     const hosted = await mintHostedConfigToken(normalized.lanPairRelayUrl || '', normalized)
@@ -1364,8 +1364,8 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
   const lanConfigureUrl = `http://127.0.0.1:${port}/configure?target=lan`
   const seedboxConfigureUrl = `http://127.0.0.1:${port}/configure?target=seedbox`
   const routeLead = desktopLocalOnly
-    ? 'The Windows EXE now exposes the two local routes only. Use PC Local on this machine, and LAN Bridge for your other home devices while this PC stays online.'
-    : 'PVTKRRX is one runtime with three separate Stremio routes. PC Local is now a real same-PC addon for browsing and playback on this Windows machine. LAN Bridge remains the route for your other home devices.'
+    ? 'The Windows EXE now exposes the two local routes only. Use PC Local on this machine, and Hybrid Home for your other synced devices while this PC stays online.'
+    : 'PVTKRRX now centers on three main Stremio routes: PC Local on this Windows machine, Hybrid Home for your synced devices, and Remote Seedbox for public ready-file playback.'
   const desktopLocalNote = desktopLocalOnly
     ? '<p class="route-note">Remote Seedbox has moved out of the Windows EXE. Use the separate server/cloud runtime for away-from-home playback.</p>'
     : ''
@@ -1384,7 +1384,7 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
           <div class="actions">
             <a class="btn" href="${seedboxConfigureUrl}">Open Remote Seedbox Setup</a>
           </div>
-          <p class="route-note">This is the right route for seedbox-first playback, not the LAN Bridge. On the hosted relay it is intentionally ready-file / public-playback only and fails closed when the path cannot actually be served.</p>
+          <p class="route-note">This is the right route for seedbox-first playback, not Hybrid Home. On the hosted relay it is intentionally ready-file / public-playback only and fails closed when the path cannot actually be served.</p>
         </section>`
 
   res.setHeader('Cache-Control', 'no-store')
@@ -1444,18 +1444,18 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
         </section>
 
         <section class="route-card">
-          <div class="route-kicker">Home network sync</div>
-          <h3>LAN Bridge</h3>
-          <p class="route-copy">Use this for phone, tablet, Android TV, Apple TV, or Stremio Web on the same LAN as the host PC.</p>
+          <div class="route-kicker">Home + away sync</div>
+          <h3>Hybrid Home</h3>
+          <p class="route-copy">Use one hosted addon on the same Stremio account. At home it follows the LAN host; away from home it falls back to your hosted/public playback path.</p>
           <ul class="route-list">
-            <li>Hosted install URL with LAN heartbeat</li>
-            <li>Optional Stremio account sync</li>
+            <li>Hosted install URL with LAN redirect at home</li>
+            <li>Cloud fallback away from home</li>
             <li>Host PC must stay online</li>
           </ul>
           <div class="actions">
-            <a class="btn" href="${lanConfigureUrl}">Open LAN Bridge Setup</a>
+            <a class="btn" href="${lanConfigureUrl}">Open Hybrid Home Setup</a>
           </div>
-          <p class="route-note">This is the route that should sync across your Stremio account on phone, TV, web, and Apple TV while the host PC stays online.</p>
+          <p class="route-note">This is the main synced route for your phone, TV, web, and Apple TV while the host PC stays online and the hosted path stays available away from home.</p>
         </section>
         ${remoteSeedboxCard}
       </div>
@@ -1561,7 +1561,7 @@ app.get('/:config/manifest.json', withConfig, async (req, res) => {
   if (m.behaviorHints) m.behaviorHints.configurationRequired = Boolean(req.localConfigMissing)
   if (shouldRejectPcLocalManifestRequest(req)) {
     if (m.behaviorHints) m.behaviorHints.configurationRequired = true
-    m.description = 'PC Local only works from http://127.0.0.1 on the same Windows PC. For LAN phones, TVs, or other devices, install LAN Bridge instead.'
+    m.description = 'PC Local only works from http://127.0.0.1 on the same Windows PC. For phones, TVs, or other synced devices, install Hybrid Home instead.'
     console.warn(
       `[stremio] local manifest rejected for non-local host=${requestHostname(req) || '?'} from=${requestClientLabel(req)}`
     )

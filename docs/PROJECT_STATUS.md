@@ -5,13 +5,13 @@ Updated: 2026-04-04
 ## Current Stage
 
 PVTKRRX is in a working `1.1.23` state on the main Windows/local route set.
-The current packaged Windows app is now verified as the real host runtime, and a live Apple TV LAN Bridge pass has been captured against it.
+The current packaged Windows app is now verified as the real host runtime, and a live Apple TV synced home-route pass has been captured against it.
 
 The practical reading of the project today is:
 
 - `PC Local` is the real host-desktop route and is working
-- `LAN Bridge` is the same-account home-device route and the host desktop should not use it for local browsing
-- the packaged Windows EXE is now treated as Windows-local only: `PC Local` plus `LAN Bridge`; `Remote Seedbox` belongs to the hosted/self-host server surfaces
+- `Hybrid Home` is now the main same-account synced route for the user's other devices; the host desktop should not use it for local browsing
+- the packaged Windows EXE now centers on `PC Local` plus `Hybrid Home`; `Remote Seedbox` belongs to the hosted/self-host server surfaces
 - explicit self-host server mode now exists for VPS/seedbox installs, with disk-backed `/selfhost` manifests, browser-admin auth for private service URLs, and optional `systemd` boot automation
 - the self-host bootstrap now auto-selects a free qBittorrent WebUI port when 8080 is occupied, and it captures the Cloudflare Tunnel URL cleanly so the saved public URL never inherits the installer log line
 - the self-host bootstrap now rewrites the Cloudflare Tunnel service on install so trycloudflare installs always print a fresh public URL, and it now wires Prowlarr to the live qBittorrent download client during bootstrap instead of leaving the download client unset
@@ -24,9 +24,23 @@ The practical reading of the project today is:
 - the Windows installer/build flow is reproducible again
 - `https://www.pvtkrrx.cc` is the live public relay; `https://pvtkrrx.vercel.app` is currently a dead preview hostname returning Vercel `DEPLOYMENT_NOT_FOUND`
 - the homepage rewrite now exists locally in `public/index.html`, but it still needs a browser pass and deliberate deploy before the live site can be treated as updated
+- legacy strict `LAN Bridge` tokens remain supported for manual troubleshooting and backwards compatibility, but they are no longer the default synced install path
 - the remaining work is real-device coverage, remote/auth playback sign-off, and performance tuning, not a reset/rebuild
 
 ## Work Carried Out On 2026-04-04
+
+- Added the new `Hybrid Home` hosted profile with a dedicated manifest id (`com.kepners.pvtkrrx.hybrid`) and route-aware configure/install copy across the shared UI.
+- Hosted `Hybrid Home` now prefers LAN redirect at home and falls back to hosted/cloud behavior away from home instead of failing closed like the legacy strict LAN profile.
+- `/local/lan-token` can now mint hybrid hosted tokens explicitly, while the Windows/local config path keeps its own host-side pairing defaults intact.
+- Legacy hosted LAN tokens without explicit pair booleans still resolve as `LAN Bridge`, so older installs do not get silently reinterpreted as `Remote Seedbox`.
+- Sports grouping now keeps one stable team order for deduped matchup posters instead of inheriting the last tracker title ordering, and the sports thumb helper is back in-tree so the richer poster generation path is not orphaned.
+- Regression coverage now includes:
+  - hybrid hosted token minting and manifest resolution
+  - hybrid cloud fallback headers when the home route is offline
+  - legacy LAN token compatibility without explicit booleans
+  - sports structured matchup/F1 poster token coverage
+
+## Earlier 2026-04-04 Self-Host Work
 
 - The Linux self-host installer now strips the Cloudflare Tunnel "waiting" line out of the captured public URL, auto-picks a free qBittorrent WebUI port if 8080 is already occupied, and writes that real port back into the qBit config before startup.
 - The shared server installer now prefers the detected or exported qBittorrent port instead of hardcoding 8080 when saving self-host config.

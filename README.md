@@ -31,16 +31,18 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 
 ## Route Framework
 
-PVTKRRX is one runtime with three install routes:
+PVTKRRX now has three main install routes:
 
 - **PC Local** — Real same-PC addon for the Windows host running PVTKRRX. Installs from the copied `127.0.0.1` URL and exposes movies, TV, sports, and library on that machine.
-- **LAN Bridge** — Home-network route for your phone, TV, web, and Apple TV on the same Stremio account. Primary install uses the hosted `stremio://...` LAN Bridge link, while the plain hosted `https://.../manifest.json` value is manual fallback only if Stremio explicitly asks for an addon URL.
+- **Hybrid Home** — Main synced hosted addon for your phone, TV, web, and Apple TV on the same Stremio account. At home it prefers the live LAN-paired Windows host; away from home it falls back to your hosted/public playback path.
 - **Remote Seedbox** — Public HTTPS route for away-from-home or seedbox-first playback. Requires public qBittorrent, Prowlarr, and file serving endpoints, and is ready-file-first on the hosted relay unless you self-host playback support.
 
-The packaged Windows EXE now exposes only the Windows-local routes: `PC Local` and `LAN Bridge`. `Remote Seedbox` now belongs to the hosted/self-host server surfaces instead of the desktop app.
+The packaged Windows EXE now exposes the Windows host routes: `PC Local` plus `Hybrid Home`. `Remote Seedbox` belongs to the hosted/self-host server surfaces instead of the desktop app.
+
+Legacy strict `LAN Bridge` tokens still resolve for older installs and manual troubleshooting, but `Hybrid Home` is now the default synced route.
 
 See [docs/CURRENT_DESIGN.md](docs/CURRENT_DESIGN.md) for the canonical current design, [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) for the route model, and [docs/STREMIO_INSTALL_TRACKER.md](docs/STREMIO_INSTALL_TRACKER.md) for current client install behavior.
-See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the exact LAN Bridge lifecycle, pair generation rules, and empty-content troubleshooting.
+See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the legacy/manual LAN-pair lifecycle, pair generation rules, and troubleshooting details that still underpin `Hybrid Home`.
 
 ## What's Working
 
@@ -52,7 +54,7 @@ See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the exact LAN B
 | Sports contamination filter | Working (SportsCult excluded from movie searches) |
 | Already-downloaded files | Working (built-in file server with Range support) |
 | Packed RAR scene releases already added to qBittorrent | Implemented with truthful direct-play behavior: partial multi-volume playback stays suppressed, completed bundles stay hidden until the host prepares an extracted direct video, and native `rarUrls` is now opt-in experimental only |
-| On-tracker download + play | Working on playback-capable routes (PC Local, LAN Bridge via local redirect, or self-hosted runtime) |
+| On-tracker download + play | Working on playback-capable routes (PC Local, Hybrid Home via local redirect at home, or self-hosted runtime) |
 | Local + Hosted install modes | Working |
 | Hosted LAN pair mode (Android TV/mobile) | Implemented (requires relay config) |
 | Windows desktop startup shell | Working and verified on Windows (frontmost splash + route-aware popup on normal boot, optional Windows sign-in auto-launch hidden in tray) |
@@ -71,7 +73,7 @@ Use these files as the live documentation set:
 - [ARCHITECTURE.md](ARCHITECTURE.md) — component/runtime structure
 - [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) — route selection and install rules
 - [docs/STREMIO_INSTALL_TRACKER.md](docs/STREMIO_INSTALL_TRACKER.md) — verified Stremio client truth table
-- [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) — LAN Bridge setup, pairing, heartbeat, and troubleshooting
+- [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) — legacy/manual LAN pair setup, heartbeat, and troubleshooting details
 - [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) — current verification and deployment status
 
 - [docs/WEBSITE_STATUS.md](docs/WEBSITE_STATUS.md) - public route health, canonical host notes, and homepage/content backlog
@@ -87,7 +89,7 @@ Visit **[www.pvtkrrx.cc](https://www.pvtkrrx.cc)** if you want the hosted launch
 Use the canonical hosted base only for bootstrap and hosted relay flows: `https://www.pvtkrrx.cc`.
 Do not use the old preview host `https://pvtkrrx.vercel.app`; on 2026-03-31 it returned Vercel `DEPLOYMENT_NOT_FOUND`.
 Hosted install links should resolve under `https://www.pvtkrrx.cc/{token}/manifest.json?...`.
-For `LAN Bridge`, the primary install action should start with `stremio://`; the hosted HTTPS manifest is manual fallback only when Stremio shows an `Add Addon URL` box.
+For `Hybrid Home`, the primary install action should start with `stremio://`; the hosted HTTPS manifest is manual fallback only when Stremio shows an `Add Addon URL` box.
 
 ### Self-Host on Your Own Hardware
 
@@ -128,11 +130,11 @@ For remote Stremio installs, give the installer a real public `https://` origin.
 
 On a self-hosted server, `/configure` is now the server app only:
 - **Remote Seedbox** is the only route exposed there
-- **PC Local** and **LAN Bridge** stay in the Windows desktop runtime
+- **PC Local** and **Hybrid Home** stay in the Windows desktop runtime
 - the server can keep its config on disk and use private/localhost backend URLs after server-admin authentication
 - only the browser-facing install origin still needs a real public `https://` hostname for Stremio
 
-When using `LAN Bridge` on Windows, install and sign into Stremio Desktop on the host PC first. On boot, the local runtime now scans the host Stremio Desktop WebView2 session automatically and links that account into startup auto-provision when a signed-in session is present. The configure page still exposes the host check as a manual fallback.
+When using `Hybrid Home` on Windows, install and sign into Stremio Desktop on the host PC first. On boot, the local runtime now scans the host Stremio Desktop WebView2 session automatically and links that account into startup auto-provision when a signed-in session is present. The configure page still exposes the host check as a manual fallback.
 
 Auto Setup also attempts to:
 - install/start Prowlarr and qBittorrent (Windows, via winget + service/process start)
@@ -142,7 +144,7 @@ Auto Setup also attempts to:
 Windows desktop install/startup now also re-checks those LAN firewall rules automatically on each boot.
 When you open the configure page on the Windows host runtime, it now also shows the live qBittorrent save path, incomplete path, fallback storage roots, and whether PVTKRRX currently manages the qBit completion hook for packed-release extraction.
 The desktop shell also has a Windows startup toggle so PVTKRRX can launch automatically after sign-in, start hidden in the tray, and keep the local runtime online without a manual app open.
-A 2026-03-31 real-device pass also confirmed the current Windows host flow plus Apple TV LAN Bridge playback while the Windows PC stayed locked; playback started normally, the client reported the video as local, and forward/back seek worked.
+A 2026-03-31 real-device pass also confirmed the current Windows host flow plus Apple TV synced home-route playback while the Windows PC stayed locked; playback started normally, the client reported the video as local, and forward/back seek worked.
 
 ## Requirements
 
@@ -150,7 +152,7 @@ Your seedbox needs:
 1. **Prowlarr** with private trackers configured
 2. **qBittorrent** with WebUI enabled
 
-That is enough for `PC Local` and `LAN Bridge`, where the local runtime can read files directly from qBittorrent's download directory with the built-in file server.
+That is enough for `PC Local` and `Hybrid Home`, where the local runtime can read files directly from qBittorrent's download directory with the built-in file server.
 
 > `Remote Seedbox` is different: the public hosted route needs a public HTTPS file-serving path for completed-file playback. Leave `File Server URL` blank only for local playback-capable routes or self-hosted runtimes that can actually serve `/file` and `/playback`.
 
@@ -174,8 +176,8 @@ That is enough for `PC Local` and `LAN Bridge`, where the local runtime can read
 Your Stremio App
         ↓
 PVTKRRX route selected in configure
-   ├── PC Local      → local runtime on the Windows host
-   ├── LAN Bridge    → hosted relay resolves active LAN host, then redirects
+   ├── PC Local       → local runtime on the Windows host
+   ├── Hybrid Home    → hosted route that redirects to LAN at home and falls back to cloud away
    └── Remote Seedbox → hosted route with public ready-file playback endpoints
 
 Back-end services used by the chosen route:
@@ -195,7 +197,7 @@ PVTKRRX stream rows now show a visible source badge plus explicit state + format
 
 **⚡ On Seedbox** — File is already downloaded. Plays immediately.
 
-**📥 Available** — File is on a private tracker. PC Local and LAN Bridge can use local `/playback` queue-and-buffer behavior. Hosted Remote Seedbox does not expose dead tracker `/playback` links and is effectively ready-file playback unless you run a playback-capable self-hosted runtime.
+**📥 Available** — File is on a private tracker. PC Local and Hybrid Home at home can use local `/playback` queue-and-buffer behavior. Hosted Remote Seedbox does not expose dead tracker `/playback` links and is effectively ready-file playback unless you run a playback-capable self-hosted runtime.
 
 **[INFO] Remote notice** — Hosted Remote Seedbox can append an explanation row when direct queue-and-buffer is hidden to protect your file-server login or when qBittorrent has not exposed enough live file info for a safe buffer URL yet.
 

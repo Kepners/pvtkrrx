@@ -12,6 +12,8 @@ This document explains the real `LAN Bridge` flow end to end:
 - what "configured" actually means
 - how to troubleshoot route mistakes vs pair/relay failures
 
+`Hybrid Home` now reuses this same LAN-pair machinery as its at-home path. This document remains relevant because the hosted fallback route is built on top of the same pair identity, heartbeat, and redirect behavior. Treat `LAN Bridge` here as the strict/manual profile and `Hybrid Home` as the default synced profile layered on top of it.
+
 ## The Short Version
 
 `LAN Bridge` is a two-part system:
