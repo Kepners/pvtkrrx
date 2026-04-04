@@ -68,7 +68,10 @@ write_ini_value() {
   local key="$2"
   local value="$3"
   local tmp; tmp="$(mktemp)"
-  awk -v key="$key" -v value="$value" '
+  local awk_key awk_value
+  awk_key="$(printf '%s' "$key" | sed 's/\\/\\\\/g')"
+  awk_value="$(printf '%s' "$value" | sed 's/\\/\\\\/g')"
+  awk -v key="$awk_key" -v value="$awk_value" '
     BEGIN { found = 0; inserted = 0 }
     {
       if (substr($0, 1, length(key) + 1) == key "=") {
