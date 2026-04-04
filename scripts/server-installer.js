@@ -490,6 +490,17 @@ function buildServerAdminBootstrapUrl(displayOrigin, token) {
   return `${origin}/configure#serverPassword=${encodeURIComponent(adminToken)}&serverAdminToken=${encodeURIComponent(adminToken)}`
 }
 
+function printWorkingUrlSummary(displayOrigin, bootstrapUrl, publicBaseUrl) {
+  const hasPublicOrigin = Boolean(normalizeOrigin(publicBaseUrl))
+  console.log(hasPublicOrigin ? 'Working public URLs:' : 'Working local URLs:')
+  console.log(`PVTKRRX URL: ${displayOrigin}`)
+  console.log(`Configure URL: ${displayOrigin}/configure`)
+  if (bootstrapUrl) {
+    console.log(`Bootstrap URL: ${bootstrapUrl}`)
+  }
+  console.log(`Self-host manifest URL: ${displayOrigin}/selfhost/manifest.json?mode=hosted`)
+}
+
 async function run() {
   const repoRoot = path.resolve(__dirname, '..')
   const envPath = path.join(repoRoot, '.env')
@@ -767,16 +778,10 @@ async function run() {
     console.log(`HTTPS mode: ${describeSelfHostHttpsMode(selfHostHttpsMode)}`)
     console.log(`Saved config: ${localConfigPath}`)
     console.log(`Self-host password file: ${adminState.path || path.join(runtimeDir, 'server-admin-token')}`)
-    console.log(`Configure URL: ${displayOrigin}/configure`)
-    if (configureBootstrapUrl) {
-      console.log(`Bootstrap URL: ${configureBootstrapUrl}`)
-    }
-    console.log(`Self-host manifest: ${displayOrigin}/selfhost/manifest.json?mode=hosted`)
+    printWorkingUrlSummary(displayOrigin, configureBootstrapUrl, publicBaseUrl)
     if (publicBaseUrl) {
-      console.log(`Public install base: ${publicBaseUrl}`)
       console.log(`Allowed web origins: ${allowedWebOrigins || '(none)'}`)
     } else {
-      console.log('Public install base: not set')
       console.log('Remote Stremio installs need a real HTTPS origin. Add one later by setting PVTKRRX_PUBLIC_BASE_URL in .env and restarting the service.')
     }
     console.log(`HTTP port: ${httpPort}`)
@@ -1020,18 +1025,9 @@ async function runAuto() {
   console.log(`HTTPS mode: ${describeSelfHostHttpsMode(selfHostHttpsMode)}`)
   console.log(`Prowlarr:    ${jackettUrl}`)
   console.log(`qBittorrent: ${qbitUrl}`)
-  console.log(`Configure:   ${displayOrigin}/configure`)
-  if (configureBootstrapUrl) {
-    console.log(`Bootstrap:   ${configureBootstrapUrl}`)
-  }
-  console.log(`Manifest:    ${displayOrigin}/selfhost/manifest.json?mode=hosted`)
+  printWorkingUrlSummary(displayOrigin, configureBootstrapUrl, publicBaseUrl)
   console.log(`HTTP port:   ${httpPort}`)
   console.log(`Node binary: ${bundledNodePath}`)
-  if (publicBaseUrl) {
-    console.log(`Public URL:  ${publicBaseUrl}`)
-  } else {
-    console.log('Public URL:  not set (add PVTKRRX_PUBLIC_BASE_URL to .env for Stremio HTTPS installs)')
-  }
 }
 
 if (require.main === module) {
