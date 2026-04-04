@@ -345,6 +345,7 @@ This now builds in the system temp directory first, then copies the finished cur
 | AUTH_TOKEN_SECRET | Recommended | Key for signing account auth tokens (falls back to ENCRYPTION_SECRET) |
 | PVTKRRX_RUNTIME_DIR | Recommended for self-host | Stable runtime/config directory. The server installer now defaults this to `<repo>/data/pvtkrrx` so saved config and password state do not depend on whichever user launched the process |
 | PVTKRRX_PUBLIC_BASE_URL | Recommended for self-host | Public `https://` origin used when generating self-host install/config links. Set this to the real reverse-proxied host you want Stremio and browsers to use |
+| PVTKRRX_PLAYBACK_BASE_URL | Optional for self-host | Dedicated public HTTPS origin for built-in `/file` and `/playback` URLs. Use this when install/control traffic should stay on one origin, such as a Cloudflare Tunnel, but actual buffering/file bytes should leave from a different direct reverse-proxied origin |
 | PVTKRRX_SELF_HOST_HTTPS_MODE | Recommended for self-host | HTTPS bootstrap mode for the installer: `cloudflare`, `domain`, or `skip` |
 | PVTKRRX_SPORTS_CACHE_AUTO_FILL | Optional | Enable background sports image cache refill on long-running runtimes. Default `true` on non-Windows non-Vercel servers |
 | PVTKRRX_SPORTS_CACHE_AUTO_FILL_INITIAL_DELAY_MS | Optional | Delay before the first background sports cache refill (default `900000`, 15 minutes) |
@@ -376,7 +377,7 @@ This now builds in the system temp directory first, then copies the finished cur
 | PVTKRRX_STREAM_MAX_CANDIDATES | Optional | Max stream candidates to process per request (default 20) |
 | STREAM_READY_START_PERCENT | Optional | Fraction of a file that must be locally readable before playback is considered ready for direct file-server redirects (default `0.5%`) |
 | STREAM_READY_MIN_BYTES | Optional | Minimum readable head buffer required before playback is considered ready for direct file-server redirects (default `24MB`) |
-| STREAM_PRIORITIZE_LAST_PIECES | Optional | Keep qBittorrent first+last piece priority enabled for incomplete playback so Stremio footer/range probes do not bounce back to source selection (default true) |
+| STREAM_PRIORITIZE_LAST_PIECES | Optional | Keep qBittorrent first+last piece priority enabled for incomplete playback so Stremio footer/range probes do not bounce back to source selection. Default `true` on desktop/local routes, default `false` on self-host cloud/server routes so they stay head-first unless you opt back in |
 | PVTKRRX_STREMIO_API_BASE_URL | Optional | Stremio API base URL for AuthKey verification (default https://api.strem.io) |
 | PVTKRRX_STREMIO_API_TIMEOUT_MS | Optional | Timeout for Stremio AuthKey verification calls (default 10000) |
 | PVTKRRX_STREMIO_LINK_SESSION_TTL_SECONDS | Optional | TTL for one-time Stremio server link sessions in seconds (default 900) |
@@ -423,6 +424,7 @@ Practical answer to "can I set this up on my PC and use the same Stremio login o
 3. `/{token}/file/...` means built-in serving; external host/path means external file server serving
 4. If it still points to an old external host, go to `http://localhost:7000/configure`, clear File Server URL, and save local config
 5. Runtime now auto-prefers built-in `/file/` whenever the addon can read the file locally
+6. Self-host cloud note: if `PVTKRRX_PUBLIC_BASE_URL` is a `trycloudflare.com` tunnel and you do not want built-in buffering/file bytes on that tunnel, set `PVTKRRX_PLAYBACK_BASE_URL` to a direct public HTTPS origin that reaches the same server runtime
 
 ### Android TV / mobile cannot reach addon
 

@@ -524,6 +524,21 @@ function printWorkingUrlSummary(displayOrigin, bootstrapUrl, publicBaseUrl) {
   writeInstallerSummaryLine(`Self-host manifest URL: ${displayOrigin}/selfhost/manifest.json?mode=hosted`)
 }
 
+function describePlaybackOrigin(displayOrigin, publicBaseUrl, playbackBaseUrl) {
+  const publicOrigin = normalizeOrigin(publicBaseUrl)
+  const playbackOrigin = normalizeOrigin(playbackBaseUrl)
+  if (!playbackOrigin) {
+    if (isTryCloudflareUrl(publicOrigin)) {
+      return 'Built-in /file and /playback still use the Cloudflare public origin until you set PVTKRRX_PLAYBACK_BASE_URL in .env.'
+    }
+    return ''
+  }
+  if (playbackOrigin === publicOrigin || playbackOrigin === normalizeOrigin(displayOrigin)) {
+    return `Playback origin: ${playbackOrigin}`
+  }
+  return `Playback origin: ${playbackOrigin} (control/install origin stays ${publicOrigin || displayOrigin})`
+}
+
 async function run() {
   const repoRoot = path.resolve(__dirname, '..')
   const envPath = path.join(repoRoot, '.env')
@@ -548,6 +563,7 @@ async function run() {
   const existingPort = Number.parseInt(String(mergedEnv.PORT || '7000').trim(), 10) || 7000
   const existingHttpsPort = Number.parseInt(String(mergedEnv.HTTPS_PORT || '7001').trim(), 10) || 7001
   const existingPublicBaseUrl = normalizeBaseUrl(mergedEnv.PVTKRRX_PUBLIC_BASE_URL || '')
+  const existingPlaybackBaseUrl = normalizeBaseUrl(mergedEnv.PVTKRRX_PLAYBACK_BASE_URL || '')
   const existingHttpsMode = normalizeSelfHostHttpsMode(mergedEnv.PVTKRRX_SELF_HOST_HTTPS_MODE || '')
   const existingConfig = loadExistingServerConfig(defaultRuntimeDir, existingSecret)
   const bundledNodePath = String(process.env.PVTKRRX_NODE_PATH || process.execPath).trim() || process.execPath
@@ -732,6 +748,7 @@ async function run() {
       PVTKRRX_SELF_HOST_HTTPS_MODE: selfHostHttpsMode,
       PVTKRRX_RUNTIME_DIR: runtimeDir,
       PVTKRRX_PUBLIC_BASE_URL: publicBaseUrl,
+      PVTKRRX_PLAYBACK_BASE_URL: existingPlaybackBaseUrl,
       PVTKRRX_ALLOWED_WEB_ORIGINS: allowedWebOrigins,
       PORT: String(httpPort),
       HTTPS_PORT: String(httpsPort)
@@ -745,6 +762,7 @@ async function run() {
     process.env.PVTKRRX_SELF_HOST_HTTPS_MODE = selfHostHttpsMode
     process.env.PVTKRRX_RUNTIME_DIR = runtimeDir
     process.env.PVTKRRX_PUBLIC_BASE_URL = publicBaseUrl
+    process.env.PVTKRRX_PLAYBACK_BASE_URL = existingPlaybackBaseUrl
     process.env.PVTKRRX_ALLOWED_WEB_ORIGINS = allowedWebOrigins
     process.env.PORT = String(httpPort)
     process.env.HTTPS_PORT = String(httpsPort)
@@ -838,6 +856,8 @@ async function run() {
     console.log(`Saved config: ${localConfigPath}`)
     console.log(`Self-host password file: ${adminState.path || path.join(runtimeDir, 'server-admin-token')}`)
     printWorkingUrlSummary(displayOrigin, configureBootstrapUrl, publicBaseUrl)
+    const playbackOriginLine = describePlaybackOrigin(displayOrigin, publicBaseUrl, existingPlaybackBaseUrl)
+    if (playbackOriginLine) console.log(playbackOriginLine)
     if (publicBaseUrl) {
       console.log(`Allowed web origins: ${allowedWebOrigins || '(none)'}`)
     } else {
@@ -935,6 +955,10 @@ async function runAuto() {
   const existingPublicBaseUrl = sanitizeHttpUrlDefault(mergedEnv.PVTKRRX_PUBLIC_BASE_URL || '', '', {
     requireHttps: true
   })
+  const existingPlaybackBaseUrl = sanitizeHttpUrlDefault(mergedEnv.PVTKRRX_PLAYBACK_BASE_URL || '', '', {
+    requireHttps: true,
+    allowEmpty: true
+  })
   const existingHttpsMode = normalizeSelfHostHttpsMode(mergedEnv.PVTKRRX_SELF_HOST_HTTPS_MODE || '')
   const selfHostHttpsMode = resolveSelfHostHttpsMode(existingHttpsMode, existingPublicBaseUrl)
   let publicBaseUrl = selfHostHttpsMode === 'domain' && !isTryCloudflareUrl(existingPublicBaseUrl)
@@ -1011,6 +1035,7 @@ async function runAuto() {
     PVTKRRX_SELF_HOST_HTTPS_MODE: selfHostHttpsMode,
     PVTKRRX_RUNTIME_DIR: defaultRuntimeDir,
     PVTKRRX_PUBLIC_BASE_URL: publicBaseUrl,
+    PVTKRRX_PLAYBACK_BASE_URL: existingPlaybackBaseUrl,
     PVTKRRX_ALLOWED_WEB_ORIGINS: allowedWebOrigins,
     PORT: String(httpPort),
     HTTPS_PORT: String(httpsPort)
@@ -1025,6 +1050,7 @@ async function runAuto() {
   process.env.PVTKRRX_SELF_HOST_HTTPS_MODE = selfHostHttpsMode
   process.env.PVTKRRX_RUNTIME_DIR = defaultRuntimeDir
   process.env.PVTKRRX_PUBLIC_BASE_URL = publicBaseUrl
+  process.env.PVTKRRX_PLAYBACK_BASE_URL = existingPlaybackBaseUrl
   process.env.PORT = String(httpPort)
   process.env.HTTPS_PORT = String(httpsPort)
 
@@ -1122,6 +1148,8 @@ async function runAuto() {
   console.log(`Prowlarr:    ${jackettUrl}`)
   console.log(`qBittorrent: ${qbitUrl}`)
   printWorkingUrlSummary(displayOrigin, configureBootstrapUrl, publicBaseUrl)
+  const playbackOriginLine = describePlaybackOrigin(displayOrigin, publicBaseUrl, existingPlaybackBaseUrl)
+  if (playbackOriginLine) console.log(playbackOriginLine)
   console.log(`HTTP port:   ${httpPort}`)
   console.log(`Node binary: ${bundledNodePath}`)
 }

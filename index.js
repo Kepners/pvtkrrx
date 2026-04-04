@@ -54,7 +54,7 @@ const {
   loadLocalConfigFile, saveLocalConfigFile, detectLanAddresses, getMdnsHost,
   normalizeBaseUrl, normalizeAddonConfig, mergeRetainedSecrets,
   hydrateAccountLinkForConfig, buildConfigReadback, resolveExistingConfigForBody,
-  getConfigIssues, getPublicBaseUrl, loadConfigFromSourceToken,
+  getConfigIssues, getPublicBaseUrl, getPlaybackBaseUrl, loadConfigFromSourceToken,
   ensureLanPairConfig, normalizeRetainedSecretFields, stripEphemeralConfigFields,
   // Pair helpers
   sanitizePairId, sanitizePairKey, sanitizePairOwnerId,
@@ -1647,8 +1647,9 @@ app.get('/catalog/:type/:id/:extra.json', withLegacyRootLocalConfig, requireConf
 
 app.get('/stream/:type/:id.json', withLegacyRootLocalConfig, requireConfigSubscription, async (req, res) => {
   const addonUrl = getPublicBaseUrl(req)
+  const playbackBaseUrl = getPlaybackBaseUrl(req)
   console.warn(`[stremio] compat root stream type=${req.params.type} id=${req.params.id} from=${requestClientLabel(req)} -> /local`)
-  const result = await handleStream(req.config, req.params.type, req.params.id, addonUrl, 'local')
+  const result = await handleStream(req.config, req.params.type, req.params.id, addonUrl, 'local', playbackBaseUrl)
   console.log(`[stremio] compat root stream result type=${req.params.type} id=${req.params.id} streams=${Array.isArray(result?.streams) ? result.streams.length : 0}`)
   const ttl = parseCacheSeconds(result?.cacheMaxAge, 20, 5, 120)
   applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: ttl, staleWhileRevalidate: Math.min(ttl * 3, 300) })
@@ -1700,8 +1701,9 @@ app.get('/:config/catalog/:type/:id/:extra.json', withConfig, requireConfigSubsc
 
 app.get('/:config/stream/:type/:id.json', withConfig, requireConfigSubscription, maybeLanPairRedirect('stream'), async (req, res) => {
   const addonUrl = getPublicBaseUrl(req)
+  const playbackBaseUrl = getPlaybackBaseUrl(req)
   console.log(`[stremio] <- stream   type=${req.params.type} id=${req.params.id} from=${requestClientLabel(req)}`)
-  const result = await handleStream(req.config, req.params.type, req.params.id, addonUrl, req.params.config)
+  const result = await handleStream(req.config, req.params.type, req.params.id, addonUrl, req.params.config, playbackBaseUrl)
   console.log(`[stremio] -> stream   type=${req.params.type} id=${req.params.id} streams=${Array.isArray(result?.streams) ? result.streams.length : 0}`)
   const ttl = parseCacheSeconds(result?.cacheMaxAge, 20, 5, 120)
   applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: ttl, staleWhileRevalidate: Math.min(ttl * 3, 300) })
@@ -2194,7 +2196,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
     let maxPeersSeen = 0
     let trackerPayload = null
     let trackerInspection = null
-    const baseUrl = getPublicBaseUrl(req)
+    const baseUrl = getPlaybackBaseUrl(req)
     const builtinFileUrlPrefix = `${baseUrl}/${req.params.config}/file/`
 
     const tryRedirectToFileRoute = (state, reason) => {

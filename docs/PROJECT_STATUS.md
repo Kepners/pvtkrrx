@@ -37,6 +37,8 @@ The practical reading of the project today is:
 - Sports grouping now keeps one stable team order for deduped matchup posters instead of inheriting the last tracker title ordering, and the sports thumb helper is back in-tree so the richer poster generation path is not orphaned.
 - Added a reusable sports cache pre-seed step plus `npm run cache:sports`, and wired both self-host setup flows to warm `sports-image-cache/` with upcoming event, team, and mapped-league artwork using the existing disk cache writer.
 - Added a recurring sports-cache autofill worker for long-running Linux/cloud runtimes. It persists a rotation cursor in the runtime directory, processes one sport group every 15 minutes by default, and keeps using the same disk cache writer so repeat passes skip already-warm images.
+- Self-host cloud/server playback now defaults to strict head-first sequential download again. qBit first+last-piece priority stays default-on for desktop/local routes, but cloud self-host runtimes now require an explicit `STREAM_PRIORITIZE_LAST_PIECES=true` opt-in if we want tail-piece probing help more than startup speed.
+- Self-host cloud/server playback can now split origins correctly: `PVTKRRX_PUBLIC_BASE_URL` stays the tunnel/control origin, while optional `PVTKRRX_PLAYBACK_BASE_URL` overrides built-in `/file` and `/playback` URLs so buffering and byte-serving can move onto a direct HTTPS origin instead of unintentionally staying on the Cloudflare tunnel.
 - Cut a fresh `1.1.24` Windows desktop build so the local EXE line now includes the sports cache pre-seed work instead of reusing the older `1.1.23` release label.
 - Re-verified the split install model: Windows desktop still owns `PC Local` plus `Hybrid Home`, while the cloud/self-host installer continues to own the server-side `Remote Seedbox` route.
 - Regression coverage now includes:
@@ -87,6 +89,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - `npm run smoke:provider-discovery` passed on 2026-04-02 after broadening the shared provider discovery helpers for existing Prowlarr/qBittorrent installs
 - `npm run smoke:sports-cache` passed on 2026-04-04 for the new sports cache pre-seed flow, including disk-cache reuse on rerun
 - `npm run smoke:sports-cache-auto` now covers the rotating background sports-cache autofill flow: first sport, cursor advance, second sport, cursor wrap, and disk-cache reuse on the wrapped pass
+- `npm run smoke:playback` now also covers the split self-host playback-origin path so `/playback` redirects can leave the control/tunnel origin and land on a dedicated direct byte-serving origin
 - `npm run smoke:sports` passed on 2026-04-04 after the `1.1.24` release cut, with the expected bad-id placeholder error still isolated to the existing negative-path assertion at the end of the smoke output
 - `npm run smoke:config` passed on 2026-04-04 after the `1.1.24` release cut, keeping `/install-selfhost.sh` and the hosted/local manifest flows green
 - `npm run smoke:selfhost` passed on 2026-04-04 after the `1.1.24` release cut, keeping disk-backed self-host config plus password gating green

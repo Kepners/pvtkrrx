@@ -118,6 +118,8 @@ function createFetchResponse(bytes, headers = {}) {
 }
 
 async function run() {
+  const originalPublicBaseUrl = process.env.PVTKRRX_PUBLIC_BASE_URL
+  const originalPlaybackBaseUrl = process.env.PVTKRRX_PLAYBACK_BASE_URL
   const hash = 'c1287d13aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
   const incompleteHash = 'b1287d13dddddddddddddddddddddddddddddddd'
   const packedHash = 'd1287d13bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
@@ -421,7 +423,21 @@ async function run() {
     const orphanFileResponse = await request(server.address().port, `/${configToken}/file/${encodeURIComponent(orphanFileToken)}`)
     assert.equal(orphanFileResponse.status, 200, 'file route should still serve an absolute local file path when the qBit torrent row no longer exists')
     assert.equal(orphanFileResponse.text, payload.toString('utf8'))
+
+    process.env.PVTKRRX_PUBLIC_BASE_URL = 'https://control.example.com'
+    process.env.PVTKRRX_PLAYBACK_BASE_URL = 'https://play.example.com'
+    const splitOriginResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(playbackToken)}`)
+    assert.equal(splitOriginResponse.status, 302, 'playback should still redirect when a dedicated playback origin is configured')
+    assert.match(
+      String(splitOriginResponse.headers.location || ''),
+      new RegExp(`^https://play\\.example\\.com/${configToken}/file/`),
+      'playback redirect should target the dedicated playback origin instead of the control/tunnel origin'
+    )
   } finally {
+    if (originalPublicBaseUrl === undefined) delete process.env.PVTKRRX_PUBLIC_BASE_URL
+    else process.env.PVTKRRX_PUBLIC_BASE_URL = originalPublicBaseUrl
+    if (originalPlaybackBaseUrl === undefined) delete process.env.PVTKRRX_PLAYBACK_BASE_URL
+    else process.env.PVTKRRX_PLAYBACK_BASE_URL = originalPlaybackBaseUrl
     await new Promise(resolve => server.close(resolve))
     restoreMocks()
     fs.rmSync(runtimeDir, { recursive: true, force: true })

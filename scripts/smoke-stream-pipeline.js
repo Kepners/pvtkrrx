@@ -368,6 +368,48 @@ async function run() {
     })
 
     await withScenario(async () => {
+      delete process.env.VERCEL
+      ProwlarrClient.prototype.searchImdb = async () => [trackerItem()]
+      QBitClient.prototype.torrents = async () => []
+      CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([
+        { path: 'Movie.Name.2026.1080p.WEB-DL.x264.mkv', length: 12_000_000_000 }
+      ]))
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        'tt1234567',
+        'https://control.example',
+        'selfhost',
+        'https://play.example'
+      )
+
+      assert.equal(result.streams.length, 1, '#3e self-host tracker playback should still emit a stream when a dedicated playback origin is configured')
+      assert.match(String(result.streams[0]?.url || ''), /^https:\/\/play\.example\/selfhost\/playback\//, '#3e self-host tracker playback should use the dedicated playback origin instead of the control/tunnel origin')
+    })
+
+    await withScenario(async () => {
+      delete process.env.VERCEL
+      ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent().hash, link: '' })]
+      QBitClient.prototype.torrents = async () => [matchedTorrent()]
+      QBitClient.prototype.files = async () => [matchedFile()]
+      CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        'tt1234567',
+        'https://control.example',
+        'selfhost',
+        'https://play.example'
+      )
+
+      assert.equal(result.streams.length, 1, '#3f self-host buffering should still emit a stream when a dedicated playback origin is configured')
+      assert.match(String(result.streams[0]?.url || ''), /^https:\/\/play\.example\/selfhost\/file\//, '#3f self-host built-in file playback should use the dedicated playback origin instead of the control/tunnel origin')
+    })
+
+    await withScenario(async () => {
       process.env.VERCEL = '1'
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem()]
       QBitClient.prototype.torrents = async () => []

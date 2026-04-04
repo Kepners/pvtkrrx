@@ -49,6 +49,11 @@ const {
 
 loadLocalEnv()
 
+const IS_VERCEL_RUNTIME = Boolean(process.env.VERCEL)
+const SELF_HOST_SERVER_MODE = (
+  !IS_VERCEL_RUNTIME &&
+  /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_SELF_HOST_MODE || '').trim())
+)
 const STREAM_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_WAIT_TIMEOUT_MS || '90000', 10)
 const STREAM_WAIT_INTERVAL_MS = parseInt(process.env.STREAM_WAIT_INTERVAL_MS || '2000', 10)
 const STREAM_RANGE_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_RANGE_WAIT_TIMEOUT_MS || '45000', 10)
@@ -59,7 +64,10 @@ const STREAM_READY_START_FRACTION = parseStartFraction(
   '0.5%'
 )
 const STREAM_READY_MIN_BYTES = parseByteCount(process.env.STREAM_READY_MIN_BYTES || '24MB', 24 * 1024 * 1024)
-const STREAM_PRIORITIZE_LAST_PIECES = String(process.env.STREAM_PRIORITIZE_LAST_PIECES || 'true').trim().toLowerCase() !== 'false'
+const STREAM_PRIORITIZE_LAST_PIECES = String(
+  process.env.STREAM_PRIORITIZE_LAST_PIECES ||
+  (SELF_HOST_SERVER_MODE ? 'false' : 'true')
+).trim().toLowerCase() !== 'false'
 const WATCHED_DELETE_THRESHOLD = Math.max(0.5, Math.min(0.99, parseFloat(process.env.PVTKRRX_WATCHED_DELETE_THRESHOLD || '0.95')))
 const WATCHED_DELETE_GRACE_MS = Math.max(0, parseInt(process.env.PVTKRRX_WATCHED_DELETE_GRACE_MS || '180000', 10))
 // Pairing should be hash-first and stable: desktop publishes LAN endpoint, hosted token hash resolves it.
@@ -74,11 +82,6 @@ const STREMIO_API_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREM
 const STREMIO_AUTH_KEY_REGEX = /^[A-Za-z0-9._~+/=-]{16,1024}$/
 const STREMIO_AUTH_KEY_CAPTURE_PATTERN = '[A-Za-z0-9._~+/=-]{16,1024}'
 const STREMIO_AUTH_SCAN_DIRS_OVERRIDE = String(process.env.PVTKRRX_STREMIO_AUTH_SCAN_DIRS || '').trim()
-const IS_VERCEL_RUNTIME = Boolean(process.env.VERCEL)
-const SELF_HOST_SERVER_MODE = (
-  !IS_VERCEL_RUNTIME &&
-  /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_SELF_HOST_MODE || '').trim())
-)
 const SENSITIVE_WEB_ORIGINS = parseOriginAllowlist(
   process.env.PVTKRRX_ALLOWED_WEB_ORIGINS || 'https://www.pvtkrrx.cc'
 )
@@ -1295,6 +1298,14 @@ function getPublicBaseUrl(req) {
   return `${protocol}://${req.get('host')}`
 }
 
+function getPlaybackBaseUrl(req) {
+  const configured = parseUrlCandidate(process.env.PVTKRRX_PLAYBACK_BASE_URL || '')
+  if (configured && (configured.protocol === 'http:' || configured.protocol === 'https:')) {
+    return normalizeBaseUrl(configured.origin)
+  }
+  return getPublicBaseUrl(req)
+}
+
 function getConfigIssues(config, options = {}) {
   const safeConfig = config && typeof config === 'object' ? config : {}
   const issues = []
@@ -2241,6 +2252,7 @@ module.exports = {
   requireLocalConfigReadback,
   requireLocalQbitControl,
   getPublicBaseUrl,
+  getPlaybackBaseUrl,
   getConfigIssues,
   isLoopbackHost,
   getInstallMode,

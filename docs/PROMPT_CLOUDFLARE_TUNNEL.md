@@ -16,7 +16,7 @@ Add a **Cloudflare Tunnel** step to the installer that gives the user a free HTT
 cloudflared tunnel --url http://localhost:7000
 ```
 
-This outputs a random `https://xxxxx.trycloudflare.com` URL. No Cloudflare account needed. The tunnel proxies HTTPS traffic to the local port. Video bytes don't go through it — only JSON API calls (manifest, catalog, search, stream lookups). Playback goes direct to the file server.
+This outputs a random `https://xxxxx.trycloudflare.com` URL. No Cloudflare account needed. The tunnel proxies HTTPS traffic to the local port. Hosted-relay video bytes don't go through it. For self-host built-in `/file` and `/playback`, keep the tunnel on control/install traffic only by setting `PVTKRRX_PLAYBACK_BASE_URL` to a separate direct HTTPS origin; otherwise built-in self-host playback falls back to the tunnel origin.
 
 ### What the installer should do
 
