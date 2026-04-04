@@ -19,7 +19,7 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 
 - **Sports** — Browse and search private tracker sports content (EPL, F1, UFC) directly in Stremio
 - **Sports-first discovery** — `All Sports` plus sport-family catalogs now lead the movie discovery column, with the third-column filter used for league/team detail
-- **Sports artwork enrichment** — Optional TheSportsDB poster, landscape, background, and logo artwork with cache-aware lookups plus on-demand disk-backed image caching on the active runtime; sports catalog tiles now prefer portrait poster art while keeping separate background/logo loading art
+- **Sports artwork enrichment** — Optional TheSportsDB poster, landscape, background, and logo artwork with cache-aware lookups plus disk-backed image caching on the active runtime; `npm run server:setup` now also pre-seeds upcoming event art, team badges, and mapped league artwork into `sports-image-cache/`, and `npm run cache:sports` can refresh that cache later without redownloading existing files
 - **Movies & TV** — IMDb-matched content from your private trackers
 - **Seedbox Library** — Browse everything already downloaded on your seedbox
 - **Smart filtering** — Sports indexers never contaminate movie/TV searches
@@ -114,6 +114,7 @@ The Linux installer now bootstraps a dedicated self-host server in one flow:
 - saves the disk-backed self-host config into the runtime directory
 - creates the self-host password file
 - can install/start a Linux `systemd` service for auto-boot
+- pre-seeds the local `sports-image-cache/` with upcoming TheSportsDB event images plus team and league artwork using the same runtime cache path the addon serves later
 - prints a one-time `Configure` bootstrap URL with `#serverPassword=...` so the first browser open can load the saved self-host config automatically
 
 After this first install, the runtime is yours. The hosted site is only the download/bootstrap source.
@@ -123,6 +124,12 @@ If you are already inside a checked-out repo on the server, run the same install
 ```bash
 npm run server:setup
 ```
+
+```bash
+npm run cache:sports
+```
+
+Re-run `npm run cache:sports` whenever you want to refresh the local poster cache non-destructively, for example from a weekly cron on a self-hosted server.
 
 The self-hosted server route keeps a stable disk-backed manifest at `/selfhost/manifest.json?mode=hosted`.
 Open `/configure` in a browser to review or edit the saved config at any time.
@@ -163,7 +170,7 @@ That is enough for `PC Local` and `Hybrid Home`, where the local runtime can rea
 | Prowlarr URL | Yes | e.g. `http://seedbox.example.com:9696` |
 | Prowlarr API Key | Yes | Found in Prowlarr → Settings → General |
 | TheSportsDB API Key | No | Defaults to free key `123`; add your own key for higher limits |
-| TheSportsDB Cache (hours) | No | How long sports artwork lookups are reused before refresh. Sports image bytes are also cached on demand by the active runtime |
+| TheSportsDB Cache (hours) | No | How long sports artwork lookups are reused before refresh. Sports image bytes are also cached on demand by the active runtime and can be pre-seeded via `npm run server:setup` or `npm run cache:sports` |
 | qBittorrent URL | Yes | e.g. `http://seedbox.example.com:8080` |
 | qBittorrent Username | Yes | qBit WebUI credentials |
 | qBittorrent Password | Yes | qBit WebUI credentials |

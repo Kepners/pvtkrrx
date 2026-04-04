@@ -8,6 +8,7 @@ const { resolveRuntimeDir } = require('../src/utils/runtimeDir')
 const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJsonFile')
 const { ensureServerAdminToken } = require('../src/utils/serverAdminToken')
 const { discoverProwlarrConfig, discoverQbitConfig, ensureProwlarrQbitDownloadClient } = require('../src/utils/provision')
+const { seedSportsImageCache, summarizeSportsImageSeed } = require('../src/utils/sportsCacheSeeder')
 const { runFullBootstrap } = require('./server-installer')
 const { installSystemdService } = require('./install-systemd-service')
 
@@ -298,6 +299,18 @@ async function run() {
       } catch (error) {
         console.warn(`systemd install skipped: ${error.message}`)
       }
+    }
+
+    console.log('')
+    console.log('Pre-seeding sports image cache...')
+    try {
+      const sportsSeedSummary = await seedSportsImageCache({
+        apiKey: sportsDbApiKey,
+        logger: console
+      })
+      console.log(`✓ Sports cache: ${summarizeSportsImageSeed(sportsSeedSummary)}`)
+    } catch (error) {
+      console.warn(`⚠ Sports cache pre-seed skipped: ${error.message}`)
     }
 
     console.log('')

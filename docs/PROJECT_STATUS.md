@@ -20,6 +20,7 @@ The practical reading of the project today is:
 - PVTKRRX now treats extracted direct video as the only supported packed-RAR playback path by default, and keeps native `rarUrls` behind an explicit experimental override
 - the sports catalog artwork path now prefers portrait poster art for tiles, while keeping separate sport-aware backgrounds/logos for player wallpaper/loading
 - sports poster, wallpaper, landscape, and logo bytes can now be cached on demand by the active runtime through signed `/image/sports/...` URLs instead of hotlinking every request back to the upstream artwork host
+- `npm run server:setup` now also pre-seeds that same `sports-image-cache/` store with upcoming event art, top team badges, and mapped league artwork, and `npm run cache:sports` can refresh it later without deleting warm entries
 - empty movie, TV, and sports catalogs now return a setup-needed placeholder when Prowlarr has no indexers or cannot be reached, instead of showing blank `EmptyContent`
 - the Windows installer/build flow is reproducible again
 - `https://www.pvtkrrx.cc` is the live public relay; `https://pvtkrrx.vercel.app` is currently a dead preview hostname returning Vercel `DEPLOYMENT_NOT_FOUND`
@@ -34,11 +35,13 @@ The practical reading of the project today is:
 - `/local/lan-token` can now mint hybrid hosted tokens explicitly, while the Windows/local config path keeps its own host-side pairing defaults intact.
 - Legacy hosted LAN tokens without explicit pair booleans still resolve as `LAN Bridge`, so older installs do not get silently reinterpreted as `Remote Seedbox`.
 - Sports grouping now keeps one stable team order for deduped matchup posters instead of inheriting the last tracker title ordering, and the sports thumb helper is back in-tree so the richer poster generation path is not orphaned.
+- Added a reusable sports cache pre-seed step plus `npm run cache:sports`, and wired both self-host setup flows to warm `sports-image-cache/` with upcoming event, team, and mapped-league artwork using the existing disk cache writer.
 - Regression coverage now includes:
   - hybrid hosted token minting and manifest resolution
   - hybrid cloud fallback headers when the home route is offline
   - legacy LAN token compatibility without explicit booleans
   - sports structured matchup/F1 poster token coverage
+  - sports cache pre-seed rerun/cache-hit coverage
 
 ## Earlier 2026-04-04 Self-Host Work
 
@@ -82,6 +85,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - `npm run smoke:config` passed on 2026-04-02 after the release-status endpoint and homepage release card were added
 - `npm run smoke:desktop` passed on 2026-04-02 after the desktop popup gained its release-status panel and preload bridge
 - `npm run smoke:sports` passed on 2026-03-31 after the sports artwork byte-cache update, including proxy URL coverage and cache-hit reuse checks
+- `npm run smoke:sports-cache` passed on 2026-04-04 for the new sports cache pre-seed flow, including disk-cache reuse on rerun
 - `npm run smoke:sports` passed again on 2026-03-31 after the Apple TV-safe meta placeholder change
 - `npm run smoke:desktop` passed on 2026-03-29 and now guards the desktop auto-provision persistence path against writing redacted config readbacks back to disk
 - `npm run smoke:playback` passed on 2026-03-29 and now covers redirect plus byte-serving on the shared `/file` route

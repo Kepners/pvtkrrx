@@ -34,6 +34,7 @@ PVTKRRX is one codebase with three active runtime pieces:
    - if those providers are missing on a direct `npm run server:setup` run, it can hand off to the full Linux bootstrap so the installer can install them instead of silently continuing with empty defaults
    - self-host install links should come from a configured public HTTPS base URL (`PVTKRRX_PUBLIC_BASE_URL`) rather than a raw public `http://IP:port` origin
    - the installer prints a one-time `Configure` bootstrap URL with `#serverAdminToken=...` so the browser can load the saved self-host config automatically on first open
+   - the installer now also runs a non-destructive sports-art preseed that warms `sports-image-cache/` with upcoming event artwork, top team badges, and mapped league art using the same runtime cache the addon serves later
    - this is the independence path: after bootstrap, the runtime and config stay on the user's hardware and the hosted PVTKRRX site is no longer in the request path unless the user explicitly chooses the hosted relay
    - can install optional Linux `systemd` startup through `npm run server:setup` / `npm run server:install-service`
 3. Local runtime on the Windows host:
@@ -124,6 +125,7 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 - `backgroundImage` and `logo` stay separate from the portrait poster contract for player-loading and wallpaper use.
 - When Prowlarr has no indexers or cannot be reached, empty movie, TV, and sports catalogs now return a setup-needed placeholder card instead of a blank grid, so the user gets a useful recovery cue in Stremio.
 - When external sports art exists, addon responses now prefer signed `/image/sports/...` URLs so the active local or hosted runtime can cache poster, wallpaper, landscape, and logo bytes on disk instead of hotlinking every request back to the upstream art host.
+- `npm run server:setup` and `npm run cache:sports` can now warm that same disk cache ahead of time with upcoming event artwork, top team badges, and mapped league art so first-run sports tiles do not depend on cold image fetches.
 - Sports detail meta now exposes Stremio `genres` tags from the resolved sport classification when available.
 - Sports title parsing now handles both team-vs-team formats (`EPL.2026.03.15.Arsenal.vs.Chelsea`) and non-vs event formats (`Formula1.2026.03.28.Japanese.Grand.Prix.Qualifying`, `UFC.Fight.Night.270.Main.Card`).
 - Motorsport coverage now includes F1, MotoGP, NASCAR, IndyCar, WRC, Supercars/V8, WSBK, WEC, and Formula E.

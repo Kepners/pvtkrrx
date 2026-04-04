@@ -42,6 +42,12 @@ function mapLeague(code) {
   return LEAGUE_MAP[normalized] || null
 }
 
+function listMappedLeagues() {
+  return Object.entries(LEAGUE_MAP).map(([code, name]) => ({ code, name }))
+}
+
 module.exports = {
+  LEAGUE_MAP,
+  listMappedLeagues,
   mapLeague
 }

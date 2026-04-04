@@ -9,6 +9,7 @@ const { stdin: input, stdout: output } = require('node:process')
 const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJsonFile')
 const { ensureServerAdminToken } = require('../src/utils/serverAdminToken')
 const { discoverProwlarrConfig, discoverQbitConfig, ensureProwlarrQbitDownloadClient } = require('../src/utils/provision')
+const { seedSportsImageCache, summarizeSportsImageSeed } = require('../src/utils/sportsCacheSeeder')
 const { installSystemdService } = require('./install-systemd-service')
 
 function parseDotEnvFile(filePath) {
@@ -791,6 +792,18 @@ async function run() {
       console.warn(`⚠ Prowlarr qBittorrent download client: ${prowlarrSync.message}`)
     }
 
+    console.log('')
+    console.log('Pre-seeding sports image cache...')
+    try {
+      const sportsSeedSummary = await seedSportsImageCache({
+        apiKey: sportsDbApiKey,
+        logger: console
+      })
+      console.log(`✓ Sports cache: ${summarizeSportsImageSeed(sportsSeedSummary)}`)
+    } catch (error) {
+      console.warn(`⚠ Sports cache pre-seed skipped: ${error.message}`)
+    }
+
     let serviceResult = null
     if (installService) {
       ensureOwnership(runtimeDir, serviceUser, repoRoot)
@@ -1052,6 +1065,18 @@ async function runAuto() {
   console.log('')
   console.log(`✓ Config saved to ${localConfigPath}`)
   console.log(`✓ Self-host password: ${adminState.path ? fs.readFileSync(adminState.path, 'utf8').trim() : adminState.token}`)
+
+  console.log('')
+  console.log('Pre-seeding sports image cache...')
+  try {
+    const sportsSeedSummary = await seedSportsImageCache({
+      apiKey: String(nextConfig?.sportsDbApiKey || '123').trim(),
+      logger: console
+    })
+    console.log(`✓ Sports cache: ${summarizeSportsImageSeed(sportsSeedSummary)}`)
+  } catch (error) {
+    console.warn(`⚠ Sports cache pre-seed skipped: ${error.message}`)
+  }
 
   // ── systemd service ──
   let serviceResult = null
