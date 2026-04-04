@@ -8,14 +8,18 @@ const { cleanTitle, isLikelyPackedReleaseTitle } = require('../utils/parser')
 const { normalizeSportKey, resolveSportHint, isSportsNoiseTitle, isLikelySportsEventTitle } = require('../utils/sportsRules')
 const { isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { formatSize, findVideoFile } = require('../utils/streams')
-const { makeSportsThumbUrl, makeSportsPosterUrl } = require('../utils/sportsThumb')
+const { makeSportsPosterUrl } = require('../utils/sportsThumb')
 const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
 const { mapLeague } = require('../utils/leagueMap')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { encodeCustomId } = require('../utils/customId')
 const { findExistingLocalFilePath } = require('../utils/localStorageRoots')
 const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
-const { proxySportsImageUrl } = require('../utils/sportsImageCache')
+const {
+  resolveSportsPosterAsset,
+  resolveSportsBackgroundAsset,
+  resolveSportsLogoAsset
+} = require('../utils/sportsArtwork')
 const { buildMetaPlaceholder } = require('../utils/metaPlaceholder')
 
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
@@ -772,25 +776,27 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     if (eventDate) descriptionParts.push(eventDate)
     if (league) descriptionParts.push(league)
 
-    const generatedArtworkItem = {
+    const artworkInput = {
+      baseUrl: options.baseUrl,
+      title: item.title || displayTitle,
+      displayTitle,
+      publishDate: eventDate || item.pubDate || item.publishDate || '',
+      sportHint: resolvedSportHint,
+      league,
+      eventName: parsedEvent?.eventName || sportsArtwork?.eventName || '',
+      homeTeam: parsedSportsEvent?.homeTeam || sportsArtwork?.homeTeam || '',
+      awayTeam: parsedSportsEvent?.awayTeam || sportsArtwork?.awayTeam || '',
+      sportsArtwork
+    }
+    const generatedPosterUrl = makeSportsPosterUrl(options.baseUrl, {
       title: displayTitle,
       publishDate: eventDate || item.pubDate || item.publishDate || '',
       sportHint: resolvedSportHint,
       league
-    }
-    const generatedPosterUrl = makeSportsPosterUrl(options.baseUrl, generatedArtworkItem)
-    const generatedBackgroundUrl = makeSportsThumbUrl(options.baseUrl, generatedArtworkItem, 'background')
-    const portraitPosterUrl = String(sportsArtwork?.poster || '').trim()
-    const landscapePosterUrl = String(sportsArtwork?.image || sportsArtwork?.landscapeImage || '').trim()
-    const backgroundSourceUrl = String(sportsArtwork?.backgroundImage || '').trim() || landscapePosterUrl
-    const posterUrl = proxySportsImageUrl(
-      options.baseUrl,
-      portraitPosterUrl || landscapePosterUrl,
-      portraitPosterUrl ? 'poster' : 'landscape'
-    ) || generatedPosterUrl
-    const backgroundUrl = proxySportsImageUrl(options.baseUrl, backgroundSourceUrl, 'background') || generatedBackgroundUrl
-    const posterShape = portraitPosterUrl || posterUrl === generatedPosterUrl ? 'poster' : 'landscape'
-    const logoUrl = proxySportsImageUrl(options.baseUrl, String(sportsArtwork?.logo || '').trim(), 'logo')
+    })
+    const { poster: posterUrl, posterShape } = resolveSportsPosterAsset(artworkInput)
+    const backgroundUrl = resolveSportsBackgroundAsset(artworkInput)
+    const logoUrl = resolveSportsLogoAsset(artworkInput)
 
     return {
       id: encodeCustomId({
@@ -819,8 +825,8 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       type: mediaType,
       name: displayTitle,
       description: descriptionParts.join(' | '),
-      poster: posterUrl,
-      background: backgroundUrl,
+      poster: posterUrl || generatedPosterUrl,
+      background: backgroundUrl || undefined,
       logo: logoUrl || undefined,
       releaseInfo: eventDate || undefined,
       posterShape

@@ -176,6 +176,31 @@ function proxySportsImageUrl(baseUrl, sourceUrl, variant = 'poster') {
   return proxied || value
 }
 
+async function resolveSportsImageSourceUrl(sourceUrl, variant = 'poster') {
+  const normalizedUrl = normalizeRemoteImageUrl(sourceUrl)
+  if (!normalizedUrl) return null
+  const token = encodeSportsImageToken(normalizedUrl)
+  if (!token) return null
+  return resolveSportsImageRequest(token, variant)
+}
+
+async function readSportsImageDataUri(sourceUrl, variant = 'logo', options = {}) {
+  const maxBytes = clampNumber(options.maxBytes, 1024 * 1024, 16 * 1024, 2 * 1024 * 1024)
+  const resolved = await resolveSportsImageSourceUrl(sourceUrl, variant)
+  if (!resolved?.filePath || !fs.existsSync(resolved.filePath)) return ''
+
+  const size = Number(resolved.size || 0)
+  if (Number.isFinite(size) && size > maxBytes) return ''
+
+  const content = fs.readFileSync(resolved.filePath)
+  if (!content || content.length === 0 || content.length > maxBytes) return ''
+
+  const ext = path.extname(String(resolved.filePath || '')).toLowerCase()
+  const contentType = inferContentType(resolved.contentType, ext)
+  if (!contentType) return ''
+  return `data:${contentType};base64,${content.toString('base64')}`
+}
+
 function buildCacheKey(sourceUrl) {
   return crypto.createHash('sha256').update(String(sourceUrl || '')).digest('hex')
 }
@@ -474,6 +499,8 @@ module.exports = {
   decodeSportsImageToken,
   makeSportsImageProxyUrl,
   proxySportsImageUrl,
+  resolveSportsImageSourceUrl,
+  readSportsImageDataUri,
   getCachedSportsImage,
   resolveSportsImageRequest
 }

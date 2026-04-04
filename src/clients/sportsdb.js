@@ -539,8 +539,8 @@ function toEventList(payload) {
 function pickLeaguePosterImage(league) {
   const candidates = [
     league?.strPoster,
-    league?.strBadge,
     league?.strLogo,
+    league?.strBadge,
     league?.strFanart1,
     league?.strFanart2,
     league?.strFanart3,
@@ -599,19 +599,24 @@ function pickLeagueLogo(league) {
   return ''
 }
 
-function pickTeamPosterImage(team) {
+function pickTeamBadgeImage(team) {
   const candidates = [
-    team?.strTeamLogo,
     team?.strBadge,
+    team?.strTeamBadge,
+    team?.strTeamLogo,
     team?.strTeamJersey,
     team?.strTeamBanner,
-    team?.strTeamFanart1,
+    team?.strTeamFanart1
   ]
   for (const value of candidates) {
     const url = String(value || '').trim()
     if (url) return url
   }
   return ''
+}
+
+function pickTeamPosterImage(team) {
+  return pickTeamBadgeImage(team)
 }
 
 function pickTeamLandscapeImage(team) {
@@ -631,8 +636,9 @@ function pickTeamLandscapeImage(team) {
 
 function pickTeamLogo(team) {
   const candidates = [
-    team?.strTeamLogo,
-    team?.strBadge
+    team?.strBadge,
+    team?.strTeamBadge,
+    team?.strTeamLogo
   ]
   for (const value of candidates) {
     const url = String(value || '').trim()
@@ -677,12 +683,22 @@ function buildStructuredEventData(item) {
 
 function structuredFingerprint(event) {
   if (!event) return ''
-  return [
-    normalizeLeagueName(event.league),
-    String(event.date || '').slice(0, 10),
-    normalizeTeamName(event.homeTeam),
-    normalizeTeamName(event.awayTeam)
-  ].join('|')
+  if (event.homeTeam && event.awayTeam) {
+    return [
+      normalizeLeagueName(event.league),
+      String(event.date || '').slice(0, 10),
+      normalizeTeamName(event.homeTeam),
+      normalizeTeamName(event.awayTeam)
+    ].join('|')
+  }
+  if (event.eventName) {
+    return [
+      normalizeLeagueName(event.league),
+      String(event.date || '').slice(0, 10),
+      normalizeToken(event.eventName)
+    ].join('|')
+  }
+  return ''
 }
 
 function structuredLookupCacheKey(apiKey, event) {
@@ -697,6 +713,12 @@ function eventArtworkCacheKey(apiKey, eventId = '') {
   const normalizedEventId = String(eventId || '').trim().toLowerCase()
   if (!normalizedEventId) return ''
   return `${CACHE_KEY_VERSION}|event-artwork|${String(apiKey || '').trim().toLowerCase()}|${normalizedEventId}`
+}
+
+function structuredArtworkCacheKey(apiKey, structuredEvent = null) {
+  const fingerprint = structuredFingerprint(structuredEvent)
+  if (!fingerprint) return ''
+  return `${CACHE_KEY_VERSION}|structured-artwork|${String(apiKey || '').trim().toLowerCase()}|${fingerprint}`
 }
 
 function leagueArtworkCacheKey(apiKey, league = '', date = '', sportHint = '') {
@@ -716,13 +738,19 @@ function persistResolvedArtworkVariants(primaryKey, value, expiresAt, options = 
   const eventKey = eventArtworkCacheKey(apiKey, options.eventId || value?.eventId)
   if (eventKey) persistResolvedArtwork(eventKey, value, expiresAt)
 
-  const leagueKey = leagueArtworkCacheKey(
-    apiKey,
-    options.league || value?.league || '',
-    options.dateHint || value?.eventDate || '',
-    options.sportHint || value?.sport || ''
-  )
-  if (leagueKey) persistResolvedArtwork(leagueKey, value, expiresAt)
+  const structuredKey = structuredArtworkCacheKey(apiKey, options.structuredEvent)
+  if (structuredKey) persistResolvedArtwork(structuredKey, value, expiresAt)
+
+  const source = String(value?.source || '').trim()
+  if (source === 'thesportsdb-league') {
+    const leagueKey = leagueArtworkCacheKey(
+      apiKey,
+      options.league || value?.league || '',
+      options.dateHint || value?.eventDate || '',
+      options.sportHint || value?.sport || ''
+    )
+    if (leagueKey) persistResolvedArtwork(leagueKey, value, expiresAt)
+  }
 }
 
 function scoreLeague(league, title, titleSport) {
@@ -770,6 +798,7 @@ function toLeagueFallbackValue(leagueFallback, dateHint, sportHint) {
     eventDate: dateHint,
     sport: leagueFallback.sport || sportHint || '',
     league: leagueFallback.league || '',
+    leagueLogo: logo,
     source: 'thesportsdb-league'
   }
 }
@@ -827,8 +856,26 @@ function buildArtworkValue(event, posterImage, landscapeImage, backgroundImage, 
     eventDate: String(event.dateEvent || '').trim(),
     sport: String(event.strSport || '').trim(),
     league: String(event.strLeague || '').trim(),
+    homeTeam: String(event.strHomeTeam || '').trim(),
+    awayTeam: String(event.strAwayTeam || '').trim(),
     source
   }
+}
+
+function applyArtworkContext(value, context = {}) {
+  if (!value || !context || typeof context !== 'object') return value
+  const next = { ...value }
+  const homeBadge = String(context.homeBadge || '').trim()
+  const awayBadge = String(context.awayBadge || '').trim()
+  const leagueLogo = String(context.leagueLogo || '').trim()
+  const homeTeam = String(context.homeTeam || value.homeTeam || '').trim()
+  const awayTeam = String(context.awayTeam || value.awayTeam || '').trim()
+  if (homeBadge) next.homeBadge = homeBadge
+  if (awayBadge) next.awayBadge = awayBadge
+  if (leagueLogo) next.leagueLogo = leagueLogo
+  if (homeTeam) next.homeTeam = homeTeam
+  if (awayTeam) next.awayTeam = awayTeam
+  return next
 }
 
 class SportsDbClient {
@@ -1143,6 +1190,23 @@ class SportsDbClient {
     return pickTeamLogo(away)
   }
 
+  async _resolveArtworkContext(bestEvent) {
+    if (!bestEvent) return {}
+    const [league, home, away] = await Promise.all([
+      this._lookupLeague(bestEvent.idLeague),
+      this._lookupTeam(bestEvent.idHomeTeam),
+      this._lookupTeam(bestEvent.idAwayTeam)
+    ])
+
+    return {
+      homeTeam: String(bestEvent.strHomeTeam || '').trim(),
+      awayTeam: String(bestEvent.strAwayTeam || '').trim(),
+      homeBadge: pickTeamBadgeImage(home),
+      awayBadge: pickTeamBadgeImage(away),
+      leagueLogo: pickLeagueLogo(league)
+    }
+  }
+
   async findEventByStructuredData(input = {}) {
     const structuredEvent = buildStructuredEventData(input)
     if (!structuredEvent) return null
@@ -1231,11 +1295,8 @@ class SportsDbClient {
     const eventArtHit = getCachedValue(cache, eventArtworkCacheKey(this.apiKey, requestedEventIdRaw))
     if (eventArtHit !== undefined) return eventArtHit || null
 
-    const leagueArtHit = getCachedValue(
-      cache,
-      leagueArtworkCacheKey(this.apiKey, mappedLeague, dateHint, sportHint || titleSport || structuredSportHint)
-    )
-    if (leagueArtHit !== undefined) return leagueArtHit || null
+    const structuredArtHit = getCachedValue(cache, structuredArtworkCacheKey(this.apiKey, structuredEvent))
+    if (structuredArtHit !== undefined) return structuredArtHit || null
 
     const ongoing = inFlight.get(key)
     if (ongoing) return ongoing
@@ -1248,7 +1309,8 @@ class SportsDbClient {
             eventId: overrides.eventId || requestedEventIdRaw || value?.eventId,
             league: overrides.league || value?.league || mappedLeague,
             dateHint: overrides.dateHint || value?.eventDate || dateHint,
-            sportHint: overrides.sportHint || value?.sport || sportHint || titleSport || structuredSportHint
+            sportHint: overrides.sportHint || value?.sport || sportHint || titleSport || structuredSportHint,
+            structuredEvent: overrides.structuredEvent || structuredEvent
           })
         }
 
@@ -1263,7 +1325,11 @@ class SportsDbClient {
             const directLandscape = await this._resolveFallbackImage(directEvent, 'landscape') || directPoster
             const directBackground = await this._resolveFallbackImage(directEvent, 'background') || directLandscape || directPoster
             const directLogo = await this._resolveFallbackLogo(directEvent)
-            const directValue = buildArtworkValue(directEvent, directPoster, directLandscape, directBackground, directLogo, 'thesportsdb-direct')
+            const directContext = await this._resolveArtworkContext(directEvent)
+            const directValue = applyArtworkContext(
+              buildArtworkValue(directEvent, directPoster, directLandscape, directBackground, directLogo, 'thesportsdb-direct'),
+              directContext
+            )
             if (directValue) {
               const expiresAt = Date.now() + this.artworkHitTtlMs
               cache.set(key, { value: directValue, expiresAt })
@@ -1279,19 +1345,23 @@ class SportsDbClient {
           return null
         }
 
-        if (structuredEvent) {
+        if (structuredEvent?.homeTeam && structuredEvent?.awayTeam) {
           const structuredMatch = await this.findEventByStructuredData(structuredEvent)
           const structuredPoster = await this._resolveFallbackImage(structuredMatch, 'poster')
           const structuredLandscape = await this._resolveFallbackImage(structuredMatch, 'landscape') || structuredPoster
           const structuredBackground = await this._resolveFallbackImage(structuredMatch, 'background') || structuredLandscape || structuredPoster
           const structuredLogo = await this._resolveFallbackLogo(structuredMatch)
-          const structuredValue = buildArtworkValue(
-            structuredMatch,
-            structuredPoster,
-            structuredLandscape,
-            structuredBackground,
-            structuredLogo,
-            'thesportsdb-structured'
+          const structuredContext = await this._resolveArtworkContext(structuredMatch)
+          const structuredValue = applyArtworkContext(
+            buildArtworkValue(
+              structuredMatch,
+              structuredPoster,
+              structuredLandscape,
+              structuredBackground,
+              structuredLogo,
+              'thesportsdb-structured'
+            ),
+            structuredContext
           )
           if (structuredValue) {
             const expiresAt = Date.now() + this.artworkHitTtlMs
@@ -1366,7 +1436,11 @@ class SportsDbClient {
           return null
         }
 
-        const value = buildArtworkValue(best, posterImage, landscapeImage, backgroundImage, logoImage, 'thesportsdb')
+        const artworkContext = await this._resolveArtworkContext(best)
+        const value = applyArtworkContext(
+          buildArtworkValue(best, posterImage, landscapeImage, backgroundImage, logoImage, 'thesportsdb'),
+          artworkContext
+        )
         const expiresAt = Date.now() + this.artworkHitTtlMs
         cache.set(key, { value, expiresAt })
         rememberArtwork(value, expiresAt)

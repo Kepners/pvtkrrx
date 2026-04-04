@@ -17,6 +17,7 @@ const { detectSport } = require('../src/utils/sportClassifier')
 const { SportsDbClient } = require('../src/clients/sportsdb')
 const { encodeCustomId, decodeCustomId } = require('../src/utils/customId')
 const { setPublicCacheHeaders } = require('../src/lib/shared')
+const { decodeSportsThumbToken } = require('../src/utils/sportsThumb')
 const {
   makeSportsImageProxyUrl,
   decodeSportsImageToken,
@@ -67,6 +68,17 @@ function assertSportsProxyUrl(url, variant, sourceUrl, message) {
   )
   const token = value.split('/').pop()
   assert.equal(decodeSportsImageToken(token), sourceUrl, 'expected proxied sports image token to resolve back to the original artwork URL')
+}
+
+function assertSportsThumbUrl(url, variant = 'poster', message) {
+  const value = String(url || '')
+  assert.match(
+    value,
+    new RegExp(`^http://127\\.0\\.0\\.1:7000/thumb/sports/${variant}/`),
+    message || `expected sports thumb variant ${variant}`
+  )
+  const token = value.split('/').pop().replace(/\.svg$/i, '')
+  return decodeSportsThumbToken(token)
 }
 
 function testCacheHeadersIncludeStaleIfError() {
@@ -164,6 +176,73 @@ async function testStructuredFallbackToFuzzyLookup() {
   assert.equal(artwork.logo, 'https://example.com/logo.png')
 }
 
+async function testStructuredArtworkCacheDoesNotBleedAcrossFixtures() {
+  const client = new SportsDbClient('smoke-key', { cacheHours: 1 })
+  let structuredCalls = 0
+
+  client.findEventByStructuredData = async (input = {}) => {
+    structuredCalls += 1
+    if (String(input.homeTeam || '').includes('Bulls')) {
+      return {
+        idEvent: 'evt-bulls-knicks',
+        strEvent: 'Chicago Bulls vs New York Knicks',
+        dateEvent: '2026-03-18',
+        strSport: 'Basketball',
+        strLeague: 'NBA',
+        strHomeTeam: 'Chicago Bulls',
+        strAwayTeam: 'New York Knicks'
+      }
+    }
+    return {
+      idEvent: 'evt-celtics-heat',
+      strEvent: 'Boston Celtics vs Miami Heat',
+      dateEvent: '2026-03-18',
+      strSport: 'Basketball',
+      strLeague: 'NBA',
+      strHomeTeam: 'Boston Celtics',
+      strAwayTeam: 'Miami Heat'
+    }
+  }
+  client._resolveFallbackImage = async (event, prefer) => `https://example.com/${event.idEvent}-${prefer}.jpg`
+  client._resolveFallbackLogo = async (event) => `https://example.com/${event.idEvent}-logo.png`
+  client._resolveArtworkContext = async (event) => ({
+    homeTeam: event?.strHomeTeam || '',
+    awayTeam: event?.strAwayTeam || '',
+    homeBadge: `https://example.com/${String(event?.strHomeTeam || '').replace(/\s+/g, '-').toLowerCase()}-badge.png`,
+    awayBadge: `https://example.com/${String(event?.strAwayTeam || '').replace(/\s+/g, '-').toLowerCase()}-badge.png`,
+    leagueLogo: 'https://example.com/nba-logo.png'
+  })
+  client._fetchEvents = async () => []
+  client._fetchEventsByDate = async () => []
+  client._fetchTvEventsByDate = async () => []
+  client._resolveLeagueArtworkFromTitle = async () => null
+
+  const first = await client.getEventArtwork({
+    title: 'NBA.2026.03.18.Chicago.Bulls.vs.New.York.Knicks.1080p',
+    publishDate: '2026-03-18T12:00:00Z',
+    league: 'NBA',
+    date: '2026-03-18',
+    homeTeam: 'Chicago Bulls',
+    awayTeam: 'New York Knicks',
+    sportHint: 'basketball'
+  })
+
+  const second = await client.getEventArtwork({
+    title: 'NBA.2026.03.18.Boston.Celtics.vs.Miami.Heat.1080p',
+    publishDate: '2026-03-18T12:30:00Z',
+    league: 'NBA',
+    date: '2026-03-18',
+    homeTeam: 'Boston Celtics',
+    awayTeam: 'Miami Heat',
+    sportHint: 'basketball'
+  })
+
+  assert.equal(structuredCalls, 2, 'each fixture should resolve its own structured artwork instead of reusing a broad league/date cache entry')
+  assert.equal(first.eventId, 'evt-bulls-knicks')
+  assert.equal(second.eventId, 'evt-celtics-heat')
+  assert.notEqual(first.poster, second.poster, 'different fixtures should not reuse the same poster artwork')
+}
+
 async function testOrderAgnosticSportsGrouping() {
   class FakeProwlarrClient {
     async search() {
@@ -193,9 +272,14 @@ async function testOrderAgnosticSportsGrouping() {
         landscapeImage: 'https://example.com/landscape.jpg',
         backgroundImage: 'https://example.com/background.jpg',
         image: 'https://example.com/landscape.jpg',
+        homeBadge: 'https://example.com/arsenal-badge.png',
+        awayBadge: 'https://example.com/chelsea-badge.png',
+        leagueLogo: 'https://example.com/epl-logo.png',
         eventId: 'sports-event-1',
         eventDate: '2026-03-15',
-        league: 'English Premier League'
+        league: 'English Premier League',
+        homeTeam: 'Arsenal',
+        awayTeam: 'Chelsea'
       }
     }
   }
@@ -220,7 +304,9 @@ async function testOrderAgnosticSportsGrouping() {
 
   assert.equal(result.metas.length, 1, 'expected reversed team order to dedupe into one sports meta')
   assert.ok(result.metas[0].id.length < 256, 'expected sports meta id to stay under common Stremio client limits')
-  assertSportsProxyUrl(result.metas[0].poster, 'poster', 'https://example.com/portrait.jpg', 'expected sports catalog to prefer portrait artwork when available')
+  const posterPayload = assertSportsThumbUrl(result.metas[0].poster, 'poster', 'expected sports catalog to build a matchup poster for vs fixtures')
+  assert.equal(posterPayload.m, 'matchup', 'expected matchup posters for team-vs-team fixtures')
+  assert.deepEqual([posterPayload.o, posterPayload.w].sort(), ['Arsenal', 'Chelsea'])
   assert.equal(result.metas[0].posterShape, 'poster', 'expected sports catalog to tag portrait artwork as poster-shaped')
   assertSportsProxyUrl(result.metas[0].background, 'background', 'https://example.com/background.jpg')
   const decoded = decodeCustomId(result.metas[0].id)
@@ -229,6 +315,54 @@ async function testOrderAgnosticSportsGrouping() {
     decoded.n && decoded.n.length > 0,
     'expected compressed sports id to carry a display title'
   )
+}
+
+async function testLeagueFallbackUsesGeneratedMatchupPoster() {
+  class FakeProwlarrClient {
+    async search() {
+      return [{
+        title: 'EPL.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-A',
+        indexer: 'GeneralA',
+        size: 1_000_000_000,
+        seeders: 20,
+        pubDate: '2026-03-15T09:00:00Z'
+      }]
+    }
+  }
+
+  const { handleCatalog } = loadCatalogWithStubs({
+    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient }
+  })
+
+  const result = await withSportsDbPrototypePatches({
+    getEventArtwork: async () => ({
+      poster: 'https://example.com/repeated-football-photo.jpg',
+      image: 'https://example.com/repeated-football-photo-landscape.jpg',
+      backgroundImage: 'https://example.com/epl-background.jpg',
+      logo: 'https://example.com/epl-logo.png',
+      leagueLogo: 'https://example.com/epl-logo.png',
+      eventDate: '2026-03-15',
+      league: 'English Premier League',
+      source: 'thesportsdb-league'
+    })
+  }, async () => handleCatalog(
+    {
+      jackettUrl: 'http://127.0.0.1:9696',
+      jackettApiKey: 'smoke-api-key',
+      sportsDbApiKey: 'smoke-sports-key',
+      maxResults: '10'
+    },
+    'sports',
+    'pvtkrrx-sports',
+    'search=Arsenal',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  ))
+
+  const posterPayload = assertSportsThumbUrl(result.metas[0].poster, 'poster', 'league fallback should still produce a matchup event card, not a repeated generic football photo')
+  assert.equal(posterPayload.m, 'matchup')
+  assert.equal(posterPayload.gl, 'https://example.com/epl-logo.png')
+  assert.equal(posterPayload.o, 'Arsenal')
+  assert.equal(posterPayload.w, 'Chelsea')
 }
 
 async function testCatalogShowsSetupPlaceholderWhenProwlarrHasNoIndexers() {
@@ -563,6 +697,54 @@ async function testEventTitleCatalogGrouping() {
   assert.equal(result.metas[0].posterShape, 'poster', 'expected F1 catalog cards to declare poster-shaped artwork')
 }
 
+async function testF1FallbackUsesWeekendPosterCard() {
+  class FakeProwlarrClient {
+    async search() {
+      return [{
+        title: 'Formula1.2026.03.28.Japanese.Grand.Prix.Qualifying.1080p.WEB.h265-VERUM',
+        indexer: 'SportsTracker',
+        size: 2_000_000_000,
+        seeders: 30,
+        pubDate: '2026-03-28T12:00:00Z'
+      }]
+    }
+  }
+
+  const { handleCatalog } = loadCatalogWithStubs({
+    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient }
+  })
+
+  const result = await withSportsDbPrototypePatches({
+    getEventArtwork: async () => ({
+      image: 'https://example.com/f1-landscape.jpg',
+      backgroundImage: 'https://example.com/f1-background.jpg',
+      logo: 'https://example.com/f1-logo.png',
+      leagueLogo: 'https://example.com/f1-logo.png',
+      eventId: '',
+      eventDate: '2026-03-28',
+      league: 'Formula 1',
+      eventName: 'Japanese Grand Prix Qualifying',
+      source: 'thesportsdb-league'
+    })
+  }, async () => handleCatalog(
+    {
+      jackettUrl: 'http://127.0.0.1:9696',
+      jackettApiKey: 'smoke-api-key',
+      sportsDbApiKey: 'smoke-sports-key',
+      maxResults: '10'
+    },
+    'sports',
+    'pvtkrrx-sports',
+    'genre=F1',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  ))
+
+  const posterPayload = assertSportsThumbUrl(result.metas[0].poster, 'poster', 'F1 fallback should use a generated race-weekend poster card')
+  assert.equal(posterPayload.m, 'formula1')
+  assert.equal(posterPayload.e, 'Japanese Grand Prix Qualifying')
+  assert.equal(posterPayload.gl, 'https://example.com/f1-logo.png')
+}
+
 async function testSportsMetaRichDescription() {
   const { handleMeta } = require('../src/handlers/meta')
   const id = encodeCustomId({
@@ -706,7 +888,10 @@ async function testCompactSportsIdMetaArtwork() {
   }, async () => handleMeta({ sportsDbApiKey: 'smoke-sports-key' }, 'movie', compactId, { baseUrl: 'http://127.0.0.1:7000' }))
 
   assert.ok(metaResult.meta, 'compact sports meta should still resolve a meta object')
-  assertSportsProxyUrl(metaResult.meta.poster, 'poster', poster, 'meta should reuse the cached portrait poster from the catalog lookup')
+  const posterPayload = assertSportsThumbUrl(metaResult.meta.poster, 'poster', 'meta should rebuild a matchup poster from cached sports context')
+  assert.equal(posterPayload.m, 'matchup')
+  assert.equal(posterPayload.o, 'Arsenal')
+  assert.equal(posterPayload.w, 'Chelsea')
   assertSportsProxyUrl(metaResult.meta.background, 'background', background, 'meta should reuse the cached background from the catalog lookup')
   assertSportsProxyUrl(metaResult.meta.logo, 'logo', logo, 'meta should reuse the cached logo from the catalog lookup')
 }
@@ -807,9 +992,14 @@ async function testSportsCatalogUsesImageProxyUrls() {
       image: 'https://images.example.com/cache-proxy-landscape.jpg',
       backgroundImage: background,
       logo,
+      homeBadge: 'https://images.example.com/arsenal-badge.png',
+      awayBadge: 'https://images.example.com/chelsea-badge.png',
+      leagueLogo: 'https://images.example.com/epl-logo.png',
       eventId: 'catalog-image-proxy-event',
       eventDate: '2026-03-15',
-      league: 'English Premier League'
+      league: 'English Premier League',
+      homeTeam: 'Arsenal',
+      awayTeam: 'Chelsea'
     })
   }, async () => handleCatalog(
     {
@@ -824,7 +1014,8 @@ async function testSportsCatalogUsesImageProxyUrls() {
     { baseUrl: 'http://127.0.0.1:7000' }
   ))
 
-  assert.match(result.metas[0].poster, /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/poster\//, 'expected catalog poster to use local sports image proxy')
+  const posterPayload = assertSportsThumbUrl(result.metas[0].poster, 'poster', 'expected catalog poster to use generated matchup artwork')
+  assert.equal(posterPayload.m, 'matchup')
   assert.match(result.metas[0].background, /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/background\//, 'expected catalog background to use local sports image proxy')
   assert.match(String(result.metas[0].logo || ''), /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/logo\//, 'expected catalog logo to use local sports image proxy')
 }
@@ -858,9 +1049,14 @@ async function testSportsMetaUsesImageProxyUrls() {
       image: 'https://images.example.com/meta-proxy-landscape.jpg',
       backgroundImage: background,
       logo,
+      homeBadge: 'https://images.example.com/arsenal-badge.png',
+      awayBadge: 'https://images.example.com/chelsea-badge.png',
+      leagueLogo: 'https://images.example.com/epl-logo.png',
       eventDate: '2026-03-15',
       league: 'English Premier League',
-      eventName: 'Arsenal vs Chelsea'
+      eventName: 'Arsenal vs Chelsea',
+      homeTeam: 'Arsenal',
+      awayTeam: 'Chelsea'
     })
   }, async () => handleMeta(
     { sportsDbApiKey: 'smoke-sports-key' },
@@ -869,7 +1065,8 @@ async function testSportsMetaUsesImageProxyUrls() {
     { baseUrl: 'http://127.0.0.1:7000' }
   ))
 
-  assert.match(result.meta.poster, /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/poster\//, 'expected sports meta poster to use local sports image proxy')
+  const posterPayload = assertSportsThumbUrl(result.meta.poster, 'poster', 'expected sports meta poster to use generated matchup artwork')
+  assert.equal(posterPayload.m, 'matchup')
   assert.match(result.meta.background, /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/background\//, 'expected sports meta background to use local sports image proxy')
   assert.match(String(result.meta.logo || ''), /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/logo\//, 'expected sports meta logo to use local sports image proxy')
 }
@@ -938,10 +1135,13 @@ async function main() {
     testEventTitleParser()
     testSportDisambiguation()
     await testStructuredFallbackToFuzzyLookup()
+    await testStructuredArtworkCacheDoesNotBleedAcrossFixtures()
     await testOrderAgnosticSportsGrouping()
+    await testLeagueFallbackUsesGeneratedMatchupPoster()
     await testCatalogShowsSetupPlaceholderWhenProwlarrHasNoIndexers()
     await testSportSpecificCatalogDetailFiltering()
     await testEventTitleCatalogGrouping()
+    await testF1FallbackUsesWeekendPosterCard()
     await testLibraryCustomIdsStayCompact()
     await testSportsMetaIncludesGenres()
     await testSportsMetaRichDescription()

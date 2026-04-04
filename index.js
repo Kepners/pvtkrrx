@@ -722,11 +722,11 @@ app.post('/auth/stremio/link-session', requireCsrfToken, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store')
   res.json(buildStremioLinkSessionResponse(req, session))
 })
-app.get(['/thumb/sports/:info.svg', '/thumb/sports/:variant/:info.svg'], (req, res) => {
+app.get(['/thumb/sports/:info.svg', '/thumb/sports/:variant/:info.svg'], async (req, res) => {
   try {
     const payload = decodeSportsThumbToken(req.params.info)
     const variant = String(req.params.variant || 'landscape').trim().toLowerCase()
-    const svg = renderSportsThumbSvg(payload, { variant })
+    const svg = await renderSportsThumbSvg(payload, { variant })
     res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8')
     setPublicCacheHeaders(res, 86400, { sMaxAge: 604800, staleWhileRevalidate: 2592000, immutable: true })
     res.send(svg)
@@ -1144,9 +1144,18 @@ app.post('/local/lan-token', requireLocalNetworkRoute, requireCsrfToken, async (
   if (!localConfig) return res.status(404).json({ error: 'Local config not saved yet' })
 
   try {
-    const normalized = await hydrateAccountLinkForConfig(normalizeAddonConfig(localConfig, {
+    const requestedRouteProfile = String(req.body?.routeProfile || '').trim().toLowerCase()
+    const mergedLocalConfig = {
+      ...localConfig,
+      lanPairEnabled: true,
+      ...(requestedRouteProfile ? { routeProfile: requestedRouteProfile } : {}),
+      ...(typeof req.body?.lanPairRequired === 'boolean'
+        ? { lanPairRequired: req.body.lanPairRequired }
+        : {})
+    }
+    const normalized = await hydrateAccountLinkForConfig(normalizeAddonConfig(mergedLocalConfig, {
       defaultEnabled: true,
-      defaultRequired: true,
+      defaultRequired: requestedRouteProfile === 'hybrid' ? false : true,
       includeLocalSecrets: true
     }))
     const pairId = sanitizePairId(normalized.lanPairId)
@@ -1242,7 +1251,7 @@ app.post('/pair/heartbeat', async (req, res) => {
 
     const incomingKeyHash = hashPairKey(pairKey)
     const incomingOwnerHash = hashPairKey(ownerId)
-    const incomingIpHash = LAN_PAIR_BIND_PUBLIC_IP ? hashClientIp(req) : ''
+    const incomingIpHash = hashClientIp(req)
     const existingState = await lanPairStore.get(pairId)
     if (existingState) {
       const existingKeyHash = String(existingState.keyHash || '')

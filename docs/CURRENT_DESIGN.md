@@ -117,7 +117,11 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
   - `landscapeImage`
   - `backgroundImage`
   - `logo`
-- Sports catalog tiles now prefer real portrait poster art first when available, while `backgroundImage` and `logo` stay separate for player-loading and wallpaper use.
+- Sports catalog posters now follow an event-type contract instead of repeating one generic league photo:
+  - team-vs-team fixtures render generated club-vs-club poster cards
+  - F1 keeps race-weekend/session-specific posters when available and otherwise falls back to generated F1 GP/session cards
+  - other non-vs sports can fall back to generated league-logo event cards
+- `backgroundImage` and `logo` stay separate from the portrait poster contract for player-loading and wallpaper use.
 - When Prowlarr has no indexers or cannot be reached, empty movie, TV, and sports catalogs now return a setup-needed placeholder card instead of a blank grid, so the user gets a useful recovery cue in Stremio.
 - When external sports art exists, addon responses now prefer signed `/image/sports/...` URLs so the active local or hosted runtime can cache poster, wallpaper, landscape, and logo bytes on disk instead of hotlinking every request back to the upstream art host.
 - Sports detail meta now exposes Stremio `genres` tags from the resolved sport classification when available.

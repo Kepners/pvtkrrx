@@ -1,12 +1,15 @@
 const { CinemetaClient } = require('../clients/cinemeta')
 const { SportsDbClient } = require('../clients/sportsdb')
 const { formatSize } = require('../utils/streams')
-const { makeSportsThumbUrl, makeSportsPosterUrl } = require('../utils/sportsThumb')
 const { resolveSportHint } = require('../utils/sportsRules')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { decodeCustomId } = require('../utils/customId')
 const { BRAND_ARTWORK, buildMetaPlaceholder } = require('../utils/metaPlaceholder')
-const { proxySportsImageUrl } = require('../utils/sportsImageCache')
+const {
+  resolveSportsPosterAsset,
+  resolveSportsBackgroundAsset,
+  resolveSportsLogoAsset
+} = require('../utils/sportsArtwork')
 const BRAND_POSTER = BRAND_ARTWORK
 const BRAND_LOGO = BRAND_ARTWORK
 
@@ -157,35 +160,34 @@ async function handleCustomMeta(config, id, context = {}) {
     }
   }
 
-  const generatedArtworkItem = {
-    title: String(info.n || info.t || '').trim() || String(info.t || ''),
+  const artworkInput = {
+    baseUrl,
+    title: String(info.t || info.n || '').trim(),
+    displayTitle: String(info.n || info.t || '').trim() || String(info.t || ''),
     publishDate: info.p,
     sportHint: resolvedSportHint,
-    league: carriedLeague || carriedLeagueCode
+    league: carriedLeague || sportsArtwork?.league || carriedLeagueCode,
+    eventName: sportsArtwork?.eventName || '',
+    homeTeam: carriedHomeTeam || sportsArtwork?.homeTeam || '',
+    awayTeam: carriedAwayTeam || sportsArtwork?.awayTeam || '',
+    carriedArtwork,
+    carriedBackground,
+    carriedLogo,
+    sportsArtwork
   }
-  const posterFallback = isSports && baseUrl
-    ? makeSportsPosterUrl(baseUrl, generatedArtworkItem)
-    : BRAND_POSTER
-  const backgroundFallback = isSports && baseUrl
-    ? makeSportsThumbUrl(baseUrl, generatedArtworkItem, 'background')
-    : posterFallback
-  const portraitPosterUrl = String(sportsArtwork?.poster || '').trim()
-  const landscapePosterUrl = String(sportsArtwork?.image || sportsArtwork?.landscapeImage || '').trim()
-  const posterSourceUrl = carriedArtwork || portraitPosterUrl || landscapePosterUrl
-  const backgroundSourceUrl = carriedBackground || String(sportsArtwork?.backgroundImage || sportsArtwork?.landscapeImage || sportsArtwork?.image || '').trim()
-  const logoSourceUrl = carriedLogo || String(sportsArtwork?.logo || '').trim()
-  const poster = (isSports
-    ? proxySportsImageUrl(baseUrl, posterSourceUrl, carriedArtwork || portraitPosterUrl ? 'poster' : 'landscape')
-    : '') || posterSourceUrl || posterFallback
-  const background = (isSports
-    ? proxySportsImageUrl(baseUrl, backgroundSourceUrl, 'background')
-    : '') || backgroundSourceUrl || backgroundFallback || poster
-  const logo = (isSports
-    ? proxySportsImageUrl(baseUrl, logoSourceUrl, 'logo')
-    : '') || logoSourceUrl || BRAND_LOGO
-  const posterShape = isSports
-    ? ((carriedArtwork || portraitPosterUrl || poster === posterFallback) ? 'poster' : 'landscape')
-    : undefined
+  const posterResolved = isSports
+    ? resolveSportsPosterAsset(artworkInput)
+    : { poster: carriedArtwork || BRAND_POSTER, posterShape: undefined }
+  const backgroundResolved = isSports
+    ? resolveSportsBackgroundAsset(artworkInput)
+    : (String(info.b || '').trim() || BRAND_POSTER)
+  const logoResolved = isSports
+    ? resolveSportsLogoAsset(artworkInput)
+    : carriedLogo
+  const poster = String(posterResolved?.poster || '').trim() || BRAND_POSTER
+  const background = String(backgroundResolved || '').trim() || poster
+  const logo = String(logoResolved || '').trim() || BRAND_LOGO
+  const posterShape = isSports ? posterResolved?.posterShape : undefined
 
   const eventDate = carriedEventDate || sportsArtwork?.eventDate || ''
   const league = carriedLeague || sportsArtwork?.league || ''
