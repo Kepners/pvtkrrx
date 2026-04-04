@@ -192,6 +192,18 @@ async function promptHttpUrl(rl, label, defaultValue = '', options = {}) {
   }
 }
 
+function sanitizeHttpUrlDefault(value, fallback = '', options = {}) {
+  try {
+    const parsed = parseHttpUrl(value, {
+      ...options,
+      allowEmpty: true
+    })
+    return parsed ? normalizeBaseUrl(parsed.toString()) : String(fallback || '').trim()
+  } catch (_) {
+    return String(fallback || '').trim()
+  }
+}
+
 async function promptInteger(rl, label, defaultValue, options = {}) {
   const min = Number.isFinite(options.min) ? options.min : 1
   const max = Number.isFinite(options.max) ? options.max : Number.MAX_SAFE_INTEGER
@@ -513,7 +525,10 @@ async function run() {
     const httpPort = await promptInteger(rl, 'HTTP port', existingPort, { min: 1, max: 65535 })
     const httpsPort = await promptInteger(rl, 'HTTPS port', existingHttpsPort, { min: 1, max: 65535 })
     const runtimeDir = await promptValue(rl, 'Runtime directory', defaultRuntimeDir)
-    const defaultHttpsMode = existingHttpsMode || (existingPublicBaseUrl ? 'domain' : 'cloudflare')
+    const safeExistingPublicBaseUrl = sanitizeHttpUrlDefault(existingPublicBaseUrl, '', {
+      requireHttps: true
+    })
+    const defaultHttpsMode = existingHttpsMode || (safeExistingPublicBaseUrl ? 'domain' : 'cloudflare')
     let selfHostHttpsMode = normalizeSelfHostHttpsMode(
       await promptValue(
         rl,
@@ -523,7 +538,7 @@ async function run() {
     )
     if (!selfHostHttpsMode) selfHostHttpsMode = defaultHttpsMode
 
-    let publicBaseUrl = existingPublicBaseUrl
+    let publicBaseUrl = safeExistingPublicBaseUrl
     if (selfHostHttpsMode === 'cloudflare') {
       const tunnelResult = await ensureCloudflaredTunnel(repoRoot, httpPort, publicBaseUrl)
       if (tunnelResult && tunnelResult.publicBaseUrl) {
@@ -533,7 +548,7 @@ async function run() {
       publicBaseUrl = await promptHttpUrl(
         rl,
         'Public HTTPS URL for Stremio install links',
-        existingPublicBaseUrl,
+        safeExistingPublicBaseUrl,
         {
           allowEmpty: false,
           requireHttps: true
@@ -558,7 +573,7 @@ async function run() {
     const jackettUrl = await promptHttpUrl(
       rl,
       'Prowlarr URL',
-      String(existingConfig?.jackettUrl || 'http://localhost:9696').trim()
+      sanitizeHttpUrlDefault(existingConfig?.jackettUrl, 'http://localhost:9696')
     )
     const jackettApiKey = await promptValue(
       rl,
@@ -569,7 +584,7 @@ async function run() {
     const qbitUrl = await promptHttpUrl(
       rl,
       'qBittorrent URL',
-      String(existingConfig?.qbitUrl || 'http://localhost:8080').trim()
+      sanitizeHttpUrlDefault(existingConfig?.qbitUrl, 'http://localhost:8080')
     )
     const qbitUsername = await promptValue(
       rl,
@@ -586,7 +601,7 @@ async function run() {
     const fileServerUrl = await promptHttpUrl(
       rl,
       'File Server URL (optional)',
-      String(existingConfig?.fileServerUrl || '').trim(),
+      sanitizeHttpUrlDefault(existingConfig?.fileServerUrl, '', { allowEmpty: true }),
       { allowEmpty: true }
     )
     const fileServerAuth = await promptValue(
@@ -814,7 +829,9 @@ async function runAuto() {
   const bundledNodePath = String(process.env.PVTKRRX_NODE_PATH || process.execPath).trim() || process.execPath
   const httpPort = Number.parseInt(String(mergedEnv.PORT || '7000').trim(), 10) || 7000
   const httpsPort = Number.parseInt(String(mergedEnv.HTTPS_PORT || '7001').trim(), 10) || 7001
-  const existingPublicBaseUrl = normalizeBaseUrl(mergedEnv.PVTKRRX_PUBLIC_BASE_URL || '')
+  const existingPublicBaseUrl = sanitizeHttpUrlDefault(mergedEnv.PVTKRRX_PUBLIC_BASE_URL || '', '', {
+    requireHttps: true
+  })
   const existingHttpsMode = normalizeSelfHostHttpsMode(mergedEnv.PVTKRRX_SELF_HOST_HTTPS_MODE || '')
   const selfHostHttpsMode = existingHttpsMode || (existingPublicBaseUrl ? 'domain' : 'cloudflare')
   let publicBaseUrl = existingPublicBaseUrl
@@ -839,9 +856,9 @@ async function runAuto() {
   const prowlarr = await discoverProwlarrConfig({ useHints: false })
   const qbit = await discoverQbitConfig({ useHints: false })
 
-  let jackettUrl = String(existingConfig?.jackettUrl || prowlarr.url || 'http://localhost:9696').trim()
+  let jackettUrl = sanitizeHttpUrlDefault(existingConfig?.jackettUrl || prowlarr.url || '', 'http://localhost:9696')
   let jackettApiKey = String(existingConfig?.jackettApiKey || prowlarr.apiKey || '').trim()
-  let qbitUrl = String(existingConfig?.qbitUrl || qbit.url || 'http://localhost:8080').trim()
+  let qbitUrl = sanitizeHttpUrlDefault(existingConfig?.qbitUrl || qbit.url || '', 'http://localhost:8080')
   let qbitUsername = String(existingConfig?.qbitUsername || qbit.username || '').trim()
   let qbitPassword = String(existingConfig?.qbitPassword || '').trim()
 
@@ -911,7 +928,7 @@ async function runAuto() {
     qbitUsername,
     qbitPassword,
     provider: String(existingConfig?.provider || 'custom').trim() || 'custom',
-    fileServerUrl: String(existingConfig?.fileServerUrl || '').trim(),
+    fileServerUrl: sanitizeHttpUrlDefault(existingConfig?.fileServerUrl || '', '', { allowEmpty: true }),
     fileServerAuth: String(existingConfig?.fileServerAuth || '').trim(),
     sportsDbApiKey: String(existingConfig?.sportsDbApiKey || '123').trim(),
     sportsDbCacheHours: existingConfig?.sportsDbCacheHours || 24,
@@ -975,7 +992,7 @@ async function runAuto() {
 }
 
 if (require.main === module) {
-  const isAuto = process.argv.includes('--auto')
+  const isAuto = process.argv.includes('--auto') || !process.stdin.isTTY || !process.stdout.isTTY
   const entry = isAuto ? runAuto : run
   entry().catch((error) => {
     console.error(error.message)

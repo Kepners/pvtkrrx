@@ -172,7 +172,7 @@ prompt_https_mode() {
     fi
   fi
 
-  if [ ! -r /dev/tty ]; then
+  if [ ! -t 0 ] || [ ! -t 1 ] || [ ! -r /dev/tty ]; then
     echo "$default_mode"
     return 0
   fi
@@ -198,7 +198,7 @@ prompt_https_mode() {
 prompt_https_url() {
   local default_value="${1:-}"
   local value=""
-  if [ ! -r /dev/tty ]; then
+  if [ ! -t 0 ] || [ ! -t 1 ] || [ ! -r /dev/tty ]; then
     echo "$default_value"
     return 0
   fi
