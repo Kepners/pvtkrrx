@@ -304,9 +304,8 @@ async function testOrderAgnosticSportsGrouping() {
 
   assert.equal(result.metas.length, 1, 'expected reversed team order to dedupe into one sports meta')
   assert.ok(result.metas[0].id.length < 256, 'expected sports meta id to stay under common Stremio client limits')
-  const posterPayload = assertSportsThumbUrl(result.metas[0].poster, 'poster', 'expected sports catalog to build a matchup poster for vs fixtures')
-  assert.equal(posterPayload.m, 'matchup', 'expected matchup posters for team-vs-team fixtures')
-  assert.deepEqual([posterPayload.o, posterPayload.w].sort(), ['Arsenal', 'Chelsea'])
+  // Real TheSportsDB poster available → must be used (proxied) instead of generated card
+  assertSportsProxyUrl(result.metas[0].poster, 'poster', 'https://example.com/portrait.jpg', 'real event poster must take priority over generated cards')
   assert.equal(result.metas[0].posterShape, 'poster', 'expected sports catalog to tag portrait artwork as poster-shaped')
   assertSportsProxyUrl(result.metas[0].background, 'background', 'https://example.com/background.jpg')
   const decoded = decodeCustomId(result.metas[0].id)
@@ -888,10 +887,8 @@ async function testCompactSportsIdMetaArtwork() {
   }, async () => handleMeta({ sportsDbApiKey: 'smoke-sports-key' }, 'movie', compactId, { baseUrl: 'http://127.0.0.1:7000' }))
 
   assert.ok(metaResult.meta, 'compact sports meta should still resolve a meta object')
-  const posterPayload = assertSportsThumbUrl(metaResult.meta.poster, 'poster', 'meta should rebuild a matchup poster from cached sports context')
-  assert.equal(posterPayload.m, 'matchup')
-  assert.equal(posterPayload.o, 'Arsenal')
-  assert.equal(posterPayload.w, 'Chelsea')
+  // Real event poster was cached by catalog → meta should use it (proxied), not generate a card
+  assertSportsProxyUrl(metaResult.meta.poster, 'poster', poster, 'meta should reuse the real cached poster from the catalog lookup')
   assertSportsProxyUrl(metaResult.meta.background, 'background', background, 'meta should reuse the cached background from the catalog lookup')
   assertSportsProxyUrl(metaResult.meta.logo, 'logo', logo, 'meta should reuse the cached logo from the catalog lookup')
 }
@@ -1014,8 +1011,8 @@ async function testSportsCatalogUsesImageProxyUrls() {
     { baseUrl: 'http://127.0.0.1:7000' }
   ))
 
-  const posterPayload = assertSportsThumbUrl(result.metas[0].poster, 'poster', 'expected catalog poster to use generated matchup artwork')
-  assert.equal(posterPayload.m, 'matchup')
+  // Real event poster available → must be proxied, not a generated card
+  assertSportsProxyUrl(result.metas[0].poster, 'poster', poster, 'real event poster must take priority over generated matchup card')
   assert.match(result.metas[0].background, /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/background\//, 'expected catalog background to use local sports image proxy')
   assert.match(String(result.metas[0].logo || ''), /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/logo\//, 'expected catalog logo to use local sports image proxy')
 }
@@ -1065,8 +1062,8 @@ async function testSportsMetaUsesImageProxyUrls() {
     { baseUrl: 'http://127.0.0.1:7000' }
   ))
 
-  const posterPayload = assertSportsThumbUrl(result.meta.poster, 'poster', 'expected sports meta poster to use generated matchup artwork')
-  assert.equal(posterPayload.m, 'matchup')
+  // Real event poster available → must be proxied, not a generated card
+  assertSportsProxyUrl(result.meta.poster, 'poster', poster, 'real event poster must take priority over generated matchup card in meta')
   assert.match(result.meta.background, /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/background\//, 'expected sports meta background to use local sports image proxy')
   assert.match(String(result.meta.logo || ''), /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/logo\//, 'expected sports meta logo to use local sports image proxy')
 }

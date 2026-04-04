@@ -12,7 +12,12 @@ const THEMES = {
   nfl: { accent: '#7e8dff', bgA: '#11152a', bgB: '#090c14', chip: 'NFL' },
   nhl: { accent: '#90ecff', bgA: '#0a1822', bgB: '#071018', chip: 'NHL' },
   mlb: { accent: '#ff6b6b', bgA: '#201014', bgB: '#12080a', chip: 'MLB' },
-  ufc: { accent: '#ff8a00', bgA: '#23180a', bgB: '#130d06', chip: 'MMA / UFC' },
+  ufc: { accent: '#ff8a00', bgA: '#23180a', bgB: '#130d06', chip: 'UFC' },
+  boxing: { accent: '#e8c547', bgA: '#221d0a', bgB: '#110f06', chip: 'BOXING' },
+  bellator: { accent: '#c74343', bgA: '#1f0c0c', bgB: '#100707', chip: 'BELLATOR' },
+  pfl: { accent: '#3b8bff', bgA: '#0a1528', bgB: '#060c14', chip: 'PFL' },
+  onechampionship: { accent: '#d4a017', bgA: '#1e1a09', bgB: '#100d06', chip: 'ONE CHAMPIONSHIP' },
+  wrestling: { accent: '#c26dff', bgA: '#1a0f26', bgB: '#0d0714', chip: 'WRESTLING' },
   cricket: { accent: '#84ff6a', bgA: '#10220d', bgB: '#091307', chip: 'CRICKET' },
   rugby: { accent: '#9dff7a', bgA: '#13230f', bgB: '#0a1408', chip: 'RUGBY' },
   tennis: { accent: '#d7ff44', bgA: '#20260b', bgB: '#121607', chip: 'TENNIS' },
@@ -42,7 +47,13 @@ function truncateLabel(value, maxLen = 28) {
 function detectSportFromTitle(title) {
   const t = String(title || '').toLowerCase()
   if (/\b(f1|formula[\s-]?1|grand prix|gp)\b/.test(t)) return 'f1'
-  if (/\b(ufc|mma|bellator)\b/.test(t)) return 'ufc'
+  if (/\bufc\b/.test(t)) return 'ufc'
+  if (/\bbellator\b/.test(t)) return 'bellator'
+  if (/\bpfl\b/.test(t)) return 'pfl'
+  if (/\b(one[\s-]*championship|one[\s-]*fc)\b/.test(t)) return 'onechampionship'
+  if (/\b(boxing|bout|heavyweight|middleweight|welterweight|lightweight|featherweight|bantamweight|flyweight)\b/.test(t)) return 'boxing'
+  if (/\b(wwe|aew|wrestling)\b/.test(t)) return 'wrestling'
+  if (/\bmma\b/.test(t)) return 'ufc'
   if (/\b(nba|wnba|basketball)\b/.test(t)) return 'nba'
   if (/\b(nfl|super bowl|american football)\b/.test(t)) return 'nfl'
   if (/\b(nhl|ice hockey|stanley cup)\b/.test(t)) return 'nhl'
@@ -59,7 +70,9 @@ function normalizeThemeSportKey(value) {
   if (!key) return ''
   if (THEMES[key]) return key
   if (key === 'basketball') return 'nba'
-  if (key === 'mma' || key === 'boxing' || key === 'wrestling') return 'ufc'
+  if (key === 'mma') return 'ufc'
+  if (key === 'boxing') return 'boxing'
+  if (key === 'wrestling' || key === 'combat sports') return 'wrestling'
   if (key === 'motorsport') return 'f1'
   if (key === 'american-football') return 'nfl'
   if (key === 'baseball') return 'mlb'
@@ -76,7 +89,13 @@ function detectLeagueThemeKey(league, title = '') {
   if (/\b(nfl|super bowl)\b/.test(text)) return 'nfl'
   if (/\b(nhl|stanley cup)\b/.test(text)) return 'nhl'
   if (/\b(mlb|world series)\b/.test(text)) return 'mlb'
-  if (/\b(ufc|fight night|mma)\b/.test(text)) return 'ufc'
+  if (/\bufc\b/.test(text)) return 'ufc'
+  if (/\bbellator\b/.test(text)) return 'bellator'
+  if (/\bpfl\b/.test(text)) return 'pfl'
+  if (/\b(one[\s-]*championship|one[\s-]*fc)\b/.test(text)) return 'onechampionship'
+  if (/\b(boxing|bout|heavyweight)\b/.test(text)) return 'boxing'
+  if (/\b(wwe|aew|wrestling)\b/.test(text)) return 'wrestling'
+  if (/\b(fight night|mma)\b/.test(text)) return 'ufc'
   if (/\b(ipl|cricket)\b/.test(text)) return 'cricket'
   if (/\b(rugby|six nations)\b/.test(text)) return 'rugby'
   if (/\b(wimbledon|roland garros|australian open|us open|atp|wta|tennis)\b/.test(text)) return 'tennis'
@@ -188,7 +207,7 @@ function makeSportsPosterUrl(baseUrl, item) {
 
 function isFightPosterTheme(payload) {
   const text = `${payload?.t || ''} ${payload?.l || ''} ${payload?.s || ''}`.toLowerCase()
-  return /\b(ufc|mma|bellator|pfl|one championship|one fc|fight night|cage warriors|strikeforce|rizin|muay thai|kickboxing)\b/.test(text)
+  return /\b(ufc|mma|bellator|pfl|one[\s-]*championship|one[\s-]*fc|fight[\s-]*night|cage[\s-]*warriors|strikeforce|rizin|muay[\s-]*thai|kickboxing|boxing|bout|heavyweight|middleweight|welterweight|wwe|aew|wrestling)\b/.test(text)
 }
 
 function getFightBadge(title) {
