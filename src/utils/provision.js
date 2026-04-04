@@ -1,6 +1,7 @@
 const fs = require('fs')
 const os = require('os')
 const path = require('path')
+const net = require('net')
 const { spawn } = require('child_process')
 const { deriveDefaultLocalHostname, normalizeLocalHostname } = require('./lanAlias')
 
@@ -236,6 +237,63 @@ function normalizePathList(list) {
     out.push(v)
   }
   return [...new Set(out)]
+}
+
+function normalizePortNumber(value) {
+  const parsed = Number.parseInt(String(value || '').trim(), 10)
+  return Number.isFinite(parsed) && parsed >= 1 && parsed <= 65535 ? parsed : 0
+}
+
+function buildPortCandidates(preferredPort, fallbackPorts = []) {
+  const seen = new Set()
+  const candidates = []
+  const push = (value) => {
+    const port = normalizePortNumber(value)
+    if (!port || seen.has(port)) return
+    seen.add(port)
+    candidates.push(port)
+  }
+
+  push(preferredPort)
+  for (const value of Array.isArray(fallbackPorts) ? fallbackPorts : []) {
+    push(value)
+  }
+  return candidates
+}
+
+async function isTcpPortAvailable(port, host = '0.0.0.0') {
+  const normalizedPort = normalizePortNumber(port)
+  if (!normalizedPort) return false
+
+  return await new Promise((resolve) => {
+    const server = net.createServer()
+    let settled = false
+
+    const finish = (value) => {
+      if (settled) return
+      settled = true
+      try { server.close() } catch (_) {}
+      resolve(Boolean(value))
+    }
+
+    server.unref()
+    server.once('error', () => finish(false))
+    server.listen({ port: normalizedPort, host, exclusive: true }, () => finish(true))
+  })
+}
+
+async function findAvailableTcpPort(preferredPort, options = {}) {
+  const fallbackPorts = Array.isArray(options.fallbackPorts) ? options.fallbackPorts : []
+  const host = String(options.host || '0.0.0.0').trim() || '0.0.0.0'
+  const candidates = buildPortCandidates(preferredPort, fallbackPorts)
+
+  for (const port of candidates) {
+    if (await isTcpPortAvailable(port, host)) {
+      return port
+    }
+  }
+
+  throw new Error(`No free TCP port available near ${normalizePortNumber(preferredPort) || 'requested value'}`)
 }
 
 function runPowerShell(script, timeoutMs = 180000) {
@@ -503,18 +561,44 @@ async function ensureQbitRunning(installIfMissing, startIfStopped, configureLoca
   const configPath = String(discovered.configPath || '').trim()
   const initialIni = configPath ? readFirstExisting([configPath])?.content || '' : ''
   let settingsPatched = false
+  let selectedPort = Number.isFinite(Number(discovered.port)) ? Number(discovered.port) : 8080
 
-  if (configureLocalNoAuth && configPath && initialIni) {
+  if (startIfStopped && !wasRunning) {
+    try {
+      selectedPort = await findAvailableTcpPort(selectedPort || 8080, {
+        fallbackPorts: [8085, 8090, 8095, 8100, 8180]
+      })
+    } catch (error) {
+      notes.push(`qBittorrent WebUI port check failed: ${error.message}`)
+    }
+  }
+
+  if (startIfStopped && !wasRunning && selectedPort !== Number(discovered.port || 0)) {
+    notes.push(`qBittorrent WebUI port moved to ${selectedPort} to avoid a conflict`)
+  }
+
+  if ((configureLocalNoAuth || (startIfStopped && !wasRunning)) && configPath) {
     let patched = initialIni
-    patched = upsertIniValue(patched, 'WebUI\\LocalHostAuth', 'false')
-    patched = upsertIniValue(patched, 'WebUI\\AuthSubnetWhitelistEnabled', 'true')
-    patched = upsertIniValue(patched, 'WebUI\\AuthSubnetWhitelist', '127.0.0.1/32,::1/128')
+    if (!patched) patched = '[Preferences]\r\n'
+    if (startIfStopped && !wasRunning) {
+      patched = upsertIniValue(patched, 'WebUI\\Port', String(selectedPort))
+    }
+    if (configureLocalNoAuth) {
+      patched = upsertIniValue(patched, 'WebUI\\LocalHostAuth', 'false')
+      patched = upsertIniValue(patched, 'WebUI\\AuthSubnetWhitelistEnabled', 'true')
+      patched = upsertIniValue(patched, 'WebUI\\AuthSubnetWhitelist', '127.0.0.1/32,::1/128')
+    }
 
     if (patched !== initialIni) {
+      fs.mkdirSync(path.dirname(configPath), { recursive: true })
       fs.writeFileSync(configPath, patched, 'utf8')
       settingsPatched = true
-      notes.push('qBittorrent localhost auth updated for zero-config addon access')
+      if (configureLocalNoAuth) notes.push('qBittorrent localhost auth updated for zero-config addon access')
     }
+  }
+
+  if (configureLocalNoAuth && !configPath) {
+    notes.push('qBittorrent config file not found yet; localhost auth will be applied after first launch')
   }
 
   if (startIfStopped) {
@@ -555,7 +639,7 @@ async function ensureQbitRunning(installIfMissing, startIfStopped, configureLoca
   }
 
   discovered = await discoverQbitConfig()
-  const url = String(discovered.url || '').trim() || 'http://127.0.0.1:8080'
+  const url = String(discovered.url || '').trim() || `http://127.0.0.1:${selectedPort || 8080}`
   const username = String(discovered.username || '').trim()
   const localHostAuthDisabled = Boolean(discovered.localHostAuthDisabled)
   let running = Boolean(discovered.running)
@@ -612,7 +696,7 @@ async function ensureQbitRunning(installIfMissing, startIfStopped, configureLoca
   return {
     installed,
     running,
-    url,
+    url: selectedPort > 0 ? `http://127.0.0.1:${selectedPort}` : url,
     username: (localHostAuthDisabled && localhostApiReady) ? '' : (username || ''),
     localHostAuthDisabled,
     localApiReady: localhostApiReady,
@@ -709,5 +793,7 @@ module.exports = {
   autoProvisionWindows,
   ensureWindowsLanAccess,
   discoverProwlarrConfig,
-  discoverQbitConfig
+  discoverQbitConfig,
+  findAvailableTcpPort,
+  isTcpPortAvailable
 }

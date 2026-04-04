@@ -93,6 +93,42 @@ write_ini_value() {
   ' "$file" > "$tmp" && mv "$tmp" "$file"
 }
 
+normalize_port() {
+  local value
+  value="$(printf '%s' "${1:-}" | tr -d '[:space:]')"
+  case "$value" in
+    ''|*[!0-9]*)
+      echo ""
+      return 0
+      ;;
+  esac
+  if [ "$value" -ge 1 ] && [ "$value" -le 65535 ]; then
+    echo "$value"
+  else
+    echo ""
+  fi
+}
+
+port_in_use() {
+  local port
+  port="$(normalize_port "${1:-}")"
+  [ -n "$port" ] || return 1
+  (echo >/dev/tcp/127.0.0.1/"$port") >/dev/null 2>&1
+}
+
+pick_available_port() {
+  local candidate
+  for candidate in "$@"; do
+    candidate="$(normalize_port "$candidate")"
+    [ -n "$candidate" ] || continue
+    if ! port_in_use "$candidate"; then
+      echo "$candidate"
+      return 0
+    fi
+  done
+  return 1
+}
+
 run_root() {
   if [ "$(id -u)" -eq 0 ]; then "$@"; return; fi
   if ! have_command sudo; then
@@ -246,7 +282,7 @@ wait_for_cloudflared_url() {
   local attempts=0
   local url=""
 
-  echo "Waiting for Cloudflare Tunnel URL..."
+  echo "Waiting for Cloudflare Tunnel URL..." >&2
   while [ "$attempts" -lt 45 ]; do
     url="$(journalctl -u "${service_name}.service" --no-pager -n 100 2>/dev/null | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -1 || true)"
     if [ -n "$url" ]; then
@@ -301,7 +337,7 @@ EOF
   fi
 
   local public_url
-  public_url="$(wait_for_cloudflared_url "$service_name")"
+  public_url="$(wait_for_cloudflared_url "$service_name" | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -1 || true)"
   export PVTKRRX_PUBLIC_BASE_URL="$public_url"
   echo "✓ Tunnel URL: $public_url"
 }
@@ -341,6 +377,29 @@ setup_qbittorrent_service() {
   local unit_path="/etc/systemd/system/qbittorrent-nox.service"
   local service_was_active=0
   ensure_qbittorrent_user
+
+  local requested_port
+  requested_port="$(normalize_port "$QBIT_PORT")"
+  if [ -z "$requested_port" ]; then
+    requested_port=8080
+  fi
+
+  local selected_port
+  selected_port="$(pick_available_port "$requested_port" 8085 8090 8095 8100 8180)"
+  if [ -z "$selected_port" ]; then
+    echo "Could not find a free qBittorrent WebUI port near $requested_port" >&2
+    exit 1
+  fi
+  if [ "$selected_port" != "$requested_port" ]; then
+    echo "✓ qBittorrent WebUI port moved to $selected_port to avoid a conflict"
+  fi
+  QBIT_PORT="$selected_port"
+
+  local qbit_conf="$QBIT_DATA_DIR/.config/qBittorrent/qBittorrent.conf"
+  if [ -f "$qbit_conf" ]; then
+    write_ini_value "$qbit_conf" 'WebUI\Port' "$QBIT_PORT"
+  fi
+
   if [ -f "$unit_path" ] && systemctl is-active --quiet qbittorrent-nox 2>/dev/null; then
     service_was_active=1
     echo "✓ qBittorrent service already running"
@@ -396,15 +455,19 @@ EOF
       curl -s -b "$cookie_jar" "http://127.0.0.1:$QBIT_PORT/api/v2/app/setPreferences" \
         -d "json={\"bypass_local_auth\":true,\"web_ui_csrf_protection_enabled\":false,\"web_ui_host_header_validation_enabled\":false,\"save_path\":\"$DOWNLOADS_DIR\",\"queueing_enabled\":false}" \
         >/dev/null 2>&1
+      if [ -f "$qbit_conf" ]; then
+        write_ini_value "$qbit_conf" 'WebUI\Port' "$QBIT_PORT"
+      fi
       echo "✓ qBittorrent configured (bypass_local_auth=true, save_path=$DOWNLOADS_DIR)"
     fi
     rm -f "$cookie_jar"
   fi
 
-  if [ -z "${temp_pass:-}" ] && [ -f "$QBIT_DATA_DIR/.config/qBittorrent/qBittorrent.conf" ]; then
-    write_ini_value "$QBIT_DATA_DIR/.config/qBittorrent/qBittorrent.conf" 'WebUI\LocalHostAuth' 'false'
-    write_ini_value "$QBIT_DATA_DIR/.config/qBittorrent/qBittorrent.conf" 'WebUI\AuthSubnetWhitelistEnabled' 'true'
-    write_ini_value "$QBIT_DATA_DIR/.config/qBittorrent/qBittorrent.conf" 'WebUI\AuthSubnetWhitelist' '127.0.0.1/32,::1/128'
+  if [ -z "${temp_pass:-}" ] && [ -f "$qbit_conf" ]; then
+    write_ini_value "$qbit_conf" 'WebUI\Port' "$QBIT_PORT"
+    write_ini_value "$qbit_conf" 'WebUI\LocalHostAuth' 'false'
+    write_ini_value "$qbit_conf" 'WebUI\AuthSubnetWhitelistEnabled' 'true'
+    write_ini_value "$qbit_conf" 'WebUI\AuthSubnetWhitelist' '127.0.0.1/32,::1/128'
     echo "✓ qBittorrent existing config patched for localhost API access"
     if [ "$service_was_active" -eq 1 ] || systemctl is-active --quiet qbittorrent-nox 2>/dev/null; then
       run_root systemctl restart qbittorrent-nox

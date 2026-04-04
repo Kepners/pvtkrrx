@@ -231,6 +231,40 @@ async function testOrderAgnosticSportsGrouping() {
   )
 }
 
+async function testCatalogShowsSetupPlaceholderWhenProwlarrHasNoIndexers() {
+  class FakeProwlarrClient {
+    async search() {
+      return []
+    }
+
+    async caps() {
+      return []
+    }
+  }
+
+  const { handleCatalog } = loadCatalogWithStubs({
+    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient }
+  })
+
+  const result = await handleCatalog(
+    {
+      jackettUrl: 'http://127.0.0.1:9696',
+      jackettApiKey: 'smoke-api-key',
+      sportsDbApiKey: 'smoke-sports-key',
+      maxResults: '10'
+    },
+    'movie',
+    'pvtkrrx-movies',
+    'search=',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  )
+
+  assert.equal(result.metas.length, 1, 'expected a setup placeholder when Prowlarr has no indexers')
+  assert.match(result.metas[0].id, /^pvtkrrx:setup-required:movie:/)
+  assert.equal(result.metas[0].type, 'movie')
+  assert.match(String(result.metas[0].description || ''), /no Prowlarr indexers/i)
+}
+
 async function testSportSpecificCatalogDetailFiltering() {
   class FakeProwlarrClient {
     async search() {
@@ -905,6 +939,7 @@ async function main() {
     testSportDisambiguation()
     await testStructuredFallbackToFuzzyLookup()
     await testOrderAgnosticSportsGrouping()
+    await testCatalogShowsSetupPlaceholderWhenProwlarrHasNoIndexers()
     await testSportSpecificCatalogDetailFiltering()
     await testEventTitleCatalogGrouping()
     await testLibraryCustomIdsStayCompact()

@@ -1,6 +1,6 @@
 # PVTKRRX Current Design
 
-Updated: 2026-04-02
+Updated: 2026-04-04
 
 ## Purpose
 
@@ -26,6 +26,7 @@ PVTKRRX is one codebase with three active runtime pieces:
    - can mint short-lived Stremio link sessions that persist the linked `stremioUserId` back into the disk-backed `selfhost` config
    - can validate localhost/private Prowlarr and qBittorrent URLs only for same-host requests or browser sessions that present the self-host password
    - now has a one-command Linux installer that bootstraps the app directory, bundled Node runtime, `.env`, stable runtime dir, saved self-host config, password, and optional `systemd` service
+   - the Linux bootstrap now auto-selects a free qBittorrent WebUI port when the default is occupied, and it captures the Cloudflare Tunnel URL cleanly instead of leaking the "waiting" log line into the saved public URL
    - can choose the self-host HTTPS front door as Cloudflare Tunnel, a user-owned `https://` origin, or skip for later manual setup, and persists that choice in `PVTKRRX_SELF_HOST_HTTPS_MODE`
    - exposes a hosted launcher script at `https://www.pvtkrrx.cc/install-selfhost.sh` so the first curl can come from the canonical site instead of the moving GitHub branch tip
    - pulls the app source from the branch payload by default, with optional pinning via `PVTKRRX_RELEASE_TAG` or a custom release manifest URL; if a pinned release is too old to include `scripts/server-installer.js`, it retries from `main`
@@ -117,6 +118,7 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
   - `backgroundImage`
   - `logo`
 - Sports catalog tiles now prefer real portrait poster art first when available, while `backgroundImage` and `logo` stay separate for player-loading and wallpaper use.
+- When Prowlarr has no indexers or cannot be reached, empty movie, TV, and sports catalogs now return a setup-needed placeholder card instead of a blank grid, so the user gets a useful recovery cue in Stremio.
 - When external sports art exists, addon responses now prefer signed `/image/sports/...` URLs so the active local or hosted runtime can cache poster, wallpaper, landscape, and logo bytes on disk instead of hotlinking every request back to the upstream art host.
 - Sports detail meta now exposes Stremio `genres` tags from the resolved sport classification when available.
 - Sports title parsing now handles both team-vs-team formats (`EPL.2026.03.15.Arsenal.vs.Chelsea`) and non-vs event formats (`Formula1.2026.03.28.Japanese.Grand.Prix.Qualifying`, `UFC.Fight.Night.270.Main.Card`).

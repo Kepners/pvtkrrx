@@ -16,6 +16,7 @@ const { encodeCustomId } = require('../utils/customId')
 const { findExistingLocalFilePath } = require('../utils/localStorageRoots')
 const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
 const { proxySportsImageUrl } = require('../utils/sportsImageCache')
+const { buildMetaPlaceholder } = require('../utils/metaPlaceholder')
 
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 const cinemeta = new CinemetaClient()
@@ -53,6 +54,85 @@ function imdbPoster(imdbId, size = 'medium') {
 
 function placeholderPoster() {
   return BRAND_POSTER
+}
+
+function slugifyCatalogKey(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') || 'catalog'
+}
+
+const PROWLARR_HEALTH_CACHE_TTL_MS = Math.max(
+  60000,
+  parseInt(process.env.PVTKRRX_PROWLARR_HEALTH_CACHE_MS || '300000', 10)
+)
+const prowlarrHealthCache = new Map()
+
+function getProwlarrHealthCacheKey(config = {}) {
+  const baseUrl = String(config?.jackettUrl || '').trim().toLowerCase()
+  const apiKey = String(config?.jackettApiKey || '').trim()
+  return `${baseUrl}|${apiKey ? `${apiKey.slice(0, 6)}:${apiKey.length}` : 'no-key'}`
+}
+
+async function getProwlarrHealth(config, torznab) {
+  const key = getProwlarrHealthCacheKey(config)
+  const now = Date.now()
+  const hit = prowlarrHealthCache.get(key)
+  if (hit && hit.expiresAt > now) return hit.value
+
+  let value
+  try {
+    const indexers = await torznab.caps()
+    const count = Array.isArray(indexers) ? indexers.length : 0
+    value = {
+      available: true,
+      hasIndexers: count > 0,
+      count,
+      error: ''
+    }
+  } catch (error) {
+    const message = String(error?.message || error || '').trim()
+    value = {
+      available: false,
+      hasIndexers: false,
+      count: 0,
+      error: message
+    }
+  }
+
+  prowlarrHealthCache.set(key, {
+    value,
+    expiresAt: now + PROWLARR_HEALTH_CACHE_TTL_MS
+  })
+  return value
+}
+
+function buildSetupRequiredMeta(type, label, reason) {
+  const cleanType = String(type || 'movie').trim() || 'movie'
+  const cleanLabel = String(label || '').trim() || cleanType
+  const cleanReason = String(reason || '').trim() || 'PVTKRRX could not load this catalog right now.'
+  return buildMetaPlaceholder({
+    id: `pvtkrrx:setup-required:${slugifyCatalogKey(cleanType)}:${slugifyCatalogKey(cleanLabel)}`,
+    type: cleanType,
+    name: `${cleanLabel} unavailable`,
+    description: cleanReason,
+    poster: placeholderPoster(),
+    background: placeholderPoster(),
+    logo: placeholderPoster()
+  })
+}
+
+async function maybeBuildSetupRequiredCatalog(config, torznab, type, label, skip = 0) {
+  if (Number.parseInt(skip || '0', 10) > 0) return null
+  const health = await getProwlarrHealth(config, torznab)
+  if (health.hasIndexers) return null
+
+  const reason = health.available
+    ? `${label} has no Prowlarr indexers configured yet. Open Configure and add indexers to populate this catalog.`
+    : `Prowlarr could not be reached${health.error ? ` (${health.error})` : ''}. Check the Prowlarr URL and API key in Configure.`
+
+  return buildSetupRequiredMeta(type, label, reason)
 }
 
 function normalizeSportsKeyPart(value) {
@@ -630,9 +710,21 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
   }
   console.log(`[sports-catalog] catalog="${catalogDefinition?.id || 'pvtkrrx-sports'}" query="${query}" prowlarr=${items.length} normalized=${normalizedItems.length} strict=${strictFiltered.length} filtered=${filtered.length}`)
 
-  const grouped = groupSportsItems(filtered.sort((a, b) => compareItems(a, b, query)), query)
-
   const skip = parseInt(extra.skip || '0', 10)
+  if (filtered.length === 0) {
+    const placeholder = await maybeBuildSetupRequiredCatalog(
+      config,
+      torznab,
+      mediaType,
+      catalogDefinition?.name || 'Sports',
+      skip
+    )
+    if (placeholder) {
+      return { metas: [placeholder], cacheMaxAge: 120 }
+    }
+  }
+
+  const grouped = groupSportsItems(filtered.sort((a, b) => compareItems(a, b, query)), query)
   const pageGroups = grouped.slice(skip, skip + limit)
   const artworkByBaseKey = new Map()
   const metas = await mapLimit(pageGroups, 6, async (group, index) => {
@@ -743,12 +835,19 @@ async function moviesCatalog(config, extra) {
   const query = String(extra.search || '').trim()
   const limit = getCatalogLimit(config)
   const items = await cachedProwlarrSearch(config, torznab, query, MOVIE_CATS)
+  const skip = parseInt(extra.skip || '0', 10)
   const filtered = items.filter(item =>
     item.imdbId &&
     !isSportsOnlyIndexer(item.indexer) &&
     !isLikelySeriesRelease(item.title) &&
     !isLikelyPackedReleaseTitle(item.title)
   )
+  if (filtered.length === 0) {
+    const placeholder = await maybeBuildSetupRequiredCatalog(config, torznab, 'movie', 'PVTKRRX Movies', skip)
+    if (placeholder) {
+      return { metas: [placeholder], cacheMaxAge: 120 }
+    }
+  }
   const best = dedupeByImdbBest(filtered, query)
   const inspectCount = Math.min(best.length, Math.max(80, (parseInt(extra.skip || '0', 10) + limit) * 3))
   const enriched = await enrichImdbEntries('movie', best, {
@@ -756,7 +855,6 @@ async function moviesCatalog(config, extra) {
     requirePoster: !query
   })
 
-  const skip = parseInt(extra.skip || '0', 10)
   const metas = (enriched.length > 0 ? enriched : best.map(item => ({
     id: item.imdbId,
     type: 'movie',
@@ -779,11 +877,18 @@ async function tvCatalog(config, extra) {
   const query = String(extra.search || '').trim()
   const limit = getCatalogLimit(config)
   const items = await cachedProwlarrSearch(config, torznab, query, TV_CATS)
+  const skip = parseInt(extra.skip || '0', 10)
   const filtered = items.filter(item =>
     !isSportsOnlyIndexer(item.indexer) &&
     (isLikelySeriesRelease(item.title) || Boolean(extra.search)) &&
     !isLikelyPackedReleaseTitle(item.title)
   )
+  if (filtered.length === 0) {
+    const placeholder = await maybeBuildSetupRequiredCatalog(config, torznab, 'series', 'PVTKRRX TV', skip)
+    if (placeholder) {
+      return { metas: [placeholder], cacheMaxAge: 120 }
+    }
+  }
 
   const withImdb = []
   const missingImdb = []
@@ -830,7 +935,6 @@ async function tvCatalog(config, extra) {
     requirePoster: !query
   })
 
-  const skip = parseInt(extra.skip || '0', 10)
   const metas = (enriched.length > 0 ? enriched : best.map(item => ({
     id: item.imdbId,
     type: 'series',

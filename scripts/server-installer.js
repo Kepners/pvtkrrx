@@ -75,6 +75,12 @@ function normalizeBaseUrl(input) {
   return String(input || '').trim().replace(/\/+$/, '')
 }
 
+function normalizePortNumber(input, fallback = 0) {
+  const parsed = Number.parseInt(String(input || '').trim(), 10)
+  if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 65535) return parsed
+  return Number.isFinite(fallback) && fallback >= 1 && fallback <= 65535 ? fallback : 0
+}
+
 function normalizeSelfHostHttpsMode(input) {
   const text = String(input || '').trim().toLowerCase()
   if (!text) return ''
@@ -133,8 +139,12 @@ function parseHttpUrl(input, options = {}) {
 }
 
 function normalizeOrigin(input) {
-  const parsed = parseHttpUrl(input, { allowEmpty: true, allowLoopbackHttp: true })
-  return parsed ? normalizeBaseUrl(parsed.origin) : ''
+  try {
+    const parsed = parseHttpUrl(input, { allowEmpty: true, allowLoopbackHttp: true })
+    return parsed ? normalizeBaseUrl(parsed.origin) : ''
+  } catch (_) {
+    return ''
+  }
 }
 
 function normalizeOriginList(input, fallback = '') {
@@ -168,6 +178,14 @@ function buildDefaultAllowedOrigins(publicBaseUrl, httpPort, httpsPort, existing
   next.push(`https://localhost:${httpsPort}`)
   next.push(`https://127.0.0.1:${httpsPort}`)
   return [...new Set(next)].join(', ')
+}
+
+function buildLoopbackHttpUrl(port, fallback = 'http://127.0.0.1:8080') {
+  const normalizedPort = normalizePortNumber(port, 0)
+  if (normalizedPort > 0) {
+    return `http://127.0.0.1:${normalizedPort}`
+  }
+  return String(fallback || '').trim() || 'http://127.0.0.1:8080'
 }
 
 async function promptValue(rl, label, defaultValue = '', options = {}) {
@@ -509,6 +527,10 @@ async function run() {
 
     const prowlarr = await discoverProwlarrConfig({ useHints: false })
     const qbit = await discoverQbitConfig({ useHints: false })
+    const envQbitPort = normalizePortNumber(mergedEnv.PVTKRRX_QBIT_WEBUI_PORT || '', 0)
+    const preferredQbitUrl = buildLoopbackHttpUrl(
+      envQbitPort || normalizePortNumber(qbit.port || '', 0) || 8080
+    )
     const missingProviders = !prowlarr.installed || !prowlarr.apiKey || !qbit.installed
     if (process.platform === 'linux' && missingProviders) {
       console.log('Prowlarr and/or qBittorrent are missing. Running the full bootstrap now so they are installed automatically.')
@@ -599,7 +621,7 @@ async function run() {
     const qbitUrl = await promptHttpUrl(
       rl,
       'qBittorrent URL',
-      sanitizeHttpUrlDefault(existingConfig?.qbitUrl, 'http://localhost:8080')
+      sanitizeHttpUrlDefault(existingConfig?.qbitUrl || preferredQbitUrl, preferredQbitUrl)
     )
     const qbitUsername = await promptValue(
       rl,
@@ -870,10 +892,14 @@ async function runAuto() {
 
   const prowlarr = await discoverProwlarrConfig({ useHints: false })
   const qbit = await discoverQbitConfig({ useHints: false })
+  const envQbitPort = normalizePortNumber(mergedEnv.PVTKRRX_QBIT_WEBUI_PORT || '', 0)
+  const preferredQbitUrl = buildLoopbackHttpUrl(
+    envQbitPort || normalizePortNumber(qbit.port || '', 0) || 8080
+  )
 
   let jackettUrl = sanitizeHttpUrlDefault(existingConfig?.jackettUrl || prowlarr.url || '', 'http://localhost:9696')
   let jackettApiKey = String(existingConfig?.jackettApiKey || prowlarr.apiKey || '').trim()
-  let qbitUrl = sanitizeHttpUrlDefault(existingConfig?.qbitUrl || qbit.url || '', 'http://localhost:8080')
+  let qbitUrl = sanitizeHttpUrlDefault(existingConfig?.qbitUrl || preferredQbitUrl || qbit.url || '', preferredQbitUrl)
   let qbitUsername = String(existingConfig?.qbitUsername || qbit.username || '').trim()
   let qbitPassword = String(existingConfig?.qbitPassword || '').trim()
 

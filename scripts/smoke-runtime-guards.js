@@ -9,6 +9,7 @@ process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'local-smoke-se
 const { isBlockedPrivateTargetHost } = require('../public/route-parity')
 const { encrypt } = require('../src/utils/crypto')
 const { encodePlaybackStateToken } = require('../src/utils/opaqueState')
+const { findAvailableTcpPort, isTcpPortAvailable } = require('../src/utils/provision')
 const CANONICAL_HOST = 'www.pvtkrrx.cc'
 const CANONICAL_ORIGIN = `https://${CANONICAL_HOST}`
 
@@ -69,6 +70,22 @@ function readCsrf(setCookieHeader) {
 }
 
 async function run() {
+  const portProbe = http.createServer((_, res) => res.end('ok'))
+  await new Promise(resolve => portProbe.listen(0, '127.0.0.1', resolve))
+
+  try {
+    const occupiedPort = portProbe.address().port
+    assert.equal(await isTcpPortAvailable(occupiedPort, '127.0.0.1'), false, 'occupied port should not be reported as free')
+    const fallbackPort = await findAvailableTcpPort(occupiedPort, {
+      host: '127.0.0.1',
+      fallbackPorts: [occupiedPort + 1, occupiedPort + 2, occupiedPort + 3]
+    })
+    assert.notEqual(fallbackPort, occupiedPort, 'expected port probe to move away from a busy listener')
+    assert.equal(await isTcpPortAvailable(fallbackPort, '127.0.0.1'), true, 'selected fallback port should be free')
+  } finally {
+    await new Promise(resolve => portProbe.close(resolve))
+  }
+
   const blockedHosts = [
     'localhost',
     '127.0.0.1',
