@@ -782,7 +782,8 @@ async function run() {
       prowlarrApiKey: jackettApiKey,
       qbitUrl,
       qbitUsername,
-      qbitPassword
+      qbitPassword,
+      queueingEnabled: Boolean(qbit.queueingEnabled)
     })
     if (prowlarrSync.ok) {
       console.log(`✓ Prowlarr qBittorrent download client ${prowlarrSync.action}`)
@@ -878,11 +879,13 @@ function parseQbitConfig(configPath) {
   const portMatch = ini.match(/WebUI\\Port=(\d+)/) || ini.match(/web_ui_port=(\d+)/i)
   const usernameMatch = ini.match(/WebUI\\Username=(.+)/)
   const savePathMatch = ini.match(/Session\\DefaultSavePath=(.+)/)
+  const queueingEnabledMatch = ini.match(/(?:Session\\)?QueueingSystemEnabled=(true|false)/i)
 
   return {
     port: portMatch ? Number.parseInt(portMatch[1], 10) : null,
     username: usernameMatch ? usernameMatch[1].trim() : '',
-    savePath: savePathMatch ? savePathMatch[1].trim() : ''
+    savePath: savePathMatch ? savePathMatch[1].trim() : '',
+    queueingEnabled: queueingEnabledMatch ? queueingEnabledMatch[1].toLowerCase() === 'true' : false
   }
 }
 
@@ -1038,7 +1041,8 @@ async function runAuto() {
     prowlarrApiKey: jackettApiKey,
     qbitUrl,
     qbitUsername,
-    qbitPassword
+    qbitPassword,
+    queueingEnabled: Boolean(qbit.queueingEnabled)
   })
   if (!prowlarrSync.ok) {
     throw new Error(`Prowlarr qBittorrent download client sync failed: ${prowlarrSync.message}`)

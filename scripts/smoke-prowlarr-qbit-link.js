@@ -138,6 +138,7 @@ async function run() {
     assert.equal(state.createBody.fields.find((field) => field.name === 'username')?.value, 'admin')
     assert.equal(state.createBody.fields.find((field) => field.name === 'password')?.value, 'secret')
     assert.equal(state.createBody.fields.find((field) => field.name === 'category')?.value, 'prowlarr')
+    assert.equal(state.createBody.fields.find((field) => field.name === 'priority')?.value, 0)
 
     const second = await ensureProwlarrQbitDownloadClient({
       prowlarrUrl: baseUrl,
@@ -153,6 +154,7 @@ async function run() {
     assert.equal(state.updateBody.fields.find((field) => field.name === 'port')?.value, 443)
     assert.equal(state.updateBody.fields.find((field) => field.name === 'useSsl')?.value, true)
     assert.equal(state.updateBody.fields.find((field) => field.name === 'urlBase')?.value, 'qbittorrent')
+    assert.equal(state.updateBody.fields.find((field) => field.name === 'priority')?.value, 0)
   } finally {
     server.close()
   }

@@ -718,6 +718,7 @@ async function discoverQbitConfig(options = {}) {
   const username = parseIniValue(iniText, 'WebUI\\Username')
   const savePath = parseIniValue(iniText, 'Session\\DefaultSavePath')
   const localHostAuth = parseIniValue(iniText, 'WebUI\\LocalHostAuth')
+  const queueingSystemEnabled = parseIniValue(iniText, 'Session\\QueueingSystemEnabled') || parseIniValue(iniText, 'QueueingSystemEnabled')
 
   return {
     installed: Boolean(cfg || (hints?.exePaths || []).length || hints?.running),
@@ -726,6 +727,7 @@ async function discoverQbitConfig(options = {}) {
     username,
     savePath,
     localHostAuthDisabled: String(localHostAuth || '').toLowerCase() === 'false',
+    queueingEnabled: String(queueingSystemEnabled || '').toLowerCase() === 'true',
     configPath: cfg?.path || '',
     port: Number.isFinite(port) ? port : 8080
   }
@@ -799,6 +801,8 @@ function buildQbitDownloadClientResource(schema, qbitUrl, options = {}, existing
   resource.configContract = String(schema?.configContract || existingResource?.configContract || 'QBittorrentSettings')
   resource.fields = cloneContractFields(schema?.fields || existingResource?.fields || [])
 
+  const queueingEnabled = Boolean(options.queueingEnabled)
+
   setContractField(resource.fields, ['Host', 'host'], target.host)
   setContractField(resource.fields, ['Port', 'port'], target.port)
   setContractField(resource.fields, ['UseSsl', 'useSsl', 'useSSL'], target.useSsl)
@@ -806,7 +810,9 @@ function buildQbitDownloadClientResource(schema, qbitUrl, options = {}, existing
   setContractField(resource.fields, ['Username', 'username'], String(options.username || ''))
   setContractField(resource.fields, ['Password', 'password'], String(options.password || ''))
   setContractField(resource.fields, ['DefaultCategory', 'Category', 'category'], String(options.category || 'prowlarr'))
-  setContractField(resource.fields, ['Priority', 'priority'], resource.priority)
+  setContractField(resource.fields, ['Priority', 'priority'], Number.isFinite(Number(options.priority))
+    ? Number(options.priority)
+    : (queueingEnabled ? 1 : 0))
   if (typeof options.initialState !== 'undefined') {
     setContractField(resource.fields, ['DownloadClientSettingsInitialState', 'initialState'], options.initialState)
   }
@@ -917,7 +923,11 @@ async function ensureProwlarrQbitDownloadClient(options = {}) {
       result.action = 'created'
     }
 
-    await client.testDownloadClient(saved || resource)
+    const testResource = {
+      ...(saved || resource || {}),
+      name: `${String(resource.name || 'qBittorrent').trim()}__pvtkrrx_test__${Date.now()}`
+    }
+    await client.testDownloadClient(testResource)
     result.ok = true
     result.client = saved || resource
     result.message = `Prowlarr qBittorrent download client ${result.action}`
@@ -953,6 +963,7 @@ async function autoProvisionWindows(options = {}) {
     qbitUrl: qbit.url,
     qbitUsername: qbit.username || '',
     qbitPassword: qbit.password || '',
+    queueingEnabled: Boolean(qbit.queueingEnabled),
     notes
   })
   if (downloadClientResult.message) notes.push(downloadClientResult.message)

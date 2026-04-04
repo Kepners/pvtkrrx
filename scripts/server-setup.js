@@ -281,7 +281,8 @@ async function run() {
       prowlarrApiKey: jackettApiKey,
       qbitUrl,
       qbitUsername,
-      qbitPassword
+      qbitPassword,
+      queueingEnabled: Boolean(qbit.queueingEnabled)
     })
     if (prowlarrSync.ok) {
       console.log(`✓ Prowlarr qBittorrent download client ${prowlarrSync.action}`)
