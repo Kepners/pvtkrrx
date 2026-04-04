@@ -306,6 +306,18 @@ EOF
   echo "✓ Tunnel URL: $public_url"
 }
 
+ensure_qbittorrent_user() {
+  local qbit_home="/var/lib/$QBIT_USER"
+
+  if ! id "$QBIT_USER" >/dev/null 2>&1; then
+    # Recreate the service account if a wipe removed it but left the package installed.
+    run_root useradd -r -s /usr/sbin/nologin -d "$qbit_home" "$QBIT_USER"
+  fi
+
+  run_root mkdir -p "$qbit_home"
+  run_root chown -R "$QBIT_USER:$QBIT_USER" "$qbit_home"
+}
+
 # ─── qBittorrent ────────────────────────────────────────────────────
 install_qbittorrent() {
   if have_command qbittorrent-nox; then
@@ -328,6 +340,7 @@ install_qbittorrent() {
 setup_qbittorrent_service() {
   local unit_path="/etc/systemd/system/qbittorrent-nox.service"
   local service_was_active=0
+  ensure_qbittorrent_user
   if [ -f "$unit_path" ] && systemctl is-active --quiet qbittorrent-nox 2>/dev/null; then
     service_was_active=1
     echo "✓ qBittorrent service already running"
