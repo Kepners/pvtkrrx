@@ -137,12 +137,23 @@ function normalizeOrigin(input) {
   return parsed ? normalizeBaseUrl(parsed.origin) : ''
 }
 
-function normalizeOriginList(input) {
-  const items = String(input || '')
+function normalizeOriginList(input, fallback = '') {
+  const collect = (value) => String(value || '')
     .split(',')
-    .map(part => normalizeOrigin(part))
+    .map((part) => {
+      try {
+        return normalizeOrigin(part)
+      } catch (_) {
+        return ''
+      }
+    })
     .filter(Boolean)
-  return [...new Set(items)].join(', ')
+
+  const items = collect(input)
+  if (items.length > 0) return [...new Set(items)].join(', ')
+
+  const fallbackItems = collect(fallback)
+  return [...new Set(fallbackItems)].join(', ')
 }
 
 function buildDefaultAllowedOrigins(publicBaseUrl, httpPort, httpsPort, existingValue = '') {
@@ -558,17 +569,21 @@ async function run() {
       publicBaseUrl = ''
     }
 
-    const allowedWebOrigins = normalizeOriginList(await promptValue(
-      rl,
-      'Allowed browser origins (comma separated, optional)',
-      buildDefaultAllowedOrigins(
-        publicBaseUrl,
-        httpPort,
-        httpsPort,
-        String(mergedEnv.PVTKRRX_ALLOWED_WEB_ORIGINS || '').trim()
+    const defaultAllowedWebOrigins = buildDefaultAllowedOrigins(
+      publicBaseUrl,
+      httpPort,
+      httpsPort,
+      String(mergedEnv.PVTKRRX_ALLOWED_WEB_ORIGINS || '').trim()
+    )
+    const allowedWebOrigins = normalizeOriginList(
+      await promptValue(
+        rl,
+        'Allowed browser origins (comma separated, optional)',
+        defaultAllowedWebOrigins,
+        { allowEmpty: true }
       ),
-      { allowEmpty: true }
-    ))
+      defaultAllowedWebOrigins
+    )
 
     const jackettUrl = await promptHttpUrl(
       rl,
@@ -886,9 +901,11 @@ async function runAuto() {
   const selfHostPassword = existingSelfHostPassword || randomSecret()
 
   // ── Write .env ──
-  const allowedWebOrigins = normalizeOriginList(
-    String(mergedEnv.PVTKRRX_ALLOWED_WEB_ORIGINS || '').trim() ||
-    buildDefaultAllowedOrigins(publicBaseUrl, httpPort, httpsPort)
+  const allowedWebOrigins = buildDefaultAllowedOrigins(
+    publicBaseUrl,
+    httpPort,
+    httpsPort,
+    String(mergedEnv.PVTKRRX_ALLOWED_WEB_ORIGINS || '').trim()
   )
 
   updateDotEnvFile(envPath, {
