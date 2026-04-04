@@ -539,6 +539,18 @@ function describePlaybackOrigin(displayOrigin, publicBaseUrl, playbackBaseUrl) {
   return `Playback origin: ${playbackOrigin} (control/install origin stays ${publicOrigin || displayOrigin})`
 }
 
+function resolveInstallPlaybackBaseUrl(existingPlaybackBaseUrl, publicBaseUrl, selfHostHttpsMode) {
+  const playbackOrigin = normalizeOrigin(existingPlaybackBaseUrl)
+  if (playbackOrigin) return playbackOrigin
+
+  const publicOrigin = normalizeOrigin(publicBaseUrl)
+  if (selfHostHttpsMode === 'domain' && publicOrigin && !isTryCloudflareUrl(publicOrigin)) {
+    return publicOrigin
+  }
+
+  return ''
+}
+
 async function run() {
   const repoRoot = path.resolve(__dirname, '..')
   const envPath = path.join(repoRoot, '.env')
@@ -641,6 +653,34 @@ async function run() {
       )
     } else {
       publicBaseUrl = ''
+    }
+    const defaultPlaybackBaseUrl = resolveInstallPlaybackBaseUrl(
+      existingPlaybackBaseUrl,
+      publicBaseUrl,
+      selfHostHttpsMode
+    )
+    let playbackBaseUrl = defaultPlaybackBaseUrl
+    if (selfHostHttpsMode === 'cloudflare') {
+      playbackBaseUrl = await promptHttpUrl(
+        rl,
+        'Direct HTTPS playback URL for built-in /file and /playback (optional; leave blank to use the tunnel)',
+        defaultPlaybackBaseUrl,
+        {
+          allowEmpty: true,
+          requireHttps: true
+        }
+      )
+    } else if (selfHostHttpsMode === 'domain') {
+      playbackBaseUrl = await promptHttpUrl(
+        rl,
+        'Playback HTTPS URL for built-in /file and /playback',
+        defaultPlaybackBaseUrl || publicBaseUrl,
+        {
+          allowEmpty: true,
+          requireHttps: true
+        }
+      )
+      if (!playbackBaseUrl) playbackBaseUrl = publicBaseUrl
     }
 
     const defaultAllowedWebOrigins = buildDefaultAllowedOrigins(
@@ -748,7 +788,7 @@ async function run() {
       PVTKRRX_SELF_HOST_HTTPS_MODE: selfHostHttpsMode,
       PVTKRRX_RUNTIME_DIR: runtimeDir,
       PVTKRRX_PUBLIC_BASE_URL: publicBaseUrl,
-      PVTKRRX_PLAYBACK_BASE_URL: existingPlaybackBaseUrl,
+      PVTKRRX_PLAYBACK_BASE_URL: playbackBaseUrl,
       PVTKRRX_ALLOWED_WEB_ORIGINS: allowedWebOrigins,
       PORT: String(httpPort),
       HTTPS_PORT: String(httpsPort)
@@ -762,7 +802,7 @@ async function run() {
     process.env.PVTKRRX_SELF_HOST_HTTPS_MODE = selfHostHttpsMode
     process.env.PVTKRRX_RUNTIME_DIR = runtimeDir
     process.env.PVTKRRX_PUBLIC_BASE_URL = publicBaseUrl
-    process.env.PVTKRRX_PLAYBACK_BASE_URL = existingPlaybackBaseUrl
+    process.env.PVTKRRX_PLAYBACK_BASE_URL = playbackBaseUrl
     process.env.PVTKRRX_ALLOWED_WEB_ORIGINS = allowedWebOrigins
     process.env.PORT = String(httpPort)
     process.env.HTTPS_PORT = String(httpsPort)
@@ -856,7 +896,7 @@ async function run() {
     console.log(`Saved config: ${localConfigPath}`)
     console.log(`Self-host password file: ${adminState.path || path.join(runtimeDir, 'server-admin-token')}`)
     printWorkingUrlSummary(displayOrigin, configureBootstrapUrl, publicBaseUrl)
-    const playbackOriginLine = describePlaybackOrigin(displayOrigin, publicBaseUrl, existingPlaybackBaseUrl)
+    const playbackOriginLine = describePlaybackOrigin(displayOrigin, publicBaseUrl, playbackBaseUrl)
     if (playbackOriginLine) console.log(playbackOriginLine)
     if (publicBaseUrl) {
       console.log(`Allowed web origins: ${allowedWebOrigins || '(none)'}`)
@@ -977,6 +1017,11 @@ async function runAuto() {
   } else if (selfHostHttpsMode === 'skip') {
     publicBaseUrl = ''
   }
+  const playbackBaseUrl = resolveInstallPlaybackBaseUrl(
+    existingPlaybackBaseUrl,
+    publicBaseUrl,
+    selfHostHttpsMode
+  )
 
   console.log('PVTKRRX auto-configuration')
   console.log(`HTTPS mode: ${describeSelfHostHttpsMode(selfHostHttpsMode)}`)
@@ -1035,7 +1080,7 @@ async function runAuto() {
     PVTKRRX_SELF_HOST_HTTPS_MODE: selfHostHttpsMode,
     PVTKRRX_RUNTIME_DIR: defaultRuntimeDir,
     PVTKRRX_PUBLIC_BASE_URL: publicBaseUrl,
-    PVTKRRX_PLAYBACK_BASE_URL: existingPlaybackBaseUrl,
+    PVTKRRX_PLAYBACK_BASE_URL: playbackBaseUrl,
     PVTKRRX_ALLOWED_WEB_ORIGINS: allowedWebOrigins,
     PORT: String(httpPort),
     HTTPS_PORT: String(httpsPort)
@@ -1050,7 +1095,7 @@ async function runAuto() {
   process.env.PVTKRRX_SELF_HOST_HTTPS_MODE = selfHostHttpsMode
   process.env.PVTKRRX_RUNTIME_DIR = defaultRuntimeDir
   process.env.PVTKRRX_PUBLIC_BASE_URL = publicBaseUrl
-  process.env.PVTKRRX_PLAYBACK_BASE_URL = existingPlaybackBaseUrl
+  process.env.PVTKRRX_PLAYBACK_BASE_URL = playbackBaseUrl
   process.env.PORT = String(httpPort)
   process.env.HTTPS_PORT = String(httpsPort)
 
@@ -1148,7 +1193,7 @@ async function runAuto() {
   console.log(`Prowlarr:    ${jackettUrl}`)
   console.log(`qBittorrent: ${qbitUrl}`)
   printWorkingUrlSummary(displayOrigin, configureBootstrapUrl, publicBaseUrl)
-  const playbackOriginLine = describePlaybackOrigin(displayOrigin, publicBaseUrl, existingPlaybackBaseUrl)
+  const playbackOriginLine = describePlaybackOrigin(displayOrigin, publicBaseUrl, playbackBaseUrl)
   if (playbackOriginLine) console.log(playbackOriginLine)
   console.log(`HTTP port:   ${httpPort}`)
   console.log(`Node binary: ${bundledNodePath}`)
@@ -1177,6 +1222,7 @@ module.exports = {
   normalizeOrigin,
   normalizeOriginList,
   resolveSelfHostHttpsMode,
+  resolveInstallPlaybackBaseUrl,
   parseDotEnvFile,
   parseHttpUrl,
   updateDotEnvFile,

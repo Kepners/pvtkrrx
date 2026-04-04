@@ -105,12 +105,13 @@ The Linux installer now bootstraps a dedicated self-host server in one flow:
 - installs production dependencies
 - auto-discovers existing Prowlarr/qBittorrent configs when they are already installed, then prompts only for the values it cannot recover
 - asks how Stremio should reach the server: Cloudflare Tunnel, a user-owned `https://` origin, or skip for later manual setup
+- asks for a built-in playback origin during install when needed: domain installs default `/file` and `/playback` to the same HTTPS origin, while Cloudflare installs can capture an optional separate direct HTTPS playback host instead of leaving video bytes on the tunnel by accident
 - configures qBittorrent for localhost addon access when it has to stand up the service itself
 - if Prowlarr or qBittorrent are missing on a direct `npm run server:setup` run, it immediately hands off to the full bootstrap and installs them automatically before continuing
 - pulls the app source from the branch payload by default, with an automatic retry from `main` if a pinned release is too old to include `scripts/server-installer.js`
 - can be pinned to a specific release with `PVTKRRX_RELEASE_TAG` or pointed at a Contabo-hosted release manifest with `PVTKRRX_RELEASE_MANIFEST_URL`
 - prompts for your public HTTPS base URL plus any remaining seedbox connection details
-- writes `.env` with `ENCRYPTION_SECRET`, `AUTH_TOKEN_SECRET`, `PVTKRRX_SELF_HOST_MODE=true`, `PVTKRRX_RUNTIME_DIR`, and `PVTKRRX_PUBLIC_BASE_URL`
+- writes `.env` with `ENCRYPTION_SECRET`, `AUTH_TOKEN_SECRET`, `PVTKRRX_SELF_HOST_MODE=true`, `PVTKRRX_RUNTIME_DIR`, `PVTKRRX_PUBLIC_BASE_URL`, and `PVTKRRX_PLAYBACK_BASE_URL` when a playback origin is set or derived
 - saves the disk-backed self-host config into the runtime directory
 - creates the self-host password file
 - can install/start a Linux `systemd` service for auto-boot

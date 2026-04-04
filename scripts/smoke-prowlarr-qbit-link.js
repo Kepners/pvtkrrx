@@ -2,7 +2,7 @@ const assert = require('node:assert/strict')
 const http = require('node:http')
 
 const { ensureProwlarrQbitDownloadClient } = require('../src/utils/provision')
-const { isTryCloudflareUrl, resolveSelfHostHttpsMode } = require('./server-installer')
+const { isTryCloudflareUrl, resolveInstallPlaybackBaseUrl, resolveSelfHostHttpsMode } = require('./server-installer')
 
 function readJsonBody(req) {
   return new Promise((resolve) => {
@@ -112,6 +112,9 @@ async function run() {
   assert.equal(resolveSelfHostHttpsMode('', 'https://scanner-seeks-cent-ant.trycloudflare.com'), 'cloudflare')
   assert.equal(resolveSelfHostHttpsMode('', 'https://example.com'), 'domain')
   assert.equal(resolveSelfHostHttpsMode('domain', 'https://scanner-seeks-cent-ant.trycloudflare.com'), 'cloudflare')
+  assert.equal(resolveInstallPlaybackBaseUrl('', 'https://seedbox.example.com', 'domain'), 'https://seedbox.example.com')
+  assert.equal(resolveInstallPlaybackBaseUrl('', 'https://scanner-seeks-cent-ant.trycloudflare.com', 'cloudflare'), '')
+  assert.equal(resolveInstallPlaybackBaseUrl('https://play.example.com', 'https://scanner-seeks-cent-ant.trycloudflare.com', 'cloudflare'), 'https://play.example.com')
 
   const { server, state } = await startMockProwlarr()
   try {

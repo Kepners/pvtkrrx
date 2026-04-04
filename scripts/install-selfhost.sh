@@ -270,6 +270,34 @@ prompt_https_url() {
   done
 }
 
+prompt_optional_https_url() {
+  local label="${1:-Public HTTPS URL}"
+  local default_value="${2:-}"
+  local value=""
+  if [ ! -t 0 ] || [ ! -t 1 ] || [ ! -r /dev/tty ]; then
+    echo "$default_value"
+    return 0
+  fi
+
+  while true; do
+    printf '%s' "$label" > /dev/tty
+    if [ -n "$default_value" ]; then
+      printf ' [%s]' "$default_value" > /dev/tty
+    else
+      printf ' [leave blank to skip]' > /dev/tty
+    fi
+    printf ': ' > /dev/tty
+    IFS= read -r value < /dev/tty || value=""
+    value="${value:-$default_value}"
+    value="$(printf '%s' "$value" | tr -d '\r' | sed 's:/*$::')"
+    case "$value" in
+      https://*) echo "$value"; return 0 ;;
+      "") echo ""; return 0 ;;
+      *) printf 'HTTPS URL must start with https:// or be left blank.\n' > /dev/tty ;;
+    esac
+  done
+}
+
 install_cloudflared() {
   if have_command cloudflared; then
     echo "✓ cloudflared already installed: $(cloudflared --version 2>/dev/null | head -n 1 || echo 'unknown')"
@@ -640,6 +668,7 @@ main() {
   export PVTKRRX_SELF_HOST_HTTPS_MODE="$https_mode"
 
   local public_base_url="${PVTKRRX_PUBLIC_BASE_URL:-}"
+  local playback_base_url="${PVTKRRX_PLAYBACK_BASE_URL:-}"
   case "$https_mode" in
     cloudflare)
       if [ -n "$public_base_url" ] && ! is_trycloudflare_url "$public_base_url"; then
@@ -650,9 +679,22 @@ main() {
         setup_cloudflared_service "$PVTKRRX_HTTP_PORT"
         public_base_url="${PVTKRRX_PUBLIC_BASE_URL:-}"
       fi
+      playback_base_url="$(prompt_optional_https_url 'Direct HTTPS playback URL for built-in /file and /playback (optional; leave blank to use the tunnel)' "$playback_base_url")"
+      if [ -n "$playback_base_url" ]; then
+        echo "âœ“ Built-in playback will use direct HTTPS origin: $playback_base_url"
+      else
+        echo "âœ“ Built-in playback will stay on the Cloudflare public origin until PVTKRRX_PLAYBACK_BASE_URL is set"
+      fi
       ;;
     domain)
       public_base_url="$(prompt_https_url "$public_base_url")"
+      if [ -z "$playback_base_url" ]; then
+        playback_base_url="$public_base_url"
+      fi
+      playback_base_url="$(prompt_optional_https_url 'Playback HTTPS URL for built-in /file and /playback' "$playback_base_url")"
+      if [ -z "$playback_base_url" ]; then
+        playback_base_url="$public_base_url"
+      fi
       echo "✓ Using custom domain: $public_base_url"
       ;;
     skip)
@@ -662,6 +704,7 @@ main() {
   esac
 
   export PVTKRRX_PUBLIC_BASE_URL="$public_base_url"
+  export PVTKRRX_PLAYBACK_BASE_URL="$playback_base_url"
 
   # ── Step 2: qBittorrent ──
   echo ""
@@ -693,6 +736,7 @@ main() {
   export PORT="$PVTKRRX_HTTP_PORT"
   export HTTPS_PORT="$PVTKRRX_HTTPS_PORT"
   export PVTKRRX_PUBLIC_BASE_URL="${PVTKRRX_PUBLIC_BASE_URL:-}"
+  export PVTKRRX_PLAYBACK_BASE_URL="${PVTKRRX_PLAYBACK_BASE_URL:-}"
 
   echo "Installing production dependencies..."
   run_root env "PATH=${node_dir}/bin:$PATH" "${node_dir}/bin/npm" install --omit=dev --prefix "$INSTALL_DIR" 2>&1 | tail -3
