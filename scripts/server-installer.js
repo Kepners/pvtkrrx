@@ -8,7 +8,7 @@ const { stdin: input, stdout: output } = require('node:process')
 
 const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJsonFile')
 const { ensureServerAdminToken } = require('../src/utils/serverAdminToken')
-const { discoverProwlarrConfig, discoverQbitConfig } = require('../src/utils/provision')
+const { discoverProwlarrConfig, discoverQbitConfig, ensureProwlarrQbitDownloadClient } = require('../src/utils/provision')
 const { installSystemdService } = require('./install-systemd-service')
 
 function parseDotEnvFile(filePath) {
@@ -73,6 +73,21 @@ function randomSecret(bytes = 32) {
 
 function normalizeBaseUrl(input) {
   return String(input || '').trim().replace(/\/+$/, '')
+}
+
+function isTryCloudflareUrl(input) {
+  return /^https:\/\/[a-z0-9-]+\.trycloudflare\.com(?:\/|$)/i.test(normalizeBaseUrl(input))
+}
+
+function resolveSelfHostHttpsMode(existingHttpsMode, existingPublicBaseUrl) {
+  const mode = normalizeSelfHostHttpsMode(existingHttpsMode || '')
+  const publicBaseUrl = normalizeBaseUrl(existingPublicBaseUrl || '')
+  const canReusePublicBaseUrl = Boolean(publicBaseUrl) && !isTryCloudflareUrl(publicBaseUrl)
+
+  if (mode === 'skip') return 'skip'
+  if (mode === 'cloudflare') return 'cloudflare'
+  if (mode === 'domain') return canReusePublicBaseUrl ? 'domain' : 'cloudflare'
+  return canReusePublicBaseUrl ? 'domain' : 'cloudflare'
 }
 
 function normalizePortNumber(input, fallback = 0) {
@@ -298,14 +313,19 @@ async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
 
-function readCloudflaredTunnelUrl(serviceName) {
-  const result = spawnSync('journalctl', [
+function readCloudflaredTunnelUrl(serviceName, since = '') {
+  const args = [
     '-u',
     `${serviceName}.service`,
     '--no-pager',
     '-n',
-    '100'
-  ], {
+    '200'
+  ]
+  if (String(since || '').trim()) {
+    args.push('--since', String(since || '').trim())
+  }
+
+  const result = spawnSync('journalctl', args, {
     encoding: 'utf8'
   })
   const text = `${result.stdout || ''}\n${result.stderr || ''}`
@@ -349,7 +369,7 @@ async function ensureCloudflaredTunnel(repoRoot, httpPort, existingPublicBaseUrl
   }
 
   const binaryPath = installCloudflaredBinary(repoRoot)
-  if (configuredBase) {
+  if (configuredBase && !isTryCloudflareUrl(configuredBase)) {
     return {
       installed: true,
       publicBaseUrl: configuredBase,
@@ -361,10 +381,7 @@ async function ensureCloudflaredTunnel(repoRoot, httpPort, existingPublicBaseUrl
 
   const serviceName = 'pvtkrrx-tunnel'
   const unitPath = `/etc/systemd/system/${serviceName}.service`
-  const activeServiceProbe = spawnSync('systemctl', ['is-active', '--quiet', `${serviceName}.service`], { stdio: 'ignore' })
-
-  if (activeServiceProbe.status !== 0) {
-    const unitBody = `[Unit]
+  const unitBody = `[Unit]
 Description=PVTKRRX Cloudflare Tunnel
 After=network-online.target
 Wants=network-online.target
@@ -381,24 +398,24 @@ TimeoutStopSec=20
 WantedBy=multi-user.target
 `
 
-    const tempPath = path.join(os.tmpdir(), `${serviceName}.service`)
-    fs.writeFileSync(tempPath, unitBody, 'utf8')
+  const tempPath = path.join(os.tmpdir(), `${serviceName}.service`)
+  fs.writeFileSync(tempPath, unitBody, 'utf8')
+  const restartStartedAt = new Date().toISOString()
+  try {
+    runAsRoot('install', ['-m', '0644', tempPath, unitPath], { cwd: repoRoot })
+    runAsRoot('systemctl', ['daemon-reload'], { cwd: repoRoot })
+    runAsRoot('systemctl', ['enable', `${serviceName}.service`], { cwd: repoRoot })
+    runAsRoot('systemctl', ['restart', `${serviceName}.service`], { cwd: repoRoot })
+  } finally {
     try {
-      runAsRoot('install', ['-m', '0644', tempPath, unitPath], { cwd: repoRoot })
-      runAsRoot('systemctl', ['daemon-reload'], { cwd: repoRoot })
-      runAsRoot('systemctl', ['enable', `${serviceName}.service`], { cwd: repoRoot })
-      runAsRoot('systemctl', ['restart', `${serviceName}.service`], { cwd: repoRoot })
-    } finally {
-      try {
-        fs.unlinkSync(tempPath)
-      } catch (_) {}
-    }
+      fs.unlinkSync(tempPath)
+    } catch (_) {}
   }
 
   console.log('Waiting for Cloudflare Tunnel URL...')
   let publicBaseUrl = ''
   for (let attempts = 0; attempts < 45; attempts += 1) {
-    publicBaseUrl = readCloudflaredTunnelUrl(serviceName)
+    publicBaseUrl = readCloudflaredTunnelUrl(serviceName, restartStartedAt)
     if (publicBaseUrl) break
     await sleep(1000)
   }
@@ -576,7 +593,7 @@ async function run() {
     const safeExistingPublicBaseUrl = sanitizeHttpUrlDefault(existingPublicBaseUrl, '', {
       requireHttps: true
     })
-    const defaultHttpsMode = existingHttpsMode || (safeExistingPublicBaseUrl ? 'domain' : 'cloudflare')
+    const defaultHttpsMode = resolveSelfHostHttpsMode(existingHttpsMode, safeExistingPublicBaseUrl)
     let selfHostHttpsMode = normalizeSelfHostHttpsMode(
       await promptValue(
         rl,
@@ -586,9 +603,11 @@ async function run() {
     )
     if (!selfHostHttpsMode) selfHostHttpsMode = defaultHttpsMode
 
-    let publicBaseUrl = safeExistingPublicBaseUrl
+    let publicBaseUrl = selfHostHttpsMode === 'domain' && !isTryCloudflareUrl(safeExistingPublicBaseUrl)
+      ? safeExistingPublicBaseUrl
+      : ''
     if (selfHostHttpsMode === 'cloudflare') {
-      const tunnelResult = await ensureCloudflaredTunnel(repoRoot, httpPort, publicBaseUrl)
+      const tunnelResult = await ensureCloudflaredTunnel(repoRoot, httpPort, '')
       if (tunnelResult && tunnelResult.publicBaseUrl) {
         publicBaseUrl = normalizeBaseUrl(tunnelResult.publicBaseUrl)
       }
@@ -625,7 +644,7 @@ async function run() {
     const jackettUrl = await promptHttpUrl(
       rl,
       'Prowlarr URL',
-      sanitizeHttpUrlDefault(existingConfig?.jackettUrl, 'http://localhost:9696')
+      sanitizeHttpUrlDefault(prowlarr.url || existingConfig?.jackettUrl || '', 'http://localhost:9696')
     )
     const jackettApiKey = await promptValue(
       rl,
@@ -636,12 +655,12 @@ async function run() {
     const qbitUrl = await promptHttpUrl(
       rl,
       'qBittorrent URL',
-      sanitizeHttpUrlDefault(existingConfig?.qbitUrl || preferredQbitUrl, preferredQbitUrl)
+      sanitizeHttpUrlDefault(preferredQbitUrl || existingConfig?.qbitUrl || '', preferredQbitUrl)
     )
     const qbitUsername = await promptValue(
       rl,
       'qBittorrent username',
-      String(existingConfig?.qbitUsername || '').trim(),
+      String(qbit.username || existingConfig?.qbitUsername || '').trim(),
       { allowEmpty: true }
     )
     const qbitPassword = await promptValue(
@@ -757,6 +776,19 @@ async function run() {
       env: process.env,
       createIfMissing: true
     })
+
+    const prowlarrSync = await ensureProwlarrQbitDownloadClient({
+      prowlarrUrl: jackettUrl,
+      prowlarrApiKey: jackettApiKey,
+      qbitUrl,
+      qbitUsername,
+      qbitPassword
+    })
+    if (prowlarrSync.ok) {
+      console.log(`✓ Prowlarr qBittorrent download client ${prowlarrSync.action}`)
+    } else if (prowlarrSync.message) {
+      console.warn(`⚠ Prowlarr qBittorrent download client: ${prowlarrSync.message}`)
+    }
 
     let serviceResult = null
     if (installService) {
@@ -879,15 +911,17 @@ async function runAuto() {
     requireHttps: true
   })
   const existingHttpsMode = normalizeSelfHostHttpsMode(mergedEnv.PVTKRRX_SELF_HOST_HTTPS_MODE || '')
-  const selfHostHttpsMode = existingHttpsMode || (existingPublicBaseUrl ? 'domain' : 'cloudflare')
-  let publicBaseUrl = existingPublicBaseUrl
+  const selfHostHttpsMode = resolveSelfHostHttpsMode(existingHttpsMode, existingPublicBaseUrl)
+  let publicBaseUrl = selfHostHttpsMode === 'domain' && !isTryCloudflareUrl(existingPublicBaseUrl)
+    ? existingPublicBaseUrl
+    : ''
 
   if (selfHostHttpsMode === 'domain' && !publicBaseUrl) {
     throw new Error('PVTKRRX_SELF_HOST_HTTPS_MODE=domain requires PVTKRRX_PUBLIC_BASE_URL to be set')
   }
 
-  if (process.platform === 'linux' && selfHostHttpsMode === 'cloudflare' && !publicBaseUrl) {
-    const tunnelResult = await ensureCloudflaredTunnel(repoRoot, httpPort, publicBaseUrl)
+  if (process.platform === 'linux' && selfHostHttpsMode === 'cloudflare') {
+    const tunnelResult = await ensureCloudflaredTunnel(repoRoot, httpPort, '')
     if (tunnelResult && tunnelResult.publicBaseUrl) {
       publicBaseUrl = normalizeBaseUrl(tunnelResult.publicBaseUrl)
     }
@@ -906,10 +940,10 @@ async function runAuto() {
     envQbitPort || normalizePortNumber(qbit.port || '', 0) || 8080
   )
 
-  let jackettUrl = sanitizeHttpUrlDefault(existingConfig?.jackettUrl || prowlarr.url || '', 'http://localhost:9696')
-  let jackettApiKey = String(existingConfig?.jackettApiKey || prowlarr.apiKey || '').trim()
-  let qbitUrl = sanitizeHttpUrlDefault(existingConfig?.qbitUrl || preferredQbitUrl || qbit.url || '', preferredQbitUrl)
-  let qbitUsername = String(existingConfig?.qbitUsername || qbit.username || '').trim()
+  let jackettUrl = sanitizeHttpUrlDefault(prowlarr.url || existingConfig?.jackettUrl || '', 'http://localhost:9696')
+  let jackettApiKey = String(prowlarr.apiKey || existingConfig?.jackettApiKey || '').trim()
+  let qbitUrl = sanitizeHttpUrlDefault(preferredQbitUrl || qbit.url || existingConfig?.qbitUrl || '', preferredQbitUrl)
+  let qbitUsername = String(qbit.username || existingConfig?.qbitUsername || '').trim()
   let qbitPassword = String(existingConfig?.qbitPassword || '').trim()
 
   if (prowlarr.configPath) {
@@ -999,6 +1033,18 @@ async function runAuto() {
     createIfMissing: true
   })
 
+  const prowlarrSync = await ensureProwlarrQbitDownloadClient({
+    prowlarrUrl: jackettUrl,
+    prowlarrApiKey: jackettApiKey,
+    qbitUrl,
+    qbitUsername,
+    qbitPassword
+  })
+  if (!prowlarrSync.ok) {
+    throw new Error(`Prowlarr qBittorrent download client sync failed: ${prowlarrSync.message}`)
+  }
+  console.log(`✓ Prowlarr qBittorrent download client ${prowlarrSync.action}`)
+
   console.log('')
   console.log(`✓ Config saved to ${localConfigPath}`)
   console.log(`✓ Self-host password: ${adminState.path ? fs.readFileSync(adminState.path, 'utf8').trim() : adminState.token}`)
@@ -1049,12 +1095,14 @@ module.exports = {
   defaultServiceName,
   defaultServiceUser,
   deriveDisplayOrigin,
+  isTryCloudflareUrl,
   printWorkingUrlSummary,
   runFullBootstrap,
   run,
   runAuto,
   normalizeOrigin,
   normalizeOriginList,
+  resolveSelfHostHttpsMode,
   parseDotEnvFile,
   parseHttpUrl,
   updateDotEnvFile,

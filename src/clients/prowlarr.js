@@ -32,6 +32,32 @@ class ProwlarrClient {
     this.indexerCategoryLookupInFlight = null
   }
 
+  async _requestJson(path, options = {}) {
+    const url = new URL(`${this.baseUrl}${path}`)
+    url.searchParams.set('apikey', this.apiKey)
+
+    const res = await fetch(url.toString(), {
+      method: options.method || 'GET',
+      headers: {
+        ...(options.headers || {})
+      },
+      body: options.body,
+      signal: AbortSignal.timeout(options.timeoutMs || TIMEOUT_MS)
+    })
+
+    if (!res.ok) {
+      throw new Error(`Prowlarr HTTP ${res.status}`)
+    }
+
+    if (options.expect === 'text') {
+      return res.text()
+    }
+
+    const text = await res.text()
+    if (!text) return null
+    return JSON.parse(text)
+  }
+
   _mapResult(r, categoryLookup = new Map()) {
     // Try to extract infohash from guid or infoUrl (some indexers embed SHA1 hash in URL)
     let infohash = ''
@@ -171,6 +197,84 @@ class ProwlarrClient {
     const indexers = await res.json()
     if (!Array.isArray(indexers) || indexers.length === 0) throw new Error('No indexers configured in Prowlarr')
     return indexers
+  }
+
+  async listDownloadClients() {
+    const rows = await this._requestJson('/api/v1/downloadclient')
+    return Array.isArray(rows) ? rows : []
+  }
+
+  async listDownloadClientSchemas() {
+    const rows = await this._requestJson('/api/v1/downloadclient/schema')
+    return Array.isArray(rows) ? rows : []
+  }
+
+  async getDownloadClientById(id) {
+    if (!String(id || '').trim()) return null
+    return this._requestJson(`/api/v1/downloadclient/${encodeURIComponent(String(id))}`)
+  }
+
+  async createDownloadClient(downloadClientResource, forceSave = false) {
+    const url = new URL(`${this.baseUrl}/api/v1/downloadclient`)
+    url.searchParams.set('apikey', this.apiKey)
+    if (forceSave) url.searchParams.set('forceSave', 'true')
+
+    const res = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(downloadClientResource || {}),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    })
+
+    if (!res.ok) {
+      throw new Error(`Prowlarr HTTP ${res.status}`)
+    }
+
+    return res.json()
+  }
+
+  async updateDownloadClient(id, downloadClientResource, forceSave = false) {
+    const url = new URL(`${this.baseUrl}/api/v1/downloadclient/${encodeURIComponent(String(id || '').trim())}`)
+    url.searchParams.set('apikey', this.apiKey)
+    if (forceSave) url.searchParams.set('forceSave', 'true')
+
+    const res = await fetch(url.toString(), {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(downloadClientResource || {}),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    })
+
+    if (!res.ok) {
+      throw new Error(`Prowlarr HTTP ${res.status}`)
+    }
+
+    return res.json()
+  }
+
+  async testDownloadClient(downloadClientResource, forceTest = false) {
+    const url = new URL(`${this.baseUrl}/api/v1/downloadclient/test`)
+    url.searchParams.set('apikey', this.apiKey)
+    if (forceTest) url.searchParams.set('forceTest', 'true')
+
+    const res = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(downloadClientResource || {}),
+      signal: AbortSignal.timeout(TIMEOUT_MS)
+    })
+
+    if (!res.ok) {
+      throw new Error(`Prowlarr HTTP ${res.status}`)
+    }
+
+    return res.text()
   }
 }
 

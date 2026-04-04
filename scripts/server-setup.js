@@ -7,7 +7,7 @@ const { stdin: input, stdout: output } = require('node:process')
 const { resolveRuntimeDir } = require('../src/utils/runtimeDir')
 const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJsonFile')
 const { ensureServerAdminToken } = require('../src/utils/serverAdminToken')
-const { discoverProwlarrConfig, discoverQbitConfig } = require('../src/utils/provision')
+const { discoverProwlarrConfig, discoverQbitConfig, ensureProwlarrQbitDownloadClient } = require('../src/utils/provision')
 const { runFullBootstrap } = require('./server-installer')
 const { installSystemdService } = require('./install-systemd-service')
 
@@ -149,7 +149,7 @@ async function run() {
     const jackettUrl = await promptValue(
       rl,
       'Prowlarr URL',
-      String(existingConfig?.jackettUrl || 'http://localhost:9696').trim()
+      String(prowlarr.url || existingConfig?.jackettUrl || 'http://localhost:9696').trim()
     )
     const jackettApiKey = await promptValue(
       rl,
@@ -160,12 +160,17 @@ async function run() {
     const qbitUrl = await promptValue(
       rl,
       'qBittorrent URL',
-      String(existingConfig?.qbitUrl || 'http://localhost:8080').trim()
+      String(
+        (process.env.PVTKRRX_QBIT_WEBUI_PORT ? `http://127.0.0.1:${process.env.PVTKRRX_QBIT_WEBUI_PORT}` : '') ||
+        qbit.url ||
+        existingConfig?.qbitUrl ||
+        'http://localhost:8080'
+      ).trim()
     )
     const qbitUsername = await promptValue(
       rl,
       'qBittorrent username',
-      String(existingConfig?.qbitUsername || '').trim(),
+      String(qbit.username || existingConfig?.qbitUsername || '').trim(),
       { allowEmpty: true }
     )
     const qbitPassword = await promptValue(
@@ -270,6 +275,19 @@ async function run() {
       env: process.env,
       createIfMissing: true
     })
+
+    const prowlarrSync = await ensureProwlarrQbitDownloadClient({
+      prowlarrUrl: jackettUrl,
+      prowlarrApiKey: jackettApiKey,
+      qbitUrl,
+      qbitUsername,
+      qbitPassword
+    })
+    if (prowlarrSync.ok) {
+      console.log(`✓ Prowlarr qBittorrent download client ${prowlarrSync.action}`)
+    } else if (prowlarrSync.message) {
+      console.warn(`⚠ Prowlarr qBittorrent download client: ${prowlarrSync.message}`)
+    }
     const configureBootstrapUrl = `http://localhost:${process.env.PORT || '7000'}/configure#serverPassword=${encodeURIComponent(adminState.token)}&serverAdminToken=${encodeURIComponent(adminState.token)}`
 
     let serviceResult = null

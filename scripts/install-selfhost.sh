@@ -200,11 +200,18 @@ normalize_https_mode() {
   esac
 }
 
+is_trycloudflare_url() {
+  case "$(printf '%s' "${1:-}" | tr -d '[:space:]')" in
+    https://*.trycloudflare.com|https://*.trycloudflare.com/*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 prompt_https_mode() {
   local default_mode
   default_mode="$(normalize_https_mode "${PVTKRRX_SELF_HOST_HTTPS_MODE:-}")"
   if [ -z "$default_mode" ]; then
-    if [ -n "${PVTKRRX_PUBLIC_BASE_URL:-}" ]; then
+    if [ -n "${PVTKRRX_PUBLIC_BASE_URL:-}" ] && ! is_trycloudflare_url "${PVTKRRX_PUBLIC_BASE_URL:-}"; then
       default_mode="domain"
     else
       default_mode="cloudflare"
@@ -282,12 +289,17 @@ install_cloudflared() {
 
 wait_for_cloudflared_url() {
   local service_name="$1"
+  local since="${2:-}"
   local attempts=0
   local url=""
+  local journal_args=(-u "${service_name}.service" --no-pager -n 200)
+  if [ -n "$since" ]; then
+    journal_args+=(--since "$since")
+  fi
 
   echo "Waiting for Cloudflare Tunnel URL..." >&2
   while [ "$attempts" -lt 45 ]; do
-    url="$(journalctl -u "${service_name}.service" --no-pager -n 100 2>/dev/null | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -1 || true)"
+    url="$(journalctl "${journal_args[@]}" 2>/dev/null | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -1 || true)"
     if [ -n "$url" ]; then
       echo "$url"
       return 0
@@ -312,10 +324,7 @@ setup_cloudflared_service() {
     exit 1
   fi
 
-  if [ -f "$unit_path" ] && systemctl is-active --quiet "$service_name" 2>/dev/null; then
-    echo "✓ Cloudflare Tunnel service already running"
-  else
-    cat > /tmp/pvtkrrx-tunnel.service << EOF
+  cat > /tmp/pvtkrrx-tunnel.service << EOF
 [Unit]
 Description=PVTKRRX Cloudflare Tunnel
 After=network-online.target
@@ -332,15 +341,16 @@ TimeoutStopSec=20
 [Install]
 WantedBy=multi-user.target
 EOF
-    run_root install -m 0644 /tmp/pvtkrrx-tunnel.service "$unit_path"
-    rm -f /tmp/pvtkrrx-tunnel.service
-    run_root systemctl daemon-reload
-    run_root systemctl enable "$service_name"
-    run_root systemctl restart "$service_name"
-  fi
+  run_root install -m 0644 /tmp/pvtkrrx-tunnel.service "$unit_path"
+  rm -f /tmp/pvtkrrx-tunnel.service
+  run_root systemctl daemon-reload
+  run_root systemctl enable "$service_name"
+  run_root systemctl restart "$service_name"
 
   local public_url
-  public_url="$(wait_for_cloudflared_url "$service_name" | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -1 || true)"
+  local restart_started_at
+  restart_started_at="$(date '+%Y-%m-%d %H:%M:%S')"
+  public_url="$(wait_for_cloudflared_url "$service_name" "$restart_started_at" | grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' | tail -1 || true)"
   export PVTKRRX_PUBLIC_BASE_URL="$public_url"
   echo "✓ Tunnel URL: $public_url"
 }
@@ -476,6 +486,10 @@ EOF
       run_root systemctl restart qbittorrent-nox
       sleep 2
     fi
+  fi
+
+  if [ -f "$qbit_conf" ]; then
+    write_ini_value "$qbit_conf" 'WebUI\Port' "$QBIT_PORT"
   fi
 
   echo "✓ qBittorrent service started on port $QBIT_PORT"
@@ -628,9 +642,10 @@ main() {
   local public_base_url="${PVTKRRX_PUBLIC_BASE_URL:-}"
   case "$https_mode" in
     cloudflare)
-      if [ -n "$public_base_url" ]; then
+      if [ -n "$public_base_url" ] && ! is_trycloudflare_url "$public_base_url"; then
         echo "✓ Using existing public HTTPS URL: $public_base_url"
       else
+        public_base_url=""
         install_cloudflared
         setup_cloudflared_service "$PVTKRRX_HTTP_PORT"
         public_base_url="${PVTKRRX_PUBLIC_BASE_URL:-}"

@@ -4,6 +4,7 @@ const path = require('path')
 const net = require('net')
 const { spawn } = require('child_process')
 const { deriveDefaultLocalHostname, normalizeLocalHostname } = require('./lanAlias')
+const { ProwlarrClient } = require('../clients/prowlarr')
 
 const PROWLARR_CONFIG_PATHS = [
   path.join(process.env.ProgramData || 'C:\\ProgramData', 'Prowlarr', 'config.xml'),
@@ -730,6 +731,204 @@ async function discoverQbitConfig(options = {}) {
   }
 }
 
+function normalizeProwlarrResourceName(value) {
+  return String(value || '')
+    .replace(/[^a-z0-9]/gi, '')
+    .toLowerCase()
+}
+
+function normalizeUrlBase(input) {
+  return String(input || '').trim().replace(/\/+$/, '')
+}
+
+function cloneContractFields(fields) {
+  return (Array.isArray(fields) ? fields : []).map(field => ({ ...field }))
+}
+
+function getContractField(fields, names) {
+  const wanted = new Set((Array.isArray(names) ? names : [names]).map(name => normalizeProwlarrResourceName(name)))
+  return (Array.isArray(fields) ? fields : []).find((field) => {
+    const fieldName = normalizeProwlarrResourceName(field?.name || field?.label || '')
+    return fieldName && wanted.has(fieldName)
+  }) || null
+}
+
+function setContractField(fields, names, value) {
+  const field = getContractField(fields, names)
+  if (field) field.value = value
+}
+
+function parseQbitUrl(input) {
+  const text = normalizeUrlBase(input)
+  if (!text) throw new Error('qBittorrent URL is required')
+
+  const parsed = new URL(text)
+  if (!['http:', 'https:'].includes(parsed.protocol)) {
+    throw new Error('qBittorrent URL must use http or https')
+  }
+
+  return {
+    host: parsed.hostname,
+    port: parsed.port ? Number.parseInt(parsed.port, 10) : (parsed.protocol === 'https:' ? 443 : 80),
+    useSsl: parsed.protocol === 'https:',
+    urlBase: parsed.pathname.replace(/^\/+|\/+$/g, '')
+  }
+}
+
+function buildQbitDownloadClientResource(schema, qbitUrl, options = {}, existingResource = null) {
+  const target = parseQbitUrl(qbitUrl)
+  const resource = {
+    ...(schema || {}),
+    ...(existingResource || {})
+  }
+
+  resource.name = String(existingResource?.name || schema?.name || 'qBittorrent').trim() || 'qBittorrent'
+  resource.enable = true
+  resource.protocol = 'torrent'
+  resource.priority = Number.isFinite(Number(options.priority))
+    ? Number(options.priority)
+    : (Number.isFinite(Number(existingResource?.priority)) ? Number(existingResource.priority) : (Number.isFinite(Number(schema?.priority)) ? Number(schema.priority) : 1))
+  resource.categories = Array.isArray(existingResource?.categories)
+    ? existingResource.categories
+    : (Array.isArray(schema?.categories) ? schema.categories : [])
+  resource.supportsCategories = typeof existingResource?.supportsCategories === 'boolean'
+    ? existingResource.supportsCategories
+    : Boolean(schema?.supportsCategories)
+  resource.implementationName = String(schema?.implementationName || existingResource?.implementationName || 'qBittorrent')
+  resource.implementation = String(schema?.implementation || existingResource?.implementation || 'qBittorrent')
+  resource.configContract = String(schema?.configContract || existingResource?.configContract || 'QBittorrentSettings')
+  resource.fields = cloneContractFields(schema?.fields || existingResource?.fields || [])
+
+  setContractField(resource.fields, ['Host', 'host'], target.host)
+  setContractField(resource.fields, ['Port', 'port'], target.port)
+  setContractField(resource.fields, ['UseSsl', 'useSsl', 'useSSL'], target.useSsl)
+  setContractField(resource.fields, ['UrlBase', 'urlBase', 'baseUrl'], target.urlBase)
+  setContractField(resource.fields, ['Username', 'username'], String(options.username || ''))
+  setContractField(resource.fields, ['Password', 'password'], String(options.password || ''))
+  setContractField(resource.fields, ['DefaultCategory', 'Category', 'category'], String(options.category || 'prowlarr'))
+  setContractField(resource.fields, ['Priority', 'priority'], resource.priority)
+  if (typeof options.initialState !== 'undefined') {
+    setContractField(resource.fields, ['DownloadClientSettingsInitialState', 'initialState'], options.initialState)
+  }
+  if (typeof options.sequentialOrder !== 'undefined') {
+    setContractField(resource.fields, ['DownloadClientQbittorrentSettingsSequentialOrder', 'sequentialOrder'], Boolean(options.sequentialOrder))
+  }
+  if (typeof options.firstAndLast !== 'undefined') {
+    setContractField(resource.fields, ['DownloadClientQbittorrentSettingsFirstAndLastFirst', 'firstAndLast'], Boolean(options.firstAndLast))
+  }
+  if (typeof options.contentLayout !== 'undefined') {
+    setContractField(resource.fields, ['DownloadClientQbittorrentSettingsContentLayout', 'contentLayout'], options.contentLayout)
+  }
+
+  if (existingResource?.id != null) {
+    resource.id = existingResource.id
+  } else {
+    delete resource.id
+  }
+
+  return resource
+}
+
+function sameQbitConnection(resource, target) {
+  const fields = Array.isArray(resource?.fields) ? resource.fields : []
+  const host = String(getContractField(fields, ['Host', 'host'])?.value || '').trim().toLowerCase()
+  const port = Number.parseInt(String(getContractField(fields, ['Port', 'port'])?.value || '0'), 10) || 0
+  const urlBase = normalizeUrlBase(getContractField(fields, ['UrlBase', 'urlBase', 'baseUrl'])?.value || '').toLowerCase()
+  const useSsl = Boolean(getContractField(fields, ['UseSsl', 'useSsl', 'useSSL'])?.value)
+  return host === String(target.host || '').trim().toLowerCase() &&
+    port === Number(target.port || 0) &&
+    urlBase === String(target.urlBase || '').trim().toLowerCase() &&
+    useSsl === Boolean(target.useSsl)
+}
+
+function findExistingQbitDownloadClient(clients, target) {
+  const rows = Array.isArray(clients) ? clients : []
+  const qbitClients = rows.filter((row) => {
+    const contract = normalizeProwlarrResourceName(row?.configContract || row?.config_contract || '')
+    const impl = normalizeProwlarrResourceName(row?.implementationName || row?.implementation_name || '')
+    const name = normalizeProwlarrResourceName(row?.name || '')
+    return contract === 'qbittorrentsettings' || impl.includes('qbittorrent') || name.includes('qbittorrent')
+  })
+  if (qbitClients.length === 0) return null
+
+  const exact = qbitClients.find((row) => sameQbitConnection(row, target))
+  return exact || qbitClients[0]
+}
+
+async function ensureProwlarrQbitDownloadClient(options = {}) {
+  const result = {
+    ok: false,
+    skipped: false,
+    action: '',
+    message: '',
+    error: null,
+    client: null
+  }
+
+  const prowlarrUrl = normalizeUrlBase(options.prowlarrUrl || options.jackettUrl || '')
+  const prowlarrApiKey = String(options.prowlarrApiKey || options.jackettApiKey || '').trim()
+  const qbitUrl = normalizeUrlBase(options.qbitUrl || '')
+
+  if (!prowlarrUrl || !prowlarrApiKey || !qbitUrl) {
+    result.skipped = true
+    result.message = 'Prowlarr qBittorrent download client skipped because the Prowlarr or qBittorrent URL/API key was missing.'
+    return result
+  }
+
+  try {
+    const client = new ProwlarrClient(prowlarrUrl, prowlarrApiKey)
+    const [clients, schemas] = await Promise.all([
+      client.listDownloadClients(),
+      client.listDownloadClientSchemas()
+    ])
+    const schema = (Array.isArray(schemas) ? schemas : []).find((row) => {
+      const contract = normalizeProwlarrResourceName(row?.configContract || row?.config_contract || '')
+      const impl = normalizeProwlarrResourceName(row?.implementationName || row?.implementation_name || '')
+      return contract === 'qbittorrentsettings' || impl.includes('qbittorrent')
+    })
+    if (!schema) {
+      throw new Error('Prowlarr qBittorrent download client schema was not found')
+    }
+
+    const target = parseQbitUrl(qbitUrl)
+    const existing = findExistingQbitDownloadClient(clients, target)
+    const resource = buildQbitDownloadClientResource(
+      schema,
+      qbitUrl,
+      {
+        username: options.qbitUsername || '',
+        password: options.qbitPassword || '',
+        category: options.category || 'prowlarr',
+        priority: options.priority,
+        initialState: options.initialState,
+        sequentialOrder: options.sequentialOrder,
+        firstAndLast: options.firstAndLast,
+        contentLayout: options.contentLayout
+      },
+      existing
+    )
+
+    let saved
+    if (existing?.id != null) {
+      saved = await client.updateDownloadClient(existing.id, resource)
+      result.action = 'updated'
+    } else {
+      saved = await client.createDownloadClient(resource)
+      result.action = 'created'
+    }
+
+    await client.testDownloadClient(saved || resource)
+    result.ok = true
+    result.client = saved || resource
+    result.message = `Prowlarr qBittorrent download client ${result.action}`
+    return result
+  } catch (error) {
+    result.error = error
+    result.message = error?.message || String(error)
+    return result
+  }
+}
+
 async function autoProvisionWindows(options = {}) {
   const installIfMissing = options.installIfMissing !== false
   const startIfStopped = options.startIfStopped !== false
@@ -748,6 +947,15 @@ async function autoProvisionWindows(options = {}) {
 
   const prowlarr = await ensureProwlarrRunning(installIfMissing, startIfStopped, notes)
   const qbit = await ensureQbitRunning(installIfMissing, startIfStopped, configureQbitLocalNoAuth, notes)
+  const downloadClientResult = await ensureProwlarrQbitDownloadClient({
+    prowlarrUrl: prowlarr.url,
+    prowlarrApiKey: prowlarr.apiKey || '',
+    qbitUrl: qbit.url,
+    qbitUsername: qbit.username || '',
+    qbitPassword: qbit.password || '',
+    notes
+  })
+  if (downloadClientResult.message) notes.push(downloadClientResult.message)
   const lanAccess = await ensureWindowsLanAccess({
     notes,
     openFirewall,
@@ -794,6 +1002,7 @@ module.exports = {
   ensureWindowsLanAccess,
   discoverProwlarrConfig,
   discoverQbitConfig,
+  ensureProwlarrQbitDownloadClient,
   findAvailableTcpPort,
   isTcpPortAvailable
 }
