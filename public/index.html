@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PVTKRRX - Three Routes</title>
-  <meta name="description" content="PVTKRRX separates Stremio into three explicit routes: PC Local, LAN Bridge, and Remote Seedbox.">
+  <title>PVTKRRX - Private Tracker Relay</title>
+  <meta name="description" content="PVTKRRX connects private trackers to Stremio through your own hardware. Open Configure to finish setup, then browse sports, movies, TV, and your library.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@500;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -1073,7 +1073,6 @@
       </div>
       <nav class="nav">
         <a href="/configure">Configure</a>
-        <a href="#routes">Routes</a>
         <a href="#requirements">What You Need</a>
         <a href="#sports">Sports</a>
         <a href="/runbooks">Runbooks</a>
@@ -1092,14 +1091,13 @@
           PRIVATE TRACKERS IN STREMIO, THROUGH YOUR OWN SETUP.
         </p>
         <p class="hero-copy">
-          Connect <strong>Prowlarr</strong> and <strong>qBittorrent</strong>, choose the route that fits your setup,
-          then browse <strong>sports</strong>, <strong>movies</strong>, <strong>TV</strong>, and your <strong>library</strong>
+          Connect <strong>Prowlarr</strong> and <strong>qBittorrent</strong>, open Configure, then browse
+          <strong>sports</strong>, <strong>movies</strong>, <strong>TV</strong>, and your <strong>library</strong>
           inside Stremio.
         </p>
         <p class="hero-support">
           PVTKRRX is a Stremio addon for people who already run their own private tracker stack.
-          Use <strong>PC Local</strong> on the Windows host, <strong>LAN Bridge</strong> for the rest of your home devices,
-          and <strong>Remote Seedbox</strong> only when your playback endpoints are already public over HTTPS.
+          The public homepage points you at Configure, where the actual runtime setup lives.
         </p>
         <div class="hero-chips" aria-label="Key features">
           <span class="hero-chip">Sports</span>
@@ -1107,11 +1105,11 @@
           <span class="hero-chip">Library</span>
           <span class="hero-chip">No Debrid</span>
           <span class="hero-chip">Your Own Hardware</span>
-          <span class="hero-chip">Three Routes</span>
+          <span class="hero-chip">Configure First</span>
         </div>
         <div class="cta-row">
           <a class="btn btn-primary" href="/configure">Open Configure</a>
-          <a class="btn btn-secondary" href="#routes">Compare Routes</a>
+          <a class="btn btn-secondary" href="#requirements">What You Need</a>
           <a class="btn btn-secondary" href="/runbooks">Seedbox Runbooks</a>
         </div>
       </div>
@@ -1147,78 +1145,13 @@
       </article>
     </section>
 
-    <section class="section-block" id="routes">
-      <div class="section-head">
-        <div class="section-kicker">Pick The Route</div>
-        <h2 class="section-title">Choose the install path that matches playback</h2>
-        <p class="section-copy">
-          PVTKRRX is one addon with three routes. The important rule is simple:
-          use <strong>PC Local</strong> on the Windows host itself, <strong>LAN Bridge</strong> for the rest of your home devices,
-          and <strong>Remote Seedbox</strong> only when your playback endpoints are already public over HTTPS.
-        </p>
-      </div>
-
-      <div class="route-grid">
-        <article class="route-card">
-          <div class="route-kicker">Same Windows PC</div>
-          <div class="route-name">PC Local</div>
-          <p class="route-copy">
-            Real same-PC addon route for the Windows machine that runs the PVTKRRX desktop server.
-            Install it from the host itself and use it as the main browsing + playback route on that machine.
-          </p>
-          <ul class="route-list">
-            <li>Install from the Windows host</li>
-            <li>Uses the copied <code>127.0.0.1</code> addon URL</li>
-            <li>Best route for playback on that PC</li>
-          </ul>
-          <div class="route-actions">
-            <a class="btn btn-primary" href="/configure?target=pc">Open PC Local Setup</a>
-          </div>
-        </article>
-
-        <article class="route-card">
-          <div class="route-kicker">Home devices</div>
-          <div class="route-name">LAN Bridge</div>
-          <p class="route-copy">
-            Use this for phone, web, Android TV, Apple TV, and other devices on the same home network and Stremio account.
-            The hosted install points back to your live Windows host while it stays online.
-          </p>
-          <ul class="route-list">
-            <li>Hosted install URL for home devices</li>
-            <li>Heartbeat updates IP changes automatically</li>
-            <li>Best route for the rest of your house</li>
-          </ul>
-          <div class="route-actions">
-            <a class="btn btn-primary" href="/configure?target=lan">Open LAN Bridge Setup</a>
-          </div>
-        </article>
-
-        <article class="route-card">
-          <div class="route-kicker">Public HTTPS playback</div>
-          <div class="route-name">Remote Seedbox</div>
-          <p class="route-copy">
-            Use this when qBittorrent, Prowlarr, and completed-file playback are already exposed intentionally over HTTPS.
-            On the hosted relay this is ready-file-first, not a generic public tracker-buffering route.
-          </p>
-          <ul class="route-list">
-            <li>For away-from-home playback</li>
-            <li>Needs public playback endpoints</li>
-            <li>Best when your remote setup is already internet-ready</li>
-          </ul>
-          <div class="route-actions">
-            <a class="btn btn-primary" href="/configure?target=seedbox">Open Remote Seedbox Setup</a>
-          </div>
-        </article>
-      </div>
-    </section>
-
     <section class="section-block" id="requirements">
       <div class="section-head">
         <div class="section-kicker">What You Need</div>
         <h2 class="section-title">The setup requirements are simpler than the homepage used to imply</h2>
         <p class="section-copy">
           PVTKRRX works best when it says the quiet part out loud.
-          If you already run your own private tracker stack, the addon is mostly about connecting the right pieces and picking the route that matches where playback happens.
+          If you already run your own private tracker stack, the addon is mostly about connecting the right pieces and finishing setup for the hardware you already have.
         </p>
       </div>
 
@@ -1233,11 +1166,11 @@
         </article>
         <article class="need-card">
           <div class="need-name">Windows Host</div>
-          <p class="need-copy">Required for <code>PC Local</code> and <code>LAN Bridge</code>, because the local runtime serves those playback-capable routes.</p>
+          <p class="need-copy">Required for the local runtime that serves same-machine browsing and home-network access.</p>
         </article>
         <article class="need-card">
           <div class="need-name">Public File Server</div>
-          <p class="need-copy">Only needed for <code>Remote Seedbox</code> when completed-file playback must work away from home over public HTTPS.</p>
+          <p class="need-copy">Only needed when completed-file playback must work away from home over public HTTPS.</p>
         </article>
       </div>
     </section>
@@ -1274,7 +1207,7 @@
 
     <section class="status-strip">
       <div class="status-track">
-        [PRIVATE TRACKERS IN STREMIO] [SPORTS + MOVIES + TV + LIBRARY] [PROWLARR + QBITHORRENT] [NO DEBRID] [YOUR HARDWARE] [PC LOCAL / LAN BRIDGE / REMOTE SEEDBOX]
+        [PRIVATE TRACKERS IN STREMIO] [SPORTS + MOVIES + TV + LIBRARY] [PROWLARR + QBITHORRENT] [NO DEBRID] [YOUR HARDWARE] [CONFIGURE FIRST]
       </div>
     </section>
 
@@ -1286,24 +1219,22 @@
           <summary>What does PVTKRRX actually do?</summary>
           <div class="faq-answer">
             It connects your existing private tracker stack to Stremio.
-            You bring Prowlarr and qBittorrent, PVTKRRX handles the route-aware addon side so you can browse sports, movies, TV, and your library inside Stremio.
+            You bring Prowlarr and qBittorrent, PVTKRRX handles the addon side so you can browse sports, movies, TV, and your library inside Stremio.
           </div>
         </details>
 
         <details class="faq-item">
-          <summary>Which route should I use?</summary>
+          <summary>Where do I start?</summary>
           <div class="faq-answer">
-            Use <code>PC Local</code> on the Windows host itself.
-            Use <code>LAN Bridge</code> for your other home devices on the same network and Stremio account.
-            Use <code>Remote Seedbox</code> only when your playback endpoints are already public over HTTPS.
+            Open <code>Configure</code> first. The homepage points you at the setup surface so you can finish the runtime details before you install anything in Stremio.
           </div>
         </details>
 
         <details class="faq-item">
           <summary>Do I need three different apps?</summary>
           <div class="faq-answer">
-            No. PVTKRRX is one runtime with three route choices inside it.
-            The point is not to install everything everywhere, it is to pick the route that matches where playback happens.
+            No. PVTKRRX is one runtime that adapts to the setup you already have.
+            The point is not to install everything everywhere, it is to connect the pieces once and keep using them from Stremio.
           </div>
         </details>
 
@@ -1314,8 +1245,8 @@
             <ul>
               <li>Prowlarr</li>
               <li>qBittorrent WebUI</li>
-              <li>The Windows host app for <code>PC Local</code> or <code>LAN Bridge</code></li>
-              <li>A public file server only if you want <code>Remote Seedbox</code> away-from-home playback</li>
+              <li>The Windows host app for same-machine or home-network access</li>
+              <li>A public file server only if you want away-from-home playback</li>
             </ul>
           </div>
         </details>
@@ -1323,8 +1254,8 @@
         <details class="faq-item">
           <summary>Does this work on Apple TV, Android TV, phone, and web?</summary>
           <div class="faq-answer">
-            Yes, through the route model.
-            <code>LAN Bridge</code> is the route meant for home devices on the same Stremio account, while <code>PC Local</code> remains the right route for the Windows host itself.
+            Yes, through the same runtime and account flow.
+            Use the configuration path that matches the device and network you are already using.
           </div>
         </details>
       </div>

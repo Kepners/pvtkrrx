@@ -26,7 +26,7 @@ Interpretation:
 - The audit claim that `/configure`, `/runbooks`, `/manifest.json`, and `/health` are missing is false for the canonical host.
 - That claim is true only for the dead `pvtkrrx.vercel.app` preview hostname.
 - `/local/install` returning `403` on the public host is expected because it is a same-host/local-network helper route.
-- The public homepage still should not send outside visitors to `/local/install`; that is a real UX problem even though the route behavior itself is intentional.
+- The public homepage should stay an entry point, not a route picker; route-specific guidance belongs inside `/configure` and the app.
 
 ## Code Check
 
@@ -43,7 +43,7 @@ Current state:
 
 - Product concept is stronger than the homepage currently communicates
 - Visual direction is on-brand
-- Homepage copy is still too route-first and operator-coded
+- Homepage copy should stay cloud-friendly and avoid route-picker language above the fold
 - The README explains the product faster and with more trust than the landing page
 - Sports is a real differentiator in the product, but the homepage only treats it like a badge
 
@@ -55,23 +55,18 @@ Main clarity gaps:
 
 ## Homepage Problems To Fix Next
 
-1. Replace the hero copy with a plain-English product sentence.
-2. Stop sending public users to the local-only `/local/install` route.
-3. Add a clear route comparison for `PC Local`, `LAN Bridge`, and `Remote Seedbox`.
-4. Add a "What you need" section:
-   - Prowlarr or Torznab-compatible search
-   - qBittorrent WebUI
-   - optional file server for public remote setups
-   - Windows host app for local/LAN routes
-5. Give sports its own section instead of leaving it in the badge strip.
-6. Reduce operator-facing nav noise on the homepage. `Manifest` and `Health` are useful, but they should not compete with the main user journey.
+1. Keep the public homepage focused on Configure rather than route selection.
+2. Keep route-specific guidance inside `/configure` and the app, not on the landing page.
+3. Leave the public homepage copy in plain English and keep the CTA stack short.
+4. Keep sports as a dedicated section instead of leaving it in the badge strip.
+5. Reduce operator-facing nav noise on the homepage. `Manifest` and `Health` are useful, but they should not compete with the main user journey.
 
 ## Implemented In This Pass
 
 - Hero copy rewritten in plain English around the actual product
 - Main CTA changed to `/configure`
 - Public `/local/install` CTA removed from the homepage
-- Added route comparison section
+- Removed the route comparison section from the public cloud homepage
 - Added "What you need" section
 - Added dedicated sports proof section
 - Moved `Manifest` and `Health` links out of the main nav and into the footer utility area
@@ -87,17 +82,13 @@ Main clarity gaps:
    - Library
    - No debrid
    - Your hardware
-3. Route comparison:
-   - `PC Local`
-   - `LAN Bridge`
-   - `Remote Seedbox`
-4. What you need
-5. Sports proof section
-6. Final CTA into `/configure`
+3. What you need
+4. Sports proof section
+5. Final CTA into `/configure`
 
 ## Files To Edit Next
 
-- `public/index.html` for the homepage rewrite
+- `public/index.html` for the cloud-homepage cleanup
 - `public/configure.html` only if the rewrite needs small CTA/copy alignment
 - `docs/WEBSITE_STATUS.md` after the homepage pass so the new truth is recorded
 
@@ -106,5 +97,5 @@ Main clarity gaps:
 - Route audit complete
 - Public host check complete
 - Canonical host vs dead preview host now documented
-- Homepage rewrite now exists locally in `public/index.html`
+- Cloud homepage cleanup now exists locally in `public/index.html`
 - Next pass should browser-check the rewrite locally, then deploy it deliberately
