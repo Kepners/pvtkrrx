@@ -18,6 +18,7 @@ const {
   findTorrentForPostProcess
 } = require('./src/utils/qbitAutomation')
 const { resolveSportsImageRequest } = require('./src/utils/sportsImageCache')
+const { startSportsCacheAutofill } = require('./src/utils/sportsCacheAutofill')
 
 // Destructure everything routes need from the shared module.
 // Shared module initializes env, console redaction, stores, and rate limiters at load time.
@@ -2447,7 +2448,8 @@ function startLocalServers(options = {}) {
     httpsReady: Promise.resolve(null),
     port,
     httpsPort,
-    lanAlias: null
+    lanAlias: null,
+    sportsCacheAutofill: null
   }
 
   logger.log(`[boot] starting local runtime port=${port} httpsPort=${httpsPort}`)
@@ -2470,6 +2472,11 @@ function startLocalServers(options = {}) {
     if (typeof warmTimer.unref === 'function') warmTimer.unref()
   }
 
+  state.sportsCacheAutofill = startSportsCacheAutofill({
+    logger,
+    reason: SELF_HOST_SERVER_MODE ? 'self-host-boot' : 'server-boot'
+  })
+
   // HTTP
   const httpServer = http.createServer(app)
   state.httpServer = httpServer
@@ -2491,6 +2498,11 @@ function startLocalServers(options = {}) {
     if (exitOnHttpError) process.exit(1)
   })
   httpServer.on('close', () => {
+    try {
+      if (state.sportsCacheAutofill && typeof state.sportsCacheAutofill.stop === 'function') {
+        state.sportsCacheAutofill.stop()
+      }
+    } catch (_) {}
     try {
       if (lanAlias && typeof lanAlias.stop === 'function') lanAlias.stop()
     } catch (err) {

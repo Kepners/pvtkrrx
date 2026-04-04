@@ -9,6 +9,7 @@ const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJ
 const { ensureServerAdminToken } = require('../src/utils/serverAdminToken')
 const { discoverProwlarrConfig, discoverQbitConfig, ensureProwlarrQbitDownloadClient } = require('../src/utils/provision')
 const { seedSportsImageCache, summarizeSportsImageSeed } = require('../src/utils/sportsCacheSeeder')
+const { describeSportsCacheAutofill, resolveSportsCacheAutofillConfig } = require('../src/utils/sportsCacheAutofill')
 const { runFullBootstrap } = require('./server-installer')
 const { installSystemdService } = require('./install-systemd-service')
 
@@ -311,6 +312,14 @@ async function run() {
       console.log(`✓ Sports cache: ${summarizeSportsImageSeed(sportsSeedSummary)}`)
     } catch (error) {
       console.warn(`⚠ Sports cache pre-seed skipped: ${error.message}`)
+    }
+    const sportsAutofillConfig = resolveSportsCacheAutofillConfig({
+      env: process.env,
+      runtimeDir,
+      platform: process.platform
+    })
+    if (sportsAutofillConfig.enabled) {
+      console.log(`✓ Background sports refill: ${describeSportsCacheAutofill(sportsAutofillConfig)}`)
     }
 
     console.log('')

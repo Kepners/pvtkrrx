@@ -21,6 +21,7 @@
     "cache:sports": "node scripts/cache-sports.js",
     "smoke:sports": "node scripts/smoke-sports-structured.js",
     "smoke:sports-cache": "node scripts/smoke-sports-cache-seed.js",
+    "smoke:sports-cache-auto": "node scripts/smoke-sports-cache-autofill.js",
     "smoke:desktop": "node scripts/smoke-desktop-provision.js",
     "smoke:provider-discovery": "node scripts/smoke-provider-discovery.js",
     "desktop:dev": "electron electron/main.js",

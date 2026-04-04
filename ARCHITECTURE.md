@@ -47,6 +47,7 @@ Self-hosted server mode uses the same Express runtime on a VPS/seedbox, but with
 | `src/handlers/*` | Catalog, stream, and meta generation |
 | `src/clients/*` | Prowlarr, qBittorrent, Cinemeta, and TheSportsDB integrations |
 | `src/utils/sportsImageCache.js` | Signed sports artwork proxy URLs plus runtime disk cache for poster, background, landscape, and logo bytes |
+| `src/utils/sportsCacheAutofill.js` | Rotating background sports-cache refill for long-running Linux/cloud runtimes |
 | `src/utils/opaqueState.js` | Opaque state tokens for `/file` and `/playback` |
 | `src/utils/pairStore.js` | LAN pair persistence |
 | `src/utils/accountStore.js` | Stremio-linked account and billing/trial data store |
@@ -119,6 +120,7 @@ Self-hosted server mode uses the same Express runtime on a VPS/seedbox, but with
 6. When external sports art exists, local and hosted runtimes now hand Stremio stable `/image/sports/...` URLs backed by the runtime disk cache instead of hotlinking TheSportsDB on every request.
 7. Sports catalog tiles now prefer portrait poster art, while background/logo art is carried separately for player-loading and wallpaper use.
 8. Library items expose completed qBittorrent content through the same addon surface.
+9. Long-running Linux/cloud runtimes now revisit one sport group every 15 minutes by default and keep filling `sports-image-cache/` gradually between installer/manual warm passes.
 
 ## Storage Model
 

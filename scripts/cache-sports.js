@@ -2,8 +2,8 @@ const fs = require('fs')
 const path = require('path')
 
 const { resolveRuntimeDir } = require('../src/utils/runtimeDir')
-const { loadSecureJsonFile } = require('../src/utils/secureJsonFile')
 const { seedSportsImageCache, summarizeSportsImageSeed } = require('../src/utils/sportsCacheSeeder')
+const { resolveSportsCacheApiKey } = require('../src/utils/sportsCacheAutofill')
 
 function loadLocalEnv(filePath) {
   if (!fs.existsSync(filePath)) return
@@ -25,27 +25,12 @@ function loadLocalEnv(filePath) {
   }
 }
 
-function loadLocalAddonConfig(runtimeDir) {
-  const configPath = path.join(runtimeDir, 'local-config.json')
-  try {
-    return loadSecureJsonFile(configPath, { defaultValue: null }) || null
-  } catch (_) {
-    return null
-  }
-}
-
 async function run() {
   const repoRoot = path.resolve(__dirname, '..')
   loadLocalEnv(path.join(repoRoot, '.env'))
 
   const runtimeDir = resolveRuntimeDir(process.env)
-  const localConfig = loadLocalAddonConfig(runtimeDir)
-  const apiKey = String(
-    process.env.PVTKRRX_SPORTS_CACHE_API_KEY ||
-    process.env.SPORTSDB_API_KEY ||
-    localConfig?.sportsDbApiKey ||
-    '123'
-  ).trim() || '123'
+  const apiKey = resolveSportsCacheApiKey({ runtimeDir })
 
   console.log(`[cache:sports] runtime dir: ${runtimeDir}`)
   console.log(`[cache:sports] cache dir: ${path.join(runtimeDir, 'sports-image-cache')}`)

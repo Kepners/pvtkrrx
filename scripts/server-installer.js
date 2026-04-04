@@ -10,6 +10,7 @@ const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJ
 const { ensureServerAdminToken } = require('../src/utils/serverAdminToken')
 const { discoverProwlarrConfig, discoverQbitConfig, ensureProwlarrQbitDownloadClient } = require('../src/utils/provision')
 const { seedSportsImageCache, summarizeSportsImageSeed } = require('../src/utils/sportsCacheSeeder')
+const { describeSportsCacheAutofill, resolveSportsCacheAutofillConfig } = require('../src/utils/sportsCacheAutofill')
 const { installSystemdService } = require('./install-systemd-service')
 
 function parseDotEnvFile(filePath) {
@@ -803,6 +804,14 @@ async function run() {
     } catch (error) {
       console.warn(`⚠ Sports cache pre-seed skipped: ${error.message}`)
     }
+    const sportsAutofillConfig = resolveSportsCacheAutofillConfig({
+      env: process.env,
+      runtimeDir,
+      platform: process.platform
+    })
+    if (sportsAutofillConfig.enabled) {
+      console.log(`✓ Background sports refill: ${describeSportsCacheAutofill(sportsAutofillConfig)}`)
+    }
 
     let serviceResult = null
     if (installService) {
@@ -1076,6 +1085,14 @@ async function runAuto() {
     console.log(`✓ Sports cache: ${summarizeSportsImageSeed(sportsSeedSummary)}`)
   } catch (error) {
     console.warn(`⚠ Sports cache pre-seed skipped: ${error.message}`)
+  }
+  const sportsAutofillConfig = resolveSportsCacheAutofillConfig({
+    env: process.env,
+    runtimeDir: defaultRuntimeDir,
+    platform: process.platform
+  })
+  if (sportsAutofillConfig.enabled) {
+    console.log(`✓ Background sports refill: ${describeSportsCacheAutofill(sportsAutofillConfig)}`)
   }
 
   // ── systemd service ──

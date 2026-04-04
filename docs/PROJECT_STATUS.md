@@ -20,7 +20,7 @@ The practical reading of the project today is:
 - PVTKRRX now treats extracted direct video as the only supported packed-RAR playback path by default, and keeps native `rarUrls` behind an explicit experimental override
 - the sports catalog artwork path now prefers portrait poster art for tiles, while keeping separate sport-aware backgrounds/logos for player wallpaper/loading
 - sports poster, wallpaper, landscape, and logo bytes can now be cached on demand by the active runtime through signed `/image/sports/...` URLs instead of hotlinking every request back to the upstream artwork host
-- `npm run server:setup` now also pre-seeds that same `sports-image-cache/` store with upcoming event art, top team badges, and mapped league artwork, and `npm run cache:sports` can refresh it later without deleting warm entries
+- `npm run server:setup` now also pre-seeds that same `sports-image-cache/` store with upcoming event art, top team badges, and mapped league artwork, `npm run cache:sports` can refresh it later without deleting warm entries, and long-running Linux/cloud runtimes now keep topping the cache up automatically every 15 minutes in rotating sport batches
 - empty movie, TV, and sports catalogs now return a setup-needed placeholder when Prowlarr has no indexers or cannot be reached, instead of showing blank `EmptyContent`
 - the Windows installer/build flow is reproducible again
 - `https://www.pvtkrrx.cc` is the live public relay; `https://pvtkrrx.vercel.app` is currently a dead preview hostname returning Vercel `DEPLOYMENT_NOT_FOUND`
@@ -36,6 +36,7 @@ The practical reading of the project today is:
 - Legacy hosted LAN tokens without explicit pair booleans still resolve as `LAN Bridge`, so older installs do not get silently reinterpreted as `Remote Seedbox`.
 - Sports grouping now keeps one stable team order for deduped matchup posters instead of inheriting the last tracker title ordering, and the sports thumb helper is back in-tree so the richer poster generation path is not orphaned.
 - Added a reusable sports cache pre-seed step plus `npm run cache:sports`, and wired both self-host setup flows to warm `sports-image-cache/` with upcoming event, team, and mapped-league artwork using the existing disk cache writer.
+- Added a recurring sports-cache autofill worker for long-running Linux/cloud runtimes. It persists a rotation cursor in the runtime directory, processes one sport group every 15 minutes by default, and keeps using the same disk cache writer so repeat passes skip already-warm images.
 - Cut a fresh `1.1.24` Windows desktop build so the local EXE line now includes the sports cache pre-seed work instead of reusing the older `1.1.23` release label.
 - Re-verified the split install model: Windows desktop still owns `PC Local` plus `Hybrid Home`, while the cloud/self-host installer continues to own the server-side `Remote Seedbox` route.
 - Regression coverage now includes:
@@ -85,6 +86,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - `npm run smoke:selfhost` passed again on 2026-03-31 after adding browser-driven Stremio link-session persistence into the disk-backed self-host config
 - `npm run smoke:provider-discovery` passed on 2026-04-02 after broadening the shared provider discovery helpers for existing Prowlarr/qBittorrent installs
 - `npm run smoke:sports-cache` passed on 2026-04-04 for the new sports cache pre-seed flow, including disk-cache reuse on rerun
+- `npm run smoke:sports-cache-auto` now covers the rotating background sports-cache autofill flow: first sport, cursor advance, second sport, cursor wrap, and disk-cache reuse on the wrapped pass
 - `npm run smoke:sports` passed on 2026-04-04 after the `1.1.24` release cut, with the expected bad-id placeholder error still isolated to the existing negative-path assertion at the end of the smoke output
 - `npm run smoke:config` passed on 2026-04-04 after the `1.1.24` release cut, keeping `/install-selfhost.sh` and the hosted/local manifest flows green
 - `npm run smoke:selfhost` passed on 2026-04-04 after the `1.1.24` release cut, keeping disk-backed self-host config plus password gating green

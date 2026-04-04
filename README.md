@@ -19,7 +19,7 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 
 - **Sports** — Browse and search private tracker sports content (EPL, F1, UFC) directly in Stremio
 - **Sports-first discovery** — `All Sports` plus sport-family catalogs now lead the movie discovery column, with the third-column filter used for league/team detail
-- **Sports artwork enrichment** — Optional TheSportsDB poster, landscape, background, and logo artwork with cache-aware lookups plus disk-backed image caching on the active runtime; `npm run server:setup` now also pre-seeds upcoming event art, team badges, and mapped league artwork into `sports-image-cache/`, and `npm run cache:sports` can refresh that cache later without redownloading existing files
+- **Sports artwork enrichment** — Optional TheSportsDB poster, landscape, background, and logo artwork with cache-aware lookups plus disk-backed image caching on the active runtime; `npm run server:setup` now also pre-seeds upcoming event art, team badges, and mapped league artwork into `sports-image-cache/`, long-running Linux/cloud runtimes now keep topping that cache up in the background every 15 minutes in rotating sport batches, and `npm run cache:sports` can still refresh the whole cache later without redownloading existing files
 - **Movies & TV** — IMDb-matched content from your private trackers
 - **Seedbox Library** — Browse everything already downloaded on your seedbox
 - **Smart filtering** — Sports indexers never contaminate movie/TV searches
@@ -115,6 +115,7 @@ The Linux installer now bootstraps a dedicated self-host server in one flow:
 - creates the self-host password file
 - can install/start a Linux `systemd` service for auto-boot
 - pre-seeds the local `sports-image-cache/` with upcoming TheSportsDB event images plus team and league artwork using the same runtime cache path the addon serves later
+- keeps filling that same cache in the background every 15 minutes after boot on long-running Linux/cloud runtimes, rotating through sports instead of hammering the free key in one burst
 - prints a one-time `Configure` bootstrap URL with `#serverPassword=...` so the first browser open can load the saved self-host config automatically
 
 After this first install, the runtime is yours. The hosted site is only the download/bootstrap source.
@@ -129,7 +130,7 @@ npm run server:setup
 npm run cache:sports
 ```
 
-Re-run `npm run cache:sports` whenever you want to refresh the local poster cache non-destructively, for example from a weekly cron on a self-hosted server.
+Re-run `npm run cache:sports` whenever you want to refresh the whole local poster cache non-destructively, especially if you switch to a paid TheSportsDB key and want a faster full warm. The long-running Linux/cloud server path now also keeps doing a smaller automatic refill every 15 minutes by default.
 
 The self-hosted server route keeps a stable disk-backed manifest at `/selfhost/manifest.json?mode=hosted`.
 Open `/configure` in a browser to review or edit the saved config at any time.
@@ -345,6 +346,14 @@ This now builds in the system temp directory first, then copies the finished cur
 | PVTKRRX_RUNTIME_DIR | Recommended for self-host | Stable runtime/config directory. The server installer now defaults this to `<repo>/data/pvtkrrx` so saved config and password state do not depend on whichever user launched the process |
 | PVTKRRX_PUBLIC_BASE_URL | Recommended for self-host | Public `https://` origin used when generating self-host install/config links. Set this to the real reverse-proxied host you want Stremio and browsers to use |
 | PVTKRRX_SELF_HOST_HTTPS_MODE | Recommended for self-host | HTTPS bootstrap mode for the installer: `cloudflare`, `domain`, or `skip` |
+| PVTKRRX_SPORTS_CACHE_AUTO_FILL | Optional | Enable background sports image cache refill on long-running runtimes. Default `true` on non-Windows non-Vercel servers |
+| PVTKRRX_SPORTS_CACHE_AUTO_FILL_INITIAL_DELAY_MS | Optional | Delay before the first background sports cache refill (default `900000`, 15 minutes) |
+| PVTKRRX_SPORTS_CACHE_AUTO_FILL_INTERVAL_MS | Optional | Background sports cache refill cadence in ms (default `900000`, 15 minutes) |
+| PVTKRRX_SPORTS_CACHE_AUTO_FILL_TARGETS_PER_RUN | Optional | How many sport groups each refill pass processes (default `1`) |
+| PVTKRRX_SPORTS_CACHE_AUTO_FILL_EVENT_LEAGUE_LIMIT | Optional | Max leagues per sport group during background refill (default `3`) |
+| PVTKRRX_SPORTS_CACHE_AUTO_FILL_TEAM_LIMIT_PER_SPORT | Optional | Max teams per sport group during background refill (default `12`) |
+| PVTKRRX_SPORTS_CACHE_AUTO_FILL_SCHEDULE_DAYS | Optional | How many upcoming schedule days each refill pass checks (default `2`) |
+| PVTKRRX_SPORTS_CACHE_AUTO_FILL_IMAGE_CONCURRENCY | Optional | Max concurrent image downloads during background refill (default `2`) |
 | KV_REST_API_URL | Recommended | Persist LAN pair heartbeat state for the hosted relay across restarts/redeploys |
 | KV_REST_API_TOKEN | Recommended | Auth token for KV REST API |
 | PVTKRRX_PAIR_RELAY_URL | Optional | Hosted relay base URL (default https://www.pvtkrrx.cc) |
