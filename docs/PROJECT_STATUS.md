@@ -4,7 +4,7 @@ Updated: 2026-04-04
 
 ## Current Stage
 
-PVTKRRX is in a working `1.1.23` state on the main Windows/local route set.
+PVTKRRX is in a working `1.1.24` state on the main Windows/local route set.
 The current packaged Windows app is now verified as the real host runtime, and a live Apple TV synced home-route pass has been captured against it.
 
 The practical reading of the project today is:
@@ -36,6 +36,8 @@ The practical reading of the project today is:
 - Legacy hosted LAN tokens without explicit pair booleans still resolve as `LAN Bridge`, so older installs do not get silently reinterpreted as `Remote Seedbox`.
 - Sports grouping now keeps one stable team order for deduped matchup posters instead of inheriting the last tracker title ordering, and the sports thumb helper is back in-tree so the richer poster generation path is not orphaned.
 - Added a reusable sports cache pre-seed step plus `npm run cache:sports`, and wired both self-host setup flows to warm `sports-image-cache/` with upcoming event, team, and mapped-league artwork using the existing disk cache writer.
+- Cut a fresh `1.1.24` Windows desktop build so the local EXE line now includes the sports cache pre-seed work instead of reusing the older `1.1.23` release label.
+- Re-verified the split install model: Windows desktop still owns `PC Local` plus `Hybrid Home`, while the cloud/self-host installer continues to own the server-side `Remote Seedbox` route.
 - Regression coverage now includes:
   - hybrid hosted token minting and manifest resolution
   - hybrid cloud fallback headers when the home route is offline
@@ -82,16 +84,22 @@ These items are verified in the current workspace or by direct client/log proof:
 - `npm run smoke:selfhost` passed on 2026-03-31 and now covers explicit self-host server mode, disk-backed `/selfhost` config, and self-host password gates
 - `npm run smoke:selfhost` passed again on 2026-03-31 after adding browser-driven Stremio link-session persistence into the disk-backed self-host config
 - `npm run smoke:provider-discovery` passed on 2026-04-02 after broadening the shared provider discovery helpers for existing Prowlarr/qBittorrent installs
+- `npm run smoke:sports-cache` passed on 2026-04-04 for the new sports cache pre-seed flow, including disk-cache reuse on rerun
+- `npm run smoke:sports` passed on 2026-04-04 after the `1.1.24` release cut, with the expected bad-id placeholder error still isolated to the existing negative-path assertion at the end of the smoke output
+- `npm run smoke:config` passed on 2026-04-04 after the `1.1.24` release cut, keeping `/install-selfhost.sh` and the hosted/local manifest flows green
+- `npm run smoke:selfhost` passed on 2026-04-04 after the `1.1.24` release cut, keeping disk-backed self-host config plus password gating green
+- `npm run smoke:desktop` passed on 2026-04-04 after the `1.1.24` release cut
+- `npm run smoke:lan-pair` passed on 2026-04-04 after the `1.1.24` release cut, including the hosted `com.kepners.pvtkrrx.hybrid` manifest path
+- `C:\Program Files\Git\bin\bash.exe -n scripts/install-selfhost.sh` passed on 2026-04-04 from the Windows workspace, confirming the cloud/self-host launcher parses cleanly even though `C:\Windows\System32\bash.exe` is only a WSL launcher stub here
 - `npm run smoke:config` passed on 2026-04-02 after the release-status endpoint and homepage release card were added
 - `npm run smoke:desktop` passed on 2026-04-02 after the desktop popup gained its release-status panel and preload bridge
 - `npm run smoke:sports` passed on 2026-03-31 after the sports artwork byte-cache update, including proxy URL coverage and cache-hit reuse checks
-- `npm run smoke:sports-cache` passed on 2026-04-04 for the new sports cache pre-seed flow, including disk-cache reuse on rerun
 - `npm run smoke:sports` passed again on 2026-03-31 after the Apple TV-safe meta placeholder change
 - `npm run smoke:desktop` passed on 2026-03-29 and now guards the desktop auto-provision persistence path against writing redacted config readbacks back to disk
 - `npm run smoke:playback` passed on 2026-03-29 and now covers redirect plus byte-serving on the shared `/file` route
 - `npm run smoke:pipeline` passed on 2026-03-29
 - `npm run smoke:sports` passed on 2026-03-29
-- `npm run dist:win` passed on 2026-03-29, again on 2026-03-30 for the `1.1.16` desktop release build, again on 2026-03-30 for the `1.1.17` bug-fix desktop release build, again on 2026-03-30 for the `1.1.18` archive-extraction desktop release build, again on 2026-03-30 for the `1.1.19` desktop power-policy build, again on 2026-03-31 for the `1.1.20` sports-image-cache build, again on 2026-03-31 for the `1.1.21` Apple TV metadata-serialization fix build, again on 2026-04-01 for the `1.1.22` Stremio link-session desktop release build, and again on 2026-04-02 for the `1.1.23` release-status build
+- `npm run dist:win` passed on 2026-03-29, again on 2026-03-30 for the `1.1.16` desktop release build, again on 2026-03-30 for the `1.1.17` bug-fix desktop release build, again on 2026-03-30 for the `1.1.18` archive-extraction desktop release build, again on 2026-03-30 for the `1.1.19` desktop power-policy build, again on 2026-03-31 for the `1.1.20` sports-image-cache build, again on 2026-03-31 for the `1.1.21` Apple TV metadata-serialization fix build, again on 2026-04-01 for the `1.1.22` Stremio link-session desktop release build, again on 2026-04-02 for the `1.1.23` release-status build, and again on 2026-04-04 for the `1.1.24` sports-cache desktop build
 - `npm run smoke:lan-pair` passed again on 2026-04-02 after the silent LAN offline meta pass-through change
 - `npm run smoke:config`, `npm run smoke:desktop`, `npm run smoke:stremio-link`, `npm run smoke:lan-pair`, `npm run smoke:guards`, `npm run smoke:security`, `npm run smoke:pipeline`, `npm run smoke:playback`, and `npm run smoke:sports` all passed again on 2026-03-30
 - root `/manifest.json` returns the bootstrap manifest (`com.kepners.pvtkrrx.bootstrap`) with no catalogs/resources and `configurationRequired=true`
@@ -134,8 +142,9 @@ These items are verified in the current workspace or by direct client/log proof:
 - `1.1.21` installers were built successfully into `dist/` on 2026-03-31 for the Apple TV metadata-serialization fix
 - `1.1.22` installers were built successfully into `dist/` on 2026-04-01 for the one-time Stremio server link-session update and self-host configure route cleanup
 - `1.1.23` installers were built successfully into `dist/` on 2026-04-02 for the GitHub release-status update
+- `1.1.24` installers were built successfully into `dist/` on 2026-04-04 for the sports cache pre-seed desktop release refresh
 - `1.1.23` GitHub release was published on 2026-04-02 with the matching `latest.yml`, portable EXE, and setup installer assets
-- `1.12.0-selfhost` GitHub prerelease was published on 2026-04-03 for the cloud/self-host password UX update; the Windows desktop line remains on `1.1.23`
+- `v1.12.10-selfhost` GitHub prerelease was published on 2026-04-03 for the cloud/self-host password UX update; the last published GitHub desktop release still remains on `1.1.23` until the new `1.1.24` desktop artifacts are published
 - the packaged Windows desktop app is working on the current host build, including the route-first setup flow and desktop shell controls shown in the live app UI
 - a real Apple TV LAN Bridge playback pass succeeded on 2026-03-31 after desktop/web install; while the Windows host stayed locked, playback started normally, the client reported the video as local, and forward/back seek worked
 
@@ -197,7 +206,7 @@ These items are verified in the current workspace or by direct client/log proof:
 
 These items should still be treated as open until captured on real clients:
 
-- one extra non-tvOS `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.23` desktop build for cross-client parity
+- one extra non-tvOS `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.24` desktop build for cross-client parity
 - one real public `Remote Seedbox` ready-file playback success on a remote client
 - one auth-protected external file-server playback success on a real Stremio client
 - long-session playback/performance tuning after qBittorrent download-speed adjustments
