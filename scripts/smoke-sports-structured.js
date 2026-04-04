@@ -77,7 +77,7 @@ function assertSportsThumbUrl(url, variant = 'poster', message) {
     new RegExp(`^http://127\\.0\\.0\\.1:7000/thumb/sports/${variant}/`),
     message || `expected sports thumb variant ${variant}`
   )
-  const token = value.split('/').pop().replace(/\.svg$/i, '')
+  const token = value.split('/').pop().replace(/\.(?:svg|png)$/i, '')
   return decodeSportsThumbToken(token)
 }
 

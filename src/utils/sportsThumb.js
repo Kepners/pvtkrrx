@@ -177,9 +177,9 @@ function makeSportsThumbUrl(baseUrl, item, variant = 'landscape') {
     e: String(item?.eventName || '')
   })
   const root = String(baseUrl || '').replace(/\/+$/, '')
-  if (variant === 'poster') return `${root}/thumb/sports/poster/${token}.svg`
-  if (variant === 'background') return `${root}/thumb/sports/background/${token}.svg`
-  return `${root}/thumb/sports/${token}.svg`
+  if (variant === 'poster') return `${root}/thumb/sports/poster/${token}.png`
+  if (variant === 'background') return `${root}/thumb/sports/background/${token}.png`
+  return `${root}/thumb/sports/${token}.png`
 }
 
 function makeSportsPosterUrl(baseUrl, item) {

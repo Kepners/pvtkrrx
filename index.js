@@ -722,6 +722,21 @@ app.post('/auth/stremio/link-session', requireCsrfToken, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store')
   res.json(buildStremioLinkSessionResponse(req, session))
 })
+app.get(['/thumb/sports/:info.png', '/thumb/sports/:variant/:info.png'], async (req, res) => {
+  try {
+    const sharp = require('sharp')
+    const payload = decodeSportsThumbToken(req.params.info)
+    const variant = String(req.params.variant || 'landscape').trim().toLowerCase()
+    const svg = await renderSportsThumbSvg(payload, { variant })
+    const pngBuffer = await sharp(Buffer.from(svg, 'utf8')).png().toBuffer()
+    res.setHeader('Content-Type', 'image/png')
+    res.setHeader('Content-Length', String(pngBuffer.length))
+    setPublicCacheHeaders(res, 86400, { sMaxAge: 604800, staleWhileRevalidate: 2592000, immutable: true })
+    res.send(pngBuffer)
+  } catch (_) {
+    res.status(400).send('invalid thumbnail payload')
+  }
+})
 app.get(['/thumb/sports/:info.svg', '/thumb/sports/:variant/:info.svg'], async (req, res) => {
   try {
     const payload = decodeSportsThumbToken(req.params.info)
