@@ -490,15 +490,19 @@ function buildServerAdminBootstrapUrl(displayOrigin, token) {
   return `${origin}/configure#serverPassword=${encodeURIComponent(adminToken)}&serverAdminToken=${encodeURIComponent(adminToken)}`
 }
 
+function writeInstallerSummaryLine(line) {
+  fs.writeSync(1, `${String(line || '')}\n`)
+}
+
 function printWorkingUrlSummary(displayOrigin, bootstrapUrl, publicBaseUrl) {
   const hasPublicOrigin = Boolean(normalizeOrigin(publicBaseUrl))
-  console.log(hasPublicOrigin ? 'Working public URLs:' : 'Working local URLs:')
-  console.log(`PVTKRRX URL: ${displayOrigin}`)
-  console.log(`Configure URL: ${displayOrigin}/configure`)
+  writeInstallerSummaryLine(hasPublicOrigin ? 'Working public URLs:' : 'Working local URLs:')
+  writeInstallerSummaryLine(`PVTKRRX URL: ${displayOrigin}`)
+  writeInstallerSummaryLine(`Configure URL: ${displayOrigin}/configure`)
   if (bootstrapUrl) {
-    console.log(`Bootstrap URL: ${bootstrapUrl}`)
+    writeInstallerSummaryLine(`Bootstrap URL: ${bootstrapUrl}`)
   }
-  console.log(`Self-host manifest URL: ${displayOrigin}/selfhost/manifest.json?mode=hosted`)
+  writeInstallerSummaryLine(`Self-host manifest URL: ${displayOrigin}/selfhost/manifest.json?mode=hosted`)
 }
 
 async function run() {
@@ -1040,13 +1044,19 @@ if (require.main === module) {
 }
 
 module.exports = {
+  buildServerAdminBootstrapUrl,
   buildDefaultAllowedOrigins,
   defaultServiceName,
   defaultServiceUser,
+  deriveDisplayOrigin,
+  printWorkingUrlSummary,
   runFullBootstrap,
+  run,
+  runAuto,
   normalizeOrigin,
   normalizeOriginList,
   parseDotEnvFile,
   parseHttpUrl,
-  updateDotEnvFile
+  updateDotEnvFile,
+  writeInstallerSummaryLine
 }
