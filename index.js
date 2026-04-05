@@ -2181,6 +2181,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
     } catch (_) {
       return res.status(400).json({ error: 'Invalid playback token' })
     }
+    const targetPathHint = String(info.p || '')
     const trackerHost = extractTrackerHost(info.l)
     let trackedHash = String(info.h || extractInfoHashFromLink(info.l) || '').toLowerCase()
     console.log(`[playback-route] hash=${trackedHash.slice(0, 8)} hasLink=${Boolean(info.l)}`)
@@ -2243,7 +2244,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
 
     // If we can identify the torrent hash, check whether it's already playable.
     if (trackedHash) {
-      const existing = await loadTorrentPlaybackState(qbit, trackedHash, '', req.config.additionalStorageRoots)
+      const existing = await loadTorrentPlaybackState(qbit, trackedHash, targetPathHint, req.config.additionalStorageRoots)
       if (existing?.torrent) {
         if (!primedTorrent || (!primedFile && existing.file)) {
           await primeTorrentForStreaming(qbit, existing.torrent, existing.file, existing.files)
@@ -2349,7 +2350,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
         }
       }
 
-      const state = await loadTorrentPlaybackState(qbit, trackedHash, '', req.config.additionalStorageRoots)
+      const state = await loadTorrentPlaybackState(qbit, trackedHash, targetPathHint, req.config.additionalStorageRoots)
       if (!state?.torrent) {
         trackedHash = ''
         continue
@@ -2405,7 +2406,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
     // the HTTP connection while bytes arrive, keeping Stremio on the player
     // page instead of crashing back to source selection.
     if (trackedHash) {
-      const finalState = await loadTorrentPlaybackState(qbit, trackedHash, '', req.config.additionalStorageRoots)
+      const finalState = await loadTorrentPlaybackState(qbit, trackedHash, targetPathHint, req.config.additionalStorageRoots)
       if (tryRedirectToFileRoute(finalState, 'timeout-fallback')) {
         return
       }

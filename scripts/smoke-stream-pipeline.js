@@ -8,7 +8,7 @@ const { QBitClient } = require('../src/clients/qbittorrent')
 const { CinemetaClient } = require('../src/clients/cinemeta')
 const { handleStream } = require('../src/handlers/stream')
 const { buildExternalFileUrl } = require('../src/utils/fileServing')
-const { decodeFileStateToken } = require('../src/utils/opaqueState')
+const { decodeFileStateToken, decodePlaybackStateToken } = require('../src/utils/opaqueState')
 const { encodeCustomId } = require('../src/utils/customId')
 const { inspectTorrentPayload } = require('../src/utils/torrentPayload')
 const ORIGINAL_FETCH = global.fetch
@@ -153,6 +153,15 @@ function decodeOpaqueFilePath(url) {
   const parsed = new URL(resolvedUrl)
   const token = decodeURIComponent(parsed.pathname.split('/').pop() || '')
   return String(decodeFileStateToken(token)?.p || '')
+}
+
+function decodeOpaquePlaybackState(url) {
+  const resolvedUrl = Array.isArray(url)
+    ? String(url[0] || '')
+    : String(url?.url || url || '')
+  const parsed = new URL(resolvedUrl)
+  const token = decodeURIComponent(parsed.pathname.split('/').pop() || '')
+  return decodePlaybackStateToken(token)
 }
 
 function customPackedId(overrides = {}) {
@@ -406,7 +415,12 @@ async function run() {
       )
 
       assert.equal(result.streams.length, 1, '#3f self-host buffering should still emit a stream when a dedicated playback origin is configured')
-      assert.match(String(result.streams[0]?.url || ''), /^https:\/\/play\.example\/selfhost\/file\//, '#3f self-host built-in file playback should use the dedicated playback origin instead of the control/tunnel origin')
+      assert.match(String(result.streams[0]?.url || ''), /^https:\/\/play\.example\/selfhost\/playback\//, '#3f self-host buffering should use the dedicated playback origin and the safer /playback handoff instead of jumping straight into /file')
+      assert.equal(
+        String(decodeOpaquePlaybackState(result.streams[0]?.url || '')?.p || ''),
+        matchedFile().name,
+        '#3f self-host buffering token should preserve the selected file path'
+      )
     })
 
     await withScenario(async () => {
@@ -451,7 +465,12 @@ async function run() {
       )
 
       assert.equal(result.streams.length, 1, '#4b local buffering flow should remain intact')
-      assert.match(String(result.streams[0]?.url || ''), /\/local\/file\//)
+      assert.match(String(result.streams[0]?.url || ''), /\/local\/playback\//)
+      assert.equal(
+        String(decodeOpaquePlaybackState(result.streams[0]?.url || '')?.p || ''),
+        matchedFile().name,
+        '#4b local buffering token should preserve the selected file path'
+      )
       assert.equal(String(result.streams[0]?.behaviorHints?.sourceMode || ''), 'buffering')
       assert.equal(String(result.streams[0]?.behaviorHints?.sourceOrigin || ''), 'pc', '#4b buffering stream should expose the PC origin hint')
       assert.match(String(result.streams[0]?.name || ''), /\[PC\]/, '#4b buffering stream should show the PC origin badge')

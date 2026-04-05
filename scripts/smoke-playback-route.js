@@ -124,10 +124,12 @@ async function run() {
   const incompleteHash = 'b1287d13dddddddddddddddddddddddddddddddd'
   const packedHash = 'd1287d13bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
   const readyPackedHash = 'e1287d13cccccccccccccccccccccccccccccccc'
+  const targetedHash = 'f1287d13eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
   const priorityCalls = []
   const firstLastToggleCalls = []
   const sequentialToggleCalls = []
   const payload = Buffer.from('smoke playback bytes', 'utf8')
+  const targetedPayload = Buffer.from('smoke episode two bytes', 'utf8')
   const partialPayload = Buffer.alloc(30 * 1024 * 1024, 7)
   const archivePayload = Buffer.from('smoke rar bytes', 'utf8')
   const extractedPayload = Buffer.from('smoke extracted bytes', 'utf8')
@@ -186,6 +188,16 @@ async function run() {
     download_path: runtimeDir,
     content_path: ''
   }
+  const targetedTorrent = {
+    hash: targetedHash,
+    name: 'Series Pack Smoke',
+    progress: 1,
+    seq_dl: true,
+    f_l_piece_prio: false,
+    save_path: runtimeDir,
+    download_path: runtimeDir,
+    content_path: ''
+  }
   const packedFiles = [
     {
       name: 'Release/Sample/sample-release.mkv',
@@ -232,11 +244,28 @@ async function run() {
       index: 3
     }
   ]
+  const targetedFiles = [
+    {
+      name: 'Series/Smoke.Show.S01E01.mkv',
+      size: payload.length,
+      progress: 1,
+      index: 0
+    },
+    {
+      name: 'Series/Smoke.Show.S01E02.mkv',
+      size: targetedPayload.length,
+      progress: 1,
+      index: 1
+    }
+  ]
   fs.writeFileSync(path.join(runtimeDir, file.name), payload)
   fs.mkdirSync(path.join(runtimeDir, 'buffering'), { recursive: true })
   fs.writeFileSync(path.join(runtimeDir, incompleteFile.name), partialPayload)
   fs.mkdirSync(path.join(runtimeDir, 'Release'), { recursive: true })
   fs.writeFileSync(path.join(runtimeDir, 'Release', 'release.rar'), archivePayload)
+  fs.mkdirSync(path.join(runtimeDir, 'Series'), { recursive: true })
+  fs.writeFileSync(path.join(runtimeDir, 'Series', 'Smoke.Show.S01E01.mkv'), payload)
+  fs.writeFileSync(path.join(runtimeDir, 'Series', 'Smoke.Show.S01E02.mkv'), targetedPayload)
   const extractedDir = path.join(runtimeDir, '.pvtkrrx-extracted', readyPackedHash)
   fs.mkdirSync(extractedDir, { recursive: true })
   const extractedFilePath = path.join(extractedDir, 'release-extracted.mp4')
@@ -256,7 +285,7 @@ async function run() {
     hash: inferredHash
   }
 
-  QBitClient.prototype.torrents = async () => [torrent, inferredTorrent, incompleteTorrent, packedTorrent, readyPackedTorrent]
+  QBitClient.prototype.torrents = async () => [torrent, inferredTorrent, incompleteTorrent, packedTorrent, readyPackedTorrent, targetedTorrent]
   QBitClient.prototype.torrentsByHashes = async (inputHash) => {
     const normalized = String(inputHash || '').toLowerCase()
     if (normalized === hash) return [torrent]
@@ -264,6 +293,7 @@ async function run() {
     if (normalized === incompleteHash) return [incompleteTorrent]
     if (normalized === packedHash) return [packedTorrent]
     if (normalized === readyPackedHash) return [readyPackedTorrent]
+    if (normalized === targetedHash) return [targetedTorrent]
     return []
   }
   QBitClient.prototype.files = async (inputHash) => {
@@ -273,6 +303,7 @@ async function run() {
     if (normalized === incompleteHash) return [incompleteFile]
     if (normalized === packedHash) return packedFiles
     if (normalized === readyPackedHash) return readyPackedFiles
+    if (normalized === targetedHash) return targetedFiles
     return []
   }
   QBitClient.prototype.properties = async (inputHash) => {
@@ -341,6 +372,7 @@ async function run() {
     const inferredPlaybackToken = encodePlaybackStateToken({ h: '', l: 'https://tracker.example/existing-without-hash.torrent' })
     const packedPlaybackToken = encodePlaybackStateToken({ h: packedHash })
     const readyPackedPlaybackToken = encodePlaybackStateToken({ h: readyPackedHash })
+    const targetedPlaybackToken = encodePlaybackStateToken({ h: targetedHash, p: targetedFiles[1].name })
     const archiveFileToken = encodeFileStateToken({ h: readyPackedHash, p: 'Release/release.rar' })
     const orphanFileToken = encodeFileStateToken({ h: 'ffffffffffffffffffffffffffffffffffffffff', p: path.join(runtimeDir, file.name) })
 
@@ -414,6 +446,12 @@ async function run() {
     assert.equal(readyPackedFileResponse.status, 200, 'completed packed archives should serve the extracted direct-play file once available')
     assert.equal(readyPackedFileResponse.text, extractedPayload.toString('utf8'))
     assert.equal(String(readyPackedFileResponse.headers['content-type'] || ''), 'video/mp4')
+
+    const targetedResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(targetedPlaybackToken)}`)
+    assert.equal(targetedResponse.status, 302, 'playback tokens with a target file hint should still redirect normally')
+    const targetedFileResponse = await request(server.address().port, String(targetedResponse.headers.location || ''))
+    assert.equal(targetedFileResponse.status, 200, 'playback target hints should resolve the requested file from a multi-file torrent')
+    assert.equal(targetedFileResponse.text, targetedPayload.toString('utf8'))
 
     const archiveFileResponse = await request(server.address().port, `/${configToken}/file/${encodeURIComponent(archiveFileToken)}`)
     assert.equal(archiveFileResponse.status, 200, 'file route should serve completed archive parts for RAR streams')

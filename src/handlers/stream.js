@@ -35,6 +35,25 @@ function buildFileUrl(config, configToken, playbackBaseUrl, hash, torrent, fileN
   return buildPlaybackFileUrl(config, configToken, playbackBaseUrl, hash, torrent, fileName, options)
 }
 
+function buildPlaybackRouteUrl(playbackBaseUrl, configToken, payload) {
+  try {
+    const playbackInfo = encodePlaybackStateToken(payload)
+    return `${playbackBaseUrl}/${configToken}/playback/${playbackInfo}`
+  } catch (_) {
+    return null
+  }
+}
+
+function buildBufferingStreamUrl(playbackBaseUrl, configToken, fileUrl, hash, fileName) {
+  const builtinFilePrefix = `${String(playbackBaseUrl || '').replace(/\/+$/, '')}/${configToken}/file/`
+  if (!String(fileUrl || '').startsWith(builtinFilePrefix)) return fileUrl
+
+  return buildPlaybackRouteUrl(playbackBaseUrl, configToken, {
+    h: String(hash || '').toLowerCase(),
+    p: String(fileName || '')
+  }) || fileUrl
+}
+
 function buildConfigureHelpUrl(addonUrl, target = 'seedbox') {
   const base = String(addonUrl || '').replace(/\/+$/, '')
   return `${base}/configure?target=${encodeURIComponent(target)}`
@@ -537,13 +556,14 @@ async function buildSupplementalSportsStreams({
       break
     }
     try {
-      const playbackInfo = encodePlaybackStateToken({
+      const playbackUrl = buildPlaybackRouteUrl(playbackBaseUrl, configToken, {
         h: item.infohash || inspection.infoHash || '',
         l: item.link
       })
+      if (!playbackUrl) continue
       streams.push(buildOnTrackerStream(
         item,
-        `${playbackBaseUrl}/${configToken}/playback/${playbackInfo}`,
+        playbackUrl,
         parse(item.title || searchQuery),
         streamSourceOptions
       ))
@@ -795,7 +815,8 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
           streams.push(buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed, streamSourceOptions))
         } else {
           const percent = Math.max(0, Math.min(99, Math.floor(videoProgress * 100)))
-          streams.push(buildOnBufferingStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed, percent, streamSourceOptions))
+          const bufferingUrl = buildBufferingStreamUrl(playbackBaseUrl, configToken, fileUrl, matched.hash, videoFile.name)
+          streams.push(buildOnBufferingStream(item, bufferingUrl, videoFile.name, videoFile.size, config, parsed, percent, streamSourceOptions))
         }
       } catch (e) {
         // File listing failed, skip this stream
@@ -816,11 +837,12 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
       if (trackerPlaybackEnabled) {
         // On tracker — playback URL (works with or without infohash)
         try {
-          const info = encodePlaybackStateToken({
+          const playbackUrl = buildPlaybackRouteUrl(playbackBaseUrl, configToken, {
             h: item.infohash || inspection.infoHash || '',
             l: item.link
           })
-          streams.push(buildOnTrackerStream(item, `${playbackBaseUrl}/${configToken}/playback/${info}`, parsed, streamSourceOptions))
+          if (!playbackUrl) continue
+          streams.push(buildOnTrackerStream(item, playbackUrl, parsed, streamSourceOptions))
         } catch (_) {
           // Skip invalid playback payloads instead of leaking raw tracker URLs.
         }
@@ -910,7 +932,8 @@ async function handleCustomStream(config, id, addonUrl, configToken, playbackBas
           streams.push(buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed, streamSourceOptions))
         } else {
           const percent = Math.max(0, Math.min(99, Math.floor(videoProgress * 100)))
-          streams.push(buildOnBufferingStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed, percent, streamSourceOptions))
+          const bufferingUrl = buildBufferingStreamUrl(playbackBaseUrl, configToken, fileUrl, matched.hash, videoFile.name)
+          streams.push(buildOnBufferingStream(item, bufferingUrl, videoFile.name, videoFile.size, config, parsed, percent, streamSourceOptions))
         }
       }
     } catch (e) {
@@ -936,16 +959,18 @@ async function handleCustomStream(config, id, addonUrl, configToken, playbackBas
       noticeCounts.trackerLinkUnverified += 1
     } else if (trackerPlaybackEnabled) {
       try {
-        const playbackInfo = encodePlaybackStateToken({
+        const playbackUrl = buildPlaybackRouteUrl(playbackBaseUrl, configToken, {
           h: infoHash || String(inspection.infoHash || '').toLowerCase(),
           l: directLink
         })
-        streams.push(buildOnTrackerStream(
-          { title: info.t, size: info.s, seeders: info.d, indexer: info.i || '' },
-          `${playbackBaseUrl}/${configToken}/playback/${playbackInfo}`,
-          parsed,
-          streamSourceOptions
-        ))
+        if (playbackUrl) {
+          streams.push(buildOnTrackerStream(
+            { title: info.t, size: info.s, seeders: info.d, indexer: info.i || '' },
+            playbackUrl,
+            parsed,
+            streamSourceOptions
+          ))
+        }
       } catch (_) {
         // Skip invalid playback payloads instead of leaking raw tracker URLs.
       }
@@ -1014,13 +1039,14 @@ async function handleCustomStream(config, id, addonUrl, configToken, playbackBas
           break
         }
         try {
-          const playbackInfo = encodePlaybackStateToken({
+          const playbackUrl = buildPlaybackRouteUrl(playbackBaseUrl, configToken, {
             h: item.infohash || inspection.infoHash || '',
             l: item.link
           })
+          if (!playbackUrl) continue
           streams.push(buildOnTrackerStream(
             item,
-            `${playbackBaseUrl}/${configToken}/playback/${playbackInfo}`,
+            playbackUrl,
             parse(item.title || info.t),
             streamSourceOptions
           ))

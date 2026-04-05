@@ -79,12 +79,14 @@ async function run() {
     // Opaque state should not be readable as plain JSON even if someone base64-decodes it.
     const plainPlayback = {
       h: '0123456789abcdef0123456789abcdef01234567',
-      l: 'https://tracker.example/download/abc?t=passkey'
+      l: 'https://tracker.example/download/abc?t=passkey',
+      p: 'Series/Smoke.Show.S01E02.mkv'
     }
     const opaquePlaybackToken = encodePlaybackStateToken(plainPlayback)
     const roundTripPlayback = decodePlaybackStateToken(opaquePlaybackToken)
     assert.equal(roundTripPlayback.h, plainPlayback.h)
     assert.equal(roundTripPlayback.l, plainPlayback.l)
+    assert.equal(roundTripPlayback.p, plainPlayback.p)
 
     let rawDecoded = ''
     let decodedJson = null

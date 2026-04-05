@@ -87,8 +87,11 @@ function decodeOpaqueToken(token, expectedType) {
 function sanitizePlaybackPayload(input) {
   const hash = normalizeHash(input?.h)
   const link = normalizeTrackerLink(input?.l)
+  const filePath = normalizeFilePath(input?.p)
   if (!hash && !link) throw new Error('Playback state must include hash or tracker link')
-  return { h: hash, l: link }
+  return filePath
+    ? { h: hash, l: link, p: filePath }
+    : { h: hash, l: link }
 }
 
 function sanitizeFilePayload(input) {

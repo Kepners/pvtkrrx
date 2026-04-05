@@ -117,6 +117,8 @@ If a row says `rarUrls`, that means the addon emits the archive source only when
 
 Today the supported packed-release path is extracted direct video. Native `rarUrls` remains implemented only behind the explicit experimental override for manual testing and future proof capture.
 
+For playback-capable runtimes, the `In-progress unpacked video` row applies both to brand-new tracker clicks and to torrents that are already in qBittorrent but still incomplete. The stream layer now keeps those matched buffering streams on `/playback` until the runtime can hand off safely into `/file`, which avoids premature direct `/file` hits that some Stremio clients surface as `liberror`.
+
 ### By Endpoint
 
 | Endpoint | PC Local | Hybrid Home (home network) | Remote Seedbox (public hosted relay) |
