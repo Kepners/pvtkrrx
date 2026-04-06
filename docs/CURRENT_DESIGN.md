@@ -1,6 +1,6 @@
 # PVTKRRX Current Design
 
-Updated: 2026-04-04
+Updated: 2026-04-06
 
 ## Purpose
 
@@ -69,7 +69,7 @@ PVTKRRX is one codebase with three active runtime pieces:
   - let any signed-in Stremio browser/device session complete the proof
   - poll status until the runtime reports `install-seen` or `linked`
 - Pasting the generated addon URL into Stremio is only a bootstrap step. It marks that the session was seen by Stremio, but the real account link still completes through browser-side AuthKey proof.
-- The desktop popup now exposes only `PC Local` and `Hybrid Home`, and tells the user to install/sign in to Stremio on the host PC before using `Hybrid Home`.
+- The desktop popup now exposes only `PC Local` and the hosted home-device route, but its current copy still uses the older `LAN Bridge` label in multiple strings. Route behavior is still the newer `Hybrid Home` model.
 - The desktop popup also exposes:
   - current runtime status
   - qBittorrent save-path controls
@@ -80,6 +80,7 @@ PVTKRRX is one codebase with three active runtime pieces:
 - The configure page now mirrors that local-runtime visibility with a live qBittorrent status panel that shows the effective save path, incomplete path, fallback storage roots, and whether PVTKRRX currently manages the qBit completion hook.
 - The current public landing page visual system is on-brand, but the copy still undersells the product compared with the README; keep the rewrite backlog in `docs/WEBSITE_STATUS.md`.
 - The public homepage now shows a live release-status card driven by `/version-status.json`, and the Windows desktop shell shows the same release check in the popup.
+- Legacy `LAN Bridge` wording also still appears in other live surfaces such as the desktop popup, runbooks/provider guidance, bootstrap manifest descriptions, and some stream info rows. Treat that as terminology drift, not a different route model, unless a doc explicitly calls out the old strict-LAN profile.
 
 ## Public Host Truth Table
 
@@ -103,6 +104,8 @@ Verified on 2026-03-31:
 
 All three routes expose the same catalog family: sports discovery catalogs first, then movies, TV, and library.
 See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including packed RAR releases and auth-protected file servers.
+
+Internal state still uses `lanPair*` field names, and older hosted tokens can still resolve as the stricter legacy `LAN Bridge` profile. That backward-compat path is still live even though `Hybrid Home` is the main synced route.
 
 ## Host Vs Home-Device Rule
 
@@ -219,9 +222,10 @@ See `docs/ROUTE_FRAMEWORK.md` for the full per-route capability matrix including
 3. `Hybrid Home` is the supported home-device route and depends on the host desktop app remaining online for the home-network path.
 4. Hosted LAN-pair installs must be refreshable because stale installed tokens can point at old pair state or old route behavior.
 5. Root `/manifest.json` must remain a bootstrap manifest, not a real catalog-bearing route manifest.
-6. The repo contains historical planning docs from February 2026; they are useful for project history, not as the live architecture.
-7. Use `https://www.pvtkrrx.cc` as the canonical hosted base; the old `https://pvtkrrx.vercel.app` hostname is not part of the supported install surface.
-8. If the goal is to keep PVTKRRX out of the request path after setup, use explicit self-hosted server mode and a user-owned HTTPS origin.
+6. Route terminology is not fully migrated yet: `Hybrid Home` is the intended name, but some live UI/help strings still say `LAN Bridge`.
+7. The repo contains historical planning docs from February 2026; they are useful for project history, not as the live architecture.
+8. Use `https://www.pvtkrrx.cc` as the canonical hosted base; the old `https://pvtkrrx.vercel.app` hostname is not part of the supported install surface.
+9. If the goal is to keep PVTKRRX out of the request path after setup, use explicit self-hosted server mode and a user-owned HTTPS origin.
 
 ## Documentation Canon
 

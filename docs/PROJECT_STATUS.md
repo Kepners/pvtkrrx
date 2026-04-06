@@ -11,7 +11,7 @@ The practical reading of the project today is:
 
 - `PC Local` is the real host-desktop route and is working
 - `Hybrid Home` is now the main same-account synced route for the user's other devices; the host desktop should not use it for local browsing
-- the packaged Windows EXE now centers on `PC Local` plus `Hybrid Home`; `Remote Seedbox` belongs to the hosted/self-host server surfaces
+- the packaged Windows EXE now centers on `PC Local` plus the `Hybrid Home` route model, although some live desktop/runbook/help strings still say `LAN Bridge`
 - explicit self-host server mode now exists for VPS/seedbox installs, with disk-backed `/selfhost` manifests, browser-admin auth for private service URLs, and optional `systemd` boot automation
 - the self-host bootstrap now auto-selects a free qBittorrent WebUI port when 8080 is occupied, and it captures the Cloudflare Tunnel URL cleanly so the saved public URL never inherits the installer log line
 - the self-host bootstrap now rewrites the Cloudflare Tunnel service on install so trycloudflare installs always print a fresh public URL, and it now wires Prowlarr to the live qBittorrent download client during bootstrap instead of leaving the download client unset
@@ -27,6 +27,13 @@ The practical reading of the project today is:
 - the homepage rewrite now exists locally in `public/index.html`, but it still needs a browser pass and deliberate deploy before the live site can be treated as updated
 - legacy strict `LAN Bridge` tokens remain supported for manual troubleshooting and backwards compatibility, but they are no longer the default synced install path
 - the remaining work is real-device coverage, remote/auth playback sign-off, and performance tuning, not a reset/rebuild
+
+## Code Review 2026-04-06
+
+- Re-ran `npm run smoke:config`, `npm run smoke:playback`, and `npm run smoke:desktop`; all passed in the current workspace during this review.
+- Main review finding: route terminology is still mixed in live code. `public/configure.html` and the hosted profile logic treat the home-device route as `Hybrid Home`, but several other shipped surfaces still present the older `LAN Bridge` name.
+- Confirmed legacy `LAN Bridge` wording still exists in the current desktop popup, bootstrap-manifest descriptions for desktop installs, runbooks/provider guidance, and stream info helpers. This is terminology drift, not evidence of a second active home-device route.
+- Updated the technical docs in this pass to stop overstating the rename as fully complete. No public-site or in-app copy was changed.
 
 ## Work Carried Out On 2026-04-04
 
@@ -238,12 +245,13 @@ These items should still be treated as open until captured on real clients:
 
 ## Current Risks
 
-- `LAN Bridge` still depends on the Windows host desktop staying online and heartbeating
+- `Hybrid Home` still depends on the Windows host desktop staying online and heartbeating
 - Bonjour may still be missing or stopped on some hosts; that affects discovery/fallback polish, not the core loopback path
 - remote/auth-protected playback behavior still depends on what the target Stremio client honors during redirect/auth handoff
 - the addon still emits `behaviorHints.sourceContainer = 'rar'` on the experimental native archive path, but official Stremio docs/core do not define that field for archive support
 - if a future Stremio client regresses local archive support, the supported fallback already remains: suppress partial multi-volume archives and only advertise extracted direct-play files
 - the rewritten homepage still needs a browser/device pass before deploy, so mobile/layout regressions are not ruled out yet
+- route naming is still inconsistent across live surfaces; until copy work is intentionally in scope, users may continue to see both `Hybrid Home` and `LAN Bridge` referring to the same home-device path
 
 ## 2026-03-30 Plan Closure
 
@@ -294,4 +302,5 @@ These items should still be treated as open until captured on real clients:
 4. Keep sports poster/wallpaper review focused on what Stremio clients actually render, not just what the metadata payload contains.
 5. Capture one extra Android TV or Android mobile `LAN Bridge` pass for cross-client parity beyond the now-verified Apple TV path.
 6. Finish public remote/auth playback sign-off before calling the whole route set fully release-ready.
-7. Keep this file updated whenever a real device test changes the truth table.
+7. When copy work is back in scope, finish the `Hybrid Home` / `LAN Bridge` terminology cleanup across the popup, runbooks, bootstrap manifest text, and stream info notices.
+8. Keep this file updated whenever a real device test changes the truth table.
