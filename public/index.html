@@ -365,6 +365,61 @@
       flex-wrap: wrap;
     }
 
+    .site-release {
+      margin-top: 18px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      min-height: 40px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 246, 255, 0.24);
+      background:
+        linear-gradient(120deg, rgba(0, 246, 255, 0.06), rgba(255, 0, 212, 0.08)),
+        rgba(5, 9, 18, 0.78);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+        0 0 24px rgba(0, 168, 255, 0.14);
+      color: #9db7da;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .site-release-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+      background: #7a96be;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .site-release-dot.up-to-date {
+      background: var(--green);
+      box-shadow: 0 0 10px rgba(0, 255, 102, 0.52);
+    }
+
+    .site-release-dot.update-available {
+      background: var(--red);
+      box-shadow: 0 0 10px rgba(255, 19, 79, 0.54);
+    }
+
+    .site-release a {
+      color: #d4e8ff;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(0, 246, 255, 0.24);
+      transition: color 0.18s ease, border-color 0.18s ease;
+    }
+
+    .site-release a:hover {
+      color: #fff;
+      border-bottom-color: rgba(255, 0, 212, 0.46);
+    }
+
     .btn {
       min-height: 44px;
       padding: 0 16px;
@@ -1029,6 +1084,11 @@
           <a class="btn btn-primary" href="/configure">Configure First</a>
           <a class="btn btn-secondary" href="#routes">Choose Your Route</a>
         </div>
+        <div class="site-release" id="siteReleaseCard">
+          <span class="site-release-dot" id="siteReleaseDot"></span>
+          <span id="siteReleaseText">Checking release...</span>
+          <a id="siteReleaseLink" href="https://github.com/Kepners/pvtkrrx/releases" target="_blank" rel="noopener noreferrer">Releases</a>
+        </div>
       </div>
     </section>
 
@@ -1207,10 +1267,10 @@
       particles.appendChild(node);
     }
 
-    function renderFooterRelease(data) {
-      const dot = document.getElementById('footerReleaseDot');
-      const text = document.getElementById('footerReleaseText');
-      const link = document.getElementById('footerReleaseLink');
+    function renderReleaseStatus(target, data) {
+      const dot = document.getElementById(target.dotId);
+      const text = document.getElementById(target.textId);
+      const link = document.getElementById(target.linkId);
       if (!dot || !text || !link) return;
 
       const currentVersion = String(data && data.currentVersion ? data.currentVersion : '0.0.0').trim() || '0.0.0';
@@ -1219,7 +1279,7 @@
       const updateAvailable = Boolean(data && data.updateAvailable);
       const latestReleaseUrl = String(data && data.latestReleaseUrl ? data.latestReleaseUrl : 'https://github.com/Kepners/pvtkrrx/releases').trim();
 
-      dot.className = 'footer-release-dot ' + status;
+      dot.className = `${target.dotClass} ${status}`.trim();
 
       if (updateAvailable) {
         text.textContent = `v${currentVersion} · Update available (v${latestVersion})`;
@@ -1234,6 +1294,24 @@
       link.href = latestReleaseUrl;
     }
 
+    function renderFooterRelease(data) {
+      renderReleaseStatus({
+        dotId: 'footerReleaseDot',
+        textId: 'footerReleaseText',
+        linkId: 'footerReleaseLink',
+        dotClass: 'footer-release-dot'
+      }, data);
+    }
+
+    function renderSiteRelease(data) {
+      renderReleaseStatus({
+        dotId: 'siteReleaseDot',
+        textId: 'siteReleaseText',
+        linkId: 'siteReleaseLink',
+        dotClass: 'site-release-dot'
+      }, data);
+    }
+
     async function refreshReleaseStatus() {
       try {
         const response = await fetch('/version-status.json', {
@@ -1241,15 +1319,18 @@
           headers: { 'Accept': 'application/json' }
         });
         const data = await response.json();
+        renderSiteRelease(data || {});
         renderFooterRelease(data || {});
       } catch (err) {
-        renderFooterRelease({
+        const fallback = {
           status: 'unavailable',
           currentVersion: '0.0.0',
           latestVersion: '0.0.0',
           latestReleaseUrl: 'https://github.com/Kepners/pvtkrrx/releases',
           updateAvailable: false
-        });
+        };
+        renderSiteRelease(fallback);
+        renderFooterRelease(fallback);
       }
     }
 

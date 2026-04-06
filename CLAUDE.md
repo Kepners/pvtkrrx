@@ -44,7 +44,7 @@
 | Item | Value |
 |------|-------|
 | Type | Stremio Addon |
-| Version | 1.1.26 |
+| Version | 1.1.27 |
 | Repo | github.com/Kepners/pvtkrrx |
 | Hosting | Contabo VPS via Caddy -> Coolify hosted relay + Local Windows runtime + optional Linux self-host runtime |
 | Framework | stremio-addon-sdk + Express v5 hybrid |
@@ -190,7 +190,7 @@ Never push to a different branch expecting the live site to update.
 
 ## Release Rule
 
-- When the user says `release`, `publish`, `ship`, or otherwise asks for the latest install/build, default to checking and updating both release surfaces together unless they explicitly scope the request:
+- When the user says `release`, `publish`, `ship`, `issue a new revision`, or otherwise asks for the latest install/build, default to checking and updating both release surfaces together unless they explicitly scope the request:
   - hosted/cloud runtime and its GitHub release/tag state
   - Windows desktop EXE artifacts (`dist/`, `dist/releases/<version>/`, `latest.yml`, setup EXE, portable EXE)
 - Do not call a PVTKRRX release complete if GitHub/cloud moved but the EXE line did not, or if the EXE line moved but the hosted/cloud release/tag line did not.
@@ -199,6 +199,7 @@ Never push to a different branch expecting the live site to update.
   - current public desktop release tag/assets
   - current self-host/cloud installer tag/assets when that line is in scope
   - whether recent spec/cache/runtime changes landed in the published release revisions or only on `main`
+- Final release parity is required: the intended `main` commit, EXE artifacts, GitHub desktop release, GitHub self-host/cloud release, and live cloud deployment must all resolve to the same revision before you call the release done.
 
 ---
 

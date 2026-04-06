@@ -21,7 +21,7 @@
 
 ## Cross-Workspace Defaults
 - If the work touches hosting, deploys, DNS, public URLs, or live environments, check `C:\Users\kepne\OneDrive\Documents\@Projects\contabo-infra` and its `BRAIN.md` before assuming the current production setup.
-- For PVTKRRX release/publish/ship requests, default to a dual-surface release check: the hosted/cloud line plus the Windows EXE line. Do not treat a release as complete if only one surface was updated unless the user explicitly scopes the release to one surface.
+- For PVTKRRX release/publish/ship requests, and whenever the user says `issue a new revision`, default to a dual-surface release check: the hosted/cloud line plus the Windows EXE line. Do not treat a release as complete if only one surface was updated unless the user explicitly scopes the release to one surface.
 - When finishing meaningful work in this repo, default to `git status` -> selective `git add <paths>` -> `git commit -m "<why>"` -> `git push origin <current-branch>`, unless the user explicitly says not to commit or not to push yet.
 - If the user's prompt is short, vague, blunt, or underspecified, use `C:\Users\kepne\.claude\PROMPT_LIBRARY.md` to upgrade it internally before acting instead of asking them to restate it.
 
