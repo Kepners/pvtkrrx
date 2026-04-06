@@ -322,8 +322,11 @@ This now validates the server-agnostic link-session flow as well:
 ### Hosted Production
 
 Use the canonical hosted base: `https://www.pvtkrrx.cc`.
-As of 2026-03-31, `https://www.pvtkrrx.cc/`, `/configure`, `/runbooks`, `/manifest.json`, and `/health` all responded from the live public host, while the old `https://pvtkrrx.vercel.app` preview returned `DEPLOYMENT_NOT_FOUND`.
-Production updates are deployed from the synced GitHub branch and must preserve the active `ENCRYPTION_SECRET`.
+As of 2026-04-06, `https://www.pvtkrrx.cc/`, `/configure`, `/manifest.json`, and `/health` all responded from the live public host, while the old `https://pvtkrrx.vercel.app` preview remained dead with `DEPLOYMENT_NOT_FOUND`.
+The current public route enters through Contabo Caddy and proxies to the live hosted `pvtkrrx` app container on port `3000`.
+The mirror checkout at `/opt/stack/sites/pvtkrrx` is useful for server-side sync and inspection, but it does not update the public site by itself.
+A separate host-level `pvtkrrx.service` runtime exists at `/opt/pvtkrrx` on port `7000`; treat it as a separate runtime unless the reverse proxy is explicitly repointed.
+Any public deploy/change must preserve the active `ENCRYPTION_SECRET` on the runtime that Caddy is actually targeting.
 
 ### Self-Host
 ```bash

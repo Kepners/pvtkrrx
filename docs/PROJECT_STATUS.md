@@ -24,7 +24,8 @@ The practical reading of the project today is:
 - empty movie, TV, and sports catalogs now return a setup-needed placeholder when Prowlarr has no indexers or cannot be reached, instead of showing blank `EmptyContent`
 - the Windows installer/build flow is reproducible again
 - `https://www.pvtkrrx.cc` is the live public relay; `https://pvtkrrx.vercel.app` is currently a dead preview hostname returning Vercel `DEPLOYMENT_NOT_FOUND`
-- the homepage rewrite now exists locally in `public/index.html`, but it still needs a browser pass and deliberate deploy before the live site can be treated as updated
+- the homepage refactor is now live on the canonical host, including the `truth-band` layout and the `Where does playback happen` section
+- the current public route still serves through Contabo Caddy into the Coolify alias `pvtkrrx:3000`; do not treat `/opt/stack/sites/pvtkrrx` or `/opt/pvtkrrx` as the live public path without checking the reverse proxy target first
 - legacy strict `LAN Bridge` tokens remain supported for manual troubleshooting and backwards compatibility, but they are no longer the default synced install path
 - the remaining work is real-device coverage, remote/auth playback sign-off, and performance tuning, not a reset/rebuild
 
@@ -146,7 +147,8 @@ These items are verified in the current workspace or by direct client/log proof:
 - root `/manifest.json` returns the bootstrap manifest (`com.kepners.pvtkrrx.bootstrap`) with no catalogs/resources and `configurationRequired=true`
 - 2026-03-31 public host check: `https://www.pvtkrrx.cc/`, `/configure`, `/runbooks`, `/manifest.json`, and `/health` all returned `200` from the live public host; `/local/install` returned `403` as expected for a local-only helper route
 - 2026-03-31 preview-host check: `https://pvtkrrx.vercel.app/` returned `404` with `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`, so treat it as stale and non-canonical
-- 2026-03-31 homepage cleanup landed locally in `public/index.html`: plain-English hero, requirements section, sports proof section, and removal of the public `/local/install` CTA
+- 2026-04-06 homepage verification against `https://www.pvtkrrx.cc/` confirmed the refactor is now live: `truth-band` and `Where does playback happen` are present, while legacy `meta-grid` and `hero-chip` markers are absent
+- 2026-04-06 Contabo runtime verification showed the public route still enters through Caddy and targets the Coolify alias `pvtkrrx:3000`; the separate `pvtkrrx.service` host runtime at `/opt/pvtkrrx` on `:7000` is not the public route unless Caddy is repointed
 - explicit self-host server mode now exposes `/app-config.json`, disk-backed `/selfhost/config.json` + `/selfhost/manifest.json?mode=hosted`, and `POST /server-config` for persisted VPS/seedbox installs
 - the self-host installer path has now been rebuilt around a dedicated Linux bootstrap script plus a new `npm run server:setup` installer flow that writes a stable `PVTKRRX_RUNTIME_DIR`, generates `AUTH_TOKEN_SECRET`, supports `PVTKRRX_PUBLIC_BASE_URL`, auto-discovers existing Prowlarr/qBittorrent configs when present, automatically hands off to the full bootstrap when those providers are missing, now exposes a hosted launcher at `https://www.pvtkrrx.cc/install-selfhost.sh`, pulls the app source from the branch payload by default with optional tag/manifest pinning and an automatic retry from `main` if a pinned release is too old for `scripts/server-installer.js`, saves the runtime config locally, creates the self-host password file, can install a Linux `systemd` service for auto-start on boot, and now prints the working public PVTKRRX root/configure/bootstrap/manifest URLs explicitly in the installer summary using raw stdout so they are not redacted; the current published self-host release is `v1.12.12-selfhost`
 - `npm run smoke:stremio-link` passed on 2026-03-31 after the new link-session flow was added for hosted token configs: server-created session, install-seen manifest hit, browser AuthKey completion, and final linked install URL/token refresh
@@ -266,7 +268,7 @@ These items should still be treated as open until captured on real clients:
 - remote/auth-protected playback behavior still depends on what the target Stremio client honors during redirect/auth handoff
 - the addon still emits `behaviorHints.sourceContainer = 'rar'` on the experimental native archive path, but official Stremio docs/core do not define that field for archive support
 - if a future Stremio client regresses local archive support, the supported fallback already remains: suppress partial multi-volume archives and only advertise extracted direct-play files
-- the rewritten homepage still needs a browser/device pass before deploy, so mobile/layout regressions are not ruled out yet
+- the homepage refactor is live, but it still needs a real mobile/desktop device pass to rule out layout regressions after deploy
 - route naming is still inconsistent across live surfaces; until copy work is intentionally in scope, users may continue to see both `Hybrid Home` and `LAN Bridge` referring to the same home-device path
 
 ## 2026-03-30 Plan Closure
@@ -312,8 +314,8 @@ These items should still be treated as open until captured on real clients:
 
 ## Recommended Next Work
 
-1. Browser-check the rewritten homepage locally and fix any desktop/mobile layout regressions before deploy.
-2. Deploy the homepage rewrite deliberately so `https://www.pvtkrrx.cc` matches the updated local `public/index.html`.
+1. Browser-check the live homepage on desktop and mobile and fix any regressions now that the refactor is public.
+2. Decide whether Contabo should keep the extra `/opt/pvtkrrx` `systemd` runtime, repoint Caddy to it, or remove it so deploy expectations stop drifting.
 3. Tune qBittorrent for faster early playback and confirm stream start time improvements on real clients.
 4. Keep sports poster/wallpaper review focused on what Stremio clients actually render, not just what the metadata payload contains.
 5. Capture one extra Android TV or Android mobile `LAN Bridge` pass for cross-client parity beyond the now-verified Apple TV path.

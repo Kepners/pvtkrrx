@@ -46,7 +46,7 @@
 | Type | Stremio Addon |
 | Version | 1.1.26 |
 | Repo | github.com/Kepners/pvtkrrx |
-| Hosting | Contabo VPS via Coolify (hosted relay) + Local Windows runtime |
+| Hosting | Contabo VPS via Caddy -> Coolify hosted relay + Local Windows runtime + optional Linux self-host runtime |
 | Framework | stremio-addon-sdk + Express v5 hybrid |
 | License | Source Available |
 

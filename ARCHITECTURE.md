@@ -12,6 +12,8 @@ Updated: 2026-04-06
 
 PVTKRRX is one addon system with a hosted relay, a local runtime, and a Windows desktop wrapper.
 
+Current Contabo note: `www.pvtkrrx.cc` is presently served through Caddy into the Coolify-hosted `pvtkrrx` app container. A separate `/opt/pvtkrrx` `systemd` runtime can exist on the same host for self-host/manual use, but it is not the public route unless Caddy is repointed.
+
 ```text
 Stremio client
    |
@@ -25,7 +27,8 @@ Stremio client
    |                                         - qBit/Prowlarr access
    |
    +-- Hybrid Home / Remote Seedbox ---------> Hosted relay (https://www.pvtkrrx.cc)
-                                             - Caddy front door -> Express app
+                                             - Contabo Caddy -> live Express runtime
+                                             - current public target: Coolify alias pvtkrrx:3000
                                              - hosted manifests/config tokens
                                              - pair heartbeat/status
                                              - Stremio account link

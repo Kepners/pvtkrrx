@@ -11,7 +11,7 @@ If another document disagrees with this file, this file wins unless that documen
 
 PVTKRRX is one codebase with three active runtime pieces:
 
-1. Optional hosted relay on the public site (`https://www.pvtkrrx.cc` today, fronted by Caddy into the Express app):
+1. Optional hosted relay on the public site (`https://www.pvtkrrx.cc` today, fronted by Caddy into the live hosted Express runtime, currently the Contabo Coolify app alias `pvtkrrx:3000`):
    - serves hosted manifests and the hosted configure UI
    - serves `/version-status.json` so the public site can compare the live build against the latest GitHub release
    - encrypts hosted config tokens
@@ -93,6 +93,13 @@ Verified on 2026-03-31:
 - `https://www.pvtkrrx.cc/health` returns health JSON (`200`) or the health page when the client asks for HTML
 - `https://www.pvtkrrx.cc/local/install` returns `403` from the public internet because it is a same-host/local-network helper route
 - `https://pvtkrrx.vercel.app` is not canonical and returned Vercel `DEPLOYMENT_NOT_FOUND`
+- 2026-04-06 homepage verification on the canonical host confirmed the refactored landing page markers are live: `truth-band` and `Where does playback happen` are present, while legacy `meta-grid` and `hero-chip` markers are absent
+
+Contabo runtime note:
+
+- `www.pvtkrrx.cc` currently reaches the Coolify-hosted `pvtkrrx` app container through Caddy.
+- A separate host-level `pvtkrrx.service` runtime can also run from `/opt/pvtkrrx` on port `7000`.
+- Treat those as separate runtimes until the reverse proxy target is deliberately changed.
 
 ## Route Model
 

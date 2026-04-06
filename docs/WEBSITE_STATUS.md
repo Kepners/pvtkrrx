@@ -10,7 +10,7 @@ Before changing homepage or configure wording, read `docs/copy.md` first. That f
 
 ## Public Host Check
 
-Verified directly on 2026-03-31:
+Verified directly on 2026-04-06:
 
 - Canonical public host: `https://www.pvtkrrx.cc`
 - Old preview host: `https://pvtkrrx.vercel.app`
@@ -21,6 +21,11 @@ Verified directly on 2026-03-31:
 - `https://www.pvtkrrx.cc/health` returned `200`
 - `https://www.pvtkrrx.cc/local/install` returned `403`
 - `https://pvtkrrx.vercel.app/` returned `404` with `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`
+- Homepage markers on `https://www.pvtkrrx.cc/` now confirm the refactor is live:
+  - `truth-band` present
+  - `Where does playback happen` present
+  - legacy `meta-grid` absent
+  - legacy `hero-chip` absent
 
 Interpretation:
 
@@ -28,15 +33,19 @@ Interpretation:
 - That claim is true only for the dead `pvtkrrx.vercel.app` preview hostname.
 - `/local/install` returning `403` on the public host is expected because it is a same-host/local-network helper route.
 - The public homepage should stay an entry point, not a route picker; route-specific guidance belongs inside `/configure` and the app.
+- The homepage refactor is now live on the canonical host, not just in the local worktree.
 
 ## Code Check
 
-Verified in the repo before changing anything:
+Verified in the repo and on Contabo before changing anything:
 
 - `index.js` already defines `/configure`, `/:config/configure`, `/runbooks`, `/seedbox-runbooks`, `/health`, `/manifest.json`, `/:config/manifest.json`, `/local/install`, and the hosted self-host launcher route at `/install-selfhost.sh` plus `/install.sh`
 - `vercel.json` still maps `/configure` and `/runbooks`, but the old preview deployment is currently dead
 - `public/index.html` is the current landing page
-- A homepage rewrite was implemented locally on 2026-03-31 in `public/index.html`, but this pass has not deployed or browser-checked it yet
+- Contabo Caddy currently routes `pvtkrrx.cc` / `www.pvtkrrx.cc` to Docker alias `pvtkrrx:3000`
+- Docker alias `pvtkrrx` currently belongs to Coolify container `w14jewmw5ubscrxh8zzfhq7d-160208288034`
+- A separate `pvtkrrx.service` runtime is active on Contabo with `WorkingDirectory=/opt/pvtkrrx` and port `7000`, but it is not the public site path while Caddy still targets the Docker alias
+- `/opt/stack/sites/pvtkrrx` is an on-box mirror/worktree, not the public-serving path by itself
 
 ## Messaging Verdict
 
@@ -62,7 +71,7 @@ Main clarity gaps:
 4. Keep sports as a dedicated section instead of leaving it in the badge strip.
 5. Reduce operator-facing nav noise on the homepage. `Manifest` and `Health` are useful, but they should not compete with the main user journey.
 
-## Implemented In This Pass
+## Implemented And Live
 
 - Main homepage and configure hero headline now reads `PVTKRRX` as live text instead of a generic descriptive headline
 - Hero copy rewritten in plain English around the actual product
@@ -90,14 +99,14 @@ Main clarity gaps:
 
 ## Files To Edit Next
 
-- `public/index.html` for the cloud-homepage cleanup
-- `public/configure.html` only if the rewrite needs small CTA/copy alignment
-- `docs/WEBSITE_STATUS.md` after the homepage pass so the new truth is recorded
+- `public/index.html` for any follow-up homepage polish after device checks
+- `public/configure.html` only if the live homepage changes need CTA/copy alignment
+- Contabo infra docs when the public runtime target changes again
 
 ## Overnight Handoff
 
 - Route audit complete
 - Public host check complete
 - Canonical host vs dead preview host now documented
-- Cloud homepage cleanup now exists locally in `public/index.html`
-- Next pass should browser-check the rewrite locally, then deploy it deliberately
+- Cloud homepage cleanup is live on the canonical host
+- Next pass should browser-check the live homepage on desktop/mobile and keep infra notes aligned if the runtime target changes
