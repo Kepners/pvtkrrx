@@ -73,7 +73,7 @@ The product must always present the app as **three distinct routes**.
 Approved route labels:
 
 * **PC Local**
-* **Hybrid Home**
+* **LAN Bridge**
 * **Remote Seedbox**
 
 These are product-facing labels.
@@ -104,14 +104,14 @@ Recommended copy pattern:
 
 * **PC Local** - use this on the Windows PC that runs PVTKRRX.
 
-### Hybrid Home
+### LAN Bridge
 
 Must mean:
 
 * for the user's other home devices
-* hybrid because the install/setup path and playback resolution path can differ
-* it may use one path or the other depending on availability, not both at once
 * home-device route, not the host-PC route
+* LAN playback at home through the Windows host when that route is online
+* public playback requirements still apply when the user expects away-from-home playback
 
 Must not imply:
 
@@ -120,11 +120,11 @@ Must not imply:
 * that everything is always active at once
 
 Required rule:
-Whenever **Hybrid Home** appears, it should be paired with a plain-English explainer.
+Whenever **LAN Bridge** appears, it should be paired with a plain-English explainer.
 
 Recommended copy pattern:
 
-* **Hybrid Home** - use this for your TV, phone, and other home devices. It uses the home route that best fits what is available.
+* **LAN Bridge** - use this for your TV, phone, and other home devices on the same Stremio account.
 
 ### Remote Seedbox
 
@@ -135,7 +135,7 @@ Must mean:
 
 Must not imply:
 
-* same as Hybrid Home
+* same as LAN Bridge
 * no public endpoint requirement
 * that it works with private local-only infrastructure
 
@@ -319,7 +319,7 @@ If yes, it passes.
 **Routes**
 
 * PC Local = host PC
-* Hybrid Home = other home devices, hybrid home route
+* LAN Bridge = other home devices on the same account, with the Windows host serving the home route
 * Remote Seedbox = public / away-from-home route
 
 If you want, I'll turn this next into a **homepage copy blueprint** with exact section headings and approved one-liners under each.
