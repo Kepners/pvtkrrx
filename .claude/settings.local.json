@@ -52,7 +52,9 @@
       "Bash(done)",
       "Bash(ssh contabo:*)",
       "Bash(grep -E \"\\\\.\\(md|MD\\)$\")",
-      "mcp__playwright__playwright_navigate"
+      "mcp__playwright__playwright_navigate",
+      "Bash(echo \"EXIT: $?\")",
+      "Read(//mnt/c/Users/kepne/OneDrive/Documents/@Projects/contabo-infra/**)"
     ],
     "additionalDirectories": [
       "C:\\Users\\kepne\\AppData\\Local\\Temp\\aws-api-mcp\\workdir"

@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+Disallow: /manifest.json
+Disallow: /health
+Disallow: /file/
+Disallow: /playback/
+Disallow: /stream/
+Disallow: /catalog/
+Disallow: /meta/
+Disallow: /api/
+Disallow: /token/
+Disallow: /lan-pair/
+Disallow: /stremio-link/
+
+Sitemap: https://pvtkrrx.cc/sitemap.xml
