@@ -223,8 +223,9 @@
       transform: translateY(-1px);
     }
 
+    /* ── Hero ── */
     .hero {
-      min-height: 78vh;
+      min-height: 72vh;
       display: flex;
       align-items: center;
       justify-content: center;
@@ -346,7 +347,7 @@
     }
 
     .tagline {
-      margin: 16px auto 20px;
+      margin: 16px auto 22px;
       max-width: 900px;
       color: #c4d5ef;
       font-family: "IBM Plex Mono", monospace;
@@ -377,6 +378,9 @@
       position: relative;
       overflow: hidden;
       transition: all 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
     }
 
     .btn-primary {
@@ -404,48 +408,12 @@
       transform: translateY(-2px);
     }
 
-    .hero-copy {
-      margin: 18px auto 10px;
-      max-width: 860px;
-      color: #ebf3ff;
-      font-size: clamp(18px, 2.5vw, 28px);
-      line-height: 1.42;
-      text-wrap: balance;
-    }
-
-    .hero-support {
-      margin: 0 auto 18px;
-      max-width: 900px;
-      color: #b5c8ea;
-      font-size: clamp(14px, 1.8vw, 18px);
-      line-height: 1.6;
-    }
-
-    .hero-chips {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin: 0 0 18px;
-    }
-
-    .hero-chip {
-      border: 1px solid rgba(0, 246, 255, 0.26);
-      border-radius: 999px;
-      padding: 7px 11px;
-      background: rgba(4, 8, 18, 0.66);
-      color: #cfe2ff;
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 11px;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-    }
-
+    /* ── Sections ── */
     .section-block {
-      margin-top: 12px;
+      margin-top: 32px;
       border: 1px solid var(--line-soft);
       border-radius: 11px;
-      padding: 14px 12px 12px;
+      padding: 20px 16px 18px;
       background:
         radial-gradient(420px 180px at 8% 0%, rgba(0, 246, 255, 0.08), transparent 70%),
         rgba(4, 8, 18, 0.72);
@@ -453,7 +421,7 @@
     }
 
     .section-head {
-      margin-bottom: 12px;
+      margin-bottom: 14px;
     }
 
     .section-kicker {
@@ -467,10 +435,10 @@
 
     .section-title {
       font-family: "Orbitron", sans-serif;
-      font-size: clamp(24px, 4vw, 34px);
+      font-size: clamp(22px, 3.6vw, 32px);
       letter-spacing: 1px;
       color: #f4f8ff;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       text-shadow: 0 0 14px rgba(0, 246, 255, 0.2);
     }
 
@@ -481,80 +449,7 @@
       line-height: 1.58;
     }
 
-    .meta-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 10px;
-      margin-bottom: 12px;
-    }
-
-    .meta-card {
-      border: 1px solid var(--line-soft);
-      border-radius: 11px;
-      padding: 12px;
-      background: rgba(4, 8, 18, 0.7);
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
-      transition: all 0.18s ease;
-    }
-
-    .meta-card:hover {
-      transform: translateY(-2px);
-      border-color: rgba(0, 246, 255, 0.4);
-      box-shadow: 0 0 16px rgba(0, 168, 255, 0.24);
-    }
-
-    .meta-card.release-card {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-
-    .meta-card.release-card.up-to-date {
-      border-color: rgba(0, 255, 102, 0.3);
-      box-shadow: 0 0 16px rgba(0, 255, 102, 0.14);
-    }
-
-    .meta-card.release-card.update-available {
-      border-color: rgba(255, 19, 79, 0.35);
-      box-shadow: 0 0 16px rgba(255, 19, 79, 0.16);
-    }
-
-    .meta-card.release-card.unavailable {
-      border-color: rgba(255, 196, 0, 0.26);
-      box-shadow: 0 0 16px rgba(255, 196, 0, 0.12);
-    }
-
-    .release-status-copy {
-      color: #b9cbe8;
-      font-size: 13px;
-      line-height: 1.45;
-    }
-
-    .release-status-link {
-      display: inline-flex;
-      align-items: center;
-      align-self: flex-start;
-      min-height: 34px;
-      padding: 0 12px;
-      border-radius: 999px;
-      border: 1px solid rgba(0, 246, 255, 0.24);
-      background: rgba(0, 246, 255, 0.07);
-      color: #b9ecff;
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 10px;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      text-decoration: none;
-      transition: all 0.18s ease;
-    }
-
-    .release-status-link:hover {
-      border-color: rgba(255, 0, 212, 0.45);
-      background: rgba(255, 0, 212, 0.08);
-      box-shadow: 0 0 14px rgba(0, 246, 255, 0.18);
-      color: #fff;
-    }
-
+    /* ── Route cards ── */
     .route-grid {
       margin-top: 12px;
       display: grid;
@@ -600,7 +495,7 @@
       color: #c8dafa;
       font-size: 14px;
       line-height: 1.45;
-      min-height: 64px;
+      min-height: 42px;
     }
 
     .route-list {
@@ -621,70 +516,96 @@
       flex-wrap: wrap;
     }
 
-    .meta-title {
-      font-family: "IBM Plex Mono", monospace;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-      font-size: 11px;
-      color: #93cdf2;
-      margin-bottom: 4px;
+    /* ── Need cards ── */
+    .needs-grid {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+      grid-template-columns: repeat(3, 1fr);
     }
 
-    .meta-value {
-      font-family: "Rajdhani", sans-serif;
-      font-weight: 700;
-      font-size: 23px;
-      letter-spacing: 0.5px;
-      color: #f0f7ff;
-      text-shadow: 0 0 12px rgba(0, 246, 255, 0.22);
-    }
-
-    .meta-caption {
-      margin-top: 2px;
-      color: var(--muted);
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 10px;
-      letter-spacing: 0.8px;
-      text-transform: uppercase;
-    }
-
-    .status-strip {
+    .need-card {
       border: 1px solid var(--line-soft);
       border-radius: 11px;
-      padding: 10px 12px;
-      background: rgba(4, 8, 18, 0.72);
+      padding: 14px 12px 12px;
+      background:
+        radial-gradient(360px 180px at 0% 0%, rgba(0, 246, 255, 0.08), transparent 68%),
+        rgba(4, 8, 18, 0.74);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+      transition: all 0.18s ease;
+    }
+
+    .need-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(0, 246, 255, 0.4);
+      box-shadow: 0 0 16px rgba(0, 168, 255, 0.18);
+    }
+
+    .need-name {
+      font-family: "Orbitron", sans-serif;
+      font-size: 18px;
+      letter-spacing: 0.8px;
+      color: #f4f8ff;
+      margin-bottom: 8px;
+    }
+
+    .need-copy {
+      color: #c8dafa;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    .needs-note {
+      margin-top: 10px;
+      padding: 10px 14px;
+      border-left: 2px solid rgba(0, 246, 255, 0.3);
+      color: #9bb2db;
+      font-size: 13px;
+      line-height: 1.5;
+      font-family: "IBM Plex Mono", monospace;
+      letter-spacing: 0.4px;
+    }
+
+    /* ── Product truth band ── */
+    .truth-band {
+      margin-top: 32px;
+      border: 1px solid var(--line-soft);
+      border-radius: 11px;
+      padding: 20px 16px 18px;
+      background:
+        radial-gradient(420px 180px at 8% 0%, rgba(0, 246, 255, 0.06), transparent 70%),
+        rgba(4, 8, 18, 0.68);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+
+    .truth-kicker {
       font-family: "IBM Plex Mono", monospace;
       font-size: 11px;
-      letter-spacing: 1px;
+      letter-spacing: 1.1px;
       text-transform: uppercase;
-      color: #a7c2e8;
-      line-height: 1.45;
-      overflow: hidden;
-      white-space: nowrap;
+      color: #9bdcff;
+      margin-bottom: 10px;
     }
 
-    .status-track {
-      display: inline-block;
-      padding-left: 100%;
-      animation: ticker 18s linear infinite;
+    .truth-text {
+      max-width: 820px;
+      color: #c8dafa;
+      font-size: clamp(15px, 2vw, 17px);
+      line-height: 1.65;
     }
 
-    .needs-grid,
+    .truth-text strong {
+      color: #e8f2ff;
+    }
+
+    /* ── Sports ── */
     .sports-grid {
       display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
       gap: 10px;
       margin-top: 12px;
     }
 
-    .needs-grid {
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    }
-
-    .sports-grid {
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-    }
-
-    .need-card,
     .sports-card {
       border: 1px solid var(--line-soft);
       border-radius: 11px;
@@ -696,14 +617,12 @@
       transition: all 0.18s ease;
     }
 
-    .need-card:hover,
     .sports-card:hover {
       transform: translateY(-2px);
       border-color: rgba(0, 246, 255, 0.4);
       box-shadow: 0 0 16px rgba(0, 168, 255, 0.18);
     }
 
-    .need-name,
     .sports-title {
       font-family: "Orbitron", sans-serif;
       font-size: 18px;
@@ -712,36 +631,18 @@
       margin-bottom: 8px;
     }
 
-    .need-copy,
     .sports-card p {
       color: #c8dafa;
       font-size: 14px;
       line-height: 1.5;
     }
 
-    .footer-links {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-    }
-
-    footer a {
-      color: #bfd6ff;
-      text-decoration: none;
-      border-bottom: 1px solid rgba(0, 246, 255, 0.28);
-      transition: color 0.18s ease, border-color 0.18s ease;
-    }
-
-    footer a:hover {
-      color: #fff;
-      border-color: rgba(255, 0, 212, 0.48);
-    }
-
+    /* ── FAQ ── */
     .faq-section {
-      margin-top: 12px;
+      margin-top: 32px;
       border: 1px solid var(--line-soft);
       border-radius: 11px;
-      padding: 14px 12px 12px;
+      padding: 20px 16px 18px;
       background:
         radial-gradient(420px 180px at 8% 0%, rgba(0, 246, 255, 0.08), transparent 70%),
         rgba(4, 8, 18, 0.72);
@@ -754,13 +655,6 @@
       letter-spacing: 1.1px;
       text-transform: uppercase;
       color: #9bdcff;
-      margin-bottom: 4px;
-    }
-
-    .faq-lead {
-      color: #b2c4e5;
-      font-family: "Rajdhani", sans-serif;
-      font-size: 15px;
       margin-bottom: 10px;
     }
 
@@ -834,23 +728,16 @@
       border: 1px solid rgba(0, 246, 255, 0.2);
     }
 
-    .faq-answer ul {
-      margin-top: 6px;
-      padding-left: 18px;
-    }
-
-    .faq-answer li + li {
-      margin-top: 4px;
-    }
-
+    /* ── Footer ── */
     footer {
-      margin-top: 12px;
+      margin-top: 32px;
       border-top: 1px solid rgba(0, 246, 255, 0.18);
-      padding-top: 14px;
+      padding-top: 16px;
       display: flex;
       justify-content: space-between;
+      align-items: center;
       flex-wrap: wrap;
-      gap: 8px;
+      gap: 10px;
       color: #8ea8cf;
       font-family: "IBM Plex Mono", monospace;
       font-size: 10px;
@@ -858,6 +745,61 @@
       text-transform: uppercase;
     }
 
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    footer a {
+      color: #bfd6ff;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(0, 246, 255, 0.28);
+      transition: color 0.18s ease, border-color 0.18s ease;
+    }
+
+    footer a:hover {
+      color: #fff;
+      border-color: rgba(255, 0, 212, 0.48);
+    }
+
+    .footer-release {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      color: #7a96be;
+      font-size: 10px;
+    }
+
+    .footer-release-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      flex: 0 0 auto;
+      background: #7a96be;
+      transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .footer-release-dot.up-to-date {
+      background: var(--green);
+      box-shadow: 0 0 8px rgba(0, 255, 102, 0.5);
+    }
+
+    .footer-release-dot.update-available {
+      background: var(--red);
+      box-shadow: 0 0 8px rgba(255, 19, 79, 0.5);
+    }
+
+    .footer-release a {
+      color: inherit;
+      border-bottom-color: rgba(0, 246, 255, 0.18);
+    }
+
+    .footer-release a:hover {
+      color: #fff;
+    }
+
+    /* ── Glitch burst ── */
     body.glitch-burst .glitch-flash {
       opacity: 1;
     }
@@ -871,6 +813,7 @@
       transform: translateX(2px);
     }
 
+    /* ── Keyframes ── */
     @keyframes vortex-spin-a {
       0% { transform: translate(-50%, -50%) rotate(0deg) scale(0.92); }
       100% { transform: translate(-50%, -50%) rotate(360deg) scale(1.08); }
@@ -973,13 +916,8 @@
       81% { opacity: 0.95; }
     }
 
-    @keyframes ticker {
-      0% { transform: translateX(0); }
-      100% { transform: translateX(-100%); }
-    }
-
+    /* ── Responsive ── */
     @media (max-width: 1000px) {
-      .meta-grid,
       .needs-grid,
       .sports-grid {
         grid-template-columns: 1fr;
@@ -990,7 +928,7 @@
       }
 
       .hero {
-        min-height: 70vh;
+        min-height: 66vh;
       }
     }
 
@@ -1016,20 +954,16 @@
         max-width: 96%;
       }
 
-      .hero-copy {
-        font-size: 18px;
-      }
-
-      .hero-support {
-        font-size: 15px;
-      }
-
       .cta-row {
         flex-direction: column;
       }
 
       .btn {
         width: 100%;
+      }
+
+      .needs-grid {
+        grid-template-columns: 1fr;
       }
     }
 
@@ -1072,9 +1006,9 @@
         <div class="brand-text">PVTKRRX / Private Tracker Bridge</div>
       </div>
       <nav class="nav">
-        <a href="/configure">Configure First</a>
+        <a href="/configure">Configure</a>
         <a href="#routes">Routes</a>
-        <a href="#requirements">What You Need</a>
+        <a href="#requirements">Requirements</a>
         <a href="#sports">Sports</a>
         <a href="/runbooks">Runbooks</a>
         <a href="#faq">FAQ</a>
@@ -1083,78 +1017,73 @@
 
     <section class="hero">
       <div class="hero-core">
-        <p class="kicker">Private Trackers To Stremio / Configure First / No Debrid</p>
+        <p class="kicker">Private Tracker Bridge For Stremio</p>
         <div class="logo-frame">
           <h1 class="logo" data-text="PVTKRRX"><span>PVTKRRX</span></h1>
         </div>
         <div class="logo-grid"></div>
         <p class="tagline">
-          PRIVATE TRACKERS IN STREMIO, THROUGH YOUR OWN STACK.
+          Your Prowlarr + qBittorrent stack, inside Stremio.
         </p>
-        <p class="hero-copy">
-          PVTKRRX is the bridge between your own <strong>Prowlarr</strong> + <strong>qBittorrent</strong>
-          setup and <strong>Stremio</strong>. Configure first, choose the route that matches where playback
-          happens, then browse <strong>sports</strong>, <strong>movies</strong>, <strong>TV</strong>, and your
-          <strong>library</strong> in one addon family.
-        </p>
-        <p class="hero-support">
-          It does not host media, replace your infrastructure, or give one universal install route.
-          PC Local is same-PC only. LAN Bridge is for your other home devices. Remote Seedbox is for public playback endpoints.
-        </p>
-        <div class="hero-chips" aria-label="Key features">
-          <span class="hero-chip">PC Local</span>
-          <span class="hero-chip">LAN Bridge</span>
-          <span class="hero-chip">Remote Seedbox</span>
-          <span class="hero-chip">Sports + Movies + TV + Library</span>
-          <span class="hero-chip">No Debrid</span>
-          <span class="hero-chip">No Media Host</span>
-          <span class="hero-chip">Configure First</span>
-        </div>
         <div class="cta-row">
           <a class="btn btn-primary" href="/configure">Configure First</a>
           <a class="btn btn-secondary" href="#routes">Choose Your Route</a>
-          <a class="btn btn-secondary" href="/runbooks">Open Runbooks</a>
         </div>
       </div>
     </section>
 
-    <section class="meta-grid">
-      <article class="meta-card">
-        <div class="meta-title">What It Is</div>
-        <div class="meta-value">Private Tracker Bridge</div>
-        <div class="meta-caption">Your stack into Stremio</div>
-      </article>
-      <article class="meta-card">
-        <div class="meta-title">Who It Is For</div>
-        <div class="meta-value">Prowlarr + qBit Operators</div>
-        <div class="meta-caption">Built for serious self-host and seedbox setups</div>
-      </article>
-      <article class="meta-card">
-        <div class="meta-title">Route Model</div>
-        <div class="meta-value">PC / LAN / Remote</div>
-        <div class="meta-caption">Pick the route that matches where playback happens</div>
-      </article>
-      <article class="meta-card">
-        <div class="meta-title">Does Not Do</div>
-        <div class="meta-value">No Debrid / No Media Host</div>
-        <div class="meta-caption">PVTKRRX is not the streaming service</div>
-      </article>
-      <article class="meta-card release-card unavailable" id="siteReleaseCard">
-        <div class="meta-title">Release</div>
-        <div class="meta-value" id="siteReleaseValue">Checking GitHub...</div>
-        <div class="meta-caption" id="siteReleaseCaption">Comparing the live site against the latest public release.</div>
-        <div class="release-status-copy" id="siteReleaseCopy">The hosted site and Windows EXE both read the same release source.</div>
-        <a class="release-status-link" id="siteReleaseLink" href="https://github.com/Kepners/pvtkrrx/releases" target="_blank" rel="noopener noreferrer">Open Release Page</a>
-      </article>
+    <section class="section-block" id="routes">
+      <div class="section-head">
+        <div class="section-kicker">Choose Your Route</div>
+        <h2 class="section-title">Where does playback happen?</h2>
+      </div>
+
+      <div class="route-grid">
+        <article class="route-card">
+          <div class="route-kicker">Host PC</div>
+          <div class="route-name">PC Local</div>
+          <p class="route-copy">Use this on the Windows PC that runs PVTKRRX.</p>
+          <ul class="route-list">
+            <li>Same-PC only through 127.0.0.1.</li>
+            <li>For when playback happens on the host machine itself.</li>
+          </ul>
+          <div class="route-actions">
+            <a class="btn btn-primary" href="/configure?target=pc">Configure PC Local</a>
+          </div>
+        </article>
+
+        <article class="route-card">
+          <div class="route-kicker">Home Devices</div>
+          <div class="route-name">LAN Bridge</div>
+          <p class="route-copy">Use this for your TV, phone, and other home devices on the same Stremio account.</p>
+          <ul class="route-list">
+            <li>The Windows host must stay online and heartbeating.</li>
+            <li>Away-from-home playback still needs a public endpoint.</li>
+          </ul>
+          <div class="route-actions">
+            <a class="btn btn-primary" href="/configure?target=lan">Configure LAN Bridge</a>
+          </div>
+        </article>
+
+        <article class="route-card">
+          <div class="route-kicker">Public Playback</div>
+          <div class="route-name">Remote Seedbox</div>
+          <p class="route-copy">Use this when playback needs to work away from home through public endpoints.</p>
+          <ul class="route-list">
+            <li>Public HTTPS endpoints required for playback.</li>
+            <li>Built for seedbox operators with real public paths.</li>
+          </ul>
+          <div class="route-actions">
+            <a class="btn btn-primary" href="/configure?target=seedbox">Configure Remote Seedbox</a>
+          </div>
+        </article>
+      </div>
     </section>
 
     <section class="section-block" id="requirements">
       <div class="section-head">
         <div class="section-kicker">What You Need</div>
-        <h2 class="section-title">You bring the infrastructure, PVTKRRX connects it</h2>
-        <p class="section-copy">
-          If you already run your own private tracker stack, the addon connects the pieces you have to Stremio. Here is what it expects.
-        </p>
+        <h2 class="section-title">You bring the infrastructure</h2>
       </div>
 
       <div class="needs-grid">
@@ -1170,94 +1099,21 @@
           <div class="need-name">Stremio</div>
           <p class="need-copy">Configure first, then install the route that matches the device you want to use.</p>
         </article>
-        <article class="need-card">
-          <div class="need-name">Windows Host</div>
-          <p class="need-copy">Required for PC Local and for LAN Bridge while your home route stays online.</p>
-        </article>
-        <article class="need-card">
-          <div class="need-name">Public HTTPS Playback</div>
-          <p class="need-copy">Needed when playback must work away from home through LAN Bridge fallback or Remote Seedbox.</p>
-        </article>
+      </div>
+      <div class="needs-note">
+        Windows host required for PC Local and LAN Bridge. Public HTTPS endpoints required for Remote Seedbox.
       </div>
     </section>
 
-    <section class="section-block" id="routes">
-      <div class="section-head">
-        <div class="section-kicker">Choose Your Route</div>
-        <h2 class="section-title">Pick the route that matches where playback happens</h2>
-        <p class="section-copy">
-          Configure first. Then install the route that matches the device and network path you actually need.
-        </p>
-      </div>
-
-      <div class="route-grid">
-        <article class="route-card">
-          <div class="route-kicker">Host PC</div>
-          <div class="route-name">PC Local</div>
-          <p class="route-copy">Use this on the Windows PC that runs PVTKRRX.</p>
-          <ul class="route-list">
-            <li>Constraint: same-PC only through 127.0.0.1.</li>
-            <li>Use this when playback happens on the host machine itself.</li>
-            <li>Best fit for direct local browsing, queueing, and playback.</li>
-          </ul>
-          <div class="route-actions">
-            <a class="btn btn-primary" href="/configure?target=pc">Configure PC Local</a>
-          </div>
-        </article>
-
-        <article class="route-card">
-          <div class="route-kicker">Home Devices</div>
-          <div class="route-name">LAN Bridge</div>
-          <p class="route-copy">Use this for your TV, phone, web, and other home devices on the same Stremio account.</p>
-          <ul class="route-list">
-            <li>Constraint: the Windows host must stay online and heartbeating.</li>
-            <li>Use this when the host PC serves playback at home and other devices sync through the same account.</li>
-            <li>Away-from-home playback still needs a public file server endpoint.</li>
-          </ul>
-          <div class="route-actions">
-            <a class="btn btn-primary" href="/configure?target=lan">Configure LAN Bridge</a>
-          </div>
-        </article>
-
-        <article class="route-card">
-          <div class="route-kicker">Public Playback</div>
-          <div class="route-name">Remote Seedbox</div>
-          <p class="route-copy">Use this when playback needs to work away from home through public endpoints.</p>
-          <ul class="route-list">
-            <li>Constraint: public HTTPS endpoints are required for playback-capable services.</li>
-            <li>Use this when the home PC is not the playback bridge.</li>
-            <li>Built for seedbox operators with real public playback paths.</li>
-          </ul>
-          <div class="route-actions">
-            <a class="btn btn-primary" href="/configure?target=seedbox">Configure Remote Seedbox</a>
-          </div>
-        </article>
-      </div>
-    </section>
-
-    <section class="section-block" id="boundaries">
-      <div class="section-head">
-        <div class="section-kicker">What It Is Not</div>
-        <h2 class="section-title">The product truth stays blunt</h2>
-        <p class="section-copy">
-          PVTKRRX is a bridge layer between your own setup and Stremio. If a line makes it sound like the media provider, that line is wrong.
-        </p>
-      </div>
-
-      <div class="needs-grid">
-        <article class="need-card">
-          <div class="need-name">Not A Debrid Service</div>
-          <p class="need-copy">PVTKRRX does not replace your tracker and torrent stack. It uses the one you already run.</p>
-        </article>
-        <article class="need-card">
-          <div class="need-name">Not A Media Host</div>
-          <p class="need-copy">PVTKRRX does not become the video host. Your playback path still depends on your own machine or public endpoints.</p>
-        </article>
-        <article class="need-card">
-          <div class="need-name">Not One Universal Install</div>
-          <p class="need-copy">PC Local, LAN Bridge, and Remote Seedbox do different jobs. Devices do not all work the same way.</p>
-        </article>
-      </div>
+    <section class="truth-band" id="boundaries">
+      <div class="truth-kicker">What It Is — And What It Isn't</div>
+      <p class="truth-text">
+        PVTKRRX is a <strong>private tracker bridge</strong>. It connects your Prowlarr and
+        qBittorrent stack to Stremio. It is <strong>not a debrid service</strong>,
+        <strong>not a media host</strong>, and not one universal install.
+        Each route works differently because each setup is different.
+        Built for operators who already run their own stack.
+      </p>
     </section>
 
     <section class="section-block" id="sports">
@@ -1265,48 +1121,25 @@
         <div class="section-kicker">Sports Support</div>
         <h2 class="section-title">Sports is a first-class catalog</h2>
         <p class="section-copy">
-          If your trackers carry sports releases, PVTKRRX surfaces them in Stremio alongside movies, TV, and your library — with artwork and metadata where available.
+          If your trackers carry sports releases, PVTKRRX surfaces them in Stremio alongside movies, TV, and your library.
         </p>
       </div>
 
       <div class="sports-grid">
         <article class="sports-card">
-          <div class="sports-title">Sports In Stremio</div>
-          <p>Sports has its own top-level catalog in Stremio with genre filtering, not a tag buried in another category.</p>
-        </article>
-        <article class="sports-card">
-          <div class="sports-title">Tracker-Driven Results</div>
-          <p>Results only appear from the tracker side you already control, keeping the product honest about what your setup can actually play.</p>
+          <div class="sports-title">Sports Catalog</div>
+          <p>Sports has its own top-level catalog in Stremio with genre filtering. Results come from the tracker side you already control — not a separate service.</p>
         </article>
         <article class="sports-card">
           <div class="sports-title">Artwork + Metadata</div>
-          <p>Sports metadata can carry posters, landscape art, background art, and logos so the Stremio surface feels like a real catalog, not a dump of filenames.</p>
+          <p>Sports metadata carries posters, landscape art, and logos so the Stremio surface feels like a real catalog. Already-downloaded files sit alongside new releases in one addon family.</p>
         </article>
-        <article class="sports-card">
-          <div class="sports-title">Library Next To New Releases</div>
-          <p>Already-downloaded files, sports releases, movies, and TV all live inside the same addon surface instead of being split into separate tools.</p>
-        </article>
-      </div>
-    </section>
-
-    <section class="status-strip">
-      <div class="status-track">
-        [PRIVATE TRACKERS INTO STREMIO] [PC LOCAL] [LAN BRIDGE] [REMOTE SEEDBOX] [SPORTS + MOVIES + TV + LIBRARY] [NO DEBRID] [NO MEDIA HOST] [CONFIGURE FIRST]
       </div>
     </section>
 
     <section class="faq-section" id="faq">
       <div class="faq-title">Quick Answers</div>
-      <p class="faq-lead">The high-signal questions new users need answered before they click into configure.</p>
       <div class="faq-list">
-        <details class="faq-item" open>
-          <summary>What is PVTKRRX?</summary>
-          <div class="faq-answer">
-            It is the bridge between your own private tracker setup and Stremio.
-            You bring Prowlarr, qBittorrent, and the playback path. PVTKRRX handles the addon side so sports, movies, TV, and library show up in one place.
-          </div>
-        </details>
-
         <details class="faq-item">
           <summary>What do I need before I start?</summary>
           <div class="faq-answer">
@@ -1331,21 +1164,20 @@
             It does not replace your own infrastructure. The playback path still comes from your own host machine, seedbox, or public file server endpoints.
           </div>
         </details>
-
-        <details class="faq-item">
-          <summary>Where do sports fit?</summary>
-          <div class="faq-answer">
-            Sports is a top-level part of the addon family, not an afterthought.
-            If your trackers carry sports releases, PVTKRRX can surface them in Stremio with enrichment where available - but it is still private tracker sports in your own stack, not a live sports service.
-          </div>
-        </details>
       </div>
     </section>
 
     <footer>
-      <span>PVTKRRX / Private Tracker Bridge / Source Available</span>
+      <div>
+        <span>PVTKRRX / Private Tracker Bridge / Source Available</span>
+      </div>
+      <div class="footer-release" id="footerRelease">
+        <span class="footer-release-dot" id="footerReleaseDot"></span>
+        <span id="footerReleaseText">Checking release...</span>
+        <a id="footerReleaseLink" href="https://github.com/Kepners/pvtkrrx/releases" target="_blank" rel="noopener noreferrer">Releases</a>
+      </div>
       <div class="footer-links">
-        <a href="/configure">Configure First</a>
+        <a href="/configure">Configure</a>
         <a href="/runbooks">Runbooks</a>
         <a href="/manifest.json">Manifest</a>
         <a href="/health">Health</a>
@@ -1356,11 +1188,6 @@
   <script>
     const particles = document.querySelector('.particles');
     const hueSet = [190, 203, 136, 345, 302];
-    const siteReleaseState = {
-      key: '',
-      currentVersion: '',
-      latestVersion: ''
-    };
 
     for (let i = 0; i < 46; i += 1) {
       const node = document.createElement('span');
@@ -1380,59 +1207,46 @@
       particles.appendChild(node);
     }
 
-    function renderSiteReleaseStatus(data) {
-      const card = document.getElementById('siteReleaseCard');
-      const value = document.getElementById('siteReleaseValue');
-      const caption = document.getElementById('siteReleaseCaption');
-      const copy = document.getElementById('siteReleaseCopy');
-      const link = document.getElementById('siteReleaseLink');
-      if (!card || !value || !caption || !copy || !link) return;
+    function renderFooterRelease(data) {
+      const dot = document.getElementById('footerReleaseDot');
+      const text = document.getElementById('footerReleaseText');
+      const link = document.getElementById('footerReleaseLink');
+      if (!dot || !text || !link) return;
 
-      const currentVersion = String(data && data.currentVersion ? data.currentVersion : siteReleaseState.currentVersion || '0.0.0').trim() || '0.0.0';
+      const currentVersion = String(data && data.currentVersion ? data.currentVersion : '0.0.0').trim() || '0.0.0';
       const latestVersion = String(data && data.latestVersion ? data.latestVersion : currentVersion).trim() || currentVersion;
       const status = String(data && data.status ? data.status : 'unavailable').trim() || 'unavailable';
       const updateAvailable = Boolean(data && data.updateAvailable);
       const latestReleaseUrl = String(data && data.latestReleaseUrl ? data.latestReleaseUrl : 'https://github.com/Kepners/pvtkrrx/releases').trim();
-      const message = String(data && data.message ? data.message : '').trim();
-      const key = [currentVersion, latestVersion, status, latestReleaseUrl, message, updateAvailable].join('|');
-      if (key === siteReleaseState.key) return;
-      siteReleaseState.key = key;
-      siteReleaseState.currentVersion = currentVersion;
-      siteReleaseState.latestVersion = latestVersion;
 
-      card.className = `meta-card release-card ${status}`.trim();
-      value.textContent = message || (updateAvailable ? 'Update available' : (status === 'up-to-date' ? 'Up to date' : 'Release check unavailable'));
-      caption.textContent = updateAvailable
-        ? `Current v${currentVersion} · Latest v${latestVersion}`
-        : (status === 'up-to-date'
-          ? `Current v${currentVersion} · Latest v${latestVersion}`
-          : `Current v${currentVersion} · Release check unavailable`);
-      copy.textContent = updateAvailable
-        ? 'Download the latest public release or review the notes before opening the desktop build.'
-        : (status === 'up-to-date'
-          ? 'The hosted site and Windows EXE are on the same public release.'
-          : (String(data && data.error ? data.error : '').trim() || 'GitHub release check is temporarily unavailable.'));
+      dot.className = 'footer-release-dot ' + status;
+
+      if (updateAvailable) {
+        text.textContent = `v${currentVersion} · Update available (v${latestVersion})`;
+        link.textContent = 'Get update';
+      } else if (status === 'up-to-date') {
+        text.textContent = `v${currentVersion} · Up to date`;
+        link.textContent = 'Releases';
+      } else {
+        text.textContent = `v${currentVersion}`;
+        link.textContent = 'Releases';
+      }
       link.href = latestReleaseUrl;
-      link.textContent = updateAvailable ? 'Open Latest Release' : 'Open Release Page';
     }
 
-    async function refreshSiteReleaseStatus() {
+    async function refreshReleaseStatus() {
       try {
         const response = await fetch('/version-status.json', {
           cache: 'no-store',
-          headers: {
-            'Accept': 'application/json'
-          }
+          headers: { 'Accept': 'application/json' }
         });
         const data = await response.json();
-        renderSiteReleaseStatus(data || {});
+        renderFooterRelease(data || {});
       } catch (err) {
-        renderSiteReleaseStatus({
+        renderFooterRelease({
           status: 'unavailable',
-          message: 'Release check unavailable',
-          error: err && err.message ? err.message : 'Failed to load release status',
-          currentVersion: siteReleaseState.currentVersion || '0.0.0',
-          latestVersion: siteReleaseState.latestVersion || siteReleaseState.currentVersion || '0.0.0',
+          currentVersion: '0.0.0',
+          latestVersion: '0.0.0',
           latestReleaseUrl: 'https://github.com/Kepners/pvtkrrx/releases',
           updateAvailable: false
         });
@@ -1452,8 +1266,8 @@
 
     scheduleBurst();
     document.addEventListener('DOMContentLoaded', () => {
-      refreshSiteReleaseStatus();
-      setInterval(refreshSiteReleaseStatus, 600000);
+      refreshReleaseStatus();
+      setInterval(refreshReleaseStatus, 600000);
     });
   </script>
 </body>
