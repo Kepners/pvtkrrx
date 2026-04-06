@@ -1,6 +1,6 @@
 # Stremio Install Protocol Tracker (Truth Table)
 
-Updated: 2026-04-04
+Updated: 2026-04-06
 
 ## Why this file exists
 
@@ -137,6 +137,6 @@ Get-Content "$env:APPDATA\PVTKRRX\runtime\logs\desktop-$(Get-Date -Format yyyy-M
 
 ## Remaining Sign-Off Blockers
 
-1. One extra Android TV or Android mobile `Hybrid Home` browse/play pass using the latest `1.1.25` desktop build for cross-client parity.
+1. One extra Android TV or Android mobile `Hybrid Home` browse/play pass using the latest `1.1.26` desktop build for cross-client parity.
 2. One real public `Remote Seedbox` playback success.
 3. One auth-protected external file-server playback success on a real client.

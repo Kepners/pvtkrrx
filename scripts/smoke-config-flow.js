@@ -661,7 +661,7 @@ async function run() {
     const tokenConfigureRes = await fetch(`${base}/${token}/configure`)
     assert.equal(tokenConfigureRes.status, 200, 'GET /:token/configure should return 200')
     const tokenConfigureHtml = await tokenConfigureRes.text()
-    assert.match(tokenConfigureHtml, /Connect your private tracker seedbox to Stremio/)
+    assert.match(tokenConfigureHtml, /Connect your private tracker setup to Stremio/)
     assert.match(tokenConfigureHtml, /maybePrefillFromToken/, 'token configure page should include prefill loader')
 
     const tokenConfigRes = await fetch(`${base}/${token}/config.json`)
