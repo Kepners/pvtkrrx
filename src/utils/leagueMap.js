@@ -69,13 +69,6 @@ const LEAGUE_MAP = Object.freeze({
     sportsDbSport: 'Fighting',
     aliases: ['Ultimate Fighting Championship']
   },
-  bellator: {
-    name: 'Bellator',
-    idLeague: '4467',
-    sportKey: 'mma',
-    sportsDbSport: 'Fighting',
-    aliases: ['Bellator Fighting Championships', 'Bellator MMA']
-  },
   pfl: {
     name: 'PFL',
     idLeague: '5430',
@@ -96,13 +89,6 @@ const LEAGUE_MAP = Object.freeze({
     sportKey: 'boxing',
     sportsDbSport: 'Fighting',
     aliases: ['Boxing']
-  },
-  toprank: {
-    name: 'Top Rank',
-    idLeague: '4875',
-    sportKey: 'boxing',
-    sportsDbSport: 'Fighting',
-    aliases: ['Top Rank Boxing']
   },
   bkfc: {
     name: 'BKFC',

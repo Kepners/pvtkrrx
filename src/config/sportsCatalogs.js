@@ -24,8 +24,8 @@ const SPORTS_DISCOVERY_CATALOGS = Object.freeze([
     id: 'pvtkrrx-sports-mma',
     name: 'MMA',
     sportHint: 'mma',
-    detailOptions: ['UFC', 'Bellator', 'PFL', 'ONE Championship', 'Fight Night'],
-    seedTerms: ['UFC', 'Bellator', 'PFL']
+    detailOptions: ['UFC', 'PFL', 'ONE Championship', 'Cage Warriors', 'Fight Night'],
+    seedTerms: ['UFC', 'PFL', 'ONE Championship']
   },
   {
     id: 'pvtkrrx-sports-american-football',
@@ -66,8 +66,8 @@ const SPORTS_DISCOVERY_CATALOGS = Object.freeze([
     id: 'pvtkrrx-sports-boxing',
     name: 'Boxing',
     sportHint: 'boxing',
-    detailOptions: ['Heavyweight', 'PPV', 'Matchroom', 'Top Rank', 'Queensberry'],
-    seedTerms: ['Boxing', 'Heavyweight']
+    detailOptions: ['Heavyweight', 'PPV', 'Matchroom', 'BKFC', 'Queensberry'],
+    seedTerms: ['Boxing', 'BKFC']
   },
   {
     id: 'pvtkrrx-sports-golf',
