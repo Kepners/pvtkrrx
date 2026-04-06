@@ -96,6 +96,10 @@
 | Accent | `#FFD8BE` | Peach | Highlights, accents |
 | Surface | `#F8F7FF` | Ghost White | Editor background, text surfaces |
 
+## Website Copy Rule
+
+- Before editing homepage, configure, docs, runbooks, or any other public-facing website copy, read `docs/copy.md` first and keep it as the governing wording spec.
+
 ---
 
 ## Development

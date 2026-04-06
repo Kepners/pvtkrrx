@@ -1,11 +1,12 @@
 # PVTKRRX Website Status
 
-Updated: 2026-04-02
+Updated: 2026-04-06
 
 ## Purpose
 
 This file tracks the current public-site truth table plus the active homepage/content backlog.
 Use it as the handoff note for website work instead of relying on chat history.
+Before changing homepage or configure wording, read `docs/copy.md` first. That file is the governing copy spec for public-facing language.
 
 ## Public Host Check
 

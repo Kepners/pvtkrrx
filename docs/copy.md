@@ -1,3 +1,5 @@
+**copy/spec rule list**
+
 # PVTKRRX Copy Specification Rules
 
 ## 1. Core product truth
@@ -100,7 +102,7 @@ Must not imply:
 
 Recommended copy pattern:
 
-* **PC Local** — use this on the Windows PC that runs PVTKRRX.
+* **PC Local** - use this on the Windows PC that runs PVTKRRX.
 
 ### Hybrid Home
 
@@ -122,7 +124,7 @@ Whenever **Hybrid Home** appears, it should be paired with a plain-English expla
 
 Recommended copy pattern:
 
-* **Hybrid Home** — use this for your TV, phone, and other home devices. It uses the home route that best fits what is available.
+* **Hybrid Home** - use this for your TV, phone, and other home devices. It uses the home route that best fits what is available.
 
 ### Remote Seedbox
 
@@ -139,7 +141,7 @@ Must not imply:
 
 Recommended copy pattern:
 
-* **Remote Seedbox** — use this when playback needs to work away from home through public endpoints.
+* **Remote Seedbox** - use this when playback needs to work away from home through public endpoints.
 
 ## 8. Honesty about limitations
 
@@ -319,3 +321,5 @@ If yes, it passes.
 * PC Local = host PC
 * Hybrid Home = other home devices, hybrid home route
 * Remote Seedbox = public / away-from-home route
+
+If you want, I'll turn this next into a **homepage copy blueprint** with exact section headings and approved one-liners under each.
