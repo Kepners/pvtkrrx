@@ -3,8 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PVTKRRX | Configure</title>
-  <meta name="description" content="Configure PVTKRRX to bring private trackers and seedbox content into Stremio through PC Local, LAN Bridge, or Remote Seedbox.">
+  <title>Configure PVTKRRX | Private Tracker Addon Setup for Stremio</title>
+  <meta name="description" content="Configure your private tracker seedbox for Stremio. Set up Prowlarr and qBittorrent connections, choose your install route, and start streaming. Your hardware, your trackers. No debrid.">
+  <link rel="canonical" href="https://pvtkrrx.cc/configure">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://pvtkrrx.cc/configure">
+  <meta property="og:title" content="Configure PVTKRRX — Private Tracker Seedbox to Stremio Setup">
+  <meta property="og:description" content="Set up your Prowlarr and qBittorrent stack for Stremio. Choose your install route and start streaming. Your hardware, your trackers. No debrid.">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Configure PVTKRRX — Private Tracker Seedbox to Stremio Setup">
+  <meta name="twitter:description" content="Set up your Prowlarr and qBittorrent stack for Stremio. Choose your install route and start streaming. Your hardware, your trackers. No debrid.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@500;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -30,6 +38,18 @@
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
 
     body {
       font-family: 'Rajdhani', sans-serif;
@@ -1955,10 +1975,10 @@
 
     <div class="logo-header">
       <div class="logo-frame">
-        <h1 class="logo-title" data-text="PVTKRRX"><span>PVTKRRX</span></h1>
+        <h1 class="logo-title" data-text="PVTKRRX"><span>PVTKRRX</span><span class="sr-only"> — Configure Your Private Tracker Bridge to Stremio</span></h1>
       </div>
       <div class="logo-grid" aria-hidden="true"></div>
-      <p class="subtitle">Configure the bridge between your own stack and Stremio</p>
+      <p class="subtitle">Your hardware, your trackers — configure the bridge to Stremio</p>
     </div>
 
     <div class="card setup-reality" id="setupRealityCard" style="display:none;">
@@ -1971,7 +1991,7 @@
         <section class="setup-guide-card" id="setupRealityWindowsCard">
           <div class="setup-guide-kicker">Option 1</div>
           <h3>Windows Host</h3>
-          <p class="setup-guide-copy">Use this when the Windows machine is the playback bridge. This is where <strong>PC Local</strong> and the home-device route are configured.</p>
+          <p class="setup-guide-copy">Use this when the Windows machine is the playback bridge. This is where <strong>PC Local</strong> and <strong>LAN Bridge</strong> are configured.</p>
           <div class="setup-visual">
             <div class="setup-visual-bar">
               <span></span><span></span><span></span>
@@ -2413,7 +2433,7 @@
             <div class="url-row">
               <button class="btn-copy" id="copyLocalInstallBtn" onclick="copyPrivateLink('localLoopback', this)">Copy PC Local URL</button>
             </div>
-            <p class="install-note" id="openLinkNote">Install this in Stremio Desktop on this same Windows PC when you want PVTKRRX to appear as a real local addon source for movies, TV, sports, and library.</p>
+            <p class="install-note" id="openLinkNote">PC Local is the real same-PC addon for movies, TV, sports, and library. Install this in Stremio Desktop on this same Windows PC.</p>
           </div>
 
           <div id="installPanelLan" class="install-target-panel">
