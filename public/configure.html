@@ -516,6 +516,219 @@
       letter-spacing: 0.5px;
     }
 
+    .setup-reality {
+      overflow: hidden;
+    }
+
+    .setup-reality::after {
+      content: '';
+      position: absolute;
+      inset: auto 0 0 0;
+      height: 110px;
+      background: radial-gradient(70% 120% at 50% 100%, rgba(0, 246, 255, 0.12), transparent 70%);
+      pointer-events: none;
+    }
+
+    .setup-reality-head {
+      position: relative;
+      z-index: 1;
+      margin-bottom: 1rem;
+    }
+
+    .setup-reality-kicker {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 1.3px;
+      color: #8fe8ff;
+      margin-bottom: 0.5rem;
+    }
+
+    .setup-reality-title {
+      font-family: "Orbitron", sans-serif;
+      font-size: clamp(1.2rem, 3.4vw, 1.8rem);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #f3f8ff;
+      margin-bottom: 0.65rem;
+      text-shadow: 0 0 18px rgba(0, 168, 255, 0.22);
+    }
+
+    .setup-guide-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.9rem;
+      position: relative;
+      z-index: 1;
+    }
+
+    .setup-guide-card {
+      border: 1px solid rgba(0, 246, 255, 0.18);
+      border-radius: 12px;
+      padding: 0.95rem;
+      background:
+        linear-gradient(180deg, rgba(7, 15, 28, 0.92), rgba(8, 14, 26, 0.82)),
+        radial-gradient(440px 180px at 0% 0%, rgba(0, 246, 255, 0.07), transparent 70%);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+
+    .setup-guide-kicker {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #7fe0ff;
+      margin-bottom: 0.55rem;
+    }
+
+    .setup-guide-card h3 {
+      font-family: "Orbitron", sans-serif;
+      font-size: 1rem;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #f4f8ff;
+      margin-bottom: 0.45rem;
+    }
+
+    .setup-guide-copy {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.67rem;
+      line-height: 1.55;
+      color: var(--text-dim);
+      margin-bottom: 0.8rem;
+    }
+
+    .setup-visual {
+      border: 1px solid rgba(0, 246, 255, 0.18);
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(5, 10, 20, 0.88);
+      margin-bottom: 0.85rem;
+      box-shadow: 0 20px 38px -30px rgba(0, 168, 255, 0.34);
+    }
+
+    .setup-visual-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid rgba(0, 246, 255, 0.14);
+      background: linear-gradient(90deg, rgba(0, 246, 255, 0.08), rgba(255, 0, 212, 0.06));
+    }
+
+    .setup-visual-bar span {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: rgba(0, 246, 255, 0.65);
+      box-shadow: 0 0 10px rgba(0, 246, 255, 0.45);
+      flex: 0 0 auto;
+    }
+
+    .setup-visual-bar code {
+      margin-left: 0.3rem;
+      font-size: 0.62rem;
+      letter-spacing: 0.5px;
+      color: #b7ddff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .setup-visual-body {
+      padding: 0.85rem 0.8rem 0.9rem;
+    }
+
+    .setup-visual-title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.72rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: #f4fbff;
+      margin-bottom: 0.45rem;
+    }
+
+    .setup-visual-copy {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.64rem;
+      line-height: 1.5;
+      color: var(--text-muted);
+      margin-bottom: 0.7rem;
+    }
+
+    .setup-visual-pills {
+      display: flex;
+      gap: 0.45rem;
+      flex-wrap: wrap;
+    }
+
+    .setup-visual-pills span {
+      display: inline-flex;
+      align-items: center;
+      min-height: 28px;
+      padding: 0 0.6rem;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 246, 255, 0.2);
+      background: rgba(0, 246, 255, 0.08);
+      color: #cfe9ff;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.6rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+    }
+
+    .setup-guide-steps {
+      list-style: none;
+      display: grid;
+      gap: 0.55rem;
+      margin-bottom: 0.8rem;
+      counter-reset: setup-step;
+    }
+
+    .setup-guide-steps li {
+      counter-increment: setup-step;
+      position: relative;
+      padding-left: 2rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.64rem;
+      line-height: 1.55;
+      color: var(--text-dim);
+    }
+
+    .setup-guide-steps li::before {
+      content: counter(setup-step);
+      position: absolute;
+      left: 0;
+      top: 0.05rem;
+      width: 1.35rem;
+      height: 1.35rem;
+      border-radius: 999px;
+      border: 1px solid rgba(0, 246, 255, 0.26);
+      background: rgba(0, 246, 255, 0.08);
+      color: #f4fbff;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.63rem;
+      font-weight: 700;
+    }
+
+    .setup-guide-actions {
+      display: flex;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+
+    .setup-guide-note {
+      position: relative;
+      z-index: 1;
+      margin-top: 0.95rem;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.64rem;
+      line-height: 1.55;
+      color: var(--text-muted);
+    }
+
     .hidden-select {
       display: none;
     }
@@ -1661,6 +1874,9 @@
       body::after { opacity: 0.05; }
       body { padding: 1rem 0.75rem; }
       .card { padding: 1.2rem; }
+      .setup-guide-grid { grid-template-columns: 1fr; }
+      .setup-guide-actions { flex-direction: column; }
+      .setup-guide-actions .btn-copy { width: 100%; }
       .logo-title {
         font-size: clamp(2.2rem, 12vw, 3rem);
         letter-spacing: 0.12em;
@@ -1700,6 +1916,9 @@
     @media (hover: none), (pointer: coarse) {
       body { padding: 1.25rem 0.9rem 2rem; }
       .topbar { padding: 12px; }
+      .setup-guide-grid { grid-template-columns: 1fr; }
+      .setup-guide-actions { flex-direction: column; }
+      .setup-guide-actions .btn-copy { width: 100%; }
       .service-tabs { gap: 0.75rem; }
       .action-row { flex-direction: column; }
       .action-row .btn-copy { width: 100%; min-width: 0; }
@@ -1742,6 +1961,71 @@
       </div>
       <div class="logo-grid" aria-hidden="true"></div>
       <p class="subtitle">Configure the bridge between your own stack and Stremio</p>
+    </div>
+
+    <div class="card setup-reality" id="setupRealityCard" style="display:none;">
+      <div class="setup-reality-head">
+        <div class="setup-reality-kicker">Where You Actually Configure</div>
+        <div class="setup-reality-title" id="setupRealityTitle">Two Real Setup Surfaces</div>
+        <p class="section-lead" id="setupRealityLead">If you privately host everything, configure on the machine that owns the route. Keep this shared page as the visual guide and fallback tool, not the default place you paste private localhost details.</p>
+      </div>
+      <div class="setup-guide-grid">
+        <section class="setup-guide-card" id="setupRealityWindowsCard">
+          <div class="setup-guide-kicker">Option 1</div>
+          <h3>Windows Host</h3>
+          <p class="setup-guide-copy">Use this when the Windows machine is the playback bridge. This is where <strong>PC Local</strong> and the home-device route are configured.</p>
+          <div class="setup-visual">
+            <div class="setup-visual-bar">
+              <span></span><span></span><span></span>
+              <code>http://127.0.0.1:7000/configure</code>
+            </div>
+            <div class="setup-visual-body">
+              <div class="setup-visual-title">PC Local + LAN Bridge</div>
+              <div class="setup-visual-copy">Local runtime. Private services. Same-host control plane. Configure the Windows box first, then install the right route in Stremio.</div>
+              <div class="setup-visual-pills">
+                <span>PC Local</span>
+                <span>LAN Bridge</span>
+              </div>
+            </div>
+          </div>
+          <ol class="setup-guide-steps">
+            <li>Open <code>http://127.0.0.1:7000/configure</code> on the Windows PC that runs PVTKRRX.</li>
+            <li>Save your Prowlarr and qBittorrent details there, then run Auto Setup on that host.</li>
+            <li>Install <code>PC Local</code> on that PC. Use <code>LAN Bridge</code> for the other home devices on the same Stremio account.</li>
+          </ol>
+          <div class="setup-guide-actions">
+            <button class="btn-copy" type="button" onclick="focusInstallTarget('pc')">Focus Windows Host Flow</button>
+          </div>
+        </section>
+
+        <section class="setup-guide-card" id="setupRealityServerCard">
+          <div class="setup-guide-kicker">Option 2</div>
+          <h3>Private Server</h3>
+          <p class="setup-guide-copy">Use this when your own seedbox or VPS is the playback bridge. This is where <strong>Remote Seedbox</strong> is configured on your own HTTPS origin.</p>
+          <div class="setup-visual">
+            <div class="setup-visual-bar">
+              <span></span><span></span><span></span>
+              <code>https://your-domain/configure</code>
+            </div>
+            <div class="setup-visual-body">
+              <div class="setup-visual-title">Remote Seedbox</div>
+              <div class="setup-visual-copy">Server runtime. Disk-backed config. Your own public HTTPS origin. Keep the browser-facing install URL on your domain, not on the public relay.</div>
+              <div class="setup-visual-pills">
+                <span>Remote Seedbox</span>
+              </div>
+            </div>
+          </div>
+          <ol class="setup-guide-steps">
+            <li>Open <code>https://your-domain/configure</code> on your own seedbox or VPS after the server installer is live.</li>
+            <li>Save the server-side Prowlarr, qBittorrent, file serving, and path settings on that private server.</li>
+            <li>Install <code>Remote Seedbox</code> from your own server origin. Keep <code>pvtkrrx.cc</code> out of the private control plane unless you intentionally want the official relay.</li>
+          </ol>
+          <div class="setup-guide-actions">
+            <button class="btn-copy" type="button" onclick="focusInstallTarget('seedbox')">Focus Private Server Flow</button>
+          </div>
+        </section>
+      </div>
+      <p class="setup-guide-note" id="setupRealityNote">The live controls stay below. This top section is here to make the route split obvious before you touch the code-driven install actions.</p>
     </div>
 
     <div class="card self-host-unlock" id="serverAdminBlock" style="display:none;">
@@ -3177,6 +3461,47 @@
       lead.textContent = 'Choose the route that matches where playback happens. PC Local is the host-PC route. LAN Bridge is for your other home devices while the Windows host stays online.';
     }
 
+    function updateSetupRealityCard() {
+      const card = document.getElementById('setupRealityCard');
+      const title = document.getElementById('setupRealityTitle');
+      const lead = document.getElementById('setupRealityLead');
+      const note = document.getElementById('setupRealityNote');
+      const windowsCard = document.getElementById('setupRealityWindowsCard');
+      const serverCard = document.getElementById('setupRealityServerCard');
+      if (!card || !title || !lead || !note || !windowsCard || !serverCard) return;
+
+      card.style.display = '';
+      windowsCard.hidden = false;
+      serverCard.hidden = false;
+
+      if (isDesktopLocalOnlyRuntime()) {
+        title.textContent = 'Windows Host Setup';
+        lead.textContent = 'This EXE is the real control surface for PC Local and LAN Bridge. Configure the Windows machine that runs PVTKRRX first, then install the route that matches the device you actually use.';
+        note.textContent = 'Remote Seedbox belongs in the separate server app on your own HTTPS origin. The live controls below stay code-driven.';
+        serverCard.hidden = true;
+        return;
+      }
+
+      if (isSelfHostedServerRuntime()) {
+        title.textContent = 'Private Server Setup';
+        lead.textContent = 'This server page is the real control surface for Remote Seedbox on your own VPS or seedbox. Save the server-side endpoints here, then install from your own HTTPS origin.';
+        note.textContent = 'PC Local and LAN Bridge belong in the Windows host app. The live controls below stay code-driven.';
+        windowsCard.hidden = true;
+        return;
+      }
+
+      title.textContent = 'Two Real Setup Surfaces';
+      lead.textContent = 'If you privately host everything, configure on the machine that owns the route. Keep this shared page as the visual guide and fallback tool, not the default place you paste private localhost details.';
+      note.textContent = 'The live controls stay below. This top section is here to make the route split obvious before you touch the code-driven install actions.';
+    }
+
+    function focusInstallTarget(target) {
+      setInstallTarget(target);
+      const next = document.getElementById('installTargetSwitcher') || document.getElementById('simpleFlowCard');
+      if (!next) return;
+      next.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+
     function applyServerRuntimeConfig(data) {
       const payload = data && typeof data === 'object' ? data : {};
       serverRuntime.selfHostServerMode = payload.selfHostServerMode === true;
@@ -3192,6 +3517,7 @@
       updateServerLinkUi();
       updateServiceLaunchLinks();
       syncInstallTargetOptions();
+      updateSetupRealityCard();
       const requestedTarget = getRequestedInstallTargetFromUrl();
       const nextTarget = isSelfHostSeedboxOnlyRuntime()
         ? 'seedbox'

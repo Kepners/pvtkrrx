@@ -58,6 +58,7 @@ PVTKRRX is one codebase with three active runtime pieces:
 
 - Hosted `/configure` now centers on three main route cards: `PC Local`, `LAN Bridge`, and `Remote Seedbox`.
 - Desktop-local `/configure` on the Windows EXE now exposes `PC Local` and `LAN Bridge`; `Remote Seedbox` belongs to the separate server/cloud runtime.
+- The top of `/configure` now opens with a visual setup guide that separates the two real private setup surfaces: Windows host (`http://127.0.0.1:7000/configure`) and private server (`https://your-domain/configure`), while keeping the live install actions below as editable code-driven controls.
 - The top of the page focuses on the next action for the selected route.
 - Noisy fallback tools are hidden by default behind `Advanced Options And Manual Fallback`, which groups connection edits, manual URLs, and rescue tools under a secondary disclosure.
 - When explicit self-host server mode is active, `/configure` is now a server-only app surface: it exposes `Remote Seedbox` only, defaults there immediately, and exposes a browser-stored self-host password field for remote seedbox administration.
