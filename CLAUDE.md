@@ -30,6 +30,15 @@
 
 ---
 
+## MANDATORY: Copy Spec Compliance
+**Before editing ANY website copy, UI text, marketing content, or user-facing labels:**
+1. Read `docs/copy.md` first — it is the governing spec for all product copy
+2. Every line must pass the two final tests in that doc
+3. Use the approved route labels: **PC Local**, **Hybrid Home**, **Remote Seedbox**
+4. Never use forbidden claims listed in Section 3
+
+---
+
 ## MANDATORY: Questions via Popup ONLY
 **ALWAYS use the `AskUserQuestion` tool** for questions. Never list questions in text.
 
@@ -69,6 +78,7 @@
 | [ARCHITECTURE.md](ARCHITECTURE.md) | Component and runtime structure |
 | [README.md](README.md) | User-facing setup guide |
 | [docs/SPEC.md](docs/SPEC.md) | Live product specification |
+| [docs/copy.md](docs/copy.md) | **READ BEFORE any website/UI copy edit** — copy spec, tone rules, forbidden claims, route labels |
 
 ### Historical (archival context only)
 `docs/CLIENT_DRIVERS.md`, `SCOPE_OF_WORKS.md`, `TECHNICAL_SPEC.md`, `COMMERCIAL_SPEC.md`, `PRODUCTION_SPEC.md`, `PROGRAMME.md`, `PRESTART_OUTCOME.md`
