@@ -248,8 +248,7 @@
     }
 
     .container {
-      max-width: 760px;
-      width: 100%;
+      width: min(1200px, 94vw);
       animation: fadeUp 0.4s ease-out;
       position: relative;
       z-index: 3;
@@ -374,10 +373,9 @@
       max-width: 100%;
       margin: 0;
       font-family: "Orbitron", sans-serif;
-      font-size: clamp(2.9rem, 10.5vw, 5.5rem);
-      font-size: clamp(2.9rem, 15cqi, 5.5rem);
+      font-size: clamp(64px, 17vw, 220px);
       font-weight: 900;
-      letter-spacing: 0.16em;
+      letter-spacing: 4px;
       line-height: 0.92;
       text-transform: uppercase;
       color: #d9ebff;
@@ -427,14 +425,14 @@
     .logo-grid {
       margin: 12px auto 0;
       height: 2px;
-      width: min(480px, 88%);
+      width: min(860px, 88%);
       background: linear-gradient(90deg, transparent, rgba(0, 246, 255, 0.9), rgba(255, 0, 212, 0.76), transparent);
       box-shadow: 0 0 18px rgba(0, 246, 255, 0.72);
       animation: line-flicker 1700ms infinite;
     }
 
     .subtitle {
-      max-width: 680px;
+      max-width: 900px;
       margin: 0.8rem auto 0;
       font-family: 'IBM Plex Mono', monospace;
       color: var(--text-dim);

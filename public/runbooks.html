@@ -251,21 +251,66 @@
     }
 
     .logo {
-      display: inline-block;
       position: relative;
+      display: inline-block;
+      width: max-content;
+      margin-inline: auto;
       font-family: "Orbitron", sans-serif;
-      font-size: clamp(3rem, 13vw, 10rem);
-      line-height: 0.95;
-      letter-spacing: 0.18em;
+      font-size: clamp(64px, 17vw, 220px);
+      font-weight: 900;
+      letter-spacing: 4px;
+      line-height: 0.9;
       text-transform: uppercase;
-      margin-bottom: 0.65rem;
       color: #d9ebff;
       text-shadow:
         0 0 8px rgba(255, 255, 255, 0.9),
         0 0 26px rgba(0, 246, 255, 0.66),
         0 0 54px rgba(0, 168, 255, 0.5),
         0 0 82px rgba(255, 0, 212, 0.28);
+      transform-style: preserve-3d;
       animation: rgb-jitter 2.8s infinite steps(2, end);
+    }
+
+    .logo-frame {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding-inline: clamp(4px, 1.6vw, 18px);
+    }
+
+    .logo > span {
+      position: relative;
+      display: inline-block;
+      background: linear-gradient(180deg, #f7fcff 0%, #c9e6ff 55%, #b4d9ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 2px 0 rgba(255, 255, 255, 0.16));
+    }
+
+    .logo::before,
+    .logo::after {
+      content: attr(data-text);
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    .logo::before {
+      color: var(--cyan);
+      transform: translate3d(-3px, 1px, 0);
+      text-shadow: -2px 0 0 rgba(0, 246, 255, 0.7);
+      animation: glitch-slice-a 2100ms infinite steps(2, end);
+      opacity: 0.85;
+    }
+
+    .logo::after {
+      color: var(--red);
+      transform: translate3d(3px, -1px, 0);
+      text-shadow: 2px 0 0 rgba(255, 19, 79, 0.72);
+      animation: glitch-slice-b 2700ms infinite steps(2, end);
+      opacity: 0.8;
     }
 
     .hero h1 {
@@ -827,7 +872,7 @@
       }
 
       .logo {
-        letter-spacing: 0.1em;
+        letter-spacing: 2px;
       }
 
       .topbar {
@@ -893,7 +938,9 @@
     </header>
 
     <section class="hero">
-      <h1 class="logo glitch-text" data-text="PVTKRRX">PVTKRRX</h1>
+      <div class="logo-frame">
+        <h1 class="logo" data-text="PVTKRRX"><span>PVTKRRX</span></h1>
+      </div>
       <h2 class="subtitle subtitle-static" data-text="Seedbox Runbooks"><span>Seedbox Runbooks</span></h2>
       <p>Provider-specific setup for PVTKRRX. Each runbook shows the exact URLs to enter on the configure page for your seedbox provider, covering Prowlarr, qBittorrent, file server, path mapping, and auth.</p>
       <p>Most users need the <strong>Remote Seedbox</strong> route: select your provider from the dropdown on <code>/configure</code>, fill in the fields below, and save. The configure page auto-fills path mapping when you pick your provider.</p>
