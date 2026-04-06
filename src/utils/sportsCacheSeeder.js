@@ -76,20 +76,6 @@ function createLogger(logger = console) {
   }
 }
 
-function sportKeyFromLeagueCode(value) {
-  const code = compactText(value)
-  if (!code) return ''
-  if (['nba'].includes(code)) return 'basketball'
-  if (['nfl'].includes(code)) return 'american-football'
-  if (['ufc'].includes(code)) return 'mma'
-  if (['f1', 'formula1', 'motogp', 'nascar', 'indycar', 'wrc', 'supercars', 'v8sc', 'wsbk', 'wec', 'formulae'].includes(code)) return 'motorsport'
-  if (['mlb'].includes(code)) return 'baseball'
-  if (['nhl'].includes(code)) return 'hockey'
-  if (['wwe', 'aew'].includes(code)) return 'wrestling'
-  if (['epl', 'ucl', 'uel', 'laliga', 'seriea', 'bundesliga', 'ligue1'].includes(code)) return 'football'
-  return ''
-}
-
 function scoreNameMatch(expected, candidate) {
   const expectedText = normalizeSpace(expected)
   const candidateText = normalizeSpace(candidate)
@@ -183,10 +169,13 @@ function toEventList(payload) {
   return []
 }
 
-function getMappedLeagueNamesForSport(sportKey) {
+function getMappedLeagueEntriesForSport(sportKey) {
   return listMappedLeagues()
-    .filter((entry) => sportKeyFromLeagueCode(entry.code) === sportKey)
-    .map((entry) => entry.name)
+    .filter((entry) => normalizeText(entry.sportKey) === normalizeText(sportKey))
+}
+
+function getMappedLeagueNamesForSport(sportKey) {
+  return getMappedLeagueEntriesForSport(sportKey).map((entry) => entry.name)
 }
 
 function getPriorityTermsForSport(target = {}) {
@@ -232,26 +221,18 @@ function findBestLeagueMatch(leagues = [], expectedName = '') {
   return bestScore >= 60 ? best : null
 }
 
-function selectLeagueTargets(leagues = [], priorityTerms = [], mappedLeagueNames = [], limit = DEFAULT_EVENT_LEAGUE_LIMIT) {
-  const mappedMatches = uniqueBy(
-    mappedLeagueNames
-      .map((name) => findBestLeagueMatch(leagues, name))
-      .filter(Boolean),
-    buildLeagueIdentity
-  )
-
+function selectLeagueTargets(leagues = [], priorityTerms = [], mappedLeagues = [], limit = DEFAULT_EVENT_LEAGUE_LIMIT) {
   const ranked = [...leagues]
     .map((league) => ({ league, score: scoreLeagueCandidate(league, priorityTerms) }))
     .sort((left, right) => right.score - left.score || String(left.league?.strLeague || '').localeCompare(String(right.league?.strLeague || '')))
     .map((entry) => entry.league)
 
   const selected = uniqueBy(
-    [...mappedMatches, ...ranked],
+    [...mappedLeagues, ...ranked],
     buildLeagueIdentity
   ).slice(0, Math.max(1, limit))
 
   return {
-    mappedMatches,
     selected
   }
 }
@@ -388,6 +369,19 @@ async function fetchLeagueDetails(apiKey, idLeague, context) {
   return Array.isArray(data?.leagues) ? data.leagues[0] || null : null
 }
 
+async function fetchMappedLeagueDetailsForSport(apiKey, sportKey, context) {
+  const entries = getMappedLeagueEntriesForSport(sportKey)
+    .filter((entry) => normalizeSpace(entry.idLeague))
+
+  const leagues = []
+  for (const entry of entries) {
+    const league = await fetchLeagueDetails(apiKey, entry.idLeague, context)
+    if (!league) continue
+    leagues.push(league)
+  }
+  return uniqueBy(leagues, buildLeagueIdentity)
+}
+
 async function fetchTeamDetails(apiKey, idTeam, context) {
   const data = await fetchSportsDbJson(apiKey, 'lookupteam.php', { id: idTeam }, context)
   return Array.isArray(data?.teams) ? data.teams[0] || null : null
@@ -422,15 +416,29 @@ async function seedSportTarget(target, context) {
     queuedImages: 0
   }
 
-  const leagues = await fetchLeaguesBySport(context.apiKey, target.sportsDbSport, context)
+  const mappedLeagueNames = getMappedLeagueNamesForSport(target.key)
+  const mappedLeagueDetails = await fetchMappedLeagueDetailsForSport(context.apiKey, target.key, context)
+  const leagues = uniqueBy([
+    ...mappedLeagueDetails,
+    ...(await fetchLeaguesBySport(context.apiKey, target.sportsDbSport, context))
+  ], buildLeagueIdentity)
   summary.leaguesAvailable = leagues.length
 
-  const mappedLeagueNames = getMappedLeagueNamesForSport(target.key)
   const priorityTerms = getPriorityTermsForSport(target)
-  const { mappedMatches, selected } = selectLeagueTargets(
+  const matchedLeagueDetails = uniqueBy(
+    mappedLeagueNames
+      .map((name) => findBestLeagueMatch(leagues, name))
+      .filter(Boolean),
+    buildLeagueIdentity
+  )
+  const mappedMatches = uniqueBy([
+    ...mappedLeagueDetails,
+    ...matchedLeagueDetails
+  ], buildLeagueIdentity)
+  const { selected } = selectLeagueTargets(
     leagues,
     priorityTerms,
-    mappedLeagueNames,
+    mappedMatches,
     Math.max(1, Number(target.eventLeagueLimit || context.eventLeagueLimit || DEFAULT_EVENT_LEAGUE_LIMIT))
   )
 

@@ -29,8 +29,22 @@ function buildFetchStub() {
       {
         countries: [
           {
+            idLeague: '4617',
+            strLeague: 'Albanian Superliga',
+            strSport: 'Soccer',
+            strLogo: 'https://images.example.com/league/albania-logo.png'
+          }
+        ]
+      }
+    ],
+    [
+      'lookupleague.php?id=4328',
+      {
+        leagues: [
+          {
             idLeague: '4328',
             strLeague: 'English Premier League',
+            strLeagueAlternate: 'Premier League, EPL, England',
             strSport: 'Soccer',
             strLogo: 'https://images.example.com/league/epl-logo.png',
             strBadge: 'https://images.example.com/league/epl-badge.png',
@@ -95,9 +109,22 @@ function buildFetchStub() {
       {
         countries: [
           {
-            idLeague: '2001',
-            strLeague: 'Ultimate Fighting Championship',
-            strLeagueAlternate: 'UFC',
+            idLeague: '5999',
+            strLeague: 'Cage Fury Fighting Championships',
+            strSport: 'MMA',
+            strLogo: 'https://images.example.com/league/cffc-logo.png'
+          }
+        ]
+      }
+    ],
+    [
+      'lookupleague.php?id=4443',
+      {
+        leagues: [
+          {
+            idLeague: '4443',
+            strLeague: 'UFC',
+            strLeagueAlternate: 'Ultimate Fighting Championship',
             strSport: 'MMA',
             strLogo: 'https://images.example.com/league/ufc-logo.png',
             strPoster: 'https://images.example.com/league/ufc-poster.jpg'
@@ -106,14 +133,14 @@ function buildFetchStub() {
       }
     ],
     [
-      'eventsnextleague.php?id=2001',
+      'eventsnextleague.php?id=4443',
       {
         events: [
           {
             idEvent: 'mma-evt-1',
             strEvent: 'UFC Fight Night 300',
             dateEvent: today,
-            strLeague: 'Ultimate Fighting Championship',
+            strLeague: 'UFC',
             strPoster: 'https://images.example.com/events/mma-evt-1-poster.jpg',
             strThumb: 'https://images.example.com/events/mma-evt-1-thumb.jpg'
           }
@@ -128,7 +155,7 @@ function buildFetchStub() {
             idEvent: 'mma-evt-1',
             strEvent: 'UFC Fight Night 300',
             dateEvent: today,
-            strLeague: 'Ultimate Fighting Championship',
+            strLeague: 'UFC',
             strPoster: 'https://images.example.com/events/mma-evt-1-poster.jpg',
             strThumb: 'https://images.example.com/events/mma-evt-1-thumb.jpg'
           }
@@ -140,7 +167,7 @@ function buildFetchStub() {
       { tvevents: [] }
     ],
     [
-      queryKey('search_all_teams.php', { l: 'Ultimate Fighting Championship' }),
+      queryKey('search_all_teams.php', { l: 'UFC' }),
       { teams: [] }
     ]
   ])
@@ -218,6 +245,7 @@ async function main() {
     })
     assert.equal(first.targets.length, 1)
     assert.equal(first.targets[0].key, 'football', 'expected first pass to start with football')
+    assert.equal(first.summary.sports[0].mappedLeagues, 1, 'expected football autofill to recover the mapped league via direct lookup')
     let state = loadSportsCacheAutofillState(statePath)
     assert.equal(state.nextTargetIndex, 1, 'expected first pass to advance cursor to next sport')
     assert.deepEqual(state.lastTargets, ['football'])
@@ -230,6 +258,7 @@ async function main() {
     })
     assert.equal(second.targets.length, 1)
     assert.equal(second.targets[0].key, 'mma', 'expected second pass to rotate to mma')
+    assert.equal(second.summary.sports[0].mappedLeagues, 1, 'expected MMA autofill to recover the mapped league via direct lookup')
     state = loadSportsCacheAutofillState(statePath)
     assert.equal(state.nextTargetIndex, 0, 'expected second pass to wrap the cursor')
     assert.deepEqual(state.lastTargets, ['mma'])

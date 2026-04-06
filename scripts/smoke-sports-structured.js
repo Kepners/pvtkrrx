@@ -798,7 +798,11 @@ async function testArtworkFallbackBehavior() {
   assert.ok(result.meta.poster, 'expected a poster fallback')
   assert.ok(result.meta.background, 'expected a background fallback')
   assert.match(String(result.meta.poster || ''), /\/thumb\/sports\/poster\//, 'expected sports poster fallback to use the poster artwork route')
-  assert.match(String(result.meta.background || ''), /\/thumb\/sports\/background\//, 'expected sports background fallback to use the background artwork route')
+  assert.match(
+    String(result.meta.background || ''),
+    /\/(?:thumb\/sports\/background|image\/sports\/background)\//,
+    'expected sports background fallback to use a generated or proxied background artwork route'
+  )
   assert.equal(result.meta.posterShape, 'poster', 'expected fallback sports meta to declare poster-shaped artwork')
   assert.ok(result.meta.description, 'expected non-empty description')
   assert.deepEqual(result.meta.genres, ['MMA', 'UFC'], 'expected MMA + UFC genres')

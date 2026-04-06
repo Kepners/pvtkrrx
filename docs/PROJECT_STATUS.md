@@ -61,6 +61,8 @@ The practical reading of the project today is:
 - Fixed the self-host/server `liberror` regression on incomplete matched torrents by keeping playback-capable buffering streams on `/playback` first instead of handing Stremio straight into `/file` too early.
 - Opaque playback tokens now carry the chosen file path so multi-file torrents still resolve the correct episode/file when `/playback` later hands off into `/file`.
 - Added smoke coverage for the new buffering handoff contract plus target-file playback-token round trips.
+- Fixed the sports artwork mapped-league path so both the cache seeder and `sportsdb.js` can resolve known TheSportsDB league ids directly instead of depending on the truncated free-key `search_all_leagues.php?s=...` listing.
+- Sports cache autofill no longer reports `0 mapped leagues` for known targets just because the sport-wide league list omitted EPL/UFC/NBA-style entries, and league-art poster fallback can now recover those same mapped leagues during normal meta/catalog requests.
 - Cut the public desktop release as `1.1.25` and the matching Windows installer assets.
 - Published the next self-host prerelease tag as `v1.12.11-selfhost` so the cloud/server installer line has a current pinned release for this fix set.
 
@@ -110,6 +112,10 @@ These items are verified in the current workspace or by direct client/log proof:
 - `npm run smoke:pipeline` passed on 2026-04-06 after the buffering-stream handoff fix, keeping self-host/local buffering rows on the safer `/playback` route
 - `npm run smoke:guards` passed on 2026-04-06 after the `1.1.25` public release cut
 - `npm run smoke:lan-pair` passed on 2026-04-06 after the playback-token update, keeping opaque LAN/home-route token flow green
+- `npm run smoke:sportsdb-league` passed on 2026-04-06, proving mapped league fallback can still recover EPL/UFC artwork when the upstream sport-wide league list is irrelevant or truncated
+- `npm run smoke:sports-cache` passed on 2026-04-06 after switching the pre-seed flow to direct mapped-league ids for known leagues
+- `npm run smoke:sports-cache-auto` passed on 2026-04-06 after the same mapped-league lookup fix, keeping cursor rotation and cache reuse green
+- `npm run smoke:sports` passed on 2026-04-06 after the mapped-league lookup fix, with the expected bad-id placeholder error still isolated to the existing negative-path assertion at the end of the smoke output
 - `C:\Program Files\Git\bin\bash.exe -n scripts/install-selfhost.sh` passed on 2026-04-06 from the Windows workspace for the public release cut
 - `npm run smoke:sports-cache` passed on 2026-04-04 for the new sports cache pre-seed flow, including disk-cache reuse on rerun
 - `npm run smoke:sports-cache-auto` now covers the rotating background sports-cache autofill flow: first sport, cursor advance, second sport, cursor wrap, and disk-cache reuse on the wrapped pass

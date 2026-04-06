@@ -1,53 +1,275 @@
 const LEAGUE_MAP = Object.freeze({
-  epl: 'English Premier League',
-  ucl: 'UEFA Champions League',
-  uel: 'UEFA Europa League',
-  laliga: 'Spanish La Liga',
-  seriea: 'Italian Serie A',
-  bundesliga: 'German Bundesliga',
-  ligue1: 'French Ligue 1',
-  nba: 'NBA',
-  nfl: 'NFL',
-  ufc: 'UFC',
-  f1: 'Formula 1',
-  formula1: 'Formula 1',
-  motogp: 'MotoGP',
-  nascar: 'NASCAR',
-  indycar: 'IndyCar',
-  wrc: 'WRC',
-  supercars: 'Supercars Championship',
-  v8sc: 'Supercars Championship',
-  wsbk: 'World Superbikes',
-  wec: 'WEC',
-  formulae: 'Formula E',
-  pga: 'PGA Tour',
-  lpga: 'LPGA Tour',
-  pdc: 'PDC Darts',
-  mlb: 'MLB',
-  nhl: 'NHL',
-  wwe: 'WWE',
-  aew: 'AEW'
+  epl: {
+    name: 'English Premier League',
+    idLeague: '4328',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['Premier League', 'EPL']
+  },
+  ucl: {
+    name: 'UEFA Champions League',
+    idLeague: '4480',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['Champions League', 'UCL']
+  },
+  uel: {
+    name: 'UEFA Europa League',
+    idLeague: '4481',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['Europa League', 'UEL']
+  },
+  laliga: {
+    name: 'Spanish La Liga',
+    idLeague: '4335',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['La Liga', 'LaLiga']
+  },
+  seriea: {
+    name: 'Italian Serie A',
+    idLeague: '4332',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['Serie A']
+  },
+  bundesliga: {
+    name: 'German Bundesliga',
+    idLeague: '4331',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['Bundesliga']
+  },
+  ligue1: {
+    name: 'French Ligue 1',
+    idLeague: '4334',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['Ligue 1']
+  },
+  nba: {
+    name: 'NBA',
+    idLeague: '4387',
+    sportKey: 'basketball',
+    sportsDbSport: 'Basketball',
+    aliases: ['National Basketball Association']
+  },
+  nfl: {
+    name: 'NFL',
+    idLeague: '4391',
+    sportKey: 'american-football',
+    sportsDbSport: 'American Football',
+    aliases: ['National Football League']
+  },
+  ufc: {
+    name: 'UFC',
+    idLeague: '4443',
+    sportKey: 'mma',
+    sportsDbSport: 'MMA',
+    aliases: ['Ultimate Fighting Championship']
+  },
+  f1: {
+    name: 'Formula 1',
+    idLeague: '4370',
+    sportKey: 'motorsport',
+    sportsDbSport: 'Motorsport',
+    aliases: ['F1', 'Formula One', 'Formula-1']
+  },
+  formula1: {
+    name: 'Formula 1',
+    idLeague: '4370',
+    sportKey: 'motorsport',
+    sportsDbSport: 'Motorsport',
+    aliases: ['F1', 'Formula One', 'Formula-1']
+  },
+  motogp: {
+    name: 'MotoGP',
+    idLeague: '4407',
+    sportKey: 'motorsport',
+    sportsDbSport: 'Motorsport'
+  },
+  nascar: {
+    name: 'NASCAR',
+    idLeague: '4393',
+    sportKey: 'motorsport',
+    sportsDbSport: 'Motorsport',
+    sportsDbName: 'NASCAR Cup Series',
+    aliases: ['NASCAR Cup Series']
+  },
+  indycar: {
+    name: 'IndyCar',
+    idLeague: '4373',
+    sportKey: 'motorsport',
+    sportsDbSport: 'Motorsport',
+    sportsDbName: 'IndyCar Series',
+    aliases: ['IndyCar Series']
+  },
+  wrc: {
+    name: 'WRC',
+    idLeague: '4409',
+    sportKey: 'motorsport',
+    sportsDbSport: 'Motorsport',
+    aliases: ['World Rally Championship']
+  },
+  supercars: {
+    name: 'Supercars Championship',
+    idLeague: '4489',
+    sportKey: 'motorsport',
+    sportsDbSport: 'Motorsport',
+    sportsDbName: 'V8 Supercars',
+    aliases: ['V8 Supercars', 'Supercars']
+  },
+  v8sc: {
+    name: 'Supercars Championship',
+    idLeague: '4489',
+    sportKey: 'motorsport',
+    sportsDbSport: 'Motorsport',
+    sportsDbName: 'V8 Supercars',
+    aliases: ['V8SC', 'V8 Supercars', 'Supercars']
+  },
+  wsbk: {
+    name: 'World Superbikes',
+    idLeague: '4454',
+    sportKey: 'motorsport',
+    sportsDbSport: 'Motorsport',
+    sportsDbName: 'SBK',
+    aliases: ['SBK', 'World Superbike Championship']
+  },
+  wec: {
+    name: 'WEC',
+    idLeague: '4413',
+    sportKey: 'motorsport',
+    sportsDbSport: 'Motorsport',
+    aliases: ['FIA World Endurance Championship']
+  },
+  formulae: {
+    name: 'Formula E',
+    idLeague: '4371',
+    sportKey: 'motorsport',
+    sportsDbSport: 'Motorsport'
+  },
+  pga: {
+    name: 'PGA Tour',
+    idLeague: '4425',
+    sportKey: 'golf',
+    sportsDbSport: 'Golf'
+  },
+  lpga: {
+    name: 'LPGA Tour',
+    idLeague: '4553',
+    sportKey: 'golf',
+    sportsDbSport: 'Golf'
+  },
+  pdc: {
+    name: 'PDC Darts',
+    idLeague: '4554',
+    sportKey: 'darts',
+    sportsDbSport: 'Darts'
+  },
+  mlb: {
+    name: 'MLB',
+    idLeague: '4424',
+    sportKey: 'baseball',
+    sportsDbSport: 'Baseball',
+    aliases: ['Major League Baseball']
+  },
+  nhl: {
+    name: 'NHL',
+    idLeague: '4380',
+    sportKey: 'hockey',
+    sportsDbSport: 'Ice Hockey',
+    aliases: ['National Hockey League']
+  },
+  wwe: {
+    name: 'WWE',
+    idLeague: '4444',
+    sportKey: 'wrestling',
+    sportsDbSport: 'Combat Sports',
+    aliases: ['World Wrestling Entertainment']
+  },
+  aew: {
+    name: 'AEW',
+    idLeague: '4563',
+    sportKey: 'wrestling',
+    sportsDbSport: 'Combat Sports',
+    aliases: ['All Elite Wrestling']
+  }
 })
 
 function normalizeLeagueCode(value) {
   return String(value || '')
     .trim()
     .toLowerCase()
-    .replace(/\s+/g, '')
+    .replace(/[^a-z0-9]+/g, '')
+}
+
+function uniqueStrings(values = []) {
+  const out = []
+  const seen = new Set()
+  for (const value of values) {
+    const text = String(value || '').trim()
+    const key = normalizeLeagueCode(text)
+    if (!text || !key || seen.has(key)) continue
+    seen.add(key)
+    out.push(text)
+  }
+  return out
+}
+
+function createLeagueEntry(code, value = {}) {
+  const name = String(value?.name || '').trim()
+  const sportsDbName = String(value?.sportsDbName || name).trim()
+  const aliases = uniqueStrings([name, sportsDbName, ...(Array.isArray(value?.aliases) ? value.aliases : [])])
+  return Object.freeze({
+    code,
+    name,
+    idLeague: String(value?.idLeague || '').trim(),
+    sportKey: String(value?.sportKey || '').trim(),
+    sportsDbSport: String(value?.sportsDbSport || '').trim(),
+    sportsDbName,
+    aliases: Object.freeze(aliases)
+  })
+}
+
+const LEAGUE_ENTRIES = Object.freeze(
+  Object.entries(LEAGUE_MAP).map(([code, value]) => createLeagueEntry(code, value))
+)
+
+const LEAGUE_LOOKUP = (() => {
+  const lookup = new Map()
+  for (const entry of LEAGUE_ENTRIES) {
+    const keys = [entry.code, entry.name, entry.sportsDbName, ...entry.aliases]
+    for (const key of keys) {
+      const normalized = normalizeLeagueCode(key)
+      if (!normalized || lookup.has(normalized)) continue
+      lookup.set(normalized, entry)
+    }
+  }
+  return lookup
+})()
+
+function getMappedLeagueEntry(value) {
+  const normalized = normalizeLeagueCode(value)
+  if (!normalized) return null
+  return LEAGUE_LOOKUP.get(normalized) || null
 }
 
 function mapLeague(code) {
-  const normalized = normalizeLeagueCode(code)
-  if (!normalized) return null
-  return LEAGUE_MAP[normalized] || null
+  return getMappedLeagueEntry(code)?.name || null
 }
 
 function listMappedLeagues() {
-  return Object.entries(LEAGUE_MAP).map(([code, name]) => ({ code, name }))
+  return LEAGUE_ENTRIES.map((entry) => ({
+    ...entry,
+    aliases: [...entry.aliases]
+  }))
 }
 
 module.exports = {
   LEAGUE_MAP,
+  getMappedLeagueEntry,
   listMappedLeagues,
-  mapLeague
+  mapLeague,
+  normalizeLeagueCode
 }

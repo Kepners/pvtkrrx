@@ -3,7 +3,7 @@ const path = require('path')
 const { cleanTitle } = require('../utils/parser')
 const { detectSport, stripSportTerms } = require('../utils/sportClassifier')
 const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
-const { mapLeague } = require('../utils/leagueMap')
+const { getMappedLeagueEntry, listMappedLeagues, mapLeague } = require('../utils/leagueMap')
 const { resolveRuntimeDir } = require('../utils/runtimeDir')
 
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json'
@@ -133,6 +133,25 @@ function normalizeTeamName(value) {
 function normalizeLeagueName(value) {
   const mapped = mapLeague(value)
   return normalizeToken(mapped || value)
+}
+
+function buildLeagueIdentity(league = {}) {
+  return String(
+    league?.idLeague ||
+    normalizeToken(league?.strLeague || league?.strLeagueAlternate || league?.strNaming || '')
+  )
+}
+
+function uniqueBy(items = [], getKey) {
+  const out = []
+  const seen = new Set()
+  for (const item of items) {
+    const key = String(getKey(item) || '').trim()
+    if (!key || seen.has(key)) continue
+    seen.add(key)
+    out.push(item)
+  }
+  return out
 }
 
 function sportKeyFromLeagueCode(value) {
@@ -812,6 +831,14 @@ function getLeagueMatchScore(expectedLeague, actualLeague) {
   return 0
 }
 
+function getLeagueMatchScoreForLeague(expectedLeague, league = {}) {
+  return Math.max(
+    getLeagueMatchScore(expectedLeague, league?.strLeague),
+    getLeagueMatchScore(expectedLeague, league?.strLeagueAlternate),
+    getLeagueMatchScore(expectedLeague, league?.strNaming)
+  )
+}
+
 function teamNameMatches(expected, actual) {
   const expectedName = normalizeTeamName(expected)
   const actualName = normalizeTeamName(actual)
@@ -1064,10 +1091,33 @@ class SportsDbClient {
     }
   }
 
+  async _fetchDirectMappedLeaguesBySport(sportName) {
+    const sport = normalizeToken(sportName)
+    if (!sport) return []
+
+    const entries = uniqueBy(
+      listMappedLeagues().filter((entry) =>
+        normalizeToken(entry?.sportsDbSport || '') === sport &&
+        String(entry?.idLeague || '').trim()
+      ),
+      (entry) => entry.idLeague || entry.code
+    )
+
+    const leagues = []
+    for (const entry of entries) {
+      const league = await this._lookupLeague(entry.idLeague)
+      if (!league) continue
+      leagues.push(league)
+    }
+
+    return uniqueBy(leagues, buildLeagueIdentity)
+  }
+
   async _fetchLeaguesBySport(sportName) {
     const sport = String(sportName || '').trim()
     if (!sport) return []
-    if (Date.now() < rateLimitedUntil) return []
+    const directMappedLeagues = await this._fetchDirectMappedLeaguesBySport(sport)
+    if (Date.now() < rateLimitedUntil) return directMappedLeagues
 
     const key = normalizeToken(sport)
     const hit = getCachedValue(leaguesBySportCache, key)
@@ -1080,15 +1130,17 @@ class SportsDbClient {
         rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
       }
       if (!res.ok) {
-        setCachedValue(leaguesBySportCache, key, [], this.missTtlMs)
-        return []
+        const ttlMs = directMappedLeagues.length > 0 ? this.leagueAssetTtlMs : this.missTtlMs
+        setCachedValue(leaguesBySportCache, key, directMappedLeagues, ttlMs)
+        return directMappedLeagues
       }
       const raw = await res.text()
       const trimmed = String(raw || '').trim()
       if (trimmed.startsWith('<')) {
         rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
-        setCachedValue(leaguesBySportCache, key, [], this.missTtlMs)
-        return []
+        const ttlMs = directMappedLeagues.length > 0 ? this.leagueAssetTtlMs : this.missTtlMs
+        setCachedValue(leaguesBySportCache, key, directMappedLeagues, ttlMs)
+        return directMappedLeagues
       }
 
       let data = null
@@ -1096,16 +1148,21 @@ class SportsDbClient {
         data = trimmed ? JSON.parse(trimmed) : null
       } catch (_) {
         rateLimitedUntil = Date.now() + RATE_LIMIT_COOLDOWN_MS
-        setCachedValue(leaguesBySportCache, key, [], this.missTtlMs)
-        return []
+        const ttlMs = directMappedLeagues.length > 0 ? this.leagueAssetTtlMs : this.missTtlMs
+        setCachedValue(leaguesBySportCache, key, directMappedLeagues, ttlMs)
+        return directMappedLeagues
       }
-      const leagues = Array.isArray(data?.countries) ? data.countries : []
+      const leagues = uniqueBy([
+        ...directMappedLeagues,
+        ...(Array.isArray(data?.countries) ? data.countries : [])
+      ], buildLeagueIdentity)
       const ttlMs = leagues.length > 0 ? this.leagueAssetTtlMs : this.missTtlMs
       setCachedValue(leaguesBySportCache, key, leagues, ttlMs)
       return leagues
     } catch (_) {
-      setCachedValue(leaguesBySportCache, key, [], this.missTtlMs)
-      return []
+      const ttlMs = directMappedLeagues.length > 0 ? this.leagueAssetTtlMs : this.missTtlMs
+      setCachedValue(leaguesBySportCache, key, directMappedLeagues, ttlMs)
+      return directMappedLeagues
     }
   }
 
@@ -1120,9 +1177,21 @@ class SportsDbClient {
       .sort((a, b) => b.score - a.score)
 
     if (leagueHint) {
-      const strictLeagueMatches = ranked.filter(entry => getLeagueMatchScore(leagueHint, entry.league?.strLeague) > 0)
-      if (strictLeagueMatches.length === 0) return null
-      ranked = strictLeagueMatches
+      const mappedLeagueEntry = getMappedLeagueEntry(leagueHint)
+      if (mappedLeagueEntry?.idLeague) {
+        const directMatch = ranked.find((entry) => String(entry.league?.idLeague || '').trim() === mappedLeagueEntry.idLeague)
+        if (directMatch) {
+          ranked = [directMatch]
+        } else {
+          const strictLeagueMatches = ranked.filter(entry => getLeagueMatchScoreForLeague(leagueHint, entry.league) > 0)
+          if (strictLeagueMatches.length === 0) return null
+          ranked = strictLeagueMatches
+        }
+      } else {
+        const strictLeagueMatches = ranked.filter(entry => getLeagueMatchScoreForLeague(leagueHint, entry.league) > 0)
+        if (strictLeagueMatches.length === 0) return null
+        ranked = strictLeagueMatches
+      }
     }
 
     const best = ranked[0]?.league

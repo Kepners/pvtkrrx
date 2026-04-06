@@ -24,8 +24,22 @@ function buildFetchStub() {
       {
         countries: [
           {
+            idLeague: '4617',
+            strLeague: 'Albanian Superliga',
+            strSport: 'Soccer',
+            strLogo: 'https://images.example.com/league/albania-logo.png'
+          }
+        ]
+      }
+    ],
+    [
+      'lookupleague.php?id=4328',
+      {
+        leagues: [
+          {
             idLeague: '4328',
             strLeague: 'English Premier League',
+            strLeagueAlternate: 'Premier League, EPL, England',
             strSport: 'Soccer',
             strLogo: 'https://images.example.com/league/epl-logo.png',
             strBadge: 'https://images.example.com/league/epl-badge.png',
@@ -166,6 +180,7 @@ async function main() {
 
     assert.equal(first.sports.length, 1, 'expected one seeded sport')
     assert.equal(first.sports[0].label, 'Soccer')
+    assert.equal(first.sports[0].mappedLeagues, 1, 'expected direct mapped-league lookup to recover EPL artwork')
     assert.equal(first.sports[0].upcomingEvents, 2, 'expected deduped event count from league + schedule feeds')
     assert.equal(first.sports[0].teamsCollected, 2, 'expected team badges to be collected')
     assert.equal(first.images.failed, 0, 'expected no image download failures on first pass')
