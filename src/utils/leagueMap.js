@@ -69,6 +69,76 @@ const LEAGUE_MAP = Object.freeze({
     sportsDbSport: 'Fighting',
     aliases: ['Ultimate Fighting Championship']
   },
+  bellator: {
+    name: 'Bellator',
+    idLeague: '4467',
+    sportKey: 'mma',
+    sportsDbSport: 'Fighting',
+    aliases: ['Bellator Fighting Championships', 'Bellator MMA']
+  },
+  pfl: {
+    name: 'PFL',
+    idLeague: '5430',
+    sportKey: 'mma',
+    sportsDbSport: 'Fighting',
+    aliases: ['Professional Fighters League']
+  },
+  one: {
+    name: 'ONE Championship',
+    idLeague: '4495',
+    sportKey: 'mma',
+    sportsDbSport: 'Fighting',
+    aliases: ['ONE', 'ONE Fighting Championship', 'ONE FC']
+  },
+  boxing: {
+    name: 'Boxing',
+    idLeague: '4445',
+    sportKey: 'boxing',
+    sportsDbSport: 'Fighting',
+    aliases: ['Boxing']
+  },
+  toprank: {
+    name: 'Top Rank',
+    idLeague: '4875',
+    sportKey: 'boxing',
+    sportsDbSport: 'Fighting',
+    aliases: ['Top Rank Boxing']
+  },
+  bkfc: {
+    name: 'BKFC',
+    idLeague: '4567',
+    sportKey: 'boxing',
+    sportsDbSport: 'Fighting',
+    aliases: ['Bare Knuckle Boxing', 'Bare Knuckle Fighting Championship']
+  },
+  glory: {
+    name: 'Glory',
+    idLeague: '4798',
+    sportKey: 'mma',
+    sportsDbSport: 'Fighting',
+    aliases: ['Glory Kickboxing']
+  },
+  rizin: {
+    name: 'Rizin FF',
+    idLeague: '4491',
+    sportKey: 'mma',
+    sportsDbSport: 'Fighting',
+    aliases: ['RIZIN', 'RIZIN Fighting Federation']
+  },
+  cagewarriors: {
+    name: 'Cage Warriors',
+    idLeague: '4492',
+    sportKey: 'mma',
+    sportsDbSport: 'Fighting',
+    aliases: ['CWFC', 'Cage Warriors Fighting Championship']
+  },
+  lfa: {
+    name: 'LFA',
+    idLeague: '5429',
+    sportKey: 'mma',
+    sportsDbSport: 'Fighting',
+    aliases: ['Legacy Fighting Alliance']
+  },
   f1: {
     name: 'Formula 1',
     idLeague: '4370',
@@ -194,6 +264,27 @@ const LEAGUE_MAP = Object.freeze({
     sportKey: 'wrestling',
     sportsDbSport: 'Fighting',
     aliases: ['All Elite Wrestling']
+  },
+  tna: {
+    name: 'TNA Wrestling',
+    idLeague: '4455',
+    sportKey: 'wrestling',
+    sportsDbSport: 'Fighting',
+    aliases: ['TNA', 'Impact Wrestling']
+  },
+  roh: {
+    name: 'ROH',
+    idLeague: '4448',
+    sportKey: 'wrestling',
+    sportsDbSport: 'Fighting',
+    aliases: ['Ring of Honor']
+  },
+  njpw: {
+    name: 'NJPW',
+    idLeague: '4449',
+    sportKey: 'wrestling',
+    sportsDbSport: 'Fighting',
+    aliases: ['New Japan Pro Wrestling']
   },
   nrl: {
     name: 'NRL',

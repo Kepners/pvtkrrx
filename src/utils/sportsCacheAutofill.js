@@ -13,10 +13,10 @@ const STATE_FILE_NAME = 'sports-cache-autofill-state.json'
 const DEFAULT_INITIAL_DELAY_MS = 15 * 60 * 1000
 const DEFAULT_INTERVAL_MS = 15 * 60 * 1000
 const DEFAULT_TARGETS_PER_RUN = 1
-const DEFAULT_EVENT_LEAGUE_LIMIT = 8
-const DEFAULT_TEAM_LIMIT_PER_SPORT = 50
+const DEFAULT_EVENT_LEAGUE_LIMIT = 20
+const DEFAULT_TEAM_LIMIT_PER_SPORT = 200
 const DEFAULT_SCHEDULE_DAYS = 7
-const DEFAULT_IMAGE_CONCURRENCY = 4
+const DEFAULT_IMAGE_CONCURRENCY = 6
 
 let activeAutofillPromise = null
 let schedulerController = null
@@ -122,13 +122,13 @@ function resolveSportsCacheAutofillConfig(options = {}) {
       options.eventLeagueLimit ?? env.PVTKRRX_SPORTS_CACHE_AUTO_FILL_EVENT_LEAGUE_LIMIT,
       DEFAULT_EVENT_LEAGUE_LIMIT,
       1,
-      50
+      500
     ),
     teamLimitPerSport: clampInteger(
       options.teamLimitPerSport ?? env.PVTKRRX_SPORTS_CACHE_AUTO_FILL_TEAM_LIMIT_PER_SPORT,
       DEFAULT_TEAM_LIMIT_PER_SPORT,
       0,
-      50
+      1000
     ),
     scheduleDays: clampInteger(
       options.scheduleDays ?? env.PVTKRRX_SPORTS_CACHE_AUTO_FILL_SCHEDULE_DAYS,

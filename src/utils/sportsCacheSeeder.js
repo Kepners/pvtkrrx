@@ -6,9 +6,9 @@ const BASE_URL = 'https://www.thesportsdb.com/api/v1/json'
 const DEFAULT_API_KEY = '123'
 const DEFAULT_TIMEOUT_MS = 10000
 const DEFAULT_IMAGE_CONCURRENCY = 6
-const DEFAULT_EVENT_LEAGUE_LIMIT = 8
-const DEFAULT_TEAM_LIMIT = 50
-const DEFAULT_SCHEDULE_DAYS = 3
+const DEFAULT_EVENT_LEAGUE_LIMIT = 20
+const DEFAULT_TEAM_LIMIT = 200
+const DEFAULT_SCHEDULE_DAYS = 7
 
 const SUPPORTED_SPORT_TARGETS = Object.freeze([
   { key: 'football', sportsDbSport: 'Soccer', label: 'Soccer' },
