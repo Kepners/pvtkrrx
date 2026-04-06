@@ -12,8 +12,8 @@ const DEFAULT_SCHEDULE_DAYS = 3
 
 const SUPPORTED_SPORT_TARGETS = Object.freeze([
   { key: 'football', sportsDbSport: 'Soccer', label: 'Soccer' },
-  { key: 'mma', sportsDbSport: 'MMA', label: 'MMA' },
-  { key: 'boxing', sportsDbSport: 'Boxing', label: 'Boxing' },
+  { key: 'mma', sportsDbSport: 'Fighting', label: 'MMA' },
+  { key: 'boxing', sportsDbSport: 'Fighting', label: 'Boxing' },
   { key: 'basketball', sportsDbSport: 'Basketball', label: 'Basketball' },
   { key: 'american-football', sportsDbSport: 'American Football', label: 'American Football' },
   { key: 'hockey', sportsDbSport: 'Ice Hockey', label: 'Ice Hockey' },
@@ -22,7 +22,7 @@ const SUPPORTED_SPORT_TARGETS = Object.freeze([
   { key: 'cricket', sportsDbSport: 'Cricket', label: 'Cricket' },
   { key: 'rugby', sportsDbSport: 'Rugby', label: 'Rugby' },
   { key: 'motorsport', sportsDbSport: 'Motorsport', label: 'Motorsport' },
-  { key: 'wrestling', sportsDbSport: 'Combat Sports', label: 'Wrestling' }
+  { key: 'wrestling', sportsDbSport: 'Fighting', label: 'Wrestling' }
 ])
 
 function normalizeSpace(value) {

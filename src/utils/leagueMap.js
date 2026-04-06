@@ -66,7 +66,7 @@ const LEAGUE_MAP = Object.freeze({
     name: 'UFC',
     idLeague: '4443',
     sportKey: 'mma',
-    sportsDbSport: 'MMA',
+    sportsDbSport: 'Fighting',
     aliases: ['Ultimate Fighting Championship']
   },
   f1: {
@@ -185,15 +185,65 @@ const LEAGUE_MAP = Object.freeze({
     name: 'WWE',
     idLeague: '4444',
     sportKey: 'wrestling',
-    sportsDbSport: 'Combat Sports',
+    sportsDbSport: 'Fighting',
     aliases: ['World Wrestling Entertainment']
   },
   aew: {
     name: 'AEW',
     idLeague: '4563',
     sportKey: 'wrestling',
-    sportsDbSport: 'Combat Sports',
+    sportsDbSport: 'Fighting',
     aliases: ['All Elite Wrestling']
+  },
+  nrl: {
+    name: 'NRL',
+    idLeague: '4416',
+    sportKey: 'rugby',
+    sportsDbSport: 'Rugby',
+    aliases: ['National Rugby League', 'Australian National Rugby League']
+  },
+  superrugby: {
+    name: 'English Rugby League Super League',
+    idLeague: '4415',
+    sportKey: 'rugby',
+    sportsDbSport: 'Rugby',
+    aliases: ['Super League', 'Rugby Super League']
+  },
+  atp: {
+    name: 'ATP World Tour',
+    idLeague: '4464',
+    sportKey: 'tennis',
+    sportsDbSport: 'Tennis',
+    aliases: ['ATP', 'Association of Tennis Professionals']
+  },
+  wta: {
+    name: 'WTA Tour',
+    idLeague: '4517',
+    sportKey: 'tennis',
+    sportsDbSport: 'Tennis',
+    aliases: ['WTA', 'Womens Tennis Association']
+  },
+  bbl: {
+    name: 'Big Bash League',
+    idLeague: '4461',
+    sportKey: 'cricket',
+    sportsDbSport: 'Cricket',
+    sportsDbName: 'Australian Big Bash League',
+    aliases: ['BBL', 'Big Bash']
+  },
+  eurobasket: {
+    name: 'EuroLeague Basketball',
+    idLeague: '4546',
+    sportKey: 'basketball',
+    sportsDbSport: 'Basketball',
+    aliases: ['EuroLeague', 'Turkish Airlines EuroLeague']
+  },
+  cfl: {
+    name: 'CFL',
+    idLeague: '4405',
+    sportKey: 'american-football',
+    sportsDbSport: 'American Football',
+    aliases: ['Canadian Football League']
   }
 })
 
