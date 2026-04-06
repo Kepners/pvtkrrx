@@ -30,15 +30,6 @@
 
 ---
 
-## MANDATORY: Copy Spec Compliance
-**Before editing ANY website copy, UI text, marketing content, or user-facing labels:**
-1. Read `docs/copy.md` first — it is the governing spec for all product copy
-2. Every line must pass the two final tests in that doc
-3. Use the approved route labels: **PC Local**, **Hybrid Home**, **Remote Seedbox**
-4. Never use forbidden claims listed in Section 3
-
----
-
 ## MANDATORY: Questions via Popup ONLY
 **ALWAYS use the `AskUserQuestion` tool** for questions. Never list questions in text.
 
@@ -61,7 +52,7 @@
 
 ### Install Routes
 1. **PC Local** — same-PC addon via `127.0.0.1:7000`
-2. **LAN Bridge** — hosted manifest + desktop heartbeat → 307 redirect to LAN
+2. **Hybrid Home** — hosted manifest + desktop heartbeat → 307 redirect to LAN for other home devices
 3. **Remote Seedbox** — hosted manifest + public HTTPS playback endpoints
 
 ---
@@ -113,19 +104,40 @@ npm run desktop:dev  # Electron wrapper
 
 ### Smoke Tests
 ```bash
-npm run smoke:config       # Config encryption, token routes, install paths
-npm run smoke:guards       # Hosted security rules, fail-fast behavior
-npm run smoke:pipeline     # Route-capability stream emission and redirect suppression
-npm run smoke:lan-pair     # LAN pair heartbeat, hosted redirect, opaque tokens
-npm run smoke:stremio-link # Stremio AuthKey verification (local mock API)
-npm run smoke:security     # Hardening regressions: CSRF, redaction, opaque tokens, secure JSON
-npm run smoke:sports       # Structured sports enrichment dedup
+npm run smoke:config             # Config encryption, token routes, install paths
+npm run smoke:guards             # Hosted security rules, fail-fast behavior
+npm run smoke:pipeline           # Route-capability stream emission and redirect suppression
+npm run smoke:lan-pair           # LAN pair heartbeat, hosted redirect, opaque tokens
+npm run smoke:stremio-link       # Stremio AuthKey verification (local mock API)
+npm run smoke:security           # Hardening regressions: CSRF, redaction, opaque tokens, secure JSON
+npm run smoke:sports             # Structured sports enrichment dedup
+npm run smoke:parity             # Parity helpers validation
+npm run smoke:selfhost           # Self-host server, admin token, disk-backed config
+npm run smoke:playback           # Playback route, Range support, state tokens
+npm run smoke:sports-cache       # Sports cache seeding
+npm run smoke:sports-cache-auto  # Background cache autofill (15-min rotation)
+npm run smoke:provider-discovery # Provider discovery testing
+npm run smoke:desktop            # Desktop provision testing
+```
+
+### Server Setup (self-host)
+```bash
+npm run server:setup           # Interactive self-host installer
+npm run server:legacy-setup    # Legacy server setup flow
+npm run server:install-service # Install systemd service
 ```
 
 ### Electron Build
 ```bash
 npm run dist:win   # NSIS installer + portable → dist/
 ```
+
+### Key Dependencies
+- `express` ^5.2.1, `stremio-addon-sdk` ^1.6.10
+- `fast-xml-parser` ^4.5.0 (Torznab), `sharp` ^0.34.5 (sports artwork)
+- `multicast-dns` ^7.2.5 (LAN mDNS), `selfsigned` ^5.5.0 (local HTTPS)
+- `7zip-bin` ^5.2.0 (RAR extraction)
+- Dev: `electron` ^31.7.7, `electron-builder` ^24.13.3
 
 ---
 
@@ -178,5 +190,5 @@ Never push to a different branch expecting the live site to update.
 
 ---
 
-*Created: February 8, 2026 | Updated: March 17, 2026*
+*Created: February 8, 2026 | Updated: April 6, 2026*
 
