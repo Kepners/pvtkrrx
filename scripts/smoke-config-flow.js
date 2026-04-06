@@ -206,10 +206,30 @@ async function run() {
       maxResults: 50
     }
 
+    const homeRes = await fetch(`${base}/`)
+    assert.equal(homeRes.status, 200, 'GET / should return 200')
+    const homeHtml = await homeRes.text()
+    assert.match(
+      homeHtml,
+      /<h1 class="logo" data-text="PVTKRRX"><span>PVTKRRX<\/span><\/h1>/,
+      'homepage hero should use live PVTKRRX text in the main headline'
+    )
+    assert.doesNotMatch(homeHtml, /SETRUP/i, 'homepage should not contain the SETRUP typo')
+    assert.doesNotMatch(homeHtml, /Stremio Seedbox Addon/i, 'homepage should not contain the old generic addon headline')
+    assert.match(homeHtml, /id="siteReleaseCard"/, 'homepage should render a release status card')
+    assert.match(homeHtml, /id="siteReleaseLink"/, 'homepage should render a release link')
+
     const configureRes = await fetch(`${base}/configure`)
     assert.equal(configureRes.status, 200, 'GET /configure should return 200')
     const csrf = readCsrf(configureRes.headers.get('set-cookie'))
     const configureHtml = await configureRes.text()
+    assert.match(
+      configureHtml,
+      /<h1 class="logo-title" data-text="PVTKRRX"><span>PVTKRRX<\/span><\/h1>/,
+      'configure hero should use live PVTKRRX text in the main headline'
+    )
+    assert.doesNotMatch(configureHtml, /SETRUP/i, 'configure page should not contain the SETRUP typo')
+    assert.doesNotMatch(configureHtml, /Stremio Seedbox Addon/i, 'configure page should not contain the old generic addon headline')
     assert.match(configureHtml, /<h2>LAN Bridge Fallback<\/h2>/, 'configure page should render LAN Bridge fallback section')
     assert.match(configureHtml, /<h2>Manual \/ Fallback<\/h2>/, 'configure page should render manual fallback section')
     assert.match(configureHtml, /id="installActionBtn"/, 'configure page should render install action button')
@@ -237,12 +257,6 @@ async function run() {
     assert.equal(typeof versionStatus.latestVersion, 'string')
     assert.equal(typeof versionStatus.updateAvailable, 'boolean')
     assert.equal(typeof versionStatus.latestReleaseUrl, 'string')
-
-    const homeRes = await fetch(`${base}/`)
-    assert.equal(homeRes.status, 200, 'GET / should return 200')
-    const homeHtml = await homeRes.text()
-    assert.match(homeHtml, /id="siteReleaseCard"/, 'homepage should render a release status card')
-    assert.match(homeHtml, /id="siteReleaseLink"/, 'homepage should render a release link')
 
     const runbooksRes = await fetch(`${base}/runbooks`)
     assert.equal(runbooksRes.status, 200, 'GET /runbooks should return 200')
@@ -661,6 +675,7 @@ async function run() {
     const tokenConfigureRes = await fetch(`${base}/${token}/configure`)
     assert.equal(tokenConfigureRes.status, 200, 'GET /:token/configure should return 200')
     const tokenConfigureHtml = await tokenConfigureRes.text()
+    assert.match(tokenConfigureHtml, /<h1 class="logo-title" data-text="PVTKRRX"><span>PVTKRRX<\/span><\/h1>/)
     assert.match(tokenConfigureHtml, /Configure the bridge between your own stack and Stremio/)
     assert.match(tokenConfigureHtml, /maybePrefillFromToken/, 'token configure page should include prefill loader')
 

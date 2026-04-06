@@ -64,6 +64,7 @@ Main clarity gaps:
 
 ## Implemented In This Pass
 
+- Main homepage and configure hero headline now reads `PVTKRRX` as live text instead of a generic descriptive headline
 - Hero copy rewritten in plain English around the actual product
 - Main CTA changed to `/configure`
 - Public `/local/install` CTA removed from the homepage
@@ -75,7 +76,7 @@ Main clarity gaps:
 ## Suggested Homepage Shape
 
 1. Hero:
-   - "Private trackers in Stremio, through your own setup."
+   - `PVTKRRX`
    - Supporting line explaining Prowlarr + qBittorrent + Stremio in one sentence
 2. Proof/value strip:
    - Sports

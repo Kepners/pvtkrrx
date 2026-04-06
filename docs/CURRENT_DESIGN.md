@@ -78,7 +78,7 @@ PVTKRRX is one codebase with three active runtime pieces:
   - runtime log copy/open actions
   - explicit `Minimize`, `Send To Tray`, and `Exit App` actions
 - The configure page now mirrors that local-runtime visibility with a live qBittorrent status panel that shows the effective save path, incomplete path, fallback storage roots, and whether PVTKRRX currently manages the qBit completion hook.
-- The public homepage and configure page now share the same `Private Trackers Into Stremio` framing, `Configure First` entry point, and locked route vocabulary (`PC Local`, `LAN Bridge`, `Remote Seedbox`).
+- The public homepage and configure page now use a brand-led `PVTKRRX` hero with live editable text, keep `Configure First` as the entry point, and keep the locked route vocabulary (`PC Local`, `LAN Bridge`, `Remote Seedbox`).
 - The public homepage now shows a live release-status card driven by `/version-status.json`, and the Windows desktop shell shows the same release check in the popup.
 - Legacy `Hybrid Home` wording may still appear in older docs or internal notes. Treat that as terminology drift, not a different route model, unless a doc explicitly calls out the older naming history.
 
