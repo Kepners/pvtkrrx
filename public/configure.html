@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PVTKRRX - Configure</title>
+  <title>PVTKRRX — Configure Your Stremio Seedbox Addon</title>
+  <meta name="description" content="Connect Prowlarr and qBittorrent to Stremio. Pick an install route — PC Local, Hybrid Home, or Remote Seedbox — and configure once.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1740,7 +1741,7 @@
         <h1 class="logo-title" data-text="PVTKRRX"><span>PVTKRRX</span></h1>
       </div>
       <div class="logo-grid" aria-hidden="true"></div>
-      <p class="subtitle">Connect your private tracker seedbox to Stremio</p>
+      <p class="subtitle">Connect your private tracker setup to Stremio</p>
     </div>
 
     <div class="card self-host-unlock" id="serverAdminBlock" style="display:none;">
@@ -1772,17 +1773,17 @@
         <button type="button" class="mode-option active" data-install-target="lan" onclick="setInstallTarget('lan')">
           <span class="mode-kicker">Home + away sync</span>
           <span class="mode-title">Hybrid Home</span>
-          <span class="mode-copy">Use one hosted addon on the same Stremio account. It uses the Windows host on your home network, then falls back to cloud playback away from home.</span>
+          <span class="mode-copy">One hosted addon URL shared across your Stremio account. At home, playback routes through your Windows host on LAN. Away from home, it requires a public file server endpoint.</span>
           <div class="summary-points">
             <span>LAN redirect at home</span>
-            <span>Cloud fallback away from home</span>
+            <span>Public endpoint required away from home</span>
             <span>Same-account sync across devices</span>
           </div>
         </button>
         <button type="button" class="mode-option" data-install-target="seedbox" onclick="setInstallTarget('seedbox')">
           <span class="mode-kicker" id="installTargetSeedboxKicker">Public endpoints</span>
           <span class="mode-title">Remote Seedbox</span>
-          <span class="mode-copy" id="installTargetSeedboxCopy">Use the hosted remote profile only when Prowlarr, qBittorrent, and file serving are reachable over public URLs. On the hosted site this is not a generic tracker-buffering path: it is effectively ready-file / public-playback only unless you self-host PVTKRRX on a runtime that can truly serve playback. Auth-protected file-server playback still needs real-device validation because client auth handling can vary.</span>
+          <span class="mode-copy" id="installTargetSeedboxCopy">All services — Prowlarr, qBittorrent, and file serving — must be reachable over public HTTPS. This is the away-from-home route for seedbox operators with publicly exposed endpoints.</span>
           <div class="summary-points">
             <span id="installTargetSeedboxPoint1">Public HTTPS ready-file path required</span>
             <span id="installTargetSeedboxPoint2">Hosted site fails closed on local-only playback</span>
@@ -3147,7 +3148,7 @@
       if (seedboxCopy) {
         seedboxCopy.textContent = isSelfHostedServerRuntime()
           ? 'Self-hosted server mode is Remote Seedbox only. Save the config here, reuse it after reboot, and keep the public URL for Stremio.'
-          : 'Use the hosted remote profile only when Prowlarr, qBittorrent, and file serving are reachable over public URLs. On the hosted site this is not a generic tracker-buffering path: it is effectively ready-file / public-playback only unless you self-host PVTKRRX on a runtime that can truly serve playback. Auth-protected file-server playback still needs real-device validation because client auth handling can vary.';
+          : 'All services — Prowlarr, qBittorrent, and file serving — must be reachable over public HTTPS. This is the away-from-home route for seedbox operators with publicly exposed endpoints.';
       }
       if (seedboxPoint1) {
         seedboxPoint1.textContent = isSelfHostedServerRuntime()
@@ -4636,7 +4637,7 @@
       if (kicker) kicker.textContent = 'Home + away sync';
       if (title) title.textContent = 'Hybrid Home';
       if (lead) lead.textContent = 'PVTKRRX checks for signed-in Stremio on this Windows PC automatically. Auto Setup reuses that session, keeps the home host pair alive, builds the hosted install link, and keeps the advanced tools out of the way.';
-      if (copy) copy.textContent = 'This route is for your phone, TV, web, and Apple TV on the same Stremio account. It uses the Windows host at home and falls back to cloud playback away from home. This Windows PC itself should use PC Local.';
+      if (copy) copy.textContent = 'This route is for your phone, TV, web, and Apple TV on the same Stremio account. At home, playback routes through your Windows host on LAN. Away from home, it requires a public file server endpoint. This Windows PC itself should use PC Local.';
       if (hint) hint.textContent = 'Need the old checklist, service tabs, or raw URLs? Open the hidden setup tabs below.';
 
       toggle(checkBtn, false);
@@ -4776,7 +4777,7 @@
       if (target === 'pc') {
         hint.textContent = 'PC Local selected. This route works on this Windows host and installs a real same-PC addon for browsing and playback. Hybrid Home is the route for your other home devices.';
       } else if (target === 'lan') {
-        hint.textContent = 'Hybrid Home selected. This is the main synced setup. The app checks Stremio on this Windows PC, reuses the signed-in Stremio account when possible, then prepares one hosted addon that uses LAN playback at home and cloud playback away from home. For browsing and playback on this Windows host itself, switch to PC Local.';
+        hint.textContent = 'Hybrid Home selected. This is the main synced setup. The app checks Stremio on this Windows PC, reuses the signed-in Stremio account when possible, then prepares one hosted addon that uses LAN playback at home. Away from home requires a public file server endpoint. For browsing and playback on this Windows host itself, switch to PC Local.';
       } else {
         hint.textContent = serverRuntime.selfHostServerMode
           ? 'Remote Seedbox selected on a self-hosted server. This server app can save its config locally, reuse it after reboot, and use private localhost service URLs when you authenticate as the server admin.'

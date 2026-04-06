@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PVTKRRX - Private Tracker Relay</title>
-  <meta name="description" content="PVTKRRX connects private trackers to Stremio through your own hardware. Open Configure to finish setup, then browse sports, movies, TV, and your library.">
+  <title>PVTKRRX — Stremio Private Tracker Addon</title>
+  <meta name="description" content="Stremio addon for private tracker and seedbox users. Connect Prowlarr and qBittorrent to browse sports, movies, TV, and your library inside Stremio.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@500;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
@@ -1097,7 +1097,7 @@
         </p>
         <p class="hero-support">
           PVTKRRX is a Stremio addon for people who already run their own private tracker stack.
-          The public homepage points you at Configure, where the actual runtime setup lives.
+          Open Configure to connect your services and choose an install route.
         </p>
         <div class="hero-chips" aria-label="Key features">
           <span class="hero-chip">Sports</span>
@@ -1124,7 +1124,7 @@
       <article class="meta-card">
         <div class="meta-title">Content</div>
         <div class="meta-value">Sports / Movies / TV / Library</div>
-        <div class="meta-caption">One addon surface, four real reasons to use it</div>
+        <div class="meta-caption">Four catalogs in one addon</div>
       </article>
       <article class="meta-card">
         <div class="meta-title">Your Stack</div>
@@ -1134,7 +1134,7 @@
       <article class="meta-card">
         <div class="meta-title">Hosted Base</div>
         <div class="meta-value">www.pvtkrrx.cc</div>
-        <div class="meta-caption">Canonical public host for configure + install links</div>
+        <div class="meta-caption">Public host for setup and install links</div>
       </article>
       <article class="meta-card release-card unavailable" id="siteReleaseCard">
         <div class="meta-title">Release</div>
@@ -1148,10 +1148,9 @@
     <section class="section-block" id="requirements">
       <div class="section-head">
         <div class="section-kicker">What You Need</div>
-        <h2 class="section-title">The setup requirements are simpler than the homepage used to imply</h2>
+        <h2 class="section-title">You bring the infrastructure, PVTKRRX connects it</h2>
         <p class="section-copy">
-          PVTKRRX works best when it says the quiet part out loud.
-          If you already run your own private tracker stack, the addon is mostly about connecting the right pieces and finishing setup for the hardware you already have.
+          If you already run your own private tracker stack, the addon connects the pieces you have to Stremio. Here is what it expects.
         </p>
       </div>
 
@@ -1166,7 +1165,7 @@
         </article>
         <article class="need-card">
           <div class="need-name">Windows Host</div>
-          <p class="need-copy">Required for the local runtime that serves same-machine browsing and home-network access.</p>
+          <p class="need-copy">Required for same-machine browsing and home-network access via PC Local or Hybrid Home.</p>
         </article>
         <article class="need-card">
           <div class="need-name">Public File Server</div>
@@ -1178,17 +1177,16 @@
     <section class="section-block" id="sports">
       <div class="section-head">
         <div class="section-kicker">Sports Support</div>
-        <h2 class="section-title">Sports is not a badge here, it is part of the product</h2>
+        <h2 class="section-title">Sports is a first-class catalog</h2>
         <p class="section-copy">
-          If your tracker setup already supports sports releases, PVTKRRX can surface them in Stremio alongside movies, TV, and your library.
-          That is one of the clearest differences between the product and the way the homepage used to describe it.
+          If your trackers carry sports releases, PVTKRRX surfaces them in Stremio alongside movies, TV, and your library — with artwork and metadata where available.
         </p>
       </div>
 
       <div class="sports-grid">
         <article class="sports-card">
           <div class="sports-title">Sports In Stremio</div>
-          <p>Sports is treated as a real top-level discovery surface, not just a throwaway tag in a feature strip.</p>
+          <p>Sports has its own top-level catalog in Stremio with genre filtering, not a tag buried in another category.</p>
         </article>
         <article class="sports-card">
           <div class="sports-title">Tracker-Driven Results</div>
@@ -1199,7 +1197,7 @@
           <p>Sports metadata can carry posters, landscape art, background art, and logos so the Stremio surface feels like a real catalog, not a dump of filenames.</p>
         </article>
         <article class="sports-card">
-          <div class="sports-title">Library Next To Live Content</div>
+          <div class="sports-title">Library Next To New Releases</div>
           <p>Already-downloaded files, sports releases, movies, and TV all live inside the same addon surface instead of being split into separate tools.</p>
         </article>
       </div>
@@ -1207,7 +1205,7 @@
 
     <section class="status-strip">
       <div class="status-track">
-        [PRIVATE TRACKERS IN STREMIO] [SPORTS + MOVIES + TV + LIBRARY] [PROWLARR + QBITHORRENT] [NO DEBRID] [YOUR HARDWARE] [CONFIGURE FIRST]
+        [PRIVATE TRACKERS IN STREMIO] [SPORTS + MOVIES + TV + LIBRARY] [PROWLARR + QBITTORRENT] [NO DEBRID] [YOUR HARDWARE] [CONFIGURE FIRST]
       </div>
     </section>
 
@@ -1226,15 +1224,14 @@
         <details class="faq-item">
           <summary>Where do I start?</summary>
           <div class="faq-answer">
-            Open <code>Configure</code> first. The homepage points you at the setup surface so you can finish the runtime details before you install anything in Stremio.
+            Open <code>Configure</code> first. That is where you connect your services, pick an install route, and generate your Stremio install link.
           </div>
         </details>
 
         <details class="faq-item">
           <summary>Do I need three different apps?</summary>
           <div class="faq-answer">
-            No. PVTKRRX is one runtime that adapts to the setup you already have.
-            The point is not to install everything everywhere, it is to connect the pieces once and keep using them from Stremio.
+            No. PVTKRRX is one addon with three install routes. You pick the route that matches where you watch — same PC, other home devices, or away from home — and configure once.
           </div>
         </details>
 
@@ -1254,8 +1251,7 @@
         <details class="faq-item">
           <summary>Does this work on Apple TV, Android TV, phone, and web?</summary>
           <div class="faq-answer">
-            Yes, through the same runtime and account flow.
-            Use the configuration path that matches the device and network you are already using.
+            Yes. PC Local is for the Windows machine running PVTKRRX. Hybrid Home covers your TV, phone, and other home devices via the same Stremio account. Remote Seedbox works anywhere if your services have public HTTPS endpoints.
           </div>
         </details>
       </div>
