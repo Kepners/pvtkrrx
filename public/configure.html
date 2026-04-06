@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>PVTKRRX — Configure Your Stremio Seedbox Addon</title>
-  <meta name="description" content="Connect Prowlarr and qBittorrent to Stremio. Pick an install route — PC Local, Hybrid Home, or Remote Seedbox — and configure once.">
+  <title>Stremio Seedbox Addon Setup | PVTKRRX</title>
+  <meta name="description" content="Configure PVTKRRX by connecting Prowlarr and qBittorrent in your private tracker setup to Stremio for PC Local, Hybrid Home, or Remote Seedbox.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -1738,7 +1738,7 @@
 
     <div class="logo-header">
       <div class="logo-frame">
-        <h1 class="logo-title" data-text="PVTKRRX"><span>PVTKRRX</span></h1>
+        <h1 class="logo-title" data-text="Stremio Seedbox Addon Setup"><span>Stremio Seedbox Addon Setup</span></h1>
       </div>
       <div class="logo-grid" aria-hidden="true"></div>
       <p class="subtitle">Connect your private tracker setup to Stremio</p>
@@ -1987,8 +1987,8 @@
             <input type="password" id="qbitPassword" placeholder="password">
           </div>
         </div>
-        <div class="status info" id="qbitRuntimeStatus">Local qBittorrent save path and extraction status will appear here when you open this page on the Windows host runtime.</div>
-        <p class="hint">Change the actual qBittorrent save path in the desktop server window or qBittorrent WebUI. This page shows the live runtime path here so you can confirm what PVTKRRX is currently using.</p>
+        <div class="status info" id="qbitRuntimeStatus">Local qBittorrent save path and extraction status will appear here when you open this page on the Windows host.</div>
+        <p class="hint">Change the actual qBittorrent save path in the desktop server window or qBittorrent WebUI. This page shows the live save path here so you can confirm what PVTKRRX is currently using.</p>
         <label style="display:flex;align-items:flex-start;gap:0.6rem;margin-top:0.9rem;">
           <input type="checkbox" id="qbitAutoExtractEnabled" style="width:auto;transform:scale(1.15);margin-top:0.15rem;">
           <span>Use qBittorrent's completion hook to trigger PVTKRRX extraction for packed releases. PVTKRRX stays the extractor; qBittorrent only triggers the post-process call when the download finishes.</span>
@@ -2006,7 +2006,7 @@
         <textarea id="additionalStorageRoots" placeholder="Z:\Media&#10;\\NAS\TV&#10;D:\Archive"></textarea>
         <p class="hint">One path per line. PVTKRRX will try qBittorrent's save path first, then these extra local or mounted network locations if the file was moved after download.</p>
         <p class="hint">Use paths the Windows host PC can already read directly, including mapped drives, NAS shares, and extra HDD folders.</p>
-        <div class="status info" id="storageRuntimeStatus">PVTKRRX checks qBittorrent's save path first, then these fallback roots. Open this page on the Windows host runtime to see the live qBit paths here.</div>
+        <div class="status info" id="storageRuntimeStatus">PVTKRRX checks qBittorrent's save path first, then these fallback roots. Open this page on the Windows host to see the live qBit paths here.</div>
       </div>
 
       <div class="service-card mode-hidden" id="serviceCard-files" data-service-visible="lan seedbox">
@@ -2075,7 +2075,7 @@
           </div>
         </div>
         <p class="hint">Maps qBit save path to file server URL path.</p>
-        <p class="hint">Remote buffering only appears when qBittorrent exposes a provable current file path and the runtime can actually serve that in-progress file.</p>
+        <p class="hint">Remote buffering only appears when qBittorrent exposes a provable current file path and PVTKRRX can actually serve that in-progress file.</p>
       </div>
 
       <div class="service-card" id="serviceCard-options" data-service-visible="pc lan seedbox">
@@ -2086,7 +2086,7 @@
         <input type="text" id="sportsDbApiKey" value="123" placeholder="123">
         <label for="sportsDbCacheHours">TheSportsDB Cache (hours)</label>
         <input type="number" id="sportsDbCacheHours" value="24" min="1" max="168">
-        <p class="hint">Controls sports artwork lookup reuse. Posters, wallpapers, landscape art, and logos are also cached on demand by the active runtime.</p>
+        <p class="hint">Controls sports artwork lookup reuse. Posters, wallpapers, landscape art, and logos are also cached on demand by the active PVTKRRX host.</p>
         <div id="localHostnameBlock">
           <label for="localHostname">Local Hostname (.local alias)</label>
           <input type="text" id="localHostname" value="pvtkrrx.local" placeholder="pvtkrrx.local">
@@ -2476,7 +2476,7 @@
       }
 
       if (canQueryLocalRuntime()) {
-        hint.textContent = 'Self-hosted server mode is active. Because you are opening this page on the same host/runtime, the password is optional here.';
+        hint.textContent = 'Self-hosted server mode is active. Because you are opening this page on the same host, the password is optional here.';
         if (!document.getElementById('serverAdminStatus')?.textContent) {
           setServerAdminStatus('ok', 'Same-host access detected.');
         }
@@ -3171,7 +3171,7 @@
         return;
       }
       if (isDesktopLocalOnlyRuntime()) {
-        lead.textContent = 'Pick where you want to watch on this Windows host. This EXE now handles PC Local and Hybrid Home. Remote Seedbox lives in the separate server/cloud runtime.';
+        lead.textContent = 'Pick where you want to watch on this Windows host. This EXE now handles PC Local and Hybrid Home. Remote Seedbox lives in the separate server app.';
         return;
       }
       lead.textContent = 'Pick where you want to watch. PC Local is the real addon for this Windows machine. Hybrid Home is the synced route for your phone, TV, web, and Apple TV.';
@@ -4089,7 +4089,7 @@
         return {
           title: isSelfHostedServerRuntime() ? 'Server Addon URL' : 'Remote Seedbox Addon URL',
           lead: isSelfHostedServerRuntime()
-            ? 'Paste this HTTPS URL into Stremio on the device that should use your self-hosted server runtime.'
+            ? 'Paste this HTTPS URL into Stremio on the device that should use your self-hosted server.'
             : 'Paste this HTTPS URL into Stremio on the device you want to use remotely.',
           hint: isSelfHostedServerRuntime()
             ? 'This self-hosted server can keep its config on disk and use private backend URLs. Only the browser-facing install origin still needs public HTTPS.'
@@ -4618,7 +4618,7 @@
           setSimpleFlowStatus(
             'ok',
             isSelfHostedServerRuntime()
-              ? 'Server install links are ready. This self-hosted runtime will keep using the saved config after reboot.'
+              ? 'Server install links are ready. This self-hosted server will keep using the saved config after reboot.'
               : 'Remote Seedbox links are ready. Use them only on clients that should hit your public playback endpoints.'
           );
         } else if (installStatusText) {
@@ -4706,13 +4706,13 @@
         if (installActionBtn) installActionBtn.textContent = 'Save And Generate PC Local URL';
         if (connectionSectionLead) connectionSectionLead.textContent = 'Home mode uses built-in local file serving. Use the Storage tab if completed files may live on NAS shares or extra drives.';
       } else if (target === 'lan') {
-        if (installActionLead) installActionLead.textContent = 'Generate the Hybrid Home Stremio install link plus the manual HTTPS fallback URL. At home it redirects to the Windows host; away from home it falls back to the hosted cloud path.';
+        if (installActionLead) installActionLead.textContent = 'Generate the Hybrid Home Stremio install link plus the manual HTTPS fallback URL. At home it redirects to the Windows host; away from home it requires your public file server endpoint.';
         if (installActionBtn) installActionBtn.textContent = 'Save And Generate Hybrid Home Links';
         if (connectionSectionLead) connectionSectionLead.textContent = 'Hybrid Home uses built-in local file serving on the Windows host at home, plus the public file-server path away from home. Storage roots can point at NAS shares or extra HDD folders the Windows host can already read.';
       } else {
         if (installActionLead) {
           installActionLead.textContent = isSelfHostedServerRuntime()
-            ? 'Generate the self-hosted server addon URL for Stremio. This runtime stores its own config locally and can use private backend service URLs after server-admin authentication.'
+            ? 'Generate the self-hosted server addon URL for Stremio. This server stores its own config locally and can use private backend service URLs after server-admin authentication.'
             : 'Generate the Remote Seedbox addon URL for Stremio. This route is separate from Hybrid Home and uses the hosted HTTPS manifest.';
         }
         if (installActionBtn) {
@@ -4781,7 +4781,7 @@
       } else {
         hint.textContent = serverRuntime.selfHostServerMode
           ? 'Remote Seedbox selected on a self-hosted server. This server app can save its config locally, reuse it after reboot, and use private localhost service URLs when you authenticate as the server admin.'
-          : 'Remote Seedbox selected. Hosted playback is effectively ready-file-first here. Direct queue-and-buffer only appears when the runtime can safely serve it, and auth-protected file-server playback still needs real-device proof.';
+          : 'Remote Seedbox selected. Hosted playback is effectively ready-file-first here. Direct queue-and-buffer only appears when PVTKRRX can safely serve it, and auth-protected file-server playback still needs real-device proof.';
       }
     }
 
@@ -5086,7 +5086,7 @@
         setRuntimeStatus(
           'qbitRuntimeStatus',
           'info',
-          'Open this page on the Windows host runtime to read qBittorrent\'s live save path and extraction-hook status.'
+          'Open this page on the Windows host to read qBittorrent\'s live save path and extraction-hook status.'
         );
         setRuntimeStatus(
           'storageRuntimeStatus',
@@ -5100,7 +5100,7 @@
         const res = await fetch('/local/qbit/preferences', { cache: 'no-store' });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || data.error) {
-          throw new Error(data.error || `Failed to read qBittorrent runtime state (${res.status})`);
+          throw new Error(data.error || `Failed to read qBittorrent host state (${res.status})`);
         }
 
         const savePath = String(data.savePath || '').trim() || 'Not configured yet';
@@ -5141,12 +5141,12 @@
         setRuntimeStatus(
           'qbitRuntimeStatus',
           'err',
-          err?.message || 'Failed to read qBittorrent runtime state.'
+          err?.message || 'Failed to read qBittorrent host state.'
         );
         setRuntimeStatus(
           'storageRuntimeStatus',
           'err',
-          'Live qBittorrent path lookup failed. Check the local runtime and qBittorrent WebUI settings.'
+          'Live qBittorrent path lookup failed. Check the Windows host and qBittorrent WebUI settings.'
         );
         return null;
       }
