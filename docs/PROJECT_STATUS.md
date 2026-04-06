@@ -1,10 +1,10 @@
 # PVTKRRX Project Status
 
-Updated: 2026-04-04
+Updated: 2026-04-06
 
 ## Current Stage
 
-PVTKRRX is in a working `1.1.24` state on the main Windows/local route set.
+PVTKRRX is in a working `1.1.25` state on the main Windows/local route set.
 The current packaged Windows app is now verified as the real host runtime, and a live Apple TV synced home-route pass has been captured against it.
 
 The practical reading of the project today is:
@@ -49,6 +49,14 @@ The practical reading of the project today is:
   - sports structured matchup/F1 poster token coverage
   - sports cache pre-seed rerun/cache-hit coverage
 
+## Work Carried Out On 2026-04-06
+
+- Fixed the self-host/server `liberror` regression on incomplete matched torrents by keeping playback-capable buffering streams on `/playback` first instead of handing Stremio straight into `/file` too early.
+- Opaque playback tokens now carry the chosen file path so multi-file torrents still resolve the correct episode/file when `/playback` later hands off into `/file`.
+- Added smoke coverage for the new buffering handoff contract plus target-file playback-token round trips.
+- Cut the public desktop release as `1.1.25` and the matching Windows installer assets.
+- Published the next self-host prerelease tag as `v1.12.11-selfhost` so the cloud/server installer line has a current pinned release for this fix set.
+
 ## Earlier 2026-04-04 Self-Host Work
 
 - The Linux self-host installer now strips the Cloudflare Tunnel "waiting" line out of the captured public URL, auto-picks a free qBittorrent WebUI port if 8080 is already occupied, and writes that real port back into the qBit config before startup.
@@ -88,6 +96,14 @@ These items are verified in the current workspace or by direct client/log proof:
 - `npm run smoke:selfhost` passed on 2026-03-31 and now covers explicit self-host server mode, disk-backed `/selfhost` config, and self-host password gates
 - `npm run smoke:selfhost` passed again on 2026-03-31 after adding browser-driven Stremio link-session persistence into the disk-backed self-host config
 - `npm run smoke:provider-discovery` passed on 2026-04-02 after broadening the shared provider discovery helpers for existing Prowlarr/qBittorrent installs
+- `npm run smoke:config` passed on 2026-04-06 after the `1.1.25` public release cut, keeping `/version-status.json`, `/install-selfhost.sh`, and the hosted/local manifest flows green
+- `npm run smoke:desktop` passed on 2026-04-06 after the `1.1.25` public release cut
+- `npm run smoke:playback` passed on 2026-04-06 after the `/playback` buffering-handoff fix and now covers target-file playback tokens for multi-file torrents
+- `npm run smoke:selfhost` passed on 2026-04-06 after the `1.1.25` public release cut, keeping disk-backed self-host config plus password gating green
+- `npm run smoke:pipeline` passed on 2026-04-06 after the buffering-stream handoff fix, keeping self-host/local buffering rows on the safer `/playback` route
+- `npm run smoke:guards` passed on 2026-04-06 after the `1.1.25` public release cut
+- `npm run smoke:lan-pair` passed on 2026-04-06 after the playback-token update, keeping opaque LAN/home-route token flow green
+- `C:\Program Files\Git\bin\bash.exe -n scripts/install-selfhost.sh` passed on 2026-04-06 from the Windows workspace for the public release cut
 - `npm run smoke:sports-cache` passed on 2026-04-04 for the new sports cache pre-seed flow, including disk-cache reuse on rerun
 - `npm run smoke:sports-cache-auto` now covers the rotating background sports-cache autofill flow: first sport, cursor advance, second sport, cursor wrap, and disk-cache reuse on the wrapped pass
 - `npm run smoke:playback` now also covers the split self-host playback-origin path so `/playback` redirects can leave the control/tunnel origin and land on a dedicated direct byte-serving origin
@@ -113,7 +129,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - 2026-03-31 preview-host check: `https://pvtkrrx.vercel.app/` returned `404` with `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`, so treat it as stale and non-canonical
 - 2026-03-31 homepage cleanup landed locally in `public/index.html`: plain-English hero, requirements section, sports proof section, and removal of the public `/local/install` CTA
 - explicit self-host server mode now exposes `/app-config.json`, disk-backed `/selfhost/config.json` + `/selfhost/manifest.json?mode=hosted`, and `POST /server-config` for persisted VPS/seedbox installs
-- the self-host installer path has now been rebuilt around a dedicated Linux bootstrap script plus a new `npm run server:setup` installer flow that writes a stable `PVTKRRX_RUNTIME_DIR`, generates `AUTH_TOKEN_SECRET`, supports `PVTKRRX_PUBLIC_BASE_URL`, auto-discovers existing Prowlarr/qBittorrent configs when present, automatically hands off to the full bootstrap when those providers are missing, now exposes a hosted launcher at `https://www.pvtkrrx.cc/install-selfhost.sh`, pulls the app source from the branch payload by default with optional tag/manifest pinning and an automatic retry from `main` if a pinned release is too old for `scripts/server-installer.js`, saves the runtime config locally, creates the self-host password file, can install a Linux `systemd` service for auto-start on boot, and now prints the working public PVTKRRX root/configure/bootstrap/manifest URLs explicitly in the installer summary using raw stdout so they are not redacted; the current published self-host release is `v1.12.10-selfhost`
+- the self-host installer path has now been rebuilt around a dedicated Linux bootstrap script plus a new `npm run server:setup` installer flow that writes a stable `PVTKRRX_RUNTIME_DIR`, generates `AUTH_TOKEN_SECRET`, supports `PVTKRRX_PUBLIC_BASE_URL`, auto-discovers existing Prowlarr/qBittorrent configs when present, automatically hands off to the full bootstrap when those providers are missing, now exposes a hosted launcher at `https://www.pvtkrrx.cc/install-selfhost.sh`, pulls the app source from the branch payload by default with optional tag/manifest pinning and an automatic retry from `main` if a pinned release is too old for `scripts/server-installer.js`, saves the runtime config locally, creates the self-host password file, can install a Linux `systemd` service for auto-start on boot, and now prints the working public PVTKRRX root/configure/bootstrap/manifest URLs explicitly in the installer summary using raw stdout so they are not redacted; the current published self-host release is `v1.12.11-selfhost`
 - `npm run smoke:stremio-link` passed on 2026-03-31 after the new link-session flow was added for hosted token configs: server-created session, install-seen manifest hit, browser AuthKey completion, and final linked install URL/token refresh
 - configure page now exposes a one-time `Server Link Session` flow so a local signed-in Stremio browser/device can link a remote/cloud server config without the server recovering raw login credentials
 - `PC Local` resolves as a real addon from `http://127.0.0.1:7000/local/manifest.json?mode=local`
@@ -149,8 +165,11 @@ These items are verified in the current workspace or by direct client/log proof:
 - `1.1.22` installers were built successfully into `dist/` on 2026-04-01 for the one-time Stremio server link-session update and self-host configure route cleanup
 - `1.1.23` installers were built successfully into `dist/` on 2026-04-02 for the GitHub release-status update
 - `1.1.24` installers were built successfully into `dist/` on 2026-04-04 for the sports cache pre-seed desktop release refresh
+- `1.1.25` installers were built successfully into `dist/` on 2026-04-06 for the public playback-handoff release
 - `1.1.23` GitHub release was published on 2026-04-02 with the matching `latest.yml`, portable EXE, and setup installer assets
-- `v1.12.10-selfhost` GitHub prerelease was published on 2026-04-03 for the cloud/self-host password UX update; the last published GitHub desktop release still remains on `1.1.23` until the new `1.1.24` desktop artifacts are published
+- `1.1.25` GitHub release was published on 2026-04-06 with the matching `latest.yml`, portable EXE, and setup installer assets
+- `v1.12.11-selfhost` GitHub prerelease was published on 2026-04-06 for the self-host/server playback-handoff fix and current cloud installer line
+- `npm run dist:win` passed again on 2026-04-06 for the `1.1.25` desktop public release build
 - the packaged Windows desktop app is working on the current host build, including the route-first setup flow and desktop shell controls shown in the live app UI
 - a real Apple TV LAN Bridge playback pass succeeded on 2026-03-31 after desktop/web install; while the Windows host stayed locked, playback started normally, the client reported the video as local, and forward/back seek worked
 
@@ -212,7 +231,7 @@ These items are verified in the current workspace or by direct client/log proof:
 
 These items should still be treated as open until captured on real clients:
 
-- one extra non-tvOS `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.24` desktop build for cross-client parity
+- one extra non-tvOS `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.25` desktop build for cross-client parity
 - one real public `Remote Seedbox` ready-file playback success on a remote client
 - one auth-protected external file-server playback success on a real Stremio client
 - long-session playback/performance tuning after qBittorrent download-speed adjustments
