@@ -753,17 +753,17 @@ app.get(['/thumb/sports/:info.svg', '/thumb/sports/:variant/:info.svg'], async (
 app.get('/image/sports/:variant/:token', async (req, res) => {
   try {
     const image = await resolveSportsImageRequest(req.params.token, req.params.variant)
+    const filePath = path.resolve(image.filePath)
+    const fileBuffer = await fs.promises.readFile(filePath)
     res.setHeader('Content-Type', image.contentType)
-    if (Number.isFinite(Number(image.size)) && Number(image.size) > 0) {
-      res.setHeader('Content-Length', String(image.size))
-    }
+    res.setHeader('Content-Length', String(fileBuffer.length))
     res.setHeader('X-PVTKRRX-Sports-Image-Cache', String(image.cacheStatus || 'miss'))
     setPublicCacheHeaders(res, 86400, {
       sMaxAge: 604800,
       staleWhileRevalidate: 2592000,
       staleIfError: 2592000
     })
-    res.sendFile(path.resolve(image.filePath))
+    res.send(fileBuffer)
   } catch (err) {
     console.warn('[sports-image-cache] Failed to serve sports image:', err.message)
     res.status(404).send('sports image unavailable')
