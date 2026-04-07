@@ -1,8 +1,13 @@
+const { getMappedLeagueEntry } = require('./leagueMap')
+
 const QUALITY_RE = /^(?:2160p|1080p|720p|576p|540p|480p|sd|hd|fhd|uhd)(?:\d{2,3}fps)?$/i
 const SOURCE_RE = /^(?:hdtv|pdtv|sdtv|webrip|webdl|web-dl|web|bluray|bdrip|dvdrip|satfeed|iptv)$/i
 const CODEC_RE = /^(?:x264|x265|h264|h265|hevc|avc|av1)(?:-.+)?$/i
 const RELEASE_GROUP_RE = /^[A-Z0-9]+-[A-Za-z0-9]+$/
 const HLG_HDR_RE = /^(?:hlg|hdr10?\+?|dovi?|dv|10bit|8bit)$/i
+const GENERIC_SPORT_PREFIX_RE = /^(?:football|soccer|basketball|baseball|cricket|rugby|mma|boxing|wrestling|darts|golf|motorsport|motor|tennis|hockey|ice|american|uefa)$/i
+const LEADING_TEAM_NOISE_RE = /^(?:game|games|match|matches|week|round|heat|session|fight|night|grand|prix|qualifying|practice|sprint|race|card|prelims?|early|cup|bowl|super|opening|closing|ceremony|playoffs?|finals?|semi(?:final)?|quarter(?:final)?|championship|title|event)$/i
+const ROMAN_NUMERAL_RE = /^(?:[ivxlcdm]+)$/i
 
 // Known league/series tokens that start non-vs event titles
 const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|MotoGP|NASCAR|IndyCar|WRC|Supercars|V8SC|Bathurst|WSBK|WEC|FormulaE|Rally|Dakar|PGA|LPGA|Masters|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
@@ -45,15 +50,148 @@ function isReleaseGroupToken(token) {
   return RELEASE_GROUP_RE.test(String(token || '').trim())
 }
 
-function parseSportsTitle(title) {
+function extractFallbackDate(value) {
+  const source = String(value || '').trim()
+  if (!source) return ''
+
+  const iso = source.match(/((?:19|20)\d{2})[._\s-](\d{2})[._\s-](\d{2})/)
+  if (iso && isValidDate(iso[1], iso[2], iso[3])) return `${iso[1]}-${iso[2]}-${iso[3]}`
+
+  const dmy = source.match(/(\d{2})[._\s-](\d{2})[._\s-]((?:19|20)\d{2})/)
+  if (dmy && isValidDate(dmy[3], dmy[2], dmy[1])) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`
+
+  const plain = source.match(/((?:19|20)\d{2}-\d{2}-\d{2})/)
+  if (plain) return plain[1]
+
+  return ''
+}
+
+function findStructuredDate(tokens, fallbackDate = '') {
+  const maxStart = Math.min(tokens.length - 3, 5)
+  for (let i = 1; i <= maxStart; i += 1) {
+    const first = String(tokens[i] || '').trim()
+    const second = String(tokens[i + 1] || '').trim()
+    const third = String(tokens[i + 2] || '').trim()
+
+    if (isValidDate(first, second, third)) {
+      return {
+        date: `${first}-${second}-${third}`,
+        startIndex: i,
+        nextIndex: i + 3
+      }
+    }
+
+    if (isValidDate(third, second, first)) {
+      return {
+        date: `${third}-${second}-${first}`,
+        startIndex: i,
+        nextIndex: i + 3
+      }
+    }
+  }
+
+  const fallback = extractFallbackDate(fallbackDate)
+  if (!fallback) return null
+
+  const yearIndex = tokens.findIndex((token, index) =>
+    index > 0 &&
+    index <= 5 &&
+    /^(19|20)\d{2}$/.test(String(token || '').trim())
+  )
+  if (yearIndex <= 0) return null
+
+  const yearToken = String(tokens[yearIndex] || '').trim()
+  if (!fallback.startsWith(`${yearToken}-`)) return null
+
+  return {
+    date: fallback,
+    startIndex: yearIndex,
+    nextIndex: yearIndex + 1
+  }
+}
+
+function resolveLeagueToken(tokens) {
+  const normalizedTokens = (Array.isArray(tokens) ? tokens : [])
+    .map(normalizeSegment)
+    .filter(Boolean)
+  if (normalizedTokens.length === 0) return ''
+
+  for (let start = 0; start < normalizedTokens.length; start += 1) {
+    const candidate = normalizeSegment(normalizedTokens.slice(start).join(' '))
+    if (getMappedLeagueEntry(candidate)) return candidate
+  }
+
+  if (normalizedTokens.length > 1 && GENERIC_SPORT_PREFIX_RE.test(normalizedTokens[0])) {
+    return normalizeSegment(normalizedTokens.slice(1).join(' '))
+  }
+
+  return normalizeSegment(normalizedTokens.join(' '))
+}
+
+function trimTrailingMetadataTokens(tokens) {
+  const parts = [...(Array.isArray(tokens) ? tokens : [])]
+  while (parts.length > 0) {
+    const token = String(parts[parts.length - 1] || '').trim()
+    if (!token) {
+      parts.pop()
+      continue
+    }
+    if (
+      isMetadataToken(token) ||
+      isReleaseGroupToken(token) ||
+      /^(?:mp4|mkv|avi|ts|m4v)$/i.test(token)
+    ) {
+      parts.pop()
+      continue
+    }
+    break
+  }
+  return parts
+}
+
+function trimLeadingTeamNoise(tokens) {
+  const parts = [...(Array.isArray(tokens) ? tokens : [])]
+  while (parts.length > 1) {
+    const token = String(parts[0] || '').trim()
+    if (!token) {
+      parts.shift()
+      continue
+    }
+    if (
+      LEADING_TEAM_NOISE_RE.test(token) ||
+      ROMAN_NUMERAL_RE.test(token) ||
+      /^\d{1,3}$/.test(token)
+    ) {
+      parts.shift()
+      continue
+    }
+    break
+  }
+  return parts
+}
+
+function normalizeTeamTokens(tokens) {
+  const normalized = trimTrailingMetadataTokens(
+    (Array.isArray(tokens) ? tokens : [])
+      .map(normalizeSegment)
+      .filter(Boolean)
+  )
+  return normalizeSegment(trimLeadingTeamNoise(normalized).join(' '))
+}
+
+function parseSportsTitle(title, fallbackDate = '') {
   const raw = String(title || '').trim()
   if (!raw) return null
 
   const tokens = raw.split('.').map(token => token.trim()).filter(Boolean)
-  if (tokens.length < 7) return null
+  if (tokens.length < 5) return null
 
-  const [leagueToken, year, month, day, ...tail] = tokens
-  if (!leagueToken || !isValidDate(year, month, day)) return null
+  const dateMatch = findStructuredDate(tokens, fallbackDate)
+  if (!dateMatch) return null
+
+  const league = resolveLeagueToken(tokens.slice(0, dateMatch.startIndex))
+  const tail = tokens.slice(dateMatch.nextIndex)
+  if (!league || tail.length < 3) return null
 
   const separatorIndex = tail.findIndex(isTeamSeparator)
   if (separatorIndex <= 0 || separatorIndex >= tail.length - 1) return null
@@ -68,9 +206,8 @@ function parseSportsTitle(title) {
 
   if (homeTeamTokens.length === 0 || awayTeamTokens.length === 0) return null
 
-  const league = normalizeSegment(leagueToken)
-  const homeTeam = normalizeSegment(homeTeamTokens.join(' '))
-  const awayTeam = normalizeSegment(awayTeamTokens.join(' '))
+  const homeTeam = normalizeTeamTokens(homeTeamTokens)
+  const awayTeam = normalizeTeamTokens(awayTeamTokens)
   if (!league || !homeTeam || !awayTeam) return null
 
   const qualityToken = metadataIndex === -1 ? '' : trailingTokens[metadataIndex]
@@ -78,7 +215,7 @@ function parseSportsTitle(title) {
 
   return {
     league,
-    date: `${year}-${month}-${day}`,
+    date: dateMatch.date,
     homeTeam,
     awayTeam,
     ...(quality ? { quality } : {}),

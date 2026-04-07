@@ -1,6 +1,6 @@
 # PVTKRRX Project Status
 
-Updated: 2026-04-06
+Updated: 2026-04-07
 
 ## Current Stage
 
@@ -21,6 +21,9 @@ The practical reading of the project today is:
 - the sports catalog artwork path now prefers portrait poster art for tiles, while keeping separate sport-aware backgrounds/logos for player wallpaper/loading
 - sports poster, wallpaper, landscape, and logo bytes can now be cached on demand by the active runtime through signed `/image/sports/...` URLs instead of hotlinking every request back to the upstream artwork host
 - `npm run server:setup` now also pre-seeds that same `sports-image-cache/` store with upcoming event art, top team badges, and mapped league artwork, `npm run cache:sports` can refresh it later without deleting warm entries, and long-running Linux/cloud runtimes now keep topping the cache up automatically every 15 minutes in rotating sport batches
+- the sports identity path is now materially wider: multi-token leagues (`Premier League`, `La Liga`), `DD.MM.YYYY` dates, year-only titles that can borrow the Prowlarr publish date, and event-prefix noise such as `Super Bowl LX` now normalize into the same shared structured matchup shape
+- structured TheSportsDB event lookup now expands league-aware team nicknames such as `Lakers`, `Yankees`, and `Maple Leafs` to the official SportsDB team names before searching, then falls back to date+sport matching when literal event queries still miss
+- non-vs event lookup now also tries stripped event-name queries (`Japanese Grand Prix`, `Fight Night 270`, etc.) so `Race`, `Qualifying`, `Practice`, `Sprint`, and `Main Card` suffixes stop blocking artwork recovery
 - empty movie, TV, and sports catalogs now return a setup-needed placeholder when Prowlarr has no indexers or cannot be reached, instead of showing blank `EmptyContent`
 - the Windows installer/build flow is reproducible again
 - `https://www.pvtkrrx.cc` is the live public relay; `https://pvtkrrx.vercel.app` is currently a dead preview hostname returning Vercel `DEPLOYMENT_NOT_FOUND`
@@ -72,6 +75,21 @@ The practical reading of the project today is:
 - Updated the repo release rules so `issue a new revision` now explicitly means synchronized desktop EXE plus cloud/self-host release parity.
 - Cut the aligned public desktop release as `1.1.27` so the published EXE line matches the current `main` revision again.
 - Published the next self-host prerelease tag as `v1.12.13-selfhost` so the cloud/server installer line points at that same aligned revision.
+
+## Work Carried Out On 2026-04-07
+
+- Broadened `parseSportsTitle` so sports grouping, custom ids, stream fallback, and SportsDB artwork lookup all share the same richer parser instead of diverging on multi-token leagues and alternate date layouts.
+- Team-vs parsing now accepts `Premier.League` / `La.Liga`, `DD.MM.YYYY`, year-only titles that can reuse the publish date, and event-prefix noise like `Super.Bowl.LX` before the teams.
+- Structured SportsDB matching now resolves official league team names before `searchevents` calls and falls back to `eventsday` / `eventstv` when exact query strings still miss.
+- Non-vs event searches now try stripped event-name variants first, so Formula 1 / UFC titles do not fail just because SportsDB stores the weekend/event without `Race`, `Qualifying`, `Practice`, `Sprint`, or `Main Card`.
+- Regression coverage now includes:
+  - multi-token league parsing
+  - `DD.MM.YYYY` parsing
+  - year-only title parsing with publish-date fallback
+  - league-aware nickname expansion for structured lookups
+  - structured date+sport fallback after literal title-search misses
+  - stripped non-vs event queries for Formula 1 session titles
+- `npm run smoke:sports`, `npm run smoke:sportsdb-league`, and `npm run smoke:pipeline` all passed on 2026-04-07 for this change set.
 
 ## Earlier 2026-04-04 Self-Host Work
 

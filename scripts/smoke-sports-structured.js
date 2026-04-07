@@ -129,6 +129,50 @@ function testParserAndLeagueMap() {
     raw: 'EPL.2026.03.15.Manchester.United.vs.Chelsea.1080p.HDTV.x264-RELEASER'
   })
   assert.equal(parseSportsTitle('Broken.Title.Without.Separator.1080p'), null)
+  assert.deepEqual(
+    parseSportsTitle('Premier.League.2026.04.05.Liverpool.vs.Manchester.City.1080p'),
+    {
+      league: 'Premier League',
+      date: '2026-04-05',
+      homeTeam: 'Liverpool',
+      awayTeam: 'Manchester City',
+      quality: '1080p',
+      raw: 'Premier.League.2026.04.05.Liverpool.vs.Manchester.City.1080p'
+    }
+  )
+  assert.deepEqual(
+    parseSportsTitle('La.Liga.2026.04.05.Barcelona.vs.Real.Madrid.1080p'),
+    {
+      league: 'La Liga',
+      date: '2026-04-05',
+      homeTeam: 'Barcelona',
+      awayTeam: 'Real Madrid',
+      quality: '1080p',
+      raw: 'La.Liga.2026.04.05.Barcelona.vs.Real.Madrid.1080p'
+    }
+  )
+  assert.deepEqual(
+    parseSportsTitle('Cricket.IPL.2026.Mumbai.Indians.vs.Chennai.Super.Kings.1080p', '2026-04-05T12:00:00Z'),
+    {
+      league: 'IPL',
+      date: '2026-04-05',
+      homeTeam: 'Mumbai Indians',
+      awayTeam: 'Chennai Super Kings',
+      quality: '1080p',
+      raw: 'Cricket.IPL.2026.Mumbai.Indians.vs.Chennai.Super.Kings.1080p'
+    }
+  )
+  assert.deepEqual(
+    parseSportsTitle('NFL.08.02.2026.Super.Bowl.LX.Seattle.Seahawks.vs.New.England.Patriots.1080p'),
+    {
+      league: 'NFL',
+      date: '2026-02-08',
+      homeTeam: 'Seattle Seahawks',
+      awayTeam: 'New England Patriots',
+      quality: '1080p',
+      raw: 'NFL.08.02.2026.Super.Bowl.LX.Seattle.Seahawks.vs.New.England.Patriots.1080p'
+    }
+  )
   assert.equal(mapLeague(' epl '), 'English Premier League')
   assert.equal(mapLeague('unknown'), null)
 }
@@ -241,6 +285,82 @@ async function testStructuredArtworkCacheDoesNotBleedAcrossFixtures() {
   assert.equal(first.eventId, 'evt-bulls-knicks')
   assert.equal(second.eventId, 'evt-celtics-heat')
   assert.notEqual(first.poster, second.poster, 'different fixtures should not reuse the same poster artwork')
+}
+
+async function testStructuredLookupExpandsLeagueTeamNicknames() {
+  const client = new SportsDbClient('smoke-structured-expand', { cacheHours: 1 })
+  const queries = []
+
+  client._fetchTeamsByLeague = async () => ([
+    { idTeam: 'nba-lal', strTeam: 'Los Angeles Lakers', strTeamShort: 'Lakers' },
+    { idTeam: 'nba-bos', strTeam: 'Boston Celtics', strTeamShort: 'Celtics' }
+  ])
+  client._fetchEvents = async (query) => {
+    queries.push(query)
+    if (query !== 'Los Angeles Lakers vs Boston Celtics') return []
+    return [{
+      idEvent: 'evt-lakers-celtics',
+      strEvent: 'Los Angeles Lakers vs Boston Celtics',
+      dateEvent: '2026-03-18',
+      strSport: 'Basketball',
+      strLeague: 'NBA',
+      strHomeTeam: 'Los Angeles Lakers',
+      strAwayTeam: 'Boston Celtics'
+    }]
+  }
+  client._fetchEventsByDate = async () => []
+  client._fetchTvEventsByDate = async () => []
+
+  const event = await client.findEventByStructuredData({
+    league: 'NBA',
+    date: '2026-03-18',
+    homeTeam: 'Lakers',
+    awayTeam: 'Celtics'
+  })
+
+  assert.equal(event?.idEvent, 'evt-lakers-celtics', 'structured lookup should resolve the expanded NBA matchup')
+  assert.equal(queries[0], 'Los Angeles Lakers vs Boston Celtics', 'structured lookup should try the full official team names before the raw nicknames')
+}
+
+async function testStructuredLookupFallsBackToDateSearchAfterLiteralMiss() {
+  const client = new SportsDbClient('smoke-structured-date-fallback', { cacheHours: 1 })
+  const queries = []
+  let dateFallbackCalls = 0
+
+  client._fetchTeamsByLeague = async () => ([
+    { idTeam: 'mlb-nyy', strTeam: 'New York Yankees', strTeamShort: 'Yankees' },
+    { idTeam: 'mlb-bos', strTeam: 'Boston Red Sox', strTeamShort: 'Red Sox' }
+  ])
+  client._fetchEvents = async (query) => {
+    queries.push(query)
+    return []
+  }
+  client._fetchEventsByDate = async (date, sport) => {
+    dateFallbackCalls += 1
+    assert.equal(date, '2026-04-05')
+    assert.equal(sport, 'Baseball')
+    return [{
+      idEvent: 'evt-yankees-redsox',
+      strEvent: 'New York Yankees vs Boston Red Sox',
+      dateEvent: '2026-04-05',
+      strSport: 'Baseball',
+      strLeague: 'MLB',
+      strHomeTeam: 'New York Yankees',
+      strAwayTeam: 'Boston Red Sox'
+    }]
+  }
+  client._fetchTvEventsByDate = async () => []
+
+  const event = await client.findEventByStructuredData({
+    league: 'MLB',
+    date: '2026-04-05',
+    homeTeam: 'Yankees',
+    awayTeam: 'Red Sox'
+  })
+
+  assert.equal(event?.idEvent, 'evt-yankees-redsox', 'structured lookup should recover from a literal title miss via date+sport fallback')
+  assert.ok(queries.includes('New York Yankees vs Boston Red Sox'), 'expected structured lookup to still try the expanded official team query first')
+  assert.equal(dateFallbackCalls, 1, 'expected exactly one date fallback call after the literal search missed')
 }
 
 async function testOrderAgnosticSportsGrouping() {
@@ -744,6 +864,44 @@ async function testF1FallbackUsesWeekendPosterCard() {
   assert.equal(posterPayload.gl, 'https://example.com/f1-logo.png')
 }
 
+async function testEventQueriesStripSessionSuffixesBeforeSearch() {
+  const client = new SportsDbClient('smoke-event-query-strip', { cacheHours: 1 })
+  const queries = []
+  const poster = 'https://example.com/f1-query-strip-poster.jpg'
+  const landscape = 'https://example.com/f1-query-strip-landscape.jpg'
+  const background = 'https://example.com/f1-query-strip-background.jpg'
+
+  client._fetchEvents = async (query) => {
+    queries.push(query)
+    if (query !== 'Japanese Grand Prix') return []
+    return [{
+      idEvent: 'evt-f1-japan',
+      strEvent: 'Japanese Grand Prix',
+      dateEvent: '2026-03-28',
+      strSport: 'Motorsport',
+      strLeague: 'Formula 1',
+      strPoster: poster,
+      strThumb: landscape,
+      strBanner: background
+    }]
+  }
+  client._fetchEventsByDate = async () => []
+  client._fetchTvEventsByDate = async () => []
+  client._lookupLeague = async () => null
+  client._lookupTeam = async () => null
+
+  const artwork = await client.getEventArtwork({
+    title: 'Formula1.2026.03.28.Japanese.Grand.Prix.Race.1080p.WEB.h265-VERUM',
+    publishDate: '2026-03-28T12:00:00Z',
+    sportHint: 'motorsport'
+  })
+
+  assert.ok(artwork, 'expected stripped event query to recover Formula 1 artwork')
+  assert.equal(queries[0], 'Japanese Grand Prix', 'expected stripped event name to be the first search query')
+  assert.equal(artwork.eventId, 'evt-f1-japan')
+  assert.equal(artwork.poster, poster)
+}
+
 async function testSportsMetaRichDescription() {
   const { handleMeta } = require('../src/handlers/meta')
   const id = encodeCustomId({
@@ -792,7 +950,9 @@ async function testArtworkFallbackBehavior() {
     g: 'UFC'
   }, { compress: true })
 
-  const result = await handleMeta({}, 'sports', id, { baseUrl: 'http://127.0.0.1:7000' })
+  const result = await withSportsDbPrototypePatches({
+    getEventArtwork: async () => null
+  }, async () => handleMeta({}, 'sports', id, { baseUrl: 'http://127.0.0.1:7000' }))
   assert.ok(result.meta, 'expected meta to exist for UFC entry')
   assert.equal(result.meta.type, 'sports')
   assert.ok(result.meta.poster, 'expected a poster fallback')
@@ -1137,12 +1297,15 @@ async function main() {
     testSportDisambiguation()
     await testStructuredFallbackToFuzzyLookup()
     await testStructuredArtworkCacheDoesNotBleedAcrossFixtures()
+    await testStructuredLookupExpandsLeagueTeamNicknames()
+    await testStructuredLookupFallsBackToDateSearchAfterLiteralMiss()
     await testOrderAgnosticSportsGrouping()
     await testLeagueFallbackUsesGeneratedMatchupPoster()
     await testCatalogShowsSetupPlaceholderWhenProwlarrHasNoIndexers()
     await testSportSpecificCatalogDetailFiltering()
     await testEventTitleCatalogGrouping()
     await testF1FallbackUsesWeekendPosterCard()
+    await testEventQueriesStripSessionSuffixesBeforeSearch()
     await testLibraryCustomIdsStayCompact()
     await testSportsMetaIncludesGenres()
     await testSportsMetaRichDescription()

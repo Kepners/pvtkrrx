@@ -370,10 +370,13 @@ function extractSportsDate(value, fallbackValue = '') {
     const compact = source.match(/\b((?:19|20)\d{2})(\d{2})(\d{2})\b/)
     if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`
 
-    const iso = source.match(/\b((?:19|20)\d{2})[.\-_\s](\d{2})[.\-_\s](\d{2})\b/)
+    const iso = source.match(/((?:19|20)\d{2})[._\s-](\d{2})[._\s-](\d{2})/)
     if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`
 
-    const plain = source.match(/\b((?:19|20)\d{2}-\d{2}-\d{2})\b/)
+    const dmy = source.match(/(\d{2})[._\s-](\d{2})[._\s-]((?:19|20)\d{2})/)
+    if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`
+
+    const plain = source.match(/((?:19|20)\d{2}-\d{2}-\d{2})/)
     if (plain) return plain[1]
   }
   return ''
@@ -410,7 +413,7 @@ function parseLooseSportsEventTitle(title, fallbackDate = '') {
   const raw = String(title || '').trim()
   if (!raw) return null
 
-  const structured = parseSportsTitle(raw)
+  const structured = parseSportsTitle(raw, fallbackDate)
   if (structured) return structured
 
   const cleaned = cleanTitle(raw)
@@ -464,7 +467,7 @@ function buildStructuredSportsTarget(info = {}) {
     }
   }
 
-  return parseSportsTitle(info.t || '') || parseLooseSportsEventTitle(info.t || '', info.p || '')
+  return parseSportsTitle(info.t || '', info.p || '') || parseLooseSportsEventTitle(info.t || '', info.p || '')
 }
 
 function sourceItemKey(item = {}) {

@@ -407,7 +407,7 @@ function normalizeSportsEventTitle(title, parsedSportsEvent = null, parsedEvent 
 
 function sportsEventKey(input) {
   const parsedSportsEvent = input && typeof input === 'object'
-    ? (input.parsedSportsEvent || parseSportsTitle(input.title || ''))
+    ? (input.parsedSportsEvent || parseSportsTitle(input.title || '', input.publishDate || input.pubDate || ''))
     : parseSportsTitle(input)
 
   if (parsedSportsEvent?.league && parsedSportsEvent?.date && parsedSportsEvent?.homeTeam && parsedSportsEvent?.awayTeam) {
@@ -704,7 +704,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
   }
 
   const normalizedItems = items.map(item => {
-    const parsedSportsEvent = parseSportsTitle(item?.title || '')
+    const parsedSportsEvent = parseSportsTitle(item?.title || '', item?.pubDate || item?.publishDate || '')
     const parsedEvent = !parsedSportsEvent ? parseSportsEventTitle(item?.title || '') : null
     const effectiveLeague = parsedSportsEvent?.league || parsedEvent?.league || ''
     return {

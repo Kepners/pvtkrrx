@@ -26,6 +26,8 @@ const eventCache = new Map()
 const eventInFlight = new Map()
 const eventLookupCache = new Map()
 const eventLookupInFlight = new Map()
+const teamsByLeagueCache = new Map()
+const teamsByLeagueInFlight = new Map()
 const endpointCache = new Map()
 const endpointInFlight = new Map()
 const leaguesBySportCache = new Map()
@@ -154,6 +156,19 @@ function uniqueBy(items = [], getKey) {
   return out
 }
 
+function uniqueStrings(values = []) {
+  const out = []
+  const seen = new Set()
+  for (const value of values) {
+    const text = normalizeSpace(value)
+    const key = normalizeToken(text)
+    if (!text || !key || seen.has(key)) continue
+    seen.add(key)
+    out.push(text)
+  }
+  return out
+}
+
 function sportKeyFromLeagueCode(value) {
   const code = normalizeToken(value).replace(/\s+/g, '')
   if (!code) return ''
@@ -191,6 +206,25 @@ function sportsDbNameForSportKey(sportKey) {
     olympics: 'Multisport'
   }
   return map[key] || ''
+}
+
+function sportsDbSportMatches(left, right) {
+  const aliases = {
+    fighting: ['fighting', 'mma', 'boxing', 'combat sports', 'wrestling'],
+    mma: ['mma', 'fighting', 'combat sports'],
+    boxing: ['boxing', 'fighting', 'combat sports'],
+    wrestling: ['wrestling', 'combat sports', 'fighting'],
+    'combat sports': ['combat sports', 'fighting', 'mma', 'boxing', 'wrestling']
+  }
+
+  const a = normalizeToken(left)
+  const b = normalizeToken(right)
+  if (!a || !b) return false
+  if (a === b) return true
+
+  const leftAliases = aliases[a] || [a]
+  const rightAliases = aliases[b] || [b]
+  return leftAliases.some(value => rightAliases.includes(value))
 }
 
 function toNumber(value, fallback) {
@@ -250,6 +284,148 @@ function capitalizeWords(value) {
     .trim()
 }
 
+function tokenizeTeamText(value) {
+  return normalizeTeamName(value)
+    .split(/\s+/)
+    .filter(Boolean)
+}
+
+function tokensEndWith(tokens, suffix) {
+  if (!Array.isArray(tokens) || !Array.isArray(suffix) || suffix.length === 0 || suffix.length > tokens.length) return false
+  for (let i = 0; i < suffix.length; i += 1) {
+    if (tokens[tokens.length - suffix.length + i] !== suffix[i]) return false
+  }
+  return true
+}
+
+function tokensContainSequence(tokens, sequence) {
+  if (!Array.isArray(tokens) || !Array.isArray(sequence) || sequence.length === 0 || sequence.length > tokens.length) return false
+  for (let i = 0; i <= tokens.length - sequence.length; i += 1) {
+    let match = true
+    for (let j = 0; j < sequence.length; j += 1) {
+      if (tokens[i + j] !== sequence[j]) {
+        match = false
+        break
+      }
+    }
+    if (match) return true
+  }
+  return false
+}
+
+function splitAlternateTeamNames(value) {
+  return String(value || '')
+    .split(/[;,|]+/)
+    .map(normalizeSpace)
+    .filter(Boolean)
+}
+
+function buildTeamNameVariants(team = {}) {
+  return uniqueStrings([
+    team?.strTeam,
+    team?.strTeamShort,
+    ...splitAlternateTeamNames(team?.strAlternate)
+  ])
+}
+
+function scoreTeamNameVariant(rawTeam, candidateName) {
+  const rawTokens = tokenizeTeamText(rawTeam)
+  const candidateTokens = tokenizeTeamText(candidateName)
+  if (rawTokens.length === 0 || candidateTokens.length === 0) return 0
+
+  const raw = rawTokens.join(' ')
+  const candidate = candidateTokens.join(' ')
+
+  if (raw === candidate) return 180
+  if (tokensEndWith(candidateTokens, rawTokens)) return 165
+  if (tokensEndWith(rawTokens, candidateTokens)) return 160
+  if (tokensContainSequence(candidateTokens, rawTokens)) return 145
+  if (tokensContainSequence(rawTokens, candidateTokens)) return 140
+  if (candidate.includes(raw)) return 130
+  if (raw.includes(candidate)) return 125
+
+  const candidateSet = new Set(candidateTokens)
+  const overlap = rawTokens.filter(token => candidateSet.has(token)).length
+  if (overlap >= Math.min(rawTokens.length, candidateTokens.length) && overlap > 0) return 110 + overlap * 5
+  if (overlap >= 2) return 75 + overlap * 5
+  if (overlap === 1 && (rawTokens.length === 1 || candidateTokens.length === 1)) return 55
+  return 0
+}
+
+function scoreLeagueTeamCandidate(rawTeam, team = {}) {
+  const variants = buildTeamNameVariants(team)
+  let best = 0
+  for (const variant of variants) {
+    const variantScore = scoreTeamNameVariant(rawTeam, variant) + (normalizeToken(variant) === normalizeToken(team?.strTeam) ? 5 : 0)
+    if (variantScore > best) best = variantScore
+  }
+  return best
+}
+
+function resolveOfficialTeamName(rawTeam, teams = []) {
+  const ranked = (Array.isArray(teams) ? teams : [])
+    .map(team => ({
+      team,
+      score: scoreLeagueTeamCandidate(rawTeam, team)
+    }))
+    .filter(entry => entry.score > 0)
+    .sort((a, b) => b.score - a.score)
+
+  const best = ranked[0]
+  if (!best || best.score < 80) return normalizeSpace(rawTeam)
+  return normalizeSpace(best.team?.strTeam || rawTeam)
+}
+
+function buildStructuredMatchQueries(structuredEvent, officialHomeTeam, officialAwayTeam) {
+  const homeVariants = uniqueStrings([officialHomeTeam, structuredEvent?.homeTeam])
+  const awayVariants = uniqueStrings([officialAwayTeam, structuredEvent?.awayTeam])
+  const variants = []
+
+  for (const homeTeam of homeVariants) {
+    for (const awayTeam of awayVariants) {
+      variants.push(`${homeTeam} vs ${awayTeam}`)
+    }
+  }
+
+  return uniqueStrings(variants)
+}
+
+function stripEventSearchNoise(value) {
+  let text = normalizeSpace(value)
+  if (!text) return ''
+
+  const suffixes = [
+    /\b(?:race|qualifying|shootout|sprint)\b$/i,
+    /\b(?:main[\s.\-_]*card|prelims?|early[\s.\-_]*prelims?)\b$/i,
+    /\b(?:practice|practice\s+(?:one|two|three|1|2|3)|free[\s.\-_]*practice(?:\s+(?:one|two|three|1|2|3))?)\b$/i
+  ]
+
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const suffix of suffixes) {
+      const next = normalizeSpace(text.replace(suffix, ' '))
+      if (next && next !== text) {
+        text = next
+        changed = true
+      }
+    }
+  }
+
+  return text
+}
+
+function buildEventQueryVariants(eventName, leagueDisplay = '') {
+  const rawName = normalizeSpace(eventName)
+  const strippedName = stripEventSearchNoise(rawName)
+  return uniqueStrings([
+    strippedName,
+    strippedName && leagueDisplay ? `${leagueDisplay} ${strippedName}` : '',
+    rawName,
+    rawName && leagueDisplay ? `${leagueDisplay} ${rawName}` : ''
+  ])
+}
+
 function buildGenericQueryFragments(value) {
   const noise = new Set([
     'mini', 'full', 'extended', 'highlights', 'highlight', 'replay',
@@ -293,13 +469,13 @@ function extractDateHint(value, fallbackDate) {
     const compact = source.match(/\b((?:19|20)\d{2})(\d{2})(\d{2})\b/)
     if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`
 
-    const iso = source.match(/\b((?:19|20)\d{2})[.\-_\s](\d{2})[.\-_\s](\d{2})\b/)
+    const iso = source.match(/((?:19|20)\d{2})[._\s-](\d{2})[._\s-](\d{2})/)
     if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`
 
-    const dmy = source.match(/\b(\d{2})[.\-_\s](\d{2})[.\-_\s]((?:19|20)\d{2})\b/)
+    const dmy = source.match(/(\d{2})[._\s-](\d{2})[._\s-]((?:19|20)\d{2})/)
     if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`
 
-    const plain = source.match(/\b((?:19|20)\d{2}-\d{2}-\d{2})\b/)
+    const plain = source.match(/((?:19|20)\d{2}-\d{2}-\d{2})/)
     if (plain) return plain[1]
   }
   return ''
@@ -343,24 +519,25 @@ function extractTeamsQuery(title) {
   return `${capitalizeWords(takeLeft.join(' '))} vs ${capitalizeWords(takeRight.join(' '))}`
 }
 
-function buildCandidateQueries(title) {
-  const original = normalizeSpace(String(title || ''))
+function buildCandidateQueries(title, structuredEvent = null) {
+  const original = normalizeSpace(String(title || structuredEvent?.raw || ''))
   const cleaned = normalizeTitle(title)
   if (!cleaned && !original) return []
 
   const variants = []
 
   // For non-vs event titles, use the event name directly as a high-priority query
-  const eventParsed = parseSportsEventTitle(title)
+  const eventParsed = structuredEvent?.eventName
+    ? structuredEvent
+    : parseSportsEventTitle(title)
   if (eventParsed?.eventName) {
-    const leagueDisplay = mapLeague(eventParsed.league) || eventParsed.league || ''
-    if (leagueDisplay && eventParsed.eventName) {
-      variants.push(`${leagueDisplay} ${eventParsed.eventName}`)
-    }
-    variants.push(capitalizeWords(eventParsed.eventName))
+    const leagueDisplay = normalizeSpace(mapLeague(eventParsed.league) || eventParsed.league || '')
+    variants.push(...buildEventQueryVariants(eventParsed.eventName, leagueDisplay))
   }
 
-  const teams = extractTeamsQuery(title)
+  const teams = structuredEvent?.homeTeam && structuredEvent?.awayTeam
+    ? `${normalizeSpace(structuredEvent.homeTeam)} vs ${normalizeSpace(structuredEvent.awayTeam)}`
+    : extractTeamsQuery(title)
   if (teams) variants.push(teams)
 
   const raw = normalizeSpace(
@@ -682,7 +859,7 @@ function buildStructuredEventData(item) {
     }
   }
 
-  const vsResult = parseSportsTitle(item?.title || '')
+  const vsResult = parseSportsTitle(item?.title || '', explicitDate || item?.publishDate || item?.pubDate || '')
   if (vsResult) return vsResult
 
   // Try event-style parsing for non-vs titles (F1, UFC, Supercars, etc.)
@@ -1091,13 +1268,73 @@ class SportsDbClient {
     }
   }
 
+  async _fetchTeamsByLeague(leagueHint = '') {
+    const mappedLeague = getMappedLeagueEntry(leagueHint)
+    const leagueId = String(mappedLeague?.idLeague || '').trim()
+    if (!leagueId) return []
+
+    const hit = getCachedValue(teamsByLeagueCache, leagueId)
+    if (hit !== undefined) return hit
+
+    const ongoing = teamsByLeagueInFlight.get(leagueId)
+    if (ongoing) return ongoing
+
+    const pending = (async () => {
+      try {
+        const url = `${BASE_URL}/${encodeURIComponent(this.apiKey)}/lookup_all_teams.php?id=${encodeURIComponent(leagueId)}`
+        const res = await fetch(url, { signal: AbortSignal.timeout(this.timeoutMs) })
+        if (!res.ok) {
+          setCachedValue(teamsByLeagueCache, leagueId, [], this.missTtlMs)
+          return []
+        }
+
+        const data = await res.json()
+        const teams = Array.isArray(data?.teams) ? data.teams : []
+        setCachedValue(teamsByLeagueCache, leagueId, teams, teams.length > 0 ? this.leagueAssetTtlMs : this.missTtlMs)
+        return teams
+      } catch (_) {
+        setCachedValue(teamsByLeagueCache, leagueId, [], this.missTtlMs)
+        return []
+      } finally {
+        teamsByLeagueInFlight.delete(leagueId)
+      }
+    })()
+
+    teamsByLeagueInFlight.set(leagueId, pending)
+    return pending
+  }
+
+  async _resolveStructuredTeamNames(structuredEvent = {}) {
+    const rawHomeTeam = normalizeSpace(structuredEvent?.homeTeam)
+    const rawAwayTeam = normalizeSpace(structuredEvent?.awayTeam)
+    if (!rawHomeTeam || !rawAwayTeam) {
+      return {
+        homeTeam: rawHomeTeam,
+        awayTeam: rawAwayTeam
+      }
+    }
+
+    const teams = await this._fetchTeamsByLeague(structuredEvent.league)
+    if (!Array.isArray(teams) || teams.length === 0) {
+      return {
+        homeTeam: rawHomeTeam,
+        awayTeam: rawAwayTeam
+      }
+    }
+
+    return {
+      homeTeam: resolveOfficialTeamName(rawHomeTeam, teams),
+      awayTeam: resolveOfficialTeamName(rawAwayTeam, teams)
+    }
+  }
+
   async _fetchDirectMappedLeaguesBySport(sportName) {
     const sport = normalizeToken(sportName)
     if (!sport) return []
 
     const entries = uniqueBy(
       listMappedLeagues().filter((entry) =>
-        normalizeToken(entry?.sportsDbSport || '') === sport &&
+        sportsDbSportMatches(entry?.sportsDbSport || '', sport) &&
         String(entry?.idLeague || '').trim()
       ),
       (entry) => entry.idLeague || entry.code
@@ -1289,16 +1526,42 @@ class SportsDbClient {
 
     const pending = (async () => {
       try {
-        const query = `${capitalizeWords(structuredEvent.homeTeam)} vs ${capitalizeWords(structuredEvent.awayTeam)}`
-        const candidates = await this._fetchList('searchevents.php', { e: query })
-        if (!Array.isArray(candidates) || candidates.length === 0) {
+        const byId = new Map()
+        const addEvent = (event) => {
+          const eventKey = makeEventKey(event)
+          if (!eventKey) return
+          byId.set(eventKey, event)
+        }
+
+        const resolvedTeams = await this._resolveStructuredTeamNames(structuredEvent)
+        const expectedHomeTeam = resolvedTeams.homeTeam || structuredEvent.homeTeam
+        const expectedAwayTeam = resolvedTeams.awayTeam || structuredEvent.awayTeam
+        const queries = buildStructuredMatchQueries(structuredEvent, expectedHomeTeam, expectedAwayTeam)
+
+        for (const query of queries.slice(0, 4)) {
+          const candidates = await this._fetchEvents(query, structuredEvent.date)
+          for (const event of candidates) addEvent(event)
+          if (byId.size >= 12) break
+        }
+
+        const structuredSport = sportsDbNameForSportKey(sportKeyFromLeagueCode(structuredEvent.league))
+        if (structuredEvent.date && byId.size < 10) {
+          const [dayEvents, tvEvents] = await Promise.all([
+            this._fetchEventsByDate(structuredEvent.date, structuredSport),
+            this._fetchTvEventsByDate(structuredEvent.date, structuredSport)
+          ])
+          for (const event of dayEvents) addEvent(event)
+          for (const event of tvEvents) addEvent(event)
+        }
+
+        if (byId.size === 0) {
           setCachedValue(eventCache, key, null, this.missTtlMs)
           return null
         }
 
-        const ranked = candidates
+        const ranked = [...byId.values()]
           .map(event => {
-            const teamScore = getStructuredTeamMatchScore(event, structuredEvent.homeTeam, structuredEvent.awayTeam)
+            const teamScore = getStructuredTeamMatchScore(event, expectedHomeTeam, expectedAwayTeam)
             const dateDistance = dateDistanceDays(structuredEvent.date, event?.dateEvent)
             const dateScore = Number.isFinite(dateDistance)
               ? (dateDistance === 0 ? 30 : dateDistance === 1 ? 20 : -100)
@@ -1408,7 +1671,7 @@ class SportsDbClient {
           }
         }
 
-        const queries = buildCandidateQueries(title)
+        const queries = buildCandidateQueries(title, structuredEvent)
         if (queries.length === 0 && !(structuredEvent || (dateHint && sportHint))) {
           cache.set(key, { value: null, expiresAt: now + this.missTtlMs })
           return null
