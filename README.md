@@ -322,7 +322,7 @@ This now validates the server-agnostic link-session flow as well:
 ### Hosted Production
 
 Use the canonical hosted base: `https://www.pvtkrrx.cc`.
-As of 2026-04-06, `https://www.pvtkrrx.cc/`, `/configure`, `/manifest.json`, and `/health` all responded from the live public host, while the old `https://pvtkrrx.vercel.app` preview remained dead with `DEPLOYMENT_NOT_FOUND`.
+As of 2026-04-07, `https://www.pvtkrrx.cc/`, `/runbooks`, `/manifest.json`, and `/health` all respond from the live public host, while public `/configure` now redirects users back to the guide-only site instead of acting as a public setup surface. The old `https://pvtkrrx.vercel.app` preview remained dead with `DEPLOYMENT_NOT_FOUND`.
 The current public route enters through Contabo Caddy and proxies to the live hosted `pvtkrrx` app container on port `3000`.
 The mirror checkout at `/opt/stack/sites/pvtkrrx` is useful for server-side sync and inspection, but it does not update the public site by itself.
 A separate host-level `pvtkrrx.service` runtime exists at `/opt/pvtkrrx` on port `7000`; treat it as a separate runtime unless the reverse proxy is explicitly repointed.

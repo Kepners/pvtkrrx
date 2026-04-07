@@ -51,20 +51,26 @@ const manifest = {
 
 function createBootstrapManifest(baseUrl = '', options = {}) {
   const normalizedBaseUrl = String(baseUrl || '').trim().replace(/\/+$/, '')
+  const configureUrl = normalizedBaseUrl ? `${normalizedBaseUrl}/configure` : '/configure'
   const logoUrl = normalizedBaseUrl ? `${normalizedBaseUrl}/logo.ico` : manifest.logo
   const runtimeOptions = options && typeof options === 'object' ? options : {}
   const selfHostServerMode = runtimeOptions.selfHostServerMode === true
   const desktopLocalOnly = runtimeOptions.desktopLocalOnly === true
-  const bootstrapName = selfHostServerMode
-    ? 'PVTKRRX Server (Configure)'
-    : desktopLocalOnly
-      ? 'PVTKRRX Desktop (Configure)'
-      : 'PVTKRRX (Configure)'
-  const bootstrapDescription = selfHostServerMode
-    ? 'Bootstrap manifest only. Open /configure to install the self-hosted server Remote Seedbox route.'
-    : desktopLocalOnly
-      ? 'Bootstrap manifest only. Open /configure to install PC Local or LAN Bridge from the Windows desktop runtime.'
-      : 'Bootstrap manifest only. Open /configure and install PC Local, LAN Bridge, or Remote Seedbox from their explicit route URLs.'
+  const guideOnlyBootstrap = runtimeOptions.guideOnlyBootstrap === true
+  const bootstrapName = guideOnlyBootstrap
+    ? 'PVTKRRX Website Only'
+    : selfHostServerMode
+      ? 'PVTKRRX Server (Setup Only)'
+      : desktopLocalOnly
+        ? 'PVTKRRX Desktop (Setup Only)'
+        : 'PVTKRRX (Setup Only)'
+  const bootstrapDescription = guideOnlyBootstrap
+    ? 'Public website guide only. Configure on the Windows host that runs PVTKRRX or on your own self-host server. Do not install this root manifest as the working addon.'
+    : selfHostServerMode
+      ? `Setup-only bootstrap. Do not install this root manifest as the working addon. Open ${configureUrl}, save the self-hosted server Remote Seedbox route, and install it from the generated route URL.`
+      : desktopLocalOnly
+        ? `Setup-only bootstrap. Do not install this root manifest as the working addon. Open ${configureUrl}, configure first, then install PC Local or LAN Bridge from the generated route URL on the Windows desktop runtime.`
+        : `Setup-only bootstrap. Do not install this root manifest as the working addon. Open ${configureUrl}, configure first, then install PC Local, LAN Bridge, or Remote Seedbox from the generated route URL.`
   return {
     id: 'com.kepners.pvtkrrx.bootstrap',
     version: manifest.version,

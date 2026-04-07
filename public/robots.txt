@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
+Disallow: /configure
 Disallow: /manifest.json
 Disallow: /health
 Disallow: /file/

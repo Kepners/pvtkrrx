@@ -937,10 +937,8 @@
       </div>
       <nav class="nav">
         <a href="/">Home</a>
-        <a href="/configure">Configure</a>
         <a href="/runbooks">Runbooks</a>
         <a href="/#faq">FAQ</a>
-        <a href="/manifest.json">Manifest</a>
         <a href="/health">Health</a>
       </nav>
     </header>
@@ -950,8 +948,8 @@
         <h1 class="logo" data-text="PVTKRRX"><span>PVTKRRX</span></h1>
       </div>
       <h2 class="subtitle subtitle-static" data-text="Seedbox Runbooks"><span>Seedbox Runbooks</span></h2>
-      <p>Provider-specific setup for PVTKRRX. Each runbook shows the exact URLs to enter on the configure page for your seedbox provider, covering Prowlarr, qBittorrent, file server, path mapping, and auth.</p>
-      <p>Most users need the <strong>Remote Seedbox</strong> route: select your provider from the dropdown on <code>/configure</code>, fill in the fields below, and save. The configure page auto-fills path mapping when you pick your provider.</p>
+      <p>Provider-specific setup for PVTKRRX. Each runbook shows the exact URLs to enter on your own self-host server <code>/configure</code> page for that seedbox provider, covering Prowlarr, qBittorrent, file server, path mapping, and auth.</p>
+      <p>Most users need the <strong>Remote Seedbox</strong> route: open <code>/configure</code> on your own HTTPS server origin, pick your provider below, and save there. This public site is guide-only and does not host your private config.</p>
       <div class="stamp glitch-text" data-text="Updated: March 30, 2026">Updated: March 30, 2026</div>
     </section>
 
@@ -1061,7 +1059,7 @@
       <h4>Configure Page Fields</h4>
       <ol>
         <li>Install or verify <strong>qBittorrent</strong> and <strong>Prowlarr</strong> from the Whatbox <em>Manage Apps</em> panel.</li>
-        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> route and pick <strong>Whatbox</strong> from the provider dropdown.</li>
+        <li>On your self-host server <code>/configure</code> page, select <strong>Remote Seedbox</strong> and pick <strong>Whatbox</strong> from the provider dropdown.</li>
         <li>Fill in the connection fields using your Managed Links HTTPS URLs:</li>
       </ol>
       <table>
@@ -1100,7 +1098,7 @@ PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pv
       <h4>Configure Page Fields</h4>
       <ol>
         <li>Install <strong>qBittorrent</strong> and <strong>Prowlarr</strong> from the Ultra.cc app panel.</li>
-        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> and pick <strong>Ultra.cc</strong> from the provider dropdown.</li>
+        <li>On your self-host server <code>/configure</code> page, select <strong>Remote Seedbox</strong> and pick <strong>Ultra.cc</strong> from the provider dropdown.</li>
         <li>Fill in the connection fields:</li>
       </ol>
       <table>
@@ -1141,7 +1139,7 @@ PORT=&lt;free-port&gt; ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node inde
       <h4>Configure Page Fields</h4>
       <ol>
         <li>Install <strong>qBittorrent</strong> and <strong>Prowlarr</strong> from SeedHost one-click apps.</li>
-        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> and pick <strong>SeedHost</strong> from the provider dropdown.</li>
+        <li>On your self-host server <code>/configure</code> page, select <strong>Remote Seedbox</strong> and pick <strong>SeedHost</strong> from the provider dropdown.</li>
         <li>Fill in the connection fields:</li>
       </ol>
       <table>
@@ -1182,7 +1180,7 @@ PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pv
       <h4>Configure Page Fields</h4>
       <ol>
         <li>Install <strong>qBittorrent</strong> and <strong>Prowlarr</strong> from the Feral manager or via user-space install.</li>
-        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> and pick <strong>Feral Hosting</strong> from the provider dropdown.</li>
+        <li>On your self-host server <code>/configure</code> page, select <strong>Remote Seedbox</strong> and pick <strong>Feral Hosting</strong> from the provider dropdown.</li>
         <li>Fill in the connection fields:</li>
       </ol>
       <table>
@@ -1224,7 +1222,7 @@ PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pv
       <h4>Configure Page Fields</h4>
       <ol>
         <li>Install <strong>qBittorrent</strong> and <strong>Prowlarr</strong> from the RapidSeedbox dashboard (one-click installers on Premium, pre-installed on Lean).</li>
-        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> and pick <strong>RapidSeedbox</strong> from the provider dropdown.</li>
+        <li>On your self-host server <code>/configure</code> page, select <strong>Remote Seedbox</strong> and pick <strong>RapidSeedbox</strong> from the provider dropdown.</li>
         <li>Fill in the connection fields:</li>
       </ol>
       <table>
@@ -1263,7 +1261,7 @@ PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pv
       <h4>Configure Page Fields</h4>
       <ol>
         <li>Install <strong>qBittorrent</strong> and <strong>Prowlarr</strong> from the Bytesized app dashboard.</li>
-        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> and pick <strong>Bytesized</strong> from the provider dropdown.</li>
+        <li>On your self-host server <code>/configure</code> page, select <strong>Remote Seedbox</strong> and pick <strong>Bytesized</strong> from the provider dropdown.</li>
         <li>Fill in the connection fields:</li>
       </ol>
       <table>
@@ -1293,7 +1291,7 @@ PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pv
       <h4>Configure Page Fields</h4>
       <ol>
         <li>Install <strong>qBittorrent</strong> and <strong>Prowlarr</strong> via Swizzin (<code>box install qbittorrent prowlarr</code>).</li>
-        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> and pick <strong>Swizzin</strong> from the provider dropdown.</li>
+        <li>On your self-host server <code>/configure</code> page, select <strong>Remote Seedbox</strong> and pick <strong>Swizzin</strong> from the provider dropdown.</li>
         <li>Fill in the connection fields using your reverse-proxy HTTPS URLs:</li>
       </ol>
       <table>
@@ -1330,7 +1328,7 @@ ENCRYPTION_SECRET=$(openssl rand -hex 32) PORT=7000 node index.js</code></pre>
       <h4>Configure Page Fields</h4>
       <ol>
         <li>Install <strong>qBittorrent</strong> and <strong>Prowlarr</strong> via the <code>box</code> command.</li>
-        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> and pick <strong>HostingByDesign</strong> from the provider dropdown.</li>
+        <li>On your self-host server <code>/configure</code> page, select <strong>Remote Seedbox</strong> and pick <strong>HostingByDesign</strong> from the provider dropdown.</li>
         <li>Fill in the connection fields:</li>
       </ol>
       <table>
@@ -1358,7 +1356,7 @@ ENCRYPTION_SECRET=$(openssl rand -hex 32) PORT=7000 node index.js</code></pre>
       </div>
       <h4>Configure Page Fields</h4>
       <ol>
-        <li>On <code>/configure</code>, select <strong>Remote Seedbox</strong> and leave provider as <strong>Custom / Other</strong>.</li>
+        <li>On your self-host server <code>/configure</code> page, select <strong>Remote Seedbox</strong> and leave provider as <strong>Custom / Other</strong>.</li>
         <li>Find the following from your provider's control panel and fill them in:</li>
       </ol>
       <table>

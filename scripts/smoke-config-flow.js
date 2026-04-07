@@ -211,11 +211,12 @@ async function run() {
     const homeHtml = await homeRes.text()
     assert.match(
       homeHtml,
-      /<h1 class="logo" data-text="PVTKRRX"><span>PVTKRRX<\/span><\/h1>/,
+      /<h1 class="logo" data-text="PVTKRRX"><span>PVTKRRX<\/span>(?:<span class="sr-only">[\s\S]*?<\/span>)?<\/h1>/,
       'homepage hero should use live PVTKRRX text in the main headline'
     )
     assert.doesNotMatch(homeHtml, /SETRUP/i, 'homepage should not contain the SETRUP typo')
     assert.doesNotMatch(homeHtml, /Stremio Seedbox Addon/i, 'homepage should not contain the old generic addon headline')
+    assert.doesNotMatch(homeHtml, /href="\/configure(?:\?|")/i, 'homepage should not link to configure routes')
     assert.match(homeHtml, /id="siteReleaseCard"/, 'homepage should render a release status card')
     assert.match(homeHtml, /id="siteReleaseLink"/, 'homepage should render a release link')
 
@@ -225,11 +226,13 @@ async function run() {
     const configureHtml = await configureRes.text()
     assert.match(
       configureHtml,
-      /<h1 class="logo-title" data-text="PVTKRRX"><span>PVTKRRX<\/span><\/h1>/,
+      /<h1 class="logo-title" data-text="PVTKRRX"><span>PVTKRRX<\/span>(?:<span class="sr-only">[\s\S]*?<\/span>)?<\/h1>/,
       'configure hero should use live PVTKRRX text in the main headline'
     )
     assert.doesNotMatch(configureHtml, /SETRUP/i, 'configure page should not contain the SETRUP typo')
     assert.doesNotMatch(configureHtml, /Stremio Seedbox Addon/i, 'configure page should not contain the old generic addon headline')
+    assert.match(configureHtml, /<meta name="robots" content="noindex,nofollow">/i, 'configure page should not be indexable')
+    assert.doesNotMatch(configureHtml, />Manifest<\/a>/i, 'configure page should not render a manifest nav link')
     assert.match(configureHtml, /<h2>LAN Bridge Fallback<\/h2>/, 'configure page should render LAN Bridge fallback section')
     assert.match(configureHtml, /<h2>Manual \/ Fallback<\/h2>/, 'configure page should render manual fallback section')
     assert.match(configureHtml, /id="installActionBtn"/, 'configure page should render install action button')
@@ -530,7 +533,7 @@ async function run() {
     assert.equal(bootstrapManifestRes.status, 200, 'GET /manifest.json should return 200')
     const bootstrapManifest = await bootstrapManifestRes.json()
     assert.equal(bootstrapManifest.id, 'com.kepners.pvtkrrx.bootstrap')
-    assert.equal(bootstrapManifest.name, 'PVTKRRX (Configure)')
+    assert.equal(bootstrapManifest.name, 'PVTKRRX (Setup Only)')
     assert.equal(bootstrapManifest.behaviorHints?.configurationRequired, true)
     assert.deepEqual(bootstrapManifest.resources, [], 'root bootstrap manifest should not advertise addon resources')
     assert.deepEqual(bootstrapManifest.catalogs, [], 'root bootstrap manifest should not advertise addon catalogs')
@@ -675,8 +678,8 @@ async function run() {
     const tokenConfigureRes = await fetch(`${base}/${token}/configure`)
     assert.equal(tokenConfigureRes.status, 200, 'GET /:token/configure should return 200')
     const tokenConfigureHtml = await tokenConfigureRes.text()
-    assert.match(tokenConfigureHtml, /<h1 class="logo-title" data-text="PVTKRRX"><span>PVTKRRX<\/span><\/h1>/)
-    assert.match(tokenConfigureHtml, /Configure the bridge between your own stack and Stremio/)
+    assert.match(tokenConfigureHtml, /<h1 class="logo-title" data-text="PVTKRRX"><span>PVTKRRX<\/span>(?:<span class="sr-only">[\s\S]*?<\/span>)?<\/h1>/)
+    assert.match(tokenConfigureHtml, /Your hardware, your trackers.*configure the bridge to Stremio/i)
     assert.match(tokenConfigureHtml, /maybePrefillFromToken/, 'token configure page should include prefill loader')
 
     const tokenConfigRes = await fetch(`${base}/${token}/config.json`)
@@ -706,14 +709,14 @@ async function run() {
     assert.equal(rootManifestRes.status, 200, 'GET /manifest.json should return 200')
     const rootManifest = await rootManifestRes.json()
     assert.equal(rootManifest.id, 'com.kepners.pvtkrrx.bootstrap')
-    assert.equal(rootManifest.name, 'PVTKRRX (Configure)')
+    assert.equal(rootManifest.name, 'PVTKRRX (Setup Only)')
     assert.equal(rootManifest.behaviorHints?.configurationRequired, true)
     assert.deepEqual(rootManifest.catalogs, [], 'root manifest should stay bootstrap-only')
     const rootHostedManifestRes = await fetch(`${base}/manifest.json?mode=hosted`)
     assert.equal(rootHostedManifestRes.status, 200, 'GET /manifest.json?mode=hosted should return 200')
     const rootHostedManifest = await rootHostedManifestRes.json()
     assert.equal(rootHostedManifest.id, 'com.kepners.pvtkrrx.bootstrap')
-    assert.equal(rootHostedManifest.name, 'PVTKRRX (Configure)')
+    assert.equal(rootHostedManifest.name, 'PVTKRRX (Setup Only)')
     assert.equal(rootHostedManifest.behaviorHints?.configurationRequired, true)
     assert.deepEqual(rootHostedManifest.catalogs, [], 'hosted-mode root manifest should stay bootstrap-only')
 

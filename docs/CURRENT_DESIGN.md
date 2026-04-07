@@ -12,13 +12,13 @@ If another document disagrees with this file, this file wins unless that documen
 PVTKRRX is one codebase with three active runtime pieces:
 
 1. Optional hosted relay on the public site (`https://www.pvtkrrx.cc` today, fronted by Caddy into the live hosted Express runtime, currently the Contabo Coolify app alias `pvtkrrx:3000`):
-   - serves hosted manifests and the hosted configure UI
+   - serves hosted manifests plus the public guide pages
    - serves `/version-status.json` so the public site can compare the live build against the latest GitHub release
    - encrypts hosted config tokens
    - stores LAN pair state and account data when KV-backed storage is configured
    - handles Stremio AuthKey linking and account-scoped access checks
    - can mint short-lived Stremio link sessions so any signed-in browser device can link a hosted config token to a Stremio account
-   - may test only public HTTP/HTTPS endpoints from the hosted configure flow
+   - may test only public HTTP/HTTPS endpoints when the shared configure UI is opened on an allowed runtime
 2. Self-hosted server mode on a VPS/seedbox (`PVTKRRX_SELF_HOST_MODE=true`):
    - serves its own `/configure` page and static UI
    - saves a disk-backed server config into the runtime directory
@@ -56,7 +56,7 @@ PVTKRRX is one codebase with three active runtime pieces:
 
 ## Current UX Model
 
-- Hosted `/configure` now centers on three main route cards: `PC Local`, `LAN Bridge`, and `Remote Seedbox`.
+- The public website is now guide-only. It explains `PC Local`, `LAN Bridge`, and `Remote Seedbox`, but it is no longer the default place to paste private runtime details.
 - Desktop-local `/configure` on the Windows EXE now exposes `PC Local` and `LAN Bridge`; `Remote Seedbox` belongs to the separate server/cloud runtime.
 - The top of `/configure` now opens with a visual setup guide that separates the two real private setup surfaces: Windows host (`http://127.0.0.1:7000/configure`) and private server (`https://your-domain/configure`), while keeping the live install actions below as editable code-driven controls.
 - The top of the page focuses on the next action for the selected route.
@@ -79,16 +79,16 @@ PVTKRRX is one codebase with three active runtime pieces:
   - runtime log copy/open actions
   - explicit `Minimize`, `Send To Tray`, and `Exit App` actions
 - The configure page now mirrors that local-runtime visibility with a live qBittorrent status panel that shows the effective save path, incomplete path, fallback storage roots, and whether PVTKRRX currently manages the qBit completion hook.
-- The public homepage and configure page now use a brand-led `PVTKRRX` hero with live editable text, keep `Configure First` as the entry point, and keep the locked route vocabulary (`PC Local`, `LAN Bridge`, `Remote Seedbox`).
+- The public homepage and runbooks now use the brand-led `PVTKRRX` guide surface, point users at docs instead of `/configure`, and keep the locked route vocabulary (`PC Local`, `LAN Bridge`, `Remote Seedbox`).
 - The public homepage now shows a live release-status card driven by `/version-status.json`, and the Windows desktop shell shows the same release check in the popup.
 - Legacy `Hybrid Home` wording may still appear in older docs or internal notes. Treat that as terminology drift, not a different route model, unless a doc explicitly calls out the older naming history.
 
 ## Public Host Truth Table
 
-Verified on 2026-03-31:
+Verified on 2026-04-07:
 
 - `https://www.pvtkrrx.cc/` returns the landing page (`200`)
-- `https://www.pvtkrrx.cc/configure` returns the hosted configure UI (`200`)
+- `https://www.pvtkrrx.cc/configure` no longer serves the public setup UI; public requests redirect back to the guide-only site
 - `https://www.pvtkrrx.cc/runbooks` returns the runbooks page (`200`)
 - `https://www.pvtkrrx.cc/manifest.json` returns the bootstrap manifest (`200`)
 - `https://www.pvtkrrx.cc/health` returns health JSON (`200`) or the health page when the client asks for HTML
@@ -234,6 +234,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 7. The repo contains historical planning docs from February 2026; they are useful for project history, not as the live architecture.
 8. Use `https://www.pvtkrrx.cc` as the canonical hosted base; the old `https://pvtkrrx.vercel.app` hostname is not part of the supported install surface.
 9. If the goal is to keep PVTKRRX out of the request path after setup, use explicit self-hosted server mode and a user-owned HTTPS origin.
+10. The public website is docs-first and guide-only; private configuration belongs on the Windows host runtime or the user's own self-host server.
 
 ## Documentation Canon
 

@@ -603,6 +603,20 @@
       flex-wrap: wrap;
     }
 
+    .route-action-copy {
+      width: 100%;
+      border: 1px solid rgba(0, 246, 255, 0.18);
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: rgba(2, 12, 26, 0.58);
+      color: #c8dafa;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.7px;
+      line-height: 1.55;
+      text-transform: uppercase;
+    }
+
     /* ── Need cards ── */
     .needs-grid {
       display: grid;
@@ -1093,7 +1107,6 @@
         <div class="brand-text">PVTKRRX / Private Tracker Bridge</div>
       </div>
       <nav class="nav">
-        <a href="/configure">Configure</a>
         <a href="#routes">Routes</a>
         <a href="#requirements">Requirements</a>
         <a href="#sports">Sports</a>
@@ -1114,7 +1127,7 @@
         </p>
         <p class="kicker" style="margin-top:-4px">No debrid. No third-party media host. Sports, movies, TV, and library in one addon family.</p>
         <div class="cta-row">
-          <a class="btn btn-primary" href="/configure">Configure First</a>
+          <a class="btn btn-primary" href="/runbooks">Read Setup Guide</a>
           <a class="btn btn-secondary" href="#routes">Choose Your Route</a>
         </div>
         <div class="site-release" id="siteReleaseCard">
@@ -1129,6 +1142,7 @@
       <div class="section-head">
         <div class="section-kicker">Choose Your Route</div>
         <h2 class="section-title">Where does playback happen?</h2>
+        <p class="section-copy">This website is guide-only. Configure on the Windows host runtime for <strong>PC Local</strong> and <strong>LAN Bridge</strong>, or on your own HTTPS server origin for <strong>Remote Seedbox</strong>.</p>
       </div>
 
       <div class="route-grid">
@@ -1141,7 +1155,7 @@
             <li>Full addon — movies, TV, sports, and library on the host machine.</li>
           </ul>
           <div class="route-actions">
-            <a class="btn btn-primary" href="/configure?target=pc">Configure PC Local</a>
+            <p class="route-action-copy">Configure on the Windows host runtime, not on this public website.</p>
           </div>
         </article>
 
@@ -1154,7 +1168,7 @@
             <li>Away-from-home playback still needs a public endpoint.</li>
           </ul>
           <div class="route-actions">
-            <a class="btn btn-primary" href="/configure?target=lan">Configure LAN Bridge</a>
+            <p class="route-action-copy">Configure on the Windows host runtime, then install the route on the same Stremio account.</p>
           </div>
         </article>
 
@@ -1167,7 +1181,7 @@
             <li>Built for seedbox operators with real public paths.</li>
           </ul>
           <div class="route-actions">
-            <a class="btn btn-primary" href="/configure?target=seedbox">Configure Remote Seedbox</a>
+            <p class="route-action-copy">Configure on your own HTTPS server origin. Use these runbooks as the public guide only.</p>
           </div>
         </article>
       </div>
@@ -1190,7 +1204,7 @@
         </article>
         <article class="need-card">
           <div class="need-name">Stremio</div>
-          <p class="need-copy">Configure first, then install the route that matches the device you want to use.</p>
+          <p class="need-copy">Install the route URL from the runtime that owns playback: Windows host for local routes, your own HTTPS server for Remote Seedbox.</p>
         </article>
       </div>
       <div class="needs-note">
@@ -1277,9 +1291,7 @@
         <a id="footerReleaseLink" href="https://github.com/Kepners/pvtkrrx/releases" target="_blank" rel="noopener noreferrer">Releases</a>
       </div>
       <div class="footer-links">
-        <a href="/configure">Configure</a>
         <a href="/runbooks">Runbooks</a>
-        <a href="/manifest.json">Manifest</a>
         <a href="/health">Health</a>
         <a href="https://clockrr.pvtkrrx.cc" target="_blank" rel="noopener noreferrer">Clockrr</a>
         <a href="mailto:kepners@pvtkrrx.cc">Contact</a>

@@ -191,12 +191,24 @@ app.use(express.static(publicDir, {
     setPublicCacheHeaders(res, 86400, { sMaxAge: 604800, staleWhileRevalidate: 2592000, immutable: true })
   }
 }))
+
+function canServeConfigureUi(req) {
+  if (SELF_HOST_SERVER_MODE) return true
+  return isSameHostRequest(req)
+}
+
 app.get('/configure', (req, res) => {
+  if (!canServeConfigureUi(req)) {
+    return res.redirect(302, '/#routes')
+  }
   ensureCsrfCookie(req, res)
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
   sendConfigurePage(req, res)
 })
 app.get('/:config/configure', (req, res) => {
+  if (!canServeConfigureUi(req)) {
+    return res.redirect(302, '/#routes')
+  }
   ensureCsrfCookie(req, res)
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
   sendConfigurePage(req, res)
@@ -250,8 +262,11 @@ function buildRuntimeAppConfig(req) {
 function sendConfigurePage(req, res) {
   const runtimeConfig = buildRuntimeAppConfig(req)
   const runtimeBootstrapJson = JSON.stringify(runtimeConfig).replace(/</g, '\\u003c')
-  const bootstrapScript = `<script>window.__PVTKRRX_RUNTIME_BOOTSTRAP__=${runtimeBootstrapJson};</script>`
-  res.type('html').send(configPageTemplate.replace('</head>', `${bootstrapScript}</head>`))
+  const runtimeHeadExtras = [
+    '<meta name="robots" content="noindex,nofollow">',
+    `<script>window.__PVTKRRX_RUNTIME_BOOTSTRAP__=${runtimeBootstrapJson};</script>`
+  ].join('')
+  res.type('html').send(configPageTemplate.replace('</head>', `${runtimeHeadExtras}</head>`))
 }
 
 function normalizeVersionString(value) {
@@ -1609,7 +1624,10 @@ app.get('/manifest.json', (req, res) => {
   })
   const m = manifest.createBootstrapManifest(getPublicBaseUrl(req), {
     selfHostServerMode: SELF_HOST_SERVER_MODE,
-    desktopLocalOnly: parseBooleanLoose(process.env.PVTKRRX_DESKTOP_LOCAL_ONLY)
+    desktopLocalOnly: parseBooleanLoose(process.env.PVTKRRX_DESKTOP_LOCAL_ONLY),
+    guideOnlyBootstrap: !SELF_HOST_SERVER_MODE &&
+      !parseBooleanLoose(process.env.PVTKRRX_DESKTOP_LOCAL_ONLY) &&
+      !isSameHostRequest(req)
   })
   m.stremioAddonsConfig = {
     issuer: 'https://stremio-addons.net',

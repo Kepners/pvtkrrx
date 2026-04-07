@@ -196,8 +196,8 @@ async function run() {
     )
     assert.equal(bootstrapManifestRes.status, 200)
     assert.equal(bootstrapManifestRes.json?.id, 'com.kepners.pvtkrrx.bootstrap')
-    assert.equal(bootstrapManifestRes.json?.name, 'PVTKRRX Server (Configure)')
-    assert.match(String(bootstrapManifestRes.json?.description || ''), /self-hosted server Remote Seedbox route/i)
+    assert.equal(bootstrapManifestRes.json?.name, 'PVTKRRX Server (Setup Only)')
+    assert.match(String(bootstrapManifestRes.json?.description || ''), /do not install this root manifest as the working addon/i)
 
     const privateTest = await request(
       port,
