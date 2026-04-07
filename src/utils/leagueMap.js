@@ -308,6 +308,13 @@ const LEAGUE_MAP = Object.freeze({
     sportsDbName: 'Australian Big Bash League',
     aliases: ['BBL', 'Big Bash']
   },
+  ipl: {
+    name: 'Indian Premier League',
+    idLeague: '4460',
+    sportKey: 'cricket',
+    sportsDbSport: 'Cricket',
+    aliases: ['IPL']
+  },
   eurobasket: {
     name: 'EuroLeague Basketball',
     idLeague: '4546',

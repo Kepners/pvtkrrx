@@ -10,7 +10,7 @@ const { isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { formatSize, findVideoFile } = require('../utils/streams')
 const { makeSportsPosterUrl } = require('../utils/sportsThumb')
 const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
-const { mapLeague } = require('../utils/leagueMap')
+const { getMappedLeagueEntry, mapLeague } = require('../utils/leagueMap')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { encodeCustomId } = require('../utils/customId')
 const { findExistingLocalFilePath } = require('../utils/localStorageRoots')
@@ -157,7 +157,18 @@ function sportHintFromLeagueCode(value) {
   if (['mlb'].includes(code)) return 'baseball'
   if (['nhl'].includes(code)) return 'hockey'
   if (['wwe', 'aew'].includes(code)) return 'wrestling'
-  if (mapLeague(value)) return 'football'
+  if ([
+    'eflleagueone',
+    'eflleaguetwo',
+    'eflchampionship',
+    'facup',
+    'carabaocup',
+    'communityshield',
+    'conferenceleague',
+    'uefaconferenceleague'
+  ].includes(code)) return 'football'
+  const mappedEntry = getMappedLeagueEntry(value)
+  if (mappedEntry?.sportKey) return mappedEntry.sportKey
   return ''
 }
 
@@ -714,7 +725,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       mappedLeague: mapLeague(effectiveLeague) || '',
       sportHint: resolveSportHint({
         explicitHint: item?.sportHint,
-        categoryHint: sportHintFromLeagueCode(effectiveLeague) || requestedSportHint,
+        categoryHint: sportHintFromLeagueCode(effectiveLeague),
         title: item?.title
       })
     }

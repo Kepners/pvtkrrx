@@ -7,7 +7,10 @@ const RELEASE_GROUP_RE = /^[A-Z0-9]+-[A-Za-z0-9]+$/
 const HLG_HDR_RE = /^(?:hlg|hdr10?\+?|dovi?|dv|10bit|8bit)$/i
 const GENERIC_SPORT_PREFIX_RE = /^(?:football|soccer|basketball|baseball|cricket|rugby|mma|boxing|wrestling|darts|golf|motorsport|motor|tennis|hockey|ice|american|uefa)$/i
 const LEADING_TEAM_NOISE_RE = /^(?:game|games|match|matches|week|round|heat|session|fight|night|grand|prix|qualifying|practice|sprint|race|card|prelims?|early|cup|bowl|super|opening|closing|ceremony|playoffs?|finals?|semi(?:final)?|quarter(?:final)?|championship|title|event)$/i
-const ROMAN_NUMERAL_RE = /^(?:[ivxlcdm]+)$/i
+const ROMAN_NUMERAL_RE = /^(?=[ivxlcdm]+$)m{0,4}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})$/i
+const TEAM_BROADCAST_RE = /\b(?:nbc|espn(?:2)?|sky(?:\s*sports?)?|bt(?:\s*sport)?|tnt(?:\s*sports?)?|fox(?:\s*sports?)?|cbs|abc|itv(?:4)?|tsn|bein(?:\s*sports?)?|canal\+?|dazn)\b/gi
+const TEAM_LANGUAGE_RE = /\b(?:english|spanish|french|german|italian|portuguese)\b/gi
+const TEAM_PRESENTATION_RE = /\b(?:condensed(?:\s*game)?|extended(?:\s*highlights?)?|highlights?|replay)\b/gi
 
 // Known league/series tokens that start non-vs event titles
 const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|MotoGP|NASCAR|IndyCar|WRC|Supercars|V8SC|Bathurst|WSBK|WEC|FormulaE|Rally|Dakar|PGA|LPGA|Masters|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
@@ -54,10 +57,10 @@ function extractFallbackDate(value) {
   const source = String(value || '').trim()
   if (!source) return ''
 
-  const iso = source.match(/((?:19|20)\d{2})[._\s-](\d{2})[._\s-](\d{2})/)
+  const iso = source.match(/\b((?:19|20)\d{2})[._\s-](\d{2})[._\s-](\d{2})\b/)
   if (iso && isValidDate(iso[1], iso[2], iso[3])) return `${iso[1]}-${iso[2]}-${iso[3]}`
 
-  const dmy = source.match(/(\d{2})[._\s-](\d{2})[._\s-]((?:19|20)\d{2})/)
+  const dmy = source.match(/\b(\d{2})[._\s-](\d{2})[._\s-]((?:19|20)\d{2})\b/)
   if (dmy && isValidDate(dmy[3], dmy[2], dmy[1])) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`
 
   const plain = source.match(/((?:19|20)\d{2}-\d{2}-\d{2})/)
@@ -151,6 +154,7 @@ function trimTrailingMetadataTokens(tokens) {
 
 function trimLeadingTeamNoise(tokens) {
   const parts = [...(Array.isArray(tokens) ? tokens : [])]
+  let strippedNoiseCount = 0
   while (parts.length > 1) {
     const token = String(parts[0] || '').trim()
     if (!token) {
@@ -159,15 +163,26 @@ function trimLeadingTeamNoise(tokens) {
     }
     if (
       LEADING_TEAM_NOISE_RE.test(token) ||
-      ROMAN_NUMERAL_RE.test(token) ||
-      /^\d{1,3}$/.test(token)
+      /^\d{1,3}$/.test(token) ||
+      (strippedNoiseCount > 0 && ROMAN_NUMERAL_RE.test(token))
     ) {
       parts.shift()
+      strippedNoiseCount += 1
       continue
     }
     break
   }
   return parts
+}
+
+function normalizeTeamLabel(value) {
+  return normalizeSegment(
+    String(value || '')
+      .replace(/\([^)]*\)/g, ' ')
+      .replace(TEAM_BROADCAST_RE, ' ')
+      .replace(TEAM_LANGUAGE_RE, ' ')
+      .replace(TEAM_PRESENTATION_RE, ' ')
+  )
 }
 
 function normalizeTeamTokens(tokens) {
@@ -176,7 +191,7 @@ function normalizeTeamTokens(tokens) {
       .map(normalizeSegment)
       .filter(Boolean)
   )
-  return normalizeSegment(trimLeadingTeamNoise(normalized).join(' '))
+  return normalizeTeamLabel(trimLeadingTeamNoise(normalized).join(' '))
 }
 
 function parseSportsTitle(title, fallbackDate = '') {

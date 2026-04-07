@@ -181,7 +181,8 @@ function sportKeyFromLeagueCode(value) {
   if (['mlb'].includes(code)) return 'baseball'
   if (['nhl'].includes(code)) return 'hockey'
   if (['wwe', 'aew'].includes(code)) return 'wrestling'
-  if (mapLeague(value)) return 'football'
+  const mappedEntry = getMappedLeagueEntry(value)
+  if (mappedEntry?.sportKey) return mappedEntry.sportKey
   return ''
 }
 
@@ -469,10 +470,10 @@ function extractDateHint(value, fallbackDate) {
     const compact = source.match(/\b((?:19|20)\d{2})(\d{2})(\d{2})\b/)
     if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`
 
-    const iso = source.match(/((?:19|20)\d{2})[._\s-](\d{2})[._\s-](\d{2})/)
+    const iso = source.match(/\b((?:19|20)\d{2})[._\s-](\d{2})[._\s-](\d{2})\b/)
     if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`
 
-    const dmy = source.match(/(\d{2})[._\s-](\d{2})[._\s-]((?:19|20)\d{2})/)
+    const dmy = source.match(/\b(\d{2})[._\s-](\d{2})[._\s-]((?:19|20)\d{2})\b/)
     if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`
 
     const plain = source.match(/((?:19|20)\d{2}-\d{2}-\d{2})/)
@@ -585,6 +586,10 @@ function tokenize(value) {
 function getSportMatchScore(titleSport, eventSportText) {
   const sport = normalizeToken(eventSportText || '')
   if (!titleSport || !sport) return 0
+
+  if (sportsDbSportMatches(sportsDbNameForSportKey(titleSport) || titleSport, sport)) {
+    return 8
+  }
 
   const isMatch = (
     (sport.includes('soccer') && titleSport === 'football') ||

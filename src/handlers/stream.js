@@ -370,10 +370,10 @@ function extractSportsDate(value, fallbackValue = '') {
     const compact = source.match(/\b((?:19|20)\d{2})(\d{2})(\d{2})\b/)
     if (compact) return `${compact[1]}-${compact[2]}-${compact[3]}`
 
-    const iso = source.match(/((?:19|20)\d{2})[._\s-](\d{2})[._\s-](\d{2})/)
+    const iso = source.match(/\b((?:19|20)\d{2})[._\s-](\d{2})[._\s-](\d{2})\b/)
     if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`
 
-    const dmy = source.match(/(\d{2})[._\s-](\d{2})[._\s-]((?:19|20)\d{2})/)
+    const dmy = source.match(/\b(\d{2})[._\s-](\d{2})[._\s-]((?:19|20)\d{2})\b/)
     if (dmy) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`
 
     const plain = source.match(/((?:19|20)\d{2}-\d{2}-\d{2})/)

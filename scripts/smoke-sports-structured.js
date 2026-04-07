@@ -173,7 +173,30 @@ function testParserAndLeagueMap() {
       raw: 'NFL.08.02.2026.Super.Bowl.LX.Seattle.Seahawks.vs.New.England.Patriots.1080p'
     }
   )
+  assert.deepEqual(
+    parseSportsTitle('NFL.08.02.2026.Super.Bowl.LX.Seattle.Seahawks.vs.New.England.Patriots.NBC.(Condensed.Game).1080p'),
+    {
+      league: 'NFL',
+      date: '2026-02-08',
+      homeTeam: 'Seattle Seahawks',
+      awayTeam: 'New England Patriots',
+      quality: '1080p',
+      raw: 'NFL.08.02.2026.Super.Bowl.LX.Seattle.Seahawks.vs.New.England.Patriots.NBC.(Condensed.Game).1080p'
+    }
+  )
+  assert.deepEqual(
+    parseSportsTitle('MLS.2026.04.05.DC.United.vs.LA.Galaxy.1080p'),
+    {
+      league: 'MLS',
+      date: '2026-04-05',
+      homeTeam: 'DC United',
+      awayTeam: 'LA Galaxy',
+      quality: '1080p',
+      raw: 'MLS.2026.04.05.DC.United.vs.LA.Galaxy.1080p'
+    }
+  )
   assert.equal(mapLeague(' epl '), 'English Premier League')
+  assert.equal(mapLeague('IPL'), 'Indian Premier League')
   assert.equal(mapLeague('unknown'), null)
 }
 
@@ -586,6 +609,94 @@ async function testSportSpecificCatalogDetailFiltering() {
   assert.equal(decoded.r, 'football', 'football discovery catalog should stamp the football sport hint into the custom id')
 }
 
+async function testSportFamilyCatalogRejectsMixedSportLeakage() {
+  class FakeProwlarrClient {
+    async search() {
+      return [
+        {
+          title: 'EFL.League.Two.2026.03.24.Oldham.Athletic.vs.Notts.County.1080p.HDTV.x264-FOOTY',
+          indexer: 'GeneralA',
+          size: 1_000_000_000,
+          seeders: 20,
+          pubDate: '2026-03-24T09:00:00Z'
+        },
+        {
+          title: 'MotoGP.2026.Round.02.Brazil.Warm.Up.1080p.WEB.h264-RACE',
+          indexer: 'GeneralB',
+          size: 1_300_000_000,
+          seeders: 25,
+          pubDate: '2026-03-22T12:00:00Z'
+        },
+        {
+          title: 'AFL.360.2026.04.07.Tuesday.720p.HDTV.x264-PANEL',
+          indexer: 'GeneralC',
+          size: 800_000_000,
+          seeders: 12,
+          pubDate: '2026-04-07T08:00:00Z'
+        },
+        {
+          title: 'Midweek.Tackle.2026.04.07.720p.HDTV.x264-PANEL',
+          indexer: 'GeneralD',
+          size: 750_000_000,
+          seeders: 10,
+          pubDate: '2026-04-07T07:00:00Z'
+        }
+      ]
+    }
+  }
+
+  class FakeSportsDbClient {
+    async getEventArtwork(input = {}) {
+      return {
+        poster: 'https://example.com/sport-family-poster.jpg',
+        landscapeImage: 'https://example.com/sport-family-landscape.jpg',
+        backgroundImage: 'https://example.com/sport-family-background.jpg',
+        image: 'https://example.com/sport-family-landscape.jpg',
+        eventId: Buffer.from(String(input.title || 'event')).toString('base64url').slice(0, 24),
+        eventDate: String(input.date || input.publishDate || '').slice(0, 10),
+        league: String(input.league || '').trim()
+      }
+    }
+  }
+
+  const { handleCatalog } = loadCatalogWithStubs({
+    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient },
+    '../clients/sportsdb': { SportsDbClient: FakeSportsDbClient }
+  })
+
+  const config = {
+    jackettUrl: 'http://127.0.0.1:9797',
+    jackettApiKey: 'smoke-family-api-key',
+    sportsDbApiKey: 'smoke-sports-key',
+    maxResults: '10'
+  }
+
+  const motorsportResult = await handleCatalog(
+    config,
+    'sports',
+    'pvtkrrx-sports-motorsport',
+    '',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  )
+
+  assert.equal(motorsportResult.metas.length, 1, 'motorsport catalog should reject football and uncategorized sports rows')
+  assert.match(motorsportResult.metas[0].name, /MotoGP/i, 'motorsport catalog should keep the MotoGP event')
+  assert.equal(decodeCustomId(motorsportResult.metas[0].id).r, 'motorsport', 'motorsport catalog should stamp motorsport sport hints')
+
+  const footballResult = await handleCatalog(
+    config,
+    'sports',
+    'pvtkrrx-sports-football',
+    '',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  )
+
+  assert.equal(footballResult.metas.length, 1, 'football catalog should keep parsed EFL fixtures without leaking other sports')
+  assert.match(footballResult.metas[0].name, /(Oldham Athletic|Notts County).*(Oldham Athletic|Notts County)/i, 'football catalog should keep the EFL fixture teams')
+  assert.match(String(footballResult.metas[0].description || ''), /EFL League Two/i, 'football catalog should keep the EFL league context')
+  assert.equal(decodeCustomId(footballResult.metas[0].id).r, 'football', 'football catalog should stamp football sport hints')
+}
+
 async function testLibraryCustomIdsStayCompact() {
   class FakeQBitClient {
     async torrents(scope) {
@@ -720,6 +831,7 @@ function testSportDisambiguation() {
   assert.equal(detectSport('V8 Supercars Bathurst 1000'), 'motorsport', 'V8 Supercars should detect as motorsport')
   assert.equal(detectSport('NASCAR Cup Series 2026'), 'motorsport', 'NASCAR should detect as motorsport')
   assert.equal(detectSport('Formula1 2026 Japanese Grand Prix'), 'motorsport', 'Formula1 should detect as motorsport')
+  assert.equal(detectSport('EFL League Two 2026 03 24 Oldham Athletic vs Notts County'), 'football', 'EFL League Two should detect as football')
   assert.equal(detectSport('PDC Darts World Championship 2026'), 'darts', 'PDC Darts should detect as darts')
   assert.equal(detectSport('Premier League Darts Night 10'), 'darts', 'Premier League Darts should detect as darts')
 
@@ -1303,6 +1415,7 @@ async function main() {
     await testLeagueFallbackUsesGeneratedMatchupPoster()
     await testCatalogShowsSetupPlaceholderWhenProwlarrHasNoIndexers()
     await testSportSpecificCatalogDetailFiltering()
+    await testSportFamilyCatalogRejectsMixedSportLeakage()
     await testEventTitleCatalogGrouping()
     await testF1FallbackUsesWeekendPosterCard()
     await testEventQueriesStripSessionSuffixesBeforeSearch()
