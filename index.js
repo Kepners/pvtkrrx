@@ -1611,6 +1611,10 @@ app.get('/manifest.json', (req, res) => {
     selfHostServerMode: SELF_HOST_SERVER_MODE,
     desktopLocalOnly: parseBooleanLoose(process.env.PVTKRRX_DESKTOP_LOCAL_ONLY)
   })
+  m.stremioAddonsConfig = {
+    issuer: 'https://stremio-addons.net',
+    signature: 'eyJhbGciOiJkaXIiLCJlbmMiOiJBMTI4Q0JDLUhTMjU2In0..AzQ40k5XkfKIpO43fWtS7A.rgrQ0RnN4MtCS-7tL73auLA3tO91P37eTo2JLWUZhd5DMLOI7psmn4CzRH7d31lu5JjNtf65Gj4NMonMW5kZn-rg93ZPkg3dYZpDk0d8EGajQMAYG8YCMdBMBuQYXY1s.wKjJvVG3pmEk-BmwU9L5AA'
+  }
   console.log(`[stremio] → manifest  id=${m.id} catalogs=${m.catalogs?.length || 0} configRequired=${m.behaviorHints?.configurationRequired}`)
   res.json(m)
 })
