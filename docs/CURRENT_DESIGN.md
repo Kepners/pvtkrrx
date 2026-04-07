@@ -1,6 +1,6 @@
 # PVTKRRX Current Design
 
-Updated: 2026-04-06
+Updated: 2026-04-08
 
 ## Purpose
 
@@ -141,6 +141,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 - When external sports art exists, addon responses now prefer signed `/image/sports/...` URLs so the active local or hosted runtime can cache poster, wallpaper, landscape, and logo bytes on disk instead of hotlinking every request back to the upstream art host.
 - `npm run server:setup` and `npm run cache:sports` can now warm that same disk cache ahead of time with upcoming event artwork, top team badges, and mapped league art so first-run sports tiles do not depend on cold image fetches.
 - On long-running Linux/cloud runtimes, a background sports-cache autofill job now revisits one sport group every 15 minutes by default and persists its rotation cursor in the runtime directory.
+- The runtime `sports-image-cache/` store is now append-only by default: once image bytes are downloaded, PVTKRRX does not auto-prune or TTL-expire them unless the user explicitly deletes the cache on disk.
 - Sports detail meta now exposes Stremio `genres` tags from the resolved sport classification when available.
 - Sports title parsing now handles both team-vs-team formats (`EPL.2026.03.15.Arsenal.vs.Chelsea`) and non-vs event formats (`Formula1.2026.03.28.Japanese.Grand.Prix.Qualifying`, `UFC.Fight.Night.270.Main.Card`).
 - Motorsport coverage now includes F1, MotoGP, NASCAR, IndyCar, WRC, Supercars/V8, WSBK, WEC, and Formula E.

@@ -1,6 +1,6 @@
 # PVTKRRX Project Status
 
-Updated: 2026-04-07
+Updated: 2026-04-08
 
 ## Current Stage
 
@@ -21,6 +21,8 @@ The practical reading of the project today is:
 - the sports catalog artwork path now prefers portrait poster art for tiles, while keeping separate sport-aware backgrounds/logos for player wallpaper/loading
 - sports poster, wallpaper, landscape, and logo bytes can now be cached on demand by the active runtime through signed `/image/sports/...` URLs instead of hotlinking every request back to the upstream artwork host
 - `npm run server:setup` now also pre-seeds that same `sports-image-cache/` store with upcoming event art, top team badges, and mapped league artwork, `npm run cache:sports` can refresh it later without deleting warm entries, and long-running Linux/cloud runtimes now keep topping the cache up automatically every 15 minutes in rotating sport batches
+- the hosted Contabo/Coolify runtime is now verified live on commit `598ca01`, which turns the disk-backed sports image cache into a permanent append-only catalogue and stretches SportsDB artwork-hit, structured-event, and league-asset persistence to one year while leaving miss retries at 6 hours
+- the live hosted relay is now ahead of the published desktop/self-host release surfaces: the running Contabo container is on `598ca01`, while `https://www.pvtkrrx.cc/version-status.json` still reports `v1.1.27`
 - the sports identity path is now materially wider: multi-token leagues (`Premier League`, `La Liga`), `DD.MM.YYYY` dates, year-only titles that can borrow the Prowlarr publish date, and event-prefix noise such as `Super Bowl LX` now normalize into the same shared structured matchup shape
 - structured TheSportsDB event lookup now expands league-aware team nicknames such as `Lakers`, `Yankees`, and `Maple Leafs` to the official SportsDB team names before searching, then falls back to date+sport matching when literal event queries still miss
 - non-vs event lookup now also tries stripped event-name queries (`Japanese Grand Prix`, `Fight Night 270`, etc.) so `Race`, `Qualifying`, `Practice`, `Sprint`, and `Main Card` suffixes stop blocking artwork recovery
@@ -90,6 +92,15 @@ The practical reading of the project today is:
   - structured date+sport fallback after literal title-search misses
   - stripped non-vs event queries for Formula 1 session titles
 - `npm run smoke:sports`, `npm run smoke:sportsdb-league`, and `npm run smoke:pipeline` all passed on 2026-04-07 for this change set.
+
+## Work Carried Out On 2026-04-08
+
+- Verified `main` and `origin/main` are both at commit `598ca01` (`📦 feat: permanent sports image catalogue — no pruning, no expiry`), so the permanent-cache work is already in GitHub rather than sitting as an unpushed local patch.
+- Verified the live public Contabo route is already running that same commit: the active Coolify container is `w14jewmw5ubscrxh8zzfhq7d-230950764321` on image `w14jewmw5ubscrxh8zzfhq7d:598ca01761f66e17439386f1e7898ba699dea563`.
+- Verified inside the live container that `sportsdb.js` now uses `PERSIST_MAX_ENTRIES = 50000`, one-year artwork-hit / structured-event / league-asset TTLs, and that `sportsImageCache.js` carries the permanent-catalogue no-prune / no-expiry contract.
+- Verified `https://www.pvtkrrx.cc/health` returned `200` after the rebuild, so the hosted relay is healthy on the new commit.
+- Re-confirmed deploy drift on the non-live mirror path: `/opt/stack/sites/pvtkrrx` is still at `cabe9a5`, so that checkout must not be treated as proof of what the public host is serving.
+- Practical outcome: the cache-policy changes are already shipped on the hosted/cloud line, but Windows EXE and self-host release parity still needs a coordinated release if we want all surfaces to move together.
 
 ## Earlier 2026-04-04 Self-Host Work
 
