@@ -1,4 +1,6 @@
-# Prompt: Add Cloudflare Tunnel to the PVTKRRX Self-Host Installer
+# Historical Prompt: Cloudflare Tunnel to the PVTKRRX Self-Host Installer
+
+This file is archival context only. The current self-host contract is `FreeDNS` or `domain` backed by a local HTTPS reverse proxy such as Caddy, not Cloudflare quick tunnels.
 
 ## Context
 

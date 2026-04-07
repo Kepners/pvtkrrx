@@ -105,8 +105,8 @@ The Linux installer now bootstraps a dedicated self-host server in one flow:
 - installs a bundled Node runtime under `/opt/pvtkrrx/.node`
 - installs production dependencies
 - auto-discovers existing Prowlarr/qBittorrent configs when they are already installed, then prompts only for the values it cannot recover
-- asks how Stremio should reach the server: Cloudflare Tunnel, a user-owned `https://` origin, or skip for later manual setup
-- asks for a built-in playback origin during install when needed: domain installs default `/file` and `/playback` to the same HTTPS origin, while Cloudflare installs can capture an optional separate direct HTTPS playback host instead of leaving video bytes on the tunnel by accident
+- asks how Stremio should reach the server: FreeDNS, a user-owned `https://` origin, or skip for later manual setup
+- asks for a built-in playback origin during install when needed: FreeDNS and domain installs default `/file` and `/playback` to the same HTTPS origin, while still allowing an optional separate direct HTTPS playback host
 - configures qBittorrent for localhost addon access when it has to stand up the service itself
 - if Prowlarr or qBittorrent are missing on a direct `npm run server:setup` run, it immediately hands off to the full bootstrap and installs them automatically before continuing
 - pulls the app source from the branch payload by default, with an automatic retry from `main` if a pinned release is too old to include `scripts/server-installer.js`
@@ -116,6 +116,7 @@ The Linux installer now bootstraps a dedicated self-host server in one flow:
 - saves the disk-backed self-host config into the runtime directory
 - creates the self-host password file
 - can install/start a Linux `systemd` service for auto-boot
+- treats legacy `cloudflare` mode values as migration aliases and disables any old `pvtkrrx-tunnel.service` once a FreeDNS or domain front door is configured
 - pre-seeds the local `sports-image-cache/` with upcoming TheSportsDB event images plus team and league artwork using the same runtime cache path the addon serves later
 - keeps filling that same cache in the background every 15 minutes after boot on long-running Linux/cloud runtimes, rotating through sports instead of hammering the free key in one burst
 - prints a one-time `Configure` bootstrap URL with `#serverPassword=...` so the first browser open can load the saved self-host config automatically
@@ -350,8 +351,9 @@ This now builds in the system temp directory first, then copies the finished cur
 | AUTH_TOKEN_SECRET | Recommended | Key for signing account auth tokens (falls back to ENCRYPTION_SECRET) |
 | PVTKRRX_RUNTIME_DIR | Recommended for self-host | Stable runtime/config directory. The server installer now defaults this to `<repo>/data/pvtkrrx` so saved config and password state do not depend on whichever user launched the process |
 | PVTKRRX_PUBLIC_BASE_URL | Recommended for self-host | Public `https://` origin used when generating self-host install/config links. Set this to the real reverse-proxied host you want Stremio and browsers to use |
-| PVTKRRX_PLAYBACK_BASE_URL | Optional for self-host | Dedicated public HTTPS origin for built-in `/file` and `/playback` URLs. Use this when install/control traffic should stay on one origin, such as a Cloudflare Tunnel, but actual buffering/file bytes should leave from a different direct reverse-proxied origin |
-| PVTKRRX_SELF_HOST_HTTPS_MODE | Recommended for self-host | HTTPS bootstrap mode for the installer: `cloudflare`, `domain`, or `skip` |
+| PVTKRRX_PLAYBACK_BASE_URL | Optional for self-host | Dedicated public HTTPS origin for built-in `/file` and `/playback` URLs. Use this when install/configure traffic should stay on one origin but actual buffering/file bytes should leave from a different direct reverse-proxied origin |
+| PVTKRRX_SELF_HOST_HTTPS_MODE | Recommended for self-host | HTTPS bootstrap mode for the installer: `freedns`, `domain`, or `skip` |
+| PVTKRRX_FREEDNS_UPDATE_URL | Optional for self-host | FreeDNS dynamic-update URL for the chosen hostname. When set, the installer can point the FreeDNS record at the current server IP before local Caddy requests TLS |
 | PVTKRRX_SPORTS_CACHE_AUTO_FILL | Optional | Enable background sports image cache refill on long-running runtimes. Default `true` on non-Windows non-Vercel servers |
 | PVTKRRX_SPORTS_CACHE_AUTO_FILL_INITIAL_DELAY_MS | Optional | Delay before the first background sports cache refill (default `900000`, 15 minutes) |
 | PVTKRRX_SPORTS_CACHE_AUTO_FILL_INTERVAL_MS | Optional | Background sports cache refill cadence in ms (default `900000`, 15 minutes) |
@@ -429,7 +431,7 @@ Practical answer to "can I set this up on my PC and use the same Stremio login o
 3. `/{token}/file/...` means built-in serving; external host/path means external file server serving
 4. If it still points to an old external host, go to `http://localhost:7000/configure`, clear File Server URL, and save local config
 5. Runtime now auto-prefers built-in `/file/` whenever the addon can read the file locally
-6. Self-host cloud note: if `PVTKRRX_PUBLIC_BASE_URL` is a `trycloudflare.com` tunnel and you do not want built-in buffering/file bytes on that tunnel, set `PVTKRRX_PLAYBACK_BASE_URL` to a direct public HTTPS origin that reaches the same server runtime
+6. Self-host cloud note: FreeDNS and custom-domain installs are expected to use a local HTTPS reverse proxy such as Caddy on the same server. Set `PVTKRRX_PUBLIC_BASE_URL` to the real public hostname Stremio should install from, and optionally set `PVTKRRX_PLAYBACK_BASE_URL` if `/file` and `/playback` should leave from a different HTTPS origin
 
 ### Android TV / mobile cannot reach addon
 

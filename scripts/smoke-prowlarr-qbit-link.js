@@ -109,12 +109,13 @@ function startMockProwlarr() {
 
 async function run() {
   assert.equal(isTryCloudflareUrl('https://scanner-seeks-cent-ant.trycloudflare.com'), true)
-  assert.equal(resolveSelfHostHttpsMode('', 'https://scanner-seeks-cent-ant.trycloudflare.com'), 'cloudflare')
+  assert.equal(resolveSelfHostHttpsMode('', 'https://scanner-seeks-cent-ant.trycloudflare.com'), 'freedns')
   assert.equal(resolveSelfHostHttpsMode('', 'https://example.com'), 'domain')
-  assert.equal(resolveSelfHostHttpsMode('domain', 'https://scanner-seeks-cent-ant.trycloudflare.com'), 'cloudflare')
+  assert.equal(resolveSelfHostHttpsMode('domain', 'https://scanner-seeks-cent-ant.trycloudflare.com'), 'freedns')
+  assert.equal(resolveSelfHostHttpsMode('freedns', 'https://seedbox.example.com'), 'freedns')
   assert.equal(resolveInstallPlaybackBaseUrl('', 'https://seedbox.example.com', 'domain'), 'https://seedbox.example.com')
-  assert.equal(resolveInstallPlaybackBaseUrl('', 'https://scanner-seeks-cent-ant.trycloudflare.com', 'cloudflare'), '')
-  assert.equal(resolveInstallPlaybackBaseUrl('https://play.example.com', 'https://scanner-seeks-cent-ant.trycloudflare.com', 'cloudflare'), 'https://play.example.com')
+  assert.equal(resolveInstallPlaybackBaseUrl('', 'https://seedbox.mooo.com', 'freedns'), 'https://seedbox.mooo.com')
+  assert.equal(resolveInstallPlaybackBaseUrl('https://play.example.com', 'https://seedbox.mooo.com', 'freedns'), 'https://play.example.com')
 
   const { server, state } = await startMockProwlarr()
   try {

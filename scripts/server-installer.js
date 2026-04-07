@@ -2,6 +2,7 @@ const fs = require('fs')
 const os = require('os')
 const path = require('path')
 const crypto = require('crypto')
+const net = require('node:net')
 const { execFileSync, spawnSync } = require('child_process')
 const readline = require('node:readline/promises')
 const { stdin: input, stdout: output } = require('node:process')
@@ -87,9 +88,10 @@ function resolveSelfHostHttpsMode(existingHttpsMode, existingPublicBaseUrl) {
   const canReusePublicBaseUrl = Boolean(publicBaseUrl) && !isTryCloudflareUrl(publicBaseUrl)
 
   if (mode === 'skip') return 'skip'
-  if (mode === 'cloudflare') return 'cloudflare'
-  if (mode === 'domain') return canReusePublicBaseUrl ? 'domain' : 'cloudflare'
-  return canReusePublicBaseUrl ? 'domain' : 'cloudflare'
+  if (mode === 'freedns') return 'freedns'
+  if (mode === 'domain') return canReusePublicBaseUrl ? 'domain' : 'freedns'
+  if (isTryCloudflareUrl(publicBaseUrl)) return 'freedns'
+  return canReusePublicBaseUrl ? 'domain' : 'freedns'
 }
 
 function normalizePortNumber(input, fallback = 0) {
@@ -101,7 +103,8 @@ function normalizePortNumber(input, fallback = 0) {
 function normalizeSelfHostHttpsMode(input) {
   const text = String(input || '').trim().toLowerCase()
   if (!text) return ''
-  if (['cloudflare', 'cloudflare-tunnel', 'tunnel', 'cf'].includes(text)) return 'cloudflare'
+  if (['freedns', 'free-dns', 'afraid', 'afraid.org'].includes(text)) return 'freedns'
+  if (['cloudflare', 'cloudflare-tunnel', 'tunnel', 'cf'].includes(text)) return 'freedns'
   if (['domain', 'custom-domain', 'own-domain', 'custom', 'https-domain'].includes(text)) return 'domain'
   if (['skip', 'later', 'manual', 'none', 'off'].includes(text)) return 'skip'
   return ''
@@ -109,10 +112,10 @@ function normalizeSelfHostHttpsMode(input) {
 
 function describeSelfHostHttpsMode(mode) {
   switch (normalizeSelfHostHttpsMode(mode)) {
-    case 'cloudflare':
-      return 'Cloudflare Tunnel'
+    case 'freedns':
+      return 'FreeDNS + local Caddy'
     case 'domain':
-      return 'custom domain'
+      return 'custom domain + local Caddy'
     case 'skip':
       return 'skip for now'
     default:
@@ -300,42 +303,19 @@ function runAsRoot(command, args, options = {}) {
   execFileSync('sudo', [command, ...args], execOptions)
 }
 
-function normalizeArchForCloudflared() {
+function normalizeArchForCaddy() {
   switch (process.arch) {
     case 'x64':
       return 'amd64'
     case 'arm64':
       return 'arm64'
     default:
-      throw new Error(`Unsupported architecture for cloudflared: ${process.arch}`)
+      throw new Error(`Unsupported architecture for Caddy: ${process.arch}`)
   }
 }
 
-async function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
-
-function readCloudflaredTunnelUrl(serviceName, since = '') {
-  const args = [
-    '-u',
-    `${serviceName}.service`,
-    '--no-pager',
-    '-n',
-    '200'
-  ]
-  if (String(since || '').trim()) {
-    args.push('--since', String(since || '').trim())
-  }
-
-  const result = spawnSync('journalctl', args, {
-    encoding: 'utf8'
-  })
-  const text = `${result.stdout || ''}\n${result.stderr || ''}`
-  const matches = text.match(/https:\/\/[a-z0-9-]+\.trycloudflare\.com/gi) || []
-  return matches.length ? matches[matches.length - 1] : ''
-}
-
-function installCloudflaredBinary(repoRoot) {
+/*
+function _legacyInstallCloudflaredBinary(repoRoot) {
   const existingBinary = resolveCommandPath('cloudflared')
   if (existingBinary) {
     return existingBinary
@@ -358,7 +338,7 @@ function installCloudflaredBinary(repoRoot) {
   return targetPath
 }
 
-async function ensureCloudflaredTunnel(repoRoot, httpPort, existingPublicBaseUrl) {
+async function _legacyEnsureCloudflaredTunnel(repoRoot, httpPort, existingPublicBaseUrl) {
   const configuredBase = normalizeBaseUrl(existingPublicBaseUrl || '')
   if (process.platform !== 'linux') {
     return {
@@ -370,7 +350,7 @@ async function ensureCloudflaredTunnel(repoRoot, httpPort, existingPublicBaseUrl
     }
   }
 
-  const binaryPath = installCloudflaredBinary(repoRoot)
+  const binaryPath = _legacyInstallCloudflaredBinary(repoRoot)
   if (configuredBase && !isTryCloudflareUrl(configuredBase)) {
     return {
       installed: true,
@@ -433,6 +413,249 @@ WantedBy=multi-user.target
     serviceName,
     unitPath,
     binaryPath
+  }
+}
+
+*/
+
+function isSystemdUnitActive(unitName) {
+  if (process.platform !== 'linux' || !commandExists('systemctl')) return false
+  const result = spawnSync('systemctl', ['is-active', '--quiet', unitName], { stdio: 'ignore' })
+  return result.status === 0
+}
+
+function systemdUnitExists(unitName) {
+  if (process.platform !== 'linux' || !commandExists('systemctl')) return false
+  const result = spawnSync('systemctl', ['cat', unitName], { stdio: 'ignore' })
+  return result.status === 0
+}
+
+function disableLegacyCloudflareTunnel(repoRoot) {
+  const serviceName = 'pvtkrrx-tunnel.service'
+  if (!systemdUnitExists(serviceName)) {
+    return {
+      disabled: false,
+      message: ''
+    }
+  }
+
+  try {
+    runAsRoot('systemctl', ['disable', '--now', serviceName], { cwd: repoRoot })
+    return {
+      disabled: true,
+      message: `Disabled legacy Cloudflare tunnel service: ${serviceName}`
+    }
+  } catch (error) {
+    return {
+      disabled: false,
+      message: `Could not disable legacy Cloudflare tunnel service ${serviceName}: ${error.message}`
+    }
+  }
+}
+
+async function isLocalPortActive(port) {
+  const candidate = normalizePortNumber(port, 0)
+  if (!candidate) return false
+
+  return new Promise((resolve) => {
+    const socket = net.createConnection({ host: '127.0.0.1', port: candidate })
+    let settled = false
+
+    const finish = (value) => {
+      if (settled) return
+      settled = true
+      socket.destroy()
+      resolve(value)
+    }
+
+    socket.setTimeout(500)
+    socket.once('connect', () => finish(true))
+    socket.once('timeout', () => finish(false))
+    socket.once('error', () => finish(false))
+  })
+}
+
+async function resolveLatestCaddyTarballUrl() {
+  const arch = normalizeArchForCaddy()
+  const response = await fetch('https://api.github.com/repos/caddyserver/caddy/releases/latest', {
+    headers: {
+      'Accept': 'application/vnd.github+json',
+      'User-Agent': 'pvtkrrx-selfhost-installer'
+    }
+  })
+
+  if (!response.ok) {
+    throw new Error(`Could not query the latest Caddy release (${response.status})`)
+  }
+
+  const payload = await response.json()
+  const asset = Array.isArray(payload?.assets)
+    ? payload.assets.find((entry) => typeof entry?.name === 'string' && entry.name.endsWith(`linux_${arch}.tar.gz`))
+    : null
+
+  if (!asset?.browser_download_url) {
+    throw new Error(`Could not find a Linux ${arch} Caddy tarball in the latest release`)
+  }
+
+  return asset.browser_download_url
+}
+
+async function installCaddyBinary(repoRoot) {
+  const existingBinary = resolveCommandPath('caddy')
+  if (existingBinary) {
+    return existingBinary
+  }
+
+  if (!commandExists('tar')) {
+    throw new Error('tar is required to install Caddy')
+  }
+
+  const downloadUrl = await resolveLatestCaddyTarballUrl()
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-caddy-'))
+  const tarballPath = path.join(tempDir, 'caddy.tar.gz')
+  const extractedPath = path.join(tempDir, 'caddy')
+  const targetPath = '/usr/local/bin/caddy'
+
+  try {
+    console.log('Downloading Caddy...')
+    const response = await fetch(downloadUrl, {
+      headers: {
+        'User-Agent': 'pvtkrrx-selfhost-installer'
+      }
+    })
+    if (!response.ok) {
+      throw new Error(`Could not download Caddy (${response.status})`)
+    }
+
+    const buffer = Buffer.from(await response.arrayBuffer())
+    fs.writeFileSync(tarballPath, buffer)
+    execFileSync('tar', ['-xzf', tarballPath, '-C', tempDir], { stdio: 'ignore' })
+    runAsRoot('mkdir', ['-p', '/usr/local/bin'], { cwd: repoRoot })
+    runAsRoot('install', ['-m', '0755', extractedPath, targetPath], { cwd: repoRoot })
+  } finally {
+    fs.rmSync(tempDir, { recursive: true, force: true })
+  }
+
+  console.log('✓ Caddy installed')
+  return targetPath
+}
+
+function buildSelfHostCaddyConfig(hostname, upstreamPort) {
+  return `${hostname} {
+    encode zstd gzip
+    reverse_proxy 127.0.0.1:${upstreamPort}
+}
+`
+}
+
+function buildSelfHostCaddyService(binaryPath, configPath) {
+  return `[Unit]
+Description=PVTKRRX self-host Caddy reverse proxy
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+ExecStart=${binaryPath} run --environ --config ${configPath}
+ExecReload=${binaryPath} reload --config ${configPath} --force
+Restart=always
+RestartSec=5
+TimeoutStopSec=20
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target
+`
+}
+
+async function ensureSelfHostCaddy(repoRoot, publicBaseUrl, httpPort) {
+  const origin = normalizeOrigin(publicBaseUrl)
+  if (process.platform !== 'linux' || !origin) {
+    return {
+      configured: false,
+      skipped: true,
+      message: ''
+    }
+  }
+
+  const hostname = new URL(origin).hostname
+  const serviceName = 'pvtkrrx-caddy.service'
+  const serviceIsActive = isSystemdUnitActive(serviceName)
+  const portsBusy = await isLocalPortActive(80) || await isLocalPortActive(443)
+  if (portsBusy && !serviceIsActive) {
+    return {
+      configured: false,
+      skipped: true,
+      message: 'Ports 80/443 are already in use. Add this hostname to your existing reverse proxy instead of starting a dedicated local Caddy service.'
+    }
+  }
+
+  const binaryPath = await installCaddyBinary(repoRoot)
+  const configDir = '/etc/pvtkrrx/caddy'
+  const configPath = path.join(configDir, 'Caddyfile')
+  const unitPath = '/etc/systemd/system/pvtkrrx-caddy.service'
+  const tempConfigPath = path.join(os.tmpdir(), 'pvtkrrx-selfhost.Caddyfile')
+  const tempUnitPath = path.join(os.tmpdir(), 'pvtkrrx-caddy.service')
+  fs.writeFileSync(tempConfigPath, buildSelfHostCaddyConfig(hostname, httpPort), 'utf8')
+  fs.writeFileSync(tempUnitPath, buildSelfHostCaddyService(binaryPath, configPath), 'utf8')
+
+  try {
+    runAsRoot('mkdir', ['-p', configDir], { cwd: repoRoot })
+    runAsRoot(binaryPath, ['validate', '--config', tempConfigPath], { cwd: repoRoot })
+    runAsRoot('install', ['-m', '0644', tempConfigPath, configPath], { cwd: repoRoot })
+    runAsRoot('install', ['-m', '0644', tempUnitPath, unitPath], { cwd: repoRoot })
+    runAsRoot('systemctl', ['daemon-reload'], { cwd: repoRoot })
+    runAsRoot('systemctl', ['enable', 'pvtkrrx-caddy.service'], { cwd: repoRoot })
+    runAsRoot('systemctl', ['restart', 'pvtkrrx-caddy.service'], { cwd: repoRoot })
+  } finally {
+    try {
+      fs.unlinkSync(tempConfigPath)
+    } catch (_) {}
+    try {
+      fs.unlinkSync(tempUnitPath)
+    } catch (_) {}
+  }
+
+  return {
+    configured: true,
+    skipped: false,
+    serviceName: 'pvtkrrx-caddy.service',
+    configPath,
+    hostname
+  }
+}
+
+async function updateFreeDnsRecord(updateUrl) {
+  const normalized = sanitizeHttpUrlDefault(updateUrl, '', {
+    allowEmpty: true
+  })
+  if (!normalized) {
+    return {
+      updated: false,
+      message: ''
+    }
+  }
+
+  console.log('Updating FreeDNS record...')
+  const response = await fetch(normalized, {
+    headers: {
+      'User-Agent': 'pvtkrrx-selfhost-installer'
+    }
+  })
+  const body = String(await response.text()).trim()
+  if (!response.ok) {
+    throw new Error(`FreeDNS update failed (${response.status})`)
+  }
+
+  if (body) {
+    console.log(`✓ FreeDNS response: ${body.split(/\r?\n/, 1)[0]}`)
+  } else {
+    console.log('✓ FreeDNS update accepted')
+  }
+
+  return {
+    updated: true,
+    message: body
   }
 }
 
@@ -528,10 +751,7 @@ function describePlaybackOrigin(displayOrigin, publicBaseUrl, playbackBaseUrl) {
   const publicOrigin = normalizeOrigin(publicBaseUrl)
   const playbackOrigin = normalizeOrigin(playbackBaseUrl)
   if (!playbackOrigin) {
-    if (isTryCloudflareUrl(publicOrigin)) {
-      return 'Built-in /file and /playback still use the Cloudflare public origin until you set PVTKRRX_PLAYBACK_BASE_URL in .env.'
-    }
-    return ''
+    return publicOrigin ? `Playback origin: ${publicOrigin}` : ''
   }
   if (playbackOrigin === publicOrigin || playbackOrigin === normalizeOrigin(displayOrigin)) {
     return `Playback origin: ${playbackOrigin}`
@@ -544,7 +764,7 @@ function resolveInstallPlaybackBaseUrl(existingPlaybackBaseUrl, publicBaseUrl, s
   if (playbackOrigin) return playbackOrigin
 
   const publicOrigin = normalizeOrigin(publicBaseUrl)
-  if (selfHostHttpsMode === 'domain' && publicOrigin && !isTryCloudflareUrl(publicOrigin)) {
+  if ((selfHostHttpsMode === 'domain' || selfHostHttpsMode === 'freedns') && publicOrigin) {
     return publicOrigin
   }
 
@@ -576,6 +796,9 @@ async function run() {
   const existingHttpsPort = Number.parseInt(String(mergedEnv.HTTPS_PORT || '7001').trim(), 10) || 7001
   const existingPublicBaseUrl = normalizeBaseUrl(mergedEnv.PVTKRRX_PUBLIC_BASE_URL || '')
   const existingPlaybackBaseUrl = normalizeBaseUrl(mergedEnv.PVTKRRX_PLAYBACK_BASE_URL || '')
+  const existingFreeDnsUpdateUrl = sanitizeHttpUrlDefault(mergedEnv.PVTKRRX_FREEDNS_UPDATE_URL || '', '', {
+    allowEmpty: true
+  })
   const existingHttpsMode = normalizeSelfHostHttpsMode(mergedEnv.PVTKRRX_SELF_HOST_HTTPS_MODE || '')
   const existingConfig = loadExistingServerConfig(defaultRuntimeDir, existingSecret)
   const bundledNodePath = String(process.env.PVTKRRX_NODE_PATH || process.execPath).trim() || process.execPath
@@ -627,21 +850,17 @@ async function run() {
     let selfHostHttpsMode = normalizeSelfHostHttpsMode(
       await promptValue(
         rl,
-        'HTTPS front door mode (cloudflare/domain/skip)',
+        'HTTPS front door mode (freedns/domain/skip)',
         defaultHttpsMode
       )
     )
     if (!selfHostHttpsMode) selfHostHttpsMode = defaultHttpsMode
 
-    let publicBaseUrl = selfHostHttpsMode === 'domain' && !isTryCloudflareUrl(safeExistingPublicBaseUrl)
+    let publicBaseUrl = (selfHostHttpsMode === 'domain' || selfHostHttpsMode === 'freedns') && !isTryCloudflareUrl(safeExistingPublicBaseUrl)
       ? safeExistingPublicBaseUrl
       : ''
-    if (selfHostHttpsMode === 'cloudflare') {
-      const tunnelResult = await ensureCloudflaredTunnel(repoRoot, httpPort, '')
-      if (tunnelResult && tunnelResult.publicBaseUrl) {
-        publicBaseUrl = normalizeBaseUrl(tunnelResult.publicBaseUrl)
-      }
-    } else if (selfHostHttpsMode === 'domain') {
+    let freeDnsUpdateUrl = existingFreeDnsUpdateUrl
+    if (selfHostHttpsMode === 'freedns' || selfHostHttpsMode === 'domain') {
       publicBaseUrl = await promptHttpUrl(
         rl,
         'Public HTTPS URL for Stremio install links',
@@ -651,8 +870,21 @@ async function run() {
           requireHttps: true
         }
       )
+      if (selfHostHttpsMode === 'freedns') {
+        freeDnsUpdateUrl = await promptHttpUrl(
+          rl,
+          'FreeDNS update URL (optional)',
+          existingFreeDnsUpdateUrl,
+          {
+            allowEmpty: true
+          }
+        )
+      } else {
+        freeDnsUpdateUrl = ''
+      }
     } else {
       publicBaseUrl = ''
+      freeDnsUpdateUrl = ''
     }
     const defaultPlaybackBaseUrl = resolveInstallPlaybackBaseUrl(
       existingPlaybackBaseUrl,
@@ -660,20 +892,10 @@ async function run() {
       selfHostHttpsMode
     )
     let playbackBaseUrl = defaultPlaybackBaseUrl
-    if (selfHostHttpsMode === 'cloudflare') {
+    if (selfHostHttpsMode === 'domain' || selfHostHttpsMode === 'freedns') {
       playbackBaseUrl = await promptHttpUrl(
         rl,
-        'Direct HTTPS playback URL for built-in /file and /playback (optional; leave blank to use the tunnel)',
-        defaultPlaybackBaseUrl,
-        {
-          allowEmpty: true,
-          requireHttps: true
-        }
-      )
-    } else if (selfHostHttpsMode === 'domain') {
-      playbackBaseUrl = await promptHttpUrl(
-        rl,
-        'Playback HTTPS URL for built-in /file and /playback',
+        'Playback HTTPS URL for built-in /file and /playback (optional; leave blank to use the main host)',
         defaultPlaybackBaseUrl || publicBaseUrl,
         {
           allowEmpty: true,
@@ -788,6 +1010,7 @@ async function run() {
       PVTKRRX_SELF_HOST_HTTPS_MODE: selfHostHttpsMode,
       PVTKRRX_RUNTIME_DIR: runtimeDir,
       PVTKRRX_PUBLIC_BASE_URL: publicBaseUrl,
+      PVTKRRX_FREEDNS_UPDATE_URL: freeDnsUpdateUrl,
       PVTKRRX_PLAYBACK_BASE_URL: playbackBaseUrl,
       PVTKRRX_ALLOWED_WEB_ORIGINS: allowedWebOrigins,
       PORT: String(httpPort),
@@ -802,10 +1025,27 @@ async function run() {
     process.env.PVTKRRX_SELF_HOST_HTTPS_MODE = selfHostHttpsMode
     process.env.PVTKRRX_RUNTIME_DIR = runtimeDir
     process.env.PVTKRRX_PUBLIC_BASE_URL = publicBaseUrl
+    process.env.PVTKRRX_FREEDNS_UPDATE_URL = freeDnsUpdateUrl
     process.env.PVTKRRX_PLAYBACK_BASE_URL = playbackBaseUrl
     process.env.PVTKRRX_ALLOWED_WEB_ORIGINS = allowedWebOrigins
     process.env.PORT = String(httpPort)
     process.env.HTTPS_PORT = String(httpsPort)
+
+    if (selfHostHttpsMode === 'freedns') {
+      await updateFreeDnsRecord(freeDnsUpdateUrl)
+    }
+    if (selfHostHttpsMode === 'domain' || selfHostHttpsMode === 'freedns') {
+      const legacyTunnelResult = disableLegacyCloudflareTunnel(repoRoot)
+      if (legacyTunnelResult?.message) {
+        console.log(legacyTunnelResult.message)
+      }
+      const caddyResult = await ensureSelfHostCaddy(repoRoot, publicBaseUrl, httpPort)
+      if (caddyResult?.message) {
+        console.log(caddyResult.message)
+      } else if (caddyResult?.configured) {
+        console.log(`✓ Local Caddy route ready for ${caddyResult.hostname}`)
+      }
+    }
 
     const { normalizeAddonConfig } = require('../src/lib/shared')
 
@@ -999,22 +1239,20 @@ async function runAuto() {
     requireHttps: true,
     allowEmpty: true
   })
+  const existingFreeDnsUpdateUrl = sanitizeHttpUrlDefault(mergedEnv.PVTKRRX_FREEDNS_UPDATE_URL || '', '', {
+    allowEmpty: true
+  })
   const existingHttpsMode = normalizeSelfHostHttpsMode(mergedEnv.PVTKRRX_SELF_HOST_HTTPS_MODE || '')
   const selfHostHttpsMode = resolveSelfHostHttpsMode(existingHttpsMode, existingPublicBaseUrl)
-  let publicBaseUrl = selfHostHttpsMode === 'domain' && !isTryCloudflareUrl(existingPublicBaseUrl)
+  let publicBaseUrl = (selfHostHttpsMode === 'domain' || selfHostHttpsMode === 'freedns') && !isTryCloudflareUrl(existingPublicBaseUrl)
     ? existingPublicBaseUrl
     : ''
 
-  if (selfHostHttpsMode === 'domain' && !publicBaseUrl) {
-    throw new Error('PVTKRRX_SELF_HOST_HTTPS_MODE=domain requires PVTKRRX_PUBLIC_BASE_URL to be set')
+  if ((selfHostHttpsMode === 'domain' || selfHostHttpsMode === 'freedns') && !publicBaseUrl) {
+    throw new Error(`PVTKRRX_SELF_HOST_HTTPS_MODE=${selfHostHttpsMode} requires PVTKRRX_PUBLIC_BASE_URL to be set`)
   }
 
-  if (process.platform === 'linux' && selfHostHttpsMode === 'cloudflare') {
-    const tunnelResult = await ensureCloudflaredTunnel(repoRoot, httpPort, '')
-    if (tunnelResult && tunnelResult.publicBaseUrl) {
-      publicBaseUrl = normalizeBaseUrl(tunnelResult.publicBaseUrl)
-    }
-  } else if (selfHostHttpsMode === 'skip') {
+  if (selfHostHttpsMode === 'skip') {
     publicBaseUrl = ''
   }
   const playbackBaseUrl = resolveInstallPlaybackBaseUrl(
@@ -1080,6 +1318,7 @@ async function runAuto() {
     PVTKRRX_SELF_HOST_HTTPS_MODE: selfHostHttpsMode,
     PVTKRRX_RUNTIME_DIR: defaultRuntimeDir,
     PVTKRRX_PUBLIC_BASE_URL: publicBaseUrl,
+    PVTKRRX_FREEDNS_UPDATE_URL: existingFreeDnsUpdateUrl,
     PVTKRRX_PLAYBACK_BASE_URL: playbackBaseUrl,
     PVTKRRX_ALLOWED_WEB_ORIGINS: allowedWebOrigins,
     PORT: String(httpPort),
@@ -1095,9 +1334,27 @@ async function runAuto() {
   process.env.PVTKRRX_SELF_HOST_HTTPS_MODE = selfHostHttpsMode
   process.env.PVTKRRX_RUNTIME_DIR = defaultRuntimeDir
   process.env.PVTKRRX_PUBLIC_BASE_URL = publicBaseUrl
+  process.env.PVTKRRX_FREEDNS_UPDATE_URL = existingFreeDnsUpdateUrl
   process.env.PVTKRRX_PLAYBACK_BASE_URL = playbackBaseUrl
+  process.env.PVTKRRX_ALLOWED_WEB_ORIGINS = allowedWebOrigins
   process.env.PORT = String(httpPort)
   process.env.HTTPS_PORT = String(httpsPort)
+
+  if (selfHostHttpsMode === 'freedns') {
+    await updateFreeDnsRecord(existingFreeDnsUpdateUrl)
+  }
+  if (selfHostHttpsMode === 'domain' || selfHostHttpsMode === 'freedns') {
+    const legacyTunnelResult = disableLegacyCloudflareTunnel(repoRoot)
+    if (legacyTunnelResult?.message) {
+      console.log(legacyTunnelResult.message)
+    }
+    const caddyResult = await ensureSelfHostCaddy(repoRoot, publicBaseUrl, httpPort)
+    if (caddyResult?.message) {
+      console.log(caddyResult.message)
+    } else if (caddyResult?.configured) {
+      console.log(`✓ Local Caddy route ready for ${caddyResult.hostname}`)
+    }
+  }
 
   // ── Write local config ──
   const { normalizeAddonConfig } = require('../src/lib/shared')

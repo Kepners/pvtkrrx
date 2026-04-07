@@ -13,8 +13,7 @@ The practical reading of the project today is:
 - `Hybrid Home` is now the main same-account synced route for the user's other devices; the host desktop should not use it for local browsing
 - the packaged Windows EXE now centers on `PC Local` plus the `Hybrid Home` route model, although some live desktop/runbook/help strings still say `LAN Bridge`
 - explicit self-host server mode now exists for VPS/seedbox installs, with disk-backed `/selfhost` manifests, browser-admin auth for private service URLs, and optional `systemd` boot automation
-- the self-host bootstrap now auto-selects a free qBittorrent WebUI port when 8080 is occupied, and it captures the Cloudflare Tunnel URL cleanly so the saved public URL never inherits the installer log line
-- the self-host bootstrap now rewrites the Cloudflare Tunnel service on install so trycloudflare installs always print a fresh public URL, and it now wires Prowlarr to the live qBittorrent download client during bootstrap instead of leaving the download client unset
+- the self-host bootstrap now auto-selects a free qBittorrent WebUI port when 8080 is occupied, wires Prowlarr to the live qBittorrent download client during bootstrap, and disables any leftover `pvtkrrx-tunnel.service` once a FreeDNS/domain front door is configured
 - completed-file playback on the local runtime is working again after the `/playback` and `/file` path fixes
 - official Stremio archive-source support for `rarUrls` is real and was re-verified against upstream SDK/core sources on 2026-03-30
 - PVTKRRX now treats extracted direct video as the only supported packed-RAR playback path by default, and keeps native `rarUrls` behind an explicit experimental override
@@ -51,8 +50,8 @@ The practical reading of the project today is:
 - Added a reusable sports cache pre-seed step plus `npm run cache:sports`, and wired both self-host setup flows to warm `sports-image-cache/` with upcoming event, team, and mapped-league artwork using the existing disk cache writer.
 - Added a recurring sports-cache autofill worker for long-running Linux/cloud runtimes. It persists a rotation cursor in the runtime directory, processes one sport group every 15 minutes by default, and keeps using the same disk cache writer so repeat passes skip already-warm images.
 - Self-host cloud/server playback now defaults to strict head-first sequential download again. qBit first+last-piece priority stays default-on for desktop/local routes, but cloud self-host runtimes now require an explicit `STREAM_PRIORITIZE_LAST_PIECES=true` opt-in if we want tail-piece probing help more than startup speed.
-- Self-host cloud/server playback can now split origins correctly: `PVTKRRX_PUBLIC_BASE_URL` stays the tunnel/control origin, while optional `PVTKRRX_PLAYBACK_BASE_URL` overrides built-in `/file` and `/playback` URLs so buffering and byte-serving can move onto a direct HTTPS origin instead of unintentionally staying on the Cloudflare tunnel.
-- The self-host installer now sets that up properly instead of treating `PVTKRRX_PLAYBACK_BASE_URL` as a manual afterthought: domain installs default it to the same public HTTPS origin, and Cloudflare installs now offer an explicit optional direct-playback URL during bootstrap.
+- Self-host cloud/server playback can now split origins correctly: `PVTKRRX_PUBLIC_BASE_URL` stays the install/control origin, while optional `PVTKRRX_PLAYBACK_BASE_URL` overrides built-in `/file` and `/playback` URLs so buffering and byte-serving can move onto a dedicated HTTPS origin.
+- The self-host installer now sets that up properly instead of treating `PVTKRRX_PLAYBACK_BASE_URL` as a manual afterthought: FreeDNS and domain installs default it to the same public HTTPS origin and still allow an explicit optional direct-playback URL during bootstrap.
 - Cut a fresh `1.1.24` Windows desktop build so the local EXE line now includes the sports cache pre-seed work instead of reusing the older `1.1.23` release label.
 - Re-verified the split install model: Windows desktop still owns `PC Local` plus `Hybrid Home`, while the cloud/self-host installer continues to own the server-side `Remote Seedbox` route.
 - Regression coverage now includes:
@@ -105,7 +104,7 @@ The practical reading of the project today is:
 
 ## Earlier 2026-04-04 Self-Host Work
 
-- The Linux self-host installer now strips the Cloudflare Tunnel "waiting" line out of the captured public URL, auto-picks a free qBittorrent WebUI port if 8080 is already occupied, and writes that real port back into the qBit config before startup.
+- The Linux self-host installer now auto-picks a free qBittorrent WebUI port if 8080 is already occupied and writes that real port back into the qBit config before startup.
 - The shared server installer now prefers the detected or exported qBittorrent port instead of hardcoding 8080 when saving self-host config.
 - Empty sports/movie/TV catalogs now short-circuit to a setup-needed placeholder when Prowlarr has no indexers or is unreachable.
 - Smoke coverage now includes the qBit port fallback helper and the empty-provider catalog placeholder.

@@ -9,29 +9,26 @@ The current installer handles qBit, Prowlarr, Node, PVTKRRX, and systemd, but it
 
 ```
 How should Stremio reach this server?
-1) Cloudflare Tunnel (free random HTTPS URL)
+1) FreeDNS (free hostname + local Caddy)
 2) I have my own domain
 3) Skip - I'll set this up later
 ```
 
-### Option 1: Cloudflare Tunnel
+### Option 1: FreeDNS
 
-- Installer runs `cloudflared tunnel --url http://localhost:7000`
-- Gets an instant random `https://*.trycloudflare.com` URL
-- Install as a systemd service for persistence
-- No Cloudflare account needed for quick tunnels
-- Works behind NAT — no ports need to be open
+- Installer asks for the FreeDNS hostname the user wants to serve
+- Installer optionally hits the FreeDNS dynamic-update URL so the hostname points at the current server IP
+- Installer configures local Caddy on the server to terminate HTTPS and reverse proxy to port 7000
 
-Pros: Zero config, no domain, works behind NAT, free
-Cons: Random URL changes on restart unless configured with an account, depends on cloudflared binary
-- For a persistent URL, use a named Cloudflare Tunnel or your own domain instead of a quick tunnel.
+Pros: Free hostname, stable install URL, no Cloudflare dependency
+Cons: Requires a FreeDNS record and public ports `80/443` on the server
 
 ### Option 2: Own Domain
 
 - Installer asks for the domain name
-- Installs Caddy or nginx plus certbot
+- Installs local Caddy on the server
 - Sets up a reverse proxy to port 7000
-- Auto-provisions a Let's Encrypt SSL cert
+- Lets Caddy handle the Let's Encrypt certificate automatically
 - Sets `PVTKRRX_PUBLIC_BASE_URL` in `.env`
 
 Pros: Permanent URL, professional, no tunnel dependency
@@ -53,7 +50,7 @@ The HTTPS URL is not proxying video streams. It handles:
 - Search queries (JSON)
 - Stream lookups (JSON, returns redirect URLs)
 
-Video playback goes direct to the qBit file server URL. The relay/tunnel sees light JSON traffic only.
+Video playback goes direct to the qBit file server URL. The HTTPS front door only needs to handle the lighter JSON/control traffic.
 
 ## Implementation Plan
 
@@ -62,12 +59,11 @@ The code should treat self-hosted installs as the independent path. The hosted s
 ### Phase 1: Finish HTTPS bootstrap in the installer
 
 - `scripts/install-selfhost.sh`
-  - Install `cloudflared` first so the public front door exists before the app stack is finalized.
-  - Start the tunnel, capture the generated HTTPS URL, and export it as `PVTKRRX_PUBLIC_BASE_URL`.
+  - Capture the chosen public hostname first and, for FreeDNS installs, optionally apply the FreeDNS dynamic update URL.
   - Install and configure qBit, Prowlarr, and Node next.
-  - Install PVTKRRX last, using the tunnel URL and the discovered provider settings.
+  - Install PVTKRRX last, using the public hostname and the discovered provider settings.
   - Keep the hosted site as the download source only.
-  - If the user chooses a domain later, print the reverse-proxy/SSL instructions and persist the chosen origin in `.env`.
+  - If the user chooses FreeDNS or a domain, configure local Caddy on the same server and persist the chosen origin in `.env`.
 
 - `scripts/server-installer.js`
   - Treat `PVTKRRX_PUBLIC_BASE_URL` as the canonical public origin for self-host mode.
@@ -117,7 +113,7 @@ The code should treat self-hosted installs as the independent path. The hosted s
 
 ## Priority
 
-1. Cloudflare Tunnel — simplest to implement, works for everyone including behind NAT
+1. FreeDNS — default free-hostname path
 2. Own domain — power users
 3. Skip — always available
 

@@ -26,15 +26,16 @@ PVTKRRX is one codebase with three active runtime pieces:
    - can mint short-lived Stremio link sessions that persist the linked `stremioUserId` back into the disk-backed `selfhost` config
    - can validate localhost/private Prowlarr and qBittorrent URLs only for same-host requests or browser sessions that present the self-host password
    - now has a one-command Linux installer that bootstraps the app directory, bundled Node runtime, `.env`, stable runtime dir, saved self-host config, password, and optional `systemd` service
-   - the Linux bootstrap now auto-selects a free qBittorrent WebUI port when the default is occupied, and it captures the Cloudflare Tunnel URL cleanly instead of leaking the "waiting" log line into the saved public URL
-   - can choose the self-host HTTPS front door as Cloudflare Tunnel, a user-owned `https://` origin, or skip for later manual setup, and persists that choice in `PVTKRRX_SELF_HOST_HTTPS_MODE`
+   - the Linux bootstrap now auto-selects a free qBittorrent WebUI port when the default is occupied
+   - can choose the self-host HTTPS front door as FreeDNS, a user-owned `https://` origin, or skip for later manual setup, and persists that choice in `PVTKRRX_SELF_HOST_HTTPS_MODE`
    - exposes a hosted launcher script at `https://www.pvtkrrx.cc/install-selfhost.sh` so the first curl can come from the canonical site instead of the moving GitHub branch tip
    - pulls the app source from the branch payload by default, with optional pinning via `PVTKRRX_RELEASE_TAG` or a custom release manifest URL; if a pinned release is too old to include `scripts/server-installer.js`, it retries from `main`
    - auto-discovers existing Prowlarr/qBittorrent configs when the services are already installed, then fills the self-host config from the recovered URLs, API keys, usernames, and ports instead of forcing a blank slate
    - if those providers are missing on a direct `npm run server:setup` run, it can hand off to the full Linux bootstrap so the installer can install them instead of silently continuing with empty defaults
    - self-host install links should come from a configured public HTTPS base URL (`PVTKRRX_PUBLIC_BASE_URL`) rather than a raw public `http://IP:port` origin
    - self-host playback can now split away from that install/control origin: `PVTKRRX_PUBLIC_BASE_URL` still drives manifest/configure/install links, while optional `PVTKRRX_PLAYBACK_BASE_URL` overrides the built-in `/file` and `/playback` stream origin
-   - the installer now handles that split directly: domain installs default built-in playback to the same public HTTPS origin, while Cloudflare installs explicitly offer an optional direct playback origin instead of silently leaving built-in bytes on the tunnel
+   - the installer now handles that split directly: FreeDNS and domain installs default built-in playback to the same public HTTPS origin while still allowing an optional direct playback origin
+   - when a real FreeDNS/domain front door is configured, the installer now disables any leftover `pvtkrrx-tunnel.service` so the old Cloudflare quick tunnel is removed from the runtime path
    - the installer prints a one-time `Configure` bootstrap URL with `#serverAdminToken=...` so the browser can load the saved self-host config automatically on first open
    - the installer now also runs a non-destructive sports-art preseed that warms `sports-image-cache/` with upcoming event artwork, top team badges, and mapped league art using the same runtime cache the addon serves later
    - long-running Linux/cloud runtimes now keep filling that same sports cache automatically every 15 minutes in rotating sport batches, so the free key can keep dribbling new fights, fixtures, and league art in over time instead of relying on a single install-time burst

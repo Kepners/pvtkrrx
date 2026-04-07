@@ -16,9 +16,9 @@ function captureSummary() {
 
   try {
     installer.printWorkingUrlSummary(
-      'https://scanner-seeks-cent-ant.trycloudflare.com',
-      'https://scanner-seeks-cent-ant.trycloudflare.com/configure#serverPassword=abc123',
-      'https://scanner-seeks-cent-ant.trycloudflare.com'
+      'https://pvtkrrx.mooo.com',
+      'https://pvtkrrx.mooo.com/configure#serverPassword=abc123',
+      'https://pvtkrrx.mooo.com'
     )
   } finally {
     fs.writeSync = originalWriteSync
@@ -30,10 +30,10 @@ function captureSummary() {
 try {
   const output = captureSummary()
   assert.match(output, /Working public URLs:/)
-  assert.match(output, /PVTKRRX URL: https:\/\/scanner-seeks-cent-ant\.trycloudflare\.com/)
-  assert.match(output, /Configure URL: https:\/\/scanner-seeks-cent-ant\.trycloudflare\.com\/configure/)
-  assert.match(output, /Bootstrap URL: https:\/\/scanner-seeks-cent-ant\.trycloudflare\.com\/configure#serverPassword=abc123/)
-  assert.match(output, /Self-host manifest URL: https:\/\/scanner-seeks-cent-ant\.trycloudflare\.com\/selfhost\/manifest\.json\?mode=hosted/)
+  assert.match(output, /PVTKRRX URL: https:\/\/pvtkrrx\.mooo\.com/)
+  assert.match(output, /Configure URL: https:\/\/pvtkrrx\.mooo\.com\/configure/)
+  assert.match(output, /Bootstrap URL: https:\/\/pvtkrrx\.mooo\.com\/configure#serverPassword=abc123/)
+  assert.match(output, /Self-host manifest URL: https:\/\/pvtkrrx\.mooo\.com\/selfhost\/manifest\.json\?mode=hosted/)
   assert.doesNotMatch(output, /\[redacted-url\]/)
   console.log('Smoke installer summary URLs passed')
 } catch (error) {

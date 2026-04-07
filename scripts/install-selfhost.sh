@@ -181,19 +181,12 @@ ensure_base_tools() {
   fi
 }
 
-normalize_cloudflared_arch() {
-  case "$(uname -m)" in
-    x86_64|amd64) echo "amd64" ;;
-    aarch64|arm64) echo "arm64" ;;
-    *) echo "Unsupported architecture for cloudflared: $(uname -m)" >&2; exit 1 ;;
-  esac
-}
-
 normalize_https_mode() {
   local value
   value="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]' | tr -d '[:space:]')"
   case "$value" in
-    cloudflare|cloudflare-tunnel|tunnel|cf) echo "cloudflare" ;;
+    freedns|free-dns|afraid|afraid.org) echo "freedns" ;;
+    cloudflare|cloudflare-tunnel|tunnel|cf) echo "freedns" ;;
     domain|custom-domain|own-domain|custom|https-domain) echo "domain" ;;
     skip|later|manual|none|off) echo "skip" ;;
     *) echo "" ;;
@@ -214,7 +207,7 @@ prompt_https_mode() {
     if [ -n "${PVTKRRX_PUBLIC_BASE_URL:-}" ] && ! is_trycloudflare_url "${PVTKRRX_PUBLIC_BASE_URL:-}"; then
       default_mode="domain"
     else
-      default_mode="cloudflare"
+      default_mode="freedns"
     fi
   fi
 
@@ -225,8 +218,8 @@ prompt_https_mode() {
 
   local choice=""
   printf '\nHow should Stremio reach this server?\n' > /dev/tty
-  printf '  1) Cloudflare Tunnel - free HTTPS URL, no domain needed (recommended)\n' > /dev/tty
-  printf '  2) I have my own domain - I will configure HTTPS myself\n' > /dev/tty
+  printf '  1) FreeDNS - free hostname, local Caddy will handle HTTPS (recommended)\n' > /dev/tty
+  printf '  2) I have my own domain - local Caddy will handle HTTPS\n' > /dev/tty
   printf '  3) Skip - I will set this up later\n' > /dev/tty
   printf 'Choose [1-3] [%s]: ' "$default_mode" > /dev/tty
   IFS= read -r choice < /dev/tty || choice=""
@@ -236,7 +229,7 @@ prompt_https_mode() {
   fi
 
   case "$choice" in
-    cloudflare|domain|skip) echo "$choice" ;;
+    freedns|domain|skip) echo "$choice" ;;
     *) echo "$default_mode" ;;
   esac
 }
@@ -298,6 +291,35 @@ prompt_optional_https_url() {
   done
 }
 
+prompt_optional_http_url() {
+  local label="${1:-Public URL}"
+  local default_value="${2:-}"
+  local value=""
+  if [ ! -t 0 ] || [ ! -t 1 ] || [ ! -r /dev/tty ]; then
+    echo "$default_value"
+    return 0
+  fi
+
+  while true; do
+    printf '%s' "$label" > /dev/tty
+    if [ -n "$default_value" ]; then
+      printf ' [%s]' "$default_value" > /dev/tty
+    else
+      printf ' [leave blank to skip]' > /dev/tty
+    fi
+    printf ': ' > /dev/tty
+    IFS= read -r value < /dev/tty || value=""
+    value="${value:-$default_value}"
+    value="$(printf '%s' "$value" | tr -d '\r' | sed 's:/*$::')"
+    case "$value" in
+      http://*|https://*) echo "$value"; return 0 ;;
+      "") echo ""; return 0 ;;
+      *) printf 'URL must start with http:// or https://, or be left blank.\n' > /dev/tty ;;
+    esac
+  done
+}
+
+: <<'PVTKRRX_UNUSED_CLOUDFLARE'
 install_cloudflared() {
   if have_command cloudflared; then
     echo "✓ cloudflared already installed: $(cloudflared --version 2>/dev/null | head -n 1 || echo 'unknown')"
@@ -382,6 +404,8 @@ EOF
   export PVTKRRX_PUBLIC_BASE_URL="$public_url"
   echo "✓ Tunnel URL: $public_url"
 }
+
+PVTKRRX_UNUSED_CLOUDFLARE
 
 ensure_qbittorrent_user() {
   local qbit_home="/var/lib/$QBIT_USER"
@@ -660,7 +684,7 @@ main() {
   ensure_base_tools
   local arch; arch="$(detect_arch)"
 
-  # ── Step 1: Cloudflare Tunnel ──
+  # ── Step 1: HTTPS front door ──
   echo ""
   echo "── Step 1/6: HTTPS front door ──"
   local https_mode
@@ -668,18 +692,17 @@ main() {
   export PVTKRRX_SELF_HOST_HTTPS_MODE="$https_mode"
 
   local public_base_url="${PVTKRRX_PUBLIC_BASE_URL:-}"
+  local freedns_update_url="${PVTKRRX_FREEDNS_UPDATE_URL:-}"
   local playback_base_url="${PVTKRRX_PLAYBACK_BASE_URL:-}"
   case "$https_mode" in
-    cloudflare)
-      if [ -n "$public_base_url" ] && ! is_trycloudflare_url "$public_base_url"; then
+    freedns)
+      public_base_url="$(prompt_https_url "$public_base_url")"
         echo "✓ Using existing public HTTPS URL: $public_base_url"
-      else
-        public_base_url=""
-        install_cloudflared
-        setup_cloudflared_service "$PVTKRRX_HTTP_PORT"
-        public_base_url="${PVTKRRX_PUBLIC_BASE_URL:-}"
+      freedns_update_url="$(prompt_optional_http_url 'FreeDNS update URL (optional)' "$freedns_update_url")"
+      if [ -z "$playback_base_url" ]; then
+        playback_base_url="$public_base_url"
       fi
-      playback_base_url="$(prompt_optional_https_url 'Direct HTTPS playback URL for built-in /file and /playback (optional; leave blank to use the tunnel)' "$playback_base_url")"
+      playback_base_url="$(prompt_optional_https_url 'Playback HTTPS URL for built-in /file and /playback (optional; leave blank to use the main host)' "$playback_base_url")"
       if [ -n "$playback_base_url" ]; then
         echo "âœ“ Built-in playback will use direct HTTPS origin: $playback_base_url"
       else
@@ -688,10 +711,11 @@ main() {
       ;;
     domain)
       public_base_url="$(prompt_https_url "$public_base_url")"
+      freedns_update_url=""
       if [ -z "$playback_base_url" ]; then
         playback_base_url="$public_base_url"
       fi
-      playback_base_url="$(prompt_optional_https_url 'Playback HTTPS URL for built-in /file and /playback' "$playback_base_url")"
+      playback_base_url="$(prompt_optional_https_url 'Playback HTTPS URL for built-in /file and /playback (optional; leave blank to use the main host)' "$playback_base_url")"
       if [ -z "$playback_base_url" ]; then
         playback_base_url="$public_base_url"
       fi
@@ -699,11 +723,14 @@ main() {
       ;;
     skip)
       public_base_url=""
+      freedns_update_url=""
+      playback_base_url=""
       echo "✓ Skipping public HTTPS setup for now"
       ;;
   esac
 
   export PVTKRRX_PUBLIC_BASE_URL="$public_base_url"
+  export PVTKRRX_FREEDNS_UPDATE_URL="$freedns_update_url"
   export PVTKRRX_PLAYBACK_BASE_URL="$playback_base_url"
 
   # ── Step 2: qBittorrent ──
