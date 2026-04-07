@@ -833,6 +833,157 @@
       display: none !important;
     }
 
+    .selfhost-console {
+      display: none;
+      border-color: rgba(110, 140, 185, 0.3);
+      background: linear-gradient(180deg, rgba(12, 17, 28, 0.96), rgba(10, 15, 24, 0.94));
+      box-shadow: none;
+    }
+
+    .selfhost-console::before {
+      opacity: 0.22;
+      background: linear-gradient(90deg, rgba(110, 140, 185, 0.24), rgba(0, 246, 255, 0.3), rgba(110, 140, 185, 0.24));
+    }
+
+    .selfhost-console-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .selfhost-console-kicker {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.64rem;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #96dbff;
+      margin-bottom: 0.35rem;
+    }
+
+    .selfhost-console-title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 1.15rem;
+      font-weight: 600;
+      letter-spacing: 1.3px;
+      text-transform: uppercase;
+      color: #f1f7ff;
+    }
+
+    .selfhost-console-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+
+    .selfhost-console-badges span {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 0.45rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid rgba(110, 140, 185, 0.28);
+      background: rgba(7, 12, 20, 0.78);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: #c9d7ef;
+    }
+
+    .selfhost-console-copy {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.69rem;
+      line-height: 1.6;
+      color: var(--text-dim);
+    }
+
+    body.selfhost-seedbox-only {
+      background: linear-gradient(180deg, #05070d 0%, #09111f 100%);
+    }
+
+    body.selfhost-seedbox-only::before,
+    body.selfhost-seedbox-only::after,
+    body.selfhost-seedbox-only .vortex,
+    body.selfhost-seedbox-only .floating-debrid,
+    body.selfhost-seedbox-only .scanlines,
+    body.selfhost-seedbox-only .noise,
+    body.selfhost-seedbox-only .glitch-flash {
+      display: none !important;
+    }
+
+    body.selfhost-seedbox-only .topbar {
+      margin-bottom: 0.75rem;
+      border-color: rgba(110, 140, 185, 0.24);
+      background: rgba(8, 12, 20, 0.94);
+      box-shadow: none;
+    }
+
+    body.selfhost-seedbox-only .topbar-dot {
+      box-shadow: 0 0 10px rgba(0, 246, 255, 0.34);
+    }
+
+    body.selfhost-seedbox-only .topbar-text {
+      color: #d7e6ff;
+      text-shadow: none;
+    }
+
+    body.selfhost-seedbox-only .topbar-nav,
+    body.selfhost-seedbox-only .logo-header,
+    body.selfhost-seedbox-only #setupRealityCard,
+    body.selfhost-seedbox-only #installTargetCard {
+      display: none !important;
+    }
+
+    body.selfhost-seedbox-only #selfhostConsoleCard {
+      display: block !important;
+    }
+
+    body.selfhost-seedbox-only .card:hover {
+      transform: none;
+      box-shadow: none;
+      border-color: rgba(110, 140, 185, 0.32);
+    }
+
+    body.selfhost-seedbox-only #serverAdminBlock,
+    body.selfhost-seedbox-only #simpleFlowCard,
+    body.selfhost-seedbox-only #advancedWorkspace,
+    body.selfhost-seedbox-only #advancedWorkspace .advanced-panel .card {
+      background: linear-gradient(180deg, rgba(12, 17, 28, 0.96), rgba(10, 15, 24, 0.94));
+      border-color: rgba(110, 140, 185, 0.28);
+      box-shadow: none;
+    }
+
+    body.selfhost-seedbox-only #simpleFlowCard .simple-flow-panel {
+      background: rgba(8, 13, 24, 0.76);
+      border-color: rgba(110, 140, 185, 0.24);
+      box-shadow: none;
+    }
+
+    body.selfhost-seedbox-only #simpleAdvancedBtn {
+      display: none !important;
+    }
+
+    body.selfhost-seedbox-only #advancedWorkspace {
+      overflow: visible;
+    }
+
+    body.selfhost-seedbox-only #advancedWorkspace > summary {
+      display: none;
+    }
+
+    body.selfhost-seedbox-only #advancedWorkspace .advanced-shell-body {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: 0;
+    }
+
+    body.selfhost-seedbox-only #advancedWorkspace .advanced-tabs {
+      margin-bottom: 1rem;
+    }
+
     .mode-option {
       width: 100%;
       min-height: 136px;
@@ -1953,6 +2104,8 @@
       .quick-step-actions .btn-test,
       .quick-step-actions .btn-install,
       .quick-step-actions a { width: 100%; min-width: 0; }
+      .selfhost-console-head { flex-direction: column; }
+      .selfhost-console-badges { justify-content: flex-start; }
     }
 
     @media (hover: none), (pointer: coarse) {
@@ -1995,6 +2148,21 @@
         <a href="/health">Health</a>
       </nav>
     </header>
+
+    <section class="card selfhost-console" id="selfhostConsoleCard" style="display:none;">
+      <div class="selfhost-console-head">
+        <div>
+          <div class="selfhost-console-kicker">Self-Hosted Server</div>
+          <div class="selfhost-console-title">Remote Seedbox</div>
+        </div>
+        <div class="selfhost-console-badges">
+          <span>Disk-backed config</span>
+          <span>Private backend URLs</span>
+          <span>Public HTTPS install origin</span>
+        </div>
+      </div>
+      <p class="selfhost-console-copy">This page is the server app. Save the server config here, then install or refresh the stable self-host addon in Stremio.</p>
+    </section>
 
     <div class="logo-header">
       <div class="logo-frame">
@@ -2801,10 +2969,8 @@
       }
 
       if (canQueryLocalRuntime()) {
-        hint.textContent = 'Self-hosted server mode is active. Because you are opening this page on the same host, the password is optional here.';
-        if (!document.getElementById('serverAdminStatus')?.textContent) {
-          setServerAdminStatus('ok', 'Same-host access detected.');
-        }
+        block.style.display = 'none';
+        setServerAdminStatus('', '');
         serverAdminTokenAttentionRequested = false;
         return;
       }
@@ -5169,6 +5335,7 @@
     }
 
     function spawnDebridDots() {
+      if (document.body?.classList.contains('selfhost-seedbox-only')) return;
       const layer = document.querySelector('.floating-debrid');
       if (!layer) return;
       const hues = [190, 203, 136, 345, 302];
@@ -5299,6 +5466,7 @@
       });
 
     function startPageFlicker() {
+      if (document.body?.classList.contains('selfhost-seedbox-only')) return;
       if (window.innerWidth < 768) return;
       const tick = () => {
         const waitMs = 8000 + Math.floor(Math.random() * 7000);
@@ -5934,6 +6102,15 @@
     function syncConfigureDisclosure(force = false) {
       const details = document.getElementById('advancedWorkspace');
       if (!details) return;
+      if (isSelfHostSeedboxOnlyRuntime()) {
+        details.open = true;
+        activeAdvancedTab = getAllowedAdvancedTabs('seedbox').includes(activeAdvancedTab)
+          ? activeAdvancedTab
+          : 'connections';
+        syncAdvancedUi();
+        setActiveServiceTab(activeServiceTab);
+        return;
+      }
       const target = getInstallTarget();
       if (hasMainPathRequirementsFilled(target)) {
         if (force) details.open = false;

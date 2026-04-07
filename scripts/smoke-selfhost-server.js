@@ -183,6 +183,8 @@ async function run() {
     const csrf = readCsrf(configureRes.headers['set-cookie'])
     assert.match(configureRes.text, /<body class="[^"]*runtime-config-pending[^"]*selfhost-seedbox-only[^"]*">/i)
     assert.match(configureRes.text, /__PVTKRRX_RUNTIME_BOOTSTRAP__/)
+    assert.match(configureRes.text, /Self-Hosted Server/i)
+    assert.match(configureRes.text, /This page is the server app\./i)
     assert.match(configureRes.text, /Generate Server Install (URL|Link)/)
     assert.match(configureRes.text, /Remote Seedbox is the only route in self-hosted server mode/i)
 
