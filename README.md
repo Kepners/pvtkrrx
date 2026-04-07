@@ -77,6 +77,7 @@ Use these files as the live documentation set:
 - [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) — current verification and deployment status
 
 - [docs/WEBSITE_STATUS.md](docs/WEBSITE_STATUS.md) - public route health, canonical host notes, and homepage/content backlog
+- [docs/SPORTSMETA_CATALOGUE_ARCHITECTURE.md](docs/SPORTSMETA_CATALOGUE_ARCHITECTURE.md) - planning doc for turning the current sports cache and image proxy into a hosted SportsMeta catalogue product
 The February 2026 planning docs under `docs/` are kept as project history and are now marked as historical where they no longer describe the live runtime.
 
 ## Quick Start
