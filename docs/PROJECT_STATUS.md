@@ -96,11 +96,12 @@ The practical reading of the project today is:
 ## Work Carried Out On 2026-04-08
 
 - Verified `main` and `origin/main` are both at commit `598ca01` (`📦 feat: permanent sports image catalogue — no pruning, no expiry`), so the permanent-cache work is already in GitHub rather than sitting as an unpushed local patch.
-- Verified the live public Contabo route is already running that same commit: the active Coolify container is `w14jewmw5ubscrxh8zzfhq7d-230950764321` on image `w14jewmw5ubscrxh8zzfhq7d:598ca01761f66e17439386f1e7898ba699dea563`.
-- Verified inside the live container that `sportsdb.js` now uses `PERSIST_MAX_ENTRIES = 50000`, one-year artwork-hit / structured-event / league-asset TTLs, and that `sportsImageCache.js` carries the permanent-catalogue no-prune / no-expiry contract.
+- Verified the live public Contabo route is still running a post-`598ca01` build with the same cache behavior: the current Coolify container is `w14jewmw5ubscrxh8zzfhq7d-232239570967` on image `w14jewmw5ubscrxh8zzfhq7d:5a7a1aca51f7353fc8de251b062e2e978fdffab3`.
+- Verified inside the live container that `sportsdb.js` still uses `PERSIST_MAX_ENTRIES = 50000`, one-year artwork-hit / structured-event / league-asset TTLs, and that `sportsImageCache.js` still carries the permanent-catalogue no-prune / no-expiry contract.
+- Verified the hosted durability split directly on Contabo: `sports-image-cache/` is bind-mounted from `/opt/pvtkrrx/sports-image-cache`, but there are no `PVTKRRX_RUNTIME_DIR` or `PVTKRRX_*_STORE_FILE` overrides and the runtime-root files `sportsdb-poster-cache.json`, `accounts-store.json`, `lan-pair-store.json`, `stremio-link-store.json`, `local-config.json`, `server-admin-token`, and `sports-cache-autofill-state.json` were absent from the mounted path during the check.
 - Verified `https://www.pvtkrrx.cc/health` returned `200` after the rebuild, so the hosted relay is healthy on the new commit.
 - Re-confirmed deploy drift on the non-live mirror path: `/opt/stack/sites/pvtkrrx` is still at `cabe9a5`, so that checkout must not be treated as proof of what the public host is serving.
-- Practical outcome: the cache-policy changes are already shipped on the hosted/cloud line, but Windows EXE and self-host release parity still needs a coordinated release if we want all surfaces to move together.
+- Practical outcome: the cache-policy changes are already shipped on the hosted/cloud line and hosted image bytes are durable across container replacement, but Windows EXE and self-host release parity still needs a coordinated release and the rest of the hosted runtime-root JSON state is not yet explicitly durable.
 
 ## Earlier 2026-04-04 Self-Host Work
 
@@ -359,11 +360,12 @@ These items should still be treated as open until captured on real clients:
 
 ## Recommended Next Work
 
-1. Browser-check the live homepage on desktop and mobile and fix any regressions now that the refactor is public.
-2. Decide whether Contabo should keep the extra `/opt/pvtkrrx` `systemd` runtime, repoint Caddy to it, or remove it so deploy expectations stop drifting.
-3. Tune qBittorrent for faster early playback and confirm stream start time improvements on real clients.
-4. Keep sports poster/wallpaper review focused on what Stremio clients actually render, not just what the metadata payload contains.
-5. Capture one extra Android TV or Android mobile `LAN Bridge` pass for cross-client parity beyond the now-verified Apple TV path.
-6. Finish public remote/auth playback sign-off before calling the whole route set fully release-ready.
-7. When copy work is back in scope, finish the `Hybrid Home` / `LAN Bridge` terminology cleanup across the popup, runbooks, bootstrap manifest text, and stream info notices.
-8. Keep this file updated whenever a real device test changes the truth table.
+1. Externalize the hosted runtime-root JSON state or move catalogue metadata into durable storage; right now only `sports-image-cache/` is definitely mounted on Contabo.
+2. Browser-check the live homepage on desktop and mobile and fix any regressions now that the refactor is public.
+3. Decide whether Contabo should keep the extra `/opt/pvtkrrx` `systemd` runtime, repoint Caddy to it, or remove it so deploy expectations stop drifting.
+4. Tune qBittorrent for faster early playback and confirm stream start time improvements on real clients.
+5. Keep sports poster/wallpaper review focused on what Stremio clients actually render, not just what the metadata payload contains.
+6. Capture one extra Android TV or Android mobile `LAN Bridge` pass for cross-client parity beyond the now-verified Apple TV path.
+7. Finish public remote/auth playback sign-off before calling the whole route set fully release-ready.
+8. When copy work is back in scope, finish the `Hybrid Home` / `LAN Bridge` terminology cleanup across the popup, runbooks, bootstrap manifest text, and stream info notices.
+9. Keep this file updated whenever a real device test changes the truth table.

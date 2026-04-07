@@ -94,7 +94,10 @@ Main gap:
 
 - the current hosted relay runs in a Coolify container
 - the current cache code writes into the runtime directory
-- without a mounted durable volume or object store, "permanent" really means "until container replacement"
+- the live Contabo app already bind-mounts `/opt/pvtkrrx/sports-image-cache` into the runtime, so downloaded image bytes do survive container replacement
+- the remaining runtime-root files, including `sportsdb-poster-cache.json`, still default inside the container unless they are externalized
+
+So the current setup is partially durable, not fully durable.
 
 For a paid catalogue product, the master store must survive:
 

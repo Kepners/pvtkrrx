@@ -101,6 +101,8 @@ Contabo runtime note:
 - `www.pvtkrrx.cc` currently reaches the Coolify-hosted `pvtkrrx` app container through Caddy.
 - A separate host-level `pvtkrrx.service` runtime can also run from `/opt/pvtkrrx` on port `7000`.
 - Treat those as separate runtimes until the reverse proxy target is deliberately changed.
+- Verified on 2026-04-08: the live Coolify app bind-mounts `/opt/pvtkrrx/sports-image-cache` into `/root/.local/share/PVTKRRX/runtime/sports-image-cache`, so hosted sports image bytes survive container replacement.
+- The rest of the hosted runtime root still defaults inside `/root/.local/share/PVTKRRX/runtime` unless separately externalized; that currently includes `sportsdb-poster-cache.json`, `accounts-store.json`, `lan-pair-store.json`, `stremio-link-store.json`, `local-config.json`, `server-admin-token`, and the sports autofill cursor.
 
 ## Route Model
 
