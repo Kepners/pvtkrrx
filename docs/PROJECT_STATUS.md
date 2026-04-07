@@ -188,6 +188,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - the desktop splash now appears on every cold boot and stays frontmost until the main shell is ready
 - the desktop wrapper now starts a Windows power blocker by default and logs lock/unlock/suspend/resume so the host is less likely to disappear when Windows is locked or the display turns off
 - the desktop shell can now toggle Windows sign-in startup on/off from inside the app, and startup launches stay hidden in the tray so the local runtime can auto-launch after login without popping the main window
+- the Windows startup toggle now writes a quoted `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` command and repairs the legacy malformed unquoted startup entry on the next desktop launch, fixing the installed EXE failing to auto-open from `C:\Program Files\...` paths
 - host-side `LAN Bridge` status now checks the hosted relay directly, and the desktop can repair a stale local pair identity after an `invalid pair key` rejection
 - host-side Stremio Desktop session scanning now detects the real WebView2 `profile/auth/key` storage format again, and startup auto-provision can link that signed-in session automatically
 - sports catalog tiles now prefer portrait poster art when TheSportsDB provides it, while backgrounds stay sport/league-aware for better Stremio wallpaper coverage

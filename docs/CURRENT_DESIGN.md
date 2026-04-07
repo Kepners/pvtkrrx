@@ -190,6 +190,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 - Closing the main desktop shell now hides it to the Windows system tray unless the user explicitly exits.
 - The tray exposes restore/open/exit behavior so the local runtime can keep serving while the window is hidden intentionally.
 - The desktop shell can also toggle Windows sign-in startup on/off without leaving the app.
+- The Windows startup toggle writes a quoted `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` command and repairs the legacy malformed unquoted entry on the next desktop launch.
 - When Windows launches PVTKRRX from sign-in startup, the runtime now stays hidden in the system tray instead of opening the main window immediately.
 - The desktop wrapper now starts a Windows power blocker by default (`prevent-app-suspension`) so the host can stay alive through lock-screen and display-off states while serving local/LAN traffic.
 - Startup still runs:

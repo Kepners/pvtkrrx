@@ -31,6 +31,9 @@ const MIN_SPLASH_MS = Math.max(1500, parseInt(process.env.PVTKRRX_MIN_SPLASH_MS 
 const STARTUP_LAUNCH_ARG = '--pvtkrrx-startup-launch'
 const PROVISION_ONLY_ARG = '--pvtkrrx-provision-only'
 const NETWORK_ACCESS_ONLY_ARG = '--pvtkrrx-network-access-only'
+const WINDOWS_STARTUP_RUN_KEY_PATH = 'HKCU:\\Software\\Microsoft\\Windows\\CurrentVersion\\Run'
+const WINDOWS_STARTUP_VALUE_NAME = 'PVTKRRX'
+const LEGACY_WINDOWS_STARTUP_VALUE_NAMES = ['electron.app.PVTKRRX']
 const startupLaunchMode = process.argv.includes(STARTUP_LAUNCH_ARG)
 const provisionOnlyMode = process.argv.includes(PROVISION_ONLY_ARG)
 const networkAccessOnlyMode = process.argv.includes(NETWORK_ACCESS_ONLY_ARG)
@@ -86,7 +89,124 @@ function getDesktopStartupLaunchConfig() {
   }
 }
 
-function getDesktopStartupState() {
+function escapePowerShellSingleQuoted(value) {
+  return String(value || '').replace(/'/g, "''")
+}
+
+function quoteWindowsCommandArg(value) {
+  const text = String(value || '').trim()
+  if (!text) return '""'
+  if (!/[ \t"]/u.test(text)) return text
+  return `"${text
+    .replace(/(\\*)"/g, '$1$1\\"')
+    .replace(/(\\+)$/g, '$1$1')}"`
+}
+
+function buildWindowsStartupCommand(launchConfig = getDesktopStartupLaunchConfig()) {
+  const executablePath = String(launchConfig?.path || '').trim()
+  if (!executablePath) return ''
+  const args = Array.isArray(launchConfig?.args)
+    ? launchConfig.args.map(arg => String(arg || '').trim()).filter(Boolean)
+    : []
+  return [quoteWindowsCommandArg(executablePath), ...args.map(quoteWindowsCommandArg)].join(' ')
+}
+
+function commandLooksLikeDesktopStartupEntry(command, launchConfig = getDesktopStartupLaunchConfig()) {
+  const text = String(command || '').trim().toLowerCase()
+  const executablePath = String(launchConfig?.path || '').trim().toLowerCase()
+  if (!text || !executablePath) return false
+  return text.includes(executablePath) && text.includes(STARTUP_LAUNCH_ARG.toLowerCase())
+}
+
+async function readWindowsStartupRegistryEntries() {
+  if (process.platform !== 'win32') return {}
+  const names = [WINDOWS_STARTUP_VALUE_NAME, ...LEGACY_WINDOWS_STARTUP_VALUE_NAMES]
+  const powerShellNames = names
+    .map(name => `'${escapePowerShellSingleQuoted(name)}'`)
+    .join(', ')
+  const command = `
+    $path = '${escapePowerShellSingleQuoted(WINDOWS_STARTUP_RUN_KEY_PATH)}'
+    $result = @{}
+    foreach ($name in @(${powerShellNames})) {
+      try {
+        $value = Get-ItemPropertyValue -Path $path -Name $name -ErrorAction Stop
+        if ($null -ne $value) {
+          $result[$name] = [string]$value
+        }
+      } catch {}
+    }
+    $result | ConvertTo-Json -Compress
+  `
+  const result = await runPowerShell(command, 15000)
+  const text = String(result.stdout || '').trim()
+  if (result.code !== 0 && !text) {
+    throw new Error(result.stderr || 'startup registry read failed')
+  }
+  if (!text) return {}
+  try {
+    const parsed = JSON.parse(text)
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed
+    }
+  } catch (_) {}
+  return {}
+}
+
+async function writeWindowsStartupRegistryValue(name, value) {
+  if (process.platform !== 'win32') return
+  const command = `
+    $path = '${escapePowerShellSingleQuoted(WINDOWS_STARTUP_RUN_KEY_PATH)}'
+    if (-not (Test-Path $path)) {
+      New-Item -Path $path -Force | Out-Null
+    }
+    New-ItemProperty -Path $path -Name '${escapePowerShellSingleQuoted(name)}' -Value '${escapePowerShellSingleQuoted(value)}' -PropertyType String -Force | Out-Null
+  `
+  const result = await runPowerShell(command, 15000)
+  if (result.code !== 0) {
+    throw new Error(result.stderr || 'startup registry write failed')
+  }
+}
+
+async function removeWindowsStartupRegistryValue(name) {
+  if (process.platform !== 'win32') return
+  const command = `
+    $path = '${escapePowerShellSingleQuoted(WINDOWS_STARTUP_RUN_KEY_PATH)}'
+    if (Test-Path $path) {
+      Remove-ItemProperty -Path $path -Name '${escapePowerShellSingleQuoted(name)}' -ErrorAction SilentlyContinue
+    }
+  `
+  const result = await runPowerShell(command, 15000)
+  if (result.code !== 0) {
+    throw new Error(result.stderr || 'startup registry delete failed')
+  }
+}
+
+async function maybeRepairDesktopStartupRegistration() {
+  if (process.platform !== 'win32') return false
+  const launchConfig = getDesktopStartupLaunchConfig()
+  const expectedCommand = buildWindowsStartupCommand(launchConfig)
+  if (!expectedCommand) return false
+
+  const entries = await readWindowsStartupRegistryEntries()
+  const currentValue = String(entries[WINDOWS_STARTUP_VALUE_NAME] || '').trim()
+  if (currentValue === expectedCommand) return false
+
+  const hasRepairableCurrentValue = currentValue && commandLooksLikeDesktopStartupEntry(currentValue, launchConfig)
+  const legacyMatch = LEGACY_WINDOWS_STARTUP_VALUE_NAMES.find((name) => {
+    return commandLooksLikeDesktopStartupEntry(entries[name], launchConfig)
+  })
+
+  if (!hasRepairableCurrentValue && !legacyMatch) return false
+
+  await writeWindowsStartupRegistryValue(WINDOWS_STARTUP_VALUE_NAME, expectedCommand)
+  for (const legacyName of LEGACY_WINDOWS_STARTUP_VALUE_NAMES) {
+    await removeWindowsStartupRegistryValue(legacyName)
+  }
+  console.log('[desktop] repaired Windows startup registration with a quoted Run-key command')
+  return true
+}
+
+async function getDesktopStartupState() {
   if (process.platform !== 'win32') {
     return {
       startupAvailable: false,
@@ -97,11 +217,10 @@ function getDesktopStartupState() {
 
   try {
     const launchConfig = getDesktopStartupLaunchConfig()
-    const settings = app.getLoginItemSettings({
-      path: launchConfig.path,
-      args: launchConfig.args
-    })
-    const enabled = Boolean(settings?.openAtLogin)
+    const expectedCommand = buildWindowsStartupCommand(launchConfig)
+    const entries = await readWindowsStartupRegistryEntries()
+    const currentValue = String(entries[WINDOWS_STARTUP_VALUE_NAME] || '').trim()
+    const enabled = currentValue === expectedCommand
     return {
       startupAvailable: true,
       startupEnabled: enabled,
@@ -118,15 +237,23 @@ function getDesktopStartupState() {
   }
 }
 
-function setDesktopStartupEnabled(enabled) {
-  if (process.platform !== 'win32') return getDesktopStartupState()
+async function setDesktopStartupEnabled(enabled) {
+  if (process.platform !== 'win32') return await getDesktopStartupState()
   const launchConfig = getDesktopStartupLaunchConfig()
-  app.setLoginItemSettings({
-    openAtLogin: Boolean(enabled),
-    path: launchConfig.path,
-    args: launchConfig.args
-  })
-  return getDesktopStartupState()
+  const command = buildWindowsStartupCommand(launchConfig)
+  if (!command) {
+    throw new Error('startup command could not be built')
+  }
+
+  if (enabled) {
+    await writeWindowsStartupRegistryValue(WINDOWS_STARTUP_VALUE_NAME, command)
+  } else {
+    await removeWindowsStartupRegistryValue(WINDOWS_STARTUP_VALUE_NAME)
+  }
+  for (const legacyName of LEGACY_WINDOWS_STARTUP_VALUE_NAMES) {
+    await removeWindowsStartupRegistryValue(legacyName)
+  }
+  return await getDesktopStartupState()
 }
 
 function ensureLocalLanPairOwner(config) {
@@ -621,9 +748,10 @@ async function readDesktopSettingsSnapshot() {
   } catch (_) {
     prefs = null
   }
+  const startupState = await getDesktopStartupState()
   return {
     ...normalizeQbitPreferenceSnapshot(prefs),
-    ...getDesktopStartupState()
+    ...startupState
   }
 }
 
@@ -1230,6 +1358,11 @@ app.whenReady().then(async () => {
   if (startupLaunchMode) {
     console.log('[desktop] startup launch detected; booting hidden in system tray')
   }
+  try {
+    await maybeRepairDesktopStartupRegistration()
+  } catch (err) {
+    console.warn('[desktop] startup registration repair failed:', err.message)
+  }
   ensureDesktopPowerBlocker('startup')
   installPowerMonitorHooks()
   const reconciled = await reconcilePortOnBoot(port)
@@ -1405,7 +1538,7 @@ ipcMain.handle('save-qbit-settings', async (_event, payload = {}) => {
   }
 
   if (typeof startupEnabled === 'boolean') {
-    setDesktopStartupEnabled(startupEnabled)
+    await setDesktopStartupEnabled(startupEnabled)
   }
 
   return readDesktopSettingsSnapshot()
