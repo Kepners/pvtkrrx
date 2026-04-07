@@ -291,6 +291,14 @@ function tokenizeTeamText(value) {
     .filter(Boolean)
 }
 
+function buildTokenInitials(tokens = []) {
+  return (Array.isArray(tokens) ? tokens : [])
+    .map(token => String(token || '').trim())
+    .filter(Boolean)
+    .map(token => token[0])
+    .join('')
+}
+
 function tokensEndWith(tokens, suffix) {
   if (!Array.isArray(tokens) || !Array.isArray(suffix) || suffix.length === 0 || suffix.length > tokens.length) return false
   for (let i = 0; i < suffix.length; i += 1) {
@@ -335,15 +343,18 @@ function scoreTeamNameVariant(rawTeam, candidateName) {
   if (rawTokens.length === 0 || candidateTokens.length === 0) return 0
 
   const raw = rawTokens.join(' ')
-  const candidate = candidateTokens.join(' ')
+  const rawCompact = rawTokens.join('')
+  const candidateCompact = candidateTokens.join('')
+  const rawInitials = buildTokenInitials(rawTokens)
+  const candidateInitials = buildTokenInitials(candidateTokens)
 
-  if (raw === candidate) return 180
+  if (raw === candidateTokens.join(' ')) return 180
   if (tokensEndWith(candidateTokens, rawTokens)) return 165
   if (tokensEndWith(rawTokens, candidateTokens)) return 160
+  if (rawCompact.length >= 2 && rawCompact === candidateInitials) return 155
+  if (candidateCompact.length >= 2 && candidateCompact === rawInitials) return 150
   if (tokensContainSequence(candidateTokens, rawTokens)) return 145
   if (tokensContainSequence(rawTokens, candidateTokens)) return 140
-  if (candidate.includes(raw)) return 130
-  if (raw.includes(candidate)) return 125
 
   const candidateSet = new Set(candidateTokens)
   const overlap = rawTokens.filter(token => candidateSet.has(token)).length
@@ -1022,10 +1033,7 @@ function getLeagueMatchScoreForLeague(expectedLeague, league = {}) {
 }
 
 function teamNameMatches(expected, actual) {
-  const expectedName = normalizeTeamName(expected)
-  const actualName = normalizeTeamName(actual)
-  if (!expectedName || !actualName) return false
-  return actualName === expectedName || actualName.includes(expectedName) || expectedName.includes(actualName)
+  return scoreTeamNameVariant(expected, actual) >= 80
 }
 
 function getStructuredTeamMatchScore(event, homeTeam, awayTeam) {

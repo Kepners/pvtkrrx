@@ -386,6 +386,58 @@ async function testStructuredLookupFallsBackToDateSearchAfterLiteralMiss() {
   assert.equal(dateFallbackCalls, 1, 'expected exactly one date fallback call after the literal search missed')
 }
 
+async function testStructuredLookupMatchesTeamAcronymsWithoutRosterHelp() {
+  const client = new SportsDbClient('smoke-structured-acronyms', { cacheHours: 1 })
+
+  client._fetchTeamsByLeague = async () => []
+  client._fetchEvents = async () => ([{
+    idEvent: 'evt-csk-mi',
+    strEvent: 'Chennai Super Kings vs Mumbai Indians',
+    dateEvent: '2026-04-05',
+    strSport: 'Cricket',
+    strLeague: 'Indian Premier League',
+    strHomeTeam: 'Chennai Super Kings',
+    strAwayTeam: 'Mumbai Indians'
+  }])
+  client._fetchEventsByDate = async () => []
+  client._fetchTvEventsByDate = async () => []
+
+  const event = await client.findEventByStructuredData({
+    league: 'IPL',
+    date: '2026-04-05',
+    homeTeam: 'CSK',
+    awayTeam: 'MI'
+  })
+
+  assert.equal(event?.idEvent, 'evt-csk-mi', 'structured lookup should match team acronyms even when the league roster could not expand them first')
+}
+
+async function testStructuredLookupRejectsLooseSubstringTeamMatches() {
+  const client = new SportsDbClient('smoke-structured-substring-guard', { cacheHours: 1 })
+
+  client._fetchTeamsByLeague = async () => []
+  client._fetchEvents = async () => ([{
+    idEvent: 'evt-substring-trap',
+    strEvent: 'Atlanta Hawks vs Los Angeles Lakers',
+    dateEvent: '2026-04-05',
+    strSport: 'Basketball',
+    strLeague: 'NBA',
+    strHomeTeam: 'Atlanta Hawks',
+    strAwayTeam: 'Los Angeles Lakers'
+  }])
+  client._fetchEventsByDate = async () => []
+  client._fetchTvEventsByDate = async () => []
+
+  const event = await client.findEventByStructuredData({
+    league: 'NBA',
+    date: '2026-04-05',
+    homeTeam: 'LA',
+    awayTeam: 'ATL'
+  })
+
+  assert.equal(event, null, 'structured lookup should not treat short substrings like LA or ATL as full-team matches')
+}
+
 async function testOrderAgnosticSportsGrouping() {
   class FakeProwlarrClient {
     async search() {
@@ -1411,6 +1463,8 @@ async function main() {
     await testStructuredArtworkCacheDoesNotBleedAcrossFixtures()
     await testStructuredLookupExpandsLeagueTeamNicknames()
     await testStructuredLookupFallsBackToDateSearchAfterLiteralMiss()
+    await testStructuredLookupMatchesTeamAcronymsWithoutRosterHelp()
+    await testStructuredLookupRejectsLooseSubstringTeamMatches()
     await testOrderAgnosticSportsGrouping()
     await testLeagueFallbackUsesGeneratedMatchupPoster()
     await testCatalogShowsSetupPlaceholderWhenProwlarrHasNoIndexers()
