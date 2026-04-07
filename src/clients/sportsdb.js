@@ -10,13 +10,13 @@ const BASE_URL = 'https://www.thesportsdb.com/api/v1/json'
 const DEFAULT_API_KEY = '123'
 const DEFAULT_TIMEOUT_MS = 8000
 const PERSIST_FILE_NAME = 'sportsdb-poster-cache.json'
-const PERSIST_MAX_ENTRIES = 5000
+const PERSIST_MAX_ENTRIES = 50000
 const CACHE_KEY_VERSION = 'v5'
 const RATE_LIMIT_COOLDOWN_MS = 10 * 60 * 1000
-const DEFAULT_ARTWORK_CACHE_HOURS = 24
+const DEFAULT_ARTWORK_CACHE_HOURS = 24 * 365
 const DEFAULT_MISS_CACHE_HOURS = 6
-const STRUCTURED_EVENT_CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000
-const LEAGUE_ASSET_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000
+const STRUCTURED_EVENT_CACHE_TTL_MS = 365 * 24 * 60 * 60 * 1000
+const LEAGUE_ASSET_CACHE_TTL_MS = 365 * 24 * 60 * 60 * 1000
 
 const cache = new Map()
 const inFlight = new Map()

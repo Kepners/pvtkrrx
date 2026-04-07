@@ -6,13 +6,9 @@ const { resolveRuntimeDir } = require('./runtimeDir')
 
 const CACHE_ROOT_NAME = 'sports-image-cache'
 const TOKEN_VERSION = 'v1'
-const DEFAULT_CACHE_TTL_HOURS = 7 * 24
 const DEFAULT_FETCH_TIMEOUT_MS = 10000
 const DEFAULT_MAX_IMAGE_BYTES = 15 * 1024 * 1024
-const DEFAULT_MAX_ENTRIES = 2000
-const PRUNE_INTERVAL_MS = 30 * 60 * 1000
 const inFlight = new Map()
-let lastPruneAt = 0
 
 function clampNumber(value, fallback, min, max) {
   const numeric = Number(value)
@@ -34,21 +30,12 @@ function getCacheRoot() {
   return root
 }
 
-function getCacheTtlMs() {
-  const hours = clampNumber(process.env.PVTKRRX_SPORTS_IMAGE_CACHE_HOURS, DEFAULT_CACHE_TTL_HOURS, 24, 24 * 30)
-  return hours * 60 * 60 * 1000
-}
-
 function getFetchTimeoutMs() {
   return clampNumber(process.env.PVTKRRX_SPORTS_IMAGE_FETCH_TIMEOUT_MS, DEFAULT_FETCH_TIMEOUT_MS, 2000, 30000)
 }
 
 function getMaxImageBytes() {
   return clampNumber(process.env.PVTKRRX_SPORTS_IMAGE_MAX_BYTES, DEFAULT_MAX_IMAGE_BYTES, 64 * 1024, 25 * 1024 * 1024)
-}
-
-function getMaxEntries() {
-  return clampNumber(process.env.PVTKRRX_SPORTS_IMAGE_CACHE_MAX_ENTRIES, DEFAULT_MAX_ENTRIES, 100, 10000)
 }
 
 function getSigningSecret() {
@@ -307,7 +294,6 @@ function writeCacheEntry(cacheKey, sourceUrl, fileBuffer, contentType, ext) {
     ext,
     size: fileBuffer.length,
     fetchedAt: now,
-    expiresAt: now + getCacheTtlMs(),
     lastAccessedAt: now
   }
 
@@ -386,7 +372,6 @@ function maybeTouchEntry(entry) {
       ext: entry.ext,
       size: entry.size,
       fetchedAt: entry.fetchedAt,
-      expiresAt: entry.expiresAt,
       lastAccessedAt: now
     }), 'utf8')
   } catch (_) {
@@ -395,40 +380,8 @@ function maybeTouchEntry(entry) {
   return nextEntry
 }
 
-function pruneSportsImageCache() {
-  const now = Date.now()
-  if (lastPruneAt && now - lastPruneAt < PRUNE_INTERVAL_MS) return
-  lastPruneAt = now
-
-  const root = getCacheRoot()
-  let entries = []
-  try {
-    const metadataFiles = fs.readdirSync(root).filter(name => name.endsWith('.json'))
-    for (const fileName of metadataFiles) {
-      const cacheKey = fileName.replace(/\.json$/i, '')
-      const entry = loadCacheEntry(cacheKey)
-      if (!entry) continue
-      if (Number(entry.expiresAt || 0) <= now) {
-        removeCacheEntry(entry)
-        continue
-      }
-      entries.push(entry)
-    }
-  } catch (_) {
-    return
-  }
-
-  const maxEntries = getMaxEntries()
-  if (entries.length <= maxEntries) return
-
-  entries = entries
-    .sort((a, b) => Number(b.lastAccessedAt || b.fetchedAt || 0) - Number(a.lastAccessedAt || a.fetchedAt || 0))
-    .slice(maxEntries)
-
-  for (const entry of entries) {
-    removeCacheEntry(entry)
-  }
-}
+// Sports image cache is a permanent catalogue — no pruning, no expiry.
+// Images are kept forever once downloaded. The catalogue is the product.
 
 async function getCachedSportsImage(sourceUrl) {
   const normalizedUrl = normalizeRemoteImageUrl(sourceUrl)
@@ -436,11 +389,9 @@ async function getCachedSportsImage(sourceUrl) {
     throw new Error('Invalid sports image URL')
   }
 
-  pruneSportsImageCache()
   const cacheKey = buildCacheKey(normalizedUrl)
   const existing = loadCacheEntry(cacheKey)
-  const now = Date.now()
-  if (existing && Number(existing.expiresAt || 0) > now) {
+  if (existing) {
     const touched = maybeTouchEntry(existing)
     return {
       ...touched,
@@ -463,15 +414,9 @@ async function getCachedSportsImage(sourceUrl) {
       )
       return {
         ...fresh,
-        cacheStatus: existing ? 'refresh' : 'miss'
+        cacheStatus: 'miss'
       }
     } catch (err) {
-      if (existing?.filePath && fs.existsSync(existing.filePath)) {
-        return {
-          ...maybeTouchEntry(existing),
-          cacheStatus: 'stale'
-        }
-      }
       throw err
     } finally {
       inFlight.delete(cacheKey)
