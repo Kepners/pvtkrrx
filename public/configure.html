@@ -776,6 +776,20 @@
       grid-template-columns: 1fr;
     }
 
+    body.runtime-config-pending #installTargetCard,
+    body.runtime-config-pending #simpleFlowCard,
+    body.runtime-config-pending #advancedWorkspace {
+      display: none !important;
+    }
+
+    body.desktop-local-only [data-install-target="seedbox"] {
+      display: none !important;
+    }
+
+    body.desktop-local-only #installTargetSwitcher {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
     body.selfhost-seedbox-only [data-install-target="pc"],
     body.selfhost-seedbox-only [data-install-target="lan"] {
       display: none !important;
@@ -2067,7 +2081,7 @@
       <div id="serverAdminStatus" class="status"></div>
     </div>
 
-    <div class="card">
+    <div class="card" id="installTargetCard">
       <h2>Choose Your Route</h2>
       <p class="section-lead" id="installTargetLead">Choose the route that matches where playback happens. Configure first, then install or refresh the route that fits the device you actually use.</p>
       <div class="mode-grid target-count-3" id="installTargetSwitcher">
@@ -3368,6 +3382,20 @@
       return isSelfHostedServerRuntime() && !getConfigTokenFromPath();
     }
 
+    function syncRuntimeBodyClasses() {
+      const body = document.body;
+      if (!body) return;
+      body.classList.toggle('selfhost-seedbox-only', isSelfHostSeedboxOnlyRuntime());
+      body.classList.toggle('desktop-local-only', isDesktopLocalOnlyRuntime());
+    }
+
+    function markRuntimeConfigReady() {
+      const body = document.body;
+      if (!body) return;
+      body.classList.remove('runtime-config-pending');
+      body.classList.add('runtime-config-ready');
+    }
+
     function getSeedboxGenerateLabel(remoteReady = false) {
       if (isSelfHostedServerRuntime()) {
         return remoteReady ? 'Rebuild Server Install Link' : 'Generate Server Install Link';
@@ -3424,7 +3452,7 @@
       const selfHostSeedboxOnly = isSelfHostSeedboxOnlyRuntime();
       let visibleCount = 0;
 
-      document.body.classList.toggle('selfhost-seedbox-only', selfHostSeedboxOnly);
+      syncRuntimeBodyClasses();
 
       document.querySelectorAll('[data-install-target]').forEach((button) => {
         const allowed = allowedTargets.includes(button.dataset.installTarget);
@@ -3540,6 +3568,7 @@
       serverRuntime.publicBaseUrl = String(payload.publicBaseUrl || '').trim();
       serverRuntime.stremioLinkingAvailable = payload.stremioLinkingAvailable === true;
       serverRuntime.desktopLocalOnly = payload.desktopLocalOnly === true;
+      syncRuntimeBodyClasses();
       updateServerAdminUi();
       updateServerLinkUi();
       updateServiceLaunchLinks();
@@ -5262,6 +5291,7 @@
       .then(() => maybePrefillFromToken())
       .then(() => maybeLoadServerLinkSessionFromUrl())
       .finally(() => {
+        markRuntimeConfigReady();
         refreshLocalQbitRuntimeStatus();
         refreshLocalStremioStatus();
         updateQuickSetupStatus();

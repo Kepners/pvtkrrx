@@ -259,6 +259,17 @@ function buildRuntimeAppConfig(req) {
   }
 }
 
+function getConfigureBodyClasses(runtimeConfig = {}) {
+  const classes = ['runtime-config-pending']
+  if (runtimeConfig.selfHostServerMode === true) {
+    classes.push('selfhost-seedbox-only')
+  }
+  if (runtimeConfig.desktopLocalOnly === true) {
+    classes.push('desktop-local-only')
+  }
+  return classes.join(' ')
+}
+
 function sendConfigurePage(req, res) {
   const runtimeConfig = buildRuntimeAppConfig(req)
   const runtimeBootstrapJson = JSON.stringify(runtimeConfig).replace(/</g, '\\u003c')
@@ -266,7 +277,12 @@ function sendConfigurePage(req, res) {
     '<meta name="robots" content="noindex,nofollow">',
     `<script>window.__PVTKRRX_RUNTIME_BOOTSTRAP__=${runtimeBootstrapJson};</script>`
   ].join('')
-  res.type('html').send(configPageTemplate.replace('</head>', `${runtimeHeadExtras}</head>`))
+  const runtimeBodyClass = getConfigureBodyClasses(runtimeConfig)
+  res.type('html').send(
+    configPageTemplate
+      .replace('</head>', `${runtimeHeadExtras}</head>`)
+      .replace('<body>', `<body class="${runtimeBodyClass}">`)
+  )
 }
 
 function normalizeVersionString(value) {
