@@ -900,6 +900,134 @@
       color: var(--text-dim);
     }
 
+    .desktop-console {
+      display: none;
+      border-color: rgba(82, 128, 164, 0.3);
+      background: linear-gradient(180deg, rgba(11, 16, 27, 0.96), rgba(9, 14, 23, 0.94));
+      box-shadow: none;
+    }
+
+    .desktop-console::before {
+      opacity: 0.24;
+      background: linear-gradient(90deg, rgba(82, 128, 164, 0.22), rgba(0, 246, 255, 0.24), rgba(0, 255, 102, 0.18), rgba(82, 128, 164, 0.22));
+    }
+
+    .desktop-console-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1rem;
+      margin-bottom: 0.9rem;
+    }
+
+    .desktop-console-kicker {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.64rem;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #96dbff;
+      margin-bottom: 0.35rem;
+    }
+
+    .desktop-console-title {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 1.15rem;
+      font-weight: 600;
+      letter-spacing: 1.3px;
+      text-transform: uppercase;
+      color: #f1f7ff;
+    }
+
+    .desktop-console-badges {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      justify-content: flex-end;
+    }
+
+    .desktop-console-badges span {
+      display: inline-flex;
+      align-items: center;
+      min-height: 32px;
+      padding: 0.45rem 0.7rem;
+      border-radius: 999px;
+      border: 1px solid rgba(82, 128, 164, 0.28);
+      background: rgba(7, 12, 20, 0.78);
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.62rem;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      color: #c9d7ef;
+    }
+
+    .desktop-console-copy {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.69rem;
+      line-height: 1.6;
+      color: var(--text-dim);
+    }
+
+    body.desktop-local-only {
+      background: linear-gradient(180deg, #05070d 0%, #09111f 100%);
+    }
+
+    body.desktop-local-only::before,
+    body.desktop-local-only::after,
+    body.desktop-local-only .vortex,
+    body.desktop-local-only .floating-debrid,
+    body.desktop-local-only .scanlines,
+    body.desktop-local-only .noise,
+    body.desktop-local-only .glitch-flash {
+      display: none !important;
+    }
+
+    body.desktop-local-only .topbar {
+      margin-bottom: 0.75rem;
+      border-color: rgba(82, 128, 164, 0.24);
+      background: rgba(8, 12, 20, 0.94);
+      box-shadow: none;
+    }
+
+    body.desktop-local-only .topbar-dot {
+      box-shadow: 0 0 10px rgba(0, 246, 255, 0.34);
+    }
+
+    body.desktop-local-only .topbar-text {
+      color: #d7e6ff;
+      text-shadow: none;
+    }
+
+    body.desktop-local-only .topbar-nav,
+    body.desktop-local-only .logo-header,
+    body.desktop-local-only #setupRealityCard {
+      display: none !important;
+    }
+
+    body.desktop-local-only #desktopConsoleCard {
+      display: block !important;
+    }
+
+    body.desktop-local-only .card:hover {
+      transform: none;
+      box-shadow: none;
+      border-color: rgba(82, 128, 164, 0.32);
+    }
+
+    body.desktop-local-only #installTargetCard,
+    body.desktop-local-only #simpleFlowCard,
+    body.desktop-local-only #advancedWorkspace,
+    body.desktop-local-only #advancedWorkspace .advanced-panel .card {
+      background: linear-gradient(180deg, rgba(11, 16, 27, 0.96), rgba(9, 14, 23, 0.94));
+      border-color: rgba(82, 128, 164, 0.28);
+      box-shadow: none;
+    }
+
+    body.desktop-local-only #simpleFlowCard .simple-flow-panel {
+      background: rgba(8, 13, 24, 0.76);
+      border-color: rgba(82, 128, 164, 0.24);
+      box-shadow: none;
+    }
+
     body.selfhost-seedbox-only {
       background: linear-gradient(180deg, #05070d 0%, #09111f 100%);
     }
@@ -2104,6 +2232,8 @@
       .quick-step-actions .btn-test,
       .quick-step-actions .btn-install,
       .quick-step-actions a { width: 100%; min-width: 0; }
+      .desktop-console-head { flex-direction: column; }
+      .desktop-console-badges { justify-content: flex-start; }
       .selfhost-console-head { flex-direction: column; }
       .selfhost-console-badges { justify-content: flex-start; }
     }
@@ -2148,6 +2278,21 @@
         <a href="/health">Health</a>
       </nav>
     </header>
+
+    <section class="card desktop-console" id="desktopConsoleCard" style="display:none;">
+      <div class="desktop-console-head">
+        <div>
+          <div class="desktop-console-kicker">Windows Host App</div>
+          <div class="desktop-console-title">PC Local + LAN Bridge</div>
+        </div>
+        <div class="desktop-console-badges">
+          <span>Windows host</span>
+          <span>PC Local</span>
+          <span>LAN Bridge</span>
+        </div>
+      </div>
+      <p class="desktop-console-copy">This page runs on the Windows host. Save the local config here, then generate the install path for this PC or your other home devices.</p>
+    </section>
 
     <section class="card selfhost-console" id="selfhostConsoleCard" style="display:none;">
       <div class="selfhost-console-head">
@@ -5335,7 +5480,10 @@
     }
 
     function spawnDebridDots() {
-      if (document.body?.classList.contains('selfhost-seedbox-only')) return;
+      if (
+        document.body?.classList.contains('selfhost-seedbox-only') ||
+        document.body?.classList.contains('desktop-local-only')
+      ) return;
       const layer = document.querySelector('.floating-debrid');
       if (!layer) return;
       const hues = [190, 203, 136, 345, 302];
@@ -5466,7 +5614,10 @@
       });
 
     function startPageFlicker() {
-      if (document.body?.classList.contains('selfhost-seedbox-only')) return;
+      if (
+        document.body?.classList.contains('selfhost-seedbox-only') ||
+        document.body?.classList.contains('desktop-local-only')
+      ) return;
       if (window.innerWidth < 768) return;
       const tick = () => {
         const waitMs = 8000 + Math.floor(Math.random() * 7000);

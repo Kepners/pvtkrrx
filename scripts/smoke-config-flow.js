@@ -233,6 +233,8 @@ async function run() {
     assert.doesNotMatch(configureHtml, /Stremio Seedbox Addon/i, 'configure page should not contain the old generic addon headline')
     assert.match(configureHtml, /<meta name="robots" content="noindex,nofollow">/i, 'configure page should not be indexable')
     assert.doesNotMatch(configureHtml, />Manifest<\/a>/i, 'configure page should not render a manifest nav link')
+    assert.match(configureHtml, /Windows Host App/, 'configure page should include the desktop host app console header')
+    assert.match(configureHtml, /This page runs on the Windows host\./, 'configure page should include the desktop host app summary copy')
     assert.match(configureHtml, /<h2>LAN Bridge Fallback<\/h2>/, 'configure page should render LAN Bridge fallback section')
     assert.match(configureHtml, /<h2>Manual \/ Fallback<\/h2>/, 'configure page should render manual fallback section')
     assert.match(configureHtml, /id="installActionBtn"/, 'configure page should render install action button')
