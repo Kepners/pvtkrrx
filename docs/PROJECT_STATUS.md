@@ -98,10 +98,10 @@ The practical reading of the project today is:
 - Verified the live public Contabo route is now running that same release build: the current Coolify container is `w14jewmw5ubscrxh8zzfhq7d-093443455325` on image `w14jewmw5ubscrxh8zzfhq7d:e568ece2a012653caea16fdfe9fefa713dc5626b`.
 - Verified `https://www.pvtkrrx.cc/version-status.json` now reports `currentVersion = 1.1.29`, `latestVersion = 1.1.29`, and `updateAvailable = false` after the manual Coolify API redeploy for deployment `cphgnqptcvtvif60g0u57n7g`.
 - The live `1.1.29` commit carries forward the earlier-verified permanent-catalogue cache behavior: `sportsdb.js` still uses `PERSIST_MAX_ENTRIES = 50000` plus one-year artwork-hit / structured-event / league-asset TTLs, and `sportsImageCache.js` still carries the no-prune / no-expiry contract.
-- Verified the hosted durability split directly on Contabo: `sports-image-cache/` is bind-mounted from `/opt/pvtkrrx/sports-image-cache`, but there are no `PVTKRRX_RUNTIME_DIR` or `PVTKRRX_*_STORE_FILE` overrides and the runtime-root files `sportsdb-poster-cache.json`, `accounts-store.json`, `lan-pair-store.json`, `stremio-link-store.json`, `local-config.json`, `server-admin-token`, and `sports-cache-autofill-state.json` were absent from the mounted path during the check.
+- Verified the hosted runtime root is now externalized directly on Contabo: Coolify bind-mounts `/opt/pvtkrrx/runtime` into `/root/.local/share/PVTKRRX/runtime`, so `sportsdb-poster-cache.json`, `accounts-store.json`, `lan-pair-store.json`, `stremio-link-store.json`, `local-config.json`, `server-admin-token`, `sports-cache-autofill-state.json`, and future runtime files now survive rebuilds and container replacement.
 - Verified `https://www.pvtkrrx.cc/health` returned `200` after the rollout, so the hosted relay is healthy on the new commit.
 - Re-confirmed deploy drift on the non-live mirror path: `/opt/stack/sites/pvtkrrx` is still at `cabe9a5`, so that checkout must not be treated as proof of what the public host is serving.
-- Practical outcome: the `1.1.29` sports-package release is now fully synchronized across GitHub desktop release, GitHub self-host release, and the live hosted/cloud runtime; the remaining durability gap is that the rest of the hosted runtime-root JSON state is not yet explicitly externalized.
+- Practical outcome: the `1.1.29` sports-package release is now fully synchronized across GitHub desktop release, GitHub self-host release, and the live hosted/cloud runtime, and the hosted runtime root is now durable enough to remember posters plus runtime config/state across updates.
 - Release-prep pass on 2026-04-08 moved the package version to `1.1.29`, kept the public canonical/OG/sitemap metadata aligned to `https://www.pvtkrrx.cc`, and added mapped sports poster package support so local/server runtimes can treat a downloaded package as the primary sports-art catalogue.
 - `npm run smoke:config`, `npm run smoke:guards`, `npm run smoke:selfhost`, `npm run smoke:desktop`, `npm run smoke:playback`, `npm run smoke:sports`, `npm run smoke:sports-cache`, and `npm run smoke:sports-cache-auto` all passed on 2026-04-08 for the `1.1.29` sports-package release cut.
 - `C:/Program Files/Git/bin/bash.exe -n scripts/install-selfhost.sh` passed on 2026-04-08 for the `1.1.29` sports-package release cut.
@@ -110,6 +110,8 @@ The practical reading of the project today is:
 - Added package-aware sports image resolution: if a configured package manifest maps a known `sourceUrl` to a local file, PVTKRRX now imports that file into the runtime cache before any upstream image fetch.
 - Added `npm run cache:sports-package` so a mapped poster package can be synced into the runtime cache in one pass instead of waiting for lazy first-hit imports.
 - Verified the live hosted rollout after the release cut: manual Coolify API redeploy `cphgnqptcvtvif60g0u57n7g` finished successfully on 2026-04-08 and moved the public relay to commit `e568ece` / version `1.1.29`.
+- Externalized the live hosted runtime root on 2026-04-08 by mounting `/opt/pvtkrrx/runtime` into `/root/.local/share/PVTKRRX/runtime`; the legacy `/opt/pvtkrrx/sports-image-cache` path now resolves back into that runtime tree so the image catalogue is remembered instead of remapped on each update.
+- Re-verified deployment health after the earlier transient build-export failure on deployment `328`: later GitHub webhook deployment `330` for commit `477595b` finished successfully, and the follow-up manual redeploy `tags0jmb4ozrq92iyykogq74` applied the runtime-root mount without rebuilding the image.
 
 - New regression coverage on 2026-04-08:
   - `npm run smoke:config`
@@ -381,9 +383,9 @@ These items should still be treated as open until captured on real clients:
 
 ## Recommended Next Work
 
-1. Externalize the hosted runtime-root JSON state or move catalogue metadata into durable storage; right now only `sports-image-cache/` is definitely mounted on Contabo.
-2. Browser-check the live homepage on desktop and mobile and fix any regressions now that the refactor is public.
-3. Decide whether Contabo should keep the extra `/opt/pvtkrrx` `systemd` runtime, repoint Caddy to it, or remove it so deploy expectations stop drifting.
+1. Browser-check the live homepage on desktop and mobile and fix any regressions now that the refactor is public.
+2. Decide whether Contabo should keep the extra `/opt/pvtkrrx` `systemd` runtime, repoint Caddy to it, or remove it so deploy expectations stop drifting.
+3. If the hosted catalogue grows into the paid SportsMeta product, move the master metadata store from flat runtime JSON into dedicated durable storage instead of treating the runtime folder as the long-term source of truth.
 4. Tune qBittorrent for faster early playback and confirm stream start time improvements on real clients.
 5. Keep sports poster/wallpaper review focused on what Stremio clients actually render, not just what the metadata payload contains.
 6. Capture one extra Android TV or Android mobile `LAN Bridge` pass for cross-client parity beyond the now-verified Apple TV path.
