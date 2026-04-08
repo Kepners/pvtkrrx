@@ -48,6 +48,7 @@
   },
   "homepage": "https://github.com/Kepners/pvtkrrx#readme",
   "dependencies": {
+    "@umami/node": "^0.4.0",
     "7zip-bin": "^5.2.0",
     "express": "^5.2.1",
     "fast-xml-parser": "^4.5.0",

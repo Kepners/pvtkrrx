@@ -1113,13 +1113,13 @@
         </p>
         <p class="kicker" style="margin-top:-4px">No debrid. No third-party media host. Sports, movies, TV, and library in one addon family.</p>
         <div class="cta-row">
-          <a class="btn btn-primary" href="/runbooks">Read Setup Guide</a>
-          <a class="btn btn-secondary" href="#routes">Choose Your Route</a>
+          <a class="btn btn-primary" href="/runbooks" data-umami-event="cta_read_setup_guide" data-umami-event-page="home" data-umami-event-section="hero">Read Setup Guide</a>
+          <a class="btn btn-secondary" href="#routes" data-umami-event="cta_choose_route" data-umami-event-page="home" data-umami-event-section="hero">Choose Your Route</a>
         </div>
         <div class="site-release" id="siteReleaseCard">
           <span class="site-release-dot" id="siteReleaseDot"></span>
           <span id="siteReleaseText">Checking release...</span>
-          <a id="siteReleaseLink" href="https://github.com/Kepners/pvtkrrx/releases" target="_blank" rel="noopener noreferrer">Releases</a>
+          <a id="siteReleaseLink" href="https://github.com/Kepners/pvtkrrx/releases" target="_blank" rel="noopener noreferrer" data-umami-event="cta_open_releases" data-umami-event-page="home" data-umami-event-section="hero_release">Releases</a>
         </div>
       </div>
     </section>
@@ -1218,7 +1218,7 @@
         </p>
       </div>
       <div class="sports-cta">
-        <a href="/sports" class="sports-cta-link">See sports features</a>
+        <a href="/sports" class="sports-cta-link" data-umami-event="cta_view_sports" data-umami-event-page="home" data-umami-event-section="sports">See sports features</a>
       </div>
     </section>
 
@@ -1266,7 +1266,7 @@
       <div class="footer-release" id="footerRelease">
         <span class="footer-release-dot" id="footerReleaseDot"></span>
         <span id="footerReleaseText">Checking release...</span>
-        <a id="footerReleaseLink" href="https://github.com/Kepners/pvtkrrx/releases" target="_blank" rel="noopener noreferrer">Releases</a>
+        <a id="footerReleaseLink" href="https://github.com/Kepners/pvtkrrx/releases" target="_blank" rel="noopener noreferrer" data-umami-event="cta_open_releases" data-umami-event-page="home" data-umami-event-section="footer_release">Releases</a>
       </div>
       <div class="footer-links">
         <a href="/runbooks">Runbooks</a>
@@ -1383,6 +1383,7 @@
       setInterval(refreshReleaseStatus, 600000);
     });
   </script>
+  <script src="/analytics.js" defer></script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",

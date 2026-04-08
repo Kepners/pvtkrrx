@@ -49,6 +49,7 @@ Self-hosted server mode uses the same Express runtime on a VPS/seedbox, but with
 | `index.js` | Main Express + SDK server, hosted + local routes, playback, file serving, account and pair APIs |
 | `src/handlers/*` | Catalog, stream, and meta generation |
 | `src/clients/*` | Prowlarr, qBittorrent, Cinemeta, and TheSportsDB integrations |
+| `src/utils/analytics.js` | Optional Umami monitoring for hosted traffic and product events, with host gating and dedupe state |
 | `src/utils/sportsImageCache.js` | Signed sports artwork proxy URLs plus runtime disk cache for poster, background, landscape, and logo bytes |
 | `src/utils/sportsCacheAutofill.js` | Rotating background sports-cache refill for long-running Linux/cloud runtimes |
 | `src/utils/opaqueState.js` | Opaque state tokens for `/file` and `/playback` |
@@ -138,6 +139,7 @@ The current desktop popup copy still says `LAN Bridge`; the configure flow and h
 | Local addon config | Runtime `local-config.json` on the Windows host or self-hosted server |
 | Pair state | Memory or KV-backed pair store |
 | Stremio-linked account data | Memory, local file, or KV-backed account store depending on deployment |
+| Hosted analytics dedupe state | Runtime `analytics-dedupe.json` with hashed keys only |
 | Video bytes | Never proxied through the hosted relay |
 
 ## Key Constraints

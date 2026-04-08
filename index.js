@@ -17,6 +17,7 @@ const {
   describeQbitAutorunMode,
   findTorrentForPostProcess
 } = require('./src/utils/qbitAutomation')
+const { getBrowserConfig, trackEvent } = require('./src/utils/analytics')
 const { resolveSportsImageRequest } = require('./src/utils/sportsImageCache')
 const { startSportsCacheAutofill } = require('./src/utils/sportsCacheAutofill')
 
@@ -181,6 +182,30 @@ let versionStatusCache = {
   data: null,
   promise: null
 }
+
+function analyticsRouteLabelFromProfile(profile) {
+  const normalized = String(profile || '').trim().toLowerCase()
+  if (normalized === 'local') return 'pc_local'
+  if (normalized === 'lan' || normalized === 'hybrid') return 'lan_bridge'
+  return 'remote_seedbox'
+}
+
+function queueAnalyticsEvent(req, eventName, data = {}, options = {}) {
+  void trackEvent({
+    hostname: requestHostname(req),
+    selfHostServerMode: SELF_HOST_SERVER_MODE,
+    eventName,
+    url: options.url || req.path || '/',
+    data: {
+      runtime_surface: SELF_HOST_SERVER_MODE ? 'selfhost' : 'hosted',
+      app_version: String(pkg.version || '0.0.0'),
+      ...data
+    },
+    dedupeKey: options.dedupeKey,
+    dedupeWindowMs: options.dedupeWindowMs
+  })
+}
+
 app.use(express.static(publicDir, {
   maxAge: '1d',
   setHeaders: (res, filePath) => {
@@ -226,6 +251,13 @@ app.get('/seedbox-runbooks', (req, res) => {
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
   res.sendFile(runbooksPage)
 })
+app.get('/analytics-config.json', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+  res.json(getBrowserConfig({
+    hostname: requestHostname(req),
+    selfHostServerMode: SELF_HOST_SERVER_MODE
+  }))
+})
 app.get('/app-config.json', (req, res) => {
   res.setHeader('Cache-Control', 'no-store')
   res.json(buildRuntimeAppConfig(req))
@@ -246,6 +278,12 @@ app.get(['/install-selfhost.sh', '/install.sh'], (req, res) => {
   if (!fs.existsSync(scriptPath)) {
     return res.status(404).type('text/plain').send('install launcher not found')
   }
+
+  queueAnalyticsEvent(req, 'selfhost_installer_requested', {
+    source: 'public_launcher'
+  }, {
+    url: '/install-selfhost.sh'
+  })
 
   res.setHeader('Cache-Control', 'no-store')
   res.setHeader('Content-Disposition', 'inline; filename="install-selfhost.sh"')
@@ -756,6 +794,13 @@ app.post('/auth/stremio/link-session', requireCsrfToken, async (req, res) => {
   }
 
   await saveStremioLinkSession(session)
+  queueAnalyticsEvent(req, 'stremio_link_session_created', {
+    config_surface: source.configAlias ? 'disk' : 'token',
+    install_mode: session.installMode || 'hosted',
+    install_target: session.installTarget || 'unknown'
+  }, {
+    url: '/auth/stremio/link-session'
+  })
   res.setHeader('Cache-Control', 'no-store')
   res.json(buildStremioLinkSessionResponse(req, session))
 })
@@ -839,6 +884,13 @@ app.post('/encrypt', async (req, res) => {
       ? stripRemoteSeedboxLanFields(normalizedConfig)
       : normalizedConfig
     const token = encrypt(tokenPayload, secret)
+    queueAnalyticsEvent(req, 'config_generated', {
+      route: analyticsRouteLabelFromProfile(normalizedConfig.routeProfile),
+      route_profile: normalizedConfig.routeProfile || 'online',
+      linked: Boolean(String(normalizedConfig.stremioUserId || '').trim())
+    }, {
+      url: '/encrypt'
+    })
     res.json({ token })
   } catch (err) {
     res.status(400).json({ error: 'Encryption failed' })
@@ -1143,6 +1195,12 @@ app.post('/auth/stremio/link-authkey', requireCsrfToken, async (req, res) => {
       await saveStremioLinkSession(linkedSession)
       payload.linkSession = buildStremioLinkSessionResponse(req, linkedSession)
     }
+    queueAnalyticsEvent(req, 'stremio_account_linked', {
+      link_source: linkSessionToken ? 'session' : 'manual',
+      persisted_config: Boolean(payload?.linkSession?.persistedConfigSaved === true)
+    }, {
+      url: '/auth/stremio/link-authkey'
+    })
     res.json(payload)
   } catch (err) {
     const statusCode = Number(err?.statusCode || 0) || 500
@@ -1347,6 +1405,15 @@ app.post('/pair/heartbeat', async (req, res) => {
       online: true,
       ttlSeconds: LAN_PAIR_TTL_SECONDS,
       updatedAt: state.updatedAt
+    })
+    queueAnalyticsEvent(req, 'lan_host_active', {
+      endpoint_count: endpoints.length,
+      endpoint_sources: endpointSources,
+      host_app_version: state.appVersion || ''
+    }, {
+      url: '/pair/heartbeat',
+      dedupeKey: `pair:${pairId}:${new Date(now).toISOString().slice(0, 10)}`,
+      dedupeWindowMs: 24 * 60 * 60 * 1000
     })
     console.log(
       `[pair] heartbeat ok id=${pairLabel} from=${clientLabel} endpoints=${endpoints.length} sources=${endpointSources} ttl=${LAN_PAIR_TTL_SECONDS}s`
@@ -1621,6 +1688,27 @@ app.get('/:config/manifest.json', withConfig, async (req, res) => {
   if (req.configIssues.length > 0) {
     if (m.behaviorHints) m.behaviorHints.configurationRequired = true
     m.description = req.configIssues[0].message
+  }
+  if (String(req.params?.config || '').trim().toLowerCase() !== 'local') {
+    const route = analyticsRouteLabelFromProfile(req.config?.routeProfile)
+    queueAnalyticsEvent(req, 'manifest_install_seen', {
+      route,
+      route_profile: req.config?.routeProfile || '',
+      linked: Boolean(String(req.config?.stremioUserId || '').trim())
+    }, {
+      url: '/addon/manifest',
+      dedupeKey: `manifest:${req.params.config}`,
+      dedupeWindowMs: 365 * 24 * 60 * 60 * 1000
+    })
+    queueAnalyticsEvent(req, 'manifest_active_day', {
+      route,
+      route_profile: req.config?.routeProfile || '',
+      linked: Boolean(String(req.config?.stremioUserId || '').trim())
+    }, {
+      url: '/addon/manifest',
+      dedupeKey: `manifest-day:${req.params.config}:${new Date().toISOString().slice(0, 10)}`,
+      dedupeWindowMs: 24 * 60 * 60 * 1000
+    })
   }
   console.log(`[stremio] → manifest  id=${m.id} catalogs=${m.catalogs?.length || 0} configRequired=${m.behaviorHints?.configurationRequired} issues=${req.configIssues.length}`)
   applyHostedRouteCacheHeaders(req, res, 60, {

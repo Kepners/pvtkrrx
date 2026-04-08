@@ -77,6 +77,7 @@ Use these files as the live documentation set:
 - [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) — current verification and deployment status
 
 - [docs/WEBSITE_STATUS.md](docs/WEBSITE_STATUS.md) - public route health, canonical host notes, and homepage/content backlog
+- [docs/MONITORING.md](docs/MONITORING.md) - Umami deployment, hosted event tracking, and install/traffic metrics
 - [docs/SPORTSMETA_CATALOGUE_ARCHITECTURE.md](docs/SPORTSMETA_CATALOGUE_ARCHITECTURE.md) - planning doc for turning the current sports cache and image proxy into a hosted SportsMeta catalogue product
 The February 2026 planning docs under `docs/` are kept as project history and are now marked as historical where they no longer describe the live runtime.
 
@@ -380,6 +381,12 @@ This now builds in the system temp directory first, then copies the finished cur
 | PVTKRRX_SPORTS_CACHE_AUTO_FILL_TEAM_LIMIT_PER_SPORT | Optional | Max teams per sport group during background refill (default `12`) |
 | PVTKRRX_SPORTS_CACHE_AUTO_FILL_SCHEDULE_DAYS | Optional | How many upcoming schedule days each refill pass checks (default `2`) |
 | PVTKRRX_SPORTS_CACHE_AUTO_FILL_IMAGE_CONCURRENCY | Optional | Max concurrent image downloads during background refill (default `2`) |
+| PVTKRRX_ANALYTICS_PROVIDER | Optional | Analytics backend for hosted monitoring. Current supported value is `umami` |
+| PVTKRRX_ANALYTICS_UMAMI_HOST_URL | Optional | Base URL of the Umami instance that should receive hosted PVTKRRX traffic and product events |
+| PVTKRRX_ANALYTICS_UMAMI_WEBSITE_ID | Optional | Umami website id used by the public guide pages and hosted relay event sender |
+| PVTKRRX_ANALYTICS_ALLOWED_HOSTS | Optional | Comma-separated host allowlist for analytics emission. Keep this pinned to the public hosted relay host(s) so local/self-host runtimes do not emit by accident |
+| PVTKRRX_ANALYTICS_HASH_SALT | Optional | Stable secret used to hash analytics dedupe keys before they are persisted in runtime state |
+| PVTKRRX_ANALYTICS_TRACK_PRIVATE_RUNTIMES | Optional | Enable analytics on local/self-host runtimes too. Default `false`; leave it off for the public hosted setup |
 | KV_REST_API_URL | Recommended | Persist LAN pair heartbeat state for the hosted relay across restarts/redeploys |
 | KV_REST_API_TOKEN | Recommended | Auth token for KV REST API |
 | PVTKRRX_PAIR_RELAY_URL | Optional | Hosted relay base URL (default https://www.pvtkrrx.cc) |
