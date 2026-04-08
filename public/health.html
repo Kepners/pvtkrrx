@@ -168,11 +168,7 @@
       display: flex;
       align-items: center;
       gap: 10px;
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 12px;
-      letter-spacing: 1.2px;
-      text-transform: uppercase;
-      white-space: nowrap;
+      min-width: 0;
     }
 
     .brand-dot {
@@ -182,6 +178,16 @@
       background: var(--cyan);
       box-shadow: 0 0 12px var(--cyan), 0 0 26px rgba(0, 246, 255, 0.75);
       flex: 0 0 auto;
+    }
+
+    .brand-text {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #d2e4ff;
+      text-shadow: 0 0 8px rgba(0, 168, 255, 0.45);
+      white-space: nowrap;
     }
 
     .nav {
@@ -380,10 +386,11 @@
     <header class="topbar">
       <div class="brand">
         <span class="brand-dot"></span>
-        <span class="glitch-text" data-text="PVTKRRX / Health Monitor">PVTKRRX / Health Monitor</span>
+        <div class="brand-text">PVTKRRX / Health Monitor</div>
       </div>
       <nav class="nav">
         <a href="/">Home</a>
+        <a href="/sports">Sports</a>
         <a href="/runbooks">Runbooks</a>
         <a href="/#faq">FAQ</a>
         <a href="/health">Health</a>

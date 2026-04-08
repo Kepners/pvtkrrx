@@ -700,42 +700,29 @@
     }
 
     /* ── Sports ── */
-    .sports-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 10px;
-      margin-top: 12px;
+    .sports-cta {
+      margin-top: 16px;
     }
 
-    .sports-card {
-      border: 1px solid var(--line-soft);
-      border-radius: 11px;
-      padding: 14px 12px 12px;
-      background:
-        radial-gradient(360px 180px at 0% 0%, rgba(0, 246, 255, 0.08), transparent 68%),
-        rgba(4, 8, 18, 0.74);
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    .sports-cta-link {
+      display: inline-block;
+      text-decoration: none;
+      border: 1px solid rgba(0, 246, 255, 0.4);
+      border-radius: 999px;
+      padding: 10px 22px;
+      color: #fff;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: rgba(0, 168, 255, 0.12);
       transition: all 0.18s ease;
     }
 
-    .sports-card:hover {
-      transform: translateY(-2px);
-      border-color: rgba(0, 246, 255, 0.4);
-      box-shadow: 0 0 16px rgba(0, 168, 255, 0.18);
-    }
-
-    .sports-title {
-      font-family: "Orbitron", sans-serif;
-      font-size: 18px;
-      letter-spacing: 0.8px;
-      color: #f4f8ff;
-      margin-bottom: 8px;
-    }
-
-    .sports-card p {
-      color: #c8dafa;
-      font-size: 14px;
-      line-height: 1.5;
+    .sports-cta-link:hover {
+      border-color: rgba(255, 0, 212, 0.55);
+      box-shadow: 0 0 0 2px rgba(255, 0, 212, 0.18), 0 0 18px rgba(0, 246, 255, 0.3);
+      transform: translateY(-1px);
     }
 
     /* ── FAQ ── */
@@ -1019,8 +1006,7 @@
 
     /* ── Responsive ── */
     @media (max-width: 1000px) {
-      .needs-grid,
-      .sports-grid {
+      .needs-grid {
         grid-template-columns: 1fr;
       }
 
@@ -1107,11 +1093,11 @@
         <div class="brand-text">PVTKRRX / Private Tracker Bridge</div>
       </div>
       <nav class="nav">
-        <a href="#routes">Routes</a>
-        <a href="#requirements">Requirements</a>
-        <a href="#sports">Sports</a>
+        <a href="/">Home</a>
+        <a href="/sports">Sports</a>
         <a href="/runbooks">Runbooks</a>
         <a href="#faq">FAQ</a>
+        <a href="/health">Health</a>
       </nav>
     </header>
 
@@ -1228,19 +1214,11 @@
         <div class="section-kicker">Sports Support</div>
         <h2 class="section-title">Private tracker sports in Stremio</h2>
         <p class="section-copy">
-          If your trackers carry sports releases, PVTKRRX surfaces them in Stremio alongside movies, TV, and your library.
+          Sports is a first-class catalog alongside movies, TV, and your library. Genre filtering, artwork enrichment, and metadata — all from the trackers you already control.
         </p>
       </div>
-
-      <div class="sports-grid">
-        <article class="sports-card">
-          <div class="sports-title">Sports Catalog</div>
-          <p>Sports has its own top-level catalog in Stremio with genre filtering. Results come from the tracker side you already control — not a separate service.</p>
-        </article>
-        <article class="sports-card">
-          <div class="sports-title">Artwork + Metadata</div>
-          <p>Sports metadata carries posters, landscape art, and logos so the Stremio surface feels like a real catalog. Already-downloaded files sit alongside new releases in one addon family.</p>
-        </article>
+      <div class="sports-cta">
+        <a href="/sports" class="sports-cta-link">See sports features</a>
       </div>
     </section>
 

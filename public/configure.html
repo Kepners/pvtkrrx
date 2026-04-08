@@ -219,14 +219,14 @@
         0 0 22px rgba(0, 168, 255, 0.14);
     }
 
-    .topbar-brand {
+    .brand {
       display: flex;
       align-items: center;
       gap: 10px;
       min-width: 0;
     }
 
-    .topbar-dot {
+    .brand-dot {
       width: 8px;
       height: 8px;
       border-radius: 999px;
@@ -235,7 +235,7 @@
       flex: 0 0 auto;
     }
 
-    .topbar-text {
+    .brand-text {
       font-family: "IBM Plex Mono", monospace;
       font-size: 12px;
       letter-spacing: 1.2px;
@@ -245,14 +245,14 @@
       white-space: nowrap;
     }
 
-    .topbar-nav {
+    .nav {
       display: flex;
       gap: 8px;
       flex-wrap: wrap;
       justify-content: flex-end;
     }
 
-    .topbar-nav a {
+    .nav a {
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -270,7 +270,7 @@
       background: rgba(2, 8, 18, 0.58);
     }
 
-    .topbar-nav a:hover {
+    .nav a:hover {
       color: #fff;
       border-color: rgba(255, 0, 212, 0.55);
       box-shadow: 0 0 0 2px rgba(255, 0, 212, 0.18), 0 0 14px rgba(0, 246, 255, 0.3);
@@ -988,16 +988,16 @@
       box-shadow: none;
     }
 
-    body.desktop-local-only .topbar-dot {
+    body.desktop-local-only .brand-dot {
       box-shadow: 0 0 10px rgba(0, 246, 255, 0.34);
     }
 
-    body.desktop-local-only .topbar-text {
+    body.desktop-local-only .brand-text {
       color: #d7e6ff;
       text-shadow: none;
     }
 
-    body.desktop-local-only .topbar-nav,
+    body.desktop-local-only .nav,
     body.desktop-local-only .logo-header,
     body.desktop-local-only #setupRealityCard {
       display: none !important;
@@ -1049,16 +1049,16 @@
       box-shadow: none;
     }
 
-    body.selfhost-seedbox-only .topbar-dot {
+    body.selfhost-seedbox-only .brand-dot {
       box-shadow: 0 0 10px rgba(0, 246, 255, 0.34);
     }
 
-    body.selfhost-seedbox-only .topbar-text {
+    body.selfhost-seedbox-only .brand-text {
       color: #d7e6ff;
       text-shadow: none;
     }
 
-    body.selfhost-seedbox-only .topbar-nav,
+    body.selfhost-seedbox-only .nav,
     body.selfhost-seedbox-only .logo-header,
     body.selfhost-seedbox-only #setupRealityCard,
     body.selfhost-seedbox-only #installTargetCard {
@@ -2266,12 +2266,13 @@
   <div class="glitch-flash" aria-hidden="true"></div>
   <div class="container">
     <header class="topbar">
-      <div class="topbar-brand">
-        <span class="topbar-dot"></span>
-        <span class="topbar-text">PVTKRRX / Private Tracker Bridge</span>
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <div class="brand-text">PVTKRRX / Private Tracker Bridge</div>
       </div>
-      <nav class="topbar-nav">
+      <nav class="nav">
         <a href="/">Home</a>
+        <a href="/sports">Sports</a>
         <a href="/configure">Configure</a>
         <a href="/runbooks">Runbooks</a>
         <a href="/#faq">FAQ</a>

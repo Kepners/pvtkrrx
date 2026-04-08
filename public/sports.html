@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-L0PH4EQEVN"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-L0PH4EQEVN');
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PVTKRRX Sports | Private Tracker Sports in Stremio</title>
+  <meta name="description" content="Sports catalog for Stremio from your private trackers. Genre filtering, artwork enrichment, and metadata — football, F1, UFC, NBA, cricket, rugby, tennis, and more. No debrid. No third-party media host.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.pvtkrrx.cc/sports">
+  <meta property="og:title" content="PVTKRRX — Private Tracker Sports in Stremio">
+  <meta property="og:description" content="Sports catalog for Stremio from your private trackers. Genre filtering, artwork enrichment, and metadata. No debrid. No third-party media host.">
+  <meta property="og:image" content="https://www.pvtkrrx.cc/og-image.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="PVTKRRX — Private Tracker Sports in Stremio">
+  <meta name="twitter:description" content="Sports catalog for Stremio from your private trackers. Genre filtering, artwork enrichment, and metadata. No debrid. No third-party media host.">
+  <meta name="twitter:image" content="https://www.pvtkrrx.cc/og-image.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@500;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-0: #010203;
+      --bg-1: #080a12;
+      --bg-2: #0d1019;
+      --cyan: #00f6ff;
+      --blue: #00a8ff;
+      --green: #00ff66;
+      --red: #ff134f;
+      --magenta: #ff00d4;
+      --text: #d8e4ff;
+      --muted: #8ca0c8;
+      --line: rgba(0, 246, 255, 0.35);
+      --line-soft: rgba(0, 246, 255, 0.18);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+    }
+
+    body {
+      font-family: "Rajdhani", sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(1100px 700px at 50% 40%, rgba(0, 168, 255, 0.13), transparent 62%),
+        radial-gradient(900px 560px at 20% 75%, rgba(255, 0, 212, 0.08), transparent 66%),
+        linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 52%, var(--bg-2) 100%);
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    .vortex,
+    .particles,
+    .scanlines,
+    .noise,
+    .glitch-flash {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+    }
+
+    .vortex {
+      z-index: 1;
+      overflow: hidden;
+    }
+
+    .vortex-layer {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      width: 170vmax;
+      height: 170vmax;
+      transform: translate(-50%, -50%);
+      border-radius: 999px;
+      mix-blend-mode: screen;
+      opacity: 0.14;
+    }
+
+    .vortex-layer.one {
+      background:
+        repeating-radial-gradient(circle at center, rgba(0, 246, 255, 0.55) 0 2px, transparent 2px 16px),
+        conic-gradient(from 0deg, transparent, rgba(0, 246, 255, 0.18), transparent, rgba(255, 0, 212, 0.16), transparent);
+      animation: spin-a 22s linear infinite;
+    }
+
+    .vortex-layer.two {
+      background:
+        repeating-radial-gradient(circle at center, rgba(0, 255, 102, 0.35) 0 1px, transparent 1px 15px),
+        conic-gradient(from 130deg, transparent, rgba(255, 49, 95, 0.16), transparent, rgba(0, 246, 255, 0.16), transparent);
+      animation: spin-b 36s linear infinite reverse;
+      opacity: 0.11;
+    }
+
+    @keyframes spin-a { to { transform: translate(-50%, -50%) rotate(360deg); } }
+    @keyframes spin-b { to { transform: translate(-50%, -50%) rotate(-360deg); } }
+
+    .scanlines {
+      z-index: 8;
+      background: repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0, 0, 0, 0.035) 1px, rgba(0, 0, 0, 0.035) 2px);
+    }
+
+    .noise {
+      z-index: 7;
+      opacity: 0.028;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+      background-size: 256px;
+    }
+
+    main {
+      position: relative;
+      z-index: 6;
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 14px 14px 40px;
+    }
+
+    /* ── Topbar ── */
+    .topbar {
+      border: 1px solid rgba(0, 246, 255, 0.2);
+      background: rgba(6, 9, 16, 0.74);
+      border-radius: 14px;
+      padding: 10px 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+        0 0 22px rgba(0, 168, 255, 0.14);
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: var(--cyan);
+      box-shadow: 0 0 12px var(--cyan), 0 0 26px rgba(0, 246, 255, 0.75);
+      flex: 0 0 auto;
+    }
+
+    .brand-text {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      color: #d2e4ff;
+      text-shadow: 0 0 8px rgba(0, 168, 255, 0.45);
+      white-space: nowrap;
+    }
+
+    .nav {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .nav a {
+      text-decoration: none;
+      border: 1px solid rgba(0, 246, 255, 0.28);
+      border-radius: 999px;
+      padding: 6px 10px;
+      color: #bfd6ff;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      transition: all 0.18s ease;
+      position: relative;
+      overflow: hidden;
+      background: rgba(2, 8, 18, 0.58);
+    }
+
+    .nav a:hover {
+      color: #fff;
+      border-color: rgba(255, 0, 212, 0.55);
+      box-shadow: 0 0 0 2px rgba(255, 0, 212, 0.18), 0 0 14px rgba(0, 246, 255, 0.3);
+      transform: translateY(-1px);
+    }
+
+    /* ── Hero ── */
+    .hero {
+      margin-top: 48px;
+      text-align: center;
+      margin-bottom: 48px;
+    }
+
+    .hero-kicker {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--cyan);
+      margin-bottom: 12px;
+    }
+
+    .hero-title {
+      font-family: "Orbitron", sans-serif;
+      font-size: clamp(28px, 5vw, 48px);
+      font-weight: 800;
+      letter-spacing: 2px;
+      color: #f4f8ff;
+      text-shadow: 0 0 28px rgba(0, 246, 255, 0.25);
+      margin-bottom: 16px;
+    }
+
+    .hero-copy {
+      max-width: 680px;
+      margin: 0 auto;
+      color: #bfd0ec;
+      font-size: 17px;
+      line-height: 1.65;
+    }
+
+    /* ── Section blocks ── */
+    .section-block {
+      margin-bottom: 32px;
+      border: 1px solid var(--line-soft);
+      border-radius: 11px;
+      padding: 28px 24px 24px;
+      background:
+        radial-gradient(420px 180px at 8% 0%, rgba(0, 246, 255, 0.08), transparent 70%),
+        rgba(4, 8, 18, 0.72);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+
+    .section-kicker {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+      color: #9bdcff;
+      margin-bottom: 8px;
+    }
+
+    .section-title {
+      font-family: "Orbitron", sans-serif;
+      font-size: clamp(20px, 3.2vw, 28px);
+      letter-spacing: 1px;
+      color: #f4f8ff;
+      margin-bottom: 12px;
+      text-shadow: 0 0 14px rgba(0, 246, 255, 0.2);
+    }
+
+    .section-copy {
+      max-width: 720px;
+      color: #bfd0ec;
+      font-size: 15px;
+      line-height: 1.65;
+    }
+
+    /* ── Genre grid ── */
+    .genre-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px;
+      margin-top: 20px;
+    }
+
+    .genre-chip {
+      border: 1px solid var(--line-soft);
+      border-radius: 10px;
+      padding: 14px 12px;
+      text-align: center;
+      background: rgba(4, 8, 18, 0.74);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+      transition: all 0.18s ease;
+    }
+
+    .genre-chip:hover {
+      transform: translateY(-2px);
+      border-color: rgba(0, 246, 255, 0.4);
+      box-shadow: 0 0 16px rgba(0, 168, 255, 0.18);
+    }
+
+    .genre-name {
+      font-family: "Orbitron", sans-serif;
+      font-size: 13px;
+      letter-spacing: 0.6px;
+      color: #f4f8ff;
+    }
+
+    /* ── Feature cards ── */
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+      margin-top: 20px;
+    }
+
+    .feature-card {
+      border: 1px solid var(--line-soft);
+      border-radius: 11px;
+      padding: 20px 16px 16px;
+      background:
+        radial-gradient(360px 180px at 0% 0%, rgba(0, 246, 255, 0.08), transparent 68%),
+        rgba(4, 8, 18, 0.74);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+      transition: all 0.18s ease;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-2px);
+      border-color: rgba(0, 246, 255, 0.4);
+      box-shadow: 0 0 16px rgba(0, 168, 255, 0.18);
+    }
+
+    .feature-title {
+      font-family: "Orbitron", sans-serif;
+      font-size: 18px;
+      letter-spacing: 0.8px;
+      color: #f4f8ff;
+      margin-bottom: 10px;
+    }
+
+    .feature-card p {
+      color: #c8dafa;
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
+    /* ── Truth note ── */
+    .truth-note {
+      margin-top: 10px;
+      padding: 14px 16px;
+      border-left: 2px solid rgba(0, 246, 255, 0.3);
+      color: #9bb2db;
+      font-size: 13px;
+      line-height: 1.55;
+      font-family: "IBM Plex Mono", monospace;
+      letter-spacing: 0.4px;
+    }
+
+    /* ── CTA ── */
+    .cta-block {
+      margin-top: 48px;
+      text-align: center;
+    }
+
+    .cta-block p {
+      color: #bfd0ec;
+      font-size: 15px;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+
+    .cta-link {
+      display: inline-block;
+      text-decoration: none;
+      border: 1px solid rgba(0, 246, 255, 0.4);
+      border-radius: 999px;
+      padding: 10px 24px;
+      color: #fff;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 13px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      background: rgba(0, 168, 255, 0.12);
+      transition: all 0.18s ease;
+    }
+
+    .cta-link:hover {
+      border-color: rgba(255, 0, 212, 0.55);
+      box-shadow: 0 0 0 2px rgba(255, 0, 212, 0.18), 0 0 18px rgba(0, 246, 255, 0.3);
+      transform: translateY(-1px);
+    }
+
+    .cta-link + .cta-link {
+      margin-left: 12px;
+    }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 48px;
+      padding: 16px 0 0;
+      border-top: 1px solid var(--line-soft);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      color: var(--muted);
+      font-size: 12px;
+      font-family: "IBM Plex Mono", monospace;
+      letter-spacing: 0.5px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 14px;
+    }
+
+    .footer-links a {
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .footer-links a:hover {
+      color: var(--cyan);
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 700px) {
+      .topbar {
+        border-radius: 11px;
+      }
+
+      .brand-text {
+        font-size: 11px;
+        letter-spacing: 0.8px;
+      }
+
+      .hero {
+        margin-top: 32px;
+        margin-bottom: 32px;
+      }
+
+      .genre-grid {
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      }
+
+      .feature-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .cta-link + .cta-link {
+        margin-left: 0;
+        margin-top: 10px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="vortex">
+    <div class="vortex-layer one"></div>
+    <div class="vortex-layer two"></div>
+  </div>
+  <div class="scanlines"></div>
+  <div class="noise"></div>
+
+  <main>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <div class="brand-text">PVTKRRX / Sports</div>
+      </div>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/sports">Sports</a>
+        <a href="/runbooks">Runbooks</a>
+        <a href="/#faq">FAQ</a>
+        <a href="/health">Health</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div class="hero-kicker">Sports Support</div>
+      <h1 class="hero-title">Private tracker sports in Stremio</h1>
+      <p class="hero-copy">
+        If your trackers carry sports releases, PVTKRRX surfaces them in Stremio alongside movies, TV, and your library. Sports is a first-class catalog — not an afterthought.
+      </p>
+    </section>
+
+    <section class="section-block">
+      <div class="section-kicker">Genre Filtering</div>
+      <h2 class="section-title">Browse by sport</h2>
+      <p class="section-copy">
+        Sports has its own top-level catalog in Stremio with genre filtering. Results come from the tracker side you already control — not a separate service.
+      </p>
+      <div class="genre-grid">
+        <div class="genre-chip"><div class="genre-name">Football</div></div>
+        <div class="genre-chip"><div class="genre-name">F1</div></div>
+        <div class="genre-chip"><div class="genre-name">UFC</div></div>
+        <div class="genre-chip"><div class="genre-name">NBA</div></div>
+        <div class="genre-chip"><div class="genre-name">Cricket</div></div>
+        <div class="genre-chip"><div class="genre-name">Rugby</div></div>
+        <div class="genre-chip"><div class="genre-name">Tennis</div></div>
+        <div class="genre-chip"><div class="genre-name">Boxing</div></div>
+        <div class="genre-chip"><div class="genre-name">Golf</div></div>
+        <div class="genre-chip"><div class="genre-name">Baseball</div></div>
+        <div class="genre-chip"><div class="genre-name">Cycling</div></div>
+        <div class="genre-chip"><div class="genre-name">Darts</div></div>
+        <div class="genre-chip"><div class="genre-name">Snooker</div></div>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-kicker">What You Get</div>
+      <h2 class="section-title">Catalog, artwork, and metadata</h2>
+      <div class="feature-grid">
+        <article class="feature-card">
+          <div class="feature-title">Sports Catalog</div>
+          <p>Sports appears as a top-level catalog in Stremio. Browse, filter by genre, and search — the same way you use movies and TV. All results come from your own trackers.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-title">Artwork Enrichment</div>
+          <p>Sports metadata carries posters, landscape art, and logos via TheSportsDB. The Stremio surface looks and feels like a real catalog, not a list of filenames.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-title">Contamination Filter</div>
+          <p>Sports indexers are automatically excluded from movie and TV searches. Your film results stay clean — sports content only appears in the sports catalog.</p>
+        </article>
+        <article class="feature-card">
+          <div class="feature-title">One Addon Family</div>
+          <p>Sports, movies, TV, and your downloaded library all live in one addon. Already-downloaded files sit alongside new releases. No separate install required.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-kicker">How It Works</div>
+      <h2 class="section-title">Your trackers, your sports</h2>
+      <p class="section-copy">
+        PVTKRRX searches your Prowlarr indexers for sports releases and presents them in Stremio with enriched metadata. The content comes from the trackers you already have access to — PVTKRRX is the bridge, not the source.
+      </p>
+      <div class="truth-note">
+        Sports support depends on your tracker catalogue. PVTKRRX is not a live sports service or a separate content provider. It surfaces what your trackers carry.
+      </div>
+    </section>
+
+    <div class="cta-block">
+      <p>Ready to set up sports alongside movies, TV, and your library?</p>
+      <a href="/configure" class="cta-link">Configure</a>
+      <a href="/runbooks" class="cta-link">Runbooks</a>
+    </div>
+
+    <footer>
+      <div>
+        <span>PVTKRRX / Private Tracker Bridge / Source Available</span>
+      </div>
+      <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="/runbooks">Runbooks</a>
+        <a href="/health">Health</a>
+        <a href="mailto:kepners@pvtkrrx.cc">Contact</a>
+      </div>
+    </footer>
+  </main>
+</body>
+</html>
