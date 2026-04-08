@@ -20,8 +20,8 @@ The practical reading of the project today is:
 - the sports catalog artwork path now prefers portrait poster art for tiles, while keeping separate sport-aware backgrounds/logos for player wallpaper/loading
 - sports poster, wallpaper, landscape, and logo bytes can now be cached on demand by the active runtime through signed `/image/sports/...` URLs instead of hotlinking every request back to the upstream artwork host
 - `npm run server:setup` now also pre-seeds that same `sports-image-cache/` store with upcoming event art, top team badges, and mapped league artwork, `npm run cache:sports` can refresh it later without deleting warm entries, and long-running Linux/cloud runtimes now keep topping the cache up automatically every 15 minutes in rotating sport batches
-- the hosted Contabo/Coolify runtime is now verified live on commit `598ca01`, which turns the disk-backed sports image cache into a permanent append-only catalogue and stretches SportsDB artwork-hit, structured-event, and league-asset persistence to one year while leaving miss retries at 6 hours
-- the current `main` workspace target now points at `1.1.29`, adding mapped sports poster package support so local/server runtimes can treat a downloaded package as the primary sports-art catalogue while the free TheSportsDB path is left to update/gap discovery
+- the current `main` workspace target and live hosted Contabo/Coolify runtime now both point at `1.1.29` / commit `e568ece`, so desktop, self-host, GitHub release, and hosted cloud are back in revision parity
+- the `1.1.29` sports update carries forward the permanent append-only hosted sports image catalogue from `598ca01` and adds mapped sports poster package support so local/server runtimes can treat a downloaded package as the primary sports-art catalogue while the free TheSportsDB path is left to update/gap discovery
 - the sports identity path is now materially wider: multi-token leagues (`Premier League`, `La Liga`), `DD.MM.YYYY` dates, year-only titles that can borrow the Prowlarr publish date, and event-prefix noise such as `Super Bowl LX` now normalize into the same shared structured matchup shape
 - structured TheSportsDB event lookup now expands league-aware team nicknames such as `Lakers`, `Yankees`, and `Maple Leafs` to the official SportsDB team names before searching, then falls back to date+sport matching when literal event queries still miss
 - non-vs event lookup now also tries stripped event-name queries (`Japanese Grand Prix`, `Fight Night 270`, etc.) so `Race`, `Qualifying`, `Practice`, `Sprint`, and `Main Card` suffixes stop blocking artwork recovery
@@ -94,20 +94,23 @@ The practical reading of the project today is:
 
 ## Work Carried Out On 2026-04-08
 
-- Verified `main` and `origin/main` are both at commit `598ca01` (`📦 feat: permanent sports image catalogue — no pruning, no expiry`), so the permanent-cache work is already in GitHub rather than sitting as an unpushed local patch.
-- Verified the live public Contabo route is still running a post-`598ca01` build with the same cache behavior: the current Coolify container is `w14jewmw5ubscrxh8zzfhq7d-232239570967` on image `w14jewmw5ubscrxh8zzfhq7d:5a7a1aca51f7353fc8de251b062e2e978fdffab3`.
-- Verified inside the live container that `sportsdb.js` still uses `PERSIST_MAX_ENTRIES = 50000`, one-year artwork-hit / structured-event / league-asset TTLs, and that `sportsImageCache.js` still carries the permanent-catalogue no-prune / no-expiry contract.
+- Verified `main` and `origin/main` are both at commit `e568ece` (`feat: add mapped sports poster packages`), so the `1.1.29` sports-package release is in GitHub rather than sitting as an unpushed local patch.
+- Verified the live public Contabo route is now running that same release build: the current Coolify container is `w14jewmw5ubscrxh8zzfhq7d-093443455325` on image `w14jewmw5ubscrxh8zzfhq7d:e568ece2a012653caea16fdfe9fefa713dc5626b`.
+- Verified `https://www.pvtkrrx.cc/version-status.json` now reports `currentVersion = 1.1.29`, `latestVersion = 1.1.29`, and `updateAvailable = false` after the manual Coolify API redeploy for deployment `cphgnqptcvtvif60g0u57n7g`.
+- The live `1.1.29` commit carries forward the earlier-verified permanent-catalogue cache behavior: `sportsdb.js` still uses `PERSIST_MAX_ENTRIES = 50000` plus one-year artwork-hit / structured-event / league-asset TTLs, and `sportsImageCache.js` still carries the no-prune / no-expiry contract.
 - Verified the hosted durability split directly on Contabo: `sports-image-cache/` is bind-mounted from `/opt/pvtkrrx/sports-image-cache`, but there are no `PVTKRRX_RUNTIME_DIR` or `PVTKRRX_*_STORE_FILE` overrides and the runtime-root files `sportsdb-poster-cache.json`, `accounts-store.json`, `lan-pair-store.json`, `stremio-link-store.json`, `local-config.json`, `server-admin-token`, and `sports-cache-autofill-state.json` were absent from the mounted path during the check.
-- Verified `https://www.pvtkrrx.cc/health` returned `200` after the rebuild, so the hosted relay is healthy on the new commit.
+- Verified `https://www.pvtkrrx.cc/health` returned `200` after the rollout, so the hosted relay is healthy on the new commit.
 - Re-confirmed deploy drift on the non-live mirror path: `/opt/stack/sites/pvtkrrx` is still at `cabe9a5`, so that checkout must not be treated as proof of what the public host is serving.
-- Practical outcome: the cache-policy changes are already shipped on the hosted/cloud line and hosted image bytes are durable across container replacement, but Windows EXE and self-host release parity still needs a coordinated release and the rest of the hosted runtime-root JSON state is not yet explicitly durable.
+- Practical outcome: the `1.1.29` sports-package release is now fully synchronized across GitHub desktop release, GitHub self-host release, and the live hosted/cloud runtime; the remaining durability gap is that the rest of the hosted runtime-root JSON state is not yet explicitly externalized.
 - Release-prep pass on 2026-04-08 moved the package version to `1.1.29`, kept the public canonical/OG/sitemap metadata aligned to `https://www.pvtkrrx.cc`, and added mapped sports poster package support so local/server runtimes can treat a downloaded package as the primary sports-art catalogue.
 - `npm run smoke:config`, `npm run smoke:guards`, `npm run smoke:selfhost`, `npm run smoke:desktop`, `npm run smoke:playback`, `npm run smoke:sports`, `npm run smoke:sports-cache`, and `npm run smoke:sports-cache-auto` all passed on 2026-04-08 for the `1.1.29` sports-package release cut.
-- `C:\Program Files\Git\bin\bash.exe -n scripts/install-selfhost.sh` passed on 2026-04-08 for the `1.1.29` sports-package release cut.
+- `C:/Program Files/Git/bin/bash.exe -n scripts/install-selfhost.sh` passed on 2026-04-08 for the `1.1.29` sports-package release cut.
 - `npm run dist:win` passed on 2026-04-08 for the `1.1.29` desktop release build and refreshed `dist/latest.yml` plus `dist/releases/index.json`.
 - Added `sportsImagePackagePath` support across runtime config, configure UI, and both self-host setup flows so operators can point PVTKRRX at a downloaded local/server sports poster package.
 - Added package-aware sports image resolution: if a configured package manifest maps a known `sourceUrl` to a local file, PVTKRRX now imports that file into the runtime cache before any upstream image fetch.
 - Added `npm run cache:sports-package` so a mapped poster package can be synced into the runtime cache in one pass instead of waiting for lazy first-hit imports.
+- Verified the live hosted rollout after the release cut: manual Coolify API redeploy `cphgnqptcvtvif60g0u57n7g` finished successfully on 2026-04-08 and moved the public relay to commit `e568ece` / version `1.1.29`.
+
 - New regression coverage on 2026-04-08:
   - `npm run smoke:config`
   - `npm run smoke:sports`
