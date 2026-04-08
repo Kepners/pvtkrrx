@@ -683,6 +683,7 @@ main() {
 
   ensure_base_tools
   local arch; arch="$(detect_arch)"
+  export PVTKRRX_SELFHOST_BOOTSTRAP_ACTIVE=1
 
   # ── Step 1: HTTPS front door ──
   echo ""

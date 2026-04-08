@@ -14,6 +14,8 @@ const { seedSportsImageCache, summarizeSportsImageSeed } = require('../src/utils
 const { describeSportsCacheAutofill, resolveSportsCacheAutofillConfig } = require('../src/utils/sportsCacheAutofill')
 const { installSystemdService } = require('./install-systemd-service')
 
+const SELFHOST_BOOTSTRAP_ACTIVE_ENV = 'PVTKRRX_SELFHOST_BOOTSTRAP_ACTIVE'
+
 function parseDotEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return {}
   const out = {}
@@ -691,10 +693,16 @@ function loadExistingServerConfig(runtimeDir, secret) {
 }
 
 function runFullBootstrap(repoRoot) {
+  if (String(process.env[SELFHOST_BOOTSTRAP_ACTIVE_ENV] || '').trim() === '1') {
+    throw new Error('Self-host bootstrap is already running; refusing to re-enter install-selfhost.sh from inside the active bootstrap chain.')
+  }
   const scriptPath = path.join(repoRoot, 'scripts', 'install-selfhost.sh')
   const result = spawnSync('bash', [scriptPath], {
     cwd: repoRoot,
-    env: process.env,
+    env: {
+      ...process.env,
+      [SELFHOST_BOOTSTRAP_ACTIVE_ENV]: '1'
+    },
     stdio: 'inherit'
   })
   if (result.error) throw result.error
