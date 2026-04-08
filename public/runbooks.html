@@ -951,7 +951,7 @@
       <h2 class="subtitle subtitle-static" data-text="Seedbox Runbooks"><span>Seedbox Runbooks</span></h2>
       <p>Provider-specific setup for PVTKRRX. Each runbook shows the exact URLs to enter on your own self-host server <code>/configure</code> page for that seedbox provider, covering Prowlarr, qBittorrent, file server, path mapping, and auth.</p>
       <p>Most users need the <strong>Remote Seedbox</strong> route: open <code>/configure</code> on your own HTTPS server origin, pick your provider below, and save there. This public site is guide-only and does not host your private config.</p>
-      <div class="stamp glitch-text" data-text="Updated: March 30, 2026">Updated: March 30, 2026</div>
+      <div class="stamp glitch-text" data-text="Updated: April 8, 2026">Updated: April 8, 2026</div>
     </section>
 
     <section class="panel">
@@ -969,6 +969,8 @@
       </div>
       <p class="note">Hard rule: Stremio install is HTTPS-first for remote hosts. HTTP loopback (<code>127.0.0.1</code>) is only for same-device local installs.</p>
       <p class="note">For the one-command self-host installer, use <code>curl -fsSL https://www.pvtkrrx.cc/install-selfhost.sh | sudo bash</code>. That launcher stays on the hosted site, installs the branch payload behind the scenes, and falls back to <code>main</code> if a pinned release is too old for the self-host bootstrap script.</p>
+      <p class="note">Direct-host update: if you clone this repo onto the seedbox or VPS itself, finish with <code>npm run server:setup</code> instead of leaving PVTKRRX on a hand-made <code>node index.js</code> launch. That setup flow writes the saved Remote Seedbox config, self-host password, runtime directory, and the HTTPS install/playback origins that the current server route expects.</p>
+      <p class="note">Sports operator note: server-route artwork is cache-only during user requests. If sports matters on that box, either let the background seeder warm the runtime automatically or set <code>Sports Poster Package Path</code> and run <code>npm run cache:sports-package</code>. Cache misses fall back to generated posters instead of blocking on live upstream artwork fetches.</p>
     </section>
 
     <section class="panel">
@@ -1085,8 +1087,8 @@
 mkdir -p ~/apps &amp;&amp; cd ~/apps
 git clone https://github.com/Kepners/pvtkrrx.git
 cd pvtkrrx &amp;&amp; npm ci --omit=dev
-PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pvtkrrx.log 2&gt;&amp;1 &amp;</code></pre>
-        <p class="note">Add this app as a custom Managed Link (port <code>15000</code>) to get an HTTPS endpoint for Stremio install.</p>
+PORT=15000 npm run server:setup</code></pre>
+        <p class="note">When setup asks for the HTTPS front door, use <code>skip</code> until the Managed Link exists if needed. Then add this app as a custom Managed Link on the same port (for example <code>15000</code>) and rerun <code>npm run server:setup</code> or set <code>PVTKRRX_PUBLIC_BASE_URL</code> to that final HTTPS origin.</p>
       </details>
     </section>
 
@@ -1126,8 +1128,8 @@ app-ports free
 mkdir -p ~/apps &amp;&amp; cd ~/apps
 git clone https://github.com/Kepners/pvtkrrx.git
 cd pvtkrrx &amp;&amp; npm ci --omit=dev
-PORT=&lt;free-port&gt; ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pvtkrrx.log 2&gt;&amp;1 &amp;</code></pre>
-        <p class="note">Proxy through <code>~/.apps/nginx/proxy.d/</code> and restart <code>app-nginx</code> for HTTPS. If your route is path-only, prefer LAN Bridge for stable addon URLs.</p>
+PORT=&lt;free-port&gt; npm run server:setup</code></pre>
+        <p class="note">Proxy the chosen port through <code>~/.apps/nginx/proxy.d/</code> and restart <code>app-nginx</code> for HTTPS. If your route is path-only or Stremio cannot install cleanly from that proxy origin, prefer LAN Bridge for stable addon URLs.</p>
       </details>
     </section>
 
@@ -1168,7 +1170,7 @@ rm -f ~/node-v22.14.0-linux-x64.tar.gz
 mkdir -p ~/apps &amp;&amp; cd ~/apps
 git clone https://github.com/Kepners/pvtkrrx.git
 cd pvtkrrx &amp;&amp; npm ci --omit=dev
-PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pvtkrrx.log 2&gt;&amp;1 &amp;</code></pre>
+PORT=15000 npm run server:setup</code></pre>
       </details>
     </section>
 
@@ -1209,8 +1211,8 @@ rm -f ~/node-v22.14.0-linux-x64.tar.gz
 mkdir -p ~/apps &amp;&amp; cd ~/apps
 git clone https://github.com/Kepners/pvtkrrx.git
 cd pvtkrrx &amp;&amp; npm ci --omit=dev
-PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pvtkrrx.log 2&gt;&amp;1 &amp;</code></pre>
-        <p class="note">Configure proxypass for HTTPS. If proxypass gives a subpath route only, use LAN Bridge for stable addon URLs.</p>
+PORT=15000 npm run server:setup</code></pre>
+        <p class="note">Configure proxypass for HTTPS and point setup at that final public origin. If proxypass only gives you a subpath route or a broken install URL, use LAN Bridge for stable addon URLs.</p>
       </details>
     </section>
 
@@ -1248,8 +1250,8 @@ PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pv
 mkdir -p ~/apps &amp;&amp; cd ~/apps
 git clone https://github.com/Kepners/pvtkrrx.git
 cd pvtkrrx &amp;&amp; npm ci --omit=dev
-PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pvtkrrx.log 2&gt;&amp;1 &amp;</code></pre>
-        <p class="note">Expose via your HTTPS routing layer. Check RapidSeedbox docs for custom app HTTPS setup.</p>
+PORT=15000 npm run server:setup</code></pre>
+        <p class="note">Expose the chosen port through your HTTPS routing layer, then set that exact HTTPS origin in setup. Check RapidSeedbox docs for the custom app routing details.</p>
       </details>
     </section>
 
@@ -1315,8 +1317,8 @@ PORT=15000 ENCRYPTION_SECRET=$(openssl rand -hex 32) nohup node index.js &gt; pv
         <summary>Direct hosting: Run PVTKRRX on your Swizzin VPS</summary>
         <pre><code>git clone https://github.com/Kepners/pvtkrrx.git
 cd pvtkrrx &amp;&amp; npm ci --omit=dev
-ENCRYPTION_SECRET=$(openssl rand -hex 32) PORT=7000 node index.js</code></pre>
-        <p class="note">Reverse proxy a dedicated domain/subdomain to <code>127.0.0.1:7000</code> for HTTPS. Use a systemd service for process supervision.</p>
+PORT=7000 npm run server:setup</code></pre>
+        <p class="note">Reverse proxy a dedicated domain or subdomain to the local HTTP port you choose in setup (default <code>7000</code>), and run <code>npm run server:install-service</code> later if you want systemd startup.</p>
       </details>
     </section>
 
@@ -1382,7 +1384,7 @@ ENCRYPTION_SECRET=$(openssl rand -hex 32) PORT=7000 node index.js</code></pre>
         <p class="note">Requirements: SSH access, Node.js, long-running process support (<code>screen</code>, <code>tmux</code>, systemd), and an HTTPS endpoint.</p>
         <pre><code>git clone https://github.com/Kepners/pvtkrrx.git
 cd pvtkrrx &amp;&amp; npm ci --omit=dev
-PORT=7000 ENCRYPTION_SECRET=$(openssl rand -hex 32) node index.js</code></pre>
+PORT=7000 npm run server:setup</code></pre>
       </details>
     </section>
 
