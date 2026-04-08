@@ -1,315 +1,243 @@
-# Historical Production Specification - PVTKRRX
+# Production Spec: SportsMeta (Integrated Feature)
 
-> **Status:** Historical planning record from February 8, 2026
-> **Current live design:** [CURRENT_DESIGN.md](CURRENT_DESIGN.md)
-> **Current architecture:** [ARCHITECTURE.md](../ARCHITECTURE.md)
-> **Current status:** [PROJECT_STATUS.md](PROJECT_STATUS.md)
-> **Important:** Any examples below that show hosted `/playback` queue-and-buffer behavior are historical planning notes, not the live hosted Remote Seedbox behavior.
-
-## How To Use This File
-
-Use this document as the original production/build plan.
-Do not use it as the live source for the current dependency list, packaging layout, or install flow.
+> **Author:** Peter (Production Engineer)
+> **Date:** April 7, 2026
+> **Status:** Approved at Concept Meeting — ready for build
+> **Supersedes:** `PRODUCTION_SPEC_HISTORICAL.md` (archived)
 
 ---
 
-## 1. Build Requirements
+## 1. Decision Summary
 
-### Development Environment
-- Node.js 18+ (Vercel runtime)
-- npm for package management
-- Git for version control
-- Vercel CLI for deployment (`npx vercel`)
+| Decision | Answer |
+|----------|--------|
+| Standalone or integrated? | **Integrated** — new routes on existing PVTKRRX Express server |
+| Customer | PVTKRRX users only (not third-party addon devs) |
+| MVP scope | Full metadata + images: JSON endpoint returning event enrichment |
+| Pricing model | **Freemium** — free gets generated SVG cards, paid gets real TheSportsDB artwork |
+| Revenue priority | Strategic moat, not revenue-chasing |
+| TheSportsDB API key | Stays private — all lookups run server-side on Contabo |
 
-### Dependencies (3 total)
-| Package | Version | Purpose |
-|---------|---------|---------|
-| stremio-addon-sdk | ^1.6.10 | Stremio protocol compliance |
-| express | ^5.2.1 | HTTP routing for encrypted config tokens |
-| fast-xml-parser | ^4.x | Torznab XML response parsing |
+---
 
-### package.json
+## 2. New Routes
+
+### 2.1 JSON Metadata Endpoint
+
+```
+GET /sportsmeta/event
+```
+
+**Query parameters:**
+
+| Param | Required | Description |
+|-------|----------|-------------|
+| `league` | yes | League name or mapped alias (e.g. `Premier League`, `EPL`, `UFC`) |
+| `date` | no | ISO date `YYYY-MM-DD` — narrows event lookup |
+| `home` | no | Home team name (vs-style events) |
+| `away` | no | Away team name (vs-style events) |
+| `event` | no | Event name (non-vs events like F1, UFC cards) |
+| `sport` | no | Sport hint key (e.g. `football`, `mma`, `motorsport`) |
+| `title` | no | Raw torrent-style title — parser extracts league/date/teams |
+
+**Lookup priority:**
+1. If `title` provided, run through `parseSportsTitle()` / `parseSportsEventTitle()` to extract structured fields
+2. Use `league` + `date` + `home`/`away` or `event` to query `SportsDbClient.getEventArtwork()`
+3. Resolve artwork via existing `resolveSportsPosterAsset()` / `resolveSportsBackgroundAsset()` / `resolveSportsLogoAsset()`
+
+**Response (200):**
+
 ```json
 {
-  "name": "pvtkrrx",
-  "version": "1.0.2",
-  "description": "Private tracker seedbox addon for Stremio",
-  "main": "index.js",
-  "type": "commonjs",
-  "scripts": {
-    "start": "node index.js",
-    "dev": "node index.js"
+  "match": true,
+  "event": {
+    "name": "Manchester City vs Arsenal",
+    "league": "English Premier League",
+    "date": "2025-12-14",
+    "sport": "football",
+    "homeTeam": "Manchester City",
+    "awayTeam": "Arsenal"
   },
-  "dependencies": {
-    "stremio-addon-sdk": "^1.6.10",
-    "express": "^5.2.1",
-    "fast-xml-parser": "^4.5.0"
-  }
+  "artwork": {
+    "poster": "https://pvtkrrx.kepners.com/image/sports/poster/v1.xxx.yyy",
+    "thumb": "https://pvtkrrx.kepners.com/image/sports/landscape/v1.xxx.yyy",
+    "background": "https://pvtkrrx.kepners.com/image/sports/background/v1.xxx.yyy",
+    "homeBadge": "https://pvtkrrx.kepners.com/image/sports/logo/v1.xxx.yyy",
+    "awayBadge": "https://pvtkrrx.kepners.com/image/sports/logo/v1.xxx.yyy",
+    "leagueLogo": "https://pvtkrrx.kepners.com/image/sports/logo/v1.xxx.yyy"
+  },
+  "tier": "free"
 }
 ```
 
-## 2. Deployment Strategy
+**No match (200):**
 
-### Target Environments
-
-| Environment | Purpose | URL |
-|-------------|---------|-----|
-| Development | Local testing | `http://localhost:7000` |
-| Production | Live addon | `https://pvtkrrx.vercel.app` |
-
-### Vercel Configuration
 ```json
 {
-  "version": 2,
-  "builds": [{ "src": "index.js", "use": "@vercel/node" }],
-  "routes": [{ "src": "/(.*)", "dest": "/index.js" }]
+  "match": false,
+  "event": null,
+  "artwork": null,
+  "tier": "free"
 }
 ```
 
-### Environment Variables
-| Variable | Required | Purpose |
-|----------|----------|---------|
-| `ENCRYPTION_SECRET` | Yes | AES-256-GCM key derivation seed |
-| `VERCEL` | Auto-set | Vercel sets this — used to skip `app.listen()` |
+### 2.2 Freemium Gate Behavior
 
-### Deployment Process
-1. `git push origin main` — Vercel auto-deploys from GitHub
-2. Or `npx vercel --prod` for manual deployment
-3. Set `ENCRYPTION_SECRET` in Vercel dashboard → Settings → Environment Variables
+The `artwork` object changes based on tier:
 
-## 3. File Structure
+| Field | Free tier | Paid tier |
+|-------|-----------|-----------|
+| `poster` | Generated SVG card URL (`/thumb/sports/poster/...`) | Real TheSportsDB image (`/image/sports/poster/...`) |
+| `thumb` | Generated SVG card URL (`/thumb/sports/...`) | Real TheSportsDB image (`/image/sports/landscape/...`) |
+| `background` | Generated SVG card URL (`/thumb/sports/background/...`) | Real TheSportsDB image (`/image/sports/background/...`) |
+| `homeBadge` | `null` (not generated) | Real team badge URL |
+| `awayBadge` | `null` (not generated) | Real team badge URL |
+| `leagueLogo` | `null` (not generated) | Real league logo URL |
 
-```
-pvtkrrx/
-├── index.js                   # Entry point (Express + SDK hybrid)
-├── src/
-│   ├── clients/
-│   │   ├── torznab.js         # Jackett/Prowlarr Torznab client
-│   │   ├── qbittorrent.js     # qBittorrent WebUI client
-│   │   └── cinemeta.js        # Cinemeta metadata resolver
-│   ├── handlers/
-│   │   ├── catalog.js         # Catalog handler (sports, movies, TV, library)
-│   │   ├── stream.js          # Stream resolution handler
-│   │   └── meta.js            # Meta handler for custom IDs
-│   ├── utils/
-│   │   ├── crypto.js          # AES-256-GCM encrypt/decrypt
-│   │   ├── parser.js          # Torrent name parsing
-│   │   ├── streams.js         # Stream object building & sorting
-│   │   └── pathMapper.js      # qBit save path → HTTP URL mapping
-│   └── config/
-│       ├── categories.js      # Torznab category constants
-│       ├── manifest.js        # Stremio manifest definition
-│       └── providers.js       # Seedbox provider presets
-├── public/
-│   ├── configure.html         # Configuration page
-│   └── logo.ico               # Addon logo
-├── vercel.json                # Vercel deployment config
-├── package.json               # Dependencies
-└── README.md                  # Documentation
-```
+**The `event` metadata is always returned regardless of tier.** Only the artwork source changes.
 
-**Note:** Spec proposed `api/[...path].js` (Vercel catch-all pattern) but we're using `index.js` with `vercel.json` catch-all route instead — matches the clockrr pattern exactly.
+**Tier detection:** Determined by the PVTKRRX config token. The existing `FREE_MODE` / subscription infrastructure in `shared.js` will gate this. For MVP, all existing PVTKRRX users with a valid config token get paid tier (since the addon is currently free). The gate exists in code but defaults open.
 
-## 4. Entry Point Pattern (index.js)
+### 2.3 Existing Image Routes (No Changes)
 
-```javascript
-const express = require('express');
-const { addonBuilder, getRouter } = require('stremio-addon-sdk');
-const { decryptConfig } = require('./src/utils/crypto');
-const { handleCatalog } = require('./src/handlers/catalog');
-const { handleStream } = require('./src/handlers/stream');
-const { handleMeta } = require('./src/handlers/meta');
-const manifest = require('./src/config/manifest');
+These routes already exist and serve both tiers:
 
-const app = express();
+| Route | Purpose | Tier |
+|-------|---------|------|
+| `GET /image/sports/:variant/:token` | Serves cached TheSportsDB images from disk | Paid |
+| `GET /thumb/sports/:variant/:info.png` | Renders generated SVG cards as PNG via sharp | Free |
+| `GET /thumb/sports/:variant/:info.svg` | Serves raw SVG cards | Free |
 
-const builder = new addonBuilder(manifest);
-
-// Middleware: decrypt config from URL path (decrypt-once pattern)
-function withConfig(req, res, next) {
-  try {
-    req.config = decryptConfig(req.params.config, process.env.ENCRYPTION_SECRET);
-    next();
-  } catch (e) {
-    res.status(400).json({ error: 'Invalid configuration' });
-  }
-}
-
-// Health + Configure
-app.get('/health', (req, res) => res.json({ status: 'ok' }));
-app.get('/configure', (req, res) => res.sendFile('configure.html', { root: 'public' }));
-
-// Config-based Stremio routes (before SDK router)
-app.get('/:config/manifest.json', withConfig, (req, res) => {
-  res.json(builder.getInterface().manifest);
-});
-
-app.get('/:config/catalog/:type/:id.json', withConfig, async (req, res) => {
-  const result = await handleCatalog({ ...req.params, extra: {}, config: req.config });
-  res.json(result);
-});
-
-app.get('/:config/catalog/:type/:id/:extra.json', withConfig, async (req, res) => {
-  const extra = parseExtra(req.params.extra);
-  const result = await handleCatalog({ ...req.params, extra, config: req.config });
-  res.json(result);
-});
-
-app.get('/:config/stream/:type/:id.json', withConfig, async (req, res) => {
-  const result = await handleStream({ ...req.params, config: req.config });
-  res.json(result);
-});
-
-app.get('/:config/meta/:type/:id.json', withConfig, async (req, res) => {
-  const result = await handleMeta({ ...req.params, config: req.config });
-  res.json(result);
-});
-
-// Playback endpoint (Comet pattern — trigger download, poll, 302 redirect)
-app.get('/:config/playback/:info', withConfig, async (req, res) => {
-  // Decode torrent info, check qBit status
-  // If already downloaded: 302 redirect to seedbox file URL
-  // If not: trigger qBit download, poll within request lifetime
-  // On completion: 302 redirect to file
-  // On timeout: 504 "Download in progress, try again"
-});
-
-// SDK router as fallback (landing page, non-config manifest)
-builder.defineCatalogHandler(() => Promise.resolve({ metas: [] }));
-builder.defineStreamHandler(() => Promise.resolve({ streams: [] }));
-builder.defineMetaHandler(() => Promise.resolve({ meta: null }));
-app.use(getRouter(builder.getInterface()));
-
-module.exports = app;
-
-if (!process.env.VERCEL) {
-  app.listen(7000, () => console.log('PVTKRRX running on http://localhost:7000'));
-}
-```
-
-## 5. Distribution
-
-### How Users Get It
-1. User visits `https://pvtkrrx.vercel.app/configure`
-2. Enters seedbox credentials (Jackett URL, qBit URL, file server URL)
-3. Clicks "Test Connection" to validate
-4. Clicks "Generate Install Link"
-5. Server encrypts config → returns `stremio://` protocol link
-6. User clicks link → Stremio installs addon
-7. Addon appears in Stremio with 4 catalogs
-
-### Update Mechanism
-- Vercel auto-deploys from `main` branch on push
-- Addon updates are instant — no user action needed
-- Users' encrypted tokens remain valid across deployments (same `ENCRYPTION_SECRET`)
-- If `ENCRYPTION_SECRET` changes, all users must reconfigure (documented in README)
-
-## 6. Build Order
-
-```
-Level 0: Foundation
-  ├── package.json + npm install
-  ├── vercel.json
-  ├── src/utils/crypto.js (encrypt/decrypt)
-  └── src/config/manifest.js
-
-Level 1: Clients
-  ├── src/clients/torznab.js (Jackett/Prowlarr)
-  ├── src/clients/qbittorrent.js
-  └── src/clients/cinemeta.js
-
-Level 2: Utilities
-  ├── src/utils/parser.js (torrent name parsing)
-  ├── src/utils/streams.js (stream object building)
-  ├── src/utils/pathMapper.js (path mapping)
-  └── src/config/categories.js + providers.js
-
-Level 3: Handlers
-  ├── src/handlers/catalog.js (sports FIRST — MD directive)
-  ├── src/handlers/stream.js
-  └── src/handlers/meta.js
-
-Level 4: Integration
-  ├── index.js (Express + SDK hybrid — clockrr pattern)
-  └── public/configure.html
-
-Level 5: Deploy
-  ├── Local testing (http://localhost:7000)
-  ├── Vercel deployment
-  └── Stremio install verification
-```
-
-## 7. Stream Status Pattern (Comet Playback Pattern)
-
-Based on Colin's Stremio behavior research. This is the industry-standard pattern used by Comet, comet-uncached, and debrid addons.
-
-### Content Already on Seedbox (instant play)
-```javascript
-{
-  name: "⚡ 1080p BluRay REMUX",
-  description: "On Seedbox | TrueHD Atmos 7.1 | 45.2 GB",
-  url: "https://seedbox.example.com/files/movie.mkv",
-  behaviorHints: {
-    notWebReady: true,
-    bingeGroup: "pvtkrrx-1080p",
-    filename: "Movie.2024.1080p.BluRay.REMUX.mkv",
-    proxyHeaders: {
-      request: { "Authorization": "Basic dXNlcjpwYXNz" }
-    }
-  }
-}
-```
-
-### Content Available on Tracker (Historical Comet pattern)
-```javascript
-{
-  name: "📥 1080p BluRay",
-  description: "250 seeders | 12.5 GB | Click to stream",
-  url: "https://pvtkrrx.vercel.app/{token}/playback/{encodedInfo}",
-  // User clicks → Stremio shows loading spinner
-  // Playback endpoint: triggers qBit download → polls → 302 redirects to file
-  // User experience: loading spinner → playback starts
-  behaviorHints: { notWebReady: true }
-}
-```
-
-Historical note: the snippet above describes the original MVP plan. The live hosted Vercel `Remote Seedbox` route is now ready-file-first and does not generally expose hosted tracker `/playback` buffering.
-
-### Historical Playback Endpoint Flow
-```
-1. Stremio sends GET to /playback/{info}
-2. Addon checks qBit: already downloaded?
-   → YES: 302 redirect to seedbox file URL (instant)
-   → NO: trigger qBit download via magnet/URL
-3. Poll qBit every 3s within request lifetime
-   → Hobby: ~8s of polling (covers ~800MB at 100MB/s)
-   → Pro: ~55s of polling (covers ~5.5GB at 100MB/s)
-4. Download complete → 302 redirect to seedbox file URL
-5. Timeout → 504 "Download in progress, close and retry"
-6. On retry: stream handler checks qBit again, finds file → returns direct URL
-```
-
-### proxyHeaders for Basic Auth
-Instead of embedding `user:pass@` in stream URLs, use Stremio's `proxyHeaders` behaviorHint:
-```javascript
-behaviorHints: {
-  proxyHeaders: {
-    request: { "Authorization": "Basic " + btoa(user + ":" + pass) }
-  }
-}
-```
-Credentials never appear in the URL. Works on desktop and mobile Stremio clients (may not work on Stremio Web).
-
-## 8. Production Risks
-
-| Risk | Impact | Mitigation |
-|------|--------|------------|
-| Vercel cold starts (~500ms) | Slower first request | fast-xml-parser helps minimize bundle size |
-| Users with slow seedbox connections | Timeouts hit before results return | Promise.allSettled() returns partial results |
-| Torznab XML format varies by indexer | Parsing failures | Robust parser with try/catch, test against multiple indexers |
-| express@5 breaking changes | Unexpected behavior | Pin to ^5.2.1, clockrr uses same version |
-| Config page served as static file | Can't server-render | Self-contained HTML with embedded JS — no build step needed |
+No modifications needed. The freemium gate lives entirely in the JSON metadata endpoint response — it controls which URL class is returned, not the image routes themselves.
 
 ---
 
-*Prepared by Peter (Production) — February 8, 2026*
+## 3. Code Reuse Map
+
+### Reused as-is (zero changes)
+
+| Module | What it does | Lines |
+|--------|-------------|-------|
+| `src/utils/sportsImageCache.js` | Permanent file cache, signed tokens, SSRF protection, in-flight dedup | ~450 |
+| `src/utils/sportsCacheSeeder.js` | League/event/team discovery, concurrent image download pipeline | ~615 |
+| `src/utils/sportsCacheAutofill.js` | 15-min background seeder cron | existing |
+| `src/utils/sportsArtwork.js` | Artwork priority resolution (exact > landscape > generated > fallback) | ~150 |
+| `src/utils/sportsTitleParser.js` | Torrent filename parser (league/date/teams extraction) | ~310 |
+| `src/utils/sportsThumb.js` | Generated SVG poster/landscape/matchup/fight card rendering | ~435 |
+| `src/config/sportsCatalogs.js` | Sport category definitions and seed terms | ~165 |
+| `src/utils/leagueMap.js` | League name normalization and alias mapping | existing |
+| `src/utils/sportsRules.js` | Sport detection, noise filtering | existing |
+| `src/utils/sportClassifier.js` | Sport category detection from titles | existing |
+
+### Reused with thin wrapper
+
+| Module | What's needed |
+|--------|--------------|
+| `src/clients/sportsdb.js` | `SportsDbClient.getEventArtwork()` — already does the full lookup. The JSON endpoint wraps this call and reformats the response. |
+| `src/handlers/meta.js` | `handleCustomMeta()` contains the artwork resolution flow. The SportsMeta endpoint extracts the same logic path but returns JSON instead of Stremio meta objects. |
+
+### New code required
+
+| File | Purpose | Estimate |
+|------|---------|----------|
+| `src/handlers/sportsmeta.js` | JSON metadata endpoint handler — accepts query params, calls SportsDbClient, resolves artwork, applies freemium gate, returns JSON | ~120-150 lines |
+| Route registration in `index.js` | `app.get('/sportsmeta/event', ...)` — wiring only | ~15 lines |
+| Rate limiter entry | Add `sportsmeta` to `rateLimiters` in `shared.js` | ~3 lines |
+
+**Total new code: ~170 lines.** Everything else is reuse.
+
+---
+
+## 4. Build Order
+
+### Phase 1: Core JSON Endpoint (Days 1-3)
+
+1. Create `src/handlers/sportsmeta.js`
+   - Accept query params (`league`, `date`, `home`, `away`, `event`, `sport`, `title`)
+   - If `title` provided: parse via `parseSportsTitle()` / `parseSportsEventTitle()` to extract structured fields
+   - Call `SportsDbClient.getEventArtwork()` with extracted/provided fields
+   - Run result through `resolveSportsPosterAsset()`, `resolveSportsBackgroundAsset()`, `resolveSportsLogoAsset()`
+   - Return JSON response with `event` + `artwork` objects
+2. Wire route in `index.js` — `GET /sportsmeta/event`
+3. Add rate limiter (reuse existing pattern from `rateLimiters`)
+4. Smoke test: `npm run smoke:sportsmeta`
+
+### Phase 2: Freemium Gate (Days 3-4)
+
+1. Add tier detection logic to `sportsmeta.js`
+   - Check config token / subscription state
+   - If free tier: return `/thumb/sports/...` URLs (generated cards) for poster/thumb/background, `null` for badges
+   - If paid tier: return `/image/sports/...` URLs (real TheSportsDB images)
+2. Gate defaults open for MVP (all valid config tokens = paid tier)
+3. Add `tier` field to response
+
+### Phase 3: Input Flexibility + Edge Cases (Days 4-6)
+
+1. Handle raw `title` param parsing — test against known torrent filename patterns
+2. Handle partial matches (league found but no event match) — return league-level fallback artwork
+3. Handle non-vs events (F1 qualifying, UFC fight nights) via `parseSportsEventTitle()`
+4. Cache response JSON in-memory (short TTL, ~60s) to avoid redundant SportsDB lookups for repeated queries
+5. Test against the 3,109+ cached images to verify artwork URL generation
+
+### Phase 4: Polish + Deploy (Days 6-8)
+
+1. Add CORS headers for browser consumption (if needed beyond existing allowlist)
+2. Response compression (existing Express middleware should handle)
+3. Add `Cache-Control` headers to JSON responses (short TTL for metadata, long TTL for image URLs)
+4. Deploy to Contabo via Coolify — same app, same container, same push-to-deploy
+5. Verify on live: hit `/sportsmeta/event?league=Premier+League&date=2026-04-07&home=Arsenal&away=Chelsea`
+
+---
+
+## 5. Deployment
+
+| Item | Value |
+|------|-------|
+| Target | Existing PVTKRRX Coolify app on Contabo VPS |
+| Container | Same Node.js container — no new service |
+| Image cache volume | Already mounted — `/sports-image-cache` with 3,109+ images (713MB) |
+| TheSportsDB key | Already in environment (`SPORTSDB_API_KEY`) |
+| Background seeder | Already running (15-min autofill via `sportsCacheAutofill.js`) |
+| HTTPS termination | Caddy (existing) |
+| CI/CD | Push to `main` -> Coolify auto-deploys |
+
+**No new infrastructure.** No new DNS. No new containers. No new env vars for MVP.
+
+---
+
+## 6. Timeline
+
+| Phase | Days | Deliverable |
+|-------|------|-------------|
+| Phase 1: Core JSON endpoint | 1-3 | `/sportsmeta/event` returns real data |
+| Phase 2: Freemium gate | 3-4 | Free vs paid artwork switching |
+| Phase 3: Input flexibility | 4-6 | Raw title parsing, partial matches, edge cases |
+| Phase 4: Polish + deploy | 6-8 | Live on Contabo, tested, cached |
+
+**Total: 8 working days to shippable MVP.**
+
+Buffer for unknowns: the SportsDB client already handles rate limits, retries, and fuzzy matching. The risk is low because we're wrapping proven code, not writing new matching logic.
+
+---
+
+## 7. What This Is NOT
+
+- **Not a standalone service** — no separate repo, no separate domain, no separate container
+- **Not an npm package** — other devs don't install anything
+- **Not a Stremio catalog addon** — it's an HTTP JSON API consumed by the PVTKRRX addon internally (and exposed for future external consumers if the moat strategy evolves)
+- **Not revenue-critical** — the gate exists for future monetization but defaults open
+
+---
+
+## 8. Future Considerations (Post-MVP)
+
+- **Batch endpoint** — `POST /sportsmeta/events` accepting an array of queries for catalog-page enrichment
+- **WebSocket/SSE** — push new event artwork to connected clients as the seeder discovers them
+- **External API keys** — if third-party addon devs want access, issue API keys with rate limits
+- **CDN layer** — if image traffic grows, put Cloudflare or MinIO gateway in front of `/image/sports/`
+- **Stremio catalog addon surface** — expose the enriched sports catalog as an installable addon for non-PVTKRRX users
+
+---
+
+*Signed: Peter, Production Engineer*
+*April 7, 2026*
