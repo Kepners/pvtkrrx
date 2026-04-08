@@ -201,6 +201,7 @@ async function run() {
       qbitPassword: 'adminadmin',
       fileServerUrl: '',
       fileServerAuth: '',
+      sportsImagePackagePath: path.join(runtimeDir, 'sports-poster-package'),
       pathMapping: { from: '/', to: '/' },
       additionalStorageRoots: ['Z:\\Media', '\\\\NAS\\TV'],
       maxResults: 50
@@ -253,6 +254,7 @@ async function run() {
     assert.match(configureHtml, /Change the actual qBittorrent save path/i, 'configure page should explain where to change the live qBittorrent save path')
     assert.match(configureHtml, /href="\/runbooks"/, 'configure page should link to runbooks')
     assert.match(configureHtml, /route-parity\.js/, 'configure page should load shared parity helper')
+    assert.match(configureHtml, /id="sportsImagePackagePath"/, 'configure page should render sports poster package path input')
 
     const versionStatusRes = await fetch(`${base}/version-status.json`)
     assert.equal(versionStatusRes.status, 200, 'GET /version-status.json should return 200')
@@ -372,6 +374,7 @@ async function run() {
     const localConfig = await localConfigRes.json()
     assert.equal(localConfig.jackettUrl, sampleConfig.jackettUrl)
     assert.equal(localConfig.qbitUrl, sampleConfig.qbitUrl)
+    assert.equal(localConfig.sportsImagePackagePath, sampleConfig.sportsImagePackagePath)
     assert.deepEqual(localConfig.additionalStorageRoots, sampleConfig.additionalStorageRoots)
     assert.equal(localConfig.jackettApiKey, undefined, 'local config readback should redact jackett api key')
     assert.equal(localConfig.qbitUsername, undefined, 'local config readback should redact qBit username')
@@ -381,6 +384,7 @@ async function run() {
     assert.equal(Boolean(localConfig.savedSecrets?.jackettApiKey), true)
     assert.equal(Boolean(localConfig.savedSecrets?.qbitUsername), true)
     assert.equal(Boolean(localConfig.savedSecrets?.qbitPassword), true)
+    assert.equal(localSavePayload.sportsImagePackagePath, sampleConfig.sportsImagePackagePath, 'local config save should return the sports poster package path')
 
     const localRepairSaveRes = await fetch(`${base}/local-config`, {
       method: 'POST',

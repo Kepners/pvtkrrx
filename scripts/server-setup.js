@@ -206,6 +206,12 @@ async function run() {
       ),
       10
     ) || 24
+    const sportsImagePackagePath = await promptValue(
+      rl,
+      'Sports poster package path (optional)',
+      String(existingConfig?.sportsImagePackagePath || '').trim(),
+      { allowEmpty: true }
+    )
     const maxResults = Number.parseInt(
       await promptValue(
         rl,
@@ -263,6 +269,7 @@ async function run() {
       fileServerAuth,
       sportsDbApiKey,
       sportsDbCacheHours: Math.max(1, Math.min(168, sportsDbCacheHours)),
+      sportsImagePackagePath,
       maxResults: Math.max(10, Math.min(200, maxResults)),
       autoDeleteWatched,
       watchedDeleteGraceSeconds: Math.max(0, watchedDeleteGraceSeconds),

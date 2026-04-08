@@ -19,7 +19,7 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 
 - **Sports** — Browse and search private tracker sports content (EPL, F1, UFC) directly in Stremio
 - **Sports-first discovery** — `All Sports` plus sport-family catalogs now lead the movie discovery column, with the third-column filter used for league/team detail
-- **Sports artwork enrichment** — Optional TheSportsDB poster, landscape, background, and logo artwork with cache-aware lookups plus disk-backed image caching on the active runtime; `npm run server:setup` now also pre-seeds upcoming event art, team badges, and mapped league artwork into `sports-image-cache/`, long-running Linux/cloud runtimes now keep topping that cache up in the background every 15 minutes in rotating sport batches, and `npm run cache:sports` can still refresh the whole cache later without redownloading existing files
+- **Sports artwork enrichment** — Optional TheSportsDB poster, landscape, background, and logo artwork with cache-aware lookups plus disk-backed image caching on the active runtime; `npm run server:setup` now also pre-seeds upcoming event art, team badges, and mapped league artwork into `sports-image-cache/`, long-running Linux/cloud runtimes now keep topping that cache up in the background every 15 minutes in rotating sport batches, `npm run cache:sports` can still refresh the whole cache later without redownloading existing files, and a downloaded local/server sports poster package can now be mapped in as the primary catalogue so upstream image fetches are only used for updates and gaps
 - **Movies & TV** — IMDb-matched content from your private trackers
 - **Seedbox Library** — Browse everything already downloaded on your seedbox
 - **Smart filtering** — Sports indexers never contaminate movie/TV searches
@@ -135,6 +135,20 @@ npm run cache:sports
 
 Re-run `npm run cache:sports` whenever you want to refresh the whole local poster cache non-destructively, especially if you switch to a paid TheSportsDB key and want a faster full warm. The long-running Linux/cloud server path now also keeps doing a smaller automatic refill every 15 minutes by default.
 
+If you have a downloaded poster package, point `Sports Poster Package Path` in configure at the local folder or manifest file, or export `PVTKRRX_SPORTS_IMAGE_PACKAGE_PATH` directly, then sync it into the runtime cache:
+
+```bash
+npm run cache:sports-package
+```
+
+You can also pass an explicit folder or manifest path:
+
+```bash
+npm run cache:sports-package -- /srv/pvtkrrx/sports-package
+```
+
+Package manifests can live anywhere on the local PC or server. PVTKRRX supports a folder containing `sports-image-package.json` (or `sports-poster-package.json`) or a direct manifest-file path. The manifest should list remote `sourceUrl` values mapped to local image files, so the runtime can satisfy existing catalogue artwork from disk before it ever tries an upstream image fetch.
+
 The self-hosted server route keeps a stable disk-backed manifest at `/selfhost/manifest.json?mode=hosted`.
 Open `/configure` in a browser to review or edit the saved config at any time.
 For remote Stremio installs, give the installer a real public `https://` origin. Raw public `http://IP:7000/...` addon URLs are not a valid self-host install target for Stremio.
@@ -175,6 +189,7 @@ That is enough for `PC Local` and `Hybrid Home`, where the local runtime can rea
 | Prowlarr API Key | Yes | Found in Prowlarr → Settings → General |
 | TheSportsDB API Key | No | Defaults to free key `123`; add your own key for higher limits |
 | TheSportsDB Cache (hours) | No | How long sports artwork lookups are reused before refresh. Sports image bytes are also cached on demand by the active runtime and can be pre-seeded via `npm run server:setup` or `npm run cache:sports` |
+| Sports Poster Package Path | No | Optional local folder or manifest path for a downloaded sports poster package. When set, PVTKRRX imports package images into the runtime cache first and only falls back to upstream image fetches for gaps or new updates |
 | qBittorrent URL | Yes | e.g. `http://seedbox.example.com:8080` |
 | qBittorrent Username | Yes | qBit WebUI credentials |
 | qBittorrent Password | Yes | qBit WebUI credentials |

@@ -981,6 +981,7 @@ async function autoProvisionWindows(options = {}) {
     jackettApiKey: prowlarr.apiKey || '',
     sportsDbApiKey: '123',
     sportsDbCacheHours: 24,
+    sportsImagePackagePath: '',
     qbitUrl: qbit.url,
     qbitUsername: qbit.username || '',
     qbitPassword: '',

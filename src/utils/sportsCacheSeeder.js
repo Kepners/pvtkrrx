@@ -521,6 +521,7 @@ function buildSeedSummary(apiKey) {
     images: {
       total: 0,
       downloaded: 0,
+      packaged: 0,
       skipped: 0,
       refreshed: 0,
       stale: 0,
@@ -545,6 +546,7 @@ function summarizeSportsImageSeed(summary = {}) {
     `${totals.teams} teams`,
     `${totals.mappedLeagues} mapped leagues`,
     `${Number(summary?.images?.downloaded || 0)} downloaded`,
+    `${Number(summary?.images?.packaged || 0)} packaged`,
     `${Number(summary?.images?.skipped || 0)} cached`,
     `${Number(summary?.images?.refreshed || 0)} refreshed`,
     `${Number(summary?.images?.failed || 0)} failed`
@@ -591,6 +593,8 @@ async function seedSportsImageCache(options = {}) {
       const entry = await getCachedSportsImage(task.sourceUrl)
       if (entry?.cacheStatus === 'hit') {
         summary.images.skipped += 1
+      } else if (entry?.cacheStatus === 'package') {
+        summary.images.packaged += 1
       } else if (entry?.cacheStatus === 'refresh') {
         summary.images.refreshed += 1
       } else if (entry?.cacheStatus === 'stale') {

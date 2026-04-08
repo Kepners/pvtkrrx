@@ -1428,6 +1428,55 @@ async function testSportsImageCacheReusesDownloadedBytes() {
   }
 }
 
+async function testSportsImageCacheUsesConfiguredPackageBeforeFetch() {
+  const packageDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-sports-package-'))
+  const manifestPath = path.join(packageDir, 'sports-image-package.json')
+  const imagePath = path.join(packageDir, 'poster.png')
+  const sourceUrl = 'https://images.example.com/package-catalog-poster.png'
+  const proxyUrl = makeSportsImageProxyUrl('http://127.0.0.1:7000', sourceUrl, 'poster')
+  const token = proxyUrl.split('/').pop()
+  const originalFetch = global.fetch
+  const originalPackagePath = process.env.PVTKRRX_SPORTS_IMAGE_PACKAGE_PATH
+  let fetchCalls = 0
+
+  fs.writeFileSync(imagePath, Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+  fs.writeFileSync(manifestPath, JSON.stringify({
+    name: 'Smoke Sports Package',
+    images: [
+      {
+        sourceUrl,
+        path: 'poster.png'
+      }
+    ]
+  }), 'utf8')
+
+  process.env.PVTKRRX_SPORTS_IMAGE_PACKAGE_PATH = packageDir
+  global.fetch = async () => {
+    fetchCalls += 1
+    throw new Error('sports image package should satisfy the request before any upstream image fetch')
+  }
+
+  try {
+    const first = await resolveSportsImageRequest(token, 'poster')
+    assert.equal(first.cacheStatus, 'package', 'expected first package-backed request to import from the mapped sports package')
+    assert.equal(first.packageName, 'Smoke Sports Package')
+    assert.equal(fetchCalls, 0, 'expected package-backed request to avoid upstream image fetches')
+    assert.ok(fs.existsSync(first.filePath), 'expected package-backed request to persist a cache file')
+
+    const second = await resolveSportsImageRequest(token, 'poster')
+    assert.equal(second.cacheStatus, 'hit', 'expected second package-backed request to reuse cached bytes')
+    assert.equal(fetchCalls, 0, 'expected cached package-backed request to avoid upstream image fetches')
+  } finally {
+    global.fetch = originalFetch
+    if (originalPackagePath) {
+      process.env.PVTKRRX_SPORTS_IMAGE_PACKAGE_PATH = originalPackagePath
+    } else {
+      delete process.env.PVTKRRX_SPORTS_IMAGE_PACKAGE_PATH
+    }
+    fs.rmSync(packageDir, { recursive: true, force: true })
+  }
+}
+
 async function testMetaFallbackNeverReturnsNull() {
   const { handleMeta } = require('../src/handlers/meta')
 
@@ -1482,6 +1531,7 @@ async function main() {
     await testSportsCatalogUsesImageProxyUrls()
     await testSportsMetaUsesImageProxyUrls()
     await testSportsImageCacheReusesDownloadedBytes()
+    await testSportsImageCacheUsesConfiguredPackageBeforeFetch()
     await testMetaFallbackNeverReturnsNull()
     console.log('Smoke sports structured flow passed')
   } finally {

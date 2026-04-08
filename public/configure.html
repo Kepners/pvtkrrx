@@ -2726,6 +2726,9 @@
         <label for="sportsDbCacheHours">TheSportsDB Cache (hours)</label>
         <input type="number" id="sportsDbCacheHours" value="24" min="1" max="168">
         <p class="hint">Controls sports artwork lookup reuse. Posters, wallpapers, landscape art, and logos are also cached on demand by the active PVTKRRX host.</p>
+        <label for="sportsImagePackagePath">Sports Poster Package Path (optional)</label>
+        <input type="text" id="sportsImagePackagePath" value="" placeholder="D:\\sports-package or /srv/pvtkrrx/sports-package">
+        <p class="hint">Point this at a local folder or manifest file for a downloaded poster package. PVTKRRX will use that package before any upstream image fetch, so the free TheSportsDB key only needs to find updates and gaps.</p>
         <div id="localHostnameBlock">
           <label for="localHostname">Local Hostname (.local alias)</label>
           <input type="text" id="localHostname" value="pvtkrrx.local" placeholder="pvtkrrx.local">
@@ -6127,6 +6130,7 @@
         jackettApiKey: document.getElementById('jackettApiKey').value.trim(),
         sportsDbApiKey: document.getElementById('sportsDbApiKey').value.trim() || '123',
         sportsDbCacheHours: Math.max(1, Math.min(168, parseInt(document.getElementById('sportsDbCacheHours').value, 10) || 24)),
+        sportsImagePackagePath: document.getElementById('sportsImagePackagePath').value.trim(),
         qbitUrl: document.getElementById('qbitUrl').value.replace(/\/+$/, ''),
         qbitUsername: document.getElementById('qbitUsername').value.trim(),
         qbitPassword: document.getElementById('qbitPassword').value,
@@ -6173,6 +6177,9 @@
       if (config.sportsDbApiKey) document.getElementById('sportsDbApiKey').value = config.sportsDbApiKey;
       if (typeof config.sportsDbCacheHours === 'number' && Number.isFinite(config.sportsDbCacheHours)) {
         document.getElementById('sportsDbCacheHours').value = String(config.sportsDbCacheHours);
+      }
+      if (typeof config.sportsImagePackagePath === 'string') {
+        document.getElementById('sportsImagePackagePath').value = config.sportsImagePackagePath;
       }
       if (config.qbitUrl) document.getElementById('qbitUrl').value = config.qbitUrl;
       const providerId = String(config.provider || '').trim().toLowerCase();

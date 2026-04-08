@@ -972,6 +972,12 @@ async function run() {
       String(existingConfig?.sportsDbCacheHours || 24).trim(),
       { min: 1, max: 168 }
     )
+    const sportsImagePackagePath = await promptValue(
+      rl,
+      'Sports poster package path (optional)',
+      String(existingConfig?.sportsImagePackagePath || '').trim(),
+      { allowEmpty: true }
+    )
     const maxResults = await promptInteger(
       rl,
       'Max results per search',
@@ -1061,6 +1067,7 @@ async function run() {
       fileServerAuth,
       sportsDbApiKey,
       sportsDbCacheHours,
+      sportsImagePackagePath,
       maxResults,
       autoDeleteWatched,
       watchedDeleteGraceSeconds,
@@ -1371,6 +1378,7 @@ async function runAuto() {
     fileServerAuth: String(existingConfig?.fileServerAuth || '').trim(),
     sportsDbApiKey: String(existingConfig?.sportsDbApiKey || '123').trim(),
     sportsDbCacheHours: existingConfig?.sportsDbCacheHours || 24,
+    sportsImagePackagePath: String(existingConfig?.sportsImagePackagePath || '').trim(),
     maxResults: existingConfig?.maxResults || 50,
     autoDeleteWatched: existingConfig?.autoDeleteWatched !== false,
     watchedDeleteGraceSeconds: existingConfig?.watchedDeleteGraceSeconds ?? 300,

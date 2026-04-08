@@ -3,6 +3,7 @@ const path = require('path')
 const crypto = require('crypto')
 const zlib = require('zlib')
 const { resolveRuntimeDir } = require('./runtimeDir')
+const { findSportsImagePackageEntry } = require('./sportsImagePackage')
 
 const CACHE_ROOT_NAME = 'sports-image-cache'
 const TOKEN_VERSION = 'v1'
@@ -234,6 +235,14 @@ function inferContentType(contentType, ext) {
   return ''
 }
 
+function inferLocalImageExtension(filePath, contentType) {
+  const ext = path.extname(String(filePath || '')).toLowerCase()
+  if (['.jpg', '.jpeg', '.png', '.webp', '.avif', '.gif', '.svg'].includes(ext)) {
+    return ext === '.jpeg' ? '.jpg' : ext
+  }
+  return inferExtension(contentType, '')
+}
+
 function removeCacheEntry(entry) {
   if (!entry?.cacheKey) return
   const ext = String(entry.ext || '').trim()
@@ -313,6 +322,54 @@ function writeCacheEntry(cacheKey, sourceUrl, fileBuffer, contentType, ext) {
   return {
     ...entry,
     filePath
+  }
+}
+
+function importSportsImageFile(sourceUrl, filePath, options = {}) {
+  const normalizedUrl = normalizeRemoteImageUrl(sourceUrl)
+  if (!normalizedUrl) {
+    throw new Error('Invalid sports image URL')
+  }
+
+  const resolvedPath = path.resolve(String(filePath || ''))
+  if (!resolvedPath || !fs.existsSync(resolvedPath)) {
+    throw new Error('Sports image package file not found')
+  }
+
+  const stats = fs.statSync(resolvedPath)
+  if (!stats.isFile()) {
+    throw new Error('Sports image package path is not a file')
+  }
+
+  const maxBytes = getMaxImageBytes()
+  if (stats.size > maxBytes) {
+    throw new Error('Sports image package file exceeds max size')
+  }
+
+  const ext = inferLocalImageExtension(resolvedPath, options.contentType)
+  const contentType = inferContentType(options.contentType, ext)
+  if (!contentType.startsWith('image/')) {
+    throw new Error('Sports image package file is not a supported image')
+  }
+
+  const buffer = fs.readFileSync(resolvedPath)
+  if (!buffer.length) {
+    throw new Error('Sports image package file was empty')
+  }
+
+  const fresh = writeCacheEntry(
+    buildCacheKey(normalizedUrl),
+    normalizedUrl,
+    buffer,
+    contentType,
+    ext
+  )
+
+  return {
+    ...fresh,
+    cacheStatus: String(options.cacheStatus || 'package'),
+    packagePath: resolvedPath,
+    packageName: String(options.packageName || '').trim()
   }
 }
 
@@ -402,8 +459,22 @@ async function getCachedSportsImage(sourceUrl) {
   const ongoing = inFlight.get(cacheKey)
   if (ongoing) return ongoing
 
+  const packageEntry = findSportsImagePackageEntry(normalizedUrl)
+
   const pending = (async () => {
     try {
+      if (packageEntry?.filePath) {
+        try {
+          return importSportsImageFile(normalizedUrl, packageEntry.filePath, {
+            contentType: packageEntry.contentType,
+            cacheStatus: 'package',
+            packageName: packageEntry.packageName
+          })
+        } catch (err) {
+          console.warn(`[sports-image-cache] package fallback failed for ${normalizedUrl}: ${err.message}`)
+        }
+      }
+
       const downloaded = await downloadSportsImage(normalizedUrl)
       const fresh = writeCacheEntry(
         cacheKey,
@@ -446,6 +517,7 @@ module.exports = {
   proxySportsImageUrl,
   resolveSportsImageSourceUrl,
   readSportsImageDataUri,
+  importSportsImageFile,
   getCachedSportsImage,
   resolveSportsImageRequest
 }
