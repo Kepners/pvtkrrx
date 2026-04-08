@@ -22,7 +22,11 @@ const SUPPORTED_SPORT_TARGETS = Object.freeze([
   { key: 'cricket', sportsDbSport: 'Cricket', label: 'Cricket' },
   { key: 'rugby', sportsDbSport: 'Rugby', label: 'Rugby' },
   { key: 'motorsport', sportsDbSport: 'Motorsport', label: 'Motorsport' },
-  { key: 'wrestling', sportsDbSport: 'Fighting', label: 'Wrestling' }
+  { key: 'wrestling', sportsDbSport: 'Fighting', label: 'Wrestling' },
+  { key: 'golf', sportsDbSport: 'Golf', label: 'Golf' },
+  { key: 'cycling', sportsDbSport: 'Cycling', label: 'Cycling' },
+  { key: 'darts', sportsDbSport: 'Darts', label: 'Darts' },
+  { key: 'snooker', sportsDbSport: 'Snooker', label: 'Snooker' }
 ])
 
 function normalizeSpace(value) {

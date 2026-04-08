@@ -221,7 +221,29 @@ const LEAGUE_MAP = Object.freeze({
     name: 'PDC Darts',
     idLeague: '4554',
     sportKey: 'darts',
-    sportsDbSport: 'Darts'
+    sportsDbSport: 'Darts',
+    aliases: ['PDC', 'Professional Darts Corporation']
+  },
+  bdo: {
+    name: 'BDO Darts',
+    idLeague: '4561',
+    sportKey: 'darts',
+    sportsDbSport: 'Darts',
+    aliases: ['BDO', 'British Darts Organisation']
+  },
+  uciworldtour: {
+    name: 'UCI World Tour',
+    idLeague: '4465',
+    sportKey: 'cycling',
+    sportsDbSport: 'Cycling',
+    aliases: ['UCI', 'UCI WorldTour', 'World Tour']
+  },
+  worldsnooker: {
+    name: 'World Snooker',
+    idLeague: '4555',
+    sportKey: 'snooker',
+    sportsDbSport: 'Snooker',
+    aliases: ['World Snooker Tour', 'WST']
   },
   mlb: {
     name: 'MLB',

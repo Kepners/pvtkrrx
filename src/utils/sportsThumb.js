@@ -21,6 +21,10 @@ const THEMES = {
   cricket: { accent: '#84ff6a', bgA: '#10220d', bgB: '#091307', chip: 'CRICKET' },
   rugby: { accent: '#9dff7a', bgA: '#13230f', bgB: '#0a1408', chip: 'RUGBY' },
   tennis: { accent: '#d7ff44', bgA: '#20260b', bgB: '#121607', chip: 'TENNIS' },
+  golf: { accent: '#4ade80', bgA: '#0d1f12', bgB: '#071009', chip: 'GOLF' },
+  cycling: { accent: '#ffd633', bgA: '#1f1c09', bgB: '#100e06', chip: 'CYCLING' },
+  darts: { accent: '#e74c3c', bgA: '#1f0d0c', bgB: '#100807', chip: 'DARTS' },
+  snooker: { accent: '#2ecc71', bgA: '#0d1f14', bgB: '#07100a', chip: 'SNOOKER' },
   generic: { accent: '#8ab0bb', bgA: '#101922', bgB: '#0a0f15', chip: 'SPORT' }
 }
 
@@ -61,6 +65,10 @@ function detectSportFromTitle(title) {
   if (/\b(cricket|ipl|t20|odi|ashes)\b/.test(t)) return 'cricket'
   if (/\b(rugby|super rugby|six nations)\b/.test(t)) return 'rugby'
   if (/\b(tennis|wta|atp|wimbledon|roland garros|us open|australian open)\b/.test(t)) return 'tennis'
+  if (/\b(darts|pdc|bdo|premier league darts|world matchplay|world darts)\b/.test(t)) return 'darts'
+  if (/\b(golf|pga|lpga|masters|ryder cup|us open golf|the open championship)\b/.test(t)) return 'golf'
+  if (/\b(cycling|tour de france|giro d.italia|vuelta|uci|peloton)\b/.test(t)) return 'cycling'
+  if (/\b(snooker|crucible|world snooker)\b/.test(t)) return 'snooker'
   if (/\b(epl|premier league|football|champions league|la liga|serie a|bundesliga|manchester|arsenal|chelsea|liverpool)\b/.test(t)) return 'football'
   return 'generic'
 }
@@ -77,6 +85,10 @@ function normalizeThemeSportKey(value) {
   if (key === 'american-football') return 'nfl'
   if (key === 'baseball') return 'mlb'
   if (key === 'hockey' || key === 'ice hockey') return 'nhl'
+  if (key === 'golf') return 'golf'
+  if (key === 'cycling') return 'cycling'
+  if (key === 'darts') return 'darts'
+  if (key === 'snooker') return 'snooker'
   return ''
 }
 
@@ -99,6 +111,10 @@ function detectLeagueThemeKey(league, title = '') {
   if (/\b(ipl|cricket)\b/.test(text)) return 'cricket'
   if (/\b(rugby|six nations)\b/.test(text)) return 'rugby'
   if (/\b(wimbledon|roland garros|australian open|us open|atp|wta|tennis)\b/.test(text)) return 'tennis'
+  if (/\b(pdc|bdo|darts|premier league darts|world matchplay)\b/.test(text)) return 'darts'
+  if (/\b(pga|lpga|golf|masters|ryder cup)\b/.test(text)) return 'golf'
+  if (/\b(tour de france|giro|vuelta|uci|cycling)\b/.test(text)) return 'cycling'
+  if (/\b(snooker|crucible|world snooker)\b/.test(text)) return 'snooker'
   return ''
 }
 
