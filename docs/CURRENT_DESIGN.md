@@ -46,6 +46,7 @@ PVTKRRX is one codebase with three active runtime pieces:
    - exposes built-in `/file` and `/playback` endpoints
    - provides local admin routes such as `/local-config`, `/auto-provision`, `/network-info`, `/local/qbit/preferences`, `/local/qbit/download-path`, and `/local/qbit/auto-extract`
    - reads completed files directly from the host download path when available
+   - keeps its disk-backed runtime under `%APPDATA%\PVTKRRX\runtime` by default, outside the EXE install directory, so local config, account/link state, sports metadata, and cached poster bytes survive normal desktop updates and reinstall-over-the-top installs unless the runtime folder is explicitly deleted
    - can mint short-lived Stremio link sessions for the disk-backed `local` config when the request comes from the same host
 4. Electron desktop wrapper:
    - launches and packages the local runtime on Windows
@@ -147,6 +148,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 - `npm run server:setup` and `npm run cache:sports` can now warm that same disk cache ahead of time with upcoming event artwork, top team badges, and mapped league art so first-run sports tiles do not depend on cold image fetches.
 - The runtime can now also map a downloaded sports poster package from any local/server filesystem path. When `sportsImagePackagePath` or `PVTKRRX_SPORTS_IMAGE_PACKAGE_PATH` is configured, package images are imported into the runtime cache before any upstream image fetch, so the free TheSportsDB key is used to find updates and gaps instead of rehydrating the whole catalogue.
 - `npm run cache:sports-package` can proactively sync that mapped package into the runtime cache instead of waiting for lazy first-hit imports.
+- Normal `/image/sports/...` request handling is now cache-only but package-aware: if the byte cache misses, the runtime can still import the mapped package file for that artwork on demand, but it does not repopulate the catalogue from live upstream image fetches during request handling.
 - On long-running Linux/cloud runtimes, a background sports-cache autofill job now revisits one sport group every 15 minutes by default and persists its rotation cursor in the runtime directory.
 - The runtime `sports-image-cache/` store is now append-only by default: once image bytes are downloaded, PVTKRRX does not auto-prune or TTL-expire them unless the user explicitly deletes the cache on disk.
 - Sports detail meta now exposes Stremio `genres` tags from the resolved sport classification when available.

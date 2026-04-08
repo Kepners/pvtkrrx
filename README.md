@@ -148,6 +148,9 @@ npm run cache:sports-package -- /srv/pvtkrrx/sports-package
 ```
 
 Package manifests can live anywhere on the local PC or server. PVTKRRX supports a folder containing `sports-image-package.json` (or `sports-poster-package.json`) or a direct manifest-file path. The manifest should list remote `sourceUrl` values mapped to local image files, so the runtime can satisfy existing catalogue artwork from disk before it ever tries an upstream image fetch.
+That explicit `npm run cache:sports-package` sync is optional acceleration. During normal runtime requests, PVTKRRX now stays cache-only: it serves already-cached bytes first, can lazily import a matching file from the mapped package on a miss, and leaves live upstream refresh work to the seeding/autofill path instead of rebuilding the catalogue on demand.
+
+On Windows desktop installs, the runtime lives under `%APPDATA%\\PVTKRRX\\runtime`, outside the EXE install directory. That means local `Prowlarr`/`qBittorrent` config, sports poster package mapping, `sportsdb-poster-cache.json`, and `sports-image-cache/` survive normal app updates and reinstall-over-the-top installs unless the user explicitly deletes that runtime folder.
 
 The self-hosted server route keeps a stable disk-backed manifest at `/selfhost/manifest.json?mode=hosted`.
 Open `/configure` in a browser to review or edit the saved config at any time.
