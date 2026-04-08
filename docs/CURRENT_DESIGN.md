@@ -80,19 +80,21 @@ PVTKRRX is one codebase with three active runtime pieces:
   - runtime log copy/open actions
   - explicit `Minimize`, `Send To Tray`, and `Exit App` actions
 - The configure page now mirrors that local-runtime visibility with a live qBittorrent status panel that shows the effective save path, incomplete path, fallback storage roots, and whether PVTKRRX currently manages the qBit completion hook.
-- The public homepage and runbooks now use the brand-led `PVTKRRX` guide surface, point users at docs instead of `/configure`, and keep the locked route vocabulary (`PC Local`, `LAN Bridge`, `Remote Seedbox`).
+- The public homepage, sports page, and runbooks now use the brand-led `PVTKRRX` guide surface, point users at docs instead of `/configure`, and keep the locked route vocabulary (`PC Local`, `LAN Bridge`, `Remote Seedbox`).
 - The public homepage now shows a live release-status card driven by `/version-status.json`, and the Windows desktop shell shows the same release check in the popup.
 - Legacy `Hybrid Home` wording may still appear in older docs or internal notes. Treat that as terminology drift, not a different route model, unless a doc explicitly calls out the older naming history.
 
 ## Public Host Truth Table
 
-Verified on 2026-04-07:
+Verified on 2026-04-08:
 
 - `https://www.pvtkrrx.cc/` returns the landing page (`200`)
 - `https://www.pvtkrrx.cc/configure` no longer serves the public setup UI; public requests redirect back to the guide-only site
+- `https://www.pvtkrrx.cc/sports` returns the dedicated sports guide page (`200`)
 - `https://www.pvtkrrx.cc/runbooks` returns the runbooks page (`200`)
 - `https://www.pvtkrrx.cc/manifest.json` returns the bootstrap manifest (`200`)
 - `https://www.pvtkrrx.cc/health` returns health JSON (`200`) or the health page when the client asks for HTML
+- `https://www.pvtkrrx.cc/sitemap.xml` now includes `/sports`
 - `https://www.pvtkrrx.cc/local/install` returns `403` from the public internet because it is a same-host/local-network helper route
 - `https://pvtkrrx.vercel.app` is not canonical and returned Vercel `DEPLOYMENT_NOT_FOUND`
 - 2026-04-06 homepage verification on the canonical host confirmed the refactored landing page markers are live: `truth-band` and `Where does playback happen` are present, while legacy `meta-grid` and `hero-chip` markers are absent
