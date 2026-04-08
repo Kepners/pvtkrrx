@@ -4,7 +4,7 @@ Updated: 2026-04-08
 
 ## Current Stage
 
-PVTKRRX is in a working `1.1.29` state on the main Windows/local route set.
+PVTKRRX is in a working `1.1.30` state on the main Windows/local route set.
 The current packaged Windows app is now verified as the real host runtime, and a live Apple TV synced home-route pass has been captured against it.
 
 The practical reading of the project today is:
@@ -20,8 +20,8 @@ The practical reading of the project today is:
 - the sports catalog artwork path now prefers portrait poster art for tiles, while keeping separate sport-aware backgrounds/logos for player wallpaper/loading
 - sports poster, wallpaper, landscape, and logo bytes can now be cached on demand by the active runtime through signed `/image/sports/...` URLs instead of hotlinking every request back to the upstream artwork host
 - `npm run server:setup` now also pre-seeds that same `sports-image-cache/` store with upcoming event art, top team badges, and mapped league artwork, `npm run cache:sports` can refresh it later without deleting warm entries, and long-running Linux/cloud runtimes now keep topping the cache up automatically every 15 minutes in rotating sport batches
-- the current `main` workspace target and live hosted Contabo/Coolify runtime now both point at `1.1.29` / commit `e568ece`, so desktop, self-host, GitHub release, and hosted cloud are back in revision parity
-- the `1.1.29` sports update carries forward the permanent append-only hosted sports image catalogue from `598ca01` and adds mapped sports poster package support so local/server runtimes can treat a downloaded package as the primary sports-art catalogue while the free TheSportsDB path is left to update/gap discovery
+- the current release cut now points desktop, self-host, GitHub release, and hosted cloud back at the same `1.1.30` revision line after the sports cache regression fix
+- the `1.1.30` sports update carries forward the mapped sports poster package support and permanent hosted image catalogue while fixing the cache-only cold-start regression so seeded event and league artwork still resolve after restart without reintroducing live TheSportsDB lookups on the user-facing path
 - the Windows desktop runtime still defaults to `%APPDATA%\PVTKRRX\runtime`, outside the EXE install directory, so local Prowlarr/qBittorrent config, poster-package mapping, and sports cache state survive normal app updates and reinstall-over-the-top installs unless that runtime folder is explicitly deleted
 - the sports identity path is now materially wider: multi-token leagues (`Premier League`, `La Liga`), `DD.MM.YYYY` dates, year-only titles that can borrow the Prowlarr publish date, and event-prefix noise such as `Super Bowl LX` now normalize into the same shared structured matchup shape
 - structured TheSportsDB event lookup now expands league-aware team nicknames such as `Lakers`, `Yankees`, and `Maple Leafs` to the official SportsDB team names before searching, then falls back to date+sport matching when literal event queries still miss
@@ -95,6 +95,12 @@ The practical reading of the project today is:
 
 ## Work Carried Out On 2026-04-08
 
+- Fixed the cache-only sports artwork cold-start regression: the background seeder now persists seeded event + league artwork metadata only for image URLs that actually made it into the disk cache, and `getEventArtwork()` can reuse that seeded metadata after a cold restart instead of collapsing straight to SVG placeholders.
+- Added smoke coverage for that release path: the seed smoke now proves `sportsdb-poster-cache.json` is written, reloads a fresh `SportsDbClient`, and verifies both seeded event artwork and seeded league fallback artwork still resolve from cache after restart.
+- Release-prep moved the package version to `1.1.30`, refreshed the desktop update feed, and rebuilt the Windows artifacts for the sports cache metadata fix release.
+- `npm run smoke:config`, `npm run smoke:guards`, `npm run smoke:selfhost`, `npm run smoke:desktop`, `npm run smoke:playback`, `npm run smoke:parity`, `npm run smoke:sports`, `npm run smoke:sports-cache`, and `npm run smoke:sports-cache-auto` all passed on 2026-04-08 for the `1.1.30` release cut.
+- `C:/Program Files/Git/bin/bash.exe -n scripts/install-selfhost.sh` passed on 2026-04-08 for the `1.1.30` release cut.
+- `npm run dist:win` passed on 2026-04-08 for the `1.1.30` desktop release build and refreshed `dist/latest.yml` plus `dist/releases/index.json`.
 - Verified `main` and `origin/main` are both at commit `e568ece` (`feat: add mapped sports poster packages`), so the `1.1.29` sports-package release is in GitHub rather than sitting as an unpushed local patch.
 - Verified the live public Contabo route is now running that same release build: the current Coolify container is `w14jewmw5ubscrxh8zzfhq7d-093443455325` on image `w14jewmw5ubscrxh8zzfhq7d:e568ece2a012653caea16fdfe9fefa713dc5626b`.
 - Verified `https://www.pvtkrrx.cc/version-status.json` now reports `currentVersion = 1.1.29`, `latestVersion = 1.1.29`, and `updateAvailable = false` after the manual Coolify API redeploy for deployment `cphgnqptcvtvif60g0u57n7g`.
@@ -211,7 +217,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - 2026-04-06 Contabo runtime verification showed the public route still enters through Caddy and targets the Coolify alias `pvtkrrx:3000`; the separate `pvtkrrx.service` host runtime at `/opt/pvtkrrx` on `:7000` is not the public route unless Caddy is repointed
 - 2026-04-07 public-site cleanup: the public website stopped advertising `/configure` as a public entry point, `GET /configure` now redirects remote/public requests back to the guide-only site, the bootstrap manifest now identifies remote root installs as `PVTKRRX Website Only`, and runbooks/homepage copy now point users to the Windows host runtime or their own self-host server for real setup
 - explicit self-host server mode now exposes `/app-config.json`, disk-backed `/selfhost/config.json` + `/selfhost/manifest.json?mode=hosted`, and `POST /server-config` for persisted VPS/seedbox installs
-- the self-host installer path has now been rebuilt around a dedicated Linux bootstrap script plus a new `npm run server:setup` installer flow that writes a stable `PVTKRRX_RUNTIME_DIR`, generates `AUTH_TOKEN_SECRET`, supports `PVTKRRX_PUBLIC_BASE_URL`, auto-discovers existing Prowlarr/qBittorrent configs when present, automatically hands off to the full bootstrap when those providers are missing, now exposes a hosted launcher at `https://www.pvtkrrx.cc/install-selfhost.sh`, pulls the app source from the branch payload by default with optional tag/manifest pinning and an automatic retry from `main` if a pinned release is too old for `scripts/server-installer.js`, saves the runtime config locally, creates the self-host password file, can install a Linux `systemd` service for auto-start on boot, and now prints the working public PVTKRRX root/configure/bootstrap/manifest URLs explicitly in the installer summary using raw stdout so they are not redacted; the current published self-host release is `v1.12.15-selfhost`
+- the self-host installer path has now been rebuilt around a dedicated Linux bootstrap script plus a new `npm run server:setup` installer flow that writes a stable `PVTKRRX_RUNTIME_DIR`, generates `AUTH_TOKEN_SECRET`, supports `PVTKRRX_PUBLIC_BASE_URL`, auto-discovers existing Prowlarr/qBittorrent configs when present, automatically hands off to the full bootstrap when those providers are missing, now exposes a hosted launcher at `https://www.pvtkrrx.cc/install-selfhost.sh`, pulls the app source from the branch payload by default with optional tag/manifest pinning and an automatic retry from `main` if a pinned release is too old for `scripts/server-installer.js`, saves the runtime config locally, creates the self-host password file, can install a Linux `systemd` service for auto-start on boot, and now prints the working public PVTKRRX root/configure/bootstrap/manifest URLs explicitly in the installer summary using raw stdout so they are not redacted; the current published self-host release is `v1.12.16-selfhost`
 - `npm run smoke:stremio-link` passed on 2026-03-31 after the new link-session flow was added for hosted token configs: server-created session, install-seen manifest hit, browser AuthKey completion, and final linked install URL/token refresh
 - configure page now exposes a one-time `Server Link Session` flow so a local signed-in Stremio browser/device can link a remote/cloud server config without the server recovering raw login credentials
 - `PC Local` resolves as a real addon from `http://127.0.0.1:7000/local/manifest.json?mode=local`
@@ -253,6 +259,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - `1.1.27` installers were built successfully into `dist/` on 2026-04-06 for the synchronized release-alignment cut and homepage release-card restore
 - `1.1.28` installers were built successfully into `dist/` on 2026-04-08 for the canonical-host cleanup and synchronized release refresh
 - `1.1.29` installers were built successfully into `dist/` on 2026-04-08 for the mapped sports poster package release
+- `1.1.30` installers were built successfully into `dist/` on 2026-04-08 for the sports cache metadata persistence release
 - `1.1.23` GitHub release was published on 2026-04-02 with the matching `latest.yml`, portable EXE, and setup installer assets
 - `1.1.25` GitHub release was published on 2026-04-06 with the matching `latest.yml`, portable EXE, and setup installer assets
 - `v1.12.11-selfhost` GitHub prerelease was published on 2026-04-06 for the self-host/server playback-handoff fix and current cloud installer line
@@ -264,6 +271,8 @@ These items are verified in the current workspace or by direct client/log proof:
 - `v1.12.14-selfhost` GitHub prerelease was published on 2026-04-08 for the synchronized release refresh and current cloud installer line
 - `1.1.29` GitHub release was published on 2026-04-08 with the matching `latest.yml`, portable EXE, and setup installer assets
 - `v1.12.15-selfhost` GitHub prerelease was published on 2026-04-08 for the mapped sports poster package release and current cloud installer line
+- `1.1.30` GitHub release was published on 2026-04-08 with the matching `latest.yml`, portable EXE, and setup installer assets
+- `v1.12.16-selfhost` GitHub prerelease was published on 2026-04-08 for the cache-only sports artwork metadata persistence release and current cloud installer line
 - `npm run dist:win` passed again on 2026-04-06 for the `1.1.25` desktop public release build
 - `npm run dist:win` passed again on 2026-04-06 for the `1.1.26` desktop installer refresh
 - `npm run dist:win` passed again on 2026-04-06 for the aligned `1.1.27` desktop release build
@@ -328,7 +337,7 @@ These items are verified in the current workspace or by direct client/log proof:
 
 These items should still be treated as open until captured on real clients:
 
-- one extra non-tvOS `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.29` desktop build for cross-client parity
+- one extra non-tvOS `LAN Bridge` browse/play pass on Android TV or Android mobile using the latest `1.1.30` desktop build for cross-client parity
 - one real public `Remote Seedbox` ready-file playback success on a remote client
 - one auth-protected external file-server playback success on a real Stremio client
 - long-session playback/performance tuning after qBittorrent download-speed adjustments
