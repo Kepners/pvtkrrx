@@ -1,6 +1,11 @@
 const { SPORTS_DISCOVERY_CATALOGS } = require('../config/sportsCatalogs')
 const { listMappedLeagues } = require('./leagueMap')
 const { fetchAndCacheSportsImage, normalizeRemoteImageUrl } = require('./sportsImageCache')
+const {
+  persistSeededEventArtwork,
+  persistSeededLeagueArtwork,
+  flushPersistedArtworkCache
+} = require('../clients/sportsdb')
 
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json'
 const DEFAULT_API_KEY = '123'
@@ -225,6 +230,49 @@ function findBestLeagueMatch(leagues = [], expectedName = '') {
   return bestScore >= 60 ? best : null
 }
 
+function scoreTeamCandidate(team = {}, expectedName = '') {
+  return Math.max(
+    scoreNameMatch(expectedName, team?.strTeam),
+    scoreNameMatch(expectedName, team?.strTeamShort),
+    scoreNameMatch(expectedName, team?.strAlternate)
+  )
+}
+
+function findBestTeamMatch(teams = [], expectedName = '', expectedId = '') {
+  const normalizedId = normalizeSpace(expectedId)
+  if (normalizedId) {
+    const byId = teams.find((team) => normalizeSpace(team?.idTeam) === normalizedId)
+    if (byId) return byId
+  }
+
+  let best = null
+  let bestScore = 0
+  for (const team of teams) {
+    const score = scoreTeamCandidate(team, expectedName)
+    if (score > bestScore) {
+      best = team
+      bestScore = score
+    }
+  }
+  return bestScore >= 60 ? best : null
+}
+
+function findLeagueForEvent(leagues = [], event = {}) {
+  const expectedId = normalizeSpace(event?.idLeague)
+  if (expectedId) {
+    const byId = leagues.find((league) => normalizeSpace(league?.idLeague) === expectedId)
+    if (byId) return byId
+  }
+  return findBestLeagueMatch(leagues, event?.strLeague || '')
+}
+
+function findTeamsForEvent(teams = [], event = {}) {
+  return {
+    homeTeam: findBestTeamMatch(teams, event?.strHomeTeam || '', event?.idHomeTeam || ''),
+    awayTeam: findBestTeamMatch(teams, event?.strAwayTeam || '', event?.idAwayTeam || '')
+  }
+}
+
 function selectLeagueTargets(leagues = [], priorityTerms = [], mappedLeagues = [], limit = DEFAULT_EVENT_LEAGUE_LIMIT) {
   const ranked = [...leagues]
     .map((league) => ({ league, score: scoreLeagueCandidate(league, priorityTerms) }))
@@ -292,6 +340,68 @@ function collectLeagueImageTasks(taskMap, league, sportKey) {
   queueImageTask(taskMap, { sourceUrl: league?.strFanart1, variant: 'background', category: 'league-fallback', sportKey, label: leagueName })
   queueImageTask(taskMap, { sourceUrl: league?.strFanart2, variant: 'background', category: 'league-fallback', sportKey, label: leagueName })
   queueImageTask(taskMap, { sourceUrl: league?.strFanart3, variant: 'background', category: 'league-fallback', sportKey, label: leagueName })
+}
+
+function keepCachedImageUrl(value, cachedImageUrls) {
+  const normalizedUrl = normalizeRemoteImageUrl(value)
+  if (!normalizedUrl || !cachedImageUrls.has(normalizedUrl)) return ''
+  return normalizedUrl
+}
+
+function filterEventArtworkByCache(event = {}, cachedImageUrls) {
+  return {
+    ...event,
+    strEventPoster: keepCachedImageUrl(event?.strEventPoster, cachedImageUrls),
+    strPoster: keepCachedImageUrl(event?.strPoster, cachedImageUrls),
+    strEventSquare: keepCachedImageUrl(event?.strEventSquare, cachedImageUrls),
+    strSquare: keepCachedImageUrl(event?.strSquare, cachedImageUrls),
+    strEventThumb: keepCachedImageUrl(event?.strEventThumb, cachedImageUrls),
+    strThumb: keepCachedImageUrl(event?.strThumb, cachedImageUrls),
+    strEventBanner: keepCachedImageUrl(event?.strEventBanner, cachedImageUrls),
+    strBanner: keepCachedImageUrl(event?.strBanner, cachedImageUrls),
+    strFanart: keepCachedImageUrl(event?.strFanart, cachedImageUrls),
+    strLogo: keepCachedImageUrl(event?.strLogo, cachedImageUrls)
+  }
+}
+
+function filterLeagueArtworkByCache(league = {}, cachedImageUrls) {
+  return {
+    ...league,
+    strLogo: keepCachedImageUrl(league?.strLogo, cachedImageUrls),
+    strBadge: keepCachedImageUrl(league?.strBadge, cachedImageUrls),
+    strPoster: keepCachedImageUrl(league?.strPoster, cachedImageUrls),
+    strBanner: keepCachedImageUrl(league?.strBanner, cachedImageUrls),
+    strFanart1: keepCachedImageUrl(league?.strFanart1, cachedImageUrls),
+    strFanart2: keepCachedImageUrl(league?.strFanart2, cachedImageUrls),
+    strFanart3: keepCachedImageUrl(league?.strFanart3, cachedImageUrls)
+  }
+}
+
+function filterTeamArtworkByCache(team = {}, cachedImageUrls) {
+  return {
+    ...team,
+    strBadge: keepCachedImageUrl(team?.strBadge, cachedImageUrls),
+    strTeamBadge: keepCachedImageUrl(team?.strTeamBadge, cachedImageUrls),
+    strTeamLogo: keepCachedImageUrl(team?.strTeamLogo, cachedImageUrls),
+    strTeamBanner: keepCachedImageUrl(team?.strTeamBanner, cachedImageUrls),
+    strTeamFanart1: keepCachedImageUrl(team?.strTeamFanart1, cachedImageUrls),
+    strTeamJersey: keepCachedImageUrl(team?.strTeamJersey, cachedImageUrls)
+  }
+}
+
+function eventHasDirectArtwork(event = {}) {
+  return Boolean(
+    event?.strEventPoster ||
+    event?.strPoster ||
+    event?.strEventSquare ||
+    event?.strSquare ||
+    event?.strEventThumb ||
+    event?.strThumb ||
+    event?.strEventBanner ||
+    event?.strBanner ||
+    event?.strFanart ||
+    event?.strLogo
+  )
 }
 
 function buildSportsDbUrl(apiKey, endpoint, params = {}) {
@@ -450,6 +560,18 @@ async function seedSportTarget(target, context) {
   summary.selectedLeagues = selected.length
 
   const eventsById = new Map()
+  const leaguePool = new Map()
+  const teamPool = new Map()
+  const rememberLeague = (league) => {
+    const key = buildLeagueIdentity(league)
+    if (!key) return
+    leaguePool.set(key, league)
+  }
+  const rememberTeam = (team) => {
+    const key = buildTeamIdentity(team)
+    if (!key) return
+    teamPool.set(key, team)
+  }
   const addEvents = (items = []) => {
     for (const item of items) {
       const key = buildEventIdentity(item)
@@ -457,6 +579,7 @@ async function seedSportTarget(target, context) {
       eventsById.set(key, item)
     }
   }
+  for (const league of [...selected, ...mappedMatches]) rememberLeague(league)
 
   for (const league of selected) {
     const idLeague = normalizeSpace(league?.idLeague)
@@ -492,6 +615,7 @@ async function seedSportTarget(target, context) {
         team = await fetchTeamDetails(context.apiKey, team.idTeam, context) || team
       }
       teamIds.add(teamId)
+      rememberTeam(team)
       collectTeamImageTasks(localTasks, team, target.key)
     }
   }
@@ -502,6 +626,7 @@ async function seedSportTarget(target, context) {
     if (!hasLeagueArtwork(league) && normalizeSpace(league?.idLeague)) {
       league = await fetchLeagueDetails(context.apiKey, league.idLeague, context) || league
     }
+    rememberLeague(league)
     collectLeagueImageTasks(localTasks, league, target.key)
   }
 
@@ -509,7 +634,13 @@ async function seedSportTarget(target, context) {
   summary.queuedImages = tasks.length
   return {
     summary,
-    tasks
+    tasks,
+    artworkSeed: {
+      target,
+      events: [...eventsById.values()],
+      leagues: [...leaguePool.values()],
+      teams: [...teamPool.values()]
+    }
   }
 }
 
@@ -566,6 +697,7 @@ async function seedSportsImageCache(options = {}) {
     : SUPPORTED_SPORT_TARGETS
   const requestCache = new Map()
   const taskMap = new Map()
+  const artworkSeeds = []
 
   const context = {
     apiKey,
@@ -584,6 +716,7 @@ async function seedSportsImageCache(options = {}) {
     logger.log(`[cache:sports] ${target.label}: fetching leagues, events, and badges`)
     const sportResult = await seedSportTarget(target, context)
     summary.sports.push(sportResult.summary)
+    artworkSeeds.push(sportResult.artworkSeed)
     for (const task of sportResult.tasks) {
       queueImageTask(taskMap, task)
     }
@@ -591,10 +724,13 @@ async function seedSportsImageCache(options = {}) {
   }
 
   const tasks = [...taskMap.values()]
+  const cachedImageUrls = new Set()
   summary.images.total = tasks.length
   await runWithConcurrency(tasks, options.imageConcurrency || DEFAULT_IMAGE_CONCURRENCY, async (task) => {
     try {
       const entry = await fetchAndCacheSportsImage(task.sourceUrl)
+      const cachedUrl = normalizeRemoteImageUrl(task.sourceUrl)
+      if (cachedUrl) cachedImageUrls.add(cachedUrl)
       if (entry?.cacheStatus === 'hit') {
         summary.images.skipped += 1
       } else if (entry?.cacheStatus === 'package') {
@@ -611,6 +747,42 @@ async function seedSportsImageCache(options = {}) {
       logger.warn(`[cache:sports] image fetch failed for ${task.category}/${task.variant} ${task.label || task.sourceUrl}: ${error.message}`)
     }
   })
+
+  for (const artworkSeed of artworkSeeds) {
+    const targetSport = normalizeSpace(artworkSeed?.target?.sportsDbSport)
+    const filteredLeagues = (Array.isArray(artworkSeed?.leagues) ? artworkSeed.leagues : [])
+      .map((league) => filterLeagueArtworkByCache(league, cachedImageUrls))
+    const filteredTeams = (Array.isArray(artworkSeed?.teams) ? artworkSeed.teams : [])
+      .map((team) => filterTeamArtworkByCache(team, cachedImageUrls))
+    for (const league of filteredLeagues) {
+      persistSeededLeagueArtwork(context.apiKey, league, {
+        sportHint: normalizeSpace(league?.strSport || targetSport),
+        persistOptions: { flush: false }
+      })
+    }
+    for (const event of (Array.isArray(artworkSeed?.events) ? artworkSeed.events : [])) {
+      const filteredEvent = filterEventArtworkByCache(event, cachedImageUrls)
+      const league = findLeagueForEvent(filteredLeagues, filteredEvent)
+      if (league) {
+        persistSeededLeagueArtwork(context.apiKey, league, {
+          dateHint: normalizeSpace(filteredEvent?.dateEvent || ''),
+          sportHint: normalizeSpace(filteredEvent?.strSport || league?.strSport || targetSport),
+          persistOptions: { flush: false }
+        })
+      }
+      if (!eventHasDirectArtwork(filteredEvent)) continue
+      const { homeTeam, awayTeam } = findTeamsForEvent(filteredTeams, filteredEvent)
+      persistSeededEventArtwork(context.apiKey, filteredEvent, {
+        league,
+        homeTeam,
+        awayTeam,
+        sportHint: normalizeSpace(filteredEvent?.strSport || league?.strSport || targetSport),
+        dateHint: normalizeSpace(filteredEvent?.dateEvent || ''),
+        persistOptions: { flush: false }
+      })
+    }
+  }
+  flushPersistedArtworkCache()
 
   summary.completedAt = new Date().toISOString()
   logger.log(`[cache:sports] complete: ${summarizeSportsImageSeed(summary)}`)

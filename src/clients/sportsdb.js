@@ -94,6 +94,10 @@ function persistResolvedArtwork(key, value, expiresAt) {
   if (!key || !value || !Number.isFinite(expiresAt)) return
   cache.set(key, { value, expiresAt })
   persistentStore.set(key, { value, expiresAt })
+}
+
+function flushPersistedArtworkCache() {
+  hydratePersistentCache()
   schedulePersistFlush()
 }
 
@@ -941,8 +945,11 @@ function leagueArtworkCacheKey(apiKey, league = '', date = '', sportHint = '') {
   return `${CACHE_KEY_VERSION}|league-artwork|${String(apiKey || '').trim().toLowerCase()}|${normalizedLeague}|${normalizedDate}|${normalizedSport}`
 }
 
-function persistResolvedArtworkVariants(primaryKey, value, expiresAt, options = {}) {
+function persistResolvedArtworkVariants(primaryKey, value, expiresAt, options = {}, persistOptions = {}) {
   if (!value || !Number.isFinite(expiresAt)) return
+  hydratePersistentCache()
+
+  const shouldFlush = persistOptions.flush !== false
 
   if (primaryKey) persistResolvedArtwork(primaryKey, value, expiresAt)
 
@@ -963,6 +970,8 @@ function persistResolvedArtworkVariants(primaryKey, value, expiresAt, options = 
     )
     if (leagueKey) persistResolvedArtwork(leagueKey, value, expiresAt)
   }
+
+  if (shouldFlush) schedulePersistFlush()
 }
 
 function scoreLeague(league, title, titleSport) {
@@ -1093,6 +1102,154 @@ function applyArtworkContext(value, context = {}) {
   if (homeTeam) next.homeTeam = homeTeam
   if (awayTeam) next.awayTeam = awayTeam
   return next
+}
+
+function buildSeededStructuredEvent(event, options = {}) {
+  const league = normalizeSpace(options.leagueCode || options.league?.strLeague || event?.strLeague || '')
+  const date = extractDateHint(options.dateHint || event?.dateEvent || '', '')
+  const homeTeam = normalizeSpace(options.homeTeam?.strTeam || event?.strHomeTeam || '')
+  const awayTeam = normalizeSpace(options.awayTeam?.strTeam || event?.strAwayTeam || '')
+  if (league && date && homeTeam && awayTeam) {
+    return {
+      league,
+      date,
+      homeTeam,
+      awayTeam,
+      raw: String(event?.strEvent || '').trim()
+    }
+  }
+
+  const eventName = normalizeSpace(options.eventName || event?.strEvent || '')
+  if (league && date && eventName) {
+    return {
+      league,
+      date,
+      eventName,
+      raw: eventName
+    }
+  }
+
+  return buildStructuredEventData({
+    title: eventName,
+    league,
+    date,
+    homeTeam,
+    awayTeam,
+    publishDate: date
+  })
+}
+
+function buildSeededEventArtworkValue(event, options = {}) {
+  if (!event) return null
+
+  const league = options.league || null
+  const homeTeam = options.homeTeam || null
+  const awayTeam = options.awayTeam || null
+  const sport = normalizeSpace(options.sportHint || event?.strSport || league?.strSport || '')
+  const leagueName = normalizeSpace(options.leagueCode || league?.strLeague || event?.strLeague || '')
+  const homeTeamName = normalizeSpace(homeTeam?.strTeam || event?.strHomeTeam || '')
+  const awayTeamName = normalizeSpace(awayTeam?.strTeam || event?.strAwayTeam || '')
+  const dateEvent = extractDateHint(options.dateHint || event?.dateEvent || '', '')
+
+  const seededEvent = {
+    ...event,
+    strSport: sport || event?.strSport || '',
+    strLeague: leagueName || event?.strLeague || '',
+    strHomeTeam: homeTeamName || event?.strHomeTeam || '',
+    strAwayTeam: awayTeamName || event?.strAwayTeam || '',
+    dateEvent: dateEvent || event?.dateEvent || ''
+  }
+
+  const poster = pickPosterImage(seededEvent) || pickLeaguePosterImage(league) || pickTeamPosterImage(homeTeam) || pickTeamPosterImage(awayTeam)
+  const landscape = pickLandscapeImage(seededEvent) || pickLeagueLandscapeImage(league) || pickTeamLandscapeImage(homeTeam) || pickTeamLandscapeImage(awayTeam) || poster
+  const background = pickBackgroundImage(seededEvent) || pickLeagueBackgroundImage(league) || landscape || poster
+  const logo = pickEventLogo(seededEvent) || pickLeagueLogo(league) || pickTeamLogo(homeTeam) || pickTeamLogo(awayTeam)
+
+  const value = buildArtworkValue(
+    seededEvent,
+    poster,
+    landscape,
+    background,
+    logo,
+    'thesportsdb-seeded'
+  )
+
+  return applyArtworkContext(value, {
+    homeBadge: pickTeamBadgeImage(homeTeam),
+    awayBadge: pickTeamBadgeImage(awayTeam),
+    leagueLogo: pickLeagueLogo(league),
+    homeTeam: homeTeamName,
+    awayTeam: awayTeamName
+  })
+}
+
+function buildSeededLeagueArtworkValue(league, options = {}) {
+  if (!league) return null
+  return toLeagueFallbackValue({
+    poster: pickLeaguePosterImage(league),
+    landscapeImage: pickLeagueLandscapeImage(league),
+    backgroundImage: pickLeagueBackgroundImage(league),
+    logo: pickLeagueLogo(league),
+    league: normalizeSpace(options.leagueCode || league?.strLeague || ''),
+    sport: normalizeSpace(options.sportHint || league?.strSport || '')
+  }, extractDateHint(options.dateHint || '', ''), normalizeSpace(options.sportHint || league?.strSport || ''))
+}
+
+function persistSeededEventArtwork(apiKey, event, options = {}) {
+  const value = buildSeededEventArtworkValue(event, options)
+  if (!value) return null
+
+  const structuredEvent = buildSeededStructuredEvent(event, options)
+  const sportHint = normalizeSpace(options.sportHint || value?.sport || '')
+  const publishDate = extractDateHint(options.dateHint || value?.eventDate || event?.dateEvent || '', '')
+  const title = normalizeSpace(options.title || event?.strEvent || value?.eventName || '')
+  const primaryKey = cacheKey(
+    apiKey,
+    title,
+    publishDate,
+    String(event?.idEvent || value?.eventId || '').trim(),
+    sportHint,
+    structuredEvent
+  )
+  const expiresAt = Date.now() + STRUCTURED_EVENT_CACHE_TTL_MS
+
+  persistResolvedArtworkVariants(primaryKey, value, expiresAt, {
+    apiKey,
+    eventId: String(event?.idEvent || value?.eventId || '').trim(),
+    league: normalizeSpace(options.leagueCode || value?.league || event?.strLeague || ''),
+    dateHint: publishDate,
+    sportHint,
+    structuredEvent
+  }, options.persistOptions)
+
+  return value
+}
+
+function persistSeededLeagueArtwork(apiKey, league, options = {}) {
+  const value = buildSeededLeagueArtworkValue(league, options)
+  if (!value) return null
+
+  const expiresAt = Date.now() + LEAGUE_ASSET_CACHE_TTL_MS
+  const baseOptions = {
+    apiKey,
+    league: normalizeSpace(options.leagueCode || value?.league || league?.strLeague || ''),
+    sportHint: normalizeSpace(options.sportHint || value?.sport || league?.strSport || '')
+  }
+
+  persistResolvedArtworkVariants('', value, expiresAt, {
+    ...baseOptions,
+    dateHint: ''
+  }, options.persistOptions)
+
+  const datedHint = extractDateHint(options.dateHint || '', '')
+  if (datedHint) {
+    persistResolvedArtworkVariants('', value, expiresAt, {
+      ...baseOptions,
+      dateHint: datedHint
+    }, options.persistOptions)
+  }
+
+  return value
 }
 
 class SportsDbClient {
@@ -1643,6 +1800,12 @@ class SportsDbClient {
     const structuredArtHit = getCachedValue(cache, structuredArtworkCacheKey(this.apiKey, structuredEvent))
     if (structuredArtHit !== undefined) return structuredArtHit || null
 
+    const leagueArtHit = getCachedValue(cache, leagueArtworkCacheKey(this.apiKey, mappedLeague, dateHint, sportHint))
+    if (leagueArtHit !== undefined) return leagueArtHit || null
+
+    const genericLeagueArtHit = getCachedValue(cache, leagueArtworkCacheKey(this.apiKey, mappedLeague, '', sportHint))
+    if (genericLeagueArtHit !== undefined) return genericLeagueArtHit || null
+
     // Cache-only mode: never make live API calls to TheSportsDB during
     // catalog or meta requests.  The background autofill populates the
     // persistent cache; on a miss we return null so the artwork resolver
@@ -1651,4 +1814,10 @@ class SportsDbClient {
   }
 }
 
-module.exports = { SportsDbClient, normalizeTeamName }
+module.exports = {
+  SportsDbClient,
+  normalizeTeamName,
+  persistSeededEventArtwork,
+  persistSeededLeagueArtwork,
+  flushPersistedArtworkCache
+}

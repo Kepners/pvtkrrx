@@ -157,6 +157,12 @@ function buildFetchStub() {
   }
 }
 
+function loadFreshSportsDbClient() {
+  const modulePath = require.resolve('../src/clients/sportsdb')
+  delete require.cache[modulePath]
+  return require('../src/clients/sportsdb').SportsDbClient
+}
+
 async function main() {
   const originalFetch = global.fetch
   const { fetchStub, getApiCalls, getImageCalls } = buildFetchStub()
@@ -190,8 +196,35 @@ async function main() {
     assert.equal(getImageCalls(), first.images.total, 'expected exactly one upstream fetch per unique image on first pass')
 
     const cacheDir = path.join(runtimeDir, 'sports-image-cache')
+    const posterCachePath = path.join(runtimeDir, 'sportsdb-poster-cache.json')
     assert.ok(fs.existsSync(cacheDir), 'expected sports image cache directory to exist')
     assert.ok(fs.readdirSync(cacheDir).length > 0, 'expected cached image files to be written to disk')
+    assert.ok(fs.existsSync(posterCachePath), 'expected seeded artwork metadata cache to be written to disk')
+
+    const FreshSportsDbClient = loadFreshSportsDbClient()
+    const freshClient = new FreshSportsDbClient('123')
+    const eventArtwork = await freshClient.getEventArtwork({
+      title: 'Arsenal vs Chelsea',
+      publishDate: todayIso(),
+      sportHint: 'football',
+      league: 'EPL',
+      date: todayIso(),
+      homeTeam: 'Arsenal',
+      awayTeam: 'Chelsea',
+      eventId: 'evt-1'
+    })
+    assert.equal(eventArtwork?.eventId, 'evt-1', 'expected cold-start client to resolve seeded event artwork')
+    assert.match(String(eventArtwork?.poster || ''), /evt-1-poster\.jpg$/, 'expected cold-start client to reuse seeded poster metadata')
+
+    const leagueFallback = await freshClient.getEventArtwork({
+      title: 'Weekend Roundup',
+      publishDate: todayIso(),
+      sportHint: 'football',
+      league: 'EPL',
+      date: todayIso()
+    })
+    assert.equal(leagueFallback?.source, 'thesportsdb-league', 'expected cold-start client to resolve seeded league fallback artwork')
+    assert.match(String(leagueFallback?.poster || ''), /epl-poster\.jpg$/, 'expected league fallback artwork to reuse seeded league poster metadata')
 
     const second = await seedSportsImageCache({
       apiKey: '123',
