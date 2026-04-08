@@ -1,6 +1,6 @@
 const { SPORTS_DISCOVERY_CATALOGS } = require('../config/sportsCatalogs')
 const { listMappedLeagues } = require('./leagueMap')
-const { getCachedSportsImage, normalizeRemoteImageUrl } = require('./sportsImageCache')
+const { fetchAndCacheSportsImage, normalizeRemoteImageUrl } = require('./sportsImageCache')
 
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json'
 const DEFAULT_API_KEY = '123'
@@ -590,7 +590,7 @@ async function seedSportsImageCache(options = {}) {
   summary.images.total = tasks.length
   await runWithConcurrency(tasks, options.imageConcurrency || DEFAULT_IMAGE_CONCURRENCY, async (task) => {
     try {
-      const entry = await getCachedSportsImage(task.sourceUrl)
+      const entry = await fetchAndCacheSportsImage(task.sourceUrl)
       if (entry?.cacheStatus === 'hit') {
         summary.images.skipped += 1
       } else if (entry?.cacheStatus === 'package') {

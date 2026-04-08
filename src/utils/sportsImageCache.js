@@ -475,20 +475,10 @@ async function getCachedSportsImage(sourceUrl) {
         }
       }
 
-      const downloaded = await downloadSportsImage(normalizedUrl)
-      const fresh = writeCacheEntry(
-        cacheKey,
-        normalizedUrl,
-        downloaded.buffer,
-        downloaded.contentType,
-        downloaded.ext
-      )
-      return {
-        ...fresh,
-        cacheStatus: 'miss'
-      }
-    } catch (err) {
-      throw err
+      // Cache-only request path: runtime requests can import from an already
+      // downloaded local/server package, but they must not repopulate the
+      // catalogue from the upstream API on demand.
+      throw new Error('sports image not cached')
     } finally {
       inFlight.delete(cacheKey)
     }
@@ -498,11 +488,62 @@ async function getCachedSportsImage(sourceUrl) {
   return pending
 }
 
+// Full download path for the background autofill seeder.  Checks disk
+// cache first, then tries a configured image package, then downloads
+// from the upstream URL.  Runtime request handlers must NOT call this —
+// use getCachedSportsImage or resolveSportsImageRequest instead.
+async function fetchAndCacheSportsImage(sourceUrl) {
+  const normalizedUrl = normalizeRemoteImageUrl(sourceUrl)
+  if (!normalizedUrl) throw new Error('Invalid sports image URL')
+
+  const key = buildCacheKey(normalizedUrl)
+  const existing = loadCacheEntry(key)
+  if (existing) {
+    return { ...maybeTouchEntry(existing), cacheStatus: 'hit' }
+  }
+
+  const ongoing = inFlight.get(key)
+  if (ongoing) return ongoing
+
+  const packageEntry = findSportsImagePackageEntry(normalizedUrl)
+
+  const pending = (async () => {
+    try {
+      if (packageEntry?.filePath) {
+        try {
+          return importSportsImageFile(normalizedUrl, packageEntry.filePath, {
+            contentType: packageEntry.contentType,
+            cacheStatus: 'package',
+            packageName: packageEntry.packageName
+          })
+        } catch (err) {
+          console.warn(`[sports-image-cache] package fallback failed for ${normalizedUrl}: ${err.message}`)
+        }
+      }
+
+      const downloaded = await downloadSportsImage(normalizedUrl)
+      const fresh = writeCacheEntry(
+        key,
+        normalizedUrl,
+        downloaded.buffer,
+        downloaded.contentType,
+        downloaded.ext
+      )
+      return { ...fresh, cacheStatus: 'miss' }
+    } finally {
+      inFlight.delete(key)
+    }
+  })()
+
+  inFlight.set(key, pending)
+  return pending
+}
+
 async function resolveSportsImageRequest(token, variant = 'poster') {
   const sourceUrl = decodeSportsImageToken(token)
-  const entry = await getCachedSportsImage(sourceUrl)
+  const existing = await getCachedSportsImage(sourceUrl)
   return {
-    ...entry,
+    ...existing,
     variant: normalizeSportsImageVariant(variant),
     sourceUrl
   }
@@ -519,5 +560,6 @@ module.exports = {
   readSportsImageDataUri,
   importSportsImageFile,
   getCachedSportsImage,
+  fetchAndCacheSportsImage,
   resolveSportsImageRequest
 }
