@@ -1,6 +1,6 @@
 # PVTKRRX Website Status
 
-Updated: 2026-04-06
+Updated: 2026-04-08
 
 ## Purpose
 
@@ -10,12 +10,12 @@ Before changing homepage or configure wording, read `docs/copy.md` first. That f
 
 ## Public Host Check
 
-Verified directly on 2026-04-06:
+Verified directly on 2026-04-08:
 
 - Canonical public host: `https://www.pvtkrrx.cc`
 - Old preview host: `https://pvtkrrx.vercel.app`
 - `https://www.pvtkrrx.cc/` returned `200`
-- `https://www.pvtkrrx.cc/configure` returned `200`
+- `https://www.pvtkrrx.cc/configure` returned `302`
 - `https://www.pvtkrrx.cc/runbooks` returned `200`
 - `https://www.pvtkrrx.cc/manifest.json` returned `200`
 - `https://www.pvtkrrx.cc/health` returned `200`
@@ -29,10 +29,11 @@ Verified directly on 2026-04-06:
 
 Interpretation:
 
-- The audit claim that `/configure`, `/runbooks`, `/manifest.json`, and `/health` are missing is false for the canonical host.
+- The audit claim that `/runbooks`, `/manifest.json`, and `/health` are missing is false for the canonical host.
 - That claim is true only for the dead `pvtkrrx.vercel.app` preview hostname.
 - `/local/install` returning `403` on the public host is expected because it is a same-host/local-network helper route.
-- The public homepage should stay an entry point, not a route picker; route-specific guidance belongs inside `/configure` and the app.
+- Public `/configure` now redirects back to the guide-only homepage instead of acting as a public setup surface.
+- The public homepage should stay an entry point, not a route picker; route-specific guidance belongs inside the Windows host app or the user's own self-host server.
 - The homepage refactor is now live on the canonical host, not just in the local worktree.
 
 ## Code Check
@@ -42,6 +43,7 @@ Verified in the repo and on Contabo before changing anything:
 - `index.js` already defines `/configure`, `/:config/configure`, `/runbooks`, `/seedbox-runbooks`, `/health`, `/manifest.json`, `/:config/manifest.json`, `/local/install`, and the hosted self-host launcher route at `/install-selfhost.sh` plus `/install.sh`
 - `vercel.json` still maps `/configure` and `/runbooks`, but the old preview deployment is currently dead
 - `public/index.html` is the current landing page
+- public canonical/OG metadata plus `robots.txt`/`sitemap.xml` now point at `https://www.pvtkrrx.cc`
 - Contabo Caddy currently routes `pvtkrrx.cc` / `www.pvtkrrx.cc` to Docker alias `pvtkrrx:3000`
 - Docker alias `pvtkrrx` currently belongs to Coolify container `w14jewmw5ubscrxh8zzfhq7d-160208288034`
 - A separate `pvtkrrx.service` runtime is active on Contabo with `WorkingDirectory=/opt/pvtkrrx` and port `7000`, but it is not the public site path while Caddy still targets the Docker alias

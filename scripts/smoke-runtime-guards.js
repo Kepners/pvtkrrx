@@ -69,6 +69,13 @@ function readCsrf(setCookieHeader) {
   }
 }
 
+function buildCsrfTokenPair(token = 'pvtkrrx-smoke-csrf-token') {
+  return {
+    cookie: `pvtkrrx_csrf=${encodeURIComponent(token)}`,
+    token
+  }
+}
+
 async function run() {
   const portProbe = http.createServer((_, res) => res.end('ok'))
   await new Promise(resolve => portProbe.listen(0, '127.0.0.1', resolve))
@@ -159,8 +166,9 @@ async function run() {
         'X-Forwarded-For': '203.0.113.10'
       }
     )
-    assert.equal(hostedConfigure.status, 200, 'hosted configure page should return 200')
-    const hostedCsrf = readCsrf(hostedConfigure.headers['set-cookie'])
+    assert.equal(hostedConfigure.status, 302, 'hosted configure page should redirect back to the guide-only homepage')
+    assert.equal(String(hostedConfigure.headers.location || ''), '/#routes', 'hosted configure page should redirect to the route guide section')
+    const hostedCsrf = buildCsrfTokenPair()
 
     const hostedLinkAuthKey = await request(
       port,

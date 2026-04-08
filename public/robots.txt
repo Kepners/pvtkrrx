@@ -13,4 +13,4 @@ Disallow: /token/
 Disallow: /lan-pair/
 Disallow: /stremio-link/
 
-Sitemap: https://pvtkrrx.cc/sitemap.xml
+Sitemap: https://www.pvtkrrx.cc/sitemap.xml
