@@ -270,6 +270,20 @@ async function run() {
     assert.match(runbooksHtml, /Whatbox Runbook/, 'runbooks page should include Whatbox runbook')
     assert.match(runbooksHtml, /Ultra\.cc Runbook/, 'runbooks page should include Ultra.cc runbook')
 
+    const sportsRes = await fetch(`${base}/sports`)
+    assert.equal(sportsRes.status, 200, 'GET /sports should return 200')
+    const sportsHtml = await sportsRes.text()
+    assert.match(sportsHtml, /<link rel="canonical" href="https:\/\/www\.pvtkrrx\.cc\/sports">/i, 'sports page should expose canonical metadata')
+    assert.match(sportsHtml, /Private tracker sports in Stremio/, 'sports page should render the main sports heading')
+    assert.match(sportsHtml, /Read Setup Guide/, 'sports page should send visitors to the setup guide')
+    assert.match(sportsHtml, /href="\/#routes"/, 'sports page should link back to the public route guide')
+    assert.doesNotMatch(sportsHtml, /href="\/configure"/i, 'sports page should not advertise public configure as a primary visitor action')
+
+    const sitemapRes = await fetch(`${base}/sitemap.xml`)
+    assert.equal(sitemapRes.status, 200, 'GET /sitemap.xml should return 200')
+    const sitemapXml = await sitemapRes.text()
+    assert.match(sitemapXml, /<loc>https:\/\/www\.pvtkrrx\.cc\/sports<\/loc>/, 'sitemap should include the sports page')
+
     const installLauncherRes = await fetch(`${base}/install-selfhost.sh`)
     assert.equal(installLauncherRes.status, 200, 'GET /install-selfhost.sh should return 200')
     const installLauncherText = await installLauncherRes.text()
