@@ -202,14 +202,20 @@ function loadLocalConfigFile() {
   try {
     const parsed = loadSecureJsonFile(localConfigPath, { defaultValue: null })
     if (!parsed || typeof parsed !== 'object') return null
-    return parsed
+    const normalized = normalizeDiskBackedDesktopHomeRouteConfig(parsed)
+    if (JSON.stringify(normalized) !== JSON.stringify(parsed)) {
+      saveSecureJsonFile(localConfigPath, normalized)
+    }
+    return normalized
   } catch (_) {
     return null
   }
 }
 
 function saveLocalConfigFile(config) {
-  saveSecureJsonFile(localConfigPath, config)
+  const normalized = normalizeDiskBackedDesktopHomeRouteConfig(config)
+  saveSecureJsonFile(localConfigPath, normalized)
+  return normalized
 }
 
 function detectLanAddresses() {
@@ -883,6 +889,34 @@ function normalizeRouteProfile(value) {
   return ''
 }
 
+function normalizeDiskBackedDesktopHomeRouteConfig(config = {}) {
+  if (!config || typeof config !== 'object' || Array.isArray(config)) return config
+  if (SELF_HOST_SERVER_MODE) return config
+
+  const explicitProfile = normalizeRouteProfile(config.routeProfile)
+  if (explicitProfile === 'local' || explicitProfile === 'online' || explicitProfile === 'hybrid') {
+    return config
+  }
+  if (config.lanPairEnabled === false) return config
+
+  const hasHomeRouteSignals = (
+    typeof config.lanPairEnabled === 'boolean' ||
+    typeof config.lanPairRequired === 'boolean' ||
+    Boolean(config.lanPairId) ||
+    Boolean(config.lanPairKey) ||
+    Boolean(config.lanPairRelayUrl) ||
+    Boolean(config.stremioUserId)
+  )
+  if (!hasHomeRouteSignals) return config
+
+  return {
+    ...config,
+    routeProfile: 'hybrid',
+    lanPairEnabled: true,
+    lanPairRequired: false
+  }
+}
+
 function resolveHostedProfile(config = {}) {
   const explicit = normalizeRouteProfile(config?.routeProfile)
   if (explicit === 'lan' || explicit === 'online' || explicit === 'hybrid') return explicit
@@ -1313,12 +1347,13 @@ function getConfigIssues(config, options = {}) {
   const requestOrigin = normalizeOrigin(requestBaseUrl)
   const relayOrigin = normalizeOrigin(String(safeConfig.lanPairRelayUrl || '').trim())
   const selfHostDiskConfig = options.selfHostDiskConfig === true
+  const localDiskConfig = options.localDiskConfig === true
   const hostedProfile = resolveHostedProfile(safeConfig)
   const usingHostedProfile = hostedProfile === 'online' || hostedProfile === 'hybrid'
   const missingFileServerUrl = !String(safeConfig.fileServerUrl || '').trim()
   const relayTargetsDifferentOrigin = Boolean(requestOrigin && relayOrigin && relayOrigin !== requestOrigin)
 
-  if (usingHostedProfile && missingFileServerUrl && !selfHostDiskConfig && (IS_VERCEL_RUNTIME || relayTargetsDifferentOrigin)) {
+  if (usingHostedProfile && missingFileServerUrl && !selfHostDiskConfig && !localDiskConfig && (IS_VERCEL_RUNTIME || relayTargetsDifferentOrigin)) {
     issues.push({
       code: 'HOSTED_FILE_SERVER_REQUIRED',
       message: 'Hosted profile needs an HTTPS File Server URL for completed-file playback. Add your seedbox file server URL or use a direct-host/LAN profile.'
@@ -1971,6 +2006,7 @@ async function withConfig(req, res, next) {
       req.config = normalizedLocal
       req.configIssues = getConfigIssues(req.config, {
         requestBaseUrl: getPublicBaseUrl(req),
+        localDiskConfig: String(req.params?.config || '').trim().toLowerCase() === 'local',
         selfHostDiskConfig: isSelfHostConfigAlias(req.params.config)
       })
       return next()

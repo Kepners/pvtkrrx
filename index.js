@@ -1056,13 +1056,13 @@ app.post('/local-config', requireLocalNetworkRoute, async (req, res) => {
       defaultRequired: true,
       includeLocalSecrets: true
     }))
-    saveLocalConfigFile(saved)
-    scheduleLocalProviderWarmup(saved, console, 'local-config-save').catch(err => {
+    const persisted = saveLocalConfigFile(saved)
+    scheduleLocalProviderWarmup(persisted, console, 'local-config-save').catch(err => {
       console.warn('[config-save] Provider warmup failed:', err.message)
     })
     res.json({
       ok: true,
-      ...buildConfigReadback(saved),
+      ...buildConfigReadback(persisted),
       localHostname
     })
   } catch (err) {
@@ -1082,14 +1082,14 @@ app.post('/server-config', requireCsrfToken, requireServerAdminToken, async (req
     const saved = await hydrateAccountLinkForConfig(normalizeAddonConfig(mergedConfig, {
       includeLocalSecrets: true
     }))
-    saveLocalConfigFile(saved)
-    scheduleLocalProviderWarmup(saved, console, 'server-config-save').catch(err => {
+    const persisted = saveLocalConfigFile(saved)
+    scheduleLocalProviderWarmup(persisted, console, 'server-config-save').catch(err => {
       console.warn('[server-config-save] Provider warmup failed:', err.message)
     })
     res.json({
       ok: true,
       configAlias: 'selfhost',
-      ...buildConfigReadback(saved)
+      ...buildConfigReadback(persisted)
     })
   } catch (err) {
     res.status(500).json({ error: 'Failed to save server config' })
@@ -1165,10 +1165,11 @@ app.post('/auto-provision', requireLocalNetworkRoute, async (req, res) => {
       : null
 
     if (result.config && result.config.qbitUrl) {
-      saveLocalConfigFile(hydratedProvisionedConfig)
-      scheduleLocalProviderWarmup(hydratedProvisionedConfig, console, 'auto-provision').catch(err => {
+      const persistedProvisionedConfig = saveLocalConfigFile(hydratedProvisionedConfig)
+      scheduleLocalProviderWarmup(persistedProvisionedConfig, console, 'auto-provision').catch(err => {
         console.warn('[auto-provision] Provider warmup failed:', err.message)
       })
+      result.config = persistedProvisionedConfig
     }
     const responseNotes = Array.isArray(result.notes) ? [...result.notes] : []
     if (autoLinkedSourceLabel) {
@@ -1177,15 +1178,13 @@ app.post('/auto-provision', requireLocalNetworkRoute, async (req, res) => {
     res.json({
       ...result,
       notes: responseNotes,
-      config: hydratedProvisionedConfig
-        ? buildConfigReadback(hydratedProvisionedConfig)
-        : (result.config ? buildConfigReadback(result.config) : null),
-      lanPair: hydratedProvisionedConfig
+      config: result.config ? buildConfigReadback(result.config) : null,
+      lanPair: result.config
         ? {
-            lanPairId: hydratedProvisionedConfig.lanPairId,
-            lanPairEnabled: hydratedProvisionedConfig.lanPairEnabled,
-            lanPairRequired: hydratedProvisionedConfig.lanPairRequired,
-            lanPairRelayUrl: hydratedProvisionedConfig.lanPairRelayUrl
+            lanPairId: result.config.lanPairId,
+            lanPairEnabled: result.config.lanPairEnabled,
+            lanPairRequired: result.config.lanPairRequired,
+            lanPairRelayUrl: result.config.lanPairRelayUrl
           }
         : null,
       localHostname

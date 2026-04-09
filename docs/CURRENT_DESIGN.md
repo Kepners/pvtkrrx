@@ -81,6 +81,7 @@ PVTKRRX is one codebase with three active runtime pieces:
   - runtime log copy/open actions
   - explicit `Minimize`, `Send To Tray`, and `Exit App` actions
 - The configure page now mirrors that local-runtime visibility with a live qBittorrent status panel that shows the effective save path, incomplete path, fallback storage roots, and whether PVTKRRX currently manages the qBit completion hook.
+- Disk-backed Windows host configs now auto-upgrade older strict `LAN Bridge` local state to the current `Hybrid Home` fallback profile on load/save, so stale desktop configs stop failing closed when the host app is offline and the user intended cloud fallback.
 - The public homepage, sports page, and runbooks now use the brand-led `PVTKRRX` guide surface, point users at docs instead of `/configure`, and keep the locked route vocabulary (`PC Local`, `LAN Bridge`, `Remote Seedbox`).
 - The public homepage now shows a live release-status card driven by `/version-status.json`, and the Windows desktop shell shows the same release check in the popup.
 - Legacy `Hybrid Home` wording may still appear in older docs or internal notes. Treat that as terminology drift, not a different route model, unless a doc explicitly calls out the older naming history.

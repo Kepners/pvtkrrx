@@ -129,6 +129,18 @@ The practical reading of the project today is:
   - `npm run smoke:sports-cache-auto`
   - manual `npm run cache:sports-package -- <temp-package-path>` operator proof
 
+## Work Carried Out On 2026-04-09
+
+- Traced the current `The addon returned empty content` desktop symptom to legacy disk-backed Windows host configs that still persisted `routeProfile = lan` with `lanPairRequired = true`, which makes the home-device route fail closed and return empty catalogs whenever the host pair is offline.
+- Added a desktop-local config migration so disk-backed host configs now auto-upgrade that old strict `LAN Bridge` state to the current hybrid fallback profile on load/save, while explicit hosted legacy LAN tokens still keep their old fail-closed behavior for troubleshooting.
+- Tightened config-issue gating so `/local/manifest.json?mode=local` does not inherit the hosted file-server warning just because the same disk-backed host config also carries a hybrid home-device profile.
+- Regression coverage now proves:
+  - auto-provision returns a hybrid desktop home route
+  - local config save/readback defaults to hybrid fallback
+  - linked desktop configs keep the hybrid profile
+  - legacy disk-backed desktop LAN configs auto-migrate and persist back to disk
+  - `npm run smoke:config`, `npm run smoke:lan-pair`, and `npm run smoke:selfhost` all passed on 2026-04-09
+
 ## Earlier 2026-04-04 Self-Host Work
 
 - The Linux self-host installer now auto-picks a free qBittorrent WebUI port if 8080 is already occupied and writes that real port back into the qBit config before startup.

@@ -7,7 +7,7 @@ const os = require('node:os')
 const path = require('node:path')
 const { decrypt, encrypt } = require('../src/utils/crypto')
 const { buildLocalModeUrls } = require('../src/utils/localInstallUrls')
-const { loadSecureJsonFile } = require('../src/utils/secureJsonFile')
+const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJsonFile')
 const { DEFAULT_PAIR_RELAY_URL, normalizeRelayUrl } = require('../src/utils/relayUrl')
 
 const LOCAL_SMOKE_SECRET = 'local-smoke-secret-12345678901234567890'
@@ -367,6 +367,8 @@ async function run() {
     assert.equal(String(autoProvisionPayload?.config?.stremioUserId || ''), LINKED_STREMIO_USER_ID, 'auto-provision should auto-link the signed-in local Stremio session')
     assert.equal(String(autoProvisionPayload?.config?.accountProvider || ''), 'stremio-authkey', 'auto-provision should persist the linked Stremio account provider')
     assert.equal(String(autoProvisionPayload?.config?.lanPairId || ''), expectedLinkedPairId, 'auto-provision should derive the LAN pair id from the linked Stremio user')
+    assert.equal(String(autoProvisionPayload?.config?.routeProfile || ''), 'hybrid', 'auto-provision should promote the desktop home route to hybrid')
+    assert.equal(Boolean(autoProvisionPayload?.config?.lanPairRequired), false, 'auto-provision should keep cloud fallback enabled for the desktop home route')
 
     const localSaveRes = await fetch(`${base}/local-config`, {
       method: 'POST',
@@ -398,6 +400,10 @@ async function run() {
     assert.equal(Boolean(localConfig.savedSecrets?.qbitUsername), true)
     assert.equal(Boolean(localConfig.savedSecrets?.qbitPassword), true)
     assert.equal(localSavePayload.sportsImagePackagePath, sampleConfig.sportsImagePackagePath, 'local config save should return the sports poster package path')
+    assert.equal(String(localSavePayload.routeProfile || ''), 'hybrid', 'local config save should default the desktop home route to hybrid')
+    assert.equal(Boolean(localSavePayload.lanPairRequired), false, 'local config save should keep hybrid LAN fallback optional')
+    assert.equal(String(localConfig.routeProfile || ''), 'hybrid', 'local config readback should expose the hybrid home route')
+    assert.equal(Boolean(localConfig.lanPairRequired), false, 'local config readback should keep hybrid LAN fallback optional')
 
     const localRepairSaveRes = await fetch(`${base}/local-config`, {
       method: 'POST',
@@ -437,7 +443,8 @@ async function run() {
     assert.equal(linkedSavePayload.lanPairId, expectedLinkedPairId, 'linked stremio user should derive deterministic lan pair id')
     assert.equal(Boolean(linkedSavePayload.savedSecrets?.lanPairKey), true, 'linked local config should retain a generated pair key')
     assert.equal(Boolean(linkedSavePayload.lanPairEnabled), true)
-    assert.equal(Boolean(linkedSavePayload.lanPairRequired), true)
+    assert.equal(String(linkedSavePayload.routeProfile || ''), 'hybrid', 'linked local config should keep the hybrid home route')
+    assert.equal(Boolean(linkedSavePayload.lanPairRequired), false)
     assert.equal(linkedSavePayload.lanPairKey, undefined, 'linked save response should not expose lanPairKey')
 
     const linkedLocalConfigRes = await fetch(`${base}/local/config.json`)
@@ -448,6 +455,28 @@ async function run() {
     assert.equal(Boolean(linkedLocalConfig.savedSecrets?.lanPairKey), true)
     assert.equal(linkedLocalConfig.lanPairKey, undefined, 'linked local config readback should not expose lanPairKey')
     assert.deepEqual(linkedLocalConfig.additionalStorageRoots, sampleConfig.additionalStorageRoots)
+    assert.equal(String(linkedLocalConfig.routeProfile || ''), 'hybrid', 'linked local config readback should expose the hybrid home route')
+    assert.equal(Boolean(linkedLocalConfig.lanPairRequired), false, 'linked local config readback should keep hybrid LAN fallback optional')
+
+    const persistedLinkedLocalConfig = loadSecureJsonFile(localConfigPath, { defaultValue: null })
+    saveSecureJsonFile(localConfigPath, {
+      ...sampleConfig,
+      routeProfile: 'lan',
+      lanPairEnabled: true,
+      lanPairRequired: true,
+      lanPairId: 'legacyPairId123',
+      lanPairKey: 'legacyPairKeyABCDEFGHIJKLMNOPQRSTUVWX',
+      lanPairRelayUrl: relayBase
+    })
+    const migratedLegacyConfigRes = await fetch(`${base}/local/config.json`)
+    assert.equal(migratedLegacyConfigRes.status, 200, 'legacy desktop local config should still read back after migration')
+    const migratedLegacyConfig = await migratedLegacyConfigRes.json()
+    assert.equal(String(migratedLegacyConfig.routeProfile || ''), 'hybrid', 'legacy desktop LAN configs should auto-upgrade to hybrid')
+    assert.equal(Boolean(migratedLegacyConfig.lanPairRequired), false, 'legacy desktop LAN configs should auto-upgrade to hybrid fallback')
+    const persistedMigratedLegacyConfig = loadSecureJsonFile(localConfigPath, { defaultValue: null })
+    assert.equal(String(persistedMigratedLegacyConfig?.routeProfile || ''), 'hybrid', 'legacy desktop local config migration should persist back to disk')
+    assert.equal(Boolean(persistedMigratedLegacyConfig?.lanPairRequired), false, 'legacy desktop local config migration should persist hybrid fallback')
+    saveSecureJsonFile(localConfigPath, persistedLinkedLocalConfig)
 
     const localLanTokenMissingCsrfRes = await fetch(`${base}/local/lan-token`, {
       method: 'POST',
