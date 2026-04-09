@@ -4,7 +4,7 @@ Updated: 2026-04-09
 
 ## Current Stage
 
-PVTKRRX is in a working `1.1.31` state on the main Windows/local route set.
+PVTKRRX is in a working `1.1.32` state on the main Windows/local route set.
 The current packaged Windows app is now verified as the real host runtime, and a live Apple TV synced home-route pass has been captured against it.
 
 The practical reading of the project today is:
@@ -22,8 +22,8 @@ The practical reading of the project today is:
 - loose motorsport event titles such as `Formula 1 2026 Race 02 Chinese Grand Prix` now survive the hosted sports filter and can reuse cached Formula 1 league poster fallback when exact event art is missing
 - sports poster, wallpaper, landscape, and logo bytes can now be cached on demand by the active runtime through signed `/image/sports/...` URLs instead of hotlinking every request back to the upstream artwork host
 - `npm run server:setup` now also pre-seeds that same `sports-image-cache/` store with upcoming event art, top team badges, and mapped league artwork, `npm run cache:sports` can refresh it later without deleting warm entries, and long-running Linux/cloud runtimes now keep topping the cache up automatically every 15 minutes in rotating sport batches
-- the current release cut now points desktop, self-host, GitHub release, and hosted cloud back at the same `1.1.30` revision line after the sports cache regression fix
-- the `1.1.30` sports update carries forward the mapped sports poster package support and permanent hosted image catalogue while fixing the cache-only cold-start regression so seeded event and league artwork still resolve after restart without reintroducing live TheSportsDB lookups on the user-facing path
+- the current working hosted cloud runtime and Windows EXE line are now aligned on `1.1.32` for the linked cloud takeover fix, even though a wider GitHub/self-host release publish is still a separate step
+- the current desktop/cloud line carries forward the mapped sports poster package support and permanent hosted image catalogue while adding the hybrid linked-cloud takeover fix for stale/offline home-route fallback
 - the Windows desktop runtime still defaults to `%APPDATA%\PVTKRRX\runtime`, outside the EXE install directory, so local Prowlarr/qBittorrent config, poster-package mapping, and sports cache state survive normal app updates and reinstall-over-the-top installs unless that runtime folder is explicitly deleted
 - the sports identity path is now materially wider: multi-token leagues (`Premier League`, `La Liga`), `DD.MM.YYYY` dates, year-only titles that can borrow the Prowlarr publish date, and event-prefix noise such as `Super Bowl LX` now normalize into the same shared structured matchup shape
 - structured TheSportsDB event lookup now expands league-aware team nicknames such as `Lakers`, `Yankees`, and `Maple Leafs` to the official SportsDB team names before searching, then falls back to date+sport matching when literal event queries still miss
@@ -142,6 +142,8 @@ The practical reading of the project today is:
 - Hybrid `/encrypt` no longer overwrites that linked cloud takeover profile just because the desktop token happens to carry one non-local URL alongside local qBit/Prowlarr values.
 - Bumped the Windows desktop EXE line to `1.1.31`, rebuilt the packaged artifacts with `npm run dist:win`, and refreshed the local desktop update metadata in `dist/latest.yml` plus `dist/releases/index.json`.
 - Scope note: this was an EXE/version refresh only, not a claim that the hosted cloud and self-host GitHub release lines were also republished to `1.1.31`.
+- Bumped the hosted cloud and Windows desktop EXE line together to `1.1.32`, refreshed the package metadata, and rebuilt the Windows artifacts so the live cloud runtime and local installer line now point at the same linked-takeover revision.
+- Scope note: this `1.1.32` pass aligns the hosted cloud runtime plus the EXE artifacts, not the wider GitHub desktop/self-host release publish flow.
 - Regression coverage now proves:
   - auto-provision returns a hybrid desktop home route
   - local config save/readback defaults to hybrid fallback
@@ -150,6 +152,7 @@ The practical reading of the project today is:
   - stale hybrid LAN-pair records now fall through to hosted/cloud instead of redirecting to a dead LAN host
   - `npm run smoke:config`, `npm run smoke:lan-pair`, and `npm run smoke:selfhost` all passed on 2026-04-09
   - `npm run dist:win` passed on 2026-04-09 for the `1.1.31` desktop EXE refresh
+  - `npm run smoke:config`, `npm run smoke:lan-pair`, `npm run smoke:selfhost`, and `npm run dist:win` all passed again on 2026-04-09 for the aligned `1.1.32` desktop/cloud revision
 
 ## Earlier 2026-04-04 Self-Host Work
 
