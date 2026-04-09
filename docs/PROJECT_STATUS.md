@@ -1,6 +1,6 @@
 # PVTKRRX Project Status
 
-Updated: 2026-04-08
+Updated: 2026-04-09
 
 ## Current Stage
 
@@ -18,6 +18,7 @@ The practical reading of the project today is:
 - official Stremio archive-source support for `rarUrls` is real and was re-verified against upstream SDK/core sources on 2026-03-30
 - PVTKRRX now treats extracted direct video as the only supported packed-RAR playback path by default, and keeps native `rarUrls` behind an explicit experimental override
 - the sports catalog artwork path now prefers portrait poster art for tiles, while keeping separate sport-aware backgrounds/logos for player wallpaper/loading
+- loose motorsport event titles such as `Formula 1 2026 Race 02 Chinese Grand Prix` now survive the hosted sports filter and can reuse cached Formula 1 league poster fallback when exact event art is missing
 - sports poster, wallpaper, landscape, and logo bytes can now be cached on demand by the active runtime through signed `/image/sports/...` URLs instead of hotlinking every request back to the upstream artwork host
 - `npm run server:setup` now also pre-seeds that same `sports-image-cache/` store with upcoming event art, top team badges, and mapped league artwork, `npm run cache:sports` can refresh it later without deleting warm entries, and long-running Linux/cloud runtimes now keep topping the cache up automatically every 15 minutes in rotating sport batches
 - the current release cut now points desktop, self-host, GitHub release, and hosted cloud back at the same `1.1.30` revision line after the sports cache regression fix

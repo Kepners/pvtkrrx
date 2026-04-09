@@ -855,6 +855,11 @@ function testEventTitleParser() {
   assert.equal(f1b.league, 'Formula1')
   assert.equal(f1b.eventName, 'Japanese Grand Prix Practice Two')
 
+  const f1Loose = parseSportsEventTitle('Formula 1 2026 Race 02 Chinese Grand Prix')
+  assert.ok(f1Loose, 'expected spaced F1 title to parse')
+  assert.equal(f1Loose.league, 'Formula 1')
+  assert.equal(f1Loose.eventName, 'Race 02 Chinese Grand Prix')
+
   // UFC event-style (no vs)
   const ufc = parseSportsEventTitle('UFC.Fight.Night.270.Main.Card.1080p.WEB.h264-GROUP')
   assert.ok(ufc, 'expected UFC event title to parse')
@@ -1019,7 +1024,7 @@ async function testF1FallbackUsesWeekendPosterCard() {
     },
     'sports',
     'pvtkrrx-sports',
-    'genre=F1',
+    'genre=Formula%201',
     { baseUrl: 'http://127.0.0.1:7000' }
   ))
 
@@ -1027,6 +1032,55 @@ async function testF1FallbackUsesWeekendPosterCard() {
   assert.equal(posterPayload.m, 'formula1')
   assert.equal(posterPayload.e, 'Japanese Grand Prix Qualifying')
   assert.equal(posterPayload.gl, 'https://example.com/f1-logo.png')
+}
+
+async function testF1LeagueFallbackUsesLeaguePosterWhenAvailable() {
+  class FakeProwlarrClient {
+    async search() {
+      return [{
+        title: 'Formula 1 2026 Race 02 Chinese Grand Prix',
+        indexer: 'SportsTracker',
+        size: 2_000_000_000,
+        seeders: 30,
+        pubDate: '2026-03-22T12:00:00Z'
+      }]
+    }
+  }
+
+  const { handleCatalog } = loadCatalogWithStubs({
+    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient }
+  })
+
+  const result = await withSportsDbPrototypePatches({
+    getEventArtwork: async () => ({
+      poster: 'https://example.com/f1-league-poster.jpg',
+      image: 'https://example.com/f1-league-landscape.jpg',
+      backgroundImage: 'https://example.com/f1-league-background.jpg',
+      logo: 'https://example.com/f1-logo.png',
+      leagueLogo: 'https://example.com/f1-logo.png',
+      eventId: '',
+      eventDate: '',
+      league: 'Formula 1',
+      eventName: '',
+      source: 'thesportsdb-league'
+    })
+  }, async () => handleCatalog(
+    {
+      jackettUrl: 'http://127.0.0.1:9696',
+      jackettApiKey: 'smoke-api-key',
+      sportsDbApiKey: 'smoke-sports-key',
+      maxResults: '10'
+    },
+    'sports',
+    'pvtkrrx-sports',
+    'genre=Formula%201',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  ))
+
+  assert.equal(result.metas.length, 1, 'expected one loose-title F1 result')
+  assert.match(result.metas[0].name, /Chinese Grand Prix/i, 'expected loose-title F1 result to stay grouped as Chinese Grand Prix')
+  assertSportsProxyUrl(result.metas[0].poster, 'poster', 'https://example.com/f1-league-poster.jpg', 'expected F1 league fallback to use the real league poster when exact event art is unavailable')
+  assert.equal(result.metas[0].posterShape, 'poster', 'expected F1 league fallback to declare poster-shaped artwork')
 }
 
 async function testEventQueriesStripSessionSuffixesBeforeSearch() {
@@ -1525,6 +1579,7 @@ async function main() {
     await testSportSpecificCatalogDetailFiltering()
     await testSportFamilyCatalogRejectsMixedSportLeakage()
     await testEventTitleCatalogGrouping()
+    await testF1LeagueFallbackUsesLeaguePosterWhenAvailable()
     await testLibraryCustomIdsStayCompact()
     await testSportsMetaIncludesGenres()
     await testSportsMetaRichDescription()

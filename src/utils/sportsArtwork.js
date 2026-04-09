@@ -68,9 +68,15 @@ function resolveSportsPosterAsset(input = {}) {
   const generatedStyle = matchup ? 'matchup' : (formulaOne ? 'formula1' : 'league-event')
   const generatedPosterUrl = resolveGeneratedPosterUrl(baseUrl, input, generatedStyle)
   const exactPosterAvailable = Boolean(portraitPosterUrl && !isLeagueFallbackArtwork(sportsArtwork))
+  const formulaOneLeaguePosterFallback = Boolean(
+    portraitPosterUrl &&
+    isLeagueFallbackArtwork(sportsArtwork) &&
+    formulaOne &&
+    !matchup
+  )
 
   // PRIORITY: real event artwork from TheSportsDB ALWAYS wins over generated cards.
-  // Generated cards are a last resort — real images make the catalog look like a real media UI.
+  // Generated cards are a last resort - real images make the catalog look like a real media UI.
   if (exactPosterAvailable) {
     return {
       poster: proxySportsImageUrl(baseUrl, portraitPosterUrl, 'poster') || portraitPosterUrl,
@@ -88,7 +94,17 @@ function resolveSportsPosterAsset(input = {}) {
     }
   }
 
-  // No real event image available — fall back to generated poster card
+  // Formula 1 cards look substantially better with the real league poster than
+  // with the generated fallback when only league-level art is available.
+  if (formulaOneLeaguePosterFallback) {
+    return {
+      poster: proxySportsImageUrl(baseUrl, portraitPosterUrl, 'poster') || portraitPosterUrl,
+      posterShape: 'poster',
+      posterMode: 'fallback-league'
+    }
+  }
+
+  // No real event image available - fall back to generated poster card
   if (generatedPosterUrl) {
     return {
       poster: generatedPosterUrl,

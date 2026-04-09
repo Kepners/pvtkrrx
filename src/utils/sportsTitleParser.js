@@ -53,6 +53,29 @@ function isReleaseGroupToken(token) {
   return RELEASE_GROUP_RE.test(String(token || '').trim())
 }
 
+function splitEventTitleTokens(raw) {
+  const dotted = String(raw || '').split('.').map(token => token.trim()).filter(Boolean)
+  if (dotted.length >= 2) return dotted
+  return normalizeSegment(raw).split(/\s+/).filter(Boolean)
+}
+
+function resolveEventLeagueStart(tokens = []) {
+  const parts = Array.isArray(tokens) ? tokens.map(normalizeSegment).filter(Boolean) : []
+  const maxParts = Math.min(parts.length, 4)
+  for (let count = 1; count <= maxParts; count += 1) {
+    const slice = parts.slice(0, count)
+    const spaced = slice.join(' ')
+    const compact = slice.join('')
+    if (EVENT_LEAGUE_RE.test(spaced) || EVENT_LEAGUE_RE.test(compact)) {
+      return {
+        leagueToken: spaced,
+        nextIndex: count
+      }
+    }
+  }
+  return null
+}
+
 function extractFallbackDate(value) {
   const source = String(value || '').trim()
   if (!source) return ''
@@ -253,23 +276,25 @@ function parseSportsEventTitle(title) {
   const raw = String(title || '').trim()
   if (!raw) return null
 
-  const tokens = raw.split('.').map(token => token.trim()).filter(Boolean)
+  const tokens = splitEventTitleTokens(raw)
   if (tokens.length < 4) return null
 
-  // First token must be a known event-league token
-  const leagueToken = tokens[0]
-  if (!EVENT_LEAGUE_RE.test(leagueToken)) return null
+  const leagueStart = resolveEventLeagueStart(tokens)
+  if (!leagueStart) return null
 
   let dateStr = ''
-  let eventStartIndex = 1
+  let eventStartIndex = leagueStart.nextIndex
 
-  // Try to extract YYYY.MM.DD date after the league token
-  if (tokens.length > 3 && isValidDate(tokens[1], tokens[2], tokens[3])) {
-    dateStr = `${tokens[1]}-${tokens[2]}-${tokens[3]}`
-    eventStartIndex = 4
-  } else if (tokens.length > 1 && /^(19|20)\d{2}$/.test(tokens[1])) {
-    // Just a year token — skip it, don't treat it as part of event name
-    eventStartIndex = 2
+  // Try to extract YYYY MM DD date immediately after the league token.
+  if (
+    tokens.length > eventStartIndex + 2 &&
+    isValidDate(tokens[eventStartIndex], tokens[eventStartIndex + 1], tokens[eventStartIndex + 2])
+  ) {
+    dateStr = `${tokens[eventStartIndex]}-${tokens[eventStartIndex + 1]}-${tokens[eventStartIndex + 2]}`
+    eventStartIndex += 3
+  } else if (tokens.length > eventStartIndex && /^(19|20)\d{2}$/.test(tokens[eventStartIndex])) {
+    // Just a year token - skip it, don't treat it as part of event name
+    eventStartIndex += 1
   }
 
   // Collect event name tokens until we hit metadata
@@ -289,7 +314,7 @@ function parseSportsEventTitle(title) {
 
   if (eventTokens.length === 0) return null
 
-  const league = normalizeSegment(leagueToken)
+  const league = normalizeSegment(leagueStart.leagueToken)
   const eventName = normalizeSegment(eventTokens.join(' '))
   if (!league || !eventName) return null
 
