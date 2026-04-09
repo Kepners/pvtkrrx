@@ -4,7 +4,7 @@ Updated: 2026-04-08
 
 ## Current Stage
 
-PVTKRRX is in a working `1.1.30` state on the main Windows/local route set.
+PVTKRRX is in a working `1.1.31` state on the main Windows/local route set.
 The current packaged Windows app is now verified as the real host runtime, and a live Apple TV synced home-route pass has been captured against it.
 
 The practical reading of the project today is:
@@ -134,12 +134,15 @@ The practical reading of the project today is:
 - Traced the current `The addon returned empty content` desktop symptom to legacy disk-backed Windows host configs that still persisted `routeProfile = lan` with `lanPairRequired = true`, which makes the home-device route fail closed and return empty catalogs whenever the host pair is offline.
 - Added a desktop-local config migration so disk-backed host configs now auto-upgrade that old strict `LAN Bridge` state to the current hybrid fallback profile on load/save, while explicit hosted legacy LAN tokens still keep their old fail-closed behavior for troubleshooting.
 - Tightened config-issue gating so `/local/manifest.json?mode=local` does not inherit the hosted file-server warning just because the same disk-backed host config also carries a hybrid home-device profile.
+- Bumped the Windows desktop EXE line to `1.1.31`, rebuilt the packaged artifacts with `npm run dist:win`, and refreshed the local desktop update metadata in `dist/latest.yml` plus `dist/releases/index.json`.
+- Scope note: this was an EXE/version refresh only, not a claim that the hosted cloud and self-host GitHub release lines were also republished to `1.1.31`.
 - Regression coverage now proves:
   - auto-provision returns a hybrid desktop home route
   - local config save/readback defaults to hybrid fallback
   - linked desktop configs keep the hybrid profile
   - legacy disk-backed desktop LAN configs auto-migrate and persist back to disk
   - `npm run smoke:config`, `npm run smoke:lan-pair`, and `npm run smoke:selfhost` all passed on 2026-04-09
+  - `npm run dist:win` passed on 2026-04-09 for the `1.1.31` desktop EXE refresh
 
 ## Earlier 2026-04-04 Self-Host Work
 
