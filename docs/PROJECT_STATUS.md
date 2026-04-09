@@ -11,6 +11,7 @@ The practical reading of the project today is:
 
 - `PC Local` is the real host-desktop route and is working
 - `Hybrid Home` is now the main same-account synced route for the user's other devices; the host desktop should not use it for local browsing
+- stale/offline `Hybrid Home` requests can now switch into the account-linked cloud profile instead of clinging to the dead desktop-local backend
 - the packaged Windows EXE now centers on `PC Local` plus the `Hybrid Home` route model, although some live desktop/runbook/help strings still say `LAN Bridge`
 - explicit self-host server mode now exists for VPS/seedbox installs, with disk-backed `/selfhost` manifests, browser-admin auth for private service URLs, and optional `systemd` boot automation
 - the self-host bootstrap now auto-selects a free qBittorrent WebUI port when 8080 is occupied, wires Prowlarr to the live qBittorrent download client during bootstrap, and disables any leftover `pvtkrrx-tunnel.service` once a FreeDNS/domain front door is configured
@@ -137,6 +138,8 @@ The practical reading of the project today is:
 - Tightened config-issue gating so `/local/manifest.json?mode=local` does not inherit the hosted file-server warning just because the same disk-backed host config also carries a hybrid home-device profile.
 - Separated LAN-pair record TTL from live redirect trust: hybrid/home-device routing now stops treating a host as online once its heartbeat goes stale relative to the configured desktop cadence, instead of clinging to a several-hour relay record after the PC or local server goes offline.
 - `/pair/status` now reports `stale-heartbeat` for that condition as well, so configure/status surfaces can match the real redirect decision instead of claiming the dead host is still online.
+- Hybrid hosted fallback now also checks for an account-linked hosted cloud profile and swaps that in when present, so the fallback backend comes from the saved cloud/seedbox config instead of the desktop token's own `127.0.0.1` service URLs.
+- Hybrid `/encrypt` no longer overwrites that linked cloud takeover profile just because the desktop token happens to carry one non-local URL alongside local qBit/Prowlarr values.
 - Bumped the Windows desktop EXE line to `1.1.31`, rebuilt the packaged artifacts with `npm run dist:win`, and refreshed the local desktop update metadata in `dist/latest.yml` plus `dist/releases/index.json`.
 - Scope note: this was an EXE/version refresh only, not a claim that the hosted cloud and self-host GitHub release lines were also republished to `1.1.31`.
 - Regression coverage now proves:
@@ -363,7 +366,7 @@ These items should still be treated as open until captured on real clients:
 
 ## Current Risks
 
-- `Hybrid Home` still depends on the Windows host desktop staying online and heartbeating
+- `Hybrid Home` now depends on the Windows host desktop only for the LAN-first path; away/offline takeover still requires a linked cloud profile with reachable non-local backends
 - Bonjour may still be missing or stopped on some hosts; that affects discovery/fallback polish, not the core loopback path
 - remote/auth-protected playback behavior still depends on what the target Stremio client honors during redirect/auth handoff
 - the addon still emits `behaviorHints.sourceContainer = 'rar'` on the experimental native archive path, but official Stremio docs/core do not define that field for archive support

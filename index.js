@@ -56,6 +56,7 @@ const {
   normalizeBaseUrl, normalizeAddonConfig, mergeRetainedSecrets,
   hydrateAccountLinkForConfig, buildConfigReadback, resolveExistingConfigForBody,
   getConfigIssues, getPublicBaseUrl, getPlaybackBaseUrl, loadConfigFromSourceToken,
+  persistAccountHostedTakeoverConfig,
   ensureLanPairConfig, normalizeRetainedSecretFields, stripEphemeralConfigFields,
   // Pair helpers
   sanitizePairId, sanitizePairKey, sanitizePairOwnerId,
@@ -1022,6 +1023,13 @@ app.post('/encrypt', async (req, res) => {
       ? stripRemoteSeedboxLanFields(normalizedConfig)
       : normalizedConfig
     const token = encrypt(tokenPayload, secret)
+    let cloudTakeoverSaved = false
+    try {
+      const persistedTakeover = await persistAccountHostedTakeoverConfig(normalizedConfig)
+      cloudTakeoverSaved = persistedTakeover?.saved === true
+    } catch (persistErr) {
+      console.warn('[encrypt] hosted takeover profile save failed:', persistErr.message)
+    }
     queueAnalyticsEvent(req, 'config_generated', {
       route: analyticsRouteLabelFromProfile(normalizedConfig.routeProfile),
       route_profile: normalizedConfig.routeProfile || 'online',
@@ -1029,7 +1037,7 @@ app.post('/encrypt', async (req, res) => {
     }, {
       url: '/encrypt'
     })
-    res.json({ token })
+    res.json({ token, cloudTakeoverSaved })
   } catch (err) {
     res.status(400).json({ error: 'Encryption failed' })
   }

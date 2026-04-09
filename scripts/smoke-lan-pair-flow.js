@@ -9,7 +9,7 @@ const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-lan-pair-'))
 process.env.PVTKRRX_RUNTIME_DIR = runtimeDir
 
 const app = require('../index')
-const { lanPairStore, hashPairKey } = require('../src/lib/shared')
+const { lanPairStore, hashPairKey, loadAccountHostedTakeoverConfig } = require('../src/lib/shared')
 const { encodePlaybackStateToken, decodePlaybackStateToken } = require('../src/utils/opaqueState')
 const pairStorePath = path.join(runtimeDir, 'lan-pair-store.json')
 
@@ -66,12 +66,37 @@ function requestWithHostHeader(port, path, hostHeader) {
 }
 
 async function run() {
+  const qbitMockServer = http.createServer((req, res) => {
+    const url = new URL(req.url, 'http://127.0.0.1')
+    if (url.pathname === '/api/v2/torrents/info') {
+      res.setHeader('Content-Type', 'application/json')
+      return res.end(JSON.stringify([
+        {
+          hash: 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+          name: 'Smoke Library Movie 2026 1080p',
+          completion_on: 1712600000
+        }
+      ]))
+    }
+    if (url.pathname === '/api/v2/torrents/files') {
+      res.setHeader('Content-Type', 'application/json')
+      return res.end(JSON.stringify([]))
+    }
+    res.statusCode = 404
+    res.end('not found')
+  })
+  await new Promise(resolve => qbitMockServer.listen(0, '127.0.0.1', resolve))
+
   const server = http.createServer(app)
   await new Promise(resolve => server.listen(0, resolve))
 
   try {
+    const qbitMockPort = qbitMockServer.address().port
+    const qbitMockBase = `http://127.0.0.1:${qbitMockPort}`
     const port = server.address().port
     const base = `http://127.0.0.1:${port}`
+    const qbitMockProbe = await fetch(`${qbitMockBase}/api/v2/torrents/info?filter=completed`)
+    assert.equal(qbitMockProbe.status, 200, 'mock qBit server should be reachable before takeover tests')
     const configureRes = await fetch(`${base}/configure`)
     assert.equal(configureRes.status, 200, 'GET /configure should return 200')
     const csrf = readCsrf(configureRes.headers.get('set-cookie'))
@@ -427,6 +452,81 @@ async function run() {
       'stale hybrid fallback should produce a non-empty HTTP response'
     )
 
+    const linkedCloudUserId = '5a1c73ab1ea03603470eaad8'
+    const cloudProfileRes = await fetch(`${base}/encrypt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        jackettUrl: 'https://cloud.seedbox.example:9696',
+        jackettApiKey: 'cloud-key',
+        qbitUrl: qbitMockBase,
+        qbitUsername: '',
+        qbitPassword: '',
+        fileServerUrl: 'https://files.seedbox.example',
+        fileServerAuth: '',
+        pathMapping: { from: '', to: '' },
+        maxResults: 50,
+        lanPairEnabled: false,
+        lanPairRequired: false,
+        routeProfile: 'online',
+        stremioUserId: linkedCloudUserId
+      })
+    })
+    assert.equal(cloudProfileRes.status, 200, 'linked cloud profile /encrypt should succeed')
+    const cloudProfilePayload = await cloudProfileRes.json()
+    assert.equal(Boolean(cloudProfilePayload?.cloudTakeoverSaved), true, 'linked cloud profile should persist takeover config')
+    const storedCloudTakeover = await loadAccountHostedTakeoverConfig({
+      routeProfile: 'hybrid',
+      lanPairEnabled: true,
+      lanPairRequired: false,
+      lanPairId: stalePairId,
+      lanPairKey: stalePairKey,
+      lanPairRelayUrl: base,
+      stremioUserId: linkedCloudUserId
+    })
+    assert.equal(String(storedCloudTakeover?.qbitUrl || ''), qbitMockBase, 'stored cloud takeover profile should keep the cloud qBit URL')
+
+    const takeoverHybridConfig = {
+      ...staleHybridConfig,
+      stremioUserId: linkedCloudUserId,
+      qbitUrl: 'http://127.0.0.1:65534',
+      qbitUsername: '',
+      qbitPassword: '',
+      fileServerUrl: ''
+    }
+    const encryptTakeoverHybridRes = await fetch(`${base}/encrypt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(takeoverHybridConfig)
+    })
+    assert.equal(encryptTakeoverHybridRes.status, 200, 'linked hybrid takeover /encrypt should succeed')
+    const takeoverHybridPayload = await encryptTakeoverHybridRes.json()
+    assert.equal(Boolean(takeoverHybridPayload?.cloudTakeoverSaved), false, 'hybrid home token should not overwrite the linked cloud takeover profile')
+    const storedCloudTakeoverAfterHybrid = await loadAccountHostedTakeoverConfig({
+      routeProfile: 'hybrid',
+      lanPairEnabled: true,
+      lanPairRequired: false,
+      lanPairId: stalePairId,
+      lanPairKey: stalePairKey,
+      lanPairRelayUrl: base,
+      stremioUserId: linkedCloudUserId
+    })
+    assert.equal(String(storedCloudTakeoverAfterHybrid?.qbitUrl || ''), qbitMockBase, 'hybrid home token should leave the stored cloud takeover profile intact')
+    const takeoverHybridToken = encodeURIComponent(String(takeoverHybridPayload?.token || ''))
+
+    const takeoverLibraryCatalog = await requestWithHostHeader(
+      port,
+      `/${takeoverHybridToken}/catalog/movie/pvtkrrx-library.json`,
+      `tv.device.example:${port}`
+    )
+    assert.equal(takeoverLibraryCatalog.status, 200, 'linked cloud takeover library catalog should resolve')
+    assert.equal(String(takeoverLibraryCatalog.headers['x-pvtkrrx-lan-pair'] || ''), 'fallback')
+    assert.equal(String(takeoverLibraryCatalog.headers['x-pvtkrrx-route-decision'] || ''), 'cloud')
+    assert.equal(String(takeoverLibraryCatalog.headers['x-pvtkrrx-route-reason'] || ''), 'stale-heartbeat')
+    assert.equal(String(takeoverLibraryCatalog.headers['x-pvtkrrx-cloud-takeover'] || ''), 'linked-account')
+    assert.equal(Array.isArray(takeoverLibraryCatalog.json?.metas), true, 'linked cloud takeover should return metas array')
+    assert.ok(takeoverLibraryCatalog.json.metas.length >= 1, 'linked cloud takeover should use stored cloud profile instead of dead desktop-local qBit')
+
     const localConfigRes = await fetch(`${base}/local-config`, {
       method: 'POST',
       headers: withCsrf(csrf, { 'Content-Type': 'application/json' }),
@@ -460,6 +560,7 @@ async function run() {
     console.log('Smoke LAN pair + opaque stream token flow passed')
   } finally {
     server.close()
+    qbitMockServer.close()
     try {
       fs.rmSync(runtimeDir, { recursive: true, force: true })
     } catch (_) {}

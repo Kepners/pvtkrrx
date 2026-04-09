@@ -1088,6 +1088,110 @@ async function hydrateAccountLinkForConfig(config = {}) {
   return next
 }
 
+function configLooksHostedTakeoverCapable(config = {}) {
+  const hostedProfile = resolveHostedProfile(config)
+  return hostedProfile === 'online'
+}
+
+function buildHostedTakeoverConfig(config = {}) {
+  return normalizeAddonConfig(stripRemoteSeedboxLanFields({
+    ...(config && typeof config === 'object' ? config : {}),
+    routeProfile: 'online',
+    lanPairEnabled: false,
+    lanPairRequired: false
+  }))
+}
+
+async function resolveAccountUserForConfig(config = {}, options = {}) {
+  const accountUserId = String(config?.accountUserId || '').trim()
+  const stremioUserId = normalizeStremioUserId(config?.stremioUserId || '')
+  const createIfMissing = options.createIfMissing === true
+
+  let user = null
+  if (accountUserId) {
+    user = await accountStore.getUserById(accountUserId)
+  }
+  if (!user && stremioUserId) {
+    user = await accountStore.getUserByStremioUserId(stremioUserId)
+  }
+  if (!user && createIfMissing && stremioUserId) {
+    user = await accountStore.createOrLinkStremioUser({ stremioUserId })
+  }
+  return user
+}
+
+async function persistAccountHostedTakeoverConfig(config = {}) {
+  if (!configLooksHostedTakeoverCapable(config)) {
+    return { saved: false, reason: 'not-hosted-capable' }
+  }
+
+  const secret = String(process.env.ENCRYPTION_SECRET || '').trim()
+  if (!secret) return { saved: false, reason: 'missing-secret' }
+
+  const user = await resolveAccountUserForConfig(config, { createIfMissing: true })
+  if (!user) return { saved: false, reason: 'missing-account' }
+
+  const takeoverConfig = buildHostedTakeoverConfig(config)
+  const next = {
+    ...user,
+    pvtkrrx: {
+      ...(user?.pvtkrrx && typeof user.pvtkrrx === 'object' ? user.pvtkrrx : {}),
+      hostedTakeoverConfigToken: encrypt(takeoverConfig, secret),
+      hostedTakeoverUpdatedAt: Date.now()
+    }
+  }
+
+  const savedUser = await accountStore.saveUser(next)
+  return {
+    saved: true,
+    userId: String(savedUser?.id || '').trim(),
+    takeoverConfig
+  }
+}
+
+async function loadAccountHostedTakeoverConfig(config = {}) {
+  if (resolveHostedProfile(config) !== 'hybrid') return null
+
+  const secret = String(process.env.ENCRYPTION_SECRET || '').trim()
+  if (!secret) return null
+
+  const user = await resolveAccountUserForConfig(config)
+  if (!user) return null
+
+  const takeoverToken = String(user?.pvtkrrx?.hostedTakeoverConfigToken || '').trim()
+  if (!takeoverToken) return null
+
+  try {
+    const takeoverConfig = normalizeAddonConfig(decrypt(takeoverToken, secret))
+    return normalizeAddonConfig({
+      ...takeoverConfig,
+      routeProfile: 'hybrid',
+      lanPairEnabled: true,
+      lanPairRequired: false,
+      lanPairId: sanitizePairId(config?.lanPairId) || sanitizePairId(takeoverConfig?.lanPairId),
+      lanPairKey: sanitizePairKey(config?.lanPairKey) || sanitizePairKey(takeoverConfig?.lanPairKey),
+      lanPairOwnerId: sanitizePairOwnerId(config?.lanPairOwnerId) || sanitizePairOwnerId(takeoverConfig?.lanPairOwnerId),
+      lanPairRelayUrl: normalizeRelayUrl(config?.lanPairRelayUrl || takeoverConfig?.lanPairRelayUrl || ''),
+      stremioUserId: normalizeStremioUserId(config?.stremioUserId || takeoverConfig?.stremioUserId),
+      accountUserId: String(config?.accountUserId || user?.id || '').trim(),
+      accountProvider: String(
+        config?.accountProvider ||
+        takeoverConfig?.accountProvider ||
+        user?.authProvider ||
+        'stremio-authkey'
+      ).trim(),
+      accountLinkedAt: Number(
+        config?.accountLinkedAt ||
+        takeoverConfig?.accountLinkedAt ||
+        user?.stremio?.linkedAt ||
+        Date.now()
+      )
+    })
+  } catch (_) {
+    return null
+  }
+}
+
 function buildConfigReadback(config = {}) {
   const safe = config && typeof config === 'object' ? { ...config } : {}
   const savedSecrets = {
@@ -1998,6 +2102,7 @@ async function mintHostedConfigToken(relayUrl, payload) {
 async function withConfig(req, res, next) {
   req.localConfigMissing = false
   req.configIssues = []
+  req.cloudTakeoverConfig = null
   if (isDiskBackedConfigAlias(req.params.config)) {
     try {
       const localConfig = loadLocalConfigFile()
@@ -2033,7 +2138,8 @@ async function withConfig(req, res, next) {
 
   try {
     req.config = normalizeAddonConfig(decrypt(req.params.config, secret))
-    req.configIssues = getConfigIssues(req.config, {
+    req.cloudTakeoverConfig = await loadAccountHostedTakeoverConfig(req.config)
+    req.configIssues = getConfigIssues(req.cloudTakeoverConfig || req.config, {
       requestBaseUrl: getPublicBaseUrl(req)
     })
     next()
@@ -2124,6 +2230,20 @@ function lanPairOfflineResponse(req, res, routeKind) {
   })
 }
 
+function applyCloudTakeoverConfig(req, res, routeKind, reason) {
+  if (!req?.cloudTakeoverConfig || typeof req.cloudTakeoverConfig !== 'object') return false
+
+  req.config = req.cloudTakeoverConfig
+  req.configIssues = getConfigIssues(req.config, {
+    requestBaseUrl: getPublicBaseUrl(req)
+  })
+  res.setHeader('X-PVTKRRX-Cloud-Takeover', 'linked-account')
+  console.log(
+    `[lan-pair] ${routeKind} cloud-takeover reason=${String(reason || 'offline')} from=${requestClientLabel(req)}`
+  )
+  return true
+}
+
 function maybeLanPairRedirect(routeKind) {
   return async (req, res, next) => {
     try {
@@ -2146,6 +2266,7 @@ function maybeLanPairRedirect(routeKind) {
             res.setHeader('X-PVTKRRX-LAN-Pair', 'fallback')
             res.setHeader('X-PVTKRRX-Route-Decision', 'cloud')
             res.setHeader('X-PVTKRRX-Route-Reason', String(resolution.reason || 'offline'))
+            applyCloudTakeoverConfig(req, res, routeKind, resolution.reason || 'offline')
           }
           return next()
         }
@@ -2159,6 +2280,7 @@ function maybeLanPairRedirect(routeKind) {
           res.setHeader('X-PVTKRRX-LAN-Pair', 'fallback')
           res.setHeader('X-PVTKRRX-Route-Decision', 'cloud')
           res.setHeader('X-PVTKRRX-Route-Reason', String(resolution.reason || 'offline'))
+          applyCloudTakeoverConfig(req, res, routeKind, resolution.reason || 'offline')
         }
         return next()
       }
@@ -2172,6 +2294,7 @@ function maybeLanPairRedirect(routeKind) {
           res.setHeader('X-PVTKRRX-LAN-Pair', 'fallback')
           res.setHeader('X-PVTKRRX-Route-Decision', 'cloud')
           res.setHeader('X-PVTKRRX-Route-Reason', 'no-redirect-url')
+          applyCloudTakeoverConfig(req, res, routeKind, 'no-redirect-url')
         }
         return next()
       }
@@ -2192,6 +2315,7 @@ function maybeLanPairRedirect(routeKind) {
         res.setHeader('X-PVTKRRX-LAN-Pair', 'fallback')
         res.setHeader('X-PVTKRRX-Route-Decision', 'cloud')
         res.setHeader('X-PVTKRRX-Route-Reason', 'resolve-error')
+        applyCloudTakeoverConfig(req, res, routeKind, 'resolve-error')
       }
       next()
     }
@@ -2293,6 +2417,7 @@ module.exports = {
   mergeRetainedSecrets,
   loadConfigFromSourceToken,
   hydrateAccountLinkForConfig,
+  persistAccountHostedTakeoverConfig,
   buildConfigReadback,
   resolveExistingConfigForBody,
   chooseLanPairEndpoint,
@@ -2358,6 +2483,9 @@ module.exports = {
   isMagnetLink,
   parseTorrentFileName,
   fetchTorrentPayload,
+  configLooksHostedTakeoverCapable,
+  buildHostedTakeoverConfig,
+  loadAccountHostedTakeoverConfig,
   isLanPairStateFresh,
   resolveLanPair,
   lanPairOfflineResponse,
