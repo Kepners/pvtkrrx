@@ -264,6 +264,19 @@ async function run() {
     assert.equal(typeof versionStatus.latestVersion, 'string')
     assert.equal(typeof versionStatus.updateAvailable, 'boolean')
     assert.equal(typeof versionStatus.latestReleaseUrl, 'string')
+    assert.equal(typeof versionStatus.latestWindowsSetupDownloadUrl, 'string')
+    assert.equal(typeof versionStatus.hasWindowsSetupDownload, 'boolean')
+
+    const latestSetupDownloadRes = await fetch(`${base}/download/windows/setup?source=smoke_config`, {
+      redirect: 'manual'
+    })
+    assert.equal(latestSetupDownloadRes.status, 302, 'GET /download/windows/setup should redirect')
+    const latestSetupDownloadLocation = String(latestSetupDownloadRes.headers.get('location') || '')
+    assert.match(
+      latestSetupDownloadLocation,
+      /^https:\/\/github\.com\/Kepners\/pvtkrrx\/releases(?:\/download\/|\/?$)/i,
+      'setup download route should redirect to the GitHub release asset or release page'
+    )
 
     const runbooksRes = await fetch(`${base}/runbooks`)
     assert.equal(runbooksRes.status, 200, 'GET /runbooks should return 200')

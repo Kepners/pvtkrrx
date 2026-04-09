@@ -1,6 +1,6 @@
 # PVTKRRX Monitoring
 
-Updated: 2026-04-08
+Updated: 2026-04-09
 
 ## Purpose
 
@@ -48,6 +48,7 @@ Tracked CTA clicks:
 - `cta_choose_route`
 - `cta_view_sports`
 - `cta_open_releases`
+- `cta_download_windows`
 
 ### Hosted Product Events
 
@@ -63,6 +64,8 @@ The hosted relay now emits these server-side Umami events:
   - fired once per pair id per day when the Windows desktop heartbeat reaches the hosted relay
 - `selfhost_installer_requested`
   - fired when the public hosted runtime serves `install-selfhost.sh`
+- `desktop_download_requested`
+  - fired when the public hosted runtime receives a tracked Windows download redirect request such as `/download/windows/setup`
 - `stremio_link_session_created`
   - fired when the hosted runtime creates a one-time Stremio link session
 - `stremio_account_linked`
@@ -76,9 +79,11 @@ The hosted relay now emits these server-side Umami events:
 - Active hosted installs: `manifest_active_day`
 - Active LAN hosts: `lan_host_active`
 - Self-host installer demand: `selfhost_installer_requested`
+- Windows EXE download requests: `desktop_download_requested` filtered by `asset_kind=setup`
 - Account-link conversion: `stremio_link_session_created` -> `stremio_account_linked`
 
 GitHub release asset download counts are still useful, but they are a secondary signal rather than the main install metric.
+The tracked Windows download route measures download starts from PVTKRRX-owned links, not guaranteed GitHub byte-complete downloads. If someone downloads straight from GitHub without touching the tracked PVTKRRX URL, Umami will not see that request.
 
 ## Privacy Rules
 

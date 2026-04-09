@@ -176,11 +176,17 @@ const STREMIO_LINK_SESSION_TTL_SECONDS = Math.max(300, parseInt(process.env.PVTK
 const GITHUB_OWNER = 'Kepners'
 const GITHUB_REPO = 'pvtkrrx'
 const GITHUB_RELEASES_LATEST_URL = `https://api.github.com/repos/${GITHUB_OWNER}/${GITHUB_REPO}/releases/latest`
+const GITHUB_RELEASES_PAGE_URL = `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases`
+const PUBLIC_DOWNLOAD_BASE_URL = normalizeBaseUrl(
+  process.env.PVTKRRX_PUBLIC_DOWNLOAD_BASE_URL ||
+  'https://www.pvtkrrx.cc'
+) || 'https://www.pvtkrrx.cc'
 const VERSION_STATUS_CACHE_MS = Math.max(60000, parseInt(process.env.PVTKRRX_VERSION_STATUS_CACHE_MS || '300000', 10))
 let versionStatusCache = {
   fetchedAt: 0,
   data: null,
-  promise: null
+  promise: null,
+  release: null
 }
 
 function analyticsRouteLabelFromProfile(profile) {
@@ -273,6 +279,46 @@ app.get(['/version-status.json', '/version.json'], async (_req, res) => {
   }
 })
 
+async function handleDesktopDownloadRedirect(req, res, assetKind = 'setup') {
+  let release = null
+  try {
+    release = await getLatestRelease()
+  } catch (_) {}
+
+  const redirect = buildDesktopDownloadRedirectTarget(release, assetKind)
+  const releaseTag = String(release?.tag_name || release?.name || '').trim()
+  const downloadSource = normalizeDownloadSource(req.query?.source)
+
+  queueAnalyticsEvent(req, 'desktop_download_requested', {
+    asset_kind: assetKind,
+    asset_name: String(redirect.asset?.name || ''),
+    release_tag: releaseTag,
+    resolved_target: redirect.resolvedTarget,
+    source: downloadSource || 'unknown'
+  }, {
+    url: `/download/windows/${assetKind}`
+  })
+
+  res.setHeader('Cache-Control', 'no-store')
+  return res.redirect(302, redirect.redirectUrl)
+}
+
+app.get(['/download/windows', '/download/windows/setup', '/download/latest/windows/setup'], async (req, res) => {
+  try {
+    await handleDesktopDownloadRedirect(req, res, 'setup')
+  } catch (err) {
+    res.redirect(302, GITHUB_RELEASES_PAGE_URL)
+  }
+})
+
+app.get(['/download/windows/portable', '/download/latest/windows/portable'], async (req, res) => {
+  try {
+    await handleDesktopDownloadRedirect(req, res, 'portable')
+  } catch (err) {
+    res.redirect(302, GITHUB_RELEASES_PAGE_URL)
+  }
+})
+
 app.get(['/install-selfhost.sh', '/install.sh'], (req, res) => {
   const scriptPath = path.join(__dirname, 'scripts', 'install-selfhost.sh')
   if (!fs.existsSync(scriptPath)) {
@@ -332,6 +378,73 @@ function normalizeVersionString(value) {
   return String(value || '').trim().replace(/^v/i, '').split('+')[0].split('-')[0]
 }
 
+function normalizeReleaseAssetName(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function sanitizeExternalHttpsUrl(value, fallback = '') {
+  const raw = String(value || '').trim()
+  if (!raw) return String(fallback || '').trim()
+  try {
+    const parsed = new URL(raw)
+    if (parsed.protocol !== 'https:') return String(fallback || '').trim()
+    return parsed.toString()
+  } catch (_) {
+    return String(fallback || '').trim()
+  }
+}
+
+function buildTrackedDownloadUrl(routePath) {
+  const base = String(PUBLIC_DOWNLOAD_BASE_URL || 'https://www.pvtkrrx.cc').trim().replace(/\/+$/, '')
+  const pathValue = String(routePath || '').trim()
+  if (!pathValue) return base
+  return `${base}${pathValue.startsWith('/') ? pathValue : `/${pathValue}`}`
+}
+
+function getLatestReleaseAssets(release) {
+  const assets = Array.isArray(release?.assets) ? release.assets : []
+  const executableAssets = assets.filter((asset) => {
+    const name = normalizeReleaseAssetName(asset?.name)
+    if (!name.endsWith('.exe')) return false
+    if (name.endsWith('.blockmap')) return false
+    return true
+  })
+
+  const setup = executableAssets.find((asset) => normalizeReleaseAssetName(asset?.name).includes('setup')) || null
+  const portable = executableAssets.find((asset) => {
+    const name = normalizeReleaseAssetName(asset?.name)
+    return !name.includes('setup')
+  }) || null
+
+  return { setup, portable }
+}
+
+function normalizeDownloadSource(value) {
+  const normalized = String(value || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_')
+  return normalized.slice(0, 40)
+}
+
+function buildDesktopDownloadRedirectTarget(release, assetKind = 'setup') {
+  const { setup, portable } = getLatestReleaseAssets(release)
+  const selectedAsset = assetKind === 'portable' ? portable : setup
+  const releasePageUrl = sanitizeExternalHttpsUrl(release?.html_url, GITHUB_RELEASES_PAGE_URL)
+  const assetUrl = sanitizeExternalHttpsUrl(selectedAsset?.browser_download_url, '')
+
+  if (assetUrl) {
+    return {
+      asset: selectedAsset,
+      redirectUrl: assetUrl,
+      resolvedTarget: 'github_asset'
+    }
+  }
+
+  return {
+    asset: selectedAsset,
+    redirectUrl: releasePageUrl,
+    resolvedTarget: 'release_page'
+  }
+}
+
 function parseVersionParts(value) {
   return normalizeVersionString(value)
     .split('.')
@@ -356,9 +469,10 @@ function compareVersionStrings(left, right) {
 function buildVersionStatusPayload(release = null, error = '') {
   const currentVersion = normalizeVersionString(pkg.version || '0.0.0') || '0.0.0'
   const latestVersion = normalizeVersionString(release?.tag_name || release?.name || currentVersion) || currentVersion
-  const latestReleaseUrl = String(release?.html_url || `https://github.com/${GITHUB_OWNER}/${GITHUB_REPO}/releases`).trim()
+  const latestReleaseUrl = sanitizeExternalHttpsUrl(release?.html_url, GITHUB_RELEASES_PAGE_URL)
   const latestReleaseName = String(release?.name || release?.tag_name || `v${latestVersion}`).trim()
   const latestTag = String(release?.tag_name || `v${latestVersion}`).trim()
+  const latestReleaseAssets = getLatestReleaseAssets(release)
   const updateAvailable = !error && compareVersionStrings(currentVersion, latestVersion) < 0
   const status = error
     ? 'unavailable'
@@ -382,10 +496,52 @@ function buildVersionStatusPayload(release = null, error = '') {
     latestReleaseUrl,
     latestPublishedAt: String(release?.published_at || ''),
     releaseAssetCount: Array.isArray(release?.assets) ? release.assets.length : 0,
+    hasWindowsSetupDownload: Boolean(latestReleaseAssets.setup),
+    latestWindowsSetupAssetName: String(latestReleaseAssets.setup?.name || ''),
+    latestWindowsSetupDownloadUrl: buildTrackedDownloadUrl('/download/windows/setup'),
+    hasWindowsPortableDownload: Boolean(latestReleaseAssets.portable),
+    latestWindowsPortableAssetName: String(latestReleaseAssets.portable?.name || ''),
+    latestWindowsPortableDownloadUrl: buildTrackedDownloadUrl('/download/windows/portable'),
     updateAvailable,
     checkedAt: new Date().toISOString(),
     error: error || ''
   }
+}
+
+async function refreshVersionStatusCache() {
+  let payload
+  try {
+    const response = await fetch(GITHUB_RELEASES_LATEST_URL, {
+      headers: {
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'PVTKRRX'
+      },
+      signal: AbortSignal.timeout(6000)
+    })
+    if (!response.ok) {
+      throw new Error(`GitHub release check returned HTTP ${response.status}`)
+    }
+    const release = await response.json()
+    versionStatusCache.release = release
+    payload = buildVersionStatusPayload(release)
+  } catch (err) {
+    payload = buildVersionStatusPayload(versionStatusCache.release, String(err?.message || err || 'Unknown release check error'))
+    if (versionStatusCache.data) {
+      payload = {
+        ...versionStatusCache.data,
+        status: 'unavailable',
+        ok: false,
+        error: payload.error,
+        message: payload.message,
+        checkedAt: payload.checkedAt
+      }
+    }
+  }
+
+  versionStatusCache.data = payload
+  versionStatusCache.fetchedAt = Date.now()
+  versionStatusCache.promise = null
+  return payload
 }
 
 async function getVersionStatus() {
@@ -397,42 +553,24 @@ async function getVersionStatus() {
     return versionStatusCache.promise
   }
 
-  versionStatusCache.promise = (async () => {
-    let payload
-    try {
-      const response = await fetch(GITHUB_RELEASES_LATEST_URL, {
-        headers: {
-          'Accept': 'application/vnd.github+json',
-          'User-Agent': 'PVTKRRX'
-        },
-        signal: AbortSignal.timeout(6000)
-      })
-      if (!response.ok) {
-        throw new Error(`GitHub release check returned HTTP ${response.status}`)
-      }
-      const release = await response.json()
-      payload = buildVersionStatusPayload(release)
-    } catch (err) {
-      payload = buildVersionStatusPayload(null, String(err?.message || err || 'Unknown release check error'))
-      if (versionStatusCache.data) {
-        payload = {
-          ...versionStatusCache.data,
-          status: 'unavailable',
-          ok: false,
-          error: payload.error,
-          message: payload.message,
-          checkedAt: payload.checkedAt
-        }
-      }
-    }
-
-    versionStatusCache.data = payload
-    versionStatusCache.fetchedAt = Date.now()
-    versionStatusCache.promise = null
-    return payload
-  })()
+  versionStatusCache.promise = refreshVersionStatusCache()
 
   return versionStatusCache.promise
+}
+
+async function getLatestRelease() {
+  const now = Date.now()
+  if (versionStatusCache.release && (now - versionStatusCache.fetchedAt) < VERSION_STATUS_CACHE_MS) {
+    return versionStatusCache.release
+  }
+  if (versionStatusCache.promise) {
+    await versionStatusCache.promise
+    return versionStatusCache.release
+  }
+
+  versionStatusCache.promise = refreshVersionStatusCache()
+  await versionStatusCache.promise
+  return versionStatusCache.release
 }
 
 function sanitizeStremioLinkSessionToken(value) {

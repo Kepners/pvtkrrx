@@ -926,7 +926,7 @@
             <span class="release-tag" id="releaseTag">v...</span>
           </div>
           <div class="release-copy" id="releaseCopy">Comparing this desktop build with the latest public release.</div>
-          <a class="release-link" id="releaseLink" href="https://github.com/Kepners/pvtkrrx/releases" target="_blank" rel="noopener noreferrer">Open Release Page</a>
+          <a class="release-link" id="releaseLink" href="https://www.pvtkrrx.cc/download/windows/setup?source=desktop_popup_release" target="_blank" rel="noopener noreferrer">Download Windows App</a>
         </div>
 
         <div class="section-label">Server Shell</div>
@@ -1133,10 +1133,13 @@
       const currentVersion = String(data && data.currentVersion ? data.currentVersion : _lastVersion || '0.0.0').trim() || '0.0.0';
       const latestVersion = String(data && data.latestVersion ? data.latestVersion : currentVersion).trim() || currentVersion;
       const latestReleaseUrl = String(data && data.latestReleaseUrl ? data.latestReleaseUrl : 'https://github.com/Kepners/pvtkrrx/releases').trim();
+      const latestSetupDownloadUrl = String(data && data.latestWindowsSetupDownloadUrl ? data.latestWindowsSetupDownloadUrl : 'https://www.pvtkrrx.cc/download/windows/setup').trim();
+      const hasWindowsSetupDownload = Boolean(data && data.hasWindowsSetupDownload);
+      const resolvedDownloadUrl = withDownloadSource(latestSetupDownloadUrl, 'desktop_popup_release');
       const updateAvailable = Boolean(data && data.updateAvailable);
       const status = String(data && data.status ? data.status : (updateAvailable ? 'update-available' : 'up-to-date')).trim();
       const message = String(data && data.message ? data.message : (updateAvailable ? `Update available: v${latestVersion}` : `Up to date: v${currentVersion}`)).trim();
-      const key = [status, currentVersion, latestVersion, latestReleaseUrl, message].join('|');
+      const key = [status, currentVersion, latestVersion, latestReleaseUrl, latestSetupDownloadUrl, String(hasWindowsSetupDownload), message].join('|');
       if (key === _lastReleaseState) return;
       _lastReleaseState = key;
 
@@ -1148,10 +1151,28 @@
         : (status === 'up-to-date'
           ? `Current v${currentVersion} · Latest v${latestVersion}`
           : (String(data && data.error ? data.error : '').trim() || 'GitHub release check is temporarily unavailable.'));
-      link.href = latestReleaseUrl;
-      link.textContent = updateAvailable ? 'Open Latest Release' : 'Open Release Page';
+      if (hasWindowsSetupDownload && (updateAvailable || status === 'up-to-date')) {
+        link.href = resolvedDownloadUrl;
+        link.textContent = updateAvailable ? 'Download Update' : 'Download Windows App';
+      } else {
+        link.href = latestReleaseUrl;
+        link.textContent = updateAvailable ? 'Open Latest Release' : 'Open Release Page';
+      }
       invalidatePopupFit();
       requestPopupFit();
+    }
+
+    function withDownloadSource(url, sourceParam) {
+      const raw = String(url || '').trim();
+      const source = String(sourceParam || '').trim();
+      if (!raw || !source) return raw;
+      try {
+        const target = new URL(raw, window.location.origin);
+        target.searchParams.set('source', source);
+        return target.toString();
+      } catch (_) {
+        return raw;
+      }
     }
 
     async function refreshReleaseStatus() {
@@ -1168,6 +1189,8 @@
           currentVersion: _lastVersion || '0.0.0',
           latestVersion: _lastVersion || '0.0.0',
           latestReleaseUrl: 'https://github.com/Kepners/pvtkrrx/releases',
+          latestWindowsSetupDownloadUrl: 'https://www.pvtkrrx.cc/download/windows/setup',
+          hasWindowsSetupDownload: true,
           updateAvailable: false
         });
       }

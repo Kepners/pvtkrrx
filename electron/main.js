@@ -1462,6 +1462,8 @@ ipcMain.handle('get-version-status', async () => {
       latestTag: `v${String(pkg.version || '0.0.0')}`,
       latestReleaseName: `v${String(pkg.version || '0.0.0')}`,
       latestReleaseUrl: 'https://github.com/Kepners/pvtkrrx/releases',
+      latestWindowsSetupDownloadUrl: 'https://www.pvtkrrx.cc/download/windows/setup',
+      hasWindowsSetupDownload: true,
       message: String(err?.message || 'Release status unavailable')
     }
   }
