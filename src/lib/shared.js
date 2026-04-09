@@ -73,6 +73,19 @@ const WATCHED_DELETE_GRACE_MS = Math.max(0, parseInt(process.env.PVTKRRX_WATCHED
 // Pairing should be hash-first and stable: desktop publishes LAN endpoint, hosted token hash resolves it.
 // Keep TTL long enough to avoid noisy relay chatter; desktop still refreshes periodically.
 const LAN_PAIR_TTL_SECONDS = Math.max(300, parseInt(process.env.PVTKRRX_LAN_PAIR_TTL_SECONDS || '21600', 10))
+const parsedLanPairHeartbeatMs = parseInt(process.env.PVTKRRX_LAN_PAIR_HEARTBEAT_MS || '720000', 10)
+const LAN_PAIR_HEARTBEAT_MS = Number.isFinite(parsedLanPairHeartbeatMs) ? parsedLanPairHeartbeatMs : 720000
+const parsedLanPairFreshnessMs = parseInt(process.env.PVTKRRX_LAN_PAIR_FRESHNESS_MS || '', 10)
+// Store TTL can stay long for repair/debug flows, but redirect decisions should stop trusting stale hosts quickly.
+const LAN_PAIR_FRESHNESS_MS = Number.isFinite(parsedLanPairFreshnessMs) && parsedLanPairFreshnessMs > 0
+  ? parsedLanPairFreshnessMs
+  : Math.min(
+    LAN_PAIR_TTL_SECONDS * 1000,
+    Math.max(
+      180000,
+      LAN_PAIR_HEARTBEAT_MS + Math.max(180000, Math.floor(LAN_PAIR_HEARTBEAT_MS * 0.25))
+    )
+  )
 const LAN_PAIR_BIND_PUBLIC_IP = String(process.env.PVTKRRX_LAN_PAIR_BIND_PUBLIC_IP || 'false').trim().toLowerCase() === 'true'
 const LAN_PAIR_LOCK_HOST = String(process.env.PVTKRRX_LAN_PAIR_LOCK_HOST || 'true').trim().toLowerCase() !== 'false'
 const LAN_PAIR_RATE_LIMIT_WINDOW_MS = Math.max(1000, parseInt(process.env.PVTKRRX_LAN_PAIR_RATE_LIMIT_WINDOW_MS || '60000', 10))
@@ -2042,6 +2055,19 @@ function isMagnetLink(link) {
   return String(link || '').trim().toLowerCase().startsWith('magnet:')
 }
 
+function isLanPairStateFresh(state, now = Date.now()) {
+  if (!state || typeof state !== 'object') return false
+
+  const updatedAt = Number(state.updatedAt || 0)
+  if (!Number.isFinite(updatedAt) || updatedAt <= 0) return false
+  if ((now - updatedAt) > LAN_PAIR_FRESHNESS_MS) return false
+
+  const expiresAt = Number(state.expiresAt || 0)
+  if (Number.isFinite(expiresAt) && expiresAt > 0 && expiresAt <= now) return false
+
+  return true
+}
+
 async function resolveLanPair(config, req) {
   const enabled = parseBooleanLoose(config?.lanPairEnabled, false)
   if (!enabled) return { enabled: false, online: false, reason: 'disabled' }
@@ -2054,6 +2080,9 @@ async function resolveLanPair(config, req) {
   if (!state) return { enabled: true, online: false, reason: 'offline' }
   if (hashPairKey(pairKey) !== String(state.keyHash || '')) {
     return { enabled: true, online: false, reason: 'key-mismatch' }
+  }
+  if (!isLanPairStateFresh(state)) {
+    return { enabled: true, online: false, reason: 'stale-heartbeat', state }
   }
   if (shouldBindLanPairToRequest(config)) {
     const stateIpHash = String(state.clientIpHash || '')
@@ -2191,6 +2220,7 @@ module.exports = {
   WATCHED_DELETE_THRESHOLD,
   WATCHED_DELETE_GRACE_MS,
   LAN_PAIR_TTL_SECONDS,
+  LAN_PAIR_FRESHNESS_MS,
   LAN_PAIR_BIND_PUBLIC_IP,
   LAN_PAIR_LOCK_HOST,
   LAN_PAIR_RATE_LIMIT_WINDOW_MS,
@@ -2328,6 +2358,7 @@ module.exports = {
   isMagnetLink,
   parseTorrentFileName,
   fetchTorrentPayload,
+  isLanPairStateFresh,
   resolveLanPair,
   lanPairOfflineResponse,
   maybeLanPairRedirect,

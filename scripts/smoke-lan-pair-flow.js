@@ -370,6 +370,63 @@ async function run() {
       'hybrid cloud fallback should produce a non-empty HTTP response'
     )
 
+    const stalePairId = 'stalepair99'
+    const stalePairKey = 'STALEPAIRKEYABCDEFGHIJKLMNOP'
+    const staleOwnerId = 'staleownerABCDEFGHIJKLMNOP'
+    const staleUpdatedAt = Date.now() - (2 * 60 * 60 * 1000)
+    await lanPairStore.set(stalePairId, {
+      pairId: stalePairId,
+      keyHash: hashPairKey(stalePairKey),
+      ownerHash: hashPairKey(staleOwnerId),
+      clientIpHash: '',
+      endpoints: [
+        { baseUrl: endpointBaseUrl, source: 'lan-ip' }
+      ],
+      localHostname: 'pvtkrrx.local',
+      relayUrl: base,
+      appVersion: 'smoke',
+      updatedAt: staleUpdatedAt,
+      expiresAt: Date.now() + 60_000
+    }, 3600)
+
+    const staleHeartbeatStatusRes = await fetch(`${base}/pair/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ pairId: stalePairId, pairKey: stalePairKey })
+    })
+    assert.equal(staleHeartbeatStatusRes.status, 200, 'stale-heartbeat pair status should return 200')
+    const staleHeartbeatStatusPayload = await staleHeartbeatStatusRes.json()
+    assert.equal(Boolean(staleHeartbeatStatusPayload?.online), false, 'stale-heartbeat pair should not stay online')
+    assert.equal(String(staleHeartbeatStatusPayload?.reason || ''), 'stale-heartbeat')
+
+    const staleHybridConfig = {
+      ...hybridConfig,
+      lanPairId: stalePairId,
+      lanPairKey: stalePairKey
+    }
+    const encryptStaleHybridRes = await fetch(`${base}/encrypt`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(staleHybridConfig)
+    })
+    assert.equal(encryptStaleHybridRes.status, 200, 'stale hybrid /encrypt should succeed')
+    const staleHybridPayload = await encryptStaleHybridRes.json()
+    const staleHybridToken = encodeURIComponent(String(staleHybridPayload?.token || ''))
+
+    const staleHybridCatalog = await requestWithHostHeader(
+      port,
+      `/${staleHybridToken}/catalog/movie/pvtkrrx-movies.json`,
+      `tv.device.example:${port}`
+    )
+    assert.equal(staleHybridCatalog.status, 200, 'stale hybrid catalog should fall through to hosted/cloud')
+    assert.equal(String(staleHybridCatalog.headers['x-pvtkrrx-lan-pair'] || ''), 'fallback')
+    assert.equal(String(staleHybridCatalog.headers['x-pvtkrrx-route-decision'] || ''), 'cloud')
+    assert.equal(String(staleHybridCatalog.headers['x-pvtkrrx-route-reason'] || ''), 'stale-heartbeat')
+    assert.ok(
+      staleHybridCatalog.json?.metas || staleHybridCatalog.json?.error || staleHybridCatalog.text,
+      'stale hybrid fallback should produce a non-empty HTTP response'
+    )
+
     const localConfigRes = await fetch(`${base}/local-config`, {
       method: 'POST',
       headers: withCsrf(csrf, { 'Content-Type': 'application/json' }),

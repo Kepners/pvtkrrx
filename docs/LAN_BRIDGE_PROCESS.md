@@ -155,6 +155,7 @@ Current heartbeat behavior:
 - startup pulse
 - Stremio-launch pulse
 - long periodic background heartbeat (default 12 minutes)
+- hosted redirect decisions stop trusting the host once that heartbeat has gone stale relative to the configured cadence (about 15 minutes by default), even if the relay record has not TTL-expired yet
 - if the hosted relay rejects the saved pair with `invalid pair key`, the desktop app now rotates the local LAN-pair identity and the user should refresh `LAN Bridge` once in Stremio on the other home devices
 
 ### 8. Hosted catalogs resolve through the live pair

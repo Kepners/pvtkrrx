@@ -61,7 +61,7 @@ const {
   sanitizePairId, sanitizePairKey, sanitizePairOwnerId,
   summarizePairId, hashPairKey, normalizePairEndpoints,
   summarizeEndpointSources, buildLanPairEndpoints,
-  chooseLanPairEndpoint, buildLanRedirectUrl,
+  chooseLanPairEndpoint, buildLanRedirectUrl, isLanPairStateFresh,
   // Request & security helpers
   getClientIp, isSameHostRequest, hashClientIp, requestClientLabel,
   isSensitiveCorsRoute, isAllowedSensitiveOrigin, normalizeOrigin,
@@ -1586,14 +1586,31 @@ app.post('/pair/status', async (req, res) => {
       const stateIpHash = String(state.clientIpHash || '')
       const requestIpHash = hashClientIp(req)
       if (stateIpHash && requestIpHash && stateIpHash !== requestIpHash) {
-        return res.json({ ok: true, online: false })
+        return res.json({
+          ok: true,
+          online: false,
+          reason: 'network-mismatch',
+          updatedAt: Number(state.updatedAt || 0),
+          expiresAt: Number(state.expiresAt || 0)
+        })
       }
+    }
+
+    if (!isLanPairStateFresh(state)) {
+      return res.json({
+        ok: true,
+        online: false,
+        reason: 'stale-heartbeat',
+        updatedAt: Number(state.updatedAt || 0),
+        expiresAt: Number(state.expiresAt || 0)
+      })
     }
 
     const preferred = chooseLanPairEndpoint(state)
     res.json({
       ok: true,
       online: Boolean(preferred),
+      reason: preferred ? 'online' : 'no-endpoint',
       updatedAt: Number(state.updatedAt || 0),
       expiresAt: Number(state.expiresAt || 0)
     })

@@ -1,6 +1,6 @@
 # PVTKRRX Current Design
 
-Updated: 2026-04-08
+Updated: 2026-04-09
 
 ## Purpose
 
@@ -220,6 +220,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
   - send a startup pulse
   - send a pulse when Stremio launches on the host
   - send a periodic background heartbeat on the long interval configured by `PVTKRRX_LAN_PAIR_HEARTBEAT_MS` (default 12 minutes)
+- The relay keeps LAN pair records around longer than one heartbeat for repair/debug flows, but redirect decisions now stop treating a host as live once the last heartbeat is stale relative to that cadence (about 15 minutes by default, unless `PVTKRRX_LAN_PAIR_FRESHNESS_MS` overrides it).
 
 ## Build Model
 
