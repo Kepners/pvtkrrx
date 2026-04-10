@@ -16,10 +16,11 @@ The addon handles: search → download → stream. PVTKRRX has a **built-in file
 Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS endpoints. Self-hosted server mode is different: the server can store a disk-backed `selfhost` config locally, reuse it on boot, and validate localhost/private service URLs once you authenticate as the server admin.
 
 ## Key Features
+- **SportsMeta boundary (work in progress)** - local draft work exists for both an integrated catalogue path inside `pvtkrrx` and a separate `sportsmeta` repo, but SportsMeta is not live on Contabo yet: the public host still returns `404` for `/sportsmeta/event`, and there is no separate SportsMeta addon/runtime deployed today
 
 - **Sports** — Browse and search private tracker sports content (EPL, F1, UFC) directly in Stremio
 - **Sports-first discovery** — `All Sports` plus sport-family catalogs now lead the movie discovery column, with the third-column filter used for league/team detail
-- **Sports artwork enrichment** — Optional TheSportsDB poster, landscape, background, and logo artwork with cache-aware lookups plus disk-backed image caching on the active runtime; `npm run server:setup` now also pre-seeds upcoming event art, team badges, and mapped league artwork into `sports-image-cache/`, long-running Linux/cloud runtimes now keep topping that cache up in the background every 15 minutes in rotating sport batches, `npm run cache:sports` can still refresh the whole cache later without redownloading existing files, and a downloaded local/server sports poster package can now be mapped in as the primary catalogue so upstream image fetches are only used for updates and gaps
+- **Sports artwork enrichment** — Optional TheSportsDB poster, landscape, background, and logo artwork with cache-aware lookups plus disk-backed image caching on the active runtime; `npm run server:setup` now also pre-seeds recent replay dates plus upcoming event art, team badges, and mapped league artwork into `sports-image-cache/`, long-running Linux/cloud runtimes now keep topping that cache up in the background every 15 minutes in rotating sport batches, `npm run cache:sports` can still refresh the whole cache later without redownloading existing files, and a downloaded local/server sports poster package can now be mapped in as the primary catalogue so upstream image fetches are only used for updates and gaps
 - **Movies & TV** — IMDb-matched content from your private trackers
 - **Seedbox Library** — Browse everything already downloaded on your seedbox
 - **Smart filtering** — Sports indexers never contaminate movie/TV searches
@@ -65,6 +66,11 @@ See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the legacy/manu
 See [docs/WEBSITE_STATUS.md](docs/WEBSITE_STATUS.md) for the current public-site truth table plus homepage rewrite backlog.
 See [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for the authoritative current stage, active worktree items, and deployment checklist. See [docs/CURRENT_DESIGN.md](docs/CURRENT_DESIGN.md) for the live architecture and [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) for route-specific install/playback rules.
 
+Verified SportsMeta audit on 2026-04-10:
+- live `https://www.pvtkrrx.cc/sportsmeta/event?...` still returns `404`
+- the live Contabo `pvtkrrx` container does not contain SportsMeta handler/catalogue files or a `sportsmeta-catalogue.sqlite` runtime DB
+- the separate `sportsmeta` repo exists, but it is currently only a Fastify scaffold and not a deployable Stremio addon yet
+
 ## Documentation Guide
 
 Use these files as the live documentation set:
@@ -79,6 +85,8 @@ Use these files as the live documentation set:
 - [docs/WEBSITE_STATUS.md](docs/WEBSITE_STATUS.md) - public route health, canonical host notes, and homepage/content backlog
 - [docs/MONITORING.md](docs/MONITORING.md) - Umami deployment, hosted event tracking, and install/traffic metrics
 - [docs/SPORTSMETA_CATALOGUE_ARCHITECTURE.md](docs/SPORTSMETA_CATALOGUE_ARCHITECTURE.md) - planning doc for turning the current sports cache and image proxy into a hosted SportsMeta catalogue product
+- [docs/SPORTSMETA_TECHNICAL_SPEC.md](docs/SPORTSMETA_TECHNICAL_SPEC.md) - local integrated-route draft only; not the live Contabo state
+- [docs/SPORTSMETA_CONTABO_V1_PLAN.md](docs/SPORTSMETA_CONTABO_V1_PLAN.md) - current preferred separate SportsMeta addon/service boundary for future Contabo work
 The February 2026 planning docs under `docs/` are kept as project history and are now marked as historical where they no longer describe the live runtime.
 
 ## Quick Start
@@ -118,7 +126,7 @@ The Linux installer now bootstraps a dedicated self-host server in one flow:
 - creates the self-host password file
 - can install/start a Linux `systemd` service for auto-boot
 - treats legacy `cloudflare` mode values as migration aliases and disables any old `pvtkrrx-tunnel.service` once a FreeDNS or domain front door is configured
-- pre-seeds the local `sports-image-cache/` with upcoming TheSportsDB event images plus team and league artwork using the same runtime cache path the addon serves later
+- pre-seeds the local `sports-image-cache/` with recent replay dates plus upcoming TheSportsDB event images, team badges, and league artwork using the same runtime cache path the addon serves later
 - keeps filling that same cache in the background every 15 minutes after boot on long-running Linux/cloud runtimes, rotating through sports instead of hammering the free key in one burst
 - prints a one-time `Configure` bootstrap URL with `#serverPassword=...` so the first browser open can load the saved self-host config automatically
 
@@ -149,7 +157,21 @@ npm run cache:sports-package -- /srv/pvtkrrx/sports-package
 ```
 
 Package manifests can live anywhere on the local PC or server. PVTKRRX supports a folder containing `sports-image-package.json` (or `sports-poster-package.json`) or a direct manifest-file path. The manifest should list remote `sourceUrl` values mapped to local image files, so the runtime can satisfy existing catalogue artwork from disk before it ever tries an upstream image fetch.
-That explicit `npm run cache:sports-package` sync is optional acceleration. During normal runtime requests, PVTKRRX now stays cache-only: it serves already-cached bytes first, can lazily import a matching file from the mapped package on a miss, and leaves live upstream refresh work to the seeding/autofill path instead of rebuilding the catalogue on demand.
+That explicit `npm run cache:sports-package` sync is optional acceleration. During normal runtime requests, PVTKRRX now stays cache-only: it serves already-cached bytes first, can lazily import a matching file from the mapped package on a miss, and leaves live upstream refresh work to the seeding/autofill path instead of rebuilding the catalogue on demand. The built-in seeder now also includes a short replay lookback window so yesterday's sports cards can keep exact event art instead of collapsing straight to generated SVG.
+
+Local draft tooling only, not deployed on Contabo yet: if you want to materialize the current sports catalogue into the draft integrated SportsMeta database, import the active runtime cache into `sportsmeta-catalogue.sqlite`:
+
+```bash
+npm run sportsmeta:import -- /opt/pvtkrrx/runtime
+```
+
+That database stores structured metadata aliases, entitlement rows, and file-path mappings back to `sports-image-cache/`; the JPG/PNG bytes stay on disk instead of being duplicated as SQLite blobs.
+
+To grant a linked account one year of the `sportsmeta` tier manually:
+
+```bash
+npm run sportsmeta:grant -- <accountUserId> 365
+```
 
 On Windows desktop installs, the runtime lives under `%APPDATA%\\PVTKRRX\\runtime`, outside the EXE install directory. That means local `Prowlarr`/`qBittorrent` config, sports poster package mapping, `sportsdb-poster-cache.json`, and `sports-image-cache/` survive normal app updates and reinstall-over-the-top installs unless the user explicitly deletes that runtime folder.
 
@@ -380,6 +402,7 @@ This now builds in the system temp directory first, then copies the finished cur
 | PVTKRRX_SPORTS_CACHE_AUTO_FILL_EVENT_LEAGUE_LIMIT | Optional | Max leagues per sport group during background refill (default `3`) |
 | PVTKRRX_SPORTS_CACHE_AUTO_FILL_TEAM_LIMIT_PER_SPORT | Optional | Max teams per sport group during background refill (default `12`) |
 | PVTKRRX_SPORTS_CACHE_AUTO_FILL_SCHEDULE_DAYS | Optional | How many upcoming schedule days each refill pass checks (default `2`) |
+| PVTKRRX_SPORTS_CACHE_AUTO_FILL_LOOKBACK_DAYS | Optional | How many recent replay days each refill pass also checks before today (default `2`) |
 | PVTKRRX_SPORTS_CACHE_AUTO_FILL_IMAGE_CONCURRENCY | Optional | Max concurrent image downloads during background refill (default `2`) |
 | PVTKRRX_ANALYTICS_PROVIDER | Optional | Analytics backend for hosted monitoring. Current supported value is `umami` |
 | PVTKRRX_ANALYTICS_UMAMI_HOST_URL | Optional | Base URL of the Umami instance that should receive hosted PVTKRRX traffic and product events |

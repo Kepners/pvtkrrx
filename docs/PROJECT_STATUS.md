@@ -417,15 +417,35 @@ These items should still be treated as open until captured on real clients:
 7. ~~Ensure `PVTKRRX` appears in the source list for normal films.~~ **Closed 2026-03-30.**
    - `npm run smoke:pipeline` still asserts that movie, direct-ready, and packed-ready stream names begin with `PVTKRRX`.
    - The real Stremio WebView2 cache on this machine contains cached stream payloads with `PVTKRRX` in the stream `name`, confirming the client is receiving and storing the branded source labels instead of only third-party addon labels.
+8. SportsMeta audit on 2026-04-10.
+   - Local repo state is ahead of production and currently contradictory:
+     - `pvtkrrx` has uncommitted draft SportsMeta work for an integrated `/sportsmeta/event` route, SQLite catalogue, and helper scripts.
+     - the separate `sportsmeta` repo exists and is pushed, but it is only a Fastify scaffold with no Stremio manifest/catalog/meta addon yet.
+   - Live Contabo state does not have SportsMeta deployed:
+     - `https://www.pvtkrrx.cc/sportsmeta/event?...` returned `404`
+     - the live Coolify `pvtkrrx` container on image `c0c1da4` had no SportsMeta handler/catalogue files or SportsMeta scripts in `package.json`
+     - the mounted runtime had `sportsdb-poster-cache.json` and `sports-image-cache/`, but no `sportsmeta-catalogue.sqlite`
+     - there is no separate SportsMeta Caddy route, container, or Coolify app on Contabo
+   - Correct next implementation shape if SportsMeta remains separate from PVTKRRX:
+     - SportsMeta should become its own Stremio addon/service boundary
+     - SportsMeta should own sports manifests, catalogs, meta pages, artwork, and canonical `sportsmeta:` IDs
+     - PVTKRRX should remain the stream addon and emit streams against those same `sportsmeta:` IDs
 
 ## Recommended Next Work
 
 1. Browser-check the live homepage on desktop and mobile and fix any regressions now that the refactor is public.
 2. Decide whether Contabo should keep the extra `/opt/pvtkrrx` `systemd` runtime, repoint Caddy to it, or remove it so deploy expectations stop drifting.
-3. If the hosted catalogue grows into the paid SportsMeta product, move the master metadata store from flat runtime JSON into dedicated durable storage instead of treating the runtime folder as the long-term source of truth.
-4. Tune qBittorrent for faster early playback and confirm stream start time improvements on real clients.
-5. Keep sports poster/wallpaper review focused on what Stremio clients actually render, not just what the metadata payload contains.
-6. Capture one extra Android TV or Android mobile `LAN Bridge` pass for cross-client parity beyond the now-verified Apple TV path.
-7. Finish public remote/auth playback sign-off before calling the whole route set fully release-ready.
-8. When copy work is back in scope, finish the `Hybrid Home` / `LAN Bridge` terminology cleanup across the popup, runbooks, bootstrap manifest text, and stream info notices.
-9. Keep this file updated whenever a real device test changes the truth table.
+3. Stop the SportsMeta architecture drift before more code lands: the verified clean target is a separate SportsMeta addon/service boundary with shared `sportsmeta:` IDs, not a half-documented “already integrated/live” story.
+4. Build the first real SportsMeta addon slice in the separate `sportsmeta` repo:
+   - manifest
+   - sports catalogs
+   - meta routes for canonical `sportsmeta:` IDs
+   - stable metadata/artwork responses
+5. Update `pvtkrrx` stream handling to accept those same `sportsmeta:` IDs and attach streams without becoming the metadata owner.
+6. Only after that boundary is explicit, decide whether the shared catalogue bootstrap stays in `pvtkrrx` temporarily or migrates fully into the standalone SportsMeta service.
+7. Tune qBittorrent for faster early playback and confirm stream start time improvements on real clients.
+8. Keep sports poster/wallpaper review focused on what Stremio clients actually render, not just what the metadata payload contains.
+9. Capture one extra Android TV or Android mobile `LAN Bridge` pass for cross-client parity beyond the now-verified Apple TV path.
+10. Finish public remote/auth playback sign-off before calling the whole route set fully release-ready.
+11. When copy work is back in scope, finish the `Hybrid Home` / `LAN Bridge` terminology cleanup across the popup, runbooks, bootstrap manifest text, and stream info notices.
+12. Keep this file updated whenever a real device test changes the truth table.
