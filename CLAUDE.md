@@ -50,6 +50,13 @@
 | Framework | stremio-addon-sdk + Express v5 hybrid |
 | License | Source Available |
 
+### SportsMeta Audit Guardrail
+- Verified on 2026-04-10: SportsMeta is not live on Contabo yet.
+- `https://www.pvtkrrx.cc/sportsmeta/event?...` still returns `404`.
+- The live hosted `pvtkrrx` container does not currently contain the SportsMeta handler/catalogue files or a `sportsmeta-catalogue.sqlite` runtime DB.
+- The separate `sportsmeta` repo exists, but it is scaffold-only and not yet a deployable Stremio addon.
+- Do not claim SportsMeta is integrated or deployed until a real public route/addon is live and re-verified.
+
 ### Install Routes
 1. **PC Local** — same-PC addon via `127.0.0.1:7000`
 2. **Hybrid Home** — hosted manifest + desktop heartbeat → 307 redirect to LAN for other home devices
