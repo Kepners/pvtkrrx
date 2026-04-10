@@ -50,12 +50,12 @@
 | Framework | stremio-addon-sdk + Express v5 hybrid |
 | License | Source Available |
 
-### SportsMeta Audit Guardrail
-- Verified on 2026-04-10: SportsMeta is not live on Contabo yet.
-- `https://www.pvtkrrx.cc/sportsmeta/event?...` still returns `404`.
-- The live hosted `pvtkrrx` container does not currently contain the SportsMeta handler/catalogue files or a `sportsmeta-catalogue.sqlite` runtime DB.
-- The separate `sportsmeta` repo exists, but it is scaffold-only and not yet a deployable Stremio addon.
-- Do not claim SportsMeta is integrated or deployed until a real public route/addon is live and re-verified.
+### SportsMeta Deployment Guardrail
+- Verified on 2026-04-10: SportsMeta is live on Contabo as a separate addon/service at `https://sportsmeta.pvtkrrx.cc`.
+- SportsMeta owns the public `manifest`, `catalog`, `meta`, and artwork routes for canonical `sportsmeta:` IDs.
+- PVTKRRX remains the separate stream addon and should only attach streams to those same `sportsmeta:` IDs.
+- Do not describe SportsMeta as a live integrated `/sportsmeta/*` path inside `https://www.pvtkrrx.cc`; the real production boundary is a separate hostname plus `sportsmeta.service`.
+- For stream proof, use a configured `https://www.pvtkrrx.cc/:config/stream/...` route, not the bootstrap `/stream/...` compatibility path.
 
 ### Install Routes
 1. **PC Local** — same-PC addon via `127.0.0.1:7000`

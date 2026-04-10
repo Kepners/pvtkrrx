@@ -1,25 +1,34 @@
 # SportsMeta Contabo V1 Plan
 
-Status: preferred target boundary after 2026-04-10 audit
+Status: live v1 baseline on Contabo after the 2026-04-10 rollout
 Updated: 2026-04-10
 Owner: PVTKRRX / SportsMeta planning
 
 ## Purpose
 
-This document captures the preferred service-split target after the 2026-04-10 audit.
+This document captures the deployed SportsMeta service split after the 2026-04-10 rollout, plus the remaining follow-up work.
 
-Verified Contabo state on 2026-04-10:
+Verified Contabo state on 2026-04-10 after deploy:
 
-- there is no live integrated `/sportsmeta/*` route on `www.pvtkrrx.cc`
-- there is no separate SportsMeta Caddy route, container, or Coolify app
-- the separate `sportsmeta` repo exists, but it is still only a scaffold
+- SportsMeta is live at `https://sportsmeta.pvtkrrx.cc/manifest.json`
+- SportsMeta is running as `sportsmeta.service`
+- Caddy serves the public hostname from `/opt/stack/caddy/apps-enabled/sportsmeta.pvtkrrx.cc.caddy`
+- the separate runtime paths are:
+  - app: `/opt/sportsmeta/app`
+  - data: `/opt/sportsmeta/data`
+  - db: `/opt/sportsmeta/data/db/sportsmeta.sqlite`
+  - asset cache: `/opt/sportsmeta/data/assets/cache`
+  - source import path: `/opt/pvtkrrx/runtime`
+- PVTKRRX now consumes the same canonical `sportsmeta:` IDs on configured `/:config/stream/...` routes and stays stream-only
 
-So this file is now the intended next-step boundary, not a dead alternate:
+The live production boundary is now:
 
 - a separate service
 - on the same Contabo server
 - with its own storage, process, and responsibility boundary
 - consumed by PVTKRRX rather than buried inside it
+
+If any later planning section in this file disagrees with the live-state section above, the live-state section wins.
 
 This is the cheapest sane path that still creates the right long-term product boundary.
 
@@ -73,10 +82,10 @@ The original cheap-stack sketch said Nginx. On this Contabo host, that is the wr
 The VPS already uses Caddy as the public reverse proxy, so v1 should reuse Caddy instead of
 adding a second proxy tier.
 
-Recommended public shape:
+Current public shape:
 
-- `sportsmeta.pvtkrrx.cc` -> Fastify API
-- `sportsmeta.pvtkrrx.cc/assets/...` -> static asset path served by Caddy from disk
+- `sportsmeta.pvtkrrx.cc` -> Fastify API plus hosted artwork routes
+- `sportsmeta.pvtkrrx.cc/asset/:variant/:id` -> hosted poster/background/logo bytes
 
 Optional later split if needed:
 
@@ -104,12 +113,12 @@ Optional later split if needed:
     revalidate-stale.sh
 ```
 
-Recommended process shape:
+Current process shape:
 
-- Fastify app listens on `127.0.0.1:3100`
+- Fastify app currently listens on `0.0.0.0:3210`
 - systemd unit keeps the service alive
-- Caddy reverse proxies `sportsmeta.pvtkrrx.cc` to `127.0.0.1:3100`
-- Caddy serves `/assets/` directly from disk when practical
+- Caddy reverse proxies `sportsmeta.pvtkrrx.cc` to `10.0.1.1:3210`
+- artwork is currently served through the app's `/asset/:variant/:id` routes
 
 ## Data Model
 

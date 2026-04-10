@@ -1,6 +1,6 @@
 # PVTKRRX Project Status
 
-Updated: 2026-04-09
+Updated: 2026-04-10
 
 ## Current Stage
 
@@ -417,32 +417,40 @@ These items should still be treated as open until captured on real clients:
 7. ~~Ensure `PVTKRRX` appears in the source list for normal films.~~ **Closed 2026-03-30.**
    - `npm run smoke:pipeline` still asserts that movie, direct-ready, and packed-ready stream names begin with `PVTKRRX`.
    - The real Stremio WebView2 cache on this machine contains cached stream payloads with `PVTKRRX` in the stream `name`, confirming the client is receiving and storing the branded source labels instead of only third-party addon labels.
-8. SportsMeta audit on 2026-04-10.
-   - Local repo state is ahead of production and currently contradictory:
-     - `pvtkrrx` has uncommitted draft SportsMeta work for an integrated `/sportsmeta/event` route, SQLite catalogue, and helper scripts.
-     - the separate `sportsmeta` repo exists and is pushed, but it is only a Fastify scaffold with no Stremio manifest/catalog/meta addon yet.
-   - Live Contabo state does not have SportsMeta deployed:
-     - `https://www.pvtkrrx.cc/sportsmeta/event?...` returned `404`
-     - the live Coolify `pvtkrrx` container on image `c0c1da4` had no SportsMeta handler/catalogue files or SportsMeta scripts in `package.json`
-     - the mounted runtime had `sportsdb-poster-cache.json` and `sports-image-cache/`, but no `sportsmeta-catalogue.sqlite`
-     - there is no separate SportsMeta Caddy route, container, or Coolify app on Contabo
-   - Correct next implementation shape if SportsMeta remains separate from PVTKRRX:
-     - SportsMeta should become its own Stremio addon/service boundary
-     - SportsMeta should own sports manifests, catalogs, meta pages, artwork, and canonical `sportsmeta:` IDs
-     - PVTKRRX should remain the stream addon and emit streams against those same `sportsmeta:` IDs
+8. SportsMeta split rollout on 2026-04-10.
+   - The separate `sportsmeta` repo is now the real live addon boundary on Contabo:
+     - manifest: `https://sportsmeta.pvtkrrx.cc/manifest.json`
+     - catalog example: `https://sportsmeta.pvtkrrx.cc/catalog/movie/sportsmeta-basketball.json`
+     - meta example: `https://sportsmeta.pvtkrrx.cc/meta/movie/sportsmeta%3Aevent%3Afighting%7C2026-04-10%7Cprofessional-fighters-league%7Cpfl-africa-1-pretoria.json`
+   - Live Contabo runtime shape for SportsMeta:
+     - service: `sportsmeta.service`
+     - app path: `/opt/sportsmeta/app`
+     - data path: `/opt/sportsmeta/data`
+     - db path: `/opt/sportsmeta/data/db/sportsmeta.sqlite`
+     - asset cache path: `/opt/sportsmeta/data/assets/cache`
+     - source import path: `/opt/pvtkrrx/runtime`
+     - live route fragment: `/opt/stack/caddy/apps-enabled/sportsmeta.pvtkrrx.cc.caddy`
+   - The live SportsMeta health surface now reports:
+     - `recordCount = 2480`
+     - `eventCount = 2432`
+     - `aliasCount = 7606`
+     - `assetCount = 5706`
+   - PVTKRRX is now attaching streams to the same canonical IDs without becoming the metadata owner:
+     - repo commit `676154b` (`⚡ fix: keep sportsmeta streams working without qbit`) deployed through Coolify deployment `368` and rolled the live hosted container to `w14jewmw5ubscrxh8zzfhq7d-233017296760`
+     - a real configured public route on `https://www.pvtkrrx.cc/:config/stream/movie/...` returned a non-empty tracker stream for `sportsmeta:event:fighting|2026-04-10|professional-fighters-league|pfl-africa-1-pretoria`
+   - Architecture truth after the rollout:
+     - SportsMeta owns sports manifests, catalogs, metadata pages, artwork, and canonical `sportsmeta:` IDs
+     - PVTKRRX remains the stream addon only
+     - the old integrated `/sportsmeta/*` draft inside `pvtkrrx` is not the live public boundary
 
 ## Recommended Next Work
 
 1. Browser-check the live homepage on desktop and mobile and fix any regressions now that the refactor is public.
 2. Decide whether Contabo should keep the extra `/opt/pvtkrrx` `systemd` runtime, repoint Caddy to it, or remove it so deploy expectations stop drifting.
-3. Stop the SportsMeta architecture drift before more code lands: the verified clean target is a separate SportsMeta addon/service boundary with shared `sportsmeta:` IDs, not a half-documented “already integrated/live” story.
-4. Build the first real SportsMeta addon slice in the separate `sportsmeta` repo:
-   - manifest
-   - sports catalogs
-   - meta routes for canonical `sportsmeta:` IDs
-   - stable metadata/artwork responses
-5. Update `pvtkrrx` stream handling to accept those same `sportsmeta:` IDs and attach streams without becoming the metadata owner.
-6. Only after that boundary is explicit, decide whether the shared catalogue bootstrap stays in `pvtkrrx` temporarily or migrates fully into the standalone SportsMeta service.
+3. Clean up SportsMeta import quality and alias contamination now that the separate addon is live; several imported basketball rows still show bad cross-league team mappings.
+4. Add repeatable operator tooling for new JPG drops and future re-imports so `/opt/pvtkrrx/runtime` is not the only bootstrap path.
+5. Decide the billing/auth boundary for yearly SportsMeta DB access without mixing that entitlement logic into the public stream addon surface.
+6. Decide whether SportsMeta should stay as the current systemd + Caddy service boundary or move under Coolify later; the separate runtime itself is now working.
 7. Tune qBittorrent for faster early playback and confirm stream start time improvements on real clients.
 8. Keep sports poster/wallpaper review focused on what Stremio clients actually render, not just what the metadata payload contains.
 9. Capture one extra Android TV or Android mobile `LAN Bridge` pass for cross-client parity beyond the now-verified Apple TV path.
