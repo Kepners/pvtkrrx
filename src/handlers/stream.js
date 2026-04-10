@@ -3,6 +3,7 @@ const path = require('path')
 const { ProwlarrClient } = require('../clients/prowlarr')
 const { QBitClient } = require('../clients/qbittorrent')
 const { CinemetaClient } = require('../clients/cinemeta')
+const { SportsMetaClient } = require('../clients/sportsmeta')
 const { normalizeTeamName } = require('../clients/sportsdb')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { parse, matchesEpisode, isLikelyPackedReleaseTitle, cleanTitle } = require('../utils/parser')
@@ -333,6 +334,10 @@ const { settleWithTimeout } = require('../utils/timeout')
 
 async function handleStream(config, type, id, addonUrl, configToken, playbackBaseUrl = addonUrl) {
   try {
+    if (id.startsWith('sportsmeta:')) {
+      return await handleSportsMetaStream(config, id, addonUrl, configToken, playbackBaseUrl)
+    }
+
     if (id.startsWith('pvtkrrx:')) {
       return await handleCustomStream(config, id, addonUrl, configToken, playbackBaseUrl)
     }
@@ -468,6 +473,141 @@ function buildStructuredSportsTarget(info = {}) {
   }
 
   return parseSportsTitle(info.t || '', info.p || '') || parseLooseSportsEventTitle(info.t || '', info.p || '')
+}
+
+function humanizeSportsMetaSlug(value) {
+  const acronyms = {
+    aew: 'AEW',
+    f1: 'F1',
+    indycar: 'IndyCar',
+    la: 'LA',
+    mlb: 'MLB',
+    mma: 'MMA',
+    motogp: 'MotoGP',
+    nascar: 'NASCAR',
+    nba: 'NBA',
+    nfl: 'NFL',
+    nhl: 'NHL',
+    okc: 'OKC',
+    pdc: 'PDC',
+    ufc: 'UFC',
+    wec: 'WEC',
+    wrc: 'WRC',
+    wwe: 'WWE'
+  }
+
+  return String(value || '')
+    .trim()
+    .replace(/-/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => {
+      const key = String(part || '').toLowerCase()
+      return acronyms[key] || titleCaseWords(part)
+    })
+    .join(' ')
+}
+
+function parseSportsMetaId(id) {
+  const rawId = String(id || '').trim()
+  if (!rawId.startsWith('sportsmeta:event:')) return null
+
+  const payload = rawId.slice('sportsmeta:event:'.length)
+  const parts = payload.split('|').map((part) => String(part || '').trim())
+  if (parts.length < 4) return null
+
+  const sport = humanizeSportsMetaSlug(parts[0])
+  const date = extractSportsDate(parts[1], parts[1])
+
+  if (parts.length >= 5) {
+    return {
+      id: rawId,
+      sport,
+      league: humanizeSportsMetaSlug(parts[2]),
+      date,
+      homeTeam: humanizeSportsMetaSlug(parts[3]),
+      awayTeam: humanizeSportsMetaSlug(parts[4])
+    }
+  }
+
+  return {
+    id: rawId,
+    sport,
+    league: humanizeSportsMetaSlug(parts[2]),
+    date,
+    eventName: humanizeSportsMetaSlug(parts[3])
+  }
+}
+
+function buildSportsMetaSearchTitle(event = {}) {
+  const league = String(event.league || '').trim()
+  const date = extractSportsDate(event.date, event.date)
+  const teams = [event.homeTeam, event.awayTeam].filter(Boolean).join(' vs ')
+  const title = String(event.title || event.name || event.eventName || teams).trim()
+  return [league, date, teams || title].filter(Boolean).join(' ').trim() || title
+}
+
+function buildSportsMetaInfo(event = {}, canonicalId = '') {
+  const id = String(event.id || canonicalId || '').trim()
+  const date = extractSportsDate(event.date, event.date)
+  const homeTeam = String(event.homeTeam || '').trim()
+  const awayTeam = String(event.awayTeam || '').trim()
+  const league = String(event.league || '').trim()
+  const sport = String(event.sport || '').trim()
+  const displayName = String(
+    event.name ||
+    event.title ||
+    [homeTeam, awayTeam].filter(Boolean).join(' vs ') ||
+    event.eventName ||
+    id
+  ).trim()
+  const searchTitle = buildSportsMetaSearchTitle({
+    ...event,
+    date,
+    homeTeam,
+    awayTeam,
+    league
+  })
+
+  return {
+    y: 'movie',
+    k: 'sports',
+    n: displayName,
+    t: searchTitle || displayName,
+    p: date,
+    e: date,
+    g: league,
+    u: league,
+    o: homeTeam,
+    w: awayTeam,
+    r: sport,
+    v: String(event.eventId || '').trim(),
+    x: id
+  }
+}
+
+async function loadSportsMetaInfo(config = {}, id = '') {
+  const client = new SportsMetaClient({
+    baseUrl: config?.sportsmetaBaseUrl
+  })
+
+  try {
+    const payload = await client.getEvent(id)
+    if (payload?.event) {
+      return buildSportsMetaInfo(payload.event, id)
+    }
+  } catch (error) {
+    console.warn(`[stream] SportsMeta lookup failed for ${id}: ${error.message}`)
+  }
+
+  const parsed = parseSportsMetaId(id)
+  if (!parsed) return null
+  return buildSportsMetaInfo({
+    ...parsed,
+    name: parsed.homeTeam && parsed.awayTeam
+      ? `${parsed.homeTeam} vs ${parsed.awayTeam}`
+      : parsed.eventName
+  }, id)
 }
 
 function sourceItemKey(item = {}) {
@@ -859,8 +999,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
   return { streams: sortStreams(streams), cacheMaxAge: 0 }
 }
 
-async function handleCustomStream(config, id, addonUrl, configToken, playbackBaseUrl = addonUrl) {
-  const info = decodeCustomId(id)
+async function handleDecodedCustomStream(config, info, addonUrl, configToken, playbackBaseUrl = addonUrl) {
   let infoHash = String(info.h || '').toLowerCase()
   const directLink = String(info.l || '')
   const seenSourceKeys = new Set()
@@ -1064,6 +1203,17 @@ async function handleCustomStream(config, id, addonUrl, configToken, playbackBas
 
   appendNoticeStreams(streams, noticeCounts, addonUrl)
   return { streams: sortStreams(streams), cacheMaxAge: 0 }
+}
+
+async function handleCustomStream(config, id, addonUrl, configToken, playbackBaseUrl = addonUrl) {
+  const info = decodeCustomId(id)
+  return handleDecodedCustomStream(config, info, addonUrl, configToken, playbackBaseUrl)
+}
+
+async function handleSportsMetaStream(config, id, addonUrl, configToken, playbackBaseUrl = addonUrl) {
+  const info = await loadSportsMetaInfo(config, id)
+  if (!info) return { streams: [] }
+  return handleDecodedCustomStream(config, info, addonUrl, configToken, playbackBaseUrl)
 }
 
 module.exports = { handleStream }
