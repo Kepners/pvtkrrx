@@ -243,6 +243,7 @@ async function withScenario(setup, run) {
 async function run() {
   const originalVercel = process.env.VERCEL
   const originalExperimentalRar = process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS
+  const originalHostedGateway = process.env.PVTKRRX_HOST_GATEWAY_HOST
   const orphanRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-stream-pipeline-'))
   const orphanFilePath = path.join(orphanRoot, 'Downloaded.Movie.2026.1080p.mp4')
   fs.writeFileSync(orphanFilePath, 'orphaned local file bytes', 'utf8')
@@ -878,6 +879,50 @@ async function run() {
       )
     })
 
+    await withScenario(async () => {
+      delete process.env.VERCEL
+      process.env.PVTKRRX_HOST_GATEWAY_HOST = '10.0.1.1'
+      QBitClient.prototype.torrents = async function () {
+        assert.equal(this.url, 'http://10.0.1.1:8090', '#4l qBit should use the hosted gateway override instead of container loopback')
+        return []
+      }
+      ProwlarrClient.prototype.search = async function () {
+        assert.equal(this.baseUrl, 'http://10.0.1.1:9696', '#4l Prowlarr should use the hosted gateway override instead of container loopback')
+        return [
+          trackerItem({
+            title: 'Sports RS 2026 Home Club vs Away Club 28 03 720pEN60fps FDSN',
+            link: 'https://tracker.example/download/home-away-loopback-override.torrent',
+            infohash: ''
+          })
+        ]
+      }
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([
+        { path: 'Sports.RS.2026.Home.Club.vs.Away.Club.720p.mp4', length: 3_600_000_000 }
+      ]))
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({
+          jackettUrl: 'http://127.0.0.1:9696',
+          qbitUrl: 'http://127.0.0.1:8090',
+          fileServerUrl: ''
+        }),
+        'movie',
+        customPackedId({
+          t: 'Sports RS 2026 Home Club vs Away Club 28 03 720pEN60fps FDSN',
+          n: 'Home Club vs Away Club',
+          h: '',
+          l: '',
+          p: '2026-03-28',
+          o: 'Home Club',
+          w: 'Away Club'
+        }),
+        'https://addon.example',
+        'relay-token'
+      )
+
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 1, '#4l hosted loopback overrides should restore tracker playback for tokenized configs on the same server')
+    })
+
     console.log('Smoke stream pipeline passed')
   } finally {
     resetMocks()
@@ -885,6 +930,8 @@ async function run() {
     else process.env.VERCEL = originalVercel
     if (originalExperimentalRar === undefined) delete process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS
     else process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS = originalExperimentalRar
+    if (originalHostedGateway === undefined) delete process.env.PVTKRRX_HOST_GATEWAY_HOST
+    else process.env.PVTKRRX_HOST_GATEWAY_HOST = originalHostedGateway
     fs.rmSync(orphanRoot, { recursive: true, force: true })
   }
 }

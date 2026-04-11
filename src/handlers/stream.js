@@ -16,6 +16,7 @@ const { decodeCustomId } = require('../utils/customId')
 const { isCompletedTorrent } = require('../utils/torrentState')
 const { fetchTorrentPayload, inspectTorrentPayload } = require('../utils/torrentPayload')
 const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
+const { applyHostedServiceOverrides } = require('../utils/hostedServiceOverrides')
 
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '7000', 10))
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '5000', 10))
@@ -334,16 +335,17 @@ const { settleWithTimeout } = require('../utils/timeout')
 
 async function handleStream(config, type, id, addonUrl, configToken, playbackBaseUrl = addonUrl) {
   try {
+    const effectiveConfig = applyHostedServiceOverrides(config && typeof config === 'object' ? config : {})
     if (id.startsWith('sportsmeta:')) {
-      return await handleSportsMetaStream(config, id, addonUrl, configToken, playbackBaseUrl)
+      return await handleSportsMetaStream(effectiveConfig, id, addonUrl, configToken, playbackBaseUrl)
     }
 
     if (id.startsWith('pvtkrrx:')) {
-      return await handleCustomStream(config, id, addonUrl, configToken, playbackBaseUrl)
+      return await handleCustomStream(effectiveConfig, id, addonUrl, configToken, playbackBaseUrl)
     }
 
     if (id.startsWith('tt')) {
-      return await handleImdbStream(config, type, id, addonUrl, configToken, playbackBaseUrl)
+      return await handleImdbStream(effectiveConfig, type, id, addonUrl, configToken, playbackBaseUrl)
     }
 
     return { streams: [] }

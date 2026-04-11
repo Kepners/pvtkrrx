@@ -21,6 +21,7 @@ const {
   resolveSportsLogoAsset
 } = require('../utils/sportsArtwork')
 const { buildMetaPlaceholder } = require('../utils/metaPlaceholder')
+const { applyHostedServiceOverrides } = require('../utils/hostedServiceOverrides')
 
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 const cinemeta = new CinemetaClient()
@@ -628,22 +629,23 @@ function itemMatchesSportsDetail(item, detailFilter = '') {
 
 async function handleCatalog(config, type, id, extraStr, context = {}) {
   try {
+    const effectiveConfig = applyHostedServiceOverrides(config && typeof config === 'object' ? config : {})
     const extra = parseExtra(extraStr)
     const opts = {
       baseUrl: String(context.baseUrl || '').replace(/\/+$/, '')
     }
     const sportsCatalogDefinition = findSportsDiscoveryCatalog(id)
     if (sportsCatalogDefinition) {
-      return await sportsCatalog(config, extra, opts, type, sportsCatalogDefinition)
+      return await sportsCatalog(effectiveConfig, extra, opts, type, sportsCatalogDefinition)
     }
 
     switch (id) {
       case 'pvtkrrx-movies':
-        return await moviesCatalog(config, extra, opts)
+        return await moviesCatalog(effectiveConfig, extra, opts)
       case 'pvtkrrx-tv':
-        return await tvCatalog(config, extra, opts)
+        return await tvCatalog(effectiveConfig, extra, opts)
       case 'pvtkrrx-library':
-        return await libraryCatalog(config, extra, opts)
+        return await libraryCatalog(effectiveConfig, extra, opts)
       default:
         return { metas: [] }
     }
