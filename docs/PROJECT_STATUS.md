@@ -1,6 +1,6 @@
 # PVTKRRX Project Status
 
-Updated: 2026-04-10
+Updated: 2026-04-11
 
 ## Current Stage
 
@@ -439,6 +439,17 @@ These items should still be treated as open until captured on real clients:
      - `importRunCount = 3`
      - `sourceDocumentCount = 7302`
      - `evidenceCount = 62791`
+     - `customerCount = 2`
+     - `subscriptionCount = 2`
+     - `activeEntitlementCount = 2`
+     - `activeTokenCount = 2`
+   - SportsMeta paid membership is now live on the standalone host only:
+     - pricing page: `https://sportsmeta.pvtkrrx.cc/pricing`
+     - free root SportsMeta remains public and now serves SVG-only asset fallback on `/asset/...`
+     - paid SportsMeta lives on tokenized member routes under `/member/:token/...`
+     - live Stripe routes: `POST /billing/checkout`, `POST /billing/portal`, `POST /webhooks/stripe`
+     - live yearly Stripe price ids: `price_1TKzDhENYh4p7RxpjEOBDw0c` (`Plus`) and `price_1TKzDiENYh4p7RxpgZb09QQN` (`Pro`)
+     - this monetizes SportsMeta without moving entitlement logic into the `pvtkrrx` stream addon
    - SportsMeta was re-imported on 2026-04-11 from both runtime roots instead of only the older hosted cache.
    - The long canonical-id route bug is fixed live:
      - root cause was Fastify's default router `maxParamLength = 100`, which dropped longer `sportsmeta:` ids as route-level 404s
@@ -450,7 +461,9 @@ These items should still be treated as open until captured on real clients:
      - a real configured public route on `https://www.pvtkrrx.cc/:config/stream/movie/...` now returns a non-empty tracker stream again for `sportsmeta:event:fighting|2026-04-10|professional-fighters-league|pfl-africa-1-pretoria`
    - Architecture truth after the rollout:
      - SportsMeta owns sports manifests, catalogs, metadata pages, artwork, and canonical `sportsmeta:` IDs
+     - SportsMeta also owns Stripe checkout, portal, webhook, and entitlement enforcement for the premium layer
      - PVTKRRX remains the stream addon only
+     - PVTKRRX remains free; the current configured `/:config/stream/...` path was not turned into a billing gate
      - the old integrated `/sportsmeta/*` draft inside `pvtkrrx` is not the live public boundary
 
 ## Recommended Next Work
@@ -459,7 +472,7 @@ These items should still be treated as open until captured on real clients:
 2. Decide whether Contabo should keep the extra `/opt/pvtkrrx` `systemd` runtime, repoint Caddy to it, or remove it so deploy expectations stop drifting.
 3. Clean up SportsMeta import quality and alias contamination now that the separate addon is live; several imported basketball rows still show bad cross-league team mappings.
 4. Add repeatable operator tooling for new JPG drops and future re-imports so `/opt/pvtkrrx/runtime` is not the only bootstrap path.
-5. Decide the billing/auth boundary for yearly SportsMeta DB access without mixing that entitlement logic into the public stream addon surface.
+5. Monitor the live SportsMeta Stripe/member-token boundary and add later commercial options there if needed; keep PVTKRRX free and keep entitlement logic off the public stream addon surface.
 6. Decide whether SportsMeta should stay as the current systemd + Caddy service boundary or move under Coolify later; the separate runtime itself is now working.
 7. Tune qBittorrent for faster early playback and confirm stream start time improvements on real clients.
 8. Keep sports poster/wallpaper review focused on what Stremio clients actually render, not just what the metadata payload contains.

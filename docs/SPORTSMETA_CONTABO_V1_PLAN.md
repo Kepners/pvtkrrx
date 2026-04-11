@@ -1,6 +1,6 @@
 # SportsMeta Contabo V1 Plan
 
-Status: live v1 baseline on Contabo after the 2026-04-10 rollout, refreshed 2026-04-11
+Status: live v1 with yearly Stripe memberships on Contabo after the 2026-04-11 billing rollout
 Updated: 2026-04-11
 Owner: PVTKRRX / SportsMeta planning
 
@@ -11,6 +11,7 @@ This document captures the deployed SportsMeta service split after the 2026-04-1
 Verified Contabo state on 2026-04-11 after deploy:
 
 - SportsMeta is live at `https://sportsmeta.pvtkrrx.cc/manifest.json`
+- the pricing page is live at `https://sportsmeta.pvtkrrx.cc/pricing`
 - SportsMeta is running as `sportsmeta.service`
 - Caddy serves the public hostname from `/opt/stack/caddy/apps-enabled/sportsmeta.pvtkrrx.cc.caddy`
 - the separate runtime paths are:
@@ -20,6 +21,14 @@ Verified Contabo state on 2026-04-11 after deploy:
   - asset cache: `/opt/sportsmeta/data/assets/cache`
   - source import roots: `/opt/pvtkrrx/runtime` and `/opt/pvtkrrx/data/pvtkrrx`
 - the service env now includes `SPORTSMETA_SPORTSDB_API_KEY` for paid-gap-fill/prewarm use
+- the service env now also includes the SportsMeta billing keys:
+  - `SPORTSMETA_FREE_ASSET_MODE=svg`
+  - `SPORTSMETA_MEMBER_TOKEN_SECRET`
+  - `SPORTSMETA_STRIPE_SECRET_KEY`
+  - `SPORTSMETA_STRIPE_WEBHOOK_SECRET`
+  - `SPORTSMETA_STRIPE_PORTAL_CONFIGURATION_ID`
+  - `SPORTSMETA_STRIPE_PRICE_PLUS_YEARLY`
+  - `SPORTSMETA_STRIPE_PRICE_PRO_YEARLY`
 - the live health surface now reports:
   - `recordCount = 2727`
   - `eventCount = 2679`
@@ -28,6 +37,24 @@ Verified Contabo state on 2026-04-11 after deploy:
   - `importRunCount = 3`
   - `sourceDocumentCount = 7302`
   - `evidenceCount = 62791`
+  - `customerCount = 2`
+  - `subscriptionCount = 2`
+  - `activeEntitlementCount = 2`
+  - `activeTokenCount = 2`
+- public free asset routes now return SVG-only fallback because production runs with `SPORTSMETA_FREE_ASSET_MODE=svg`
+- paid SportsMeta is now delivered through tokenized member routes under `/member/:token/...`
+- live billing routes:
+  - `GET /pricing`
+  - `POST /billing/checkout`
+  - `GET /billing/success`
+  - `POST /billing/portal`
+  - `POST /webhooks/stripe`
+- live Stripe ids:
+  - Plus product `prod_UJcSIIL9W3C4o5`
+  - Plus yearly price `price_1TKzDhENYh4p7RxpjEOBDw0c`
+  - Pro product `prod_UJcSqt7aILFloN`
+  - Pro yearly price `price_1TKzDiENYh4p7RxpgZb09QQN`
+  - webhook endpoint `we_1TKzInENYh4p7RxpPpQR9uIt`
 - long canonical-id `meta` and `event` routes are fixed live after raising Fastify router `maxParamLength`
 - PVTKRRX now consumes the same canonical `sportsmeta:` IDs on configured `/:config/stream/...` routes and stays stream-only
 - the current public hosted relay fix is repo commit `f676564` on the `pvtkrrx` side, live through Coolify deployment `372` on container `w14jewmw5ubscrxh8zzfhq7d-082417863890`
@@ -52,6 +79,7 @@ SportsMeta v1 should be:
 - a small separate Node service on Contabo
 - backed by SQLite first
 - storing asset files on local disk first
+- monetized through Stripe yearly memberships on SportsMeta itself
 - prewarming and revalidating via cron or systemd timers
 - exposed through the existing Contabo reverse proxy layer
 - consumed by PVTKRRX for sports metadata and artwork
@@ -59,7 +87,6 @@ SportsMeta v1 should be:
 SportsMeta v1 should not be:
 
 - another feature path inside the current PVTKRRX runtime
-- a new paid platform bill on day one
 - a Google Drive or Dropbox-powered runtime asset origin
 - a full public developer product in v1
 - a queue-heavy or multi-service platform build
@@ -70,9 +97,21 @@ SportsMeta v1 should not be:
 2. Keep the stack boring enough to recover by hand from SSH.
 3. Download each asset once and serve stable hosted URLs.
 4. Make PVTKRRX a consumer only for sports metadata and artwork.
-5. Keep upgrades obvious:
+5. Keep billing and entitlements inside SportsMeta, not inside the PVTKRRX stream addon.
+6. Keep upgrades obvious:
    - SQLite to Postgres only when concurrency or querying becomes painful
    - local disk to object storage only when asset growth or bandwidth becomes annoying
+
+## Membership Boundary
+
+The live commercial split is now:
+
+- public root SportsMeta routes = free compatibility surface
+- public root asset routes = SVG-only fallback
+- member token routes under `/member/:token/...` = premium transport
+- PVTKRRX configured stream routes stay free and keep attaching streams to the same canonical ids
+
+That is the key production guardrail. Premium enforcement happens on SportsMeta output, not on PVTKRRX streams.
 
 ## V1 Architecture
 
@@ -98,7 +137,9 @@ adding a second proxy tier.
 Current public shape:
 
 - `sportsmeta.pvtkrrx.cc` -> Fastify API plus hosted artwork routes
-- `sportsmeta.pvtkrrx.cc/asset/:variant/:id` -> hosted poster/background/logo bytes
+- `sportsmeta.pvtkrrx.cc/asset/:variant/:id` -> public SVG-first asset routes
+- `sportsmeta.pvtkrrx.cc/member/:token/...` -> premium member transport
+- `sportsmeta.pvtkrrx.cc/pricing` -> public pricing and upgrade page
 
 Optional later split if needed:
 
@@ -250,6 +291,20 @@ Do not build a full image-processing pipeline in v1.
 - `GET /event/:id`
 - `GET /event/:id/assets`
 
+### Billing / Membership Endpoints
+
+- `GET /pricing`
+- `POST /billing/checkout`
+- `GET /billing/success`
+- `POST /billing/portal`
+- `POST /webhooks/stripe`
+- `GET /member/:token`
+- `GET /member/:token/manifest.json`
+- `GET /member/:token/catalog/:type/:id.json`
+- `GET /member/:token/meta/:type/:id.json`
+- `GET /member/:token/asset/:variant/:id`
+- `GET /member/:token/resolve`
+
 ### Internal/Protected Write Endpoints
 
 - `POST /internal/prewarm/upcoming`
@@ -366,11 +421,14 @@ Cheap recovery model:
 - lightly rate-limit `/resolve`
 - do not expose provider secrets to clients
 - do not expose local filesystem paths in responses
+- keep Stripe secrets and member-token secrets server-only
+- do not claim premium access unless the member token resolves to an active server-side entitlement
 
 ## What V1 Must Not Include
 
 - no admin dashboard
-- no billing work
+- no fake billing buttons or frontend-only entitlement logic
+- no billing logic inside PVTKRRX
 - no public API key product
 - no queue system
 - no Redis
@@ -430,30 +488,23 @@ Cheap recovery model:
   - next 7 days
 - add revalidate endpoint for stale records
 
-## Immediate Planning Decisions
+## Current Commercial State
 
-These still need confirming before implementation starts:
+The production system now runs the intended paid-upgrade boundary:
 
-1. Domain:
-   - use `sportsmeta.pvtkrrx.cc` by default unless a better hostname is preferred
-2. Repository ownership:
-   - separate repo is preferred once implementation starts
-   - if implementation begins here temporarily, the service should still be deployed as a separate app
-3. Upstream provider order:
-   - confirm whether v1 still starts with TheSportsDB as the only live provider
-4. Asset path strategy:
-   - keep `/assets/` under the API host for v1 unless Caddy/static routing proves awkward
+1. Free users install the public addon and get SVG-only assets.
+2. Plus and Pro users upgrade through Stripe Checkout on SportsMeta itself.
+3. Stripe webhook events sync entitlements into the SportsMeta SQLite DB.
+4. The server issues member-token transport URLs under `/member/:token/...`.
+5. PVTKRRX continues to consume canonical ids without becoming the metadata owner or billing owner.
 
-## Initial Execution Backlog
+## Remaining Backlog
 
-- [ ] Decide final hostname and Caddy route name
-- [ ] Decide whether SportsMeta starts in a new repo immediately or is scaffolded here first
-- [ ] Define the SQLite schema and migration files
-- [ ] Define the exact `GET /resolve` response contract
-- [ ] Define the upstream provider adapter interface
-- [ ] Stand up a local dev service and a Contabo systemd unit
-- [ ] Add prewarm scripts for yesterday, today, and next 7 days
-- [ ] Switch one narrow PVTKRRX sports surface to consume SportsMeta first
+- [ ] Watch the first real paid customers through Stripe webhooks and the portal path instead of only smoke tokens
+- [ ] Decide whether SportsMeta should later add lifetime/manual offers on top of the current yearly-first model
+- [ ] Improve import quality and alias contamination without weakening canonical-id stability
+- [ ] Add more premium asset coverage so Plus/Pro hit SVG fallback less often on edge leagues
+- [ ] Decide whether SportsMeta stays as `systemd + Caddy` or later moves behind Coolify without changing the separate hostname and token boundary
 
 ## Relationship To Existing Docs
 
