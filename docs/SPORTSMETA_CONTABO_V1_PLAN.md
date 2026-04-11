@@ -19,7 +19,7 @@ Verified Contabo state on 2026-04-11 after deploy:
   - data: `/opt/sportsmeta/data`
   - db: `/opt/sportsmeta/data/db/sportsmeta.sqlite`
   - asset cache: `/opt/sportsmeta/data/assets/cache`
-  - source import roots: `/opt/pvtkrrx/runtime` and `/opt/pvtkrrx/data/pvtkrrx`
+  - source import roots: `/opt/pvtkrrx/runtime` and `/opt/pvtkrrx/data/pvtkrrx` (bootstrap import inputs, not live request-path dependencies)
 - the service env now includes `SPORTSMETA_SPORTSDB_API_KEY` for paid-gap-fill/prewarm use
 - the service env now also includes the SportsMeta billing keys:
   - `SPORTSMETA_FREE_ASSET_MODE=svg`
@@ -57,6 +57,7 @@ Verified Contabo state on 2026-04-11 after deploy:
   - webhook endpoint `we_1TKzInENYh4p7RxpPpQR9uIt`
 - long canonical-id `meta` and `event` routes are fixed live after raising Fastify router `maxParamLength`
 - PVTKRRX now consumes the same canonical `sportsmeta:` IDs on configured `/:config/stream/...` routes and stays stream-only
+- the old integrated `/sportsmeta/*` draft inside `pvtkrrx` is now explicitly non-production and disabled by default unless `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA=true`
 - the current public hosted relay fix is repo commit `f676564` on the `pvtkrrx` side, live through Coolify deployment `372` on container `w14jewmw5ubscrxh8zzfhq7d-082417863890`
 - the hosted relay now carries `PVTKRRX_HOST_GATEWAY_HOST=10.0.1.1` so tokenized loopback service URLs can resolve Prowlarr and qBittorrent through the Contabo host gateway from inside the Coolify container
 - a configured public stream route for `sportsmeta:event:fighting|2026-04-10|professional-fighters-league|pfl-africa-1-pretoria` now returns a real tracker stream again on `https://www.pvtkrrx.cc/:config/stream/movie/...`

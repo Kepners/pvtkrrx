@@ -465,6 +465,7 @@ These items should still be treated as open until captured on real clients:
      - PVTKRRX remains the stream addon only
      - PVTKRRX remains free; the current configured `/:config/stream/...` path was not turned into a billing gate
      - the old integrated `/sportsmeta/*` draft inside `pvtkrrx` is not the live public boundary
+     - the local integrated draft is now explicitly non-production in this repo and only loads when `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA=true`
 
 ## Recommended Next Work
 

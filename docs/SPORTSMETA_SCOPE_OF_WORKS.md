@@ -1,5 +1,7 @@
 # Scope of Works — SportsMeta
 
+> **Status note (2026-04-11):** historical scope draft. The live deployment moved to a separate SportsMeta service/addon boundary, so the "not a separate product" framing below is no longer current truth.
+>
 > **Version:** 1.0
 > **Date:** 2026-04-08
 > **Status:** DRAFT — Pending Client Approval

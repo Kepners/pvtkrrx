@@ -1,15 +1,15 @@
 # SportsMeta Technical Specification
 
-> **Status:** Draft - local integrated-route proposal, not the live Contabo state
+> **Status:** Draft - local integrated-route proposal, not the live product boundary
 > **Author:** Colin (CTO)
 > **Date:** 2026-04-10
 > **Parent project:** PVTKRRX
 > **Depends on:** `sportsdb.js`, `sportsImageCache.js`, `sportsCacheSeeder.js`, `sportsArtwork.js`, `sportsThumb.js`
 
-> **Verified audit note (2026-04-10):** this file does not describe the current live Contabo deployment.
-> Public `https://www.pvtkrrx.cc/sportsmeta/event?...` still returns `404`, the live `pvtkrrx`
-> container does not include the SportsMeta handler/catalogue files described here, and the mounted
-> runtime does not contain `sportsmeta-catalogue.sqlite`. Treat this as a draft local proposal only.
+> **Verified audit note (2026-04-11):** this file still does not describe the live Contabo deployment.
+> SportsMeta is now live separately at `https://sportsmeta.pvtkrrx.cc`, while the integrated route
+> described here is a non-production draft that now stays disabled unless
+> `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA=true`.
 
 ---
 
@@ -196,8 +196,8 @@ The SQLite catalogue stores structured aliases, entitlements, and file-path refe
 
 Operational bootstrap commands:
 
-- `npm run sportsmeta:import -- /opt/pvtkrrx/runtime`
-- `npm run sportsmeta:grant -- <accountUserId> 365`
+- `npm run experimental:sportsmeta:import -- /opt/pvtkrrx/runtime`
+- `npm run experimental:sportsmeta:grant -- <accountUserId> 365`
 
 ---
 

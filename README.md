@@ -16,7 +16,7 @@ The addon handles: search → download → stream. PVTKRRX has a **built-in file
 Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS endpoints. Self-hosted server mode is different: the server can store a disk-backed `selfhost` config locally, reuse it on boot, and validate localhost/private service URLs once you authenticate as the server admin.
 
 ## Key Features
-- **SportsMeta boundary (work in progress)** - local draft work exists for both an integrated catalogue path inside `pvtkrrx` and a separate `sportsmeta` repo, but SportsMeta is not live on Contabo yet: the public host still returns `404` for `/sportsmeta/event`, and there is no separate SportsMeta addon/runtime deployed today
+- **SportsMeta boundary is real** - SportsMeta is live as a separate addon/service at `https://sportsmeta.pvtkrrx.cc`, while PVTKRRX stays the separate stream addon and only attaches streams to canonical `sportsmeta:` ids
 
 - **Sports** — Browse and search private tracker sports content (EPL, F1, UFC) directly in Stremio
 - **Sports-first discovery** — `All Sports` plus sport-family catalogs now lead the movie discovery column, with the third-column filter used for league/team detail
@@ -66,10 +66,12 @@ See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the legacy/manu
 See [docs/WEBSITE_STATUS.md](docs/WEBSITE_STATUS.md) for the current public-site truth table plus homepage rewrite backlog.
 See [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md) for the authoritative current stage, active worktree items, and deployment checklist. See [docs/CURRENT_DESIGN.md](docs/CURRENT_DESIGN.md) for the live architecture and [docs/ROUTE_FRAMEWORK.md](docs/ROUTE_FRAMEWORK.md) for route-specific install/playback rules.
 
-Verified SportsMeta audit on 2026-04-10:
-- live `https://www.pvtkrrx.cc/sportsmeta/event?...` still returns `404`
-- the live Contabo `pvtkrrx` container does not contain SportsMeta handler/catalogue files or a `sportsmeta-catalogue.sqlite` runtime DB
-- the separate `sportsmeta` repo exists, but it is currently only a Fastify scaffold and not a deployable Stremio addon yet
+Verified SportsMeta boundary on 2026-04-11:
+- the live standalone addon is public at `https://sportsmeta.pvtkrrx.cc/manifest.json`
+- the live pricing page is public at `https://sportsmeta.pvtkrrx.cc/pricing`
+- `sportsmeta.service` is the real live metadata/artwork/billing boundary
+- PVTKRRX now consumes canonical `sportsmeta:` ids on configured `/:config/stream/...` routes without becoming the metadata or billing owner
+- the old integrated `/sportsmeta/*` draft inside this repo is not the live boundary and is now disabled by default unless `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA=true`
 
 ## Documentation Guide
 
@@ -84,9 +86,10 @@ Use these files as the live documentation set:
 
 - [docs/WEBSITE_STATUS.md](docs/WEBSITE_STATUS.md) - public route health, canonical host notes, and homepage/content backlog
 - [docs/MONITORING.md](docs/MONITORING.md) - Umami deployment, hosted event tracking, and install/traffic metrics
-- [docs/SPORTSMETA_CATALOGUE_ARCHITECTURE.md](docs/SPORTSMETA_CATALOGUE_ARCHITECTURE.md) - planning doc for turning the current sports cache and image proxy into a hosted SportsMeta catalogue product
-- [docs/SPORTSMETA_TECHNICAL_SPEC.md](docs/SPORTSMETA_TECHNICAL_SPEC.md) - local integrated-route draft only; not the live Contabo state
-- [docs/SPORTSMETA_CONTABO_V1_PLAN.md](docs/SPORTSMETA_CONTABO_V1_PLAN.md) - current preferred separate SportsMeta addon/service boundary for future Contabo work
+- [docs/SPORTSMETA_BOUNDARY.md](docs/SPORTSMETA_BOUNDARY.md) - exact ownership split, downtime behavior, licence behavior, and remaining coupling
+- [docs/SPORTSMETA_CONTABO_V1_PLAN.md](docs/SPORTSMETA_CONTABO_V1_PLAN.md) - live separate SportsMeta addon/service rollout notes
+- [docs/SPORTSMETA_TECHNICAL_SPEC.md](docs/SPORTSMETA_TECHNICAL_SPEC.md) - experimental integrated-route draft only; not the live product boundary
+- [docs/SPORTSMETA_CATALOGUE_ARCHITECTURE.md](docs/SPORTSMETA_CATALOGUE_ARCHITECTURE.md) - historical/planning context for how the separate SportsMeta product emerged
 The February 2026 planning docs under `docs/` are kept as project history and are now marked as historical where they no longer describe the live runtime.
 
 ## Quick Start
@@ -159,10 +162,12 @@ npm run cache:sports-package -- /srv/pvtkrrx/sports-package
 Package manifests can live anywhere on the local PC or server. PVTKRRX supports a folder containing `sports-image-package.json` (or `sports-poster-package.json`) or a direct manifest-file path. The manifest should list remote `sourceUrl` values mapped to local image files, so the runtime can satisfy existing catalogue artwork from disk before it ever tries an upstream image fetch.
 That explicit `npm run cache:sports-package` sync is optional acceleration. During normal runtime requests, PVTKRRX now stays cache-only: it serves already-cached bytes first, can lazily import a matching file from the mapped package on a miss, and leaves live upstream refresh work to the seeding/autofill path instead of rebuilding the catalogue on demand. The built-in seeder now also includes a short replay lookback window so yesterday's sports cards can keep exact event art instead of collapsing straight to generated SVG.
 
-Local draft tooling only, not deployed on Contabo yet: if you want to materialize the current sports catalogue into the draft integrated SportsMeta database, import the active runtime cache into `sportsmeta-catalogue.sqlite`:
+Experimental local draft tooling only. The integrated `/sportsmeta/*` path inside `pvtkrrx` is not a production surface and now stays disabled unless `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA=true` is set deliberately on a private/local runtime.
+
+If you still want to materialize the draft integrated SportsMeta database locally, import the active runtime cache into `sportsmeta-catalogue.sqlite`:
 
 ```bash
-npm run sportsmeta:import -- /opt/pvtkrrx/runtime
+npm run experimental:sportsmeta:import -- /opt/pvtkrrx/runtime
 ```
 
 That database stores structured metadata aliases, entitlement rows, and file-path mappings back to `sports-image-cache/`; the JPG/PNG bytes stay on disk instead of being duplicated as SQLite blobs.
@@ -170,7 +175,7 @@ That database stores structured metadata aliases, entitlement rows, and file-pat
 To grant a linked account one year of the `sportsmeta` tier manually:
 
 ```bash
-npm run sportsmeta:grant -- <accountUserId> 365
+npm run experimental:sportsmeta:grant -- <accountUserId> 365
 ```
 
 On Windows desktop installs, the runtime lives under `%APPDATA%\\PVTKRRX\\runtime`, outside the EXE install directory. That means local `Prowlarr`/`qBittorrent` config, sports poster package mapping, `sportsdb-poster-cache.json`, and `sports-image-cache/` survive normal app updates and reinstall-over-the-top installs unless the user explicitly deletes that runtime folder.
@@ -440,6 +445,7 @@ This now builds in the system temp directory first, then copies the finished cur
 | PVTKRRX_PLAYBACK_STATE_TTL_SECONDS | Optional | TTL for `/playback/:info` opaque tokens in seconds (default 86400) |
 | PVTKRRX_FILE_STATE_TTL_SECONDS | Optional | TTL for `/file/:info` opaque tokens in seconds (default 86400) |
 | PVTKRRX_EXPERIMENTAL_RAR_STREAMS | Optional | Opt in to emitting native `rarUrls` archive streams for manual testing; default supported behavior keeps packed releases hidden until extracted direct video is ready |
+| PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA | Optional local-only flag | Enables the old integrated `/sportsmeta/*` draft and runtime-local `sportsmeta-catalogue.sqlite` path inside `pvtkrrx`. Default off; do not enable on the public hosted relay. |
 | PVTKRRX_FREE_MODE | Optional | Reserved for future billing rollout. Access is currently forced free in server code. |
 | PVTKRRX_REQUIRE_ACTIVE_SUBSCRIPTION | Optional | Reserved for future billing rollout. Currently ignored while free mode is forced. |
 | PVTKRRX_TRIAL_ENABLED | Optional | Allow free trial access before paid subscription is required (default true) |

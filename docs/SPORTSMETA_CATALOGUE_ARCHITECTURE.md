@@ -1,7 +1,11 @@
 # SportsMeta Catalogue Architecture
 
-Status: planning draft
+Status: historical/planning draft
 Updated: 2026-04-08
+
+Reality check (2026-04-11): the separate SportsMeta service is now live at `https://sportsmeta.pvtkrrx.cc`.
+This file is still useful as product-history context, but the "next step" language below is no longer
+the live boundary description.
 
 ## Purpose
 

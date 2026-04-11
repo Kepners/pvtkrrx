@@ -1,5 +1,7 @@
 # Production Spec: SportsMeta (Integrated Feature)
 
+> **Status note (2026-04-11):** historical integrated-build plan only. The live product boundary is now the separate SportsMeta service at `https://sportsmeta.pvtkrrx.cc`, not a production `/sportsmeta/*` path inside `www.pvtkrrx.cc`.
+>
 > **Author:** Peter (Production Engineer)
 > **Date:** April 7, 2026
 > **Status:** Approved at Concept Meeting — ready for build
@@ -160,7 +162,7 @@ No modifications needed. The freemium gate lives entirely in the JSON metadata e
    - Return JSON response with `event` + `artwork` objects
 2. Wire route in `index.js` — `GET /sportsmeta/event`
 3. Add rate limiter (reuse existing pattern from `rateLimiters`)
-4. Smoke test: `npm run smoke:sportsmeta`
+4. Smoke test: `npm run experimental:smoke:sportsmeta`
 
 ### Phase 2: Freemium Gate (Days 3-4)
 

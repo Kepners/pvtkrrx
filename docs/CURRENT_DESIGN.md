@@ -1,6 +1,6 @@
 # PVTKRRX Current Design
 
-Updated: 2026-04-09
+Updated: 2026-04-11
 
 ## Purpose
 
@@ -37,7 +37,7 @@ PVTKRRX is one codebase with three active runtime pieces:
    - the installer now handles that split directly: FreeDNS and domain installs default built-in playback to the same public HTTPS origin while still allowing an optional direct playback origin
    - when a real FreeDNS/domain front door is configured, the installer now disables any leftover `pvtkrrx-tunnel.service` so the old Cloudflare quick tunnel is removed from the runtime path
    - the installer prints a one-time `Configure` bootstrap URL with `#serverAdminToken=...` so the browser can load the saved self-host config automatically on first open
-   - the installer now also runs a non-destructive sports-art preseed that warms `sports-image-cache/` with upcoming event artwork, top team badges, and mapped league art using the same runtime cache the addon serves later
+   - the installer now also runs a non-destructive sports-art preseed that warms `sports-image-cache/` with recent replay dates plus upcoming event artwork, top team badges, and mapped league art using the same runtime cache the addon serves later
    - long-running Linux/cloud runtimes now keep filling that same sports cache automatically every 15 minutes in rotating sport batches, so the free key can keep dribbling new fights, fixtures, and league art in over time instead of relying on a single install-time burst
    - this is the independence path: after bootstrap, the runtime and config stay on the user's hardware and the hosted PVTKRRX site is no longer in the request path unless the user explicitly chooses the hosted relay
    - can install optional Linux `systemd` startup through `npm run server:setup` / `npm run server:install-service`
@@ -55,6 +55,29 @@ PVTKRRX is one codebase with three active runtime pieces:
    - performs startup checks, provider warm-up, and local auto-provision helpers
    - can register/unregister itself with Windows sign-in startup from the desktop shell
    - sends LAN pair heartbeat updates and Stremio launch pulses
+
+## SportsMeta Boundary
+
+SportsMeta is now the separate metadata/artwork product boundary.
+
+- live host: `https://sportsmeta.pvtkrrx.cc`
+- live service: `sportsmeta.service`
+- SportsMeta owns canonical `sportsmeta:` ids, metadata routes, artwork routes, member-token routes, and billing
+- PVTKRRX stays the separate stream addon and only consumes `sportsmeta:` ids when attaching streams
+- the old integrated `/sportsmeta/*` draft inside this repo is not the live public surface and is now disabled unless `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA=true`
+
+Shared Contabo hosting still exists:
+
+- same VPS
+- same Caddy edge
+- same-box internal network path from the Coolify `pvtkrrx` container to SportsMeta when `PVTKRRX_SPORTSMETA_INTERNAL_BASE_URL` is used
+
+That is shared infrastructure, not shared product ownership.
+
+Operational behavior:
+
+- if SportsMeta is down, PVTKRRX can still parse `sportsmeta:event:` ids locally and attempt stream search, but it loses live SportsMeta event enrichment and SportsMeta-owned asset URLs
+- if a SportsMeta membership is revoked, only SportsMeta member routes degrade/fail; PVTKRRX stream routes remain free
 
 ## Current UX Model
 
@@ -99,6 +122,7 @@ Verified on 2026-04-08:
 - `https://www.pvtkrrx.cc/health` returns health JSON (`200`) or the health page when the client asks for HTML
 - `https://www.pvtkrrx.cc/sitemap.xml` now includes `/sports`
 - `https://www.pvtkrrx.cc/local/install` returns `403` from the public internet because it is a same-host/local-network helper route
+- `https://www.pvtkrrx.cc/sportsmeta/...` is not a supported public production surface; the integrated draft is disabled by default in this repo
 - `https://pvtkrrx.vercel.app` is not canonical and returned Vercel `DEPLOYMENT_NOT_FOUND`
 - 2026-04-06 homepage verification on the canonical host confirmed the refactored landing page markers are live: `truth-band` and `Where does playback happen` are present, while legacy `meta-grid` and `hero-chip` markers are absent
 
@@ -147,7 +171,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 - `backgroundImage` and `logo` stay separate from the portrait poster contract for player-loading and wallpaper use.
 - When Prowlarr has no indexers or cannot be reached, empty movie, TV, and sports catalogs now return a setup-needed placeholder card instead of a blank grid, so the user gets a useful recovery cue in Stremio.
 - When external sports art exists, addon responses now prefer signed `/image/sports/...` URLs so the active local or hosted runtime can cache poster, wallpaper, landscape, and logo bytes on disk instead of hotlinking every request back to the upstream art host.
-- `npm run server:setup` and `npm run cache:sports` can now warm that same disk cache ahead of time with upcoming event artwork, top team badges, and mapped league art so first-run sports tiles do not depend on cold image fetches.
+- `npm run server:setup` and `npm run cache:sports` can now warm that same disk cache ahead of time with recent replay dates plus upcoming event artwork, top team badges, and mapped league art so first-run sports tiles do not depend on cold image fetches.
 - The runtime can now also map a downloaded sports poster package from any local/server filesystem path. When `sportsImagePackagePath` or `PVTKRRX_SPORTS_IMAGE_PACKAGE_PATH` is configured, package images are imported into the runtime cache before any upstream image fetch, so the free TheSportsDB key is used to find updates and gaps instead of rehydrating the whole catalogue.
 - `npm run cache:sports-package` can proactively sync that mapped package into the runtime cache instead of waiting for lazy first-hit imports.
 - Normal `/image/sports/...` request handling is now cache-only but package-aware: if the byte cache misses, the runtime can still import the mapped package file for that artwork on demand, but it does not repopulate the catalogue from live upstream image fetches during request handling.
@@ -160,6 +184,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 - Sports catalog grouping uses structured event keys for both vs and non-vs titles, so different quality variants of the same event collapse into one tile.
 - Sports detail pages now carry richer metadata: league, date, event name, sport type label, and multi-line descriptions instead of flat stat lines.
 - Library and sports items use internal `pvtkrrx:` custom ids inside Stremio responses.
+- canonical SportsMeta event ids use `sportsmeta:` and are resolved through the separate SportsMeta service boundary
 - Installed route manifests keep the plain addon name `PVTKRRX`; route identity now lives in the manifest `id` and description so Stremio source grouping stays consistent.
 - There is no standalone `.pvtk` file format in this repository.
 

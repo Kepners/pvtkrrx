@@ -1,5 +1,7 @@
 # SALES_SPEC — SportsMeta (PVTKRRX Premium Feature)
 
+> **Status note (2026-04-11):** historical sales planning only. The "SportsMeta lives inside PVTKRRX" framing below is no longer current; SportsMeta is now the separate live product boundary at `https://sportsmeta.pvtkrrx.cc`.
+>
 > **Authors:** Jason (Sales Director) & Jasmine (Marketing)
 > **Status:** Concept approved — ready for implementation planning
 > **Date:** 2026-04-07

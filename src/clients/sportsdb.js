@@ -6,6 +6,18 @@ const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitl
 const { getMappedLeagueEntry, listMappedLeagues, mapLeague } = require('../utils/leagueMap')
 const { resolveRuntimeDir } = require('../utils/runtimeDir')
 
+const EXPERIMENTAL_INTERNAL_SPORTSMETA = /^(1|true|yes|on)$/i.test(
+  String(process.env.PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA || '').trim()
+)
+let lookupSportsMetaRecord = null
+let upsertResolvedSportsMetaRecord = null
+if (EXPERIMENTAL_INTERNAL_SPORTSMETA) {
+  ;({
+    lookupSportsMetaRecord,
+    upsertResolvedSportsMetaRecord
+  } = require('../utils/sportsmetaCatalogue'))
+}
+
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json'
 const DEFAULT_API_KEY = '123'
 const DEFAULT_TIMEOUT_MS = 8000
@@ -971,7 +983,59 @@ function persistResolvedArtworkVariants(primaryKey, value, expiresAt, options = 
     if (leagueKey) persistResolvedArtwork(leagueKey, value, expiresAt)
   }
 
+  try {
+    if (!upsertResolvedSportsMetaRecord) return
+    upsertResolvedSportsMetaRecord(value, {
+      sourceKey: primaryKey
+    })
+  } catch (_) {
+    // Keep the hot path tolerant when the catalogue is unavailable.
+  }
+
   if (shouldFlush) schedulePersistFlush()
+}
+
+function buildCatalogueLookupInput(item = {}, options = {}) {
+  const title = String(options.title || item?.title || '').trim()
+  const structuredEvent = options.structuredEvent || null
+  const mappedLeague = normalizeSpace(options.mappedLeague || item?.league || item?.leagueCode || '')
+  const dateHint = extractDateHint(options.dateHint || item?.date || item?.publishDate || item?.pubDate || '', '')
+  const sportHint = normalizeSpace(options.sportHint || item?.sportHint || item?.sport || '')
+
+  return {
+    eventId: String(item?.eventId || '').trim(),
+    title,
+    displayTitle: title,
+    league: mappedLeague || normalizeSpace(structuredEvent?.league || ''),
+    date: dateHint,
+    homeTeam: normalizeSpace(item?.homeTeam || structuredEvent?.homeTeam || ''),
+    awayTeam: normalizeSpace(item?.awayTeam || structuredEvent?.awayTeam || ''),
+    eventName: normalizeSpace(item?.eventName || structuredEvent?.eventName || title),
+    sportHint
+  }
+}
+
+function primeInMemoryArtworkCacheFromCatalogue(apiKey, primaryKey, artwork, options = {}) {
+  if (!artwork) return null
+
+  const expiresAt = Date.now() + (
+    String(artwork?.source || '').trim() === 'thesportsdb-league'
+      ? LEAGUE_ASSET_CACHE_TTL_MS
+      : STRUCTURED_EVENT_CACHE_TTL_MS
+  )
+
+  persistResolvedArtworkVariants(primaryKey, artwork, expiresAt, {
+    apiKey,
+    eventId: String(options.eventId || artwork?.eventId || '').trim(),
+    league: normalizeSpace(options.league || artwork?.league || ''),
+    dateHint: extractDateHint(options.dateHint || artwork?.eventDate || '', ''),
+    sportHint: normalizeSpace(options.sportHint || artwork?.sport || ''),
+    structuredEvent: options.structuredEvent || null
+  }, {
+    flush: false
+  })
+
+  return artwork
 }
 
 function scoreLeague(league, title, titleSport) {
@@ -1805,6 +1869,28 @@ class SportsDbClient {
 
     const genericLeagueArtHit = getCachedValue(cache, leagueArtworkCacheKey(this.apiKey, mappedLeague, '', sportHint))
     if (genericLeagueArtHit !== undefined) return genericLeagueArtHit || null
+
+    try {
+      if (!lookupSportsMetaRecord) throw new Error('internal SportsMeta catalogue disabled')
+      const catalogueHit = lookupSportsMetaRecord(buildCatalogueLookupInput(item, {
+        title,
+        structuredEvent,
+        mappedLeague,
+        dateHint,
+        sportHint: titleSport || structuredSportHint
+      }))
+      if (catalogueHit) {
+        return primeInMemoryArtworkCacheFromCatalogue(this.apiKey, key, catalogueHit, {
+          eventId: requestedEventIdRaw,
+          league: mappedLeague,
+          dateHint,
+          sportHint: titleSport || structuredSportHint,
+          structuredEvent
+        })
+      }
+    } catch (_) {
+      // Ignore catalogue lookup errors and keep the request path cache-only.
+    }
 
     // Cache-only mode: never make live API calls to TheSportsDB during
     // catalog or meta requests.  The background autofill populates the

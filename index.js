@@ -21,6 +21,15 @@ const { getBrowserConfig, trackEvent } = require('./src/utils/analytics')
 const { resolveSportsImageRequest } = require('./src/utils/sportsImageCache')
 const { startSportsCacheAutofill } = require('./src/utils/sportsCacheAutofill')
 
+const EXPERIMENTAL_INTERNAL_SPORTSMETA = /^(1|true|yes|on)$/i.test(
+  String(process.env.PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA || '').trim()
+)
+let handleSportsMetaEvent = null
+if (EXPERIMENTAL_INTERNAL_SPORTSMETA) {
+  ;({ handleSportsMetaEvent } = require('./src/handlers/sportsmeta'))
+}
+const experimentalSportsMetaRateLimiter = rateLimiters.sportsmeta || rateLimiters.auth
+
 // Destructure everything routes need from the shared module.
 // Shared module initializes env, console redaction, stores, and rate limiters at load time.
 const {
@@ -2015,6 +2024,48 @@ app.get('/:config/meta/:type/:id.json', withConfig, requireConfigSubscription, m
   })
   res.json(result)
 })
+
+if (EXPERIMENTAL_INTERNAL_SPORTSMETA && handleSportsMetaEvent) {
+  app.get('/sportsmeta/event', withLegacyRootLocalConfig, requireConfigSubscription, async (req, res) => {
+    const clientIp = getClientIp(req)
+    const limit = experimentalSportsMetaRateLimiter.consume(clientIp || 'unknown')
+    if (!limit.allowed) {
+      res.setHeader('Retry-After', String(limit.retryAfterSeconds))
+      return res.status(429).json({ error: 'too many requests' })
+    }
+
+    const result = await handleSportsMetaEvent(req.config, req.query, {
+      baseUrl: getPublicBaseUrl(req)
+    })
+    const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 30, 900)
+    applyHostedRouteCacheHeaders(req, res, 0, {
+      sMaxAge: ttl,
+      staleWhileRevalidate: Math.min(ttl * 4, 3600),
+      staleIfError: Math.min(Math.max(ttl * 24, 3600), 86400)
+    })
+    res.json(result)
+  })
+
+  app.get('/:config/sportsmeta/event', withConfig, requireConfigSubscription, async (req, res) => {
+    const clientIp = getClientIp(req)
+    const limit = experimentalSportsMetaRateLimiter.consume(clientIp || 'unknown')
+    if (!limit.allowed) {
+      res.setHeader('Retry-After', String(limit.retryAfterSeconds))
+      return res.status(429).json({ error: 'too many requests' })
+    }
+
+    const result = await handleSportsMetaEvent(req.config, req.query, {
+      baseUrl: getPublicBaseUrl(req)
+    })
+    const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 30, 900)
+    applyHostedRouteCacheHeaders(req, res, 0, {
+      sMaxAge: ttl,
+      staleWhileRevalidate: Math.min(ttl * 4, 3600),
+      staleIfError: Math.min(Math.max(ttl * 24, 3600), 86400)
+    })
+    res.json(result)
+  })
+}
 
 app.get('/:config/qbit/preferences', withConfig, requireLocalQbitControl, async (req, res) => {
   try {

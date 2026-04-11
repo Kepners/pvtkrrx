@@ -1,9 +1,11 @@
 # Commercial Specification — SportsMeta (PVTKRRX Internal)
 
-> **Status:** Active  
+> **Status:** Historical planning draft only  
 > **Author:** Stewart (Commercial)  
 > **Date:** April 7, 2026  
-> **Decision:** SportsMeta is an internal PVTKRRX feature, not a standalone product
+> **Recorded decision then:** SportsMeta is an internal PVTKRRX feature, not a standalone product
+>
+> **Reality check (2026-04-11):** that is no longer the live product truth. SportsMeta is now live as a separate addon/service at `https://sportsmeta.pvtkrrx.cc`. Use `README.md`, `docs/SPORTSMETA_BOUNDARY.md`, and `docs/SPORTSMETA_CONTABO_V1_PLAN.md` for the current boundary.
 
 ---
 

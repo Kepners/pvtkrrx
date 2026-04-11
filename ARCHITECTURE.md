@@ -1,6 +1,6 @@
 # PVTKRRX Architecture
 
-Updated: 2026-04-06
+Updated: 2026-04-11
 
 ## Canonical Sources
 
@@ -42,13 +42,24 @@ Stremio client
 Self-hosted server mode uses the same Express runtime on a VPS/seedbox, but with `PVTKRRX_SELF_HOST_MODE=true` so the server can persist a disk-backed config, expose a stable `/selfhost/manifest.json?mode=hosted`, and accept authenticated private/localhost service URLs from the configure page.
 ```
 
+## SportsMeta Boundary
+
+SportsMeta is not a subsection of the public `www.pvtkrrx.cc` app.
+
+- SportsMeta owns the separate hostname `https://sportsmeta.pvtkrrx.cc`
+- SportsMeta owns `sportsmeta.service`, the SportsMeta SQLite DB, asset cache, member-token routes, and Stripe billing
+- PVTKRRX stays the separate stream addon and only consumes canonical `sportsmeta:` ids when attaching streams
+- the old integrated `/sportsmeta/*` draft inside this repo is now non-production and disabled by default unless `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA=true`
+
+Shared Contabo hosting and same-box network access are infrastructure couplings, not proof that the products are one runtime.
+
 ## Components
 
 | Component | Responsibility |
 |---|---|
 | `index.js` | Main Express + SDK server, hosted + local routes, playback, file serving, account and pair APIs |
 | `src/handlers/*` | Catalog, stream, and meta generation |
-| `src/clients/*` | Prowlarr, qBittorrent, Cinemeta, and TheSportsDB integrations |
+| `src/clients/*` | Prowlarr, qBittorrent, Cinemeta, TheSportsDB, and separate-SportsMeta integrations |
 | `src/utils/analytics.js` | Optional Umami monitoring for hosted traffic and product events, with host gating and dedupe state |
 | `src/utils/sportsImageCache.js` | Signed sports artwork proxy URLs plus runtime disk cache for poster, background, landscape, and logo bytes |
 | `src/utils/sportsCacheAutofill.js` | Rotating background sports-cache refill for long-running Linux/cloud runtimes |
@@ -122,14 +133,15 @@ The current desktop popup copy still says `LAN Bridge`; the configure flow and h
 ### Sports And Library
 
 1. Sports catalog items use internal `pvtkrrx:` ids.
-2. Meta and stream handlers decode those ids at request time.
-3. TheSportsDB is used for poster, background, and logo enrichment where configured.
-4. The manifest now exposes a dedicated top-level `sports` surface with an `All Sports` catalog plus sport-family catalogs such as `Football`, `Motorsport`, and `MMA`.
-5. Each sport-family catalog uses the third-column `genre` dropdown for narrower league/team filters.
-6. When external sports art exists, local and hosted runtimes now hand Stremio stable `/image/sports/...` URLs backed by the runtime disk cache instead of hotlinking TheSportsDB on every request.
-7. Sports catalog tiles now prefer portrait poster art, while background/logo art is carried separately for player-loading and wallpaper use.
-8. Library items expose completed qBittorrent content through the same addon surface.
-9. Long-running Linux/cloud runtimes now revisit one sport group every 15 minutes by default and keep filling `sports-image-cache/` gradually between installer/manual warm passes.
+2. Canonical cross-product sports metadata ids use `sportsmeta:` and are owned by SportsMeta, not PVTKRRX.
+3. Meta and stream handlers decode `pvtkrrx:` ids locally and consume `sportsmeta:` ids only on the stream-attach side.
+4. TheSportsDB is used for poster, background, and logo enrichment where configured for PVTKRRX-owned rows.
+5. The manifest now exposes a dedicated top-level `sports` surface with an `All Sports` catalog plus sport-family catalogs such as `Football`, `Motorsport`, and `MMA`.
+6. Each sport-family catalog uses the third-column `genre` dropdown for narrower league/team filters.
+7. When external sports art exists, local and hosted runtimes now hand Stremio stable `/image/sports/...` URLs backed by the runtime disk cache instead of hotlinking TheSportsDB on every request.
+8. Sports catalog tiles now prefer portrait poster art, while background/logo art is carried separately for player-loading and wallpaper use.
+9. Library items expose completed qBittorrent content through the same addon surface.
+10. Long-running Linux/cloud runtimes now revisit one sport group every 15 minutes by default and keep filling `sports-image-cache/` gradually between installer/manual warm passes.
 
 ## Storage Model
 
