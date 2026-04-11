@@ -428,16 +428,26 @@ These items should still be treated as open until captured on real clients:
      - data path: `/opt/sportsmeta/data`
      - db path: `/opt/sportsmeta/data/db/sportsmeta.sqlite`
      - asset cache path: `/opt/sportsmeta/data/assets/cache`
-     - source import path: `/opt/pvtkrrx/runtime`
+     - source import roots: `/opt/pvtkrrx/runtime` and `/opt/pvtkrrx/data/pvtkrrx`
      - live route fragment: `/opt/stack/caddy/apps-enabled/sportsmeta.pvtkrrx.cc.caddy`
+     - paid TheSportsDB key is now configured on the service via `SPORTSMETA_SPORTSDB_API_KEY`
    - The live SportsMeta health surface now reports:
-     - `recordCount = 2480`
-     - `eventCount = 2432`
-     - `aliasCount = 7606`
-     - `assetCount = 5706`
+     - `recordCount = 2727`
+     - `eventCount = 2679`
+     - `aliasCount = 8300`
+     - `assetCount = 6196`
+     - `importRunCount = 3`
+     - `sourceDocumentCount = 7302`
+     - `evidenceCount = 62791`
+   - SportsMeta was re-imported on 2026-04-11 from both runtime roots instead of only the older hosted cache.
+   - The long canonical-id route bug is fixed live:
+     - root cause was Fastify's default router `maxParamLength = 100`, which dropped longer `sportsmeta:` ids as route-level 404s
+     - `https://sportsmeta.pvtkrrx.cc/meta/movie/sportsmeta%3Aevent%3Abasketball%7C2026-11-15%7Ceurobasket-women%7Cfinland-basketball-women%7Clithuania-basketball-women.json` now returns canonical metadata publicly
    - PVTKRRX is now attaching streams to the same canonical IDs without becoming the metadata owner:
-     - repo commit `676154b` (`⚡ fix: keep sportsmeta streams working without qbit`) deployed through Coolify deployment `368` and rolled the live hosted container to `w14jewmw5ubscrxh8zzfhq7d-233017296760`
-     - a real configured public route on `https://www.pvtkrrx.cc/:config/stream/movie/...` returned a non-empty tracker stream for `sportsmeta:event:fighting|2026-04-10|professional-fighters-league|pfl-africa-1-pretoria`
+     - repo commit `f676564` (`🛠️ fix: route hosted loopback services through contabo gateway`) is now live through successful Coolify deployment `372` (`sysdu6nl1s2wxcm48o01o78v`) after webhook deployment `371` failed during image export/unpack
+     - that rollout moved the live public hosted container to `w14jewmw5ubscrxh8zzfhq7d-082417863890` on image `w14jewmw5ubscrxh8zzfhq7d:f676564650b757b40544b0b236fee272fd446a07`
+     - the hosted relay now requires `PVTKRRX_HOST_GATEWAY_HOST=10.0.1.1` so tokenized configs that still carry `http://127.0.0.1:9696` and `http://127.0.0.1:8090` can reach the Contabo host's Prowlarr and qBittorrent services from inside the Coolify container
+     - a real configured public route on `https://www.pvtkrrx.cc/:config/stream/movie/...` now returns a non-empty tracker stream again for `sportsmeta:event:fighting|2026-04-10|professional-fighters-league|pfl-africa-1-pretoria`
    - Architecture truth after the rollout:
      - SportsMeta owns sports manifests, catalogs, metadata pages, artwork, and canonical `sportsmeta:` IDs
      - PVTKRRX remains the stream addon only

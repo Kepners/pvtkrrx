@@ -1,14 +1,14 @@
 # SportsMeta Contabo V1 Plan
 
-Status: live v1 baseline on Contabo after the 2026-04-10 rollout
-Updated: 2026-04-10
+Status: live v1 baseline on Contabo after the 2026-04-10 rollout, refreshed 2026-04-11
+Updated: 2026-04-11
 Owner: PVTKRRX / SportsMeta planning
 
 ## Purpose
 
 This document captures the deployed SportsMeta service split after the 2026-04-10 rollout, plus the remaining follow-up work.
 
-Verified Contabo state on 2026-04-10 after deploy:
+Verified Contabo state on 2026-04-11 after deploy:
 
 - SportsMeta is live at `https://sportsmeta.pvtkrrx.cc/manifest.json`
 - SportsMeta is running as `sportsmeta.service`
@@ -18,8 +18,21 @@ Verified Contabo state on 2026-04-10 after deploy:
   - data: `/opt/sportsmeta/data`
   - db: `/opt/sportsmeta/data/db/sportsmeta.sqlite`
   - asset cache: `/opt/sportsmeta/data/assets/cache`
-  - source import path: `/opt/pvtkrrx/runtime`
+  - source import roots: `/opt/pvtkrrx/runtime` and `/opt/pvtkrrx/data/pvtkrrx`
+- the service env now includes `SPORTSMETA_SPORTSDB_API_KEY` for paid-gap-fill/prewarm use
+- the live health surface now reports:
+  - `recordCount = 2727`
+  - `eventCount = 2679`
+  - `aliasCount = 8300`
+  - `assetCount = 6196`
+  - `importRunCount = 3`
+  - `sourceDocumentCount = 7302`
+  - `evidenceCount = 62791`
+- long canonical-id `meta` and `event` routes are fixed live after raising Fastify router `maxParamLength`
 - PVTKRRX now consumes the same canonical `sportsmeta:` IDs on configured `/:config/stream/...` routes and stays stream-only
+- the current public hosted relay fix is repo commit `f676564` on the `pvtkrrx` side, live through Coolify deployment `372` on container `w14jewmw5ubscrxh8zzfhq7d-082417863890`
+- the hosted relay now carries `PVTKRRX_HOST_GATEWAY_HOST=10.0.1.1` so tokenized loopback service URLs can resolve Prowlarr and qBittorrent through the Contabo host gateway from inside the Coolify container
+- a configured public stream route for `sportsmeta:event:fighting|2026-04-10|professional-fighters-league|pfl-africa-1-pretoria` now returns a real tracker stream again on `https://www.pvtkrrx.cc/:config/stream/movie/...`
 
 The live production boundary is now:
 
