@@ -471,6 +471,14 @@ These items should still be treated as open until captured on real clients:
      - that rollout moved the live public hosted container to `w14jewmw5ubscrxh8zzfhq7d-082417863890` on image `w14jewmw5ubscrxh8zzfhq7d:f676564650b757b40544b0b236fee272fd446a07`
      - the hosted relay now requires `PVTKRRX_HOST_GATEWAY_HOST=10.0.1.1` so tokenized configs that still carry `http://127.0.0.1:9696` and `http://127.0.0.1:8090` can reach the Contabo host's Prowlarr and qBittorrent services from inside the Coolify container
      - a real configured public route on `https://www.pvtkrrx.cc/:config/stream/movie/...` now returns a non-empty tracker stream again for `sportsmeta:event:fighting|2026-04-10|professional-fighters-league|pfl-africa-1-pretoria`
+   - Follow-up live production repair on 2026-04-12 after the deployment audit:
+     - SportsMeta upcoming ingest is now automated on the standalone host via `sportsmeta-upcoming-ingest.timer` -> `sportsmeta-upcoming-ingest.service` every 2 hours
+     - the first scheduled run removed `658` contaminated seeded event rows and logged `contaminatedAfter = 0`
+     - public `sportsmeta-all` is now ordered nearest-upcoming first on the live route
+     - public `search=arsenal` and `search=rennes` are materially cleaner on the live SportsMeta host, and the bad `az-alkmaar|rennes` route was replaced by the correct live `az-alkmaar|heerenveen` metadata row
+     - repo commit `70f0423` (`🛠 fix sports stream category constraints`) is now live on the hosted Coolify relay in container `w14jewmw5ubscrxh8zzfhq7d-184556663532` on image `w14jewmw5ubscrxh8zzfhq7d:70f0423e8dd95542b9f4a34b77c70036170fca28`
+     - the configured hosted stream route now logs `Custom re-search query="..." cats="5060" useCategories=true`, proving the deployed re-search path is really category-constrained again
+     - the same configured hosted stream route still returns tracker-backed football streams, so the category fix did not break SportsMeta stream attachment
    - Architecture truth after the rollout:
      - SportsMeta owns sports manifests, catalogs, metadata pages, artwork, and canonical `sportsmeta:` IDs
      - SportsMeta also owns Stripe checkout, portal, webhook, and entitlement enforcement for the premium layer
@@ -483,7 +491,7 @@ These items should still be treated as open until captured on real clients:
 
 1. Browser-check the live homepage on desktop and mobile and fix any regressions now that the refactor is public.
 2. Decide whether Contabo should keep the extra `/opt/pvtkrrx` `systemd` runtime, repoint Caddy to it, or remove it so deploy expectations stop drifting.
-3. Clean up SportsMeta import quality and alias contamination now that the separate addon is live; several imported basketball rows still show bad cross-league team mappings.
+3. Monitor SportsMeta scheduled ingest completeness and decide whether to add a broader revalidate/prune path; the new timer is live, but the first scheduled history pass still logged `status = partial` and one football window needed a one-off import after cleanup.
 4. Add repeatable operator tooling for new JPG drops and future re-imports so `/opt/pvtkrrx/runtime` is not the only bootstrap path.
 5. Monitor the live SportsMeta Stripe/member-token boundary and add later commercial options there if needed; keep PVTKRRX free and keep entitlement logic off the public stream addon surface.
 6. Decide whether SportsMeta should stay as the current systemd + Caddy service boundary or move under Coolify later; the separate runtime itself is now working.
