@@ -28,7 +28,6 @@ let handleSportsMetaEvent = null
 if (EXPERIMENTAL_INTERNAL_SPORTSMETA) {
   ;({ handleSportsMetaEvent } = require('./src/handlers/sportsmeta'))
 }
-const experimentalSportsMetaRateLimiter = rateLimiters.sportsmeta || rateLimiters.auth
 
 // Destructure everything routes need from the shared module.
 // Shared module initializes env, console redaction, stores, and rate limiters at load time.
@@ -101,6 +100,7 @@ const {
   isMagnetLink, parseTorrentFileName, fetchTorrentPayload,
   mintHostedConfigToken, resolveLanPair, lanPairOfflineResponse, maybeLanPairRedirect
 } = shared
+const experimentalSportsMetaRateLimiter = rateLimiters.sportsmeta || rateLimiters.auth
 
 const app = express()
 app.set('trust proxy', false)
