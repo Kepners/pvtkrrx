@@ -79,6 +79,12 @@ function uniqueBy(items = [], getKey) {
   return out
 }
 
+function hasExpectedLookupId(entity, key, expectedId) {
+  const normalizedExpectedId = normalizeSpace(expectedId)
+  if (!normalizedExpectedId) return true
+  return normalizeSpace(entity?.[key]) === normalizedExpectedId
+}
+
 function createLogger(logger = console) {
   return {
     log: typeof logger?.log === 'function' ? logger.log.bind(logger) : () => {},
@@ -481,7 +487,9 @@ async function fetchTvEventsByDate(apiKey, date, sportName, context) {
 
 async function fetchLeagueDetails(apiKey, idLeague, context) {
   const data = await fetchSportsDbJson(apiKey, 'lookupleague.php', { id: idLeague }, context)
-  return Array.isArray(data?.leagues) ? data.leagues[0] || null : null
+  const league = Array.isArray(data?.leagues) ? data.leagues[0] || null : null
+  if (league && !hasExpectedLookupId(league, 'idLeague', idLeague)) return null
+  return league
 }
 
 async function fetchMappedLeagueDetailsForSport(apiKey, sportKey, context) {
@@ -499,7 +507,9 @@ async function fetchMappedLeagueDetailsForSport(apiKey, sportKey, context) {
 
 async function fetchTeamDetails(apiKey, idTeam, context) {
   const data = await fetchSportsDbJson(apiKey, 'lookupteam.php', { id: idTeam }, context)
-  return Array.isArray(data?.teams) ? data.teams[0] || null : null
+  const team = Array.isArray(data?.teams) ? data.teams[0] || null : null
+  if (team && !hasExpectedLookupId(team, 'idTeam', idTeam)) return null
+  return team
 }
 
 async function fetchTeamsForLeague(apiKey, league, context) {

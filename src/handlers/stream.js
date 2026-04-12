@@ -677,8 +677,9 @@ async function buildSupplementalSportsStreams({
   if (!targetEvent?.date || !targetEvent?.homeTeam || !targetEvent?.awayTeam) return []
 
   const searchQuery = `${targetEvent.homeTeam} vs ${targetEvent.awayTeam}`
+  console.log(`[stream] Supplemental sports search query="${searchQuery}" cats="${SPORT_CATS}" useCategories=true`)
   const searchResult = await settleWithTimeout(
-    torznab.search(searchQuery, SPORT_CATS),
+    torznab.search(searchQuery, SPORT_CATS, 'search', { useCategories: true }),
     STREAM_TITLE_FALLBACK_TIMEOUT_MS,
     []
   )
@@ -922,8 +923,9 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
   // Use generic type=search — private trackers (HD-Torrents, SpeedCD) only support type=search.
   if (jackettItems.length === 0 && contentTitle) {
     console.log(`[stream] Falling back to title search: "${contentTitle}"`)
+    console.log(`[stream] Title fallback query="${contentTitle}" cats="${cats}" useCategories=${Boolean(String(cats || '').trim())}`)
     const fallbackResult = await settleWithTimeout(
-      torznab.search(contentTitle, cats),
+      torznab.search(contentTitle, cats, 'search', { useCategories: Boolean(String(cats || '').trim()) }),
       STREAM_TITLE_FALLBACK_TIMEOUT_MS,
       []
     )
@@ -1224,7 +1226,8 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
     for (const query of targetTitles) {
       let results = []
       try {
-        results = await torznab.search(query, SPORT_CATS)
+        console.log(`[stream] Custom re-search query="${query}" cats="${SPORT_CATS}" useCategories=true`)
+        results = await torznab.search(query, SPORT_CATS, 'search', { useCategories: true })
       } catch (error) {
         console.error(`[stream] custom re-search failed for "${query}":`, error.message)
         continue

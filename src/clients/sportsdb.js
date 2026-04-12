@@ -937,6 +937,12 @@ function cacheKey(apiKey, title, publishDate, eventId = '', sportHint = '', stru
   return `${CACHE_KEY_VERSION}|${String(apiKey || '').trim().toLowerCase()}|${String(eventId || '').trim().toLowerCase()}|${normalizeToken(title)}|${String(publishDate || '').slice(0, 10)}|${normalizeToken(sportHint)}|${structuredFingerprint(structuredEvent)}`
 }
 
+function hasExpectedLookupId(entity, key, expectedId) {
+  const normalizedExpectedId = String(expectedId || '').trim()
+  if (!normalizedExpectedId) return true
+  return String(entity?.[key] || '').trim() === normalizedExpectedId
+}
+
 function eventArtworkCacheKey(apiKey, eventId = '') {
   const normalizedEventId = String(eventId || '').trim().toLowerCase()
   if (!normalizedEventId) return ''
@@ -1171,8 +1177,8 @@ function applyArtworkContext(value, context = {}) {
 function buildSeededStructuredEvent(event, options = {}) {
   const league = normalizeSpace(options.leagueCode || options.league?.strLeague || event?.strLeague || '')
   const date = extractDateHint(options.dateHint || event?.dateEvent || '', '')
-  const homeTeam = normalizeSpace(options.homeTeam?.strTeam || event?.strHomeTeam || '')
-  const awayTeam = normalizeSpace(options.awayTeam?.strTeam || event?.strAwayTeam || '')
+  const homeTeam = normalizeSpace(event?.strHomeTeam || options.homeTeam?.strTeam || '')
+  const awayTeam = normalizeSpace(event?.strAwayTeam || options.awayTeam?.strTeam || '')
   if (league && date && homeTeam && awayTeam) {
     return {
       league,
@@ -1210,9 +1216,9 @@ function buildSeededEventArtworkValue(event, options = {}) {
   const homeTeam = options.homeTeam || null
   const awayTeam = options.awayTeam || null
   const sport = normalizeSpace(options.sportHint || event?.strSport || league?.strSport || '')
-  const leagueName = normalizeSpace(options.leagueCode || league?.strLeague || event?.strLeague || '')
-  const homeTeamName = normalizeSpace(homeTeam?.strTeam || event?.strHomeTeam || '')
-  const awayTeamName = normalizeSpace(awayTeam?.strTeam || event?.strAwayTeam || '')
+  const leagueName = normalizeSpace(event?.strLeague || options.leagueCode || league?.strLeague || '')
+  const homeTeamName = normalizeSpace(event?.strHomeTeam || homeTeam?.strTeam || '')
+  const awayTeamName = normalizeSpace(event?.strAwayTeam || awayTeam?.strTeam || '')
   const dateEvent = extractDateHint(options.dateHint || event?.dateEvent || '', '')
 
   const seededEvent = {
@@ -1438,9 +1444,13 @@ class SportsDbClient {
         return null
       }
       const data = await res.json()
-      const league = Array.isArray(data?.leagues) ? data.leagues[0] : null
-      setCachedValue(leagueCache, key, league || null, league ? this.leagueAssetTtlMs : this.missTtlMs)
-      return league || null
+        const league = Array.isArray(data?.leagues) ? data.leagues[0] : null
+        if (league && !hasExpectedLookupId(league, 'idLeague', key)) {
+          setCachedValue(leagueCache, key, null, this.missTtlMs)
+          return null
+        }
+        setCachedValue(leagueCache, key, league || null, league ? this.leagueAssetTtlMs : this.missTtlMs)
+        return league || null
     } catch (_) {
       setCachedValue(leagueCache, key, null, this.missTtlMs)
       return null
@@ -1466,6 +1476,10 @@ class SportsDbClient {
         }
         const data = await res.json()
         const event = Array.isArray(data?.events) ? data.events[0] : null
+        if (event && !hasExpectedLookupId(event, 'idEvent', key)) {
+          setCachedValue(eventLookupCache, key, null, this.missTtlMs)
+          return null
+        }
         setCachedValue(eventLookupCache, key, event || null, event ? this.artworkHitTtlMs : this.missTtlMs)
         return event || null
       } catch (_) {
@@ -1495,6 +1509,10 @@ class SportsDbClient {
       }
       const data = await res.json()
       const team = Array.isArray(data?.teams) ? data.teams[0] : null
+      if (team && !hasExpectedLookupId(team, 'idTeam', key)) {
+        setCachedValue(teamCache, key, null, this.missTtlMs)
+        return null
+      }
       setCachedValue(teamCache, key, team || null, team ? this.leagueAssetTtlMs : this.missTtlMs)
       return team || null
     } catch (_) {
