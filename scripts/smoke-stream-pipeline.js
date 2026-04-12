@@ -10,6 +10,7 @@ const { handleStream } = require('../src/handlers/stream')
 const { buildExternalFileUrl } = require('../src/utils/fileServing')
 const { decodeFileStateToken, decodePlaybackStateToken } = require('../src/utils/opaqueState')
 const { encodeCustomId } = require('../src/utils/customId')
+const { clearSportsAvailabilityAnchors, setSportsAvailabilityAnchor } = require('../src/utils/sportsAvailabilityStore')
 const { inspectTorrentPayload } = require('../src/utils/torrentPayload')
 const ORIGINAL_FETCH = global.fetch
 
@@ -182,6 +183,25 @@ function customPackedId(overrides = {}) {
   })
 }
 
+function customSportsId(overrides = {}) {
+  return encodeCustomId({
+    y: 'movie',
+    k: 'sports',
+    t: 'Arsenal vs Chelsea',
+    n: 'Arsenal vs Chelsea',
+    r: 'football',
+    e: '2026-03-15',
+    u: 'EPL',
+    o: 'Arsenal',
+    w: 'Chelsea',
+    q: 'ambiguous',
+    ...overrides
+  }, {
+    compress: true,
+    compact: 'sports'
+  })
+}
+
 function bencode(value) {
   if (Buffer.isBuffer(value)) return Buffer.concat([Buffer.from(String(value.length)), Buffer.from(':'), value])
   if (value instanceof Uint8Array) return bencode(Buffer.from(value))
@@ -246,6 +266,7 @@ async function run() {
   const originalHostedGateway = process.env.PVTKRRX_HOST_GATEWAY_HOST
   const orphanRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-stream-pipeline-'))
   const orphanFilePath = path.join(orphanRoot, 'Downloaded.Movie.2026.1080p.mp4')
+  let resolvedSportsAnchorKey = ''
   fs.writeFileSync(orphanFilePath, 'orphaned local file bytes', 'utf8')
 
   try {
@@ -742,9 +763,8 @@ async function run() {
         'local'
       )
 
-      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4h packed supplemental sports torrents should not leak into generic tracker playback')
-      const unsupportedNotice = findNoticeStream(result.streams, 'packed-archive-live-unsupported')
-      assert.ok(unsupportedNotice, '#4h packed supplemental sports torrents should still surface the packed-release notice')
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4h packed non-SportsCult supplemental sports torrents should not leak into generic tracker playback')
+      assert.equal(findNoticeStream(result.streams, 'packed-archive-live-unsupported'), undefined, '#4h packed non-SportsCult supplemental sports torrents should stay suppressed entirely without a SportsCult anchor')
     })
 
     await withScenario(async () => {
@@ -778,9 +798,8 @@ async function run() {
         'local'
       )
 
-      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4i unverified supplemental sports torrents should not be advertised as playable')
-      const verificationNotice = findNoticeStream(result.streams, 'tracker-link-unverified')
-      assert.ok(verificationNotice, '#4i unverified supplemental sports torrents should show a verification notice instead')
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4i unverified non-SportsCult supplemental sports torrents should not be advertised as playable')
+      assert.equal(findNoticeStream(result.streams, 'tracker-link-unverified'), undefined, '#4i unverified non-SportsCult supplemental sports torrents should stay suppressed entirely without a SportsCult anchor')
     })
 
     await withScenario(async () => {
@@ -892,7 +911,8 @@ async function run() {
           trackerItem({
             title: 'Sports RS 2026 Home Club vs Away Club 28 03 720pEN60fps FDSN',
             link: 'https://tracker.example/download/home-away-loopback-override.torrent',
-            infohash: ''
+            infohash: '',
+            indexer: 'sportscult'
           })
         ]
       }
@@ -923,9 +943,111 @@ async function run() {
       assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 1, '#4l hosted loopback overrides should restore tracker playback for tokenized configs on the same server')
     })
 
+    await withScenario(async () => {
+      delete process.env.VERCEL
+      clearSportsAvailabilityAnchors()
+      const anchorKey = setSportsAvailabilityAnchor({
+        title: 'Premier.League.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-SC',
+        link: 'https://tracker.example/download/arsenal-chelsea-sportscult.torrent',
+        infohash: '',
+        size: 4_200_000_000,
+        seeders: 34,
+        indexer: 'sportscult',
+        pubDate: '2026-03-15T19:00:00Z',
+        sportHint: 'football'
+      })
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      ProwlarrClient.prototype.search = async () => []
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([
+        { path: 'Premier.League.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-SC.mkv', length: 4_200_000_000 }
+      ]))
+      resolvedSportsAnchorKey = anchorKey
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        customSportsId({
+          q: 'resolved',
+          x: 'sportsmeta:event:football|2026-03-15|premier-league|arsenal|chelsea',
+          ak: resolvedSportsAnchorKey
+        }),
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 1, '#4m resolved sports ids should reattach to the original SportsCult tracker availability')
+      const playbackState = decodeOpaquePlaybackState(result.streams[0]?.url || '')
+      assert.equal(String(playbackState?.l || ''), 'https://tracker.example/download/arsenal-chelsea-sportscult.torrent', '#4m resolved sports ids should keep playback tied to the originating SportsCult torrent')
+      assert.ok(result.streams.every(stream => String(stream?.name || '').startsWith('PVTKRRX ') || !stream?.name), '#4m anchored sports streams should keep the addon-prefixed stream naming')
+    })
+
+    await withScenario(async () => {
+      delete process.env.VERCEL
+      clearSportsAvailabilityAnchors()
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      ProwlarrClient.prototype.search = async () => [
+        trackerItem({
+          title: 'Premier.League.2026.03.15.Arsenal.vs.Chelsea.1080p.WEB.h264-GENERAL',
+          link: 'https://tracker.example/download/arsenal-chelsea-general.torrent',
+          infohash: '',
+          indexer: 'GeneralTracker',
+          pubDate: '2026-03-15T20:00:00Z'
+        })
+      ]
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([
+        { path: 'Premier.League.2026.03.15.Arsenal.vs.Chelsea.1080p.WEB.h264-GENERAL.mkv', length: 4_100_000_000 }
+      ]))
+    }, async () => {
+      const withoutAnchor = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        customSportsId({
+          q: 'ambiguous'
+        }),
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(withoutAnchor.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4n non-SportsCult search results should not surface without a resolved SportsCult anchor')
+
+      const anchorKey = setSportsAvailabilityAnchor({
+        title: 'Premier.League.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-SC',
+        link: 'https://tracker.example/download/arsenal-chelsea-sportscult.torrent',
+        infohash: '',
+        size: 4_200_000_000,
+        seeders: 34,
+        indexer: 'sportscult',
+        pubDate: '2026-03-15T19:00:00Z',
+        sportHint: 'football'
+      })
+
+      const withResolvedAnchor = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        customSportsId({
+          q: 'resolved',
+          x: 'sportsmeta:event:football|2026-03-15|premier-league|arsenal|chelsea',
+          ak: anchorKey
+        }),
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      const playbackStates = withResolvedAnchor.streams
+        .filter(stream => /\/playback\//.test(String(stream?.url || '')))
+        .map(stream => decodeOpaquePlaybackState(stream?.url || ''))
+      const playbackLinks = playbackStates.map((state) => String(state?.l || ''))
+
+      assert.ok(playbackLinks.includes('https://tracker.example/download/arsenal-chelsea-sportscult.torrent'), '#4n resolved anchors should retain the original SportsCult playback source')
+      assert.ok(playbackLinks.includes('https://tracker.example/download/arsenal-chelsea-general.torrent'), '#4n non-SportsCult streams may attach only after a resolved SportsCult anchor exists')
+    })
+
     console.log('Smoke stream pipeline passed')
   } finally {
     resetMocks()
+    clearSportsAvailabilityAnchors()
     if (originalVercel === undefined) delete process.env.VERCEL
     else process.env.VERCEL = originalVercel
     if (originalExperimentalRar === undefined) delete process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS

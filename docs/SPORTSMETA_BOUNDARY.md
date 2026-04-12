@@ -1,6 +1,6 @@
 # SportsMeta Boundary
 
-Updated: 2026-04-11
+Updated: 2026-04-12
 
 ## Live Truth
 
@@ -33,6 +33,37 @@ The shared Contabo VM does not make them the same product.
 - `sportsmeta:` ids are canonical sports metadata ids owned by SportsMeta.
 - `pvtkrrx:` ids are PVTKRRX runtime ids for PVTKRRX-owned catalog rows.
 - PVTKRRX may attach streams to `sportsmeta:` ids, but that does not make PVTKRRX the metadata or billing owner.
+
+## Availability Vs Identity Rule
+
+- SportsCult / Prowlarr is the availability truth inside PVTKRRX sports browsing:
+  - whether a row exists right now
+  - torrent title, size, seeders, infohash, and download source
+  - whether a stream can actually be offered
+- SportsMeta is the identity and enrichment truth:
+  - canonical sport, league, team, and event identity
+  - canonical naming, alias handling, ambiguity handling, and grouping ids
+  - canonical artwork and metadata for resolved events
+- SportsMeta must not create sports catalog rows by itself inside PVTKRRX.
+  If SportsMeta knows an event exists but SportsCult / Prowlarr does not return a matching tracker item, that event must not appear in the user-facing PVTKRRX catalog.
+- PVTKRRX now enforces this as an explicit pipeline:
+  - fetch SportsCult availability
+  - parse tracker title hints
+  - resolve through SportsMeta when hints are strong enough
+  - enrich the already-available row if resolution is safe
+  - keep stream playback tied to the original tracker availability, not to SportsMeta
+- SportsMeta resolution outcomes are explicit inside PVTKRRX:
+  - `resolved`
+  - `ambiguous`
+  - `not_found`
+  - `weak_match`
+  - `fallback_only`
+- Ambiguous, weak, or missing SportsMeta matches must stay honest:
+  - keep the tracker row visible if it is available
+  - keep fallback naming/art conservative
+  - do not assign a fake canonical event or misleading artwork
+- Non-SportsCult indexers may only attach later as supplemental stream candidates after a SportsCult-backed row has already resolved safely to one canonical event.
+  They must not create independent catalog identity inside PVTKRRX.
 
 ## Failure Rules
 
@@ -73,4 +104,3 @@ It is now intentionally non-production:
 - disabled unless `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA=true`
 - exposed only as local draft tooling and draft route code
 - not part of the supported public `www.pvtkrrx.cc` surface
-

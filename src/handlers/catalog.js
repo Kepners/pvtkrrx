@@ -1,20 +1,26 @@
 const { ProwlarrClient } = require('../clients/prowlarr')
 const { QBitClient } = require('../clients/qbittorrent')
 const { CinemetaClient } = require('../clients/cinemeta')
-const { SportsDbClient } = require('../clients/sportsdb')
+const { SportsMetaClient } = require('../clients/sportsmeta')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { findSportsDiscoveryCatalog, getSportsSearchSeedTerms } = require('../config/sportsCatalogs')
 const { cleanTitle, isLikelyPackedReleaseTitle } = require('../utils/parser')
 const { normalizeSportKey, resolveSportHint, isSportsNoiseTitle, isLikelySportsEventTitle } = require('../utils/sportsRules')
-const { isSportsOnlyIndexer } = require('../utils/sportsIndexers')
+const { isSportsCultIndexer, isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { formatSize, findVideoFile } = require('../utils/streams')
 const { makeSportsPosterUrl } = require('../utils/sportsThumb')
 const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
 const { getMappedLeagueEntry, mapLeague } = require('../utils/leagueMap')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { encodeCustomId } = require('../utils/customId')
+const { setSportsAvailabilityAnchor } = require('../utils/sportsAvailabilityStore')
 const { findExistingLocalFilePath } = require('../utils/localStorageRoots')
 const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
+const {
+  SPORTS_META_RESOLUTION_STATUS,
+  normalizeLeagueLabel,
+  resolveSportsMetaIdentity
+} = require('../utils/sportsIdentityResolution')
 const {
   resolveSportsPosterAsset,
   resolveSportsBackgroundAsset,
@@ -38,6 +44,7 @@ const SPORTS_CATALOG_CACHE_MAX_AGE = Math.max(
     10
   )
 )
+const DEBUG_SPORTS_RESOLUTION = /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_DEBUG_SPORTS_RESOLUTION || '').trim())
 
 function isLikelySeriesRelease(title) {
   const value = String(title || '')
@@ -492,37 +499,37 @@ function getSportsVariantTag(title) {
   return 'main'
 }
 
-function groupSportsItems(items, query = '') {
+function groupSportsAvailabilityItems(items, query = '') {
   const groups = new Map()
   for (const item of items || []) {
-    // Reuse pre-computed parsedSportsEvent, parsedEvent, and mappedLeague from normalization step
     const parsedSportsEvent = item?.parsedSportsEvent || null
     const displaySportsEvent = canonicalizeSportsMatchupOrder(parsedSportsEvent, query)
     const parsedEvent = item?.parsedEvent || null
     const itemMappedLeague = item?.mappedLeague || ''
-    const display = normalizeSportsEventTitle(item.title, displaySportsEvent, parsedEvent) || cleanTitle(item.title) || String(item.title || '').trim()
-    if (!display) continue
-    const baseKey = sportsEventKey({ title: item.title, parsedSportsEvent, parsedEvent })
+    const fallbackDisplayTitle = normalizeSportsEventTitle(item.title, displaySportsEvent, parsedEvent) || cleanTitle(item.title) || String(item.title || '').trim()
+    if (!fallbackDisplayTitle) continue
+    const availabilityKey = sportsEventKey({ title: item.title, parsedSportsEvent, parsedEvent })
     const hasStructuredKey = (parsedSportsEvent?.league && parsedSportsEvent?.date && parsedSportsEvent?.homeTeam && parsedSportsEvent?.awayTeam) ||
       (parsedEvent?.league && parsedEvent?.eventName)
     const key = hasStructuredKey
-      ? baseKey
-      : `${baseKey}|${getSportsVariantTag(item.title)}`
+      ? availabilityKey
+      : `${availabilityKey}|${getSportsVariantTag(item.title)}`
     const current = groups.get(key)
     if (!current) {
       groups.set(key, {
-        display,
-        baseKey,
-        best: item,
-        count: 1,
+        availabilityKey,
+        fallbackDisplayTitle,
+        bestAvailability: item,
+        availabilityCount: 1,
         parsedSportsEvent,
         displaySportsEvent,
         parsedEvent,
-        mappedLeague: itemMappedLeague
+        mappedLeague: itemMappedLeague,
+        sportsMetaResolution: null
       })
       continue
     }
-    current.count += 1
+    current.availabilityCount += 1
     if (!current.parsedSportsEvent && parsedSportsEvent) {
       current.parsedSportsEvent = parsedSportsEvent
       current.displaySportsEvent = current.displaySportsEvent || displaySportsEvent
@@ -532,9 +539,9 @@ function groupSportsItems(items, query = '') {
       current.parsedEvent = parsedEvent
       current.mappedLeague = itemMappedLeague || current.mappedLeague
     }
-    if (compareItems(item, current.best, query) < 0) {
-      current.best = item
-      current.display = display || current.display
+    if (compareItems(item, current.bestAvailability, query) < 0) {
+      current.bestAvailability = item
+      current.fallbackDisplayTitle = fallbackDisplayTitle || current.fallbackDisplayTitle
       if (parsedSportsEvent) {
         current.parsedSportsEvent = parsedSportsEvent
         current.displaySportsEvent = displaySportsEvent
@@ -546,7 +553,88 @@ function groupSportsItems(items, query = '') {
       }
     }
   }
-  return [...groups.values()].sort((a, b) => compareItems(a.best, b.best, query))
+  return [...groups.values()].sort((a, b) => compareItems(a.bestAvailability, b.bestAvailability, query))
+}
+
+function buildSportsIdentityGroupKey(group = {}) {
+  const resolution = group?.sportsMetaResolution || {}
+  const canonicalId = String(resolution?.canonicalId || '').trim()
+  if (resolution?.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED && canonicalId) {
+    return `canonical:${canonicalId}`
+  }
+  return `availability:${String(group?.availabilityKey || '').trim()}`
+}
+
+function logSportsAvailabilityResolution(group = {}) {
+  if (!DEBUG_SPORTS_RESOLUTION) return
+
+  const availability = group?.bestAvailability || {}
+  const resolution = group?.sportsMetaResolution || {}
+  const parsedSportsEvent = group?.parsedSportsEvent || null
+  const parsedEvent = group?.parsedEvent || null
+  const parsedHints = parsedSportsEvent
+    ? {
+        type: 'matchup',
+        league: parsedSportsEvent.league,
+        date: parsedSportsEvent.date,
+        homeTeam: parsedSportsEvent.homeTeam,
+        awayTeam: parsedSportsEvent.awayTeam
+      }
+    : parsedEvent
+      ? {
+          type: 'event',
+          league: parsedEvent.league,
+          date: parsedEvent.date || '',
+          eventName: parsedEvent.eventName
+        }
+      : { type: 'none' }
+
+  console.log('[sports-resolution]',
+    JSON.stringify({
+      title: availability?.title || '',
+      trackerSource: String(availability?.indexer || '').trim().toLowerCase(),
+      parsedHints,
+      sportsMetaQuery: resolution?.query || {},
+      outcome: resolution?.status || '',
+      canonicalId: resolution?.canonicalId || '',
+      fallbackReason: resolution?.reason || ''
+    })
+  )
+}
+
+function mergeSportsIdentityGroups(groups, query = '') {
+  const merged = new Map()
+  for (const group of groups || []) {
+    const key = buildSportsIdentityGroupKey(group)
+    const current = merged.get(key)
+    if (!current) {
+      merged.set(key, {
+        ...group,
+        identityGroupKey: key
+      })
+      continue
+    }
+
+    current.availabilityCount += Math.max(1, Number(group?.availabilityCount || 0))
+    if (compareItems(group.bestAvailability, current.bestAvailability, query) < 0) {
+      current.bestAvailability = group.bestAvailability
+      current.fallbackDisplayTitle = group.fallbackDisplayTitle || current.fallbackDisplayTitle
+      current.parsedSportsEvent = group.parsedSportsEvent || current.parsedSportsEvent
+      current.displaySportsEvent = group.displaySportsEvent || current.displaySportsEvent
+      current.parsedEvent = group.parsedEvent || current.parsedEvent
+      current.mappedLeague = group.mappedLeague || current.mappedLeague
+    }
+
+    const currentResolution = current.sportsMetaResolution || {}
+    const incomingResolution = group.sportsMetaResolution || {}
+    const currentResolved = currentResolution.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED
+    const incomingResolved = incomingResolution.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED
+    if (!currentResolved && incomingResolved) {
+      current.sportsMetaResolution = incomingResolution
+    }
+  }
+
+  return [...merged.values()].sort((a, b) => compareItems(a.bestAvailability, b.bestAvailability, query))
 }
 
 function getCatalogLimit(config) {
@@ -657,8 +745,8 @@ async function handleCatalog(config, type, id, extraStr, context = {}) {
 
 async function sportsCatalog(config, extra, options = {}, catalogType = 'movie', catalogDefinition = null) {
   const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
-  const sportsDb = new SportsDbClient(config.sportsDbApiKey, {
-    cacheHours: config.sportsDbCacheHours
+  const sportsMeta = new SportsMetaClient({
+    baseUrl: config?.sportsmetaBaseUrl
   })
   const mediaType = String(catalogType || 'movie').trim().toLowerCase() || 'movie'
   const requestedDetail = String(extra.genre || extra.search || '').trim()
@@ -722,6 +810,17 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     const effectiveLeague = parsedSportsEvent?.league || parsedEvent?.league || ''
     return {
       ...item,
+      trackerSource: {
+        title: item?.title || '',
+        link: item?.link || '',
+        infohash: item?.infohash || '',
+        size: item?.size || 0,
+        seeders: item?.seeders || 0,
+        indexer: item?.indexer || '',
+        pubDate: item?.pubDate || item?.publishDate || '',
+        sportHint: item?.sportHint || ''
+      },
+      trackerSourceType: isSportsCultIndexer(item?.indexer) ? 'sportscult' : 'other',
       parsedSportsEvent,
       parsedEvent,
       mappedLeague: mapLeague(effectiveLeague) || '',
@@ -734,7 +833,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
   })
 
   const strictFiltered = normalizedItems.filter(item =>
-    (isSportsOnlyIndexer(item.indexer) || Boolean(item.sportHint)) &&
+    item.trackerSourceType === 'sportscult' &&
     itemMatchesSportsCatalog(item, catalogSportHint) &&
     itemMatchesSportsDetail(item, requestedDetail) &&
     isLikelySportsEventTitle(item.title, item.sportHint) &&
@@ -746,14 +845,21 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     // noise rejection so the catalog isn't empty on default browse or sparse
     // genre/search results
     filtered = normalizedItems.filter(item =>
-      (isSportsOnlyIndexer(item.indexer) || Boolean(item.sportHint)) &&
+      item.trackerSourceType === 'sportscult' &&
       itemMatchesSportsCatalog(item, catalogSportHint) &&
       itemMatchesSportsDetail(item, requestedDetail) &&
       !isSportsNoiseTitle(item.title) &&
       !isLikelyPackedReleaseTitle(item.title)
     )
   }
-  console.log(`[sports-catalog] catalog="${catalogDefinition?.id || 'pvtkrrx-sports'}" query="${query}" prowlarr=${items.length} normalized=${normalizedItems.length} strict=${strictFiltered.length} filtered=${filtered.length}`)
+
+  const suppressedNonSportsCult = normalizedItems.filter(item =>
+    item.trackerSourceType !== 'sportscult' &&
+    itemMatchesSportsCatalog(item, catalogSportHint) &&
+    itemMatchesSportsDetail(item, requestedDetail) &&
+    !isSportsNoiseTitle(item.title) &&
+    !isLikelyPackedReleaseTitle(item.title)
+  ).length
 
   const skip = parseInt(extra.skip || '0', 10)
   if (filtered.length === 0) {
@@ -769,97 +875,104 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     }
   }
 
-  const grouped = groupSportsItems(filtered.sort((a, b) => compareItems(a, b, query)), query)
-  const pageGroups = grouped.slice(skip, skip + limit)
-  const artworkByBaseKey = new Map()
-  const metas = await mapLimit(pageGroups, 6, async (group, index) => {
-    const item = group.best
-    const parsedSportsEvent = group.parsedSportsEvent || item.parsedSportsEvent || null
-    const displaySportsEvent = group.displaySportsEvent || parsedSportsEvent || null
-    const parsedEvent = group.parsedEvent || item.parsedEvent || null
-    const effectiveLeagueCode = parsedSportsEvent?.league || displaySportsEvent?.league || parsedEvent?.league || ''
-    const mappedLeague = group.mappedLeague || item.mappedLeague || mapLeague(effectiveLeagueCode) || ''
-    const displayTitle = group.display || normalizeSportsEventTitle(item.title, displaySportsEvent, parsedEvent) || cleanTitle(item.title) || item.title
-    const resolvedSportHint = resolveSportHint({
-      explicitHint: effectiveLeagueCode ? (sportHintFromLeagueCode(effectiveLeagueCode) || item?.sportHint) : item?.sportHint,
-      categoryHint: requestedSportHint,
-      title: item?.title || displayTitle
-    })
-    let sportsArtwork = artworkByBaseKey.get(group.baseKey) || null
-    try {
-      if (!sportsArtwork) {
-        sportsArtwork = await sportsDb.getEventArtwork({
-          ...item,
-          title: item.title,
-          publishDate: item.pubDate || item.publishDate || '',
-          sportHint: resolvedSportHint,
-          league: parsedSportsEvent?.league || parsedEvent?.league || mappedLeague,
-          date: parsedSportsEvent?.date || parsedEvent?.date || '',
-          homeTeam: parsedSportsEvent?.homeTeam || '',
-          awayTeam: parsedSportsEvent?.awayTeam || '',
-          eventName: parsedEvent?.eventName || '',
-          quality: parsedSportsEvent?.quality || parsedEvent?.quality || ''
-        })
-      }
-    } catch (_) {
-      // keep fallback flow below
+  const groupedAvailability = groupSportsAvailabilityItems(filtered.sort((a, b) => compareItems(a, b, query)), query)
+  const resolvedAvailabilityGroups = await mapLimit(groupedAvailability, 6, async (group) => {
+    const sportsMetaResolution = await resolveSportsMetaIdentity(sportsMeta, group.bestAvailability)
+    const resolvedGroup = {
+      ...group,
+      sportsMetaResolution
     }
-    if (sportsArtwork && group.baseKey) {
-      artworkByBaseKey.set(group.baseKey, sportsArtwork)
-    }
+    logSportsAvailabilityResolution(resolvedGroup)
+    return resolvedGroup
+  })
+  const groupedIdentity = mergeSportsIdentityGroups(resolvedAvailabilityGroups, query)
 
-    const eventDate = String(sportsArtwork?.eventDate || parsedSportsEvent?.date || parsedEvent?.date || '').trim()
-    const league = String(sportsArtwork?.league || mappedLeague || parsedSportsEvent?.league || parsedEvent?.league || '').trim()
+  const resolutionCounts = resolvedAvailabilityGroups.reduce((counts, group) => {
+    const state = String(group?.sportsMetaResolution?.status || SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY)
+    counts[state] = (counts[state] || 0) + 1
+    return counts
+  }, {})
+
+  console.log(
+    `[sports-catalog] catalog="${catalogDefinition?.id || 'pvtkrrx-sports'}" query="${query}" prowlarr=${items.length} normalized=${normalizedItems.length} strict=${strictFiltered.length} anchors=${filtered.length} suppressedNonSportsCult=${suppressedNonSportsCult} availabilityGroups=${groupedAvailability.length} identityGroups=${groupedIdentity.length} resolved=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.RESOLVED] || 0} ambiguous=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.AMBIGUOUS] || 0} notFound=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.NOT_FOUND] || 0} weak=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH] || 0} fallback=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY] || 0}`
+  )
+
+  const pageGroups = groupedIdentity.slice(skip, skip + limit)
+  const metas = await mapLimit(pageGroups, 6, async (group) => {
+    const availability = group.bestAvailability
+    const sportsMetaResolution = group.sportsMetaResolution || {}
+    const canonicalIdentity = sportsMetaResolution.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED
+      ? (sportsMetaResolution.canonical || null)
+      : null
+    const canonicalEvent = canonicalIdentity?.event || {}
+    const sportsArtwork = canonicalIdentity?.sportsArtwork || null
+    const parsedSportsEvent = group.parsedSportsEvent || availability?.parsedSportsEvent || null
+    const displaySportsEvent = group.displaySportsEvent || parsedSportsEvent || null
+    const parsedEvent = group.parsedEvent || availability?.parsedEvent || null
+    const effectiveLeagueCode = parsedSportsEvent?.league || displaySportsEvent?.league || parsedEvent?.league || ''
+    const fallbackLeague = normalizeLeagueLabel(group.mappedLeague || availability?.mappedLeague || mapLeague(effectiveLeagueCode) || effectiveLeagueCode)
+    const fallbackDisplayTitle = group.fallbackDisplayTitle || normalizeSportsEventTitle(availability?.title, displaySportsEvent, parsedEvent) || cleanTitle(availability?.title) || availability?.title
+    const displayTitle = canonicalEvent?.name || canonicalEvent?.title || fallbackDisplayTitle
+    const resolvedSportHint = resolveSportHint({
+      explicitHint: canonicalEvent?.sport || (effectiveLeagueCode ? (sportHintFromLeagueCode(effectiveLeagueCode) || availability?.sportHint) : availability?.sportHint),
+      categoryHint: requestedSportHint,
+      title: canonicalEvent?.title || availability?.title || displayTitle
+    })
+    const eventDate = String(canonicalEvent?.date || sportsArtwork?.eventDate || parsedSportsEvent?.date || parsedEvent?.date || '').trim()
+    const league = String(canonicalEvent?.league || sportsArtwork?.league || fallbackLeague || parsedSportsEvent?.league || parsedEvent?.league || '').trim()
+    const fallbackHomeTeam = displaySportsEvent?.homeTeam || parsedSportsEvent?.homeTeam || ''
+    const fallbackAwayTeam = displaySportsEvent?.awayTeam || parsedSportsEvent?.awayTeam || ''
+    const fallbackEventName = parsedEvent?.eventName || ''
     const descriptionParts = [
-      `${item.seeders} seeders`,
-      formatSize(item.size),
-      `${group.count} source${group.count === 1 ? '' : 's'}`
+      `${availability.seeders} seeders`,
+      formatSize(availability.size),
+      `${group.availabilityCount} source${group.availabilityCount === 1 ? '' : 's'}`
     ]
     if (eventDate) descriptionParts.push(eventDate)
     if (league) descriptionParts.push(league)
 
     const artworkInput = {
       baseUrl: options.baseUrl,
-      title: item.title || displayTitle,
+      title: availability.title || displayTitle,
       displayTitle,
-      publishDate: eventDate || item.pubDate || item.publishDate || '',
+      publishDate: eventDate || availability.pubDate || availability.publishDate || '',
       sportHint: resolvedSportHint,
       league,
-      eventName: parsedEvent?.eventName || sportsArtwork?.eventName || '',
-      homeTeam: displaySportsEvent?.homeTeam || sportsArtwork?.homeTeam || '',
-      awayTeam: displaySportsEvent?.awayTeam || sportsArtwork?.awayTeam || '',
+      eventName: canonicalEvent?.title || canonicalEvent?.name || fallbackEventName || sportsArtwork?.eventName || '',
+      homeTeam: canonicalEvent?.homeTeam || fallbackHomeTeam || sportsArtwork?.homeTeam || '',
+      awayTeam: canonicalEvent?.awayTeam || fallbackAwayTeam || sportsArtwork?.awayTeam || '',
       sportsArtwork
     }
     const generatedPosterUrl = makeSportsPosterUrl(options.baseUrl, {
       title: displayTitle,
-      publishDate: eventDate || item.pubDate || item.publishDate || '',
+      publishDate: eventDate || availability.pubDate || availability.publishDate || '',
       sportHint: resolvedSportHint,
       league
     })
     const { poster: posterUrl, posterShape } = resolveSportsPosterAsset(artworkInput)
     const backgroundUrl = resolveSportsBackgroundAsset(artworkInput)
     const logoUrl = resolveSportsLogoAsset(artworkInput)
+    const availabilityAnchorKey = setSportsAvailabilityAnchor(availability.trackerSource || availability)
 
     return {
       id: encodeCustomId({
         y: mediaType,
         k: 'sports',
         n: displayTitle,
-        t: item.title || displayTitle,
-        h: '',
-        l: '',
-        i: item.indexer,
-        s: item.size,
-        d: item.seeders,
-        p: item.pubDate || '',
-        c: group.count,
+        t: displayTitle,
+        s: availability.size,
+        d: availability.seeders,
+        p: availability.pubDate || '',
+        c: group.availabilityCount,
         e: eventDate,
-        g: league,
         r: resolvedSportHint,
         u: parsedSportsEvent?.league || parsedEvent?.league || '',
-        o: displaySportsEvent?.homeTeam || '',
-        w: displaySportsEvent?.awayTeam || '',
-        v: String(sportsArtwork?.eventId || '').trim()
+        o: canonicalEvent?.homeTeam || fallbackHomeTeam || '',
+        w: canonicalEvent?.awayTeam || fallbackAwayTeam || '',
+        v: String(canonicalEvent?.eventId || sportsArtwork?.eventId || '').trim(),
+        x: String(sportsMetaResolution?.canonicalId || '').trim(),
+        q: String(sportsMetaResolution?.status || SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY),
+        ak: availabilityAnchorKey
       }, {
         compress: true,
         compact: 'sports'

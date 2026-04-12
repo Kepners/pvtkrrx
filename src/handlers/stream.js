@@ -7,7 +7,8 @@ const { SportsMetaClient } = require('../clients/sportsmeta')
 const { normalizeTeamName } = require('../clients/sportsdb')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { parse, matchesEpisode, isLikelyPackedReleaseTitle, cleanTitle } = require('../utils/parser')
-const { isSportsOnlyIndexer } = require('../utils/sportsIndexers')
+const { getSportsAvailabilityAnchor } = require('../utils/sportsAvailabilityStore')
+const { isSportsCultIndexer, isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { buildOnSeedboxStream, buildOnBufferingStream, buildOnArchiveStream, buildOnTrackerStream, buildInfoStream, findVideoFile, findPackedArchiveFiles, arePackedArchiveFilesReady, findEpisodeFile, sortStreams } = require('../utils/streams')
 const { encodePlaybackStateToken, encodeFileStateToken } = require('../utils/opaqueState')
 const { parseSportsTitle } = require('../utils/sportsTitleParser')
@@ -630,9 +631,9 @@ async function loadSportsMetaInfo(config = {}, id = '') {
   })
 
   try {
-    const payload = await client.getEvent(id)
-    if (payload?.event) {
-      return buildSportsMetaInfo(payload.event, id)
+    const canonical = await client.getEvent(id)
+    if (canonical?.event) {
+      return buildSportsMetaInfo(canonical.event, id)
     }
   } catch (error) {
     console.warn(`[stream] SportsMeta lookup failed for ${id}: ${error.message}`)
@@ -983,7 +984,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
         }
         const videoProgress = Number(videoFile?.progress || 0)
         const requireCurrentPathProof = !isCompletedTorrent(matched, videoProgress)
-        const fileUrl = buildFileUrl(effectiveConfig, configToken, playbackBaseUrl, matched.hash, matched, videoFile.name, {
+        const fileUrl = buildFileUrl(config, configToken, playbackBaseUrl, matched.hash, matched, videoFile.name, {
           multipleFiles: files.length > 1,
           requireCurrentPathProof
         })
@@ -1040,8 +1041,26 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
 
 async function handleDecodedCustomStream(config, info, addonUrl, configToken, playbackBaseUrl = addonUrl) {
   const effectiveConfig = config && typeof config === 'object' ? config : {}
-  let infoHash = String(info.h || '').toLowerCase()
-  const directLink = String(info.l || '')
+  const resolvedInfo = info && typeof info === 'object' ? { ...info } : {}
+  const availabilityAnchorKey = String(resolvedInfo.ak || '').trim()
+  const anchoredAvailability = availabilityAnchorKey
+    ? getSportsAvailabilityAnchor(availabilityAnchorKey)
+    : null
+
+  if (anchoredAvailability) {
+    resolvedInfo.t = String(anchoredAvailability.title || resolvedInfo.t || '').trim()
+    if (!resolvedInfo.h && anchoredAvailability.infohash) resolvedInfo.h = anchoredAvailability.infohash
+    if (!resolvedInfo.l && anchoredAvailability.link) resolvedInfo.l = anchoredAvailability.link
+    if (!resolvedInfo.i && anchoredAvailability.indexer) resolvedInfo.i = anchoredAvailability.indexer
+    if (!resolvedInfo.s && Number(anchoredAvailability.size) > 0) resolvedInfo.s = anchoredAvailability.size
+    if (!resolvedInfo.d && Number(anchoredAvailability.seeders) > 0) resolvedInfo.d = anchoredAvailability.seeders
+    if (!resolvedInfo.p && anchoredAvailability.pubDate) resolvedInfo.p = anchoredAvailability.pubDate
+  } else if (availabilityAnchorKey) {
+    console.warn(`[stream] sports availability anchor miss key=${availabilityAnchorKey}`)
+  }
+
+  let infoHash = String(resolvedInfo.h || '').toLowerCase()
+  const directLink = String(resolvedInfo.l || '')
   const seenSourceKeys = new Set()
   if (infoHash) seenSourceKeys.add(infoHash)
   if (directLink) seenSourceKeys.add(directLink.toLowerCase())
@@ -1055,6 +1074,9 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
   const streamSourceOptions = getStreamSourceOptions(configToken)
   const trackerPlaybackRestriction = getTrackerPlaybackRestriction(effectiveConfig, configToken)
   const trackerPlaybackEnabled = !trackerPlaybackRestriction
+  const allowSupplementalNonSportsCult = Boolean(availabilityAnchorKey) &&
+    String(resolvedInfo.q || '').trim().toLowerCase() === 'resolved' &&
+    String(resolvedInfo.x || '').trim().startsWith('sportsmeta:')
   const noticeCounts = createNoticeCounts()
   let torrents = []
   if (qbit) {
@@ -1064,7 +1086,7 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
       console.warn(`[stream] qBit torrent list failed: ${error.message}`)
     }
   }
-  const likelyPackedDirectRelease = isLikelyPackedReleaseTitle(info.t)
+  const likelyPackedDirectRelease = isLikelyPackedReleaseTitle(resolvedInfo.t)
   let directInspection = null
   let matched = infoHash ? torrents.find(t => t.hash.toLowerCase() === infoHash) : null
   if (!matched && !infoHash && directLink && !likelyPackedDirectRelease) {
@@ -1075,14 +1097,14 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
       matched = torrents.find(t => t.hash.toLowerCase() === infoHash) || null
     }
   }
-  if (!matched) matched = findTorrentByTitle(torrents, info.t)
+  if (!matched) matched = findTorrentByTitle(torrents, resolvedInfo.t)
   if (matched?.hash) seenSourceKeys.add(String(matched.hash).toLowerCase())
 
-  const parsed = parse(info.t)
+  const parsed = parse(resolvedInfo.t)
   const streams = []
   let packedArchivePending = false
 
-  console.log(`[stream] custom title="${info.t}" hash=${infoHash || 'none'} matched=${matched ? matched.hash : 'none'}`)
+  console.log(`[stream] custom title="${resolvedInfo.t}" hash=${infoHash || 'none'} matched=${matched ? matched.hash : 'none'} anchored=${Boolean(availabilityAnchorKey)}`)
 
   if (matched) {
     try {
@@ -1095,7 +1117,7 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
           playbackBaseUrl,
           matched,
           files,
-          { title: info.t, size: info.s, seeders: info.d, indexer: info.i || '' },
+          { title: resolvedInfo.t, size: resolvedInfo.s, seeders: resolvedInfo.d, indexer: resolvedInfo.i || '' },
           parsed,
           streamSourceOptions
         )
@@ -1120,7 +1142,7 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
           }
           throw new Error('Hosted mode requires a provable playback path for on-seedbox streams')
         }
-        const item = { title: info.t, size: info.s, seeders: info.d }
+        const item = { title: resolvedInfo.t, size: resolvedInfo.s, seeders: resolvedInfo.d }
         if (isCompletedTorrent(matched, videoProgress)) {
           streams.push(buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, effectiveConfig, parsed, streamSourceOptions))
         } else {
@@ -1135,7 +1157,7 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
   }
 
   if (streams.length === 0) {
-    const orphanedFileStream = buildOrphanedCustomFileStream(effectiveConfig, configToken, playbackBaseUrl, info, parsed)
+    const orphanedFileStream = buildOrphanedCustomFileStream(effectiveConfig, configToken, playbackBaseUrl, resolvedInfo, parsed)
     if (orphanedFileStream) {
       streams.push(orphanedFileStream)
     }
@@ -1158,7 +1180,7 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
         })
         if (playbackUrl) {
           streams.push(buildOnTrackerStream(
-            { title: info.t, size: info.s, seeders: info.d, indexer: info.i || '' },
+            { title: resolvedInfo.t, size: resolvedInfo.s, seeders: resolvedInfo.d, indexer: resolvedInfo.i || '' },
             playbackUrl,
             parsed,
             streamSourceOptions
@@ -1172,29 +1194,31 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
     }
   }
 
-  try {
-    const supplementalStreams = await buildSupplementalSportsStreams({
-      info,
-      torznab,
-      playbackBaseUrl,
-      configToken,
-      config: effectiveConfig,
-      streamSourceOptions,
-      seenKeys: seenSourceKeys,
-      noticeCounts,
-      trackerPlaybackEnabled,
-      trackerPlaybackRestriction
-    })
-    if (supplementalStreams.length > 0) {
-      streams.push(...supplementalStreams)
+  if (allowSupplementalNonSportsCult) {
+    try {
+      const supplementalStreams = await buildSupplementalSportsStreams({
+        info: resolvedInfo,
+        torznab,
+        playbackBaseUrl,
+        configToken,
+        config: effectiveConfig,
+        streamSourceOptions,
+        seenKeys: seenSourceKeys,
+        noticeCounts,
+        trackerPlaybackEnabled,
+        trackerPlaybackRestriction
+      })
+      if (supplementalStreams.length > 0) {
+        streams.push(...supplementalStreams)
+      }
+    } catch (e) {
+      console.error('[stream] supplemental sports search failed:', e.message)
     }
-  } catch (e) {
-    console.error('[stream] supplemental sports search failed:', e.message)
   }
 
   if (streams.length === 0 && torznab) {
-    const targetTitles = buildCustomSearchQueries(info)
-    const primaryTargetTitle = normalizeSearchQuery(info.t || info.n || '')
+    const targetTitles = buildCustomSearchQueries(resolvedInfo)
+    const primaryTargetTitle = normalizeSearchQuery(resolvedInfo.t || resolvedInfo.n || '')
     const seen = new Set()
 
     for (const query of targetTitles) {
@@ -1208,6 +1232,7 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
 
       const filtered = results.filter(r => {
         if (!r?.link) return false
+        if (!allowSupplementalNonSportsCult && !isSportsCultIndexer(r.indexer)) return false
         if (infoHash && String(r.infohash || '').toLowerCase() === infoHash) return true
         if (isLikelyPackedReleaseTitle(r.title)) return false
         return (

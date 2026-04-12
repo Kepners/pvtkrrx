@@ -1,6 +1,6 @@
 # PVTKRRX Current Design
 
-Updated: 2026-04-11
+Updated: 2026-04-12
 
 ## Purpose
 
@@ -177,6 +177,24 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 - Normal `/image/sports/...` request handling is now cache-only but package-aware: if the byte cache misses, the runtime can still import the mapped package file for that artwork on demand, but it does not repopulate the catalogue from live upstream image fetches during request handling.
 - On long-running Linux/cloud runtimes, a background sports-cache autofill job now revisits one sport group every 15 minutes by default and persists its rotation cursor in the runtime directory.
 - The runtime `sports-image-cache/` store is now append-only by default: once image bytes are downloaded, PVTKRRX does not auto-prune or TTL-expire them unless the user explicitly deletes the cache on disk.
+- Sports catalog inclusion is availability-driven:
+  - SportsCult / Prowlarr decides whether a row exists at all.
+  - SportsMeta only resolves identity and enrichment for rows that already have tracker availability.
+  - SportsMeta must not inject upcoming fixtures, scheduled events, teams, leagues, or synthetic rows without a SportsCult anchor.
+- Sports catalog resolution now follows an explicit availability -> identity -> enrichment boundary:
+  - fetch SportsCult tracker rows
+  - parse tracker titles into structured hints
+  - attempt SportsMeta resolution conservatively
+  - attach canonical ids and artwork only when the match verifies safely
+  - keep the available tracker row visible when SportsMeta is ambiguous, weak, or missing
+- Sports identity outcomes are explicit:
+  - `resolved`
+  - `ambiguous`
+  - `not_found`
+  - `weak_match`
+  - `fallback_only`
+- Resolved sports rows now carry both a canonical SportsMeta id for grouping/meta identity and an availability anchor back to the original SportsCult tracker item so stream playback stays tied to the real torrent source.
+- Non-SportsCult search results no longer drive sports catalog rows and may only attach later as supplemental stream candidates after a SportsCult-backed row has already resolved safely to one canonical event.
 - Sports detail meta now exposes Stremio `genres` tags from the resolved sport classification when available.
 - Sports title parsing now handles both team-vs-team formats (`EPL.2026.03.15.Arsenal.vs.Chelsea`) and non-vs event formats (`Formula1.2026.03.28.Japanese.Grand.Prix.Qualifying`, `UFC.Fight.Night.270.Main.Card`).
 - Motorsport coverage now includes F1, MotoGP, NASCAR, IndyCar, WRC, Supercars/V8, WSBK, WEC, and Formula E.
@@ -201,6 +219,8 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 - Local `/file` can continue serving a known absolute local file path even after qBittorrent no longer reports the torrent row, as long as the file still exists on disk.
 - Local `/playback` is the queued-download path for tracker content that is not yet ready. It fetches the `.torrent` payload, adds it to qBittorrent, and as soon as qBittorrent exposes the target file on a built-in playback-capable runtime it 302-redirects into `/file`, letting the shared file route hold the HTTP connection open while bytes arrive. Already-matched in-progress streams on playback-capable runtimes now also stay on `/playback` first, carrying the chosen file path in the opaque token so Stremio does not hit `/file` prematurely and trip a player-side `liberror` while the partial file is still forming. When built-in buffering is not possible, `/playback` still waits for ready-file thresholds before redirecting.
 - Completed-file playback correctly checks torrent completion state before redirecting into `/file`.
+- Sports stream playback now prefers the original SportsCult availability anchor carried in the custom id, so canonical SportsMeta grouping does not break the link back to the real tracker torrent.
+- Non-SportsCult sports streams may only attach as supplemental candidates after a resolved SportsCult anchor exists; they cannot create an independent sports stream surface from identity data alone.
 - Stream rows now expose emoji state badges (`⬇️` download-and-play, `⏳` buffering, `✅` downloaded, `📦` extracted), a visible origin badge (`[PC]` for host-PC playback or `[SERVER]` for remote/server playback), and a film-icon container badge (`🎬MKV`, `🎬MP4`, etc.) in the addon `name`. The description switches from `Download and play` to `Downloaded — ready to play` once the file is ready and also states whether the host PC or remote server is serving it.
 - Packed RAR releases (`.rar/.r00/.r01/...`):
   - Official Stremio archive-source support is real: `rarUrls` is part of the addon/core contract and is routed through the client's local streaming server.

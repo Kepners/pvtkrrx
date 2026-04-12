@@ -1,9 +1,10 @@
 const { CinemetaClient } = require('../clients/cinemeta')
-const { SportsDbClient } = require('../clients/sportsdb')
+const { SportsMetaClient } = require('../clients/sportsmeta')
 const { formatSize } = require('../utils/streams')
 const { resolveSportHint } = require('../utils/sportsRules')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { decodeCustomId } = require('../utils/customId')
+const { mapLeague } = require('../utils/leagueMap')
 const { BRAND_ARTWORK, buildMetaPlaceholder } = require('../utils/metaPlaceholder')
 const {
   resolveSportsPosterAsset,
@@ -55,11 +56,81 @@ function buildSportsGenres(sportHint, league) {
   return genres
 }
 
+async function loadCanonicalSportsMeta(config = {}, canonicalId = '') {
+  const normalizedId = String(canonicalId || '').trim()
+  if (!normalizedId) return null
+
+  const client = new SportsMetaClient({
+    baseUrl: config?.sportsmetaBaseUrl
+  })
+
+  try {
+    return await client.getEvent(normalizedId)
+  } catch (error) {
+    console.warn(`[meta] SportsMeta lookup failed for ${normalizedId}: ${error.message}`)
+    return null
+  }
+}
+
+function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl) {
+  const canonicalEvent = canonical?.event || {}
+  const sportsArtwork = canonical?.sportsArtwork || null
+  const sportHint = resolveSportHint({
+    explicitHint: canonicalEvent?.sport,
+    title: canonicalEvent?.title || canonicalEvent?.name
+  })
+  const league = String(canonicalEvent?.league || '').trim()
+  const eventDate = String(canonicalEvent?.date || '').trim()
+  const displayTitle = String(canonicalEvent?.name || canonicalEvent?.title || requestedId).trim() || requestedId
+  const artworkInput = {
+    baseUrl,
+    title: canonicalEvent?.title || displayTitle,
+    displayTitle,
+    publishDate: eventDate,
+    sportHint,
+    league,
+    eventName: canonicalEvent?.title || canonicalEvent?.name || '',
+    homeTeam: canonicalEvent?.homeTeam || '',
+    awayTeam: canonicalEvent?.awayTeam || '',
+    sportsArtwork
+  }
+  const posterResolved = resolveSportsPosterAsset(artworkInput)
+  const backgroundResolved = resolveSportsBackgroundAsset(artworkInput)
+  const logoResolved = resolveSportsLogoAsset(artworkInput)
+  const poster = String(posterResolved?.poster || '').trim() || BRAND_POSTER
+  const background = String(backgroundResolved || '').trim() || poster
+  const logo = String(logoResolved || '').trim() || BRAND_LOGO
+  const meta = {
+    id: requestedId,
+    type: String(canonicalEvent?.type || 'movie').trim() || 'movie',
+    name: displayTitle,
+    description: String(canonicalEvent?.description || '').trim(),
+    poster,
+    background,
+    logo
+  }
+  if (posterResolved?.posterShape) meta.posterShape = posterResolved.posterShape
+  const genres = buildSportsGenres(sportHint, league)
+  if (genres.length > 0) meta.genres = genres
+  if (eventDate) meta.releaseInfo = eventDate
+  if (sportHint) meta.runtime = formatSportGenreLabel(sportHint)
+  return { meta }
+}
+
 async function handleMeta(config, type, id, context = {}) {
   try {
+    const baseUrl = String(context.baseUrl || '').replace(/\/+$/, '')
+
     // Custom ID (sports, library)
     if (id.startsWith('pvtkrrx:')) {
       return await handleCustomMeta(config, id, context)
+    }
+
+    if (id.startsWith('sportsmeta:')) {
+      const canonical = await loadCanonicalSportsMeta(config, id)
+      if (canonical) {
+        return buildCanonicalSportsMetaResponse(canonical, id, baseUrl)
+      }
     }
 
     // IMDb ID — proxy to Cinemeta
@@ -96,7 +167,6 @@ async function handleCustomMeta(config, id, context = {}) {
   const info = decodeCustomId(id)
   const baseUrl = String(context.baseUrl || '').replace(/\/+$/, '')
   const imdbId = normalizeImdbId(String(info.m || '').trim())
-  let sportsArtwork = null
   const carriedArtwork = String(info.a || '').trim()
   const carriedBackground = String(info.b || '').trim()
   const carriedLogo = String(info.z || '').trim()
@@ -106,32 +176,19 @@ async function handleCustomMeta(config, id, context = {}) {
   const carriedHomeTeam = String(info.o || '').trim()
   const carriedAwayTeam = String(info.w || '').trim()
   const carriedSportHint = String(info.r || '').trim()
-  const carriedEventId = String(info.v || '').trim()
+  const canonicalId = String(info.x || '').trim()
+  const resolutionStatus = String(info.q || '').trim()
+  const normalizedCarriedLeague = String(carriedLeague || mapLeague(carriedLeagueCode) || carriedLeagueCode).trim()
+  const isSports = String(info.k || '').toLowerCase() === 'sports' || Boolean(carriedSportHint) || Boolean(canonicalId)
+  const canonicalSportsMeta = isSports && canonicalId && resolutionStatus === 'resolved'
+    ? await loadCanonicalSportsMeta(config, canonicalId)
+    : null
+  const canonicalEvent = canonicalSportsMeta?.event || {}
+  const sportsArtwork = canonicalSportsMeta?.sportsArtwork || null
   const resolvedSportHint = resolveSportHint({
-    explicitHint: carriedSportHint,
-    title: info.t
+    explicitHint: canonicalEvent?.sport || carriedSportHint,
+    title: canonicalEvent?.title || canonicalEvent?.name || info.t
   })
-  const isSports = String(info.k || '').toLowerCase() === 'sports' || Boolean(resolvedSportHint)
-  const shouldLookupSportsArtwork = isSports && (!carriedArtwork || !carriedEventDate || !carriedLeague || !carriedBackground || !carriedLogo)
-  if (shouldLookupSportsArtwork) {
-    try {
-      const sportsDb = new SportsDbClient(config?.sportsDbApiKey, {
-        cacheHours: config?.sportsDbCacheHours
-      })
-      sportsArtwork = await sportsDb.getEventArtwork({
-        title: info.t,
-        publishDate: info.p,
-        sportHint: resolvedSportHint,
-        eventId: carriedEventId,
-        league: carriedLeagueCode || carriedLeague,
-        date: carriedEventDate,
-        homeTeam: carriedHomeTeam,
-        awayTeam: carriedAwayTeam
-      })
-    } catch (_) {
-      sportsArtwork = null
-    }
-  }
 
   if (!isSports && /^tt\d{7,10}$/i.test(imdbId)) {
     try {
@@ -160,16 +217,23 @@ async function handleCustomMeta(config, id, context = {}) {
     }
   }
 
+  const displayTitle = String(canonicalEvent?.name || canonicalEvent?.title || info.n || info.t || '').trim() || String(info.t || '')
+  const eventDate = String(canonicalEvent?.date || carriedEventDate || sportsArtwork?.eventDate || '').trim()
+  const league = String(canonicalEvent?.league || normalizedCarriedLeague || sportsArtwork?.league || '').trim()
+  const homeTeam = String(canonicalEvent?.homeTeam || carriedHomeTeam || sportsArtwork?.homeTeam || '').trim()
+  const awayTeam = String(canonicalEvent?.awayTeam || carriedAwayTeam || sportsArtwork?.awayTeam || '').trim()
+  const eventName = String(canonicalEvent?.title || canonicalEvent?.name || sportsArtwork?.eventName || '').trim()
+
   const artworkInput = {
     baseUrl,
-    title: String(info.t || info.n || '').trim(),
-    displayTitle: String(info.n || info.t || '').trim() || String(info.t || ''),
+    title: String(canonicalEvent?.title || info.t || info.n || '').trim(),
+    displayTitle,
     publishDate: info.p,
     sportHint: resolvedSportHint,
-    league: carriedLeague || sportsArtwork?.league || carriedLeagueCode,
-    eventName: sportsArtwork?.eventName || '',
-    homeTeam: carriedHomeTeam || sportsArtwork?.homeTeam || '',
-    awayTeam: carriedAwayTeam || sportsArtwork?.awayTeam || '',
+    league,
+    eventName,
+    homeTeam,
+    awayTeam,
     carriedArtwork,
     carriedBackground,
     carriedLogo,
@@ -189,19 +253,22 @@ async function handleCustomMeta(config, id, context = {}) {
   const logo = String(logoResolved || '').trim() || BRAND_LOGO
   const posterShape = isSports ? posterResolved?.posterShape : undefined
 
-  const eventDate = carriedEventDate || sportsArtwork?.eventDate || ''
-  const league = carriedLeague || sportsArtwork?.league || ''
   const sportsGenres = isSports ? buildSportsGenres(resolvedSportHint, league) : []
 
-  // Build a rich description for sports detail pages
   const descriptionLines = []
   if (isSports) {
-    const eventName = sportsArtwork?.eventName || ''
-    if (eventName) descriptionLines.push(eventName)
-    if (league && !descriptionLines.some(line => line.includes(league))) descriptionLines.push(league)
-    if (eventDate) descriptionLines.push(`Date: ${eventDate}`)
-    if (carriedHomeTeam && carriedAwayTeam) {
-      descriptionLines.push(`${carriedHomeTeam} vs ${carriedAwayTeam}`)
+    const canonicalDescription = String(canonicalEvent?.description || '').trim()
+    if (canonicalDescription) {
+      for (const line of canonicalDescription.split(/\r?\n/).map((value) => value.trim()).filter(Boolean)) {
+        if (!descriptionLines.includes(line)) descriptionLines.push(line)
+      }
+    } else {
+      if (eventName && eventName !== displayTitle) descriptionLines.push(eventName)
+      if (league && !descriptionLines.some(line => line.includes(league))) descriptionLines.push(league)
+      if (eventDate) descriptionLines.push(`Date: ${eventDate}`)
+      if (homeTeam && awayTeam) {
+        descriptionLines.push(`${homeTeam} vs ${awayTeam}`)
+      }
     }
   }
   const statParts = []
@@ -214,12 +281,10 @@ async function handleCustomMeta(config, id, context = {}) {
   if (statParts.length > 0) descriptionLines.push(statParts.join(' | '))
   const description = descriptionLines.filter(Boolean).join('\n') || statParts.join(' | ')
 
-  const displayName = String(info.n || info.t || '').trim() || String(info.t || '')
-
   const meta = {
     id,
     type: String(info.y || 'movie'),
-    name: displayName,
+    name: displayTitle,
     description,
     poster,
     background,

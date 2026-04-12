@@ -15,9 +15,11 @@ const { parseSportsTitle, parseSportsEventTitle } = require('../src/utils/sports
 const { resolveSportHint, scoreSportsEventSignals, isLikelySportsEventTitle } = require('../src/utils/sportsRules')
 const { detectSport } = require('../src/utils/sportClassifier')
 const { SportsDbClient } = require('../src/clients/sportsdb')
+const { SportsMetaClient } = require('../src/clients/sportsmeta')
 const { encodeCustomId, decodeCustomId } = require('../src/utils/customId')
 const { setPublicCacheHeaders } = require('../src/lib/shared')
 const { decodeSportsThumbToken } = require('../src/utils/sportsThumb')
+const { clearSportsAvailabilityAnchors } = require('../src/utils/sportsAvailabilityStore')
 const {
   makeSportsImageProxyUrl,
   decodeSportsImageToken,
@@ -56,6 +58,92 @@ async function withSportsDbPrototypePatches(patches, run) {
   } finally {
     for (const [name, original] of originals.entries()) {
       SportsDbClient.prototype[name] = original
+    }
+  }
+}
+
+async function withSportsMetaPrototypePatches(patches, run) {
+  const originals = new Map()
+  for (const [name, impl] of Object.entries(patches || {})) {
+    originals.set(name, SportsMetaClient.prototype[name])
+    SportsMetaClient.prototype[name] = impl
+  }
+
+  try {
+    return await run()
+  } finally {
+    for (const [name, original] of originals.entries()) {
+      SportsMetaClient.prototype[name] = original
+    }
+  }
+}
+
+function buildCanonicalSportsMetaResult(overrides = {}) {
+  const canonicalId = String(overrides.canonicalId || overrides.id || 'sportsmeta:event:football|2026-03-15|premier-league|arsenal|chelsea')
+  const title = String(overrides.title || overrides.name || 'Arsenal vs Chelsea')
+  const name = String(overrides.name || title)
+  const sport = String(overrides.sport || 'football')
+  const league = String(overrides.league || 'English Premier League')
+  const date = String(overrides.date || '2026-03-15')
+  const homeTeam = String(overrides.homeTeam || 'Arsenal')
+  const awayTeam = String(overrides.awayTeam || 'Chelsea')
+  const eventId = String(overrides.eventId || 'sports-event-1')
+  const description = String(
+    overrides.description ||
+    `${league}\nDate: ${date}`
+  )
+  const poster = String(overrides.poster || 'https://example.com/portrait.jpg')
+  const landscape = String(overrides.landscape || overrides.image || 'https://example.com/landscape.jpg')
+  const background = String(overrides.background || 'https://example.com/background.jpg')
+  const logo = String(overrides.logo || 'https://example.com/logo.png')
+  const leagueLogo = String(overrides.leagueLogo || logo)
+  const homeBadge = String(overrides.homeBadge || '')
+  const awayBadge = String(overrides.awayBadge || '')
+
+  return {
+    canonicalId,
+    event: {
+      id: canonicalId,
+      type: String(overrides.type || 'movie'),
+      name,
+      title,
+      description,
+      sport,
+      league,
+      date,
+      homeTeam,
+      awayTeam,
+      eventId,
+      source: String(overrides.source || 'sportsmeta'),
+      truthStatus: '',
+      caveat: ''
+    },
+    assets: {
+      poster,
+      background,
+      landscape,
+      logo,
+      leagueLogo,
+      homeBadge,
+      awayBadge
+    },
+    sportsArtwork: {
+      poster,
+      image: landscape,
+      landscapeImage: landscape,
+      backgroundImage: background,
+      logo,
+      leagueLogo,
+      homeBadge,
+      awayBadge,
+      eventName: title,
+      league,
+      sport,
+      eventDate: date,
+      homeTeam,
+      awayTeam,
+      eventId,
+      source: String(overrides.source || 'sportsmeta')
     }
   }
 }
@@ -445,14 +533,14 @@ async function testOrderAgnosticSportsGrouping() {
       return [
         {
           title: 'EPL.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-A',
-          indexer: 'GeneralA',
+          indexer: 'sportscult',
           size: 1_000_000_000,
           seeders: 20,
           pubDate: '2026-03-15T09:00:00Z'
         },
         {
           title: 'EPL.2026.03.15.Chelsea.vs.Arsenal.720p.HDTV.x264-B',
-          indexer: 'GeneralB',
+          indexer: 'sportscult',
           size: 900_000_000,
           seeders: 15,
           pubDate: '2026-03-15T10:00:00Z'
@@ -481,35 +569,42 @@ async function testOrderAgnosticSportsGrouping() {
   }
 
   const { handleCatalog } = loadCatalogWithStubs({
-    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient },
-    '../clients/sportsdb': { SportsDbClient: FakeSportsDbClient }
+    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient }
   })
 
-  const result = await handleCatalog(
+  clearSportsAvailabilityAnchors()
+  const result = await withSportsMetaPrototypePatches({
+    resolveEvent: async () => buildCanonicalSportsMetaResult({
+      poster: 'https://example.com/portrait.jpg',
+      landscape: 'https://example.com/landscape.jpg',
+      background: 'https://example.com/background.jpg',
+      homeBadge: 'https://example.com/arsenal-badge.png',
+      awayBadge: 'https://example.com/chelsea-badge.png',
+      leagueLogo: 'https://example.com/epl-logo.png'
+    })
+  }, async () => handleCatalog(
     {
       jackettUrl: 'http://127.0.0.1:9696',
       jackettApiKey: 'smoke-api-key',
-      sportsDbApiKey: 'smoke-sports-key',
       maxResults: '10'
     },
     'sports',
     'pvtkrrx-sports',
     'search=Arsenal',
     { baseUrl: 'http://127.0.0.1:7000' }
-  )
+  ))
 
   assert.equal(result.metas.length, 1, 'expected reversed team order to dedupe into one sports meta')
   assert.ok(result.metas[0].id.length < 256, 'expected sports meta id to stay under common Stremio client limits')
   // Real TheSportsDB poster available → must be used (proxied) instead of generated card
-  assertSportsProxyUrl(result.metas[0].poster, 'poster', 'https://example.com/portrait.jpg', 'real event poster must take priority over generated cards')
+  assertSportsProxyUrl(result.metas[0].poster, 'poster', 'https://example.com/portrait.jpg', 'resolved SportsMeta poster must take priority over generated cards')
   assert.equal(result.metas[0].posterShape, 'poster', 'expected sports catalog to tag portrait artwork as poster-shaped')
   assertSportsProxyUrl(result.metas[0].background, 'background', 'https://example.com/background.jpg')
   const decoded = decodeCustomId(result.metas[0].id)
   assert.equal(decoded.k, 'sports')
-  assert.ok(
-    decoded.n && decoded.n.length > 0,
-    'expected compressed sports id to carry a display title'
-  )
+  assert.equal(decoded.x, 'sportsmeta:event:football|2026-03-15|premier-league|arsenal|chelsea', 'expected resolved catalog items to carry the canonical SportsMeta id')
+  assert.equal(decoded.q, 'resolved', 'expected resolved catalog items to stamp the resolution state')
+  assert.ok(decoded.ak, 'expected resolved catalog items to carry an availability anchor')
 }
 
 async function testLeagueFallbackUsesGeneratedMatchupPoster() {
@@ -600,7 +695,7 @@ async function testSportSpecificCatalogDetailFiltering() {
       return [
         {
           title: 'EPL.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-A',
-          indexer: 'GeneralA',
+          indexer: 'sportscult',
           size: 1_000_000_000,
           seeders: 20,
           pubDate: '2026-03-15T09:00:00Z'
@@ -623,37 +718,30 @@ async function testSportSpecificCatalogDetailFiltering() {
     }
   }
 
-  class FakeSportsDbClient {
-    async getEventArtwork() {
-      return {
-        poster: 'https://example.com/football-portrait.jpg',
-        landscapeImage: 'https://example.com/football-landscape.jpg',
-        backgroundImage: 'https://example.com/football-background.jpg',
-        image: 'https://example.com/football-landscape.jpg',
-        eventId: 'football-event-1',
-        eventDate: '2026-03-15',
-        league: 'English Premier League'
-      }
-    }
-  }
-
   const { handleCatalog } = loadCatalogWithStubs({
-    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient },
-    '../clients/sportsdb': { SportsDbClient: FakeSportsDbClient }
+    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient }
   })
 
-  const result = await handleCatalog(
+  const result = await withSportsMetaPrototypePatches({
+    resolveEvent: async (query) => {
+      assert.equal(query.home, 'Arsenal')
+      return buildCanonicalSportsMetaResult({
+        poster: 'https://example.com/football-portrait.jpg',
+        landscape: 'https://example.com/football-landscape.jpg',
+        background: 'https://example.com/football-background.jpg'
+      })
+    }
+  }, async () => handleCatalog(
     {
       jackettUrl: 'http://127.0.0.1:9696',
       jackettApiKey: 'smoke-api-key',
-      sportsDbApiKey: 'smoke-sports-key',
       maxResults: '10'
     },
     'sports',
     'pvtkrrx-sports-football',
     'genre=Arsenal',
     { baseUrl: 'http://127.0.0.1:7000' }
-  )
+  ))
 
   assert.equal(result.metas.length, 1, 'football discovery detail filter should narrow results to the requested team')
   assert.match(result.metas[0].name, /Arsenal vs Chelsea/i)
@@ -668,14 +756,14 @@ async function testSportFamilyCatalogRejectsMixedSportLeakage() {
       return [
         {
           title: 'EFL.League.Two.2026.03.24.Oldham.Athletic.vs.Notts.County.1080p.HDTV.x264-FOOTY',
-          indexer: 'GeneralA',
+          indexer: 'sportscult',
           size: 1_000_000_000,
           seeders: 20,
           pubDate: '2026-03-24T09:00:00Z'
         },
         {
           title: 'MotoGP.2026.Round.02.Brazil.Warm.Up.1080p.WEB.h264-RACE',
-          indexer: 'GeneralB',
+          indexer: 'sportscult',
           size: 1_300_000_000,
           seeders: 25,
           pubDate: '2026-03-22T12:00:00Z'
@@ -698,23 +786,8 @@ async function testSportFamilyCatalogRejectsMixedSportLeakage() {
     }
   }
 
-  class FakeSportsDbClient {
-    async getEventArtwork(input = {}) {
-      return {
-        poster: 'https://example.com/sport-family-poster.jpg',
-        landscapeImage: 'https://example.com/sport-family-landscape.jpg',
-        backgroundImage: 'https://example.com/sport-family-background.jpg',
-        image: 'https://example.com/sport-family-landscape.jpg',
-        eventId: Buffer.from(String(input.title || 'event')).toString('base64url').slice(0, 24),
-        eventDate: String(input.date || input.publishDate || '').slice(0, 10),
-        league: String(input.league || '').trim()
-      }
-    }
-  }
-
   const { handleCatalog } = loadCatalogWithStubs({
-    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient },
-    '../clients/sportsdb': { SportsDbClient: FakeSportsDbClient }
+    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient }
   })
 
   const config = {
@@ -724,25 +797,61 @@ async function testSportFamilyCatalogRejectsMixedSportLeakage() {
     maxResults: '10'
   }
 
-  const motorsportResult = await handleCatalog(
+  const motorsportResult = await withSportsMetaPrototypePatches({
+    resolveEvent: async (query) => {
+      if (String(query.event || '').includes('Brazil Warm Up')) {
+        return buildCanonicalSportsMetaResult({
+          canonicalId: 'sportsmeta:event:motorsport|2026-03-22|motogp|brazil-warm-up',
+          name: 'MotoGP Brazil Warm Up',
+          title: 'MotoGP Brazil Warm Up',
+          sport: 'motorsport',
+          league: 'MotoGP',
+          date: '2026-03-22',
+          homeTeam: '',
+          awayTeam: ''
+        })
+      }
+      return buildCanonicalSportsMetaResult({
+        canonicalId: 'sportsmeta:event:football|2026-03-24|efl-league-two|oldham-athletic|notts-county',
+        name: 'Oldham Athletic vs Notts County',
+        title: 'Oldham Athletic vs Notts County',
+        sport: 'football',
+        league: 'EFL League Two',
+        date: '2026-03-24',
+        homeTeam: 'Oldham Athletic',
+        awayTeam: 'Notts County'
+      })
+    }
+  }, async () => handleCatalog(
     config,
     'sports',
     'pvtkrrx-sports-motorsport',
     '',
     { baseUrl: 'http://127.0.0.1:7000' }
-  )
+  ))
 
   assert.equal(motorsportResult.metas.length, 1, 'motorsport catalog should reject football and uncategorized sports rows')
   assert.match(motorsportResult.metas[0].name, /MotoGP/i, 'motorsport catalog should keep the MotoGP event')
   assert.equal(decodeCustomId(motorsportResult.metas[0].id).r, 'motorsport', 'motorsport catalog should stamp motorsport sport hints')
 
-  const footballResult = await handleCatalog(
+  const footballResult = await withSportsMetaPrototypePatches({
+    resolveEvent: async () => buildCanonicalSportsMetaResult({
+      canonicalId: 'sportsmeta:event:football|2026-03-24|efl-league-two|oldham-athletic|notts-county',
+      name: 'Oldham Athletic vs Notts County',
+      title: 'Oldham Athletic vs Notts County',
+      sport: 'football',
+      league: 'EFL League Two',
+      date: '2026-03-24',
+      homeTeam: 'Oldham Athletic',
+      awayTeam: 'Notts County'
+    })
+  }, async () => handleCatalog(
     config,
     'sports',
     'pvtkrrx-sports-football',
     '',
     { baseUrl: 'http://127.0.0.1:7000' }
-  )
+  ))
 
   assert.equal(footballResult.metas.length, 1, 'football catalog should keep parsed EFL fixtures without leaking other sports')
   assert.match(footballResult.metas[0].name, /(Oldham Athletic|Notts County).*(Oldham Athletic|Notts County)/i, 'football catalog should keep the EFL fixture teams')
@@ -1529,6 +1638,238 @@ async function testSportsImageCacheUsesConfiguredPackageBeforeFetch() {
   }
 }
 
+async function testCanonicalResolutionMergesSeparateLeagueAliases() {
+  class FakeProwlarrClient {
+    async search() {
+      return [
+        {
+          title: 'EPL.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-A',
+          indexer: 'sportscult',
+          size: 1_000_000_000,
+          seeders: 20,
+          pubDate: '2026-03-15T09:00:00Z'
+        },
+        {
+          title: 'Premier.League.2026.03.15.Chelsea.vs.Arsenal.720p.HDTV.x264-B',
+          indexer: 'sportscult',
+          size: 900_000_000,
+          seeders: 15,
+          pubDate: '2026-03-15T10:00:00Z'
+        }
+      ]
+    }
+  }
+
+  const { handleCatalog } = loadCatalogWithStubs({
+    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient }
+  })
+
+  const result = await withSportsMetaPrototypePatches({
+    resolveEvent: async () => buildCanonicalSportsMetaResult()
+  }, async () => handleCatalog(
+    {
+      jackettUrl: 'http://127.0.0.1:9696',
+      jackettApiKey: 'smoke-api-key',
+      maxResults: '10'
+    },
+    'sports',
+    'pvtkrrx-sports',
+    'search=Arsenal',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  ))
+
+  assert.equal(result.metas.length, 1, 'separate availability keys should still collapse under one canonical SportsMeta identity')
+  assert.equal(decodeCustomId(result.metas[0].id).x, 'sportsmeta:event:football|2026-03-15|premier-league|arsenal|chelsea')
+}
+
+async function testAmbiguousSportsMetaKeepsAvailabilityItem() {
+  class FakeProwlarrClient {
+    async search() {
+      return [{
+        title: 'Giants.1080p.HDTV',
+        indexer: 'sportscult',
+        size: 800_000_000,
+        seeders: 9,
+        pubDate: '2026-03-15T09:00:00Z'
+      }]
+    }
+  }
+
+  const { handleCatalog } = loadCatalogWithStubs({
+    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient }
+  })
+
+  const result = await withSportsMetaPrototypePatches({
+    resolveEvent: async () => {
+      throw new Error('ambiguous fallback should not call SportsMeta resolve')
+    }
+  }, async () => handleCatalog(
+    {
+      jackettUrl: 'http://127.0.0.1:9696',
+      jackettApiKey: 'smoke-api-key',
+      maxResults: '10'
+    },
+    'sports',
+    'pvtkrrx-sports',
+    'search=Giants',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  ))
+
+  assert.equal(result.metas.length, 1, 'ambiguous titles should stay visible when Sportscult has availability')
+  const decoded = decodeCustomId(result.metas[0].id)
+  assert.equal(decoded.q, 'ambiguous', 'ambiguous availability should be marked honestly')
+  assert.ok(!decoded.x, 'ambiguous availability should not claim a canonical SportsMeta id')
+  assert.match(String(result.metas[0].poster || ''), /\/thumb\/sports\/poster\//, 'ambiguous availability should fall back to generated artwork')
+}
+
+async function testNotFoundSportsMetaKeepsAvailabilityItem() {
+  class FakeProwlarrClient {
+    async search() {
+      return [{
+        title: 'Formula1.2026.03.28.Japanese.Grand.Prix.Qualifying.1080p.WEB.h265-VERUM',
+        indexer: 'sportscult',
+        size: 2_000_000_000,
+        seeders: 30,
+        pubDate: '2026-03-28T12:00:00Z'
+      }]
+    }
+  }
+
+  const { handleCatalog } = loadCatalogWithStubs({
+    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient }
+  })
+
+  const result = await withSportsMetaPrototypePatches({
+    resolveEvent: async () => null
+  }, async () => handleCatalog(
+    {
+      jackettUrl: 'http://127.0.0.1:9696',
+      jackettApiKey: 'smoke-api-key',
+      maxResults: '10'
+    },
+    'sports',
+    'pvtkrrx-sports',
+    'genre=Formula%201',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  ))
+
+  assert.equal(result.metas.length, 1, 'not-found identity should not remove a valid Sportscult row')
+  const decoded = decodeCustomId(result.metas[0].id)
+  assert.equal(decoded.q, 'not_found', 'not-found identity should be recorded explicitly')
+  assert.ok(!decoded.x, 'not-found identity should not claim a canonical SportsMeta id')
+  assert.match(String(result.metas[0].poster || ''), /\/thumb\/sports\/poster\//, 'not-found identity should fall back to generated artwork')
+}
+
+async function testSportsMetaOnlyEventDoesNotCreateCatalogItem() {
+  class FakeProwlarrClient {
+    async search() {
+      return []
+    }
+
+    async caps() {
+      return [{ id: 1 }]
+    }
+  }
+
+  const { handleCatalog } = loadCatalogWithStubs({
+    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient }
+  })
+
+  const result = await withSportsMetaPrototypePatches({
+    resolveEvent: async () => {
+      throw new Error('SportsMeta should not invent catalog rows without availability')
+    }
+  }, async () => handleCatalog(
+    {
+      jackettUrl: 'http://127.0.0.1:9696',
+      jackettApiKey: 'smoke-api-key',
+      maxResults: '10'
+    },
+    'sports',
+    'pvtkrrx-sports',
+    'search=Arsenal',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  ))
+
+  assert.equal(result.metas.length, 0, 'SportsMeta-only knowledge must not create catalog rows')
+}
+
+async function testNonSportsCultAvailabilityDoesNotCreateCatalogItem() {
+  class FakeProwlarrClient {
+    async search() {
+      return [{
+        title: 'EPL.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-A',
+        indexer: 'GeneralTracker',
+        size: 1_000_000_000,
+        seeders: 20,
+        pubDate: '2026-03-15T09:00:00Z',
+        sportHint: 'football'
+      }]
+    }
+
+    async caps() {
+      return [{ id: 1 }]
+    }
+  }
+
+  const { handleCatalog } = loadCatalogWithStubs({
+    '../clients/prowlarr': { ProwlarrClient: FakeProwlarrClient }
+  })
+
+  const result = await withSportsMetaPrototypePatches({
+    resolveEvent: async () => buildCanonicalSportsMetaResult()
+  }, async () => handleCatalog(
+    {
+      jackettUrl: 'http://127.0.0.1:9696',
+      jackettApiKey: 'smoke-api-key',
+      maxResults: '10'
+    },
+    'sports',
+    'pvtkrrx-sports',
+    'search=Arsenal',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  ))
+
+  assert.equal(result.metas.length, 0, 'non-SportsCult availability must not create its own catalog row')
+}
+
+async function testResolvedMetaUsesSportsMetaProxyUrls() {
+  const { handleMeta } = require('../src/handlers/meta')
+  const id = encodeCustomId({
+    y: 'movie',
+    k: 'sports',
+    n: 'Arsenal vs Chelsea',
+    t: 'Arsenal vs Chelsea',
+    s: 1_000_000_000,
+    d: 20,
+    r: 'football',
+    e: '2026-03-15',
+    u: 'EPL',
+    o: 'Arsenal',
+    w: 'Chelsea',
+    x: 'sportsmeta:event:football|2026-03-15|premier-league|arsenal|chelsea',
+    q: 'resolved'
+  }, {
+    compress: true,
+    compact: 'sports'
+  })
+
+  const result = await withSportsMetaPrototypePatches({
+    getEvent: async () => buildCanonicalSportsMetaResult({
+      poster: 'https://images.example.com/meta-proxy-poster.jpg',
+      background: 'https://images.example.com/meta-proxy-background.jpg',
+      landscape: 'https://images.example.com/meta-proxy-landscape.jpg',
+      logo: 'https://images.example.com/meta-proxy-logo.png'
+    })
+  }, async () => handleMeta({}, 'movie', id, {
+    baseUrl: 'http://127.0.0.1:7000'
+  }))
+
+  assertSportsProxyUrl(result.meta.poster, 'poster', 'https://images.example.com/meta-proxy-poster.jpg', 'resolved sports meta should use proxied SportsMeta poster art')
+  assert.match(result.meta.background, /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/background\//, 'expected resolved sports meta background to use local sports image proxy')
+  assert.match(String(result.meta.logo || ''), /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/logo\//, 'expected resolved sports meta logo to use local sports image proxy')
+}
+
 async function testMetaFallbackNeverReturnsNull() {
   const { handleMeta } = require('../src/handlers/meta')
 
@@ -1555,6 +1896,7 @@ async function testMetaFallbackNeverReturnsNull() {
 
 async function main() {
   try {
+    clearSportsAvailabilityAnchors()
     testCacheHeadersIncludeStaleIfError()
     testSportsDiscoveryCatalogLayout()
     testParserAndLeagueMap()
@@ -1577,18 +1919,20 @@ async function main() {
     await testOrderAgnosticSportsGrouping()
     await testCatalogShowsSetupPlaceholderWhenProwlarrHasNoIndexers()
     await testSportSpecificCatalogDetailFiltering()
-    await testSportFamilyCatalogRejectsMixedSportLeakage()
-    await testEventTitleCatalogGrouping()
-    await testF1LeagueFallbackUsesLeaguePosterWhenAvailable()
+    await testCanonicalResolutionMergesSeparateLeagueAliases()
+    await testAmbiguousSportsMetaKeepsAvailabilityItem()
+    await testNotFoundSportsMetaKeepsAvailabilityItem()
+    await testSportsMetaOnlyEventDoesNotCreateCatalogItem()
+    await testNonSportsCultAvailabilityDoesNotCreateCatalogItem()
     await testLibraryCustomIdsStayCompact()
     await testSportsMetaIncludesGenres()
     await testSportsMetaRichDescription()
     await testArtworkFallbackBehavior()
-    await testSportsCatalogUsesImageProxyUrls()
-    await testSportsMetaUsesImageProxyUrls()
+    await testResolvedMetaUsesSportsMetaProxyUrls()
     await testMetaFallbackNeverReturnsNull()
     console.log('Smoke sports structured flow passed')
   } finally {
+    clearSportsAvailabilityAnchors()
     fs.rmSync(runtimeDir, { recursive: true, force: true })
   }
 }

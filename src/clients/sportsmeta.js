@@ -35,6 +35,84 @@ function inferFallbackBaseUrls(options = {}) {
   ])
 }
 
+function normalizeResolveQueryValue(value) {
+  return String(value || '').trim()
+}
+
+function normalizeSportsMetaResolveQuery(query = {}) {
+  const normalized = {
+    title: normalizeResolveQueryValue(query?.title),
+    date: normalizeResolveQueryValue(query?.date),
+    sport: normalizeResolveQueryValue(query?.sport),
+    league: normalizeResolveQueryValue(query?.league),
+    home: normalizeResolveQueryValue(query?.home || query?.homeTeam),
+    away: normalizeResolveQueryValue(query?.away || query?.awayTeam),
+    event: normalizeResolveQueryValue(query?.event || query?.eventName)
+  }
+
+  return Object.fromEntries(
+    Object.entries(normalized).filter(([, value]) => Boolean(value))
+  )
+}
+
+function normalizeSportsMetaPayload(payload = {}) {
+  const event = payload?.event || {}
+  const assets = payload?.assets || {}
+  const canonicalId = String(event?.id || payload?.id || '').trim()
+  if (!canonicalId) return null
+
+  const normalizedEvent = {
+    id: canonicalId,
+    type: String(event?.type || 'movie').trim() || 'movie',
+    name: String(event?.name || event?.title || canonicalId).trim() || canonicalId,
+    title: String(event?.title || event?.name || canonicalId).trim() || canonicalId,
+    description: String(event?.description || '').trim(),
+    sport: String(event?.sport || '').trim(),
+    league: String(event?.league || '').trim(),
+    date: String(event?.date || '').trim(),
+    homeTeam: String(event?.homeTeam || '').trim(),
+    awayTeam: String(event?.awayTeam || '').trim(),
+    eventId: String(event?.eventId || '').trim(),
+    source: String(event?.source || 'sportsmeta').trim() || 'sportsmeta',
+    truthStatus: String(event?.truthStatus || '').trim(),
+    caveat: String(event?.caveat || '').trim()
+  }
+
+  const normalizedAssets = {
+    poster: String(assets?.poster || '').trim(),
+    background: String(assets?.background || '').trim(),
+    landscape: String(assets?.landscape || '').trim(),
+    logo: String(assets?.logo || '').trim(),
+    leagueLogo: String(assets?.leagueLogo || '').trim(),
+    homeBadge: String(assets?.homeBadge || '').trim(),
+    awayBadge: String(assets?.awayBadge || '').trim()
+  }
+
+  return {
+    canonicalId,
+    event: normalizedEvent,
+    assets: normalizedAssets,
+    sportsArtwork: {
+      poster: normalizedAssets.poster,
+      image: normalizedAssets.landscape,
+      landscapeImage: normalizedAssets.landscape,
+      backgroundImage: normalizedAssets.background,
+      logo: normalizedAssets.logo,
+      leagueLogo: normalizedAssets.leagueLogo,
+      homeBadge: normalizedAssets.homeBadge,
+      awayBadge: normalizedAssets.awayBadge,
+      eventName: normalizedEvent.title || normalizedEvent.name,
+      league: normalizedEvent.league,
+      sport: normalizedEvent.sport,
+      eventDate: normalizedEvent.date,
+      homeTeam: normalizedEvent.homeTeam,
+      awayTeam: normalizedEvent.awayTeam,
+      eventId: normalizedEvent.eventId,
+      source: normalizedEvent.source
+    }
+  }
+}
+
 class SportsMetaClient {
   constructor(options = {}) {
     this.baseUrl = normalizeBaseUrl(
@@ -46,16 +124,19 @@ class SportsMetaClient {
     this.timeoutMs = Math.max(500, Number(options.timeoutMs || DEFAULT_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS)
   }
 
-  async getEvent(canonicalId) {
-    const normalizedId = String(canonicalId || '').trim()
-    if (!normalizedId || !this.baseUrl) return null
-
+  async _requestJson(pathname, query = null) {
     let lastError = null
     const candidateBaseUrls = uniqueBaseUrls([this.baseUrl, ...this.fallbackBaseUrls])
     for (const baseUrl of candidateBaseUrls) {
       try {
+        const url = new URL(`${baseUrl}${pathname}`)
+        for (const [key, value] of Object.entries(query || {})) {
+          if (!String(value || '').trim()) continue
+          url.searchParams.set(key, String(value).trim())
+        }
+
         const response = await fetch(
-          `${baseUrl}/event/${encodeURIComponent(normalizedId)}`,
+          url.toString(),
           {
             headers: {
               accept: 'application/json'
@@ -71,7 +152,7 @@ class SportsMetaClient {
         }
 
         const payload = await response.json()
-        if (payload?.event) return payload
+        if (payload && typeof payload === 'object') return payload
       } catch (error) {
         lastError = error
       }
@@ -80,9 +161,27 @@ class SportsMetaClient {
     if (lastError) throw lastError
     return null
   }
+
+  async getEvent(canonicalId) {
+    const normalizedId = String(canonicalId || '').trim()
+    if (!normalizedId || !this.baseUrl) return null
+
+    const payload = await this._requestJson(`/event/${encodeURIComponent(normalizedId)}`)
+    return normalizeSportsMetaPayload(payload)
+  }
+
+  async resolveEvent(query = {}) {
+    const normalizedQuery = normalizeSportsMetaResolveQuery(query)
+    if (Object.keys(normalizedQuery).length === 0 || !this.baseUrl) return null
+
+    const payload = await this._requestJson('/resolve', normalizedQuery)
+    return normalizeSportsMetaPayload(payload)
+  }
 }
 
 module.exports = {
   DEFAULT_BASE_URL,
+  normalizeSportsMetaPayload,
+  normalizeSportsMetaResolveQuery,
   SportsMetaClient
 }
