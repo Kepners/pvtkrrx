@@ -196,7 +196,7 @@ async function run() {
     const sportsDbApiKey = await promptValue(
       rl,
       'TheSportsDB API key',
-      String(existingConfig?.sportsDbApiKey || '123').trim()
+      String(existingConfig?.sportsDbApiKey || '').trim()
     )
     const sportsDbCacheHours = Number.parseInt(
       await promptValue(

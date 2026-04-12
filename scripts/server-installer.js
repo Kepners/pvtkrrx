@@ -972,7 +972,7 @@ async function run() {
     const sportsDbApiKey = await promptValue(
       rl,
       'TheSportsDB API key',
-      String(existingConfig?.sportsDbApiKey || '123').trim()
+      String(existingConfig?.sportsDbApiKey || '').trim()
     )
     const sportsDbCacheHours = await promptInteger(
       rl,
@@ -1384,7 +1384,7 @@ async function runAuto() {
     provider: String(existingConfig?.provider || 'custom').trim() || 'custom',
     fileServerUrl: sanitizeHttpUrlDefault(existingConfig?.fileServerUrl || '', '', { allowEmpty: true }),
     fileServerAuth: String(existingConfig?.fileServerAuth || '').trim(),
-    sportsDbApiKey: String(existingConfig?.sportsDbApiKey || '123').trim(),
+    sportsDbApiKey: String(existingConfig?.sportsDbApiKey || '').trim(),
     sportsDbCacheHours: existingConfig?.sportsDbCacheHours || 24,
     sportsImagePackagePath: String(existingConfig?.sportsImagePackagePath || '').trim(),
     maxResults: existingConfig?.maxResults || 50,
@@ -1423,7 +1423,7 @@ async function runAuto() {
   console.log('Pre-seeding sports image cache...')
   try {
     const sportsSeedSummary = await seedSportsImageCache({
-      apiKey: String(nextConfig?.sportsDbApiKey || '123').trim(),
+      apiKey: String(nextConfig?.sportsDbApiKey || '').trim(),
       logger: console
     })
     console.log(`✓ Sports cache: ${summarizeSportsImageSeed(sportsSeedSummary)}`)

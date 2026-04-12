@@ -103,16 +103,7 @@ function resolveSportsMetaTier(config = {}, options = {}) {
     config?.sportsmetaEntitlement ||
     config?.sportsMetaEntitlement
   )
-  if (configTier) return configTier
-
-  if (
-    parseBooleanLoose(config?.sportsmetaPaid, false) ||
-    parseBooleanLoose(config?.sportsMetaPaid, false) ||
-    parseBooleanLoose(config?.sportsmetaEnabled, false) ||
-    parseBooleanLoose(config?.sportsMetaEnabled, false)
-  ) {
-    return 'sportsmeta'
-  }
+  if (configTier === 'svg') return 'svg'
 
   const defaultTier = normalizeTierCandidate(process.env.PVTKRRX_SPORTSMETA_DEFAULT_TIER || 'svg')
   return defaultTier || 'svg'

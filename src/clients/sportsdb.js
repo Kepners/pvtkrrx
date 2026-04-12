@@ -19,7 +19,7 @@ if (EXPERIMENTAL_INTERNAL_SPORTSMETA) {
 }
 
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json'
-const DEFAULT_API_KEY = '123'
+const DEFAULT_API_KEY = ''
 const DEFAULT_TIMEOUT_MS = 8000
 const PERSIST_FILE_NAME = 'sportsdb-poster-cache.json'
 const PERSIST_MAX_ENTRIES = 50000
@@ -1318,7 +1318,7 @@ function persistSeededLeagueArtwork(apiKey, league, options = {}) {
 
 class SportsDbClient {
   constructor(apiKey, options = {}) {
-    this.apiKey = String(apiKey || process.env.SPORTSDB_API_KEY || DEFAULT_API_KEY).trim() || DEFAULT_API_KEY
+    this.apiKey = String(apiKey || process.env.SPORTSDB_API_KEY || DEFAULT_API_KEY).trim()
     const cacheHours = Math.max(1, Math.min(24, toNumber(options.cacheHours, DEFAULT_ARTWORK_CACHE_HOURS)))
     this.artworkHitTtlMs = cacheHours * 60 * 60 * 1000
     this.missTtlMs = DEFAULT_MISS_CACHE_HOURS * 60 * 60 * 1000
@@ -1328,6 +1328,7 @@ class SportsDbClient {
   }
 
   async _fetchList(endpoint, params = {}) {
+    if (!this.apiKey) return []
     if (Date.now() < rateLimitedUntil) return []
 
     const query = new URLSearchParams()

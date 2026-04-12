@@ -2722,13 +2722,13 @@
         <label for="maxResults">Max Results Per Search</label>
         <input type="number" id="maxResults" value="50" min="10" max="200">
         <label for="sportsDbApiKey">TheSportsDB API Key (optional)</label>
-        <input type="text" id="sportsDbApiKey" value="123" placeholder="123">
+        <input type="text" id="sportsDbApiKey" value="" placeholder="Optional paid key">
         <label for="sportsDbCacheHours">TheSportsDB Cache (hours)</label>
         <input type="number" id="sportsDbCacheHours" value="24" min="1" max="168">
-        <p class="hint">Controls sports artwork lookup reuse. Posters, wallpapers, landscape art, and logos are also cached on demand by the active PVTKRRX host.</p>
+        <p class="hint">Optional local cache tooling only. PVTKRRX now stays SVG-only for live sports artwork; leave this blank unless you deliberately want to run manual SportsDB cache warm/import work.</p>
         <label for="sportsImagePackagePath">Sports Poster Package Path (optional)</label>
         <input type="text" id="sportsImagePackagePath" value="" placeholder="D:\\sports-package or /srv/pvtkrrx/sports-package">
-        <p class="hint">Point this at a local folder or manifest file for a downloaded poster package. PVTKRRX will use that package before any upstream image fetch, so the free TheSportsDB key only needs to find updates and gaps.</p>
+        <p class="hint">Point this at a local folder or manifest file for a downloaded poster package if you want local cache tooling to import it. Normal live PVTKRRX artwork stays on generated SVG cards.</p>
         <div id="localHostnameBlock">
           <label for="localHostname">Local Hostname (.local alias)</label>
           <input type="text" id="localHostname" value="pvtkrrx.local" placeholder="pvtkrrx.local">
@@ -5647,9 +5647,6 @@
       if (!document.getElementById('jackettUrl').value.trim()) {
         document.getElementById('jackettUrl').value = 'http://localhost:9696';
       }
-      if (!document.getElementById('sportsDbApiKey').value.trim()) {
-        document.getElementById('sportsDbApiKey').value = '123';
-      }
       if (!document.getElementById('sportsDbCacheHours').value.trim()) {
         document.getElementById('sportsDbCacheHours').value = '24';
       }
@@ -6128,7 +6125,7 @@
       const base = {
         jackettUrl: normalizeProwlarrBaseUrl(document.getElementById('jackettUrl').value),
         jackettApiKey: document.getElementById('jackettApiKey').value.trim(),
-        sportsDbApiKey: document.getElementById('sportsDbApiKey').value.trim() || '123',
+        sportsDbApiKey: document.getElementById('sportsDbApiKey').value.trim(),
         sportsDbCacheHours: Math.max(1, Math.min(168, parseInt(document.getElementById('sportsDbCacheHours').value, 10) || 24)),
         sportsImagePackagePath: document.getElementById('sportsImagePackagePath').value.trim(),
         qbitUrl: document.getElementById('qbitUrl').value.replace(/\/+$/, ''),

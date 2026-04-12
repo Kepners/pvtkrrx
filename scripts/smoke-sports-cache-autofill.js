@@ -20,8 +20,16 @@ function todayIso() {
   return date.toISOString().slice(0, 10)
 }
 
+function isoOffset(days) {
+  const date = new Date()
+  date.setUTCHours(0, 0, 0, 0)
+  date.setUTCDate(date.getUTCDate() + Number(days || 0))
+  return date.toISOString().slice(0, 10)
+}
+
 function buildFetchStub() {
   const today = todayIso()
+  const yesterday = isoOffset(-1)
   const queryKey = (endpoint, params = {}) => `${endpoint}?${new URLSearchParams(params).toString()}`
   const jsonResponses = new Map([
     [
@@ -69,6 +77,21 @@ function buildFetchStub() {
       }
     ],
     [
+      queryKey('eventsday.php', { d: yesterday, s: 'Soccer' }),
+      {
+        events: [
+          {
+            idEvent: 'football-evt-0',
+            strEvent: 'Tottenham Hotspur vs Newcastle United',
+            dateEvent: yesterday,
+            strLeague: 'English Premier League',
+            strPoster: 'https://images.example.com/events/football-evt-0-poster.jpg',
+            strThumb: 'https://images.example.com/events/football-evt-0-thumb.jpg'
+          }
+        ]
+      }
+    ],
+    [
       queryKey('eventsday.php', { d: today, s: 'Soccer' }),
       {
         events: [
@@ -82,6 +105,10 @@ function buildFetchStub() {
           }
         ]
       }
+    ],
+    [
+      queryKey('eventstv.php', { d: yesterday, s: 'Soccer' }),
+      { tvevents: [] }
     ],
     [
       queryKey('eventstv.php', { d: today, s: 'Soccer' }),
@@ -227,6 +254,7 @@ async function main() {
     platform: 'linux',
     runtimeDir,
     statePath,
+    apiKey: '123',
     targets: [footballTarget, mmaTarget],
     targetsPerRun: 1,
     eventLeagueLimit: 1,
@@ -241,11 +269,13 @@ async function main() {
   try {
     const first = await runSportsCacheAutofill({
       ...options,
+      scheduleLookbackDays: 1,
       reason: 'smoke-first'
     })
     assert.equal(first.targets.length, 1)
     assert.equal(first.targets[0].key, 'football', 'expected first pass to start with football')
     assert.equal(first.summary.sports[0].mappedLeagues, 1, 'expected football autofill to recover the mapped league via direct lookup')
+    assert.equal(first.summary.sports[0].upcomingEvents, 3, 'expected autofill to include yesterday replays alongside today\'s football schedule')
     let state = loadSportsCacheAutofillState(statePath)
     assert.equal(state.nextTargetIndex, 1, 'expected first pass to advance cursor to next sport')
     assert.deepEqual(state.lastTargets, ['football'])
@@ -254,6 +284,7 @@ async function main() {
 
     const second = await runSportsCacheAutofill({
       ...options,
+      scheduleLookbackDays: 1,
       reason: 'smoke-second'
     })
     assert.equal(second.targets.length, 1)
@@ -267,6 +298,7 @@ async function main() {
 
     const third = await runSportsCacheAutofill({
       ...options,
+      scheduleLookbackDays: 1,
       reason: 'smoke-third'
     })
     assert.equal(third.targets.length, 1)

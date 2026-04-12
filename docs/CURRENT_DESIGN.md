@@ -170,11 +170,12 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
   - other non-vs sports can fall back to generated league-logo event cards
 - `backgroundImage` and `logo` stay separate from the portrait poster contract for player-loading and wallpaper use.
 - When Prowlarr has no indexers or cannot be reached, empty movie, TV, and sports catalogs now return a setup-needed placeholder card instead of a blank grid, so the user gets a useful recovery cue in Stremio.
-- When external sports art exists, addon responses now prefer signed `/image/sports/...` URLs so the active local or hosted runtime can cache poster, wallpaper, landscape, and logo bytes on disk instead of hotlinking every request back to the upstream art host.
-- `npm run server:setup` and `npm run cache:sports` can now warm that same disk cache ahead of time with recent replay dates plus upcoming event artwork, top team badges, and mapped league art so first-run sports tiles do not depend on cold image fetches.
-- The runtime can now also map a downloaded sports poster package from any local/server filesystem path. When `sportsImagePackagePath` or `PVTKRRX_SPORTS_IMAGE_PACKAGE_PATH` is configured, package images are imported into the runtime cache before any upstream image fetch, so the free TheSportsDB key is used to find updates and gaps instead of rehydrating the whole catalogue.
+- PVTKRRX's own live addon surface now stays on generated SVG sports poster/background cards, with sport-specific themes handled by `sportsThumb.js`.
+- Licensed real imagery remains SportsMeta-owned on its own paid/member routes instead of being surfaced directly from the free PVTKRRX catalog/meta path.
+- `npm run server:setup` and `npm run cache:sports` can still warm that disk cache ahead of time with recent replay dates plus upcoming event artwork, top team badges, and mapped league art, but only when an explicit SportsDB key is configured.
+- The runtime can still map a downloaded sports poster package from any local/server filesystem path for manual/operator tooling. That package path is no longer the default live artwork path for ordinary PVTKRRX catalog/meta responses.
 - `npm run cache:sports-package` can proactively sync that mapped package into the runtime cache instead of waiting for lazy first-hit imports.
-- Normal `/image/sports/...` request handling is now cache-only but package-aware: if the byte cache misses, the runtime can still import the mapped package file for that artwork on demand, but it does not repopulate the catalogue from live upstream image fetches during request handling.
+- Normal `/image/sports/...` request handling is now cache-only but package-aware: if the byte cache misses, the runtime can still import the mapped package file for that artwork on demand, but the live PVTKRRX catalog/meta path no longer depends on those `/image/sports/...` URLs.
 - On long-running Linux/cloud runtimes, a background sports-cache autofill job now revisits one sport group every 15 minutes by default and persists its rotation cursor in the runtime directory.
 - The runtime `sports-image-cache/` store is now append-only by default: once image bytes are downloaded, PVTKRRX does not auto-prune or TTL-expire them unless the user explicitly deletes the cache on disk.
 - Sports catalog inclusion is availability-driven:
@@ -209,7 +210,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 ## Playback Model
 
 - Hosted relay routes do not proxy video bytes.
-- Hosted/local runtimes may proxy and cache sports artwork bytes through `/image/sports/...`; that image path is intentional and separate from the no-video-proxy rule.
+- Hosted/local runtimes may still hold manual/operator sports cache bytes under `/image/sports/...`, but the default live PVTKRRX sports catalog/meta path now stays on generated SVG artwork.
 - Hosted `/file` and `/playback` return 403 on the public hosted relay for non-local requests.
 - `LAN Bridge` requests 307-redirect to the host's local runtime before hitting `/file` or `/playback` when the home route is online, so after redirect all local playback capabilities apply.
 - Self-host server mode now supports separate control/install and byte-serving origins: `PVTKRRX_PUBLIC_BASE_URL` drives manifest/configure/install links, while optional `PVTKRRX_PLAYBACK_BASE_URL` can point built-in `/file` and `/playback` to a different public HTTPS origin. If the playback base is unset, built-in self-host playback falls back to the public base.

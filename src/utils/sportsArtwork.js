@@ -1,4 +1,9 @@
-const { makeSportsPosterUrl, makeSportsThumbUrl } = require('./sportsThumb')
+const {
+  makeSportsPosterUrl,
+  makeSportsPosterSvgUrl,
+  makeSportsThumbSvgUrl,
+  makeSportsThumbUrl
+} = require('./sportsThumb')
 const { proxySportsImageUrl } = require('./sportsImageCache')
 
 function normalizeSpace(value) {
@@ -32,6 +37,18 @@ function isFormulaOneContext(input = {}) {
   return /\b(?:f1|formula[\s-]*1|formula1|grand[\s-]*prix)\b/.test(text)
 }
 
+function resolveArtworkMode(input = {}) {
+  const normalized = normalizeSpace(input?.artworkMode || input?.assetMode).toLowerCase()
+  if (['svg', 'generated', 'free'].includes(normalized)) return 'svg'
+  return 'auto'
+}
+
+function resolveGeneratedArtworkStyle(input = {}) {
+  if (hasMatchupContext(input)) return 'matchup'
+  if (isFormulaOneContext(input)) return 'formula1'
+  return 'league-event'
+}
+
 function buildGeneratedArtworkItem(input = {}, style = 'generic-event') {
   const sportsArtwork = input?.sportsArtwork || {}
   const homeTeam = normalizeSpace(input?.homeTeam || sportsArtwork?.homeTeam)
@@ -53,20 +70,35 @@ function buildGeneratedArtworkItem(input = {}, style = 'generic-event') {
   }
 }
 
+function buildGeneratedArtworkUrls(input = {}) {
+  const style = resolveGeneratedArtworkStyle(input)
+  const item = buildGeneratedArtworkItem(input, style)
+  const baseUrl = normalizeSpace(input?.baseUrl)
+
+  return {
+    poster: makeSportsPosterSvgUrl(baseUrl, item),
+    landscape: makeSportsThumbSvgUrl(baseUrl, item, 'landscape'),
+    background: makeSportsThumbSvgUrl(baseUrl, item, 'background'),
+    style
+  }
+}
+
 function resolveGeneratedPosterUrl(baseUrl, input, style) {
   return makeSportsPosterUrl(baseUrl, buildGeneratedArtworkItem(input, style))
 }
 
 function resolveSportsPosterAsset(input = {}) {
   const baseUrl = normalizeSpace(input?.baseUrl)
+  const artworkMode = resolveArtworkMode(input)
   const sportsArtwork = input?.sportsArtwork || {}
   const carriedArtwork = normalizeSpace(input?.carriedArtwork)
   const portraitPosterUrl = normalizeSpace(carriedArtwork || sportsArtwork?.poster)
   const landscapePosterUrl = normalizeSpace(sportsArtwork?.image || sportsArtwork?.landscapeImage)
   const matchup = hasMatchupContext(input)
   const formulaOne = isFormulaOneContext(input)
-  const generatedStyle = matchup ? 'matchup' : (formulaOne ? 'formula1' : 'league-event')
-  const generatedPosterUrl = resolveGeneratedPosterUrl(baseUrl, input, generatedStyle)
+  const generated = buildGeneratedArtworkUrls(input)
+  const generatedStyle = generated.style
+  const generatedPosterUrl = generated.poster || resolveGeneratedPosterUrl(baseUrl, input, generatedStyle)
   const exactPosterAvailable = Boolean(portraitPosterUrl && !isLeagueFallbackArtwork(sportsArtwork))
   const formulaOneLeaguePosterFallback = Boolean(
     portraitPosterUrl &&
@@ -74,6 +106,14 @@ function resolveSportsPosterAsset(input = {}) {
     formulaOne &&
     !matchup
   )
+
+  if (artworkMode === 'svg' && generatedPosterUrl) {
+    return {
+      poster: generatedPosterUrl,
+      posterShape: 'poster',
+      posterMode: generatedStyle
+    }
+  }
 
   // PRIORITY: real event artwork from TheSportsDB ALWAYS wins over generated cards.
   // Generated cards are a last resort - real images make the catalog look like a real media UI.
@@ -124,6 +164,8 @@ function resolveSportsPosterAsset(input = {}) {
 }
 
 function resolveSportsBackgroundAsset(input = {}) {
+  const artworkMode = resolveArtworkMode(input)
+  const generated = buildGeneratedArtworkUrls(input)
   const baseUrl = normalizeSpace(input?.baseUrl)
   const sportsArtwork = input?.sportsArtwork || {}
   const carriedBackground = normalizeSpace(input?.carriedBackground)
@@ -137,10 +179,14 @@ function resolveSportsBackgroundAsset(input = {}) {
     baseUrl,
     buildGeneratedArtworkItem(
       input,
-      hasMatchupContext(input) ? 'matchup' : (isFormulaOneContext(input) ? 'formula1' : 'league-event')
+      generated.style
     ),
     'background'
   )
+
+  if (artworkMode === 'svg') {
+    return generated.background || backgroundFallback
+  }
 
   return (
     proxySportsImageUrl(baseUrl, backgroundSourceUrl, 'background') ||
@@ -150,6 +196,7 @@ function resolveSportsBackgroundAsset(input = {}) {
 }
 
 function resolveSportsLogoAsset(input = {}) {
+  if (resolveArtworkMode(input) === 'svg') return ''
   const baseUrl = normalizeSpace(input?.baseUrl)
   const sportsArtwork = input?.sportsArtwork || {}
   const carriedLogo = normalizeSpace(input?.carriedLogo)

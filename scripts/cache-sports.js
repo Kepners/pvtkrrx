@@ -38,6 +38,9 @@ async function run() {
     apiKey,
     logger: console
   })
+  if (summary?.disabled) {
+    console.log('[cache:sports] skipped: no TheSportsDB API key configured')
+  }
   console.log(`[cache:sports] summary: ${summarizeSportsImageSeed(summary)}`)
 }
 

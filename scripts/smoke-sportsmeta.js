@@ -8,11 +8,15 @@ const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-sportsmeta-'))
 process.env.PVTKRRX_RUNTIME_DIR = runtimeDir
 process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'pvtkrrx-sportsmeta-smoke-secret'
 process.env.PVTKRRX_SPORTSMETA_DEFAULT_TIER = 'svg'
+process.env.PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA = 'true'
 
 const { encrypt } = require('../src/utils/crypto')
 const { saveSecureJsonFile } = require('../src/utils/secureJsonFile')
 const { SportsDbClient } = require('../src/clients/sportsdb')
-const { closeSportsMetaCatalogue } = require('../src/utils/sportsmetaCatalogue')
+const {
+  closeSportsMetaCatalogue,
+  upsertSportsMetaEntitlement
+} = require('../src/utils/sportsmetaCatalogue')
 
 async function fetchJson(url, options = {}) {
   const res = await fetch(url, options)
@@ -54,9 +58,10 @@ async function main() {
   try {
     const { port } = server.address()
     const baseUrl = `http://127.0.0.1:${port}`
+    const accountUserId = 'usr_sportsmeta_smoke'
     const sportsmetaToken = encodeURIComponent(encrypt({
       sportsDbApiKey: 'smoke-sports-key',
-      sportsmetaTier: 'sportsmeta'
+      accountUserId
     }, process.env.ENCRYPTION_SECRET))
 
     const freeResult = await fetchJson(
@@ -73,6 +78,21 @@ async function main() {
     assert.equal(freeResult.json.artwork?.homeBadge, null)
     assert.equal(freeResult.json.artwork?.awayBadge, null)
     assert.equal(freeResult.json.artwork?.leagueLogo, null)
+
+    const unlicensedResult = await fetchJson(
+      `${baseUrl}/${sportsmetaToken}/sportsmeta/event?title=NBA.2026.04.08.Oklahoma.City.Thunder.vs.LA.Clippers.1080p`
+    )
+    assert.equal(unlicensedResult.status, 200, 'token SportsMeta route should still return 200 without entitlement')
+    assert.equal(unlicensedResult.json.tier, 'svg', 'issued entitlement should be required before paid artwork unlocks')
+    assert.match(String(unlicensedResult.json.artwork?.poster || ''), /\/thumb\/sports\/poster\/.+\.svg$/i)
+
+    upsertSportsMetaEntitlement({
+      accountUserId,
+      tier: 'sportsmeta',
+      plan: 'annual',
+      expiresAt: Date.now() + (24 * 60 * 60 * 1000),
+      source: 'smoke'
+    }, { runtimeDir })
 
     const paidResult = await fetchJson(
       `${baseUrl}/${sportsmetaToken}/sportsmeta/event?title=NBA.2026.04.08.Oklahoma.City.Thunder.vs.LA.Clippers.1080p`

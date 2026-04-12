@@ -597,9 +597,11 @@ async function testOrderAgnosticSportsGrouping() {
   assert.equal(result.metas.length, 1, 'expected reversed team order to dedupe into one sports meta')
   assert.ok(result.metas[0].id.length < 256, 'expected sports meta id to stay under common Stremio client limits')
   // Real TheSportsDB poster available → must be used (proxied) instead of generated card
-  assertSportsProxyUrl(result.metas[0].poster, 'poster', 'https://example.com/portrait.jpg', 'resolved SportsMeta poster must take priority over generated cards')
+  const resolvedPosterPayload = assertSportsThumbUrl(result.metas[0].poster, 'poster', 'resolved sports catalog rows should stay on generated SVG poster cards')
+  assert.equal(resolvedPosterPayload.s, 'football')
   assert.equal(result.metas[0].posterShape, 'poster', 'expected sports catalog to tag portrait artwork as poster-shaped')
-  assertSportsProxyUrl(result.metas[0].background, 'background', 'https://example.com/background.jpg')
+  assertSportsThumbUrl(result.metas[0].background, 'background', 'resolved sports catalog backgrounds should stay on generated SVG cards')
+  assert.equal(String(result.metas[0].logo || ''), '', 'resolved sports catalog rows should not expose a live logo image from PVTKRRX')
   const decoded = decodeCustomId(result.metas[0].id)
   assert.equal(decoded.k, 'sports')
   assert.equal(decoded.x, 'sportsmeta:event:football|2026-03-15|premier-league|arsenal|chelsea', 'expected resolved catalog items to carry the canonical SportsMeta id')
@@ -1256,9 +1258,11 @@ async function testSportsMetaRichDescription() {
   assert.ok(result.meta.description.includes('Formula 1'), 'expected description to mention league')
   assert.ok(result.meta.genres.includes('Motorsport'), 'expected Motorsport genre')
   assert.equal(result.meta.releaseInfo, '2026-03-28')
-  assertSportsProxyUrl(result.meta.poster, 'poster', 'https://example.com/f1-poster.jpg')
-  assertSportsProxyUrl(result.meta.background, 'background', 'https://example.com/f1-bg.jpg')
-  assert.ok(result.meta.logo, 'expected sports meta to include a logo for the Stremio waiting screen')
+  const posterPayload = assertSportsThumbUrl(result.meta.poster, 'poster', 'expected sports meta poster to stay on generated SVG artwork')
+  assert.equal(posterPayload.s, 'f1')
+  assertSportsThumbUrl(result.meta.background, 'background', 'expected sports meta background to stay on generated SVG artwork')
+  assert.doesNotMatch(String(result.meta.logo || ''), /\/image\/sports\/logo\//, 'expected sports meta to avoid live logo image proxies on the PVTKRRX surface')
+  assert.match(String(result.meta.logo || ''), /\.svg(?:$|\?)/i, 'expected sports meta logo fallback to stay on an SVG asset')
   assert.ok(result.meta.runtime, 'expected runtime to carry sport type label')
 }
 
@@ -1833,7 +1837,7 @@ async function testNonSportsCultAvailabilityDoesNotCreateCatalogItem() {
   assert.equal(result.metas.length, 0, 'non-SportsCult availability must not create its own catalog row')
 }
 
-async function testResolvedMetaUsesSportsMetaProxyUrls() {
+async function testResolvedMetaUsesSportsMetaSvgUrls() {
   const { handleMeta } = require('../src/handlers/meta')
   const id = encodeCustomId({
     y: 'movie',
@@ -1865,9 +1869,11 @@ async function testResolvedMetaUsesSportsMetaProxyUrls() {
     baseUrl: 'http://127.0.0.1:7000'
   }))
 
-  assertSportsProxyUrl(result.meta.poster, 'poster', 'https://images.example.com/meta-proxy-poster.jpg', 'resolved sports meta should use proxied SportsMeta poster art')
-  assert.match(result.meta.background, /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/background\//, 'expected resolved sports meta background to use local sports image proxy')
-  assert.match(String(result.meta.logo || ''), /^http:\/\/127\.0\.0\.1:7000\/image\/sports\/logo\//, 'expected resolved sports meta logo to use local sports image proxy')
+  const resolvedPosterPayload = assertSportsThumbUrl(result.meta.poster, 'poster', 'resolved sports meta should stay on generated SVG poster art in PVTKRRX')
+  assert.equal(resolvedPosterPayload.s, 'football')
+  assertSportsThumbUrl(result.meta.background, 'background', 'resolved sports meta background should stay on generated SVG art in PVTKRRX')
+  assert.doesNotMatch(String(result.meta.logo || ''), /\/image\/sports\/logo\//, 'resolved sports meta should not expose a live logo image proxy from PVTKRRX')
+  assert.match(String(result.meta.logo || ''), /\.svg(?:$|\?)/i, 'resolved sports meta logo fallback should stay on an SVG asset')
 }
 
 async function testMetaFallbackNeverReturnsNull() {
@@ -1928,7 +1934,7 @@ async function main() {
     await testSportsMetaIncludesGenres()
     await testSportsMetaRichDescription()
     await testArtworkFallbackBehavior()
-    await testResolvedMetaUsesSportsMetaProxyUrls()
+    await testResolvedMetaUsesSportsMetaSvgUrls()
     await testMetaFallbackNeverReturnsNull()
     console.log('Smoke sports structured flow passed')
   } finally {

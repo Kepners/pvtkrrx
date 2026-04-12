@@ -84,6 +84,7 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl) 
   const displayTitle = String(canonicalEvent?.name || canonicalEvent?.title || requestedId).trim() || requestedId
   const artworkInput = {
     baseUrl,
+    artworkMode: 'svg',
     title: canonicalEvent?.title || displayTitle,
     displayTitle,
     publishDate: eventDate,
@@ -226,6 +227,7 @@ async function handleCustomMeta(config, id, context = {}) {
 
   const artworkInput = {
     baseUrl,
+    artworkMode: 'svg',
     title: String(canonicalEvent?.title || info.t || info.n || '').trim(),
     displayTitle,
     publishDate: info.p,

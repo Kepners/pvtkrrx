@@ -8,7 +8,7 @@ const { cleanTitle, isLikelyPackedReleaseTitle } = require('../utils/parser')
 const { normalizeSportKey, resolveSportHint, isSportsNoiseTitle, isLikelySportsEventTitle } = require('../utils/sportsRules')
 const { isSportsCultIndexer, isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { formatSize, findVideoFile } = require('../utils/streams')
-const { makeSportsPosterUrl } = require('../utils/sportsThumb')
+const { makeSportsPosterSvgUrl } = require('../utils/sportsThumb')
 const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
 const { getMappedLeagueEntry, mapLeague } = require('../utils/leagueMap')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
@@ -933,6 +933,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
 
     const artworkInput = {
       baseUrl: options.baseUrl,
+      artworkMode: 'svg',
       title: availability.title || displayTitle,
       displayTitle,
       publishDate: eventDate || availability.pubDate || availability.publishDate || '',
@@ -943,7 +944,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       awayTeam: canonicalEvent?.awayTeam || fallbackAwayTeam || sportsArtwork?.awayTeam || '',
       sportsArtwork
     }
-    const generatedPosterUrl = makeSportsPosterUrl(options.baseUrl, {
+    const generatedPosterUrl = makeSportsPosterSvgUrl(options.baseUrl, {
       title: displayTitle,
       publishDate: eventDate || availability.pubDate || availability.publishDate || '',
       sportHint: resolvedSportHint,

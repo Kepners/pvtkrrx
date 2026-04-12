@@ -16,6 +16,7 @@ const DEFAULT_TARGETS_PER_RUN = 1
 const DEFAULT_EVENT_LEAGUE_LIMIT = 20
 const DEFAULT_TEAM_LIMIT_PER_SPORT = 200
 const DEFAULT_SCHEDULE_DAYS = 7
+const DEFAULT_SCHEDULE_LOOKBACK_DAYS = 2
 const DEFAULT_IMAGE_CONCURRENCY = 6
 
 let activeAutofillPromise = null
@@ -81,9 +82,8 @@ function resolveSportsCacheApiKey(options = {}) {
     options.apiKey ||
     env.PVTKRRX_SPORTS_CACHE_API_KEY ||
     env.SPORTSDB_API_KEY ||
-    localConfig?.sportsDbApiKey ||
-    '123'
-  ) || '123'
+    localConfig?.sportsDbApiKey
+  )
 }
 
 function resolveSportsCacheAutofillConfig(options = {}) {
@@ -134,6 +134,12 @@ function resolveSportsCacheAutofillConfig(options = {}) {
       options.scheduleDays ?? env.PVTKRRX_SPORTS_CACHE_AUTO_FILL_SCHEDULE_DAYS,
       DEFAULT_SCHEDULE_DAYS,
       1,
+      7
+    ),
+    scheduleLookbackDays: clampInteger(
+      options.scheduleLookbackDays ?? env.PVTKRRX_SPORTS_CACHE_AUTO_FILL_LOOKBACK_DAYS,
+      DEFAULT_SCHEDULE_LOOKBACK_DAYS,
+      0,
       7
     ),
     imageConcurrency: clampInteger(
@@ -281,6 +287,7 @@ async function runSportsCacheAutofill(options = {}) {
         fetchImpl: options.fetchImpl,
         targets: selection.targets,
         scheduleDays: config.scheduleDays,
+        scheduleLookbackDays: config.scheduleLookbackDays,
         eventLeagueLimit: config.eventLeagueLimit,
         teamLimitPerSport: config.teamLimitPerSport,
         imageConcurrency: config.imageConcurrency
@@ -375,6 +382,7 @@ module.exports = {
   DEFAULT_INITIAL_DELAY_MS,
   DEFAULT_INTERVAL_MS,
   DEFAULT_SCHEDULE_DAYS,
+  DEFAULT_SCHEDULE_LOOKBACK_DAYS,
   DEFAULT_TARGETS_PER_RUN,
   DEFAULT_TEAM_LIMIT_PER_SPORT,
   STATE_FILE_NAME,

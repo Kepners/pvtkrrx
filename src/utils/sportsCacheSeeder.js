@@ -8,12 +8,13 @@ const {
 } = require('../clients/sportsdb')
 
 const BASE_URL = 'https://www.thesportsdb.com/api/v1/json'
-const DEFAULT_API_KEY = '123'
+const DEFAULT_API_KEY = ''
 const DEFAULT_TIMEOUT_MS = 10000
 const DEFAULT_IMAGE_CONCURRENCY = 6
 const DEFAULT_EVENT_LEAGUE_LIMIT = 20
 const DEFAULT_TEAM_LIMIT = 200
 const DEFAULT_SCHEDULE_DAYS = 7
+const DEFAULT_SCHEDULE_LOOKBACK_DAYS = 2
 
 const SUPPORTED_SPORT_TARGETS = Object.freeze([
   { key: 'football', sportsDbSport: 'Soccer', label: 'Soccer' },
@@ -518,6 +519,12 @@ function toIsoDateFromOffset(offsetDays = 0) {
   return date.toISOString().slice(0, 10)
 }
 
+function normalizeCount(value, fallback, min = 0) {
+  const parsed = Number.parseInt(String(value ?? '').trim(), 10)
+  if (!Number.isFinite(parsed)) return fallback
+  return Math.max(min, parsed)
+}
+
 async function seedSportTarget(target, context) {
   const summary = {
     key: target.key,
@@ -587,8 +594,13 @@ async function seedSportTarget(target, context) {
     addEvents(await fetchUpcomingLeagueEvents(context.apiKey, idLeague, context))
   }
 
-  const scheduleDays = Math.max(1, Number(context.scheduleDays || DEFAULT_SCHEDULE_DAYS))
-  for (let offset = 0; offset < scheduleDays; offset += 1) {
+  const scheduleDays = normalizeCount(context.scheduleDays, DEFAULT_SCHEDULE_DAYS, 1)
+  const scheduleLookbackDays = normalizeCount(
+    context.scheduleLookbackDays,
+    DEFAULT_SCHEDULE_LOOKBACK_DAYS,
+    0
+  )
+  for (let offset = -scheduleLookbackDays; offset < scheduleDays; offset += 1) {
     const date = toIsoDateFromOffset(offset)
     addEvents(await fetchScheduleEventsByDate(context.apiKey, date, target.sportsDbSport, context))
     addEvents(await fetchTvEventsByDate(context.apiKey, date, target.sportsDbSport, context))
@@ -667,6 +679,10 @@ function buildSeedSummary(apiKey) {
 }
 
 function summarizeSportsImageSeed(summary = {}) {
+  if (summary?.disabled) {
+    return `disabled (${normalizeSpace(summary?.reason || 'no_api_key')})`
+  }
+
   const sports = Array.isArray(summary?.sports) ? summary.sports : []
   const totals = sports.reduce((acc, sport) => {
     acc.events += Number(sport?.upcomingEvents || 0)
@@ -689,9 +705,15 @@ function summarizeSportsImageSeed(summary = {}) {
 }
 
 async function seedSportsImageCache(options = {}) {
-  const apiKey = normalizeSpace(options.apiKey || process.env.SPORTSDB_API_KEY || DEFAULT_API_KEY) || DEFAULT_API_KEY
+  const apiKey = normalizeSpace(options.apiKey || process.env.SPORTSDB_API_KEY || DEFAULT_API_KEY)
   const summary = buildSeedSummary(apiKey)
   const logger = createLogger(options.logger)
+  if (!apiKey) {
+    summary.disabled = true
+    summary.reason = 'missing_api_key'
+    logger.log('[cache:sports] skipped: no TheSportsDB API key configured')
+    return summary
+  }
   const targets = Array.isArray(options.targets) && options.targets.length > 0
     ? options.targets
     : SUPPORTED_SPORT_TARGETS
@@ -707,6 +729,7 @@ async function seedSportsImageCache(options = {}) {
     summary,
     timeoutMs: options.timeoutMs || DEFAULT_TIMEOUT_MS,
     scheduleDays: options.scheduleDays || DEFAULT_SCHEDULE_DAYS,
+    scheduleLookbackDays: options.scheduleLookbackDays ?? DEFAULT_SCHEDULE_LOOKBACK_DAYS,
     eventLeagueLimit: options.eventLeagueLimit || DEFAULT_EVENT_LEAGUE_LIMIT,
     teamLimitPerSport: options.teamLimitPerSport || DEFAULT_TEAM_LIMIT
   }

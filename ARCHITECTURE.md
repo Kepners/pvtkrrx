@@ -61,7 +61,7 @@ Shared Contabo hosting and same-box network access are infrastructure couplings,
 | `src/handlers/*` | Catalog, stream, and meta generation |
 | `src/clients/*` | Prowlarr, qBittorrent, Cinemeta, TheSportsDB, and separate-SportsMeta integrations |
 | `src/utils/analytics.js` | Optional Umami monitoring for hosted traffic and product events, with host gating and dedupe state |
-| `src/utils/sportsImageCache.js` | Signed sports artwork proxy URLs plus runtime disk cache for poster, background, landscape, and logo bytes |
+| `src/utils/sportsImageCache.js` | Local/experimental sports artwork cache tooling; no longer the default live PVTKRRX catalog/meta path |
 | `src/utils/sportsCacheAutofill.js` | Rotating background sports-cache refill for long-running Linux/cloud runtimes |
 | `src/utils/opaqueState.js` | Opaque state tokens for `/file` and `/playback` |
 | `src/utils/pairStore.js` | LAN pair persistence |
@@ -135,11 +135,11 @@ The current desktop popup copy still says `LAN Bridge`; the configure flow and h
 1. Sports catalog items use internal `pvtkrrx:` ids.
 2. Canonical cross-product sports metadata ids use `sportsmeta:` and are owned by SportsMeta, not PVTKRRX.
 3. Meta and stream handlers decode `pvtkrrx:` ids locally and consume `sportsmeta:` ids only on the stream-attach side.
-4. TheSportsDB is used for poster, background, and logo enrichment where configured for PVTKRRX-owned rows.
+4. PVTKRRX's live sports catalog/meta surface now stays on generated SVG poster/background cards with sport-specific theming.
 5. The manifest now exposes a dedicated top-level `sports` surface with an `All Sports` catalog plus sport-family catalogs such as `Football`, `Motorsport`, and `MMA`.
 6. Each sport-family catalog uses the third-column `genre` dropdown for narrower league/team filters.
-7. When external sports art exists, local and hosted runtimes now hand Stremio stable `/image/sports/...` URLs backed by the runtime disk cache instead of hotlinking TheSportsDB on every request.
-8. Sports catalog tiles now prefer portrait poster art, while background/logo art is carried separately for player-loading and wallpaper use.
+7. Licensed real imagery remains SportsMeta-owned on its own paid/member routes instead of being surfaced directly from the free PVTKRRX path.
+8. Local/manual SportsDB or package cache tooling can still exist on disk, but the live PVTKRRX request path does not depend on `/image/sports/...` URLs anymore.
 9. Library items expose completed qBittorrent content through the same addon surface.
 10. Long-running Linux/cloud runtimes now revisit one sport group every 15 minutes by default and keep filling `sports-image-cache/` gradually between installer/manual warm passes.
 

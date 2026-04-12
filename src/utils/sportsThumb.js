@@ -196,7 +196,7 @@ function decodeSportsThumbToken(token) {
   }
 }
 
-function makeSportsThumbUrl(baseUrl, item, variant = 'landscape') {
+function makeSportsThumbAssetUrl(baseUrl, item, variant = 'landscape', format = 'png') {
   const hintedSport = normalizeThemeSportKey(item?.sportHint || item?.sport)
   const token = encodeSportsThumbToken({
     t: String(item?.title || ''),
@@ -212,13 +212,26 @@ function makeSportsThumbUrl(baseUrl, item, variant = 'landscape') {
     e: String(item?.eventName || '')
   })
   const root = String(baseUrl || '').replace(/\/+$/, '')
-  if (variant === 'poster') return `${root}/thumb/sports/poster/${token}.png`
-  if (variant === 'background') return `${root}/thumb/sports/background/${token}.png`
-  return `${root}/thumb/sports/${token}.png`
+  const ext = String(format || '').trim().toLowerCase() === 'svg' ? 'svg' : 'png'
+  if (variant === 'poster') return `${root}/thumb/sports/poster/${token}.${ext}`
+  if (variant === 'background') return `${root}/thumb/sports/background/${token}.${ext}`
+  return `${root}/thumb/sports/${token}.${ext}`
+}
+
+function makeSportsThumbUrl(baseUrl, item, variant = 'landscape') {
+  return makeSportsThumbAssetUrl(baseUrl, item, variant, 'png')
+}
+
+function makeSportsThumbSvgUrl(baseUrl, item, variant = 'landscape') {
+  return makeSportsThumbAssetUrl(baseUrl, item, variant, 'svg')
 }
 
 function makeSportsPosterUrl(baseUrl, item) {
   return makeSportsThumbUrl(baseUrl, item, 'poster')
+}
+
+function makeSportsPosterSvgUrl(baseUrl, item) {
+  return makeSportsThumbSvgUrl(baseUrl, item, 'poster')
 }
 
 function isFightPosterTheme(payload) {
@@ -444,8 +457,11 @@ async function renderSportsThumbSvg(payload, options = {}) {
 
 module.exports = {
   detectSportFromTitle,
+  makeSportsThumbAssetUrl,
   makeSportsThumbUrl,
+  makeSportsThumbSvgUrl,
   makeSportsPosterUrl,
+  makeSportsPosterSvgUrl,
   decodeSportsThumbToken,
   renderSportsThumbSvg
 }
