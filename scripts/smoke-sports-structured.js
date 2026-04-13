@@ -20,6 +20,7 @@ const { encodeCustomId, decodeCustomId } = require('../src/utils/customId')
 const { setPublicCacheHeaders } = require('../src/lib/shared')
 const { decodeSportsThumbToken } = require('../src/utils/sportsThumb')
 const { clearSportsAvailabilityAnchors } = require('../src/utils/sportsAvailabilityStore')
+const { buildSportsMetaResolutionQuery } = require('../src/utils/sportsIdentityResolution')
 const {
   makeSportsImageProxyUrl,
   decodeSportsImageToken,
@@ -205,6 +206,11 @@ function testSportsDiscoveryCatalogLayout() {
   assert.ok(footballCatalog, 'expected football discovery catalog definition')
   assert.ok(footballCatalog.detailOptions.includes('Premier League'), 'football discovery should expose league filters')
   assert.ok(footballCatalog.detailOptions.includes('Arsenal'), 'football discovery should expose team filters')
+
+  const metaResource = manifest.resources.find((resource) => resource?.name === 'meta')
+  const streamResource = manifest.resources.find((resource) => resource?.name === 'stream')
+  assert.ok(metaResource?.idPrefixes?.includes('sportsmeta:'), 'manifest meta resource should declare canonical SportsMeta ids')
+  assert.ok(streamResource?.idPrefixes?.includes('sportsmeta:'), 'manifest stream resource should declare canonical SportsMeta ids')
 }
 
 function testParserAndLeagueMap() {
@@ -287,6 +293,47 @@ function testParserAndLeagueMap() {
   assert.equal(mapLeague(' epl '), 'English Premier League')
   assert.equal(mapLeague('IPL'), 'Indian Premier League')
   assert.equal(mapLeague('unknown'), null)
+
+  assert.deepEqual(
+    buildSportsMetaResolutionQuery({
+      title: 'NEWVISION Premier League Arsenal Bournemouth 20260411 HDTV 1080i MP1 H 264 TPTV',
+      pubDate: '2026-04-11T00:00:00Z'
+    }),
+    {
+      status: '',
+      identityType: 'matchup',
+      params: {
+        title: 'NEWVISION Premier League Arsenal Bournemouth 20260411 HDTV 1080i MP1 H 264 TPTV',
+        date: '2026-04-11',
+        sport: 'football',
+        league: 'English Premier League',
+        home: 'Arsenal',
+        away: 'Bournemouth'
+      },
+      reason: 'heuristic_league_split:0:1'
+    },
+    'resolver should derive canonical matchup hints from live tracker title patterns'
+  )
+  assert.deepEqual(
+    buildSportsMetaResolutionQuery({
+      title: 'NEWVISION Premier League Arsenal Bournemouth 20260411',
+      pubDate: '2026-04-11T00:00:00Z'
+    }),
+    {
+      status: '',
+      identityType: 'matchup',
+      params: {
+        title: 'NEWVISION Premier League Arsenal Bournemouth 20260411',
+        date: '2026-04-11',
+        sport: 'football',
+        league: 'English Premier League',
+        home: 'Arsenal',
+        away: 'Bournemouth'
+      },
+      reason: 'heuristic_league_split:0:1'
+    },
+    'resolver should derive canonical matchup hints from live tracker title patterns'
+  )
 }
 
 async function testStructuredFallbackToFuzzyLookup() {
@@ -602,11 +649,7 @@ async function testOrderAgnosticSportsGrouping() {
   assert.equal(result.metas[0].posterShape, 'poster', 'expected sports catalog to tag portrait artwork as poster-shaped')
   assertSportsThumbUrl(result.metas[0].background, 'background', 'resolved sports catalog backgrounds should stay on generated SVG cards')
   assert.equal(String(result.metas[0].logo || ''), '', 'resolved sports catalog rows should not expose a live logo image from PVTKRRX')
-  const decoded = decodeCustomId(result.metas[0].id)
-  assert.equal(decoded.k, 'sports')
-  assert.equal(decoded.x, 'sportsmeta:event:football|2026-03-15|premier-league|arsenal|chelsea', 'expected resolved catalog items to carry the canonical SportsMeta id')
-  assert.equal(decoded.q, 'resolved', 'expected resolved catalog items to stamp the resolution state')
-  assert.ok(decoded.ak, 'expected resolved catalog items to carry an availability anchor')
+  assert.equal(result.metas[0].id, 'sportsmeta:event:football|2026-03-15|premier-league|arsenal|chelsea', 'expected resolved catalog items to emit the canonical SportsMeta id directly')
 }
 
 async function testLeagueFallbackUsesGeneratedMatchupPoster() {
@@ -748,8 +791,7 @@ async function testSportSpecificCatalogDetailFiltering() {
   assert.equal(result.metas.length, 1, 'football discovery detail filter should narrow results to the requested team')
   assert.match(result.metas[0].name, /Arsenal vs Chelsea/i)
   assert.match(String(result.metas[0].description || ''), /English Premier League/i)
-  const decoded = decodeCustomId(result.metas[0].id)
-  assert.equal(decoded.r, 'football', 'football discovery catalog should stamp the football sport hint into the custom id')
+  assert.equal(result.metas[0].id, 'sportsmeta:event:football|2026-03-15|premier-league|arsenal|chelsea', 'football discovery catalog should expose canonical SportsMeta ids')
 }
 
 async function testSportFamilyCatalogRejectsMixedSportLeakage() {
@@ -1683,10 +1725,10 @@ async function testCanonicalResolutionMergesSeparateLeagueAliases() {
   ))
 
   assert.equal(result.metas.length, 1, 'separate availability keys should still collapse under one canonical SportsMeta identity')
-  assert.equal(decodeCustomId(result.metas[0].id).x, 'sportsmeta:event:football|2026-03-15|premier-league|arsenal|chelsea')
+  assert.equal(result.metas[0].id, 'sportsmeta:event:football|2026-03-15|premier-league|arsenal|chelsea')
 }
 
-async function testAmbiguousSportsMetaKeepsAvailabilityItem() {
+async function testAmbiguousSportsMetaSuppressesAvailabilityItem() {
   class FakeProwlarrClient {
     async search() {
       return [{
@@ -1719,14 +1761,10 @@ async function testAmbiguousSportsMetaKeepsAvailabilityItem() {
     { baseUrl: 'http://127.0.0.1:7000' }
   ))
 
-  assert.equal(result.metas.length, 1, 'ambiguous titles should stay visible when Sportscult has availability')
-  const decoded = decodeCustomId(result.metas[0].id)
-  assert.equal(decoded.q, 'ambiguous', 'ambiguous availability should be marked honestly')
-  assert.ok(!decoded.x, 'ambiguous availability should not claim a canonical SportsMeta id')
-  assert.match(String(result.metas[0].poster || ''), /\/thumb\/sports\/poster\//, 'ambiguous availability should fall back to generated artwork')
+  assert.equal(result.metas.length, 0, 'ambiguous titles should fail cleanly instead of leaking non-canonical ids into the addon-facing catalog')
 }
 
-async function testNotFoundSportsMetaKeepsAvailabilityItem() {
+async function testNotFoundSportsMetaSuppressesAvailabilityItem() {
   class FakeProwlarrClient {
     async search() {
       return [{
@@ -1757,11 +1795,7 @@ async function testNotFoundSportsMetaKeepsAvailabilityItem() {
     { baseUrl: 'http://127.0.0.1:7000' }
   ))
 
-  assert.equal(result.metas.length, 1, 'not-found identity should not remove a valid Sportscult row')
-  const decoded = decodeCustomId(result.metas[0].id)
-  assert.equal(decoded.q, 'not_found', 'not-found identity should be recorded explicitly')
-  assert.ok(!decoded.x, 'not-found identity should not claim a canonical SportsMeta id')
-  assert.match(String(result.metas[0].poster || ''), /\/thumb\/sports\/poster\//, 'not-found identity should fall back to generated artwork')
+  assert.equal(result.metas.length, 0, 'not-found identity should fail cleanly instead of leaking non-canonical ids into the addon-facing catalog')
 }
 
 async function testSportsMetaOnlyEventDoesNotCreateCatalogItem() {
@@ -1926,8 +1960,8 @@ async function main() {
     await testCatalogShowsSetupPlaceholderWhenProwlarrHasNoIndexers()
     await testSportSpecificCatalogDetailFiltering()
     await testCanonicalResolutionMergesSeparateLeagueAliases()
-    await testAmbiguousSportsMetaKeepsAvailabilityItem()
-    await testNotFoundSportsMetaKeepsAvailabilityItem()
+    await testAmbiguousSportsMetaSuppressesAvailabilityItem()
+    await testNotFoundSportsMetaSuppressesAvailabilityItem()
     await testSportsMetaOnlyEventDoesNotCreateCatalogItem()
     await testNonSportsCultAvailabilityDoesNotCreateCatalogItem()
     await testLibraryCustomIdsStayCompact()

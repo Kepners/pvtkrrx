@@ -148,6 +148,7 @@ class SportsMetaClient {
         if (response.status === 404) return null
         if (!response.ok) {
           lastError = new Error(`SportsMeta request failed with ${response.status}`)
+          lastError.status = response.status
           continue
         }
 

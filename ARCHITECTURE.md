@@ -132,9 +132,9 @@ The current desktop popup copy still says `LAN Bridge`; the configure flow and h
 
 ### Sports And Library
 
-1. Sports catalog items use internal `pvtkrrx:` ids.
+1. Unresolved sports catalog items use internal `pvtkrrx:` ids, while safely resolved sports rows emit raw canonical `sportsmeta:` ids.
 2. Canonical cross-product sports metadata ids use `sportsmeta:` and are owned by SportsMeta, not PVTKRRX.
-3. Meta and stream handlers decode `pvtkrrx:` ids locally and consume `sportsmeta:` ids only on the stream-attach side.
+3. Meta and stream handlers decode `pvtkrrx:` ids locally and also accept canonical `sportsmeta:` ids on the addon-facing catalog, meta, and stream flow.
 4. PVTKRRX's live sports catalog/meta surface now stays on generated SVG poster/background cards with sport-specific theming.
 5. The manifest now exposes a dedicated top-level `sports` surface with an `All Sports` catalog plus sport-family catalogs such as `Football`, `Motorsport`, and `MMA`.
 6. Each sport-family catalog uses the third-column `genre` dropdown for narrower league/team filters.

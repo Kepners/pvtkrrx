@@ -51,6 +51,7 @@ The shared Contabo VM does not make them the same product.
   - parse tracker title hints
   - resolve through SportsMeta when hints are strong enough
   - enrich the already-available row if resolution is safe
+  - emit the raw canonical `sportsmeta:` id on resolved addon-facing rows while keeping an internal anchor to the original tracker availability
   - keep stream playback tied to the original tracker availability, not to SportsMeta
 - SportsMeta resolution outcomes are explicit inside PVTKRRX:
   - `resolved`

@@ -10,6 +10,7 @@ const SPORTS_AVAILABILITY_MAX_ENTRIES = Math.max(
 )
 
 const sportsAvailabilityStore = new Map()
+const sportsCanonicalAnchorStore = new Map()
 
 function normalizeSportsAvailabilitySource(source = {}) {
   return {
@@ -28,6 +29,12 @@ function pruneExpiredSportsAvailabilityEntries(now = Date.now()) {
   for (const [key, entry] of sportsAvailabilityStore.entries()) {
     if (!entry || entry.expiresAt <= now) {
       sportsAvailabilityStore.delete(key)
+    }
+  }
+
+  for (const [canonicalId, entry] of sportsCanonicalAnchorStore.entries()) {
+    if (!entry || entry.expiresAt <= now) {
+      sportsCanonicalAnchorStore.delete(canonicalId)
     }
   }
 }
@@ -93,14 +100,63 @@ function getSportsAvailabilityAnchor(anchorKey) {
   }
 }
 
+function setSportsAvailabilityCanonicalAnchor(canonicalId, anchorKey) {
+  const normalizedCanonicalId = String(canonicalId || '').trim()
+  const normalizedAnchorKey = String(anchorKey || '').trim()
+  if (!normalizedCanonicalId || !normalizedAnchorKey) return ''
+
+  const now = Date.now()
+  const sourceEntry = sportsAvailabilityStore.get(normalizedAnchorKey)
+  if (!sourceEntry || sourceEntry.expiresAt <= now) {
+    sportsCanonicalAnchorStore.delete(normalizedCanonicalId)
+    return ''
+  }
+
+  sportsCanonicalAnchorStore.set(normalizedCanonicalId, {
+    anchorKey: normalizedAnchorKey,
+    expiresAt: sourceEntry.expiresAt,
+    touchedAt: now
+  })
+  trimSportsAvailabilityEntries(now)
+  return normalizedAnchorKey
+}
+
+function getSportsAvailabilityAnchorByCanonical(canonicalId) {
+  const normalizedCanonicalId = String(canonicalId || '').trim()
+  if (!normalizedCanonicalId) return null
+
+  const now = Date.now()
+  const entry = sportsCanonicalAnchorStore.get(normalizedCanonicalId)
+  if (!entry) return null
+  if (entry.expiresAt <= now) {
+    sportsCanonicalAnchorStore.delete(normalizedCanonicalId)
+    return null
+  }
+
+  const source = getSportsAvailabilityAnchor(entry.anchorKey)
+  if (!source) {
+    sportsCanonicalAnchorStore.delete(normalizedCanonicalId)
+    return null
+  }
+
+  entry.touchedAt = now
+  return {
+    anchorKey: String(entry.anchorKey || '').trim(),
+    source
+  }
+}
+
 function clearSportsAvailabilityAnchors() {
   sportsAvailabilityStore.clear()
+  sportsCanonicalAnchorStore.clear()
 }
 
 module.exports = {
   buildSportsAvailabilityAnchorKey,
   clearSportsAvailabilityAnchors,
   getSportsAvailabilityAnchor,
+  getSportsAvailabilityAnchorByCanonical,
   normalizeSportsAvailabilitySource,
-  setSportsAvailabilityAnchor
+  setSportsAvailabilityAnchor,
+  setSportsAvailabilityCanonicalAnchor
 }

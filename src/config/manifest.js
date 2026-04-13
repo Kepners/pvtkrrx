@@ -9,8 +9,16 @@ const manifest = {
   logo: 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.ico',
   resources: [
     'catalog',
-    'meta',
-    { name: 'stream', types: ['movie', 'series', 'sports'] }
+    {
+      name: 'meta',
+      types: ['movie', 'series', 'sports'],
+      idPrefixes: ['tt', 'pvtkrrx:', 'sportsmeta:']
+    },
+    {
+      name: 'stream',
+      types: ['movie', 'series', 'sports'],
+      idPrefixes: ['tt', 'pvtkrrx:', 'sportsmeta:']
+    }
   ],
   types: ['movie', 'series', 'sports'],
   catalogs: [

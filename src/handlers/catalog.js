@@ -13,7 +13,10 @@ const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitl
 const { getMappedLeagueEntry, mapLeague } = require('../utils/leagueMap')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { encodeCustomId } = require('../utils/customId')
-const { setSportsAvailabilityAnchor } = require('../utils/sportsAvailabilityStore')
+const {
+  setSportsAvailabilityAnchor,
+  setSportsAvailabilityCanonicalAnchor
+} = require('../utils/sportsAvailabilityStore')
 const { findExistingLocalFilePath } = require('../utils/localStorageRoots')
 const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
 const {
@@ -886,6 +889,11 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     return resolvedGroup
   })
   const groupedIdentity = mergeSportsIdentityGroups(resolvedAvailabilityGroups, query)
+  const resolvedIdentityGroups = groupedIdentity.filter((group) => {
+    const status = String(group?.sportsMetaResolution?.status || '').trim()
+    const canonicalId = String(group?.sportsMetaResolution?.canonicalId || '').trim()
+    return status === SPORTS_META_RESOLUTION_STATUS.RESOLVED && canonicalId.startsWith('sportsmeta:event:')
+  })
 
   const resolutionCounts = resolvedAvailabilityGroups.reduce((counts, group) => {
     const state = String(group?.sportsMetaResolution?.status || SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY)
@@ -894,10 +902,10 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
   }, {})
 
   console.log(
-    `[sports-catalog] catalog="${catalogDefinition?.id || 'pvtkrrx-sports'}" query="${query}" prowlarr=${items.length} normalized=${normalizedItems.length} strict=${strictFiltered.length} anchors=${filtered.length} suppressedNonSportsCult=${suppressedNonSportsCult} availabilityGroups=${groupedAvailability.length} identityGroups=${groupedIdentity.length} resolved=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.RESOLVED] || 0} ambiguous=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.AMBIGUOUS] || 0} notFound=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.NOT_FOUND] || 0} weak=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH] || 0} fallback=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY] || 0}`
+    `[sports-catalog] catalog="${catalogDefinition?.id || 'pvtkrrx-sports'}" query="${query}" prowlarr=${items.length} normalized=${normalizedItems.length} strict=${strictFiltered.length} anchors=${filtered.length} suppressedNonSportsCult=${suppressedNonSportsCult} availabilityGroups=${groupedAvailability.length} identityGroups=${groupedIdentity.length} emitted=${resolvedIdentityGroups.length} resolved=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.RESOLVED] || 0} ambiguous=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.AMBIGUOUS] || 0} notFound=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.NOT_FOUND] || 0} weak=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH] || 0} fallback=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY] || 0}`
   )
 
-  const pageGroups = groupedIdentity.slice(skip, skip + limit)
+  const pageGroups = resolvedIdentityGroups.slice(skip, skip + limit)
   const metas = await mapLimit(pageGroups, 6, async (group) => {
     const availability = group.bestAvailability
     const sportsMetaResolution = group.sportsMetaResolution || {}
@@ -954,30 +962,43 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     const backgroundUrl = resolveSportsBackgroundAsset(artworkInput)
     const logoUrl = resolveSportsLogoAsset(artworkInput)
     const availabilityAnchorKey = setSportsAvailabilityAnchor(availability.trackerSource || availability)
+    const canonicalCatalogId = String(sportsMetaResolution?.canonicalId || '').trim()
+    if (
+      sportsMetaResolution.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED &&
+      canonicalCatalogId &&
+      availabilityAnchorKey
+    ) {
+      setSportsAvailabilityCanonicalAnchor(canonicalCatalogId, availabilityAnchorKey)
+    }
 
     return {
-      id: encodeCustomId({
-        y: mediaType,
-        k: 'sports',
-        n: displayTitle,
-        t: displayTitle,
-        s: availability.size,
-        d: availability.seeders,
-        p: availability.pubDate || '',
-        c: group.availabilityCount,
-        e: eventDate,
-        r: resolvedSportHint,
-        u: parsedSportsEvent?.league || parsedEvent?.league || '',
-        o: canonicalEvent?.homeTeam || fallbackHomeTeam || '',
-        w: canonicalEvent?.awayTeam || fallbackAwayTeam || '',
-        v: String(canonicalEvent?.eventId || sportsArtwork?.eventId || '').trim(),
-        x: String(sportsMetaResolution?.canonicalId || '').trim(),
-        q: String(sportsMetaResolution?.status || SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY),
-        ak: availabilityAnchorKey
-      }, {
-        compress: true,
-        compact: 'sports'
-      }),
+      id: (
+        sportsMetaResolution.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED &&
+        canonicalCatalogId
+      )
+        ? canonicalCatalogId
+        : encodeCustomId({
+            y: mediaType,
+            k: 'sports',
+            n: displayTitle,
+            t: displayTitle,
+            s: availability.size,
+            d: availability.seeders,
+            p: availability.pubDate || '',
+            c: group.availabilityCount,
+            e: eventDate,
+            r: resolvedSportHint,
+            u: parsedSportsEvent?.league || parsedEvent?.league || '',
+            o: canonicalEvent?.homeTeam || fallbackHomeTeam || '',
+            w: canonicalEvent?.awayTeam || fallbackAwayTeam || '',
+            v: String(canonicalEvent?.eventId || sportsArtwork?.eventId || '').trim(),
+            x: canonicalCatalogId,
+            q: String(sportsMetaResolution?.status || SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY),
+            ak: availabilityAnchorKey
+          }, {
+            compress: true,
+            compact: 'sports'
+          }),
       type: mediaType,
       name: displayTitle,
       description: descriptionParts.join(' | '),

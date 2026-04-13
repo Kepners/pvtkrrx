@@ -10,7 +10,11 @@ const { handleStream } = require('../src/handlers/stream')
 const { buildExternalFileUrl } = require('../src/utils/fileServing')
 const { decodeFileStateToken, decodePlaybackStateToken } = require('../src/utils/opaqueState')
 const { encodeCustomId } = require('../src/utils/customId')
-const { clearSportsAvailabilityAnchors, setSportsAvailabilityAnchor } = require('../src/utils/sportsAvailabilityStore')
+const {
+  clearSportsAvailabilityAnchors,
+  setSportsAvailabilityAnchor,
+  setSportsAvailabilityCanonicalAnchor
+} = require('../src/utils/sportsAvailabilityStore')
 const { inspectTorrentPayload } = require('../src/utils/torrentPayload')
 const ORIGINAL_FETCH = global.fetch
 
@@ -980,6 +984,19 @@ async function run() {
       const playbackState = decodeOpaquePlaybackState(result.streams[0]?.url || '')
       assert.equal(String(playbackState?.l || ''), 'https://tracker.example/download/arsenal-chelsea-sportscult.torrent', '#4m resolved sports ids should keep playback tied to the originating SportsCult torrent')
       assert.ok(result.streams.every(stream => String(stream?.name || '').startsWith('PVTKRRX ') || !stream?.name), '#4m anchored sports streams should keep the addon-prefixed stream naming')
+
+      setSportsAvailabilityCanonicalAnchor('sportsmeta:event:football|2026-03-15|premier-league|arsenal|chelsea', resolvedSportsAnchorKey)
+      const canonicalResult = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        'sportsmeta:event:football|2026-03-15|premier-league|arsenal|chelsea',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(canonicalResult.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 1, '#4m canonical SportsMeta ids should recover the original SportsCult tracker availability')
+      const canonicalPlaybackState = decodeOpaquePlaybackState(canonicalResult.streams[0]?.url || '')
+      assert.equal(String(canonicalPlaybackState?.l || ''), 'https://tracker.example/download/arsenal-chelsea-sportscult.torrent', '#4m canonical SportsMeta ids should keep playback tied to the originating SportsCult torrent')
     })
 
     await withScenario(async () => {

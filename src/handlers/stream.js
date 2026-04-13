@@ -7,7 +7,10 @@ const { SportsMetaClient } = require('../clients/sportsmeta')
 const { normalizeTeamName } = require('../clients/sportsdb')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { parse, matchesEpisode, isLikelyPackedReleaseTitle, cleanTitle } = require('../utils/parser')
-const { getSportsAvailabilityAnchor } = require('../utils/sportsAvailabilityStore')
+const {
+  getSportsAvailabilityAnchor,
+  getSportsAvailabilityAnchorByCanonical
+} = require('../utils/sportsAvailabilityStore')
 const { isSportsCultIndexer, isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { buildOnSeedboxStream, buildOnBufferingStream, buildOnArchiveStream, buildOnTrackerStream, buildInfoStream, findVideoFile, findPackedArchiveFiles, arePackedArchiveFilesReady, findEpisodeFile, sortStreams } = require('../utils/streams')
 const { encodePlaybackStateToken, encodeFileStateToken } = require('../utils/opaqueState')
@@ -1306,7 +1309,16 @@ async function handleCustomStream(config, id, addonUrl, configToken, playbackBas
 async function handleSportsMetaStream(config, id, addonUrl, configToken, playbackBaseUrl = addonUrl) {
   const info = await loadSportsMetaInfo(config, id)
   if (!info) return { streams: [] }
-  return handleDecodedCustomStream(config, info, addonUrl, configToken, playbackBaseUrl)
+  const anchoredAvailability = getSportsAvailabilityAnchorByCanonical(id)
+  const resolvedInfo = {
+    ...info,
+    x: String(info?.x || id || '').trim(),
+    q: 'resolved'
+  }
+  if (anchoredAvailability?.anchorKey) {
+    resolvedInfo.ak = anchoredAvailability.anchorKey
+  }
+  return handleDecodedCustomStream(config, resolvedInfo, addonUrl, configToken, playbackBaseUrl)
 }
 
 module.exports = { handleStream }

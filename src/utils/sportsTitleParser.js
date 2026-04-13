@@ -86,6 +86,9 @@ function extractFallbackDate(value) {
   const dmy = source.match(/\b(\d{2})[._\s-](\d{2})[._\s-]((?:19|20)\d{2})\b/)
   if (dmy && isValidDate(dmy[3], dmy[2], dmy[1])) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`
 
+  const compact = source.match(/\b((?:19|20)\d{2})(\d{2})(\d{2})\b/)
+  if (compact && isValidDate(compact[1], compact[2], compact[3])) return `${compact[1]}-${compact[2]}-${compact[3]}`
+
   const plain = source.match(/((?:19|20)\d{2}-\d{2}-\d{2})/)
   if (plain) return plain[1]
 

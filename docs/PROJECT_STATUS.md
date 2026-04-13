@@ -1,6 +1,6 @@
 # PVTKRRX Project Status
 
-Updated: 2026-04-12
+Updated: 2026-04-13
 
 ## Current Stage
 
@@ -34,8 +34,20 @@ The practical reading of the project today is:
 - `https://www.pvtkrrx.cc` is the live public relay; `https://pvtkrrx.vercel.app` is currently a dead preview hostname returning Vercel `DEPLOYMENT_NOT_FOUND`
 - the homepage refactor is now live on the canonical host, including the `truth-band` layout and the `Where does playback happen` section
 - the current public route still serves through Contabo Caddy into the Coolify alias `pvtkrrx:3000`; do not treat `/opt/stack/sites/pvtkrrx` or `/opt/pvtkrrx` as the live public path without checking the reverse proxy target first
+- `https://www.pvtkrrx.cc/manifest.json` remains a setup/bootstrap manifest only; the real public self-host addon surface for the Contabo `systemd` runtime is `https://pvt.kepners.co.uk/selfhost/manifest.json?mode=hosted`
+- the public self-host sports handshake now emits raw canonical `sportsmeta:` ids only when SportsMeta resolution is provable, and suppresses unresolved sports discovery rows instead of leaking weak or contaminated fallback ids into Stremio-facing catalogs
+- a real Stremio desktop pass on 2026-04-13 hit the live self-host `manifest -> catalog -> meta -> stream` path for `sportsmeta:event:football|2026-04-11|english-premier-league|arsenal|bournemouth`, so the current proof set now includes one actual client trace rather than curl-only route checks
 - legacy strict `LAN Bridge` tokens remain supported for manual troubleshooting and backwards compatibility, but they are no longer the default synced install path
 - the remaining work is real-device coverage, remote/auth playback sign-off, and performance tuning, not a reset/rebuild
+
+## Work Carried Out On 2026-04-13
+
+- widened the SportsMeta identity bridge so noisy SportsCult football titles such as `NEWVISION Premier League Arsenal Bournemouth 20260411 HDTV 1080i MP1 H 264 TPTV` now resolve deterministically to the canonical SportsMeta event id instead of falling back to an internal `pvtkrrx:` sports row
+- changed the self-host sports catalog contract so resolved discovery rows emit raw canonical `sportsmeta:event:...` ids, while unresolved rows fail closed and are suppressed from addon-facing discovery instead of serving unstable fallback metadata
+- added a canonical-id to availability-anchor bridge so a direct Stremio `stream/sports/sportsmeta:...` request can recover the original SportsCult playback anchor and still return the expected `/playback` stream
+- updated the live self-host `systemd` runtime on Contabo (`/opt/pvtkrrx`, `pvtkrrx.service`) and re-verified the addon-facing public routes on `https://pvt.kepners.co.uk/selfhost`
+- captured one real Stremio desktop trace on 2026-04-13 against that public self-host route: manifest, catalog, meta, and stream were all requested by the client for the same canonical Arsenal vs Bournemouth event
+- `npm run smoke:sports` and `npm run smoke:pipeline` both passed on 2026-04-13 after the canonical-id handshake and stream-anchor recovery changes
 
 ## Work Carried Out On 2026-04-12
 

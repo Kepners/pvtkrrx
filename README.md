@@ -73,7 +73,7 @@ Verified SportsMeta boundary on 2026-04-11:
 - the live standalone addon is public at `https://sportsmeta.pvtkrrx.cc/manifest.json`
 - the live pricing page is public at `https://sportsmeta.pvtkrrx.cc/pricing`
 - `sportsmeta.service` is the real live metadata/artwork/billing boundary
-- PVTKRRX now consumes canonical `sportsmeta:` ids on configured `/:config/stream/...` routes without becoming the metadata or billing owner
+- PVTKRRX now emits and consumes canonical `sportsmeta:` ids on resolved configured catalog/meta/stream routes without becoming the metadata or billing owner
 - the old integrated `/sportsmeta/*` draft inside this repo is not the live boundary and is now disabled by default unless `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA=true`
 
 ## Documentation Guide
