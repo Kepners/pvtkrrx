@@ -211,7 +211,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 ## Playback Model
 
 - Hosted relay routes do not proxy video bytes.
-- Hosted/local runtimes may still hold manual/operator sports cache bytes under `/image/sports/...`, but the default live PVTKRRX sports catalog/meta path now stays on generated SVG artwork.
+- Legacy sports cache files may still exist on disk from older deployments, but no live PVTKRRX route reads them anymore. `/thumb/sports/...` and `/image/sports/...` are removed from the product path and now return `HTTP 410 Gone`.
 - Hosted `/file` and `/playback` return 403 on the public hosted relay for non-local requests.
 - `LAN Bridge` requests 307-redirect to the host's local runtime before hitting `/file` or `/playback` when the home route is online, so after redirect all local playback capabilities apply.
 - Self-host server mode now supports separate control/install and byte-serving origins: `PVTKRRX_PUBLIC_BASE_URL` drives manifest/configure/install links, while optional `PVTKRRX_PLAYBACK_BASE_URL` can point built-in `/file` and `/playback` to a different public HTTPS origin. If the playback base is unset, built-in self-host playback falls back to the public base.

@@ -215,7 +215,7 @@ async function getCinemetaCached(type, imdbId) {
   return meta
 }
 
-const { withTimeout } = require('../utils/timeout')
+const { settleWithTimeout } = require('../utils/timeout')
 
 function cacheKeyForProwlarrSearch(config, query, cats, type = 'search', options = {}) {
   const apiKey = String(config?.jackettApiKey || '').trim()
@@ -247,17 +247,19 @@ async function cachedProwlarrSearch(config, client, query, cats, type = 'search'
   if (prowlarrSearchInFlight.has(key)) return prowlarrSearchInFlight.get(key)
 
   const fallback = Array.isArray(cached?.value) ? cached.value : []
-  const pending = withTimeout(
+  const pending = settleWithTimeout(
     client.search(query, cats, type, options),
     PROWLARR_SEARCH_TIMEOUT_MS,
     fallback
   ).then((result) => {
-    const value = Array.isArray(result) ? result : fallback
-    prowlarrSearchCache.set(key, {
-      value,
-      expiresAt: Date.now() + PROWLARR_SEARCH_CACHE_TTL_MS
-    })
-    trimProwlarrSearchCache()
+    const value = Array.isArray(result?.value) ? result.value : fallback
+    if (!result?.timedOut && !result?.error) {
+      prowlarrSearchCache.set(key, {
+        value,
+        expiresAt: Date.now() + PROWLARR_SEARCH_CACHE_TTL_MS
+      })
+      trimProwlarrSearchCache()
+    }
     return value
   }).finally(() => {
     prowlarrSearchInFlight.delete(key)
@@ -265,6 +267,38 @@ async function cachedProwlarrSearch(config, client, query, cats, type = 'search'
 
   prowlarrSearchInFlight.set(key, pending)
   return pending
+}
+
+function mergeUniqueProwlarrItems(...batches) {
+  const byKey = new Map()
+  for (const batch of batches) {
+    for (const item of (Array.isArray(batch) ? batch : [])) {
+      const key = `${String(item?.indexer || '').trim().toLowerCase()}|${String(item?.title || '').trim().toLowerCase()}`
+      if (!key || byKey.has(key)) continue
+      byKey.set(key, item)
+    }
+  }
+  return [...byKey.values()]
+}
+
+async function searchSportsCatalogItems(config, torznab, query, limit) {
+  const strictItems = await cachedProwlarrSearch(
+    config,
+    torznab,
+    query,
+    SPORT_CATS,
+    'search',
+    { useCategories: true }
+  )
+  if (strictItems.length >= Math.min(80, limit * 2)) return strictItems
+
+  const broadItems = await cachedProwlarrSearch(
+    config,
+    torznab,
+    query,
+    SPORT_CATS
+  )
+  return mergeUniqueProwlarrItems(strictItems, broadItems)
 }
 
 async function mapLimit(items, limit, mapper) {
@@ -756,30 +790,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
   const requestedSportHint = catalogSportHint || resolveSportHint({ explicitHint: requestedDetail })
   const query = requestedDetail
   const limit = getCatalogLimit(config)
-  const strictItems = await cachedProwlarrSearch(
-    config,
-    torznab,
-    query,
-    SPORT_CATS,
-    'search',
-    { useCategories: true }
-  )
-  let items = strictItems
-  if (items.length < Math.min(80, limit * 2)) {
-    const broadItems = await cachedProwlarrSearch(
-      config,
-      torznab,
-      query,
-      SPORT_CATS
-    )
-    const byKey = new Map()
-    for (const item of [...strictItems, ...broadItems]) {
-      const key = `${String(item?.indexer || '').trim().toLowerCase()}|${String(item?.title || '').trim().toLowerCase()}`
-      if (!key || byKey.has(key)) continue
-      byKey.set(key, item)
-    }
-    items = [...byKey.values()]
-  }
+  let items = await searchSportsCatalogItems(config, torznab, query, limit)
 
   // Fallback: many indexers don't support empty-query text search — try
   // tvsearch browse (Torznab browse mode) then seed with popular sport terms
@@ -791,19 +802,22 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       items = browseItems
     } else {
       const SEED_TERMS = getSportsSearchSeedTerms(catalogSportHint)
-      const seedBatches = await Promise.all(
-        SEED_TERMS.map(term => cachedProwlarrSearch(config, torznab, term, SPORT_CATS))
+      const seedBatches = await mapLimit(
+        SEED_TERMS,
+        1,
+        (term) => cachedProwlarrSearch(config, torznab, term, SPORT_CATS)
       )
-      const byKey = new Map()
-      for (const batch of seedBatches) {
-        for (const item of batch) {
-          const key = `${String(item?.indexer || '').trim().toLowerCase()}|${String(item?.title || '').trim().toLowerCase()}`
-          if (!key || byKey.has(key)) continue
-          byKey.set(key, item)
-        }
-      }
-      items = [...byKey.values()]
+      items = mergeUniqueProwlarrItems(...seedBatches)
     }
+  }
+
+  if (!query && catalogSportHint) {
+    const seedBatches = await mapLimit(
+      getSportsSearchSeedTerms(catalogSportHint),
+      1,
+      (term) => searchSportsCatalogItems(config, torznab, term, limit)
+    )
+    items = mergeUniqueProwlarrItems(items, ...seedBatches)
   }
 
   const normalizedItems = items.map(item => {
