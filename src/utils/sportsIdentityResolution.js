@@ -34,6 +34,9 @@ const GENERIC_EVENT_TOKENS = new Set([
 ])
 
 const TRACKER_NOISE_TOKENS = new Set([
+  '50fps',
+  '60fps',
+  'abc',
   '1080i',
   '1080p',
   '2160p',
@@ -48,18 +51,27 @@ const TRACKER_NOISE_TOKENS = new Set([
   'dubbed',
   'dublado',
   'eng',
+  'english',
+  'espn',
   'extended',
+  'fox',
   'h264',
   'h265',
   'hdtv',
   'hevc',
   'hdr',
   'internal',
+  'itv',
   'multi',
   'proper',
   'repack',
   'rip',
   'sdtv',
+  'sky',
+  'sports',
+  'supersport',
+  'tnt',
+  'tsn',
   'uhd',
   'web',
   'webrip',
@@ -199,6 +211,8 @@ function isResolutionNoiseToken(token = '') {
   if (GENERIC_EVENT_TOKENS.has(normalized) || TRACKER_NOISE_TOKENS.has(normalized)) return true
   if (['feed', 'full', 'h', 'live', 'mp1', 'mp2', 'mp3', 'newvision', 'replay', 'stream', 'tptv'].includes(normalized)) return true
   if (/^(?:264|265|x264|x265)$/i.test(normalized)) return true
+  if (/^\d{2,3}fps$/i.test(normalized)) return true
+  if (/^(?:2160p|1080p|720p|576p|540p|480p)(?:[a-z]{2})?(?:\d{2,3}(?:fps)?)?$/i.test(normalized)) return true
   if (/^(19|20)\d{2}$/.test(normalized) || /^\d{1,2}$/.test(normalized)) return true
   return false
 }
@@ -412,7 +426,12 @@ function buildSportsMetaResolutionPlan(availability = {}) {
   const attempts = []
   const seen = new Set()
   const addAttempt = (attempt = {}) => {
-    const params = attempt?.params || {}
+    const params = {
+      ...(attempt?.params || {}),
+      ...(['matchup', 'event'].includes(String(attempt?.identityType || '').trim())
+        ? { recordType: 'event' }
+        : {})
+    }
     if (!params || Object.keys(params).length === 0) return
     const key = JSON.stringify({
       identityType: String(attempt?.identityType || '').trim(),
@@ -433,6 +452,7 @@ function buildSportsMetaResolutionPlan(availability = {}) {
     addAttempt({
       identityType: 'matchup',
       params: {
+        recordType: 'event',
         title: trackerTitle,
         date,
         sport,
@@ -450,6 +470,7 @@ function buildSportsMetaResolutionPlan(availability = {}) {
     addAttempt({
       identityType: 'event',
       params: {
+        recordType: 'event',
         title: trackerTitle,
         date,
         sport,
@@ -508,12 +529,13 @@ function buildSportsMetaResolutionPlan(availability = {}) {
       fallback: {
         status: SPORTS_META_RESOLUTION_STATUS.AMBIGUOUS,
         identityType: 'unknown',
-        params: {
-          title: trackerTitle,
-          sport,
-          league: mappedLeague
-        },
-        reason: 'ambiguous_tracker_title'
+      params: {
+        recordType: 'event',
+        title: trackerTitle,
+        sport,
+        league: mappedLeague
+      },
+      reason: 'ambiguous_tracker_title'
       },
     }
   }
@@ -524,6 +546,7 @@ function buildSportsMetaResolutionPlan(availability = {}) {
       status: SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY,
       identityType: 'unknown',
       params: {
+        recordType: 'event',
         title: trackerTitle,
         sport,
         league: mappedLeague

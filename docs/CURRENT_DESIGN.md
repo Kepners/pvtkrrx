@@ -136,7 +136,7 @@ Contabo runtime note:
 - A separate host-level `pvtkrrx.service` runtime can also run from `/opt/pvtkrrx` on port `7000`.
 - Treat those as separate runtimes until the reverse proxy target is deliberately changed.
 - Verified on 2026-04-08: the live Coolify app now bind-mounts the whole hosted runtime root from `/opt/pvtkrrx/runtime` into `/root/.local/share/PVTKRRX/runtime`, so hosted runtime JSON/config state survives container replacement instead of living only in the container layer.
-- The older host path `/opt/pvtkrrx/sports-image-cache` is now a symlink to `/opt/pvtkrrx/runtime/sports-image-cache`, so the permanent sports image catalogue keeps the same bytes across updates without forcing a fresh remap or redownload.
+- Legacy hosted `sports-image-cache/` persistence notes are historical only; the live sports metadata/artwork path now depends on SportsMeta rather than a PVTKRRX-owned image cache.
 
 ## Route Model
 
@@ -176,9 +176,8 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 - PVTKRRX no longer generates its own live sports poster/background cards and no longer maintains a local TheSportsDB cache or sports poster package path.
 - Licensed real imagery remains SportsMeta-owned on its own paid/member routes instead of being surfaced directly from the free PVTKRRX catalog/meta path.
 - `npm run server:setup` and `npm run server:install-service` now treat SportsMeta as the sports metadata/artwork dependency; they do not prompt for a TheSportsDB key or local sports poster package path anymore.
-- Normal `/image/sports/...` request handling is now cache-only but package-aware: if the byte cache misses, the runtime can still import the mapped package file for that artwork on demand, but the live PVTKRRX catalog/meta path no longer depends on those `/image/sports/...` URLs.
-- On long-running Linux/cloud runtimes, a background sports-cache autofill job now revisits one sport group every 15 minutes by default and persists its rotation cursor in the runtime directory.
-- The runtime `sports-image-cache/` store is now append-only by default: once image bytes are downloaded, PVTKRRX does not auto-prune or TTL-expire them unless the user explicitly deletes the cache on disk.
+- Legacy `/image/sports/...` request handling and the old 15-minute sports-cache autofill job were removed from the live runtime; clients should consume SportsMeta asset URLs directly.
+- The old `sports-image-cache/` runtime store is historical, not part of the live SportsMeta-owned sports path.
 - Sports catalog inclusion is availability-driven:
   - SportsCult / Prowlarr decides whether a row exists at all.
   - SportsMeta only resolves identity and enrichment for rows that already have tracker availability.

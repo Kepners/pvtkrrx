@@ -17,7 +17,7 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 
 ## Key Features
 
-Current sports artwork rule as of 2026-04-22: SportsMeta (`https://sportsmeta.pvtkrrx.cc`) is the single owner of sports metadata and artwork. PVTKRRX sports catalogs now emit every availability group — resolved groups carry a `sportsmeta:` canonical id and point posters/backgrounds/logos at SportsMeta's canonical `/asset/{variant}/{id}` route; unresolved groups carry a `pvtkrrx:` custom id and point at SportsMeta's default `/asset/default/{variant}/{sport}?league=...` SVG route. The legacy local TheSportsDB client, `sports-image-cache/`, `/thumb/sports/...`, `/image/sports/...`, the 15-minute autofill job, and the experimental internal SportsMeta handler were all removed.
+Current sports artwork rule as of 2026-04-22: SportsMeta (`https://sportsmeta.pvtkrrx.cc`) is the single owner of sports metadata and artwork. PVTKRRX sports catalogs now emit every availability group — resolved groups carry a canonical `sportsmeta:event:` id and point posters/backgrounds/logos at SportsMeta's canonical `/asset/{variant}/{id}` route; unresolved groups carry a `pvtkrrx:` custom id and point at SportsMeta's default `/asset/default/{variant}/{sport}?league=...` SVG route. The legacy local TheSportsDB client, `sports-image-cache/`, `/thumb/sports/...`, `/image/sports/...`, the 15-minute autofill job, and the experimental internal SportsMeta handler were all removed.
 
 - **SportsMeta boundary is real** - SportsMeta is live as a separate addon/service at `https://sportsmeta.pvtkrrx.cc`, while PVTKRRX stays the separate stream addon and only attaches streams to canonical `sportsmeta:` ids
 

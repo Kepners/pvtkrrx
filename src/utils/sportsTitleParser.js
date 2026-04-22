@@ -1,6 +1,6 @@
 const { getMappedLeagueEntry } = require('./leagueMap')
 
-const QUALITY_RE = /^(?:2160p|1080p|720p|576p|540p|480p|sd|hd|fhd|uhd)(?:\d{2,3}fps)?$/i
+const QUALITY_RE = /^(?:2160p|1080p|720p|576p|540p|480p|sd|hd|fhd|uhd)(?:[a-z]{2})?(?:\d{2,3}(?:fps)?)?$/i
 const SOURCE_RE = /^(?:hdtv|pdtv|sdtv|webrip|webdl|web-dl|web|bluray|bdrip|dvdrip|satfeed|iptv)$/i
 const CODEC_RE = /^(?:x264|x265|h264|h265|hevc|avc|av1)(?:-.+)?$/i
 const RELEASE_GROUP_RE = /^[A-Z0-9]+-[A-Za-z0-9]+$/
@@ -9,7 +9,7 @@ const GENERIC_SPORT_PREFIX_RE = /^(?:football|soccer|basketball|baseball|cricket
 const LEADING_TEAM_NOISE_RE = /^(?:game|games|match|matches|week|round|heat|session|fight|night|grand|prix|qualifying|practice|sprint|race|card|prelims?|early|cup|bowl|super|opening|closing|ceremony|playoffs?|finals?|semi(?:final)?|quarter(?:final)?|championship|title|event)$/i
 const ROMAN_NUMERAL_RE = /^(?=[ivxlcdm]+$)m{0,4}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})$/i
 const TEAM_BROADCAST_RE = /\b(?:nbc|espn(?:2)?|sky(?:\s*sports?)?|bt(?:\s*sport)?|tnt(?:\s*sports?)?|fox(?:\s*sports?)?|cbs|abc|itv(?:4)?|tsn|bein(?:\s*sports?)?|canal\+?|dazn)\b/gi
-const TEAM_LANGUAGE_RE = /\b(?:english|spanish|french|german|italian|portuguese)\b/gi
+const TEAM_LANGUAGE_RE = /\b(?:en|english|spanish|french|german|italian|portuguese)\b/gi
 const TEAM_PRESENTATION_RE = /\b(?:condensed(?:\s*game)?|extended(?:\s*highlights?)?|highlights?|replay)\b/gi
 
 // Known league/series tokens that start non-vs event titles
@@ -57,6 +57,16 @@ function splitEventTitleTokens(raw) {
   const dotted = String(raw || '').split('.').map(token => token.trim()).filter(Boolean)
   if (dotted.length >= 2) return dotted
   return normalizeSegment(raw).split(/\s+/).filter(Boolean)
+}
+
+function splitMatchupTitleTokens(raw) {
+  return String(raw || '')
+    .replace(/[()[\]{}]/g, ' ')
+    .replace(/[._]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
 }
 
 function resolveEventLeagueStart(tokens = []) {
@@ -157,6 +167,37 @@ function resolveLeagueToken(tokens) {
   return normalizeSegment(normalizedTokens.join(' '))
 }
 
+function findLeadingLeagueSpan(tokens = []) {
+  const parts = (Array.isArray(tokens) ? tokens : [])
+    .map(normalizeSegment)
+    .filter(Boolean)
+  if (parts.length === 0) return null
+
+  let best = null
+  const maxParts = Math.min(parts.length, 6)
+  for (let count = 1; count <= maxParts; count += 1) {
+    const candidate = normalizeSegment(parts.slice(0, count).join(' '))
+    const mapped = getMappedLeagueEntry(candidate)
+    if (mapped) {
+      best = {
+        league: mapped.name || candidate,
+        nextIndex: count
+      }
+    }
+  }
+
+  if (best) return best
+
+  if (parts.length > 1 && GENERIC_SPORT_PREFIX_RE.test(parts[0])) {
+    return {
+      league: resolveLeagueToken(parts.slice(0, Math.min(parts.length, 3))),
+      nextIndex: 1
+    }
+  }
+
+  return null
+}
+
 function trimTrailingMetadataTokens(tokens) {
   const parts = [...(Array.isArray(tokens) ? tokens : [])]
   while (parts.length > 0) {
@@ -208,6 +249,7 @@ function normalizeTeamLabel(value) {
       .replace(TEAM_BROADCAST_RE, ' ')
       .replace(TEAM_LANGUAGE_RE, ' ')
       .replace(TEAM_PRESENTATION_RE, ' ')
+      .replace(/\b(?:\d{2,3}fps|fps)\b/gi, ' ')
   )
 }
 
@@ -217,7 +259,225 @@ function normalizeTeamTokens(tokens) {
       .map(normalizeSegment)
       .filter(Boolean)
   )
-  return normalizeTeamLabel(trimLeadingTeamNoise(normalized).join(' '))
+  const cleanedLabel = normalizeTeamLabel(trimLeadingTeamNoise(normalized).join(' '))
+  return trimTrailingMetadataTokens(cleanedLabel.split(/\s+/)).join(' ')
+}
+
+function parseSingleDateToken(token = '') {
+  const value = String(token || '').trim()
+  if (!value) return ''
+
+  const iso = value.match(/^((?:19|20)\d{2})[._/-](\d{2})[._/-](\d{2})$/)
+  if (iso && isValidDate(iso[1], iso[2], iso[3])) return `${iso[1]}-${iso[2]}-${iso[3]}`
+
+  const dmy = value.match(/^(\d{2})[._/-](\d{2})[._/-]((?:19|20)\d{2})$/)
+  if (dmy && isValidDate(dmy[3], dmy[2], dmy[1])) return `${dmy[3]}-${dmy[2]}-${dmy[1]}`
+
+  return ''
+}
+
+function resolveSeasonYearHint(token = '', nextToken = '') {
+  const value = String(token || '').trim()
+  if (!value) return ''
+
+  const season = value.match(/^((?:19|20)\d{2})[/-](\d{2})$/)
+  if (season) {
+    const century = season[1].slice(0, 2)
+    return `${century}${season[2]}`
+  }
+
+  if (/^(19|20)\d{2}$/.test(value)) {
+    const trailing = String(nextToken || '').trim()
+    if (/^\d{2}$/.test(trailing)) {
+      const century = value.slice(0, 2)
+      return `${century}${trailing}`
+    }
+    return value
+  }
+
+  return ''
+}
+
+function stripLeadingSeasonTokens(tokens = []) {
+  const parts = [...(Array.isArray(tokens) ? tokens : [])]
+  let yearHint = ''
+
+  while (parts.length > 0) {
+    const current = String(parts[0] || '').trim()
+    const next = String(parts[1] || '').trim()
+    const resolvedYearHint = resolveSeasonYearHint(current, next)
+    if (!resolvedYearHint) break
+
+    yearHint = resolvedYearHint
+    parts.shift()
+    if (/^(19|20)\d{2}$/.test(current) && /^\d{2}$/.test(next)) {
+      parts.shift()
+    }
+  }
+
+  return {
+    tokens: parts,
+    yearHint
+  }
+}
+
+function parseLeadingDateTokens(tokens = [], fallbackDate = '') {
+  const parts = (Array.isArray(tokens) ? tokens : []).map((token) => String(token || '').trim()).filter(Boolean)
+  if (parts.length === 0) return null
+
+  const single = parseSingleDateToken(parts[0])
+  if (single) {
+    return {
+      date: single,
+      nextIndex: 1
+    }
+  }
+
+  if (parts.length >= 3) {
+    const first = parts[0]
+    const second = parts[1]
+    const third = parts[2]
+    if (isValidDate(first, second, third)) {
+      return {
+        date: `${first}-${second}-${third}`,
+        nextIndex: 3
+      }
+    }
+
+    if (isValidDate(third, second, first)) {
+      return {
+        date: `${third}-${second}-${first}`,
+        nextIndex: 3
+      }
+    }
+  }
+
+  const fallback = extractFallbackDate(fallbackDate)
+  if (!fallback) return null
+  return {
+    date: fallback,
+    nextIndex: 0
+  }
+}
+
+function inferDateFromMonthDayTokens(left = '', right = '', yearHint = '') {
+  const year = String(yearHint || '').trim()
+  if (!/^(19|20)\d{2}$/.test(year)) return ''
+
+  const a = String(left || '').trim()
+  const b = String(right || '').trim()
+  if (!/^\d{2}$/.test(a) || !/^\d{2}$/.test(b)) return ''
+
+  if (isValidDate(year, b, a)) return `${year}-${b}-${a}`
+  if (isValidDate(year, a, b)) return `${year}-${a}-${b}`
+  return ''
+}
+
+function findTrailingDateSpan(tokens = [], yearHint = '', fallbackDate = '') {
+  const parts = (Array.isArray(tokens) ? tokens : []).map((token) => String(token || '').trim()).filter(Boolean)
+  for (let index = 0; index < parts.length; index += 1) {
+    const single = parseSingleDateToken(parts[index])
+    if (single) {
+      return {
+        date: single,
+        startIndex: index,
+        nextIndex: index + 1
+      }
+    }
+  }
+
+  for (let index = 0; index <= parts.length - 3; index += 1) {
+    const first = parts[index]
+    const second = parts[index + 1]
+    const third = parts[index + 2]
+    if (isValidDate(first, second, third)) {
+      return {
+        date: `${first}-${second}-${third}`,
+        startIndex: index,
+        nextIndex: index + 3
+      }
+    }
+
+    if (isValidDate(third, second, first)) {
+      return {
+        date: `${third}-${second}-${first}`,
+        startIndex: index,
+        nextIndex: index + 3
+      }
+    }
+  }
+
+  if (parts.length >= 2) {
+    for (let index = 0; index <= parts.length - 2; index += 1) {
+      const inferred = inferDateFromMonthDayTokens(parts[index], parts[index + 1], yearHint)
+      if (inferred) {
+        return {
+          date: inferred,
+          startIndex: index,
+          nextIndex: index + 2
+        }
+      }
+    }
+  }
+
+  const fallback = extractFallbackDate(fallbackDate)
+  if (!fallback) return null
+  return {
+    date: fallback,
+    startIndex: parts.length,
+    nextIndex: parts.length
+  }
+}
+
+function parseFlexibleMatchupTitle(title, fallbackDate = '') {
+  const raw = String(title || '').trim()
+  if (!raw) return null
+
+  const tokens = splitMatchupTitleTokens(raw)
+  if (tokens.length < 4) return null
+
+  const separatorIndex = tokens.findIndex(isTeamSeparator)
+  if (separatorIndex <= 0 || separatorIndex >= tokens.length - 1) return null
+
+  const beforeSeparator = tokens.slice(0, separatorIndex)
+  const afterSeparator = tokens.slice(separatorIndex + 1)
+  const leadingLeague = findLeadingLeagueSpan(beforeSeparator)
+  if (!leadingLeague?.league) return null
+
+  const preTeamTokens = beforeSeparator.slice(leadingLeague.nextIndex)
+  const leadingDate = parseLeadingDateTokens(preTeamTokens, fallbackDate)
+  const seasonInfo = leadingDate
+    ? { tokens: preTeamTokens, yearHint: leadingDate.date.slice(0, 4) }
+    : stripLeadingSeasonTokens(preTeamTokens)
+
+  const homeTeamTokens = leadingDate
+    ? preTeamTokens.slice(leadingDate.nextIndex)
+    : seasonInfo.tokens
+  const dateHint = String(
+    leadingDate?.date?.slice(0, 4) ||
+    seasonInfo.yearHint ||
+    ''
+  ).trim()
+  const trailingDate = leadingDate
+    ? null
+    : findTrailingDateSpan(afterSeparator, dateHint, fallbackDate)
+
+  const awayTeamTokens = trailingDate
+    ? afterSeparator.slice(0, trailingDate.startIndex)
+    : afterSeparator
+  const date = leadingDate?.date || trailingDate?.date || extractFallbackDate(fallbackDate)
+
+  const homeTeam = normalizeTeamTokens(homeTeamTokens)
+  const awayTeam = normalizeTeamTokens(awayTeamTokens)
+  if (!homeTeam || !awayTeam || !date) return null
+
+  return {
+    league: leadingLeague.league,
+    date,
+    homeTeam,
+    awayTeam,
+    raw
+  }
 }
 
 function parseSportsTitle(title, fallbackDate = '') {
@@ -225,17 +485,17 @@ function parseSportsTitle(title, fallbackDate = '') {
   if (!raw) return null
 
   const tokens = raw.split('.').map(token => token.trim()).filter(Boolean)
-  if (tokens.length < 5) return null
+  if (tokens.length < 5) return parseFlexibleMatchupTitle(raw, fallbackDate)
 
   const dateMatch = findStructuredDate(tokens, fallbackDate)
-  if (!dateMatch) return null
+  if (!dateMatch) return parseFlexibleMatchupTitle(raw, fallbackDate)
 
   const league = resolveLeagueToken(tokens.slice(0, dateMatch.startIndex))
   const tail = tokens.slice(dateMatch.nextIndex)
-  if (!league || tail.length < 3) return null
+  if (!league || tail.length < 3) return parseFlexibleMatchupTitle(raw, fallbackDate)
 
   const separatorIndex = tail.findIndex(isTeamSeparator)
-  if (separatorIndex <= 0 || separatorIndex >= tail.length - 1) return null
+  if (separatorIndex <= 0 || separatorIndex >= tail.length - 1) return parseFlexibleMatchupTitle(raw, fallbackDate)
 
   const homeTeamTokens = tail.slice(0, separatorIndex)
   const trailingTokens = tail.slice(separatorIndex + 1)
@@ -245,11 +505,11 @@ function parseSportsTitle(title, fallbackDate = '') {
     ? trailingTokens
     : trailingTokens.slice(0, metadataIndex)
 
-  if (homeTeamTokens.length === 0 || awayTeamTokens.length === 0) return null
+  if (homeTeamTokens.length === 0 || awayTeamTokens.length === 0) return parseFlexibleMatchupTitle(raw, fallbackDate)
 
   const homeTeam = normalizeTeamTokens(homeTeamTokens)
   const awayTeam = normalizeTeamTokens(awayTeamTokens)
-  if (!league || !homeTeam || !awayTeam) return null
+  if (!league || !homeTeam || !awayTeam) return parseFlexibleMatchupTitle(raw, fallbackDate)
 
   const qualityToken = metadataIndex === -1 ? '' : trailingTokens[metadataIndex]
   const quality = QUALITY_RE.test(qualityToken) ? qualityToken : ''

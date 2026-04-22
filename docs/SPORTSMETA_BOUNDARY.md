@@ -25,7 +25,8 @@ The shared Contabo VM does not make them the same product.
 - the public PVTKRRX hostname and stream-addon surface
 - `/:config/stream/...`, local `/file`, `/playback`, and route-specific install/config flows
 - internal `pvtkrrx:` ids for its own sports/library rows
-- its own runtime caches and sports artwork handling for `pvtkrrx:` items
+- tracker availability anchoring plus `pvtkrrx:` fallback ids for unresolved sports rows
+- rendering SportsMeta-owned canonical or default artwork URLs on addon responses without making independent sports artwork decisions
 - qBittorrent/Prowlarr integration and actual stream attachment
 
 ## Id Rules
@@ -100,8 +101,8 @@ These are infrastructure couplings, not proof of one product.
 
 The old integrated `/sportsmeta/*` draft inside `pvtkrrx` is not the live boundary.
 
-It is now intentionally non-production:
+It has now been removed from the live product boundary:
 
-- disabled unless `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA=true`
-- exposed only as local draft tooling and draft route code
-- not part of the supported public `www.pvtkrrx.cc` surface
+- the legacy PVTKRRX-owned `/thumb/sports/...` and `/image/sports/...` artwork routes return `HTTP 410 Gone`
+- live sports metadata/artwork ownership now sits fully in SportsMeta
+- any remaining planning docs that mention the integrated draft are historical context only, not current runtime behavior
