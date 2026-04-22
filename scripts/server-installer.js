@@ -10,8 +10,6 @@ const { stdin: input, stdout: output } = require('node:process')
 const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJsonFile')
 const { ensureServerAdminToken } = require('../src/utils/serverAdminToken')
 const { discoverProwlarrConfig, discoverQbitConfig, ensureProwlarrQbitDownloadClient } = require('../src/utils/provision')
-const { seedSportsImageCache, summarizeSportsImageSeed } = require('../src/utils/sportsCacheSeeder')
-const { describeSportsCacheAutofill, resolveSportsCacheAutofillConfig } = require('../src/utils/sportsCacheAutofill')
 const { installSystemdService } = require('./install-systemd-service')
 
 const SELFHOST_BOOTSTRAP_ACTIVE_ENV = 'PVTKRRX_SELFHOST_BOOTSTRAP_ACTIVE'
@@ -969,23 +967,6 @@ async function run() {
       String(existingConfig?.fileServerAuth || '').trim(),
       { allowEmpty: true }
     )
-    const sportsDbApiKey = await promptValue(
-      rl,
-      'TheSportsDB API key',
-      String(existingConfig?.sportsDbApiKey || '').trim()
-    )
-    const sportsDbCacheHours = await promptInteger(
-      rl,
-      'TheSportsDB cache hours',
-      String(existingConfig?.sportsDbCacheHours || 24).trim(),
-      { min: 1, max: 168 }
-    )
-    const sportsImagePackagePath = await promptValue(
-      rl,
-      'Sports poster package path (optional)',
-      String(existingConfig?.sportsImagePackagePath || '').trim(),
-      { allowEmpty: true }
-    )
     const maxResults = await promptInteger(
       rl,
       'Max results per search',
@@ -1073,9 +1054,6 @@ async function run() {
       provider: String(existingConfig?.provider || 'custom').trim() || 'custom',
       fileServerUrl,
       fileServerAuth,
-      sportsDbApiKey,
-      sportsDbCacheHours,
-      sportsImagePackagePath,
       maxResults,
       autoDeleteWatched,
       watchedDeleteGraceSeconds,
@@ -1106,25 +1084,9 @@ async function run() {
       console.warn(`⚠ Prowlarr qBittorrent download client: ${prowlarrSync.message}`)
     }
 
-    console.log('')
-    console.log('Pre-seeding sports image cache...')
-    try {
-      const sportsSeedSummary = await seedSportsImageCache({
-        apiKey: sportsDbApiKey,
-        logger: console
-      })
-      console.log(`✓ Sports cache: ${summarizeSportsImageSeed(sportsSeedSummary)}`)
-    } catch (error) {
-      console.warn(`⚠ Sports cache pre-seed skipped: ${error.message}`)
-    }
-    const sportsAutofillConfig = resolveSportsCacheAutofillConfig({
-      env: process.env,
-      runtimeDir,
-      platform: process.platform
-    })
-    if (sportsAutofillConfig.enabled) {
-      console.log(`✓ Background sports refill: ${describeSportsCacheAutofill(sportsAutofillConfig)}`)
-    }
+    // Sports artwork is served by the SportsMeta service
+    // (https://sportsmeta.pvtkrrx.cc). PVTKRRX no longer pre-seeds or refreshes
+    // a local TheSportsDB image cache during install.
 
     let serviceResult = null
     if (installService) {
@@ -1384,9 +1346,6 @@ async function runAuto() {
     provider: String(existingConfig?.provider || 'custom').trim() || 'custom',
     fileServerUrl: sanitizeHttpUrlDefault(existingConfig?.fileServerUrl || '', '', { allowEmpty: true }),
     fileServerAuth: String(existingConfig?.fileServerAuth || '').trim(),
-    sportsDbApiKey: String(existingConfig?.sportsDbApiKey || '').trim(),
-    sportsDbCacheHours: existingConfig?.sportsDbCacheHours || 24,
-    sportsImagePackagePath: String(existingConfig?.sportsImagePackagePath || '').trim(),
     maxResults: existingConfig?.maxResults || 50,
     autoDeleteWatched: existingConfig?.autoDeleteWatched !== false,
     watchedDeleteGraceSeconds: existingConfig?.watchedDeleteGraceSeconds ?? 300,
@@ -1419,25 +1378,8 @@ async function runAuto() {
   console.log(`✓ Config saved to ${localConfigPath}`)
   console.log(`✓ Self-host password: ${adminState.path ? fs.readFileSync(adminState.path, 'utf8').trim() : adminState.token}`)
 
-  console.log('')
-  console.log('Pre-seeding sports image cache...')
-  try {
-    const sportsSeedSummary = await seedSportsImageCache({
-      apiKey: String(nextConfig?.sportsDbApiKey || '').trim(),
-      logger: console
-    })
-    console.log(`✓ Sports cache: ${summarizeSportsImageSeed(sportsSeedSummary)}`)
-  } catch (error) {
-    console.warn(`⚠ Sports cache pre-seed skipped: ${error.message}`)
-  }
-  const sportsAutofillConfig = resolveSportsCacheAutofillConfig({
-    env: process.env,
-    runtimeDir: defaultRuntimeDir,
-    platform: process.platform
-  })
-  if (sportsAutofillConfig.enabled) {
-    console.log(`✓ Background sports refill: ${describeSportsCacheAutofill(sportsAutofillConfig)}`)
-  }
+  // Sports artwork is served by SportsMeta (https://sportsmeta.pvtkrrx.cc);
+  // no local TheSportsDB cache is populated from this installer anymore.
 
   // ── systemd service ──
   let serviceResult = null

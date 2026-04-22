@@ -4,7 +4,7 @@ const { ProwlarrClient } = require('../clients/prowlarr')
 const { QBitClient } = require('../clients/qbittorrent')
 const { CinemetaClient } = require('../clients/cinemeta')
 const { SportsMetaClient } = require('../clients/sportsmeta')
-const { normalizeTeamName } = require('../clients/sportsdb')
+const { normalizeTeamName } = require('../utils/teamName')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { parse, matchesEpisode, isLikelyPackedReleaseTitle, cleanTitle } = require('../utils/parser')
 const {
@@ -363,8 +363,8 @@ function normalizeForMatch(value) {
   return String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 }
 
-// Team name normalization is now shared via sportsdb.js normalizeTeamName()
-// which includes a richer alias table (Manchester United variants, etc.)
+// Team name normalization is shared in utils/teamName.js so stream matching
+// no longer depends on the legacy SportsDb client module.
 const normalizeSportsTeamName = normalizeTeamName
 
 function titleCaseWords(value) {

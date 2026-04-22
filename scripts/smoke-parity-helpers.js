@@ -104,8 +104,11 @@ function run() {
 
   assert.match(read('src/lib/shared.js'), /resolveRuntimeDir/, 'server shared runtime should use the runtime dir helper')
   assert.match(read('electron/main.js'), /resolveRuntimeDir/, 'Electron should use shared runtime dir helper')
-  assert.match(read('src/clients/sportsdb.js'), /resolveRuntimeDir/, 'SportsDB cache should use shared runtime dir helper')
   assert.match(read('public/configure.html'), /route-parity\.js/, 'configure UI should load the shared route parity helper')
+  assert.doesNotMatch(read('index.js'), /require\(['"]\.\/src\/clients\/sportsdb['"]\)/, 'index.js must not import the legacy sportsdb client')
+  assert.doesNotMatch(read('src/lib/shared.js'), /require\(['"]\.\.\/utils\/sportsThumb['"]\)/, 'shared must not import the legacy sportsThumb generator')
+  assert.match(read('src/utils/sportsArtwork.js'), /buildSportsMetaAssetUrl/, 'sports artwork must route through SportsMeta asset URLs')
+  assert.match(read('src/clients/sportsmeta.js'), /buildSportsMetaDefaultAssetUrl/, 'SportsMeta client must expose a default-asset URL helper')
 
   console.log('Smoke parity helpers passed')
 }

@@ -48,8 +48,10 @@ SportsMeta is not a subsection of the public `www.pvtkrrx.cc` app.
 
 - SportsMeta owns the separate hostname `https://sportsmeta.pvtkrrx.cc`
 - SportsMeta owns `sportsmeta.service`, the SportsMeta SQLite DB, asset cache, member-token routes, and Stripe billing
-- PVTKRRX stays the separate stream addon and only consumes canonical `sportsmeta:` ids when attaching streams
-- the old integrated `/sportsmeta/*` draft inside this repo is now non-production and disabled by default unless `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA=true`
+- SportsMeta owns sports identity resolution, artwork selection, paid TheSportsDB usage, and the default/free sport poster SVG routes
+- PVTKRRX stays the separate stream addon and only consumes canonical `sportsmeta:event:` ids when a sports row resolves cleanly
+- unresolved sports rows in PVTKRRX still point at SportsMeta-owned default `/asset/default/{variant}/{sport}?league=...` artwork instead of local fallback generation
+- the old integrated `/sportsmeta/*` draft inside this repo is removed from the live product boundary; legacy `pvtkrrx` sports artwork endpoints now return `HTTP 410 Gone`
 
 Shared Contabo hosting and same-box network access are infrastructure couplings, not proof that the products are one runtime.
 
@@ -59,10 +61,9 @@ Shared Contabo hosting and same-box network access are infrastructure couplings,
 |---|---|
 | `index.js` | Main Express + SDK server, hosted + local routes, playback, file serving, account and pair APIs |
 | `src/handlers/*` | Catalog, stream, and meta generation |
-| `src/clients/*` | Prowlarr, qBittorrent, Cinemeta, TheSportsDB, and separate-SportsMeta integrations |
+| `src/clients/*` | Prowlarr, qBittorrent, Cinemeta, and SportsMeta integrations (TheSportsDB is owned by SportsMeta, not this repo) |
 | `src/utils/analytics.js` | Optional Umami monitoring for hosted traffic and product events, with host gating and dedupe state |
-| `src/utils/sportsImageCache.js` | Local/experimental sports artwork cache tooling; no longer the default live PVTKRRX catalog/meta path |
-| `src/utils/sportsCacheAutofill.js` | Rotating background sports-cache refill for long-running Linux/cloud runtimes |
+| `src/utils/sportsArtwork.js` | Thin resolver that points every sport poster/background/logo at `sportsmeta.pvtkrrx.cc` — either the canonical `/asset/{variant}/{id}` route when a SportsMeta id is known, or the `/asset/default/{variant}/{sport}?league=...` route for unresolved fallbacks |
 | `src/utils/opaqueState.js` | Opaque state tokens for `/file` and `/playback` |
 | `src/utils/pairStore.js` | LAN pair persistence |
 | `src/utils/accountStore.js` | Stremio-linked account and billing/trial data store |
@@ -138,10 +139,8 @@ The current desktop popup copy still says `LAN Bridge`; the configure flow and h
 4. PVTKRRX's live sports catalog/meta surface now stays on generated SVG poster/background cards with sport-specific theming.
 5. The manifest now exposes a dedicated top-level `sports` surface with an `All Sports` catalog plus sport-family catalogs such as `Football`, `Motorsport`, and `MMA`.
 6. Each sport-family catalog uses the third-column `genre` dropdown for narrower league/team filters.
-7. Licensed real imagery remains SportsMeta-owned on its own paid/member routes instead of being surfaced directly from the free PVTKRRX path.
-8. Local/manual SportsDB or package cache tooling can still exist on disk, but the live PVTKRRX request path does not depend on `/image/sports/...` URLs anymore.
-9. Library items expose completed qBittorrent content through the same addon surface.
-10. Long-running Linux/cloud runtimes now revisit one sport group every 15 minutes by default and keep filling `sports-image-cache/` gradually between installer/manual warm passes.
+7. Sports artwork — canonical posters, backgrounds, logos, and the default-sport SVG fallbacks — is always served by SportsMeta at `https://sportsmeta.pvtkrrx.cc/asset/...`. PVTKRRX no longer generates or proxies sports images itself, and the paid TheSportsDB key lives exclusively in SportsMeta.
+8. Library items expose completed qBittorrent content through the same addon surface.
 
 ## Storage Model
 

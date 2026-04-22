@@ -23,7 +23,6 @@ const { normalizeRelayUrl } = require('../utils/relayUrl')
 const { stripRemoteSeedboxLanFields } = require('../utils/remoteSeedboxConfig')
 const { resolveRuntimeDir } = require('../utils/runtimeDir')
 const { ensureServerAdminToken } = require('../utils/serverAdminToken')
-const { decodeSportsThumbToken, renderSportsThumbSvg } = require('../utils/sportsThumb')
 const { parseTorrentFileName, fetchTorrentPayload } = require('../utils/torrentPayload')
 const { findVideoFile, hasPackedArchiveFiles, isSampleVideoName, isArchiveFileName, findPackedArchiveFiles } = require('../utils/streams')
 const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
@@ -111,6 +110,7 @@ const rateLimiters = {
   encrypt: new RateLimiter(LAN_PAIR_RATE_LIMIT_WINDOW_MS, Math.max(5, parseInt(process.env.PVTKRRX_ENCRYPT_MAX_PER_WINDOW || '30', 10))),
   testConnection: new RateLimiter(LAN_PAIR_RATE_LIMIT_WINDOW_MS, Math.max(5, parseInt(process.env.PVTKRRX_TEST_CONNECTION_MAX_PER_WINDOW || '20', 10))),
   auth: new RateLimiter(LAN_PAIR_RATE_LIMIT_WINDOW_MS, Math.max(5, parseInt(process.env.PVTKRRX_AUTH_MAX_PER_WINDOW || '20', 10))),
+  sportsmeta: new RateLimiter(LAN_PAIR_RATE_LIMIT_WINDOW_MS, Math.max(10, parseInt(process.env.PVTKRRX_SPORTSMETA_MAX_PER_WINDOW || '60', 10))),
   heartbeat: new RateLimiter(LAN_PAIR_RATE_LIMIT_WINDOW_MS, Math.max(5, parseInt(process.env.PVTKRRX_LAN_PAIR_HEARTBEAT_MAX_PER_WINDOW || '30', 10))),
   status: new RateLimiter(LAN_PAIR_RATE_LIMIT_WINDOW_MS, Math.max(5, parseInt(process.env.PVTKRRX_LAN_PAIR_STATUS_MAX_PER_WINDOW || '60', 10)))
 }
@@ -949,9 +949,18 @@ function shouldBindLanPairToRequest(config = {}) {
   return LAN_PAIR_BIND_PUBLIC_IP || resolveHostedProfile(config) === 'hybrid'
 }
 
+function stripLegacySportsMetadataConfigFields(config = {}) {
+  const next = { ...(config && typeof config === 'object' ? config : {}) }
+  delete next.sportsDbApiKey
+  delete next.sportsDbCacheHours
+  delete next.sportsImagePackagePath
+  delete next.sportsImagePackagePaths
+  return next
+}
+
 function normalizeAddonConfig(config = {}, options = {}) {
   const normalized = {
-    ...config,
+    ...stripLegacySportsMetadataConfigFields(config),
     additionalStorageRoots: normalizeLocalStorageRoots(config.additionalStorageRoots)
   }
   const explicitProfile = normalizeRouteProfile(normalized.routeProfile)
@@ -2515,8 +2524,6 @@ module.exports = {
   normalizeRelayUrl,
   stripRemoteSeedboxLanFields,
   resolveRuntimeDir,
-  decodeSportsThumbToken,
-  renderSportsThumbSvg,
   findVideoFile,
   hasPackedArchiveFiles,
   isSampleVideoName,

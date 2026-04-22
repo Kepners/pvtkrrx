@@ -1,10 +1,18 @@
 # PVTKRRX Project Status
 
-Updated: 2026-04-13
+Updated: 2026-04-22
 
 ## Current Stage
 
-PVTKRRX is in a working `1.1.33` state on the main Windows/local route set.
+PVTKRRX is in a working `1.1.34` state on the main Windows/local route set.
+
+## 2026-04-22: SportsMeta boundary finalised
+
+- SportsMeta is now the single owner of sports metadata and artwork. PVTKRRX no longer ships `src/clients/sportsdb.js`, `src/utils/sportsmetaCatalogue.js`, `src/utils/sportsCacheSeeder.js`, `src/utils/sportsCacheAutofill.js`, `src/utils/sportsImageCache.js`, or `src/utils/sportsThumb.js`; the experimental `src/handlers/sportsmeta.js` and the `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA` flag were also removed.
+- `src/utils/sportsArtwork.js` was rewritten into a thin resolver that returns `https://sportsmeta.pvtkrrx.cc/asset/{variant}/{canonicalId}` when SportsMeta resolved the event and `https://sportsmeta.pvtkrrx.cc/asset/default/{variant}/{sport}?league=...` when it did not. SportsMeta was extended with a new `/asset/default/:variant/:sport` route that serves a deterministic sport-coloured SVG, and that route is live on Contabo.
+- SportsMeta `/resolve` plus the PVTKRRX resolver now enforce an event-only contract for live sports attachment: resolved rows emit canonical `sportsmeta:event:` ids, while unresolved rows stay explicit `pvtkrrx:` fallback rows with SportsMeta-owned default artwork instead of silently disappearing.
+- The configure UI, provision defaults, `normalizeAddonConfig`, `server-installer.js`, and `server-setup.js` no longer accept or store `sportsDbApiKey`, `sportsDbCacheHours`, or `sportsImagePackagePath`. `index.js` no longer starts the 15-minute autofill loop and `/thumb/sports/...` plus `/image/sports/...` now return `HTTP 410 Gone`.
+- The live Contabo logs prior to this release showed PVTKRRX hammering `www.thesportsdb.com` with the free key `123` and receiving `HTTP 429` every few minutes on `search_all_teams.php`. Those requests disappear after this change because the scheduled job that produced them has been removed from the codebase.
 The current packaged Windows app is now verified as the real host runtime, and a live Apple TV synced home-route pass has been captured against it.
 
 The practical reading of the project today is:
@@ -135,7 +143,7 @@ The practical reading of the project today is:
 - `npm run smoke:config`, `npm run smoke:guards`, `npm run smoke:selfhost`, `npm run smoke:desktop`, `npm run smoke:playback`, `npm run smoke:sports`, `npm run smoke:sports-cache`, and `npm run smoke:sports-cache-auto` all passed on 2026-04-08 for the `1.1.29` sports-package release cut.
 - `C:/Program Files/Git/bin/bash.exe -n scripts/install-selfhost.sh` passed on 2026-04-08 for the `1.1.29` sports-package release cut.
 - `npm run dist:win` passed on 2026-04-08 for the `1.1.29` desktop release build and refreshed `dist/latest.yml` plus `dist/releases/index.json`.
-- Added `sportsImagePackagePath` support across runtime config, configure UI, and both self-host setup flows so operators can point PVTKRRX at a downloaded local/server sports poster package.
+- Historical note: `sportsImagePackagePath` existed in the 2026-04-08 release path, but that config surface is now removed because SportsMeta owns live sports artwork and default fallback posters.
 - Added package-aware sports image resolution: if a configured package manifest maps a known `sourceUrl` to a local file, PVTKRRX now imports that file into the runtime cache before any upstream image fetch.
 - Added `npm run cache:sports-package` so a mapped poster package can be synced into the runtime cache in one pass instead of waiting for lazy first-hit imports.
 - Tightened the image serve path so `/image/sports/...` now stays cache-only on request: it can satisfy a miss by importing from the mapped package, but it no longer repopulates the catalogue from live upstream image fetches during normal request handling.
@@ -496,8 +504,8 @@ These items should still be treated as open until captured on real clients:
      - SportsMeta also owns Stripe checkout, portal, webhook, and entitlement enforcement for the premium layer
      - PVTKRRX remains the stream addon only
      - PVTKRRX remains free; the current configured `/:config/stream/...` path was not turned into a billing gate
-     - the old integrated `/sportsmeta/*` draft inside `pvtkrrx` is not the live public boundary
-     - the local integrated draft is now explicitly non-production in this repo and only loads when `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA=true`
+     - the old integrated `/sportsmeta/*` draft inside `pvtkrrx` is not the live public boundary and the remaining legacy public routes now return `HTTP 410 Gone`
+     - the live contract between PVTKRRX and SportsMeta is event-only canonical resolution plus SportsMeta-owned default fallback artwork
 
 ## Recommended Next Work
 

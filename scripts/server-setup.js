@@ -8,8 +8,6 @@ const { resolveRuntimeDir } = require('../src/utils/runtimeDir')
 const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJsonFile')
 const { ensureServerAdminToken } = require('../src/utils/serverAdminToken')
 const { discoverProwlarrConfig, discoverQbitConfig, ensureProwlarrQbitDownloadClient } = require('../src/utils/provision')
-const { seedSportsImageCache, summarizeSportsImageSeed } = require('../src/utils/sportsCacheSeeder')
-const { describeSportsCacheAutofill, resolveSportsCacheAutofillConfig } = require('../src/utils/sportsCacheAutofill')
 const { runFullBootstrap } = require('./server-installer')
 const { installSystemdService } = require('./install-systemd-service')
 
@@ -193,25 +191,6 @@ async function run() {
       String(existingConfig?.fileServerAuth || '').trim(),
       { allowEmpty: true }
     )
-    const sportsDbApiKey = await promptValue(
-      rl,
-      'TheSportsDB API key',
-      String(existingConfig?.sportsDbApiKey || '').trim()
-    )
-    const sportsDbCacheHours = Number.parseInt(
-      await promptValue(
-        rl,
-        'TheSportsDB cache hours',
-        String(existingConfig?.sportsDbCacheHours || 24).trim()
-      ),
-      10
-    ) || 24
-    const sportsImagePackagePath = await promptValue(
-      rl,
-      'Sports poster package path (optional)',
-      String(existingConfig?.sportsImagePackagePath || '').trim(),
-      { allowEmpty: true }
-    )
     const maxResults = Number.parseInt(
       await promptValue(
         rl,
@@ -267,9 +246,6 @@ async function run() {
       provider: String(existingConfig?.provider || 'custom').trim() || 'custom',
       fileServerUrl,
       fileServerAuth,
-      sportsDbApiKey,
-      sportsDbCacheHours: Math.max(1, Math.min(168, sportsDbCacheHours)),
-      sportsImagePackagePath,
       maxResults: Math.max(10, Math.min(200, maxResults)),
       autoDeleteWatched,
       watchedDeleteGraceSeconds: Math.max(0, watchedDeleteGraceSeconds),
@@ -309,25 +285,8 @@ async function run() {
       }
     }
 
-    console.log('')
-    console.log('Pre-seeding sports image cache...')
-    try {
-      const sportsSeedSummary = await seedSportsImageCache({
-        apiKey: sportsDbApiKey,
-        logger: console
-      })
-      console.log(`✓ Sports cache: ${summarizeSportsImageSeed(sportsSeedSummary)}`)
-    } catch (error) {
-      console.warn(`⚠ Sports cache pre-seed skipped: ${error.message}`)
-    }
-    const sportsAutofillConfig = resolveSportsCacheAutofillConfig({
-      env: process.env,
-      runtimeDir,
-      platform: process.platform
-    })
-    if (sportsAutofillConfig.enabled) {
-      console.log(`✓ Background sports refill: ${describeSportsCacheAutofill(sportsAutofillConfig)}`)
-    }
+    // Sports artwork is served by SportsMeta (https://sportsmeta.pvtkrrx.cc).
+    // No local TheSportsDB cache is seeded from this setup flow.
 
     console.log('')
     console.log('PVTKRRX server setup complete')

@@ -8,7 +8,6 @@ const { cleanTitle, isLikelyPackedReleaseTitle } = require('../utils/parser')
 const { normalizeSportKey, resolveSportHint, isSportsNoiseTitle, isLikelySportsEventTitle } = require('../utils/sportsRules')
 const { isSportsCultIndexer, isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { formatSize, findVideoFile } = require('../utils/streams')
-const { makeSportsPosterSvgUrl } = require('../utils/sportsThumb')
 const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
 const { getMappedLeagueEntry, mapLeague } = require('../utils/leagueMap')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
@@ -889,11 +888,11 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     return resolvedGroup
   })
   const groupedIdentity = mergeSportsIdentityGroups(resolvedAvailabilityGroups, query)
-  const resolvedIdentityGroups = groupedIdentity.filter((group) => {
-    const status = String(group?.sportsMetaResolution?.status || '').trim()
-    const canonicalId = String(group?.sportsMetaResolution?.canonicalId || '').trim()
-    return status === SPORTS_META_RESOLUTION_STATUS.RESOLVED && canonicalId.startsWith('sportsmeta:event:')
-  })
+  // Emit every group. Resolved groups get a canonical `sportsmeta:` id and
+  // SportsMeta canonical artwork. Unresolved groups still emit with a
+  // `pvtkrrx:` custom id and the SportsMeta default poster for the sport —
+  // never a silently dropped item.
+  const resolvedIdentityGroups = groupedIdentity
 
   const resolutionCounts = resolvedAvailabilityGroups.reduce((counts, group) => {
     const state = String(group?.sportsMetaResolution?.status || SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY)
@@ -939,25 +938,15 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     if (eventDate) descriptionParts.push(eventDate)
     if (league) descriptionParts.push(league)
 
+    const canonicalCatalogIdForArtwork = String(sportsMetaResolution?.canonicalId || '').trim()
     const artworkInput = {
-      baseUrl: options.baseUrl,
-      artworkMode: 'svg',
-      title: availability.title || displayTitle,
-      displayTitle,
-      publishDate: eventDate || availability.pubDate || availability.publishDate || '',
-      sportHint: resolvedSportHint,
-      league,
-      eventName: canonicalEvent?.title || canonicalEvent?.name || fallbackEventName || sportsArtwork?.eventName || '',
-      homeTeam: canonicalEvent?.homeTeam || fallbackHomeTeam || sportsArtwork?.homeTeam || '',
-      awayTeam: canonicalEvent?.awayTeam || fallbackAwayTeam || sportsArtwork?.awayTeam || '',
-      sportsArtwork
-    }
-    const generatedPosterUrl = makeSportsPosterSvgUrl(options.baseUrl, {
-      title: displayTitle,
-      publishDate: eventDate || availability.pubDate || availability.publishDate || '',
+      sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
+      canonicalId: sportsMetaResolution?.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED
+        ? canonicalCatalogIdForArtwork
+        : '',
       sportHint: resolvedSportHint,
       league
-    })
+    }
     const { poster: posterUrl, posterShape } = resolveSportsPosterAsset(artworkInput)
     const backgroundUrl = resolveSportsBackgroundAsset(artworkInput)
     const logoUrl = resolveSportsLogoAsset(artworkInput)
@@ -1002,7 +991,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       type: mediaType,
       name: displayTitle,
       description: descriptionParts.join(' | '),
-      poster: posterUrl || generatedPosterUrl,
+      poster: posterUrl,
       background: backgroundUrl || undefined,
       logo: logoUrl || undefined,
       releaseInfo: eventDate || undefined,

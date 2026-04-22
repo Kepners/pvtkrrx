@@ -72,9 +72,8 @@ async function loadCanonicalSportsMeta(config = {}, canonicalId = '') {
   }
 }
 
-function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl) {
+function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, config = {}) {
   const canonicalEvent = canonical?.event || {}
-  const sportsArtwork = canonical?.sportsArtwork || null
   const sportHint = resolveSportHint({
     explicitHint: canonicalEvent?.sport,
     title: canonicalEvent?.title || canonicalEvent?.name
@@ -83,17 +82,10 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl) 
   const eventDate = String(canonicalEvent?.date || '').trim()
   const displayTitle = String(canonicalEvent?.name || canonicalEvent?.title || requestedId).trim() || requestedId
   const artworkInput = {
-    baseUrl,
-    artworkMode: 'svg',
-    title: canonicalEvent?.title || displayTitle,
-    displayTitle,
-    publishDate: eventDate,
+    sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
+    canonicalId: String(canonicalEvent?.id || canonical?.canonicalId || requestedId || '').trim(),
     sportHint,
-    league,
-    eventName: canonicalEvent?.title || canonicalEvent?.name || '',
-    homeTeam: canonicalEvent?.homeTeam || '',
-    awayTeam: canonicalEvent?.awayTeam || '',
-    sportsArtwork
+    league
   }
   const posterResolved = resolveSportsPosterAsset(artworkInput)
   const backgroundResolved = resolveSportsBackgroundAsset(artworkInput)
@@ -130,7 +122,7 @@ async function handleMeta(config, type, id, context = {}) {
     if (id.startsWith('sportsmeta:')) {
       const canonical = await loadCanonicalSportsMeta(config, id)
       if (canonical) {
-        return buildCanonicalSportsMetaResponse(canonical, id, baseUrl)
+        return buildCanonicalSportsMetaResponse(canonical, id, baseUrl, config)
       }
     }
 
@@ -226,20 +218,10 @@ async function handleCustomMeta(config, id, context = {}) {
   const eventName = String(canonicalEvent?.title || canonicalEvent?.name || sportsArtwork?.eventName || '').trim()
 
   const artworkInput = {
-    baseUrl,
-    artworkMode: 'svg',
-    title: String(canonicalEvent?.title || info.t || info.n || '').trim(),
-    displayTitle,
-    publishDate: info.p,
+    sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
+    canonicalId: canonicalId && resolutionStatus === 'resolved' ? canonicalId : '',
     sportHint: resolvedSportHint,
-    league,
-    eventName,
-    homeTeam,
-    awayTeam,
-    carriedArtwork,
-    carriedBackground,
-    carriedLogo,
-    sportsArtwork
+    league
   }
   const posterResolved = isSports
     ? resolveSportsPosterAsset(artworkInput)

@@ -1,6 +1,6 @@
 # PVTKRRX Current Design
 
-Updated: 2026-04-12
+Updated: 2026-04-22
 
 ## Purpose
 
@@ -37,8 +37,7 @@ PVTKRRX is one codebase with three active runtime pieces:
    - the installer now handles that split directly: FreeDNS and domain installs default built-in playback to the same public HTTPS origin while still allowing an optional direct playback origin
    - when a real FreeDNS/domain front door is configured, the installer now disables any leftover `pvtkrrx-tunnel.service` so the old Cloudflare quick tunnel is removed from the runtime path
    - the installer prints a one-time `Configure` bootstrap URL with `#serverAdminToken=...` so the browser can load the saved self-host config automatically on first open
-   - the installer now also runs a non-destructive sports-art preseed that warms `sports-image-cache/` with recent replay dates plus upcoming event artwork, top team badges, and mapped league art using the same runtime cache the addon serves later
-   - long-running Linux/cloud runtimes now keep filling that same sports cache automatically every 15 minutes in rotating sport batches, so the free key can keep dribbling new fights, fixtures, and league art in over time instead of relying on a single install-time burst
+   - sports metadata and artwork are served by the SportsMeta companion service (`https://sportsmeta.pvtkrrx.cc`); the installer no longer pre-seeds a local TheSportsDB image cache and the previous 15-minute autofill job has been removed on 2026-04-22
    - this is the independence path: after bootstrap, the runtime and config stay on the user's hardware and the hosted PVTKRRX site is no longer in the request path unless the user explicitly chooses the hosted relay
    - can install optional Linux `systemd` startup through `npm run server:setup` / `npm run server:install-service`
 3. Local runtime on the Windows host:
@@ -63,8 +62,13 @@ SportsMeta is now the separate metadata/artwork product boundary.
 - live host: `https://sportsmeta.pvtkrrx.cc`
 - live service: `sportsmeta.service`
 - SportsMeta owns canonical `sportsmeta:` ids, metadata routes, artwork routes, member-token routes, and billing
-- PVTKRRX stays the separate stream addon and only consumes `sportsmeta:` ids when attaching streams
-- the old integrated `/sportsmeta/*` draft inside this repo is not the live public surface and is now disabled unless `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA=true`
+- SportsMeta owns paid TheSportsDB usage plus the default/free sport poster/background/logo SVG routes
+- PVTKRRX stays the separate stream addon and only consumes canonical `sportsmeta:event:` ids on resolved sports rows
+- the old integrated `/sportsmeta/*` draft inside this repo, the embedded `SportsDbClient`, the `sports-image-cache/` runtime directory, `sportsdb-poster-cache.json`, the `/thumb/sports/...` + `/image/sports/...` PVTKRRX-generated artwork routes, and the `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA` escape hatch were all removed on 2026-04-22; any remaining request to those paths returns `HTTP 410 Gone`
+- for every sports availability group the catalog now resolves against SportsMeta and emits:
+  - a canonical `sportsmeta:event:...` id when SportsMeta resolves the tracker item to one event, or
+  - a `pvtkrrx:...` custom id when resolution fails, paired with SportsMeta's default-sport poster URL (`https://sportsmeta.pvtkrrx.cc/asset/default/{variant}/{sport}?league=...`) so the Stremio surface never shows a raw placeholder for a real fixture
+- PVTKRRX meta (`handleMeta`) proxies `sportsmeta:event:` ids straight to SportsMeta for canonical event detail and asset URLs; `pvtkrrx:sports:...` ids build the same SportsMeta default-asset URLs from the encoded sport/league hints, so there is a single authoritative source of sports artwork
 
 Shared Contabo hosting still exists:
 
@@ -164,17 +168,14 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
   - `landscapeImage`
   - `backgroundImage`
   - `logo`
-- Sports catalog posters now follow an event-type contract instead of repeating one generic league photo:
-  - team-vs-team fixtures render generated club-vs-club poster cards
-  - F1 keeps race-weekend/session-specific posters when available and otherwise falls back to generated F1 GP/session cards
-  - other non-vs sports can fall back to generated league-logo event cards
-- `backgroundImage` and `logo` stay separate from the portrait poster contract for player-loading and wallpaper use.
+- Sports catalog artwork now follows a SportsMeta-owned event contract instead of PVTKRRX-generated league cards:
+  - resolved sports rows use SportsMeta canonical `/asset/{variant}/{sportsmeta:event:...}` URLs
+  - unresolved sports rows use SportsMeta default `/asset/default/{variant}/{sport}?league=...` URLs
+- `backgroundImage` and `logo` stay separate from the portrait poster contract, but SportsMeta now owns those decisions too.
 - When Prowlarr has no indexers or cannot be reached, empty movie, TV, and sports catalogs now return a setup-needed placeholder card instead of a blank grid, so the user gets a useful recovery cue in Stremio.
-- PVTKRRX's own live addon surface now stays on generated SVG sports poster/background cards, with sport-specific themes handled by `sportsThumb.js`.
+- PVTKRRX no longer generates its own live sports poster/background cards and no longer maintains a local TheSportsDB cache or sports poster package path.
 - Licensed real imagery remains SportsMeta-owned on its own paid/member routes instead of being surfaced directly from the free PVTKRRX catalog/meta path.
-- `npm run server:setup` and `npm run cache:sports` can still warm that disk cache ahead of time with recent replay dates plus upcoming event artwork, top team badges, and mapped league art, but only when an explicit SportsDB key is configured.
-- The runtime can still map a downloaded sports poster package from any local/server filesystem path for manual/operator tooling. That package path is no longer the default live artwork path for ordinary PVTKRRX catalog/meta responses.
-- `npm run cache:sports-package` can proactively sync that mapped package into the runtime cache instead of waiting for lazy first-hit imports.
+- `npm run server:setup` and `npm run server:install-service` now treat SportsMeta as the sports metadata/artwork dependency; they do not prompt for a TheSportsDB key or local sports poster package path anymore.
 - Normal `/image/sports/...` request handling is now cache-only but package-aware: if the byte cache misses, the runtime can still import the mapped package file for that artwork on demand, but the live PVTKRRX catalog/meta path no longer depends on those `/image/sports/...` URLs.
 - On long-running Linux/cloud runtimes, a background sports-cache autofill job now revisits one sport group every 15 minutes by default and persists its rotation cursor in the runtime directory.
 - The runtime `sports-image-cache/` store is now append-only by default: once image bytes are downloaded, PVTKRRX does not auto-prune or TTL-expire them unless the user explicitly deletes the cache on disk.

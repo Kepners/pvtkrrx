@@ -128,8 +128,6 @@ async function run() {
         provider: 'custom',
         fileServerUrl: 'https://files.example',
         fileServerAuth: '',
-        sportsDbApiKey: '123',
-        sportsDbCacheHours: 24,
         maxResults: 50,
         lanPairEnabled: false,
         lanPairRequired: false

@@ -18,16 +18,11 @@ const {
   findTorrentForPostProcess
 } = require('./src/utils/qbitAutomation')
 const { getBrowserConfig, trackEvent } = require('./src/utils/analytics')
-const { resolveSportsImageRequest } = require('./src/utils/sportsImageCache')
-const { startSportsCacheAutofill } = require('./src/utils/sportsCacheAutofill')
 
-const EXPERIMENTAL_INTERNAL_SPORTSMETA = /^(1|true|yes|on)$/i.test(
-  String(process.env.PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA || '').trim()
-)
-let handleSportsMetaEvent = null
-if (EXPERIMENTAL_INTERNAL_SPORTSMETA) {
-  ;({ handleSportsMetaEvent } = require('./src/handlers/sportsmeta'))
-}
+// Legacy direct TheSportsDB paths (sports-image cache, 15-min autofill job,
+// /sports/image proxy, and the experimental internal SportsMeta handler) were
+// removed on 2026-04-22. SportsMeta is the single owner of sports metadata and
+// artwork — PVTKRRX consumes it via https://sportsmeta.pvtkrrx.cc only.
 
 // Destructure everything routes need from the shared module.
 // Shared module initializes env, console redaction, stores, and rate limiters at load time.
@@ -53,7 +48,6 @@ const {
   // URL & network helpers
   buildLocalModeUrls, normalizeRelayUrl, stripRemoteSeedboxLanFields,
   buildPlaybackFileUrl, normalizeLocalStorageRoots,
-  decodeSportsThumbToken, renderSportsThumbSvg,
   findVideoFile, hasPackedArchiveFiles, isSampleVideoName,
   // Account
   normalizeStremioUserId, createAuthToken,
@@ -100,7 +94,6 @@ const {
   isMagnetLink, parseTorrentFileName, fetchTorrentPayload,
   mintHostedConfigToken, resolveLanPair, lanPairOfflineResponse, maybeLanPairRedirect
 } = shared
-const experimentalSportsMetaRateLimiter = rateLimiters.sportsmeta || rateLimiters.auth
 
 const app = express()
 app.set('trust proxy', false)
@@ -952,51 +945,18 @@ app.post('/auth/stremio/link-session', requireCsrfToken, async (req, res) => {
   res.setHeader('Cache-Control', 'no-store')
   res.json(buildStremioLinkSessionResponse(req, session))
 })
-app.get(['/thumb/sports/:info.png', '/thumb/sports/:variant/:info.png'], async (req, res) => {
-  try {
-    const sharp = require('sharp')
-    const payload = decodeSportsThumbToken(req.params.info)
-    const variant = String(req.params.variant || 'landscape').trim().toLowerCase()
-    const svg = await renderSportsThumbSvg(payload, { variant })
-    const pngBuffer = await sharp(Buffer.from(svg, 'utf8')).png().toBuffer()
-    res.setHeader('Content-Type', 'image/png')
-    res.setHeader('Content-Length', String(pngBuffer.length))
-    setPublicCacheHeaders(res, 86400, { sMaxAge: 604800, staleWhileRevalidate: 2592000, immutable: true })
-    res.send(pngBuffer)
-  } catch (_) {
-    res.status(400).send('invalid thumbnail payload')
-  }
-})
-app.get(['/thumb/sports/:info.svg', '/thumb/sports/:variant/:info.svg'], async (req, res) => {
-  try {
-    const payload = decodeSportsThumbToken(req.params.info)
-    const variant = String(req.params.variant || 'landscape').trim().toLowerCase()
-    const svg = await renderSportsThumbSvg(payload, { variant })
-    res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8')
-    setPublicCacheHeaders(res, 86400, { sMaxAge: 604800, staleWhileRevalidate: 2592000, immutable: true })
-    res.send(svg)
-  } catch (_) {
-    res.status(400).send('invalid thumbnail payload')
-  }
-})
-app.get('/image/sports/:variant/:token', async (req, res) => {
-  try {
-    const image = await resolveSportsImageRequest(req.params.token, req.params.variant)
-    const filePath = path.resolve(image.filePath)
-    const fileBuffer = await fs.promises.readFile(filePath)
-    res.setHeader('Content-Type', image.contentType)
-    res.setHeader('Content-Length', String(fileBuffer.length))
-    res.setHeader('X-PVTKRRX-Sports-Image-Cache', String(image.cacheStatus || 'miss'))
-    setPublicCacheHeaders(res, 86400, {
-      sMaxAge: 604800,
-      staleWhileRevalidate: 2592000,
-      staleIfError: 2592000
-    })
-    res.send(fileBuffer)
-  } catch (err) {
-    console.warn('[sports-image-cache] Failed to serve sports image:', err.message)
-    res.status(404).send('sports image unavailable')
-  }
+// Legacy PVTKRRX-owned sports artwork endpoints removed 2026-04-22.
+// SportsMeta (https://sportsmeta.pvtkrrx.cc/asset/...) is now authoritative
+// for sport posters, backgrounds, logos, and default/free SVG fallbacks. Any
+// client still pointing at these paths should refresh its catalog cache.
+app.get([
+  '/thumb/sports/:info.png',
+  '/thumb/sports/:variant/:info.png',
+  '/thumb/sports/:info.svg',
+  '/thumb/sports/:variant/:info.svg',
+  '/image/sports/:variant/:token'
+], (_req, res) => {
+  res.status(410).send('pvtkrrx sports artwork moved to sportsmeta.pvtkrrx.cc')
 })
 
 // ─── POST /encrypt — server-side config encryption ─────────
@@ -2025,47 +1985,9 @@ app.get('/:config/meta/:type/:id.json', withConfig, requireConfigSubscription, m
   res.json(result)
 })
 
-if (EXPERIMENTAL_INTERNAL_SPORTSMETA && handleSportsMetaEvent) {
-  app.get('/sportsmeta/event', withLegacyRootLocalConfig, requireConfigSubscription, async (req, res) => {
-    const clientIp = getClientIp(req)
-    const limit = experimentalSportsMetaRateLimiter.consume(clientIp || 'unknown')
-    if (!limit.allowed) {
-      res.setHeader('Retry-After', String(limit.retryAfterSeconds))
-      return res.status(429).json({ error: 'too many requests' })
-    }
-
-    const result = await handleSportsMetaEvent(req.config, req.query, {
-      baseUrl: getPublicBaseUrl(req)
-    })
-    const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 30, 900)
-    applyHostedRouteCacheHeaders(req, res, 0, {
-      sMaxAge: ttl,
-      staleWhileRevalidate: Math.min(ttl * 4, 3600),
-      staleIfError: Math.min(Math.max(ttl * 24, 3600), 86400)
-    })
-    res.json(result)
-  })
-
-  app.get('/:config/sportsmeta/event', withConfig, requireConfigSubscription, async (req, res) => {
-    const clientIp = getClientIp(req)
-    const limit = experimentalSportsMetaRateLimiter.consume(clientIp || 'unknown')
-    if (!limit.allowed) {
-      res.setHeader('Retry-After', String(limit.retryAfterSeconds))
-      return res.status(429).json({ error: 'too many requests' })
-    }
-
-    const result = await handleSportsMetaEvent(req.config, req.query, {
-      baseUrl: getPublicBaseUrl(req)
-    })
-    const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 30, 900)
-    applyHostedRouteCacheHeaders(req, res, 0, {
-      sMaxAge: ttl,
-      staleWhileRevalidate: Math.min(ttl * 4, 3600),
-      staleIfError: Math.min(Math.max(ttl * 24, 3600), 86400)
-    })
-    res.json(result)
-  })
-}
+// Experimental internal SportsMeta routes removed 2026-04-22. SportsMeta is
+// now a standalone service at https://sportsmeta.pvtkrrx.cc and owns its own
+// /resolve, /event, catalog, and asset routes.
 
 app.get('/:config/qbit/preferences', withConfig, requireLocalQbitControl, async (req, res) => {
   try {
@@ -2795,8 +2717,7 @@ function startLocalServers(options = {}) {
     httpsReady: Promise.resolve(null),
     port,
     httpsPort,
-    lanAlias: null,
-    sportsCacheAutofill: null
+    lanAlias: null
   }
 
   logger.log(`[boot] starting local runtime port=${port} httpsPort=${httpsPort}`)
@@ -2819,10 +2740,9 @@ function startLocalServers(options = {}) {
     if (typeof warmTimer.unref === 'function') warmTimer.unref()
   }
 
-  state.sportsCacheAutofill = startSportsCacheAutofill({
-    logger,
-    reason: SELF_HOST_SERVER_MODE ? 'self-host-boot' : 'server-boot'
-  })
+  // Legacy sportsCacheAutofill (15-min TheSportsDB scheduled job) was removed
+  // on 2026-04-22. SportsMeta owns artwork now, so no recurring PVTKRRX job
+  // hits TheSportsDB from this runtime anymore.
 
   // HTTP
   const httpServer = http.createServer(app)
@@ -2845,11 +2765,6 @@ function startLocalServers(options = {}) {
     if (exitOnHttpError) process.exit(1)
   })
   httpServer.on('close', () => {
-    try {
-      if (state.sportsCacheAutofill && typeof state.sportsCacheAutofill.stop === 'function') {
-        state.sportsCacheAutofill.stop()
-      }
-    } catch (_) {}
     try {
       if (lanAlias && typeof lanAlias.stop === 'function') lanAlias.stop()
     } catch (err) {

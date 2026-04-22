@@ -44,7 +44,7 @@
 | Item | Value |
 |------|-------|
 | Type | Stremio Addon |
-| Version | 1.1.32 |
+| Version | 1.1.34 |
 | Repo | github.com/Kepners/pvtkrrx |
 | Hosting | Contabo VPS via Caddy -> Coolify hosted relay + Local Windows runtime + optional Linux self-host runtime |
 | Framework | stremio-addon-sdk + Express v5 hybrid |
@@ -56,6 +56,13 @@
 - PVTKRRX remains the separate stream addon and should only attach streams to those same `sportsmeta:` IDs.
 - Do not describe SportsMeta as a live integrated `/sportsmeta/*` path inside `https://www.pvtkrrx.cc`; the real production boundary is a separate hostname plus `sportsmeta.service`.
 - For stream proof, use a configured `https://www.pvtkrrx.cc/:config/stream/...` route, not the bootstrap `/stream/...` compatibility path.
+
+### Sports Poster Cache — REMOVED 2026-04-22
+- PVTKRRX no longer owns a sports image cache. SportsMeta is the only source of sports artwork.
+- Deleted modules: `src/clients/sportsdb.js`, `src/utils/sportsImageCache.js`, `src/utils/sportsCacheSeeder.js`, `src/utils/sportsCacheAutofill.js`, `src/utils/sportsThumb.js`, `src/utils/sportsmetaCatalogue.js`, `src/handlers/sportsmeta.js`.
+- Deleted routes: `/thumb/sports/:info.svg|.png`, `/image/sports/:variant/:token` now respond with `HTTP 410 Gone`.
+- Deleted runtime state: `sports-image-cache/` and `sportsdb-poster-cache.json` are no longer written. Existing copies on Contabo at `/opt/pvtkrrx/data/pvtkrrx/sports-image-cache/` and `/opt/pvtkrrx/sports-image-cache/` are dead and safe to delete once ops confirms nothing else reads them.
+- Fallback artwork is now deterministic from SportsMeta: `https://sportsmeta.pvtkrrx.cc/asset/default/{variant}/{sport}?league=...`. SportsMeta is the only place that decides the per-sport SVG colour, title, and subtitle.
 
 ### Install Routes
 1. **PC Local** — same-PC addon via `127.0.0.1:7000`
@@ -117,12 +124,9 @@ npm run smoke:pipeline           # Route-capability stream emission and redirect
 npm run smoke:lan-pair           # LAN pair heartbeat, hosted redirect, opaque tokens
 npm run smoke:stremio-link       # Stremio AuthKey verification (local mock API)
 npm run smoke:security           # Hardening regressions: CSRF, redaction, opaque tokens, secure JSON
-npm run smoke:sports             # Structured sports enrichment dedup
 npm run smoke:parity             # Parity helpers validation
 npm run smoke:selfhost           # Self-host server, admin token, disk-backed config
 npm run smoke:playback           # Playback route, Range support, state tokens
-npm run smoke:sports-cache       # Sports cache seeding
-npm run smoke:sports-cache-auto  # Background cache autofill (15-min rotation)
 npm run smoke:provider-discovery # Provider discovery testing
 npm run smoke:desktop            # Desktop provision testing
 ```

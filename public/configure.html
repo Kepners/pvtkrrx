@@ -825,10 +825,6 @@
 
     body.selfhost-seedbox-only #serviceCard-options label[for="maxResults"],
     body.selfhost-seedbox-only #serviceCard-options #maxResults,
-    body.selfhost-seedbox-only #serviceCard-options label[for="sportsDbApiKey"],
-    body.selfhost-seedbox-only #serviceCard-options #sportsDbApiKey,
-    body.selfhost-seedbox-only #serviceCard-options label[for="sportsDbCacheHours"],
-    body.selfhost-seedbox-only #serviceCard-options #sportsDbCacheHours,
     body.selfhost-seedbox-only #serviceCard-options #localHostnameBlock {
       display: none !important;
     }
@@ -2721,14 +2717,7 @@
         <h2>Settings</h2>
         <label for="maxResults">Max Results Per Search</label>
         <input type="number" id="maxResults" value="50" min="10" max="200">
-        <label for="sportsDbApiKey">TheSportsDB API Key (optional)</label>
-        <input type="text" id="sportsDbApiKey" value="" placeholder="Optional paid key">
-        <label for="sportsDbCacheHours">TheSportsDB Cache (hours)</label>
-        <input type="number" id="sportsDbCacheHours" value="24" min="1" max="168">
-        <p class="hint">Optional local cache tooling only. PVTKRRX now stays SVG-only for live sports artwork; leave this blank unless you deliberately want to run manual SportsDB cache warm/import work.</p>
-        <label for="sportsImagePackagePath">Sports Poster Package Path (optional)</label>
-        <input type="text" id="sportsImagePackagePath" value="" placeholder="D:\\sports-package or /srv/pvtkrrx/sports-package">
-        <p class="hint">Point this at a local folder or manifest file for a downloaded poster package if you want local cache tooling to import it. Normal live PVTKRRX artwork stays on generated SVG cards.</p>
+        <p class="hint">Sports metadata and artwork are served by the SportsMeta service (https://sportsmeta.pvtkrrx.cc). PVTKRRX no longer needs a TheSportsDB key or a local poster package — it just consumes SportsMeta canonical ids and asset URLs.</p>
         <div id="localHostnameBlock">
           <label for="localHostname">Local Hostname (.local alias)</label>
           <input type="text" id="localHostname" value="pvtkrrx.local" placeholder="pvtkrrx.local">
@@ -5648,9 +5637,6 @@
       if (!document.getElementById('jackettUrl').value.trim()) {
         document.getElementById('jackettUrl').value = 'http://localhost:9696';
       }
-      if (!document.getElementById('sportsDbCacheHours').value.trim()) {
-        document.getElementById('sportsDbCacheHours').value = '24';
-      }
       if (!document.getElementById('qbitUrl').value.trim()) {
         document.getElementById('qbitUrl').value = 'http://localhost:8080';
       }
@@ -6126,9 +6112,6 @@
       const base = {
         jackettUrl: normalizeProwlarrBaseUrl(document.getElementById('jackettUrl').value),
         jackettApiKey: document.getElementById('jackettApiKey').value.trim(),
-        sportsDbApiKey: document.getElementById('sportsDbApiKey').value.trim(),
-        sportsDbCacheHours: Math.max(1, Math.min(168, parseInt(document.getElementById('sportsDbCacheHours').value, 10) || 24)),
-        sportsImagePackagePath: document.getElementById('sportsImagePackagePath').value.trim(),
         qbitUrl: document.getElementById('qbitUrl').value.replace(/\/+$/, ''),
         qbitUsername: document.getElementById('qbitUsername').value.trim(),
         qbitPassword: document.getElementById('qbitPassword').value,
@@ -6172,13 +6155,6 @@
       updateSavedSecretState(config.savedSecrets || {});
 
       if (config.jackettUrl) document.getElementById('jackettUrl').value = normalizeProwlarrBaseUrl(config.jackettUrl);
-      if (config.sportsDbApiKey) document.getElementById('sportsDbApiKey').value = config.sportsDbApiKey;
-      if (typeof config.sportsDbCacheHours === 'number' && Number.isFinite(config.sportsDbCacheHours)) {
-        document.getElementById('sportsDbCacheHours').value = String(config.sportsDbCacheHours);
-      }
-      if (typeof config.sportsImagePackagePath === 'string') {
-        document.getElementById('sportsImagePackagePath').value = config.sportsImagePackagePath;
-      }
       if (config.qbitUrl) document.getElementById('qbitUrl').value = config.qbitUrl;
       const providerId = String(config.provider || '').trim().toLowerCase();
       if (providerId && providers[providerId]) {

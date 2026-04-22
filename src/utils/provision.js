@@ -979,9 +979,6 @@ async function autoProvisionWindows(options = {}) {
   const config = {
     jackettUrl: prowlarr.url,
     jackettApiKey: prowlarr.apiKey || '',
-    sportsDbApiKey: '',
-    sportsDbCacheHours: 24,
-    sportsImagePackagePath: '',
     qbitUrl: qbit.url,
     qbitUsername: qbit.username || '',
     qbitPassword: '',

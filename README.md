@@ -17,13 +17,13 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 
 ## Key Features
 
-Current sports artwork rule as of 2026-04-12: PVTKRRX itself now keeps the live addon surface on generated SVG poster/background cards with sport-specific theming. Licensed real imagery belongs to SportsMeta on its own paid/member routes, and any local SportsDB/package cache work inside PVTKRRX is explicit operator tooling rather than an automatic free-key request path.
+Current sports artwork rule as of 2026-04-22: SportsMeta (`https://sportsmeta.pvtkrrx.cc`) is the single owner of sports metadata and artwork. PVTKRRX sports catalogs now emit every availability group — resolved groups carry a `sportsmeta:` canonical id and point posters/backgrounds/logos at SportsMeta's canonical `/asset/{variant}/{id}` route; unresolved groups carry a `pvtkrrx:` custom id and point at SportsMeta's default `/asset/default/{variant}/{sport}?league=...` SVG route. The legacy local TheSportsDB client, `sports-image-cache/`, `/thumb/sports/...`, `/image/sports/...`, the 15-minute autofill job, and the experimental internal SportsMeta handler were all removed.
 
 - **SportsMeta boundary is real** - SportsMeta is live as a separate addon/service at `https://sportsmeta.pvtkrrx.cc`, while PVTKRRX stays the separate stream addon and only attaches streams to canonical `sportsmeta:` ids
 
 - **Sports** — Browse and search private tracker sports content (EPL, F1, UFC) directly in Stremio
 - **Sports-first discovery** — `All Sports` plus sport-family catalogs now lead the movie discovery column, with the third-column filter used for league/team detail
-- **Sports artwork enrichment** — Optional TheSportsDB poster, landscape, background, and logo artwork with cache-aware lookups plus disk-backed image caching on the active runtime; `npm run server:setup` now also pre-seeds recent replay dates plus upcoming event art, team badges, and mapped league artwork into `sports-image-cache/`, long-running Linux/cloud runtimes now keep topping that cache up in the background every 15 minutes in rotating sport batches, `npm run cache:sports` can still refresh the whole cache later without redownloading existing files, and a downloaded local/server sports poster package can now be mapped in as the primary catalogue so upstream image fetches are only used for updates and gaps
+- **Sports artwork via SportsMeta** — Posters, backgrounds, logos, and per-sport default SVG fallbacks are all served by the SportsMeta companion service at `https://sportsmeta.pvtkrrx.cc/asset/...`. PVTKRRX no longer holds a TheSportsDB key, maintains a local `sports-image-cache/`, or runs the 15-minute autofill job.
 - **Movies & TV** — IMDb-matched content from your private trackers
 - **Seedbox Library** — Browse everything already downloaded on your seedbox
 - **Smart filtering** — Sports indexers never contaminate movie/TV searches
@@ -74,7 +74,7 @@ Verified SportsMeta boundary on 2026-04-11:
 - the live pricing page is public at `https://sportsmeta.pvtkrrx.cc/pricing`
 - `sportsmeta.service` is the real live metadata/artwork/billing boundary
 - PVTKRRX now emits and consumes canonical `sportsmeta:` ids on resolved configured catalog/meta/stream routes without becoming the metadata or billing owner
-- the old integrated `/sportsmeta/*` draft inside this repo is not the live boundary and is now disabled by default unless `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA=true`
+- the old integrated `/sportsmeta/*` draft inside this repo is removed from the live boundary; legacy `pvtkrrx` sports artwork endpoints now return `HTTP 410 Gone`
 
 ## Documentation Guide
 
@@ -132,13 +132,9 @@ The Linux installer now bootstraps a dedicated self-host server in one flow:
 - creates the self-host password file
 - can install/start a Linux `systemd` service for auto-boot
 - treats legacy `cloudflare` mode values as migration aliases and disables any old `pvtkrrx-tunnel.service` once a FreeDNS or domain front door is configured
-- pre-seeds the local `sports-image-cache/` with recent replay dates plus upcoming TheSportsDB event images, team badges, and league artwork using the same runtime cache path the addon serves later
-- keeps filling that same cache in the background every 15 minutes after boot on long-running Linux/cloud runtimes, rotating through sports instead of hammering the free key in one burst
 - prints a one-time `Configure` bootstrap URL with `#serverPassword=...` so the first browser open can load the saved self-host config automatically
 
 After this first install, the runtime is yours. The hosted site is only the download/bootstrap source.
-
-Sports cache pre-seed/autofill is now opt-in by key presence: if no SportsDB key is configured, those warm steps skip instead of silently falling back to the public free `123` key.
 
 If you are already inside a checked-out repo on the server, run the same installer directly:
 
@@ -146,46 +142,9 @@ If you are already inside a checked-out repo on the server, run the same install
 npm run server:setup
 ```
 
-```bash
-npm run cache:sports
-```
+Sports posters and metadata now come from SportsMeta (`https://sportsmeta.pvtkrrx.cc`), so there are no local sports-cache commands anymore. The installer no longer prompts for a TheSportsDB API key, no longer writes `sports-image-cache/` or `sportsdb-poster-cache.json`, and no longer runs a 15-minute background TheSportsDB refill loop.
 
-Re-run `npm run cache:sports` whenever you want to refresh the local poster cache non-destructively with an explicitly configured SportsDB key. The long-running Linux/cloud server path only does the smaller automatic refill when that key is present.
-
-If no SportsDB key is configured, that command now skips instead of making an implicit free-key API pass.
-
-If you have a downloaded poster package, point `Sports Poster Package Path` in configure at the local folder or manifest file, or export `PVTKRRX_SPORTS_IMAGE_PACKAGE_PATH` directly, then sync it into the runtime cache:
-
-```bash
-npm run cache:sports-package
-```
-
-You can also pass an explicit folder or manifest path:
-
-```bash
-npm run cache:sports-package -- /srv/pvtkrrx/sports-package
-```
-
-Package manifests can live anywhere on the local PC or server. PVTKRRX supports a folder containing `sports-image-package.json` (or `sports-poster-package.json`) or a direct manifest-file path. The manifest should list remote `sourceUrl` values mapped to local image files, so the runtime can satisfy existing catalogue artwork from disk before it ever tries an upstream image fetch.
-That explicit `npm run cache:sports-package` sync is optional acceleration. During normal runtime requests, PVTKRRX now stays cache-only: it serves already-cached bytes first, can lazily import a matching file from the mapped package on a miss, and leaves live upstream refresh work to the seeding/autofill path instead of rebuilding the catalogue on demand. The built-in seeder now also includes a short replay lookback window so yesterday's sports cards can keep exact event art instead of collapsing straight to generated SVG.
-
-Experimental local draft tooling only. The integrated `/sportsmeta/*` path inside `pvtkrrx` is not a production surface and now stays disabled unless `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA=true` is set deliberately on a private/local runtime.
-
-If you still want to materialize the draft integrated SportsMeta database locally, import the active runtime cache into `sportsmeta-catalogue.sqlite`:
-
-```bash
-npm run experimental:sportsmeta:import -- /opt/pvtkrrx/runtime
-```
-
-That database stores structured metadata aliases, entitlement rows, and file-path mappings back to `sports-image-cache/`; the JPG/PNG bytes stay on disk instead of being duplicated as SQLite blobs.
-
-To grant a linked account one year of the `sportsmeta` tier manually:
-
-```bash
-npm run experimental:sportsmeta:grant -- <accountUserId> 365
-```
-
-On Windows desktop installs, the runtime lives under `%APPDATA%\\PVTKRRX\\runtime`, outside the EXE install directory. That means local `Prowlarr`/`qBittorrent` config, sports poster package mapping, `sportsdb-poster-cache.json`, and `sports-image-cache/` survive normal app updates and reinstall-over-the-top installs unless the user explicitly deletes that runtime folder.
+On Windows desktop installs, the runtime still lives under `%APPDATA%\\PVTKRRX\\runtime`, outside the EXE install directory. Local `Prowlarr`/`qBittorrent` config and account/link state survive normal app updates and reinstall-over-the-top installs unless the user explicitly deletes that runtime folder.
 
 The self-hosted server route keeps a stable disk-backed manifest at `/selfhost/manifest.json?mode=hosted`.
 Open `/configure` in a browser to review or edit the saved config at any time.
@@ -225,9 +184,6 @@ That is enough for `PC Local` and `Hybrid Home`, where the local runtime can rea
 |-------|----------|-------------|
 | Prowlarr URL | Yes | e.g. `http://seedbox.example.com:9696` |
 | Prowlarr API Key | Yes | Found in Prowlarr → Settings → General |
-| TheSportsDB API Key | No | Optional local/operator key for manual cache tooling only. PVTKRRX no longer defaults to the free `123` key and its live addon surface stays SVG-only |
-| TheSportsDB Cache (hours) | No | Cache window for optional local SportsDB warm/import tooling. It is ignored when no SportsDB key is configured |
-| Sports Poster Package Path | No | Optional local folder or manifest path for manual package import tooling. The live PVTKRRX addon surface still stays on generated SVG cards |
 | qBittorrent URL | Yes | e.g. `http://seedbox.example.com:8080` |
 | qBittorrent Username | Yes | qBit WebUI credentials |
 | qBittorrent Password | Yes | qBit WebUI credentials |
@@ -407,15 +363,6 @@ This now builds in the system temp directory first, then copies the finished cur
 | PVTKRRX_PLAYBACK_BASE_URL | Optional for self-host | Dedicated public HTTPS origin for built-in `/file` and `/playback` URLs. Use this when install/configure traffic should stay on one origin but actual buffering/file bytes should leave from a different direct reverse-proxied origin |
 | PVTKRRX_SELF_HOST_HTTPS_MODE | Recommended for self-host | HTTPS bootstrap mode for the installer: `freedns`, `domain`, or `skip` |
 | PVTKRRX_FREEDNS_UPDATE_URL | Optional for self-host | FreeDNS dynamic-update URL for the chosen hostname. When set, the installer can point the FreeDNS record at the current server IP before local Caddy requests TLS |
-| PVTKRRX_SPORTS_CACHE_AUTO_FILL | Optional | Enable background sports image cache refill on long-running runtimes. Default `true` on non-Windows non-Vercel servers |
-| PVTKRRX_SPORTS_CACHE_AUTO_FILL_INITIAL_DELAY_MS | Optional | Delay before the first background sports cache refill (default `900000`, 15 minutes) |
-| PVTKRRX_SPORTS_CACHE_AUTO_FILL_INTERVAL_MS | Optional | Background sports cache refill cadence in ms (default `900000`, 15 minutes) |
-| PVTKRRX_SPORTS_CACHE_AUTO_FILL_TARGETS_PER_RUN | Optional | How many sport groups each refill pass processes (default `1`) |
-| PVTKRRX_SPORTS_CACHE_AUTO_FILL_EVENT_LEAGUE_LIMIT | Optional | Max leagues per sport group during background refill (default `3`) |
-| PVTKRRX_SPORTS_CACHE_AUTO_FILL_TEAM_LIMIT_PER_SPORT | Optional | Max teams per sport group during background refill (default `12`) |
-| PVTKRRX_SPORTS_CACHE_AUTO_FILL_SCHEDULE_DAYS | Optional | How many upcoming schedule days each refill pass checks (default `2`) |
-| PVTKRRX_SPORTS_CACHE_AUTO_FILL_LOOKBACK_DAYS | Optional | How many recent replay days each refill pass also checks before today (default `2`) |
-| PVTKRRX_SPORTS_CACHE_AUTO_FILL_IMAGE_CONCURRENCY | Optional | Max concurrent image downloads during background refill (default `2`) |
 | PVTKRRX_ANALYTICS_PROVIDER | Optional | Analytics backend for hosted monitoring. Current supported value is `umami` |
 | PVTKRRX_ANALYTICS_UMAMI_HOST_URL | Optional | Base URL of the Umami instance that should receive hosted PVTKRRX traffic and product events |
 | PVTKRRX_ANALYTICS_UMAMI_WEBSITE_ID | Optional | Umami website id used by the public guide pages and hosted relay event sender |
@@ -452,7 +399,6 @@ This now builds in the system temp directory first, then copies the finished cur
 | PVTKRRX_PLAYBACK_STATE_TTL_SECONDS | Optional | TTL for `/playback/:info` opaque tokens in seconds (default 86400) |
 | PVTKRRX_FILE_STATE_TTL_SECONDS | Optional | TTL for `/file/:info` opaque tokens in seconds (default 86400) |
 | PVTKRRX_EXPERIMENTAL_RAR_STREAMS | Optional | Opt in to emitting native `rarUrls` archive streams for manual testing; default supported behavior keeps packed releases hidden until extracted direct video is ready |
-| PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA | Optional local-only flag | Enables the old integrated `/sportsmeta/*` draft and runtime-local `sportsmeta-catalogue.sqlite` path inside `pvtkrrx`. Default off; do not enable on the public hosted relay. |
 | PVTKRRX_FREE_MODE | Optional | Reserved for future billing rollout. Access is currently forced free in server code. |
 | PVTKRRX_REQUIRE_ACTIVE_SUBSCRIPTION | Optional | Reserved for future billing rollout. Currently ignored while free mode is forced. |
 | PVTKRRX_TRIAL_ENABLED | Optional | Allow free trial access before paid subscription is required (default true) |

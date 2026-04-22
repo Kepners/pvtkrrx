@@ -41,6 +41,7 @@ function normalizeResolveQueryValue(value) {
 
 function normalizeSportsMetaResolveQuery(query = {}) {
   const normalized = {
+    recordType: normalizeResolveQueryValue(query?.recordType || query?.type),
     title: normalizeResolveQueryValue(query?.title),
     date: normalizeResolveQueryValue(query?.date),
     sport: normalizeResolveQueryValue(query?.sport),
@@ -180,9 +181,78 @@ class SportsMetaClient {
   }
 }
 
+const SUPPORTED_SPORT_SLUGS = new Set([
+  'american-football',
+  'baseball',
+  'basketball',
+  'cricket',
+  'cycling',
+  'darts',
+  'fighting',
+  'football',
+  'golf',
+  'hockey',
+  'ice-hockey',
+  'mma',
+  'motorsport',
+  'rugby',
+  'wrestling'
+])
+
+function normalizeSportSlug(value) {
+  return String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function resolveSportSlug(value) {
+  const slug = normalizeSportSlug(value)
+  if (!slug) return ''
+  if (SUPPORTED_SPORT_SLUGS.has(slug)) return slug
+  if (slug === 'boxing') return 'fighting'
+  if (slug === 'ufc' || slug === 'mixed-martial-arts') return 'mma'
+  if (slug === 'formula-1' || slug === 'formula1' || slug === 'f1') return 'motorsport'
+  if (slug === 'nhl' || slug === 'hockey') return 'hockey'
+  if (slug === 'nba' || slug === 'wnba') return 'basketball'
+  return slug
+}
+
+function getPublicSportsMetaBaseUrl(overrideBaseUrl) {
+  return normalizeBaseUrl(
+    overrideBaseUrl ||
+    process.env.PVTKRRX_SPORTSMETA_BASE_URL ||
+    DEFAULT_BASE_URL
+  )
+}
+
+function buildSportsMetaAssetUrl(baseUrl, variant, canonicalId) {
+  const base = getPublicSportsMetaBaseUrl(baseUrl)
+  const v = String(variant || '').trim()
+  const id = String(canonicalId || '').trim()
+  if (!base || !v || !id) return ''
+  return `${base}/asset/${encodeURIComponent(v)}/${encodeURIComponent(id)}`
+}
+
+function buildSportsMetaDefaultAssetUrl(baseUrl, variant, sport, league = '') {
+  const base = getPublicSportsMetaBaseUrl(baseUrl)
+  const v = String(variant || '').trim()
+  const slug = resolveSportSlug(sport)
+  if (!base || !v || !slug) return ''
+  const url = new URL(`${base}/asset/default/${encodeURIComponent(v)}/${encodeURIComponent(slug)}`)
+  const leagueValue = String(league || '').trim()
+  if (leagueValue) url.searchParams.set('league', leagueValue)
+  return url.toString()
+}
+
 module.exports = {
   DEFAULT_BASE_URL,
+  buildSportsMetaAssetUrl,
+  buildSportsMetaDefaultAssetUrl,
+  getPublicSportsMetaBaseUrl,
   normalizeSportsMetaPayload,
   normalizeSportsMetaResolveQuery,
+  resolveSportSlug,
   SportsMetaClient
 }
