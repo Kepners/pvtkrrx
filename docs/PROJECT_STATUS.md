@@ -1,10 +1,73 @@
 # PVTKRRX Project Status
 
-Updated: 2026-04-23
+Updated: 2026-04-24
 
 ## Current Stage
 
-PVTKRRX is in a working `1.1.34` state on the main Windows/local route set.
+PVTKRRX is in a working `1.1.35` state on the main Windows/local and self-host route set, with the remaining sports catalog reliability failure materially reduced by a portable repo/runtime fix.
+
+## 2026-04-24: Portable sports catalog reliability fix
+
+- Reproduced the remaining runtime failure on the supported product surfaces before changing code:
+  - local desktop `manifest` returned `200`
+  - local desktop `football` timed out at roughly `90s`
+  - local desktop `motorsport` returned `200` with `50 metas`, `0 canonical`, `50 fallback`
+  - local desktop `mma` returned `200` with `50 metas`, `1 canonical`, `49 fallback`
+  - self-host `manifest` returned `200`
+  - self-host `football` timed out at roughly `90s`
+  - self-host `motorsport` returned `200` with `50 metas`, `0 canonical`, `50 fallback`
+  - self-host `mma` returned `200` with `50 metas`, `1 canonical`, `49 fallback`
+- Proved the true failure boundary was not a machine-specific install path and not direct Prowlarr starvation. The portable bottleneck was repeated SportsMeta resolution churn on football titles:
+  - direct trace before the fix showed `sportsmetaResolve=766`, `sportsmetaSearch=1400` with only `190` unique search keys, and `sportsmetaEvent=6289` with only `631` unique canonical ids
+  - the same trace showed football runtime exploding to `149164ms` and later `458972ms`, while Prowlarr time was only a smaller subset of the total wall-clock time
+  - football was uniquely bad because noisy repeated club tokens kept re-walking the same SportsMeta search and event candidates
+- Landed the repo fix in the real product code instead of patching one box:
+  - `src/clients/sportsmeta.js` now caches successful JSON lookups and dedupes in-flight requests across repeated catalog/event fetches
+  - `src/utils/sportsIdentityResolution.js` now strips generic football noise terms from search terms and shortlists search candidates before dereferencing canonical events
+  - `scripts/smoke-sports-resolution.js` now proves repeated football resolutions reuse cached SportsMeta responses and skip mismatched-date/unrelated candidates
+- Direct trace after the fix proved the pathological churn was cut down materially:
+  - football dropped to `29005ms`, `50 metas`, `20 canonical`, `30 fallback`
+  - `sportsmetaEvent` dropped from `6289` to `95`
+  - motorsport stayed at `10036ms`, `50 metas`
+  - mma stayed at `6110ms`, `50 metas`
+- Deployed the same repo-backed fix to the live self-host runtime at `/opt/pvtkrrx`, restarted `pvtkrrx.service`, and re-tested the supported surfaces.
+- Post-fix supported-surface proof on 2026-04-24:
+  - local desktop:
+    - `manifest`: `200` in `25ms`
+    - `football`: `200` in `25355ms`, `50 metas`, `20 canonical`, `30 fallback`
+    - `motorsport`: `200` in `7360ms`, `50 metas`, `0 canonical`, `50 fallback`
+    - `mma`: `200` in `7168ms`, `50 metas`, `1 canonical`, `49 fallback`
+  - self-host:
+    - `manifest`: `200` in `160ms`
+    - `football`: `200` in `26884ms`, `50 metas`, `20 canonical`, `30 fallback`
+    - `motorsport`: `200` in `7425ms`, `50 metas`, `0 canonical`, `50 fallback`
+    - `mma`: `200` in `5991ms`, `50 metas`, `1 canonical`, `49 fallback`
+- Local and self-host are now back on the same sports contract:
+  - both surfaces return `50` metas for football, motorsport, and mma
+  - both surfaces emit canonical `sportsmeta:event:` ids where resolution is provable and `pvtkrrx:` fallback ids where it is not
+  - both surfaces emit only `https://sportsmeta.pvtkrrx.cc` artwork URLs on the tested catalogs
+- Re-proved the approved SportsMeta/PVTKRRX model still holds:
+  - public canonical poster route `GET /asset/poster/:id` returns `200 image/svg+xml`
+  - public default fallback poster route `GET /asset/default/poster/:sport` returns `200 image/svg+xml`
+  - SportsMeta member routes still work live:
+    - `GET /member/:token/manifest.json` returns `200`
+    - `GET /member/:token/asset/poster/:id` returns `200 image/jpeg`
+  - `src/lib/shared.js` still keeps `requireConfigSubscription()` as a pass-through, so no fake sports unlock gate has reappeared
+  - the current repo `src` tree still does not import or use a live legacy SportsDB client on the active sports path
+- Smoke coverage passed on 2026-04-24:
+  - PASS: `smoke:sports-resolution`
+  - PASS: `smoke:sports-catalog-seeds`
+  - PASS: `smoke:sports-catalog-latency`
+  - PASS: `smoke:config`
+  - PASS: `smoke:selfhost`
+  - PASS: `smoke:parity`
+  - PASS: `smoke:desktop`
+  - PASS: `smoke:stremio-link`
+  - PASS: `smoke:guards`
+  - PASS: `smoke:security`
+- Remaining honest caveat:
+  - the desktop runtime proof used the fresh `1.1.35` build launched from the builder temp output because this machine still had a stale OS lock against copying back into `dist/win-unpacked`
+  - that lock does not change the product/runtime fix itself, but it does mean the local packaging copy step on this box still needs cleanup before treating `dist/win-unpacked` as clean build output
 
 ## 2026-04-23: SportsMeta coordination truth pass
 

@@ -82,6 +82,7 @@ const TRACKER_NOISE_TOKENS = new Set([
 
 const CLUB_PREFIX_TOKENS = new Set(['fc', 'cf', 'rc', 'sc', 'ac'])
 const SEARCH_TOKEN_STOPWORDS = new Set([
+  'at',
   'city',
   'club',
   'fc',
@@ -89,10 +90,26 @@ const SEARCH_TOKEN_STOPWORDS = new Set([
   'rc',
   'sc',
   'ac',
+  'first',
+  'fourth',
+  'leg',
+  'legs',
+  'of',
+  'quarterfinal',
+  'quarterfinals',
   'real',
+  'second',
+  'semifinal',
+  'semifinals',
   'sporting',
+  'summer',
+  'series',
+  'the',
+  'third',
   'united',
-  'vs'
+  'vs',
+  'women',
+  'womens'
 ])
 
 function normalizeSpace(value) {
@@ -264,7 +281,16 @@ function levenshteinDistance(left = '', right = '') {
 function buildSearchTokensForLabel(value = '') {
   const tokens = tokenizeIdentity(simplifyTeamLabel(value), {
     keepNumbers: false
-  }).filter((token) => !SEARCH_TOKEN_STOPWORDS.has(token))
+  }).filter((token) => {
+    const normalized = normalizeIdentityToken(token)
+    return (
+      normalized.length >= 3 &&
+      !SEARCH_TOKEN_STOPWORDS.has(normalized) &&
+      !GENERIC_EVENT_TOKENS.has(normalized) &&
+      !TRACKER_NOISE_TOKENS.has(normalized) &&
+      !isResolutionNoiseToken(normalized)
+    )
+  })
 
   return tokens.sort((left, right) => right.length - left.length)
 }
@@ -292,7 +318,10 @@ function buildSearchTermsFromQuery(query = {}) {
 
   if (String(query?.identityType || '').trim() === 'event') {
     const descriptorTokens = buildDescriptorTokens(params.event, { league: params.league })
-    const alphaTokens = descriptorTokens.filter((token) => /[a-z]/.test(token))
+    const alphaTokens = descriptorTokens.filter((token) =>
+      /[a-z]/.test(token) &&
+      buildSearchTokensForLabel(token).length > 0
+    )
     if (alphaTokens.length > 0) {
       alphaTokens.sort((left, right) => right.length - left.length)
       addTerm(alphaTokens[0])
@@ -871,6 +900,55 @@ function verifySportsMetaSearchCandidate(query = {}, canonical = {}) {
   }
 }
 
+function extractCanonicalEventDate(value = '') {
+  const match = String(value || '').trim().match(/\|((?:19|20)\d{2}-\d{2}-\d{2})\|/)
+  return match ? match[1] : ''
+}
+
+function shortlistSportsMetaSearchCandidates(query = {}, candidates = []) {
+  const params = query?.params || {}
+  const requestedDate = extractResolutionDate(params.date || '')
+  const descriptor = String(query?.identityType || '').trim() === 'matchup'
+    ? buildRequestedMatchupDescriptor(params)
+    : normalizeEventNameLabel(params.event)
+  const requestedTokens = buildDescriptorTokens(descriptor, { league: params.league })
+  const hasSpecificRequestedTokens = hasSpecificDescriptorTokens(requestedTokens)
+
+  const scored = (Array.isArray(candidates) ? candidates : [])
+    .map((candidate) => {
+      const canonicalId = String(candidate?.id || '').trim()
+      if (!canonicalId || !canonicalId.startsWith('sportsmeta:')) return null
+
+      const candidateDate = extractResolutionDate(candidate?.releaseInfo || '') || extractCanonicalEventDate(canonicalId)
+      if (requestedDate && (!candidateDate || candidateDate !== requestedDate)) return null
+
+      const candidateTokens = hasSpecificRequestedTokens
+        ? buildDescriptorTokens(candidate?.name || candidate?.description || '', { league: params.league })
+        : []
+      const fullDescriptorMatch = hasSpecificRequestedTokens && descriptorTokensFullyMatch(requestedTokens, candidateTokens)
+      const partialDescriptorMatch = hasSpecificRequestedTokens && !fullDescriptorMatch &&
+        candidateTokens.some((token) => requestedTokens.some((requested) => tokensLooselyMatch(requested, token)))
+
+      let score = 0
+      if (requestedDate && candidateDate === requestedDate) score += 3
+      if (fullDescriptorMatch) score += 3
+      else if (partialDescriptorMatch) score += 1
+
+      return {
+        candidate,
+        score
+      }
+    })
+    .filter(Boolean)
+    .sort((left, right) => right.score - left.score || String(left?.candidate?.id || '').localeCompare(String(right?.candidate?.id || '')))
+
+  if (scored.length === 0) return []
+  if (scored[0].score > 0) return scored.slice(0, 3).map((entry) => entry.candidate)
+  if (requestedDate) return scored.slice(0, 2).map((entry) => entry.candidate)
+  if (hasSpecificRequestedTokens && scored.length <= 3) return scored.map((entry) => entry.candidate)
+  return []
+}
+
 async function resolveSportsMetaIdentityBySearch(client, query = {}) {
   const params = query?.params || {}
   const sport = normalizeSportKey(params.sport)
@@ -888,9 +966,9 @@ async function resolveSportsMetaIdentityBySearch(client, query = {}) {
       continue
     }
 
-    for (const candidate of candidates.slice(0, 6)) {
+    for (const candidate of shortlistSportsMetaSearchCandidates(query, candidates)) {
       const canonicalId = String(candidate?.id || '').trim()
-      if (!canonicalId || !canonicalId.startsWith('sportsmeta:') || seenCandidateIds.has(canonicalId)) continue
+      if (seenCandidateIds.has(canonicalId)) continue
       seenCandidateIds.add(canonicalId)
 
       const canonical = await client.getEvent(canonicalId)

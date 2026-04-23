@@ -49,9 +49,18 @@ function availability(title, options = {}) {
 async function run() {
   const burnsId = 'sportsmeta:event:mma|2026-04-18|ufc|ufc-fight-night-273-burns|malott'
   const barcaId = 'sportsmeta:event:football|2026-04-22|spanish-la-liga|barcelona|celta-vigo'
+  const barcaOtherId = 'sportsmeta:event:football|2026-04-25|spanish-la-liga|getafe|barcelona'
+  const barcaWomenId = 'sportsmeta:event:football|2026-04-25|uefa-womens-champions-league|bayern-munich-women|barcelona-femen'
+  const fetchCounts = new Map()
+
+  const countFetch = (url) => {
+    const key = String(url || '')
+    fetchCounts.set(key, (fetchCounts.get(key) || 0) + 1)
+  }
 
   global.fetch = async (input) => {
     const url = new URL(String(input))
+    countFetch(url.toString())
     if (url.hostname !== 'sportsmeta.test') {
       throw new Error(`Unexpected fetch host in smoke-sports-resolution: ${url.hostname}`)
     }
@@ -66,6 +75,8 @@ async function run() {
     if (url.pathname === '/catalog/movie/sportsmeta-football/search=barcelona.json') {
       return new Response(JSON.stringify({
         metas: [
+          { id: barcaOtherId, name: 'Getafe vs Barcelona', releaseInfo: '2026-04-25' },
+          { id: barcaWomenId, name: 'Bayern Munich Women vs Barcelona Femeni', releaseInfo: '2026-04-25' },
           { id: barcaId, name: 'Barcelona vs Celta Vigo', releaseInfo: '2026-04-22' }
         ]
       }), {
@@ -126,6 +137,32 @@ async function run() {
       })
     }
 
+    if (url.pathname === `/event/${encodeURIComponent(barcaOtherId)}`) {
+      return new Response(JSON.stringify(canonicalPayload({
+        id: barcaOtherId,
+        name: 'Getafe vs Barcelona',
+        league: 'Spanish La Liga',
+        date: '2026-04-25',
+        sport: 'Football'
+      })), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
+    if (url.pathname === `/event/${encodeURIComponent(barcaWomenId)}`) {
+      return new Response(JSON.stringify(canonicalPayload({
+        id: barcaWomenId,
+        name: 'Bayern Munich Women vs Barcelona Femeni',
+        league: 'UEFA Womens Champions League',
+        date: '2026-04-25',
+        sport: 'Football'
+      })), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
     if (url.pathname === `/event/${encodeURIComponent(burnsId)}`) {
       return new Response(JSON.stringify(canonicalPayload({
         id: burnsId,
@@ -144,16 +181,25 @@ async function run() {
 
   const client = new SportsMetaClient({ baseUrl: 'https://sportsmeta.test' })
 
+  const footballAvailability = availability('FC Barcelona vs RC Celta Round 33 1080p50fps', {
+    sportHint: 'football',
+    mappedLeague: 'Spanish La Liga',
+    pubDate: '2026-04-22'
+  })
+
   const footballResolution = await resolveSportsMetaIdentity(
     client,
-    availability('FC Barcelona vs RC Celta Round 33 1080p50fps', {
-      sportHint: 'football',
-      mappedLeague: 'Spanish La Liga',
-      pubDate: '2026-04-22'
-    })
+    footballAvailability
   )
   assert.equal(footballResolution.status, SPORTS_META_RESOLUTION_STATUS.RESOLVED, 'football fallback search should resolve Barcelona vs Celta')
   assert.equal(footballResolution.canonicalId, barcaId, 'football fallback search should return the canonical SportsMeta id')
+
+  const cachedFootballResolution = await resolveSportsMetaIdentity(client, footballAvailability)
+  assert.equal(cachedFootballResolution.status, SPORTS_META_RESOLUTION_STATUS.RESOLVED, 'football fallback search should still resolve from cached SportsMeta responses')
+  assert.equal(fetchCounts.get('https://sportsmeta.test/catalog/movie/sportsmeta-football/search=barcelona.json') || 0, 1, 'football search fallback should cache repeated SportsMeta catalog lookups')
+  assert.equal(fetchCounts.get(`https://sportsmeta.test/event/${encodeURIComponent(barcaId)}`) || 0, 1, 'football fallback search should cache repeated canonical event fetches')
+  assert.equal(fetchCounts.get(`https://sportsmeta.test/event/${encodeURIComponent(barcaOtherId)}`) || 0, 0, 'football fallback search should skip mismatched-date candidates before fetching canonical events')
+  assert.equal(fetchCounts.get(`https://sportsmeta.test/event/${encodeURIComponent(barcaWomenId)}`) || 0, 0, 'football fallback search should not walk unrelated same-term candidates')
 
   const mmaResolution = await resolveSportsMetaIdentity(
     client,

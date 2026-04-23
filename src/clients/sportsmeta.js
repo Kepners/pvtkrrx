@@ -4,6 +4,16 @@ const DEFAULT_TIMEOUT_MS = Math.max(
   1500,
   parseInt(process.env.PVTKRRX_SPORTSMETA_TIMEOUT_MS || '4000', 10)
 )
+const SPORTS_META_CACHE_TTL_MS = Math.max(
+  1000,
+  parseInt(process.env.PVTKRRX_SPORTSMETA_CACHE_MS || '60000', 10)
+)
+const SPORTS_META_CACHE_MAX_KEYS = Math.max(
+  100,
+  parseInt(process.env.PVTKRRX_SPORTSMETA_CACHE_MAX_KEYS || '3000', 10)
+)
+const sportsMetaJsonCache = new Map()
+const sportsMetaJsonInFlight = new Map()
 
 function normalizeBaseUrl(value) {
   return String(value || '').trim().replace(/\/+$/, '')
@@ -37,6 +47,62 @@ function inferFallbackBaseUrls(options = {}) {
 
 function normalizeResolveQueryValue(value) {
   return String(value || '').trim()
+}
+
+function trimSportsMetaCache() {
+  while (sportsMetaJsonCache.size > SPORTS_META_CACHE_MAX_KEYS) {
+    const oldestKey = sportsMetaJsonCache.keys().next().value
+    if (!oldestKey) break
+    sportsMetaJsonCache.delete(oldestKey)
+  }
+}
+
+async function requestSportsMetaJson(urlString, timeoutMs) {
+  const now = Date.now()
+  const cached = sportsMetaJsonCache.get(urlString)
+  if (cached && cached.expiresAt > now) return cached.value
+  if (sportsMetaJsonInFlight.has(urlString)) return sportsMetaJsonInFlight.get(urlString)
+
+  const pending = (async () => {
+    const response = await fetch(
+      urlString,
+      {
+        headers: {
+          accept: 'application/json'
+        },
+        signal: AbortSignal.timeout(timeoutMs)
+      }
+    )
+
+    if (response.status === 404) {
+      return { ok: true, payload: null }
+    }
+    if (!response.ok) {
+      const error = new Error(`SportsMeta request failed with ${response.status}`)
+      error.status = response.status
+      throw error
+    }
+
+    const payload = await response.json()
+    return {
+      ok: true,
+      payload: payload && typeof payload === 'object' ? payload : null
+    }
+  })()
+    .then((value) => {
+      sportsMetaJsonCache.set(urlString, {
+        value,
+        expiresAt: Date.now() + SPORTS_META_CACHE_TTL_MS
+      })
+      trimSportsMetaCache()
+      return value
+    })
+    .finally(() => {
+      sportsMetaJsonInFlight.delete(urlString)
+    })
+
+  sportsMetaJsonInFlight.set(urlString, pending)
+  return pending
 }
 
 function normalizeSportsMetaResolveQuery(query = {}) {
@@ -135,26 +201,8 @@ class SportsMetaClient {
           if (!String(value || '').trim()) continue
           url.searchParams.set(key, String(value).trim())
         }
-
-        const response = await fetch(
-          url.toString(),
-          {
-            headers: {
-              accept: 'application/json'
-            },
-            signal: AbortSignal.timeout(this.timeoutMs)
-          }
-        )
-
-        if (response.status === 404) return null
-        if (!response.ok) {
-          lastError = new Error(`SportsMeta request failed with ${response.status}`)
-          lastError.status = response.status
-          continue
-        }
-
-        const payload = await response.json()
-        if (payload && typeof payload === 'object') return payload
+        const result = await requestSportsMetaJson(url.toString(), this.timeoutMs)
+        return result?.payload || null
       } catch (error) {
         lastError = error
       }
