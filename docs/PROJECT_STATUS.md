@@ -6,6 +6,22 @@ Updated: 2026-04-23
 
 PVTKRRX is in a working `1.1.34` state on the main Windows/local route set.
 
+## 2026-04-23: SportsMeta coordination truth pass
+
+- Verified the approved product boundary directly against live code and live routes: PVTKRRX is the Stremio-facing addon/install/playback layer, while SportsMeta is the sports identity/artwork/billing service inside the same overall sports stack.
+- Verified free/default artwork truth on the live SportsMeta root routes:
+  - `GET /asset/default/:variant/:sport` returns `200 image/svg+xml`
+  - `GET /asset/:variant/:id` returns `200 image/svg+xml` on the public root surface
+- Verified paid/member artwork truth on the live SportsMeta member routes:
+  - `GET /member/:token/manifest.json` returns `200` for a live active member token
+  - `GET /member/:token/asset/poster/:id` returns `200 image/jpeg`
+  - `POST /billing/checkout` returns a live Stripe Checkout session for paid tiers
+- Verified PVTKRRX runtime truth on both local desktop and self-host meta routes: the addon emits only public SportsMeta asset URLs (`/asset/...` and `/asset/default/...`) and does not switch artwork by user entitlement. `requireConfigSubscription()` is still a pass-through, so PVTKRRX remains free on the tested path.
+- Verified no direct TheSportsDB dependency on the tested live sports path. The current sports path resolves through SportsMeta rather than a local PVTKRRX TheSportsDB client.
+- Current caveat from the exact route re-test on 2026-04-23:
+  - local desktop and self-host `motorsport` and `mma` sports catalogs returned `50` metas in the current pass
+  - football returned `50` metas earlier in same-day logs, but timed out and later produced `metas=0` during the direct re-test window, so football catalog reliability is not cleanly signed off in this pass
+
 ## 2026-04-23: Final sports closeout pass
 
 - Replaced the stale Windows desktop listener with the current `1.1.34` build and re-proved the real installed listener on `127.0.0.1:7000` / `127.0.0.1:7001`.

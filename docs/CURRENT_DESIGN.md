@@ -1,6 +1,6 @@
 # PVTKRRX Current Design
 
-Updated: 2026-04-22
+Updated: 2026-04-23
 
 ## Purpose
 
@@ -54,6 +54,19 @@ PVTKRRX is one codebase with three active runtime pieces:
    - performs startup checks, provider warm-up, and local auto-provision helpers
    - can register/unregister itself with Windows sign-in startup from the desktop shell
    - sends LAN pair heartbeat updates and Stremio launch pulses
+
+## Coordinated Product Stack And Entitlement
+
+Canonical product truth (verified 2026-04-23):
+
+- The stack is two coordinated services in one PVTKRRX product family. They are co-owned, co-hosted on Contabo, and deliberately designed to work together, but they are not one binary and not one addon.
+- **PVTKRRX** is the Stremio-facing stream addon at `https://www.pvtkrrx.cc` and on the Windows desktop runtime. It owns install routes (`PC Local`, `LAN Bridge`, `Remote Seedbox`), catalog emission, `/file`, `/playback`, qBittorrent/Prowlarr integration, and stream attachment.
+- **SportsMeta** is the sports identity and artwork service at `https://sportsmeta.pvtkrrx.cc`. It owns the canonical `sportsmeta:` id space, sports resolution, the SQLite DB, the asset cache, public SVG asset routes, member-token routes, and Stripe billing.
+- PVTKRRX consumes only the public SportsMeta asset routes for every user: `https://sportsmeta.pvtkrrx.cc/asset/{variant}/{sportsmeta:event:...}` for resolved events and `https://sportsmeta.pvtkrrx.cc/asset/default/{variant}/{sport}?league=...` for unresolved fallbacks. Both return themed SVG on the public surface today.
+- **Every PVTKRRX user — free, unconfigured, desktop, hosted, self-host — gets the same SportsMeta SVG artwork.** There is no user-entitlement branch inside PVTKRRX. `requireConfigSubscription` in `src/lib/shared.js` is a pass-through middleware, `package.json` has no billing dependency, and `src/utils/sportsArtwork.js` branches on whether a canonical id is known, not on who the user is.
+- Real poster/background/logo raster artwork plus the full member lookup routes (`/resolve`, `/event`, `/event/:id/assets`) are a separate SportsMeta `Plus` / `Pro` product on the SportsMeta pricing page (`https://sportsmeta.pvtkrrx.cc/pricing`). The paid half of the stack is live on SportsMeta, not inside PVTKRRX: verified on 2026-04-23, the pricing page exposes paid plan actions, `POST /billing/checkout` returns a live Stripe Checkout session, and valid member routes return premium member-scoped URLs and raster artwork. PVTKRRX does not mint, forward, or consume those member tokens today.
+- So the product-level statement "SVG for everyone, real posters for paying customers" is a **stack-level truth that runs through two separate Stremio addons**, not a free/paid split inside PVTKRRX. Any doc, copy, or UI that implies PVTKRRX has an internal paid artwork tier is drift and should be read as historical intent.
+- If SportsMeta billing state changes, PVTKRRX behavior does not change. PVTKRRX stream routes are free on every install surface tested here.
 
 ## SportsMeta Boundary
 

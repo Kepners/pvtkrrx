@@ -19,7 +19,7 @@ Hosted `Test Connection` checks are intentionally limited to public HTTP/HTTPS e
 
 Current sports artwork rule as of 2026-04-22: SportsMeta (`https://sportsmeta.pvtkrrx.cc`) is the single owner of sports metadata and artwork. PVTKRRX sports catalogs now emit every availability group — resolved groups carry a canonical `sportsmeta:event:` id and point posters/backgrounds/logos at SportsMeta's canonical `/asset/{variant}/{id}` route; unresolved groups carry a `pvtkrrx:` custom id and point at SportsMeta's default `/asset/default/{variant}/{sport}?league=...` SVG route. The legacy local TheSportsDB client, `sports-image-cache/`, `/thumb/sports/...`, `/image/sports/...`, the 15-minute autofill job, and the experimental internal SportsMeta handler were all removed.
 
-- **SportsMeta boundary is real** - SportsMeta is live as a separate addon/service at `https://sportsmeta.pvtkrrx.cc`, while PVTKRRX stays the separate stream addon and only attaches streams to canonical `sportsmeta:` ids
+- **SportsMeta boundary is real** - SportsMeta is live as a separate addon/service inside the overall PVTKRRX sports stack at `https://sportsmeta.pvtkrrx.cc`, while PVTKRRX stays the separate Stremio-facing stream addon and only attaches streams to canonical `sportsmeta:` ids
 
 - **Sports** — Browse and search private tracker sports content (EPL, F1, UFC) directly in Stremio
 - **Sports-first discovery** — `All Sports` plus sport-family catalogs now lead the movie discovery column, with the third-column filter used for league/team detail
@@ -53,7 +53,7 @@ See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the legacy/manu
 | Feature | Status |
 |---------|--------|
 | Sports discovery catalogs (All Sports, Football, Motorsport, MMA, etc.) | Working |
-| Sports artwork enrichment | Working (PVTKRRX live sports cards are now SVG-only with sport-specific theming; licensed real imagery remains a SportsMeta-owned paid/member surface) |
+| Sports artwork enrichment | Working. PVTKRRX always serves the free public SportsMeta asset routes (themed SVG — canonical when the event resolves, default when it doesn't), for every user, with no in-addon free/paid split. Real poster/background/logo artwork is sold by the separate SportsMeta member install (`Plus` / `Pro` tiers at `https://sportsmeta.pvtkrrx.cc/pricing`) and is delivered there, not inside PVTKRRX. |
 | Movie/TV streams from private trackers | Working |
 | Sports contamination filter | Working (SportsCult excluded from movie searches) |
 | Already-downloaded files | Working (built-in file server with Range support) |

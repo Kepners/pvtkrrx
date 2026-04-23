@@ -1,11 +1,11 @@
 # SportsMeta Boundary
 
-Updated: 2026-04-12
+Updated: 2026-04-23
 
 ## Live Truth
 
-SportsMeta is live as a separate addon and paid metadata/artwork product at `https://sportsmeta.pvtkrrx.cc`.
-PVTKRRX remains the separate stream addon at `https://www.pvtkrrx.cc`.
+SportsMeta is live as a separate addon/service inside the overall PVTKRRX sports stack at `https://sportsmeta.pvtkrrx.cc`.
+PVTKRRX remains the separate Stremio-facing stream addon at `https://www.pvtkrrx.cc`.
 
 The shared Contabo VM does not make them the same product.
 
@@ -26,7 +26,8 @@ The shared Contabo VM does not make them the same product.
 - `/:config/stream/...`, local `/file`, `/playback`, and route-specific install/config flows
 - internal `pvtkrrx:` ids for its own sports/library rows
 - tracker availability anchoring plus `pvtkrrx:` fallback ids for unresolved sports rows
-- rendering SportsMeta-owned canonical or default artwork URLs on addon responses without making independent sports artwork decisions
+- rendering SportsMeta-owned public canonical or default artwork URLs on addon responses without making independent sports artwork decisions
+- no SportsMeta member token issuance, forwarding, or entitlement-aware asset selection
 - qBittorrent/Prowlarr integration and actual stream attachment
 
 ## Id Rules
@@ -93,7 +94,7 @@ These are infrastructure couplings, not proof of one product.
 ## Coupling To Reduce Next
 
 - SportsMeta bootstrap imports still start from PVTKRRX cache roots instead of a fully self-owned ingest pipeline
-- PVTKRRX still owns some sports artwork/cache behavior for `pvtkrrx:` catalog items
+- PVTKRRX still owns fallback row ids and tracker-availability anchors for unresolved sports rows, even though the artwork bytes now come from SportsMeta
 - same-box internal networking still exists between the hosted PVTKRRX relay and the SportsMeta service
 - import quality cleanup is still needed for some SportsMeta alias mappings
 

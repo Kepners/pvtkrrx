@@ -174,11 +174,20 @@ The tone should be:
    * enriched presentation where available
    * not a separate live sports service
 5. The sports story should support the product's uniqueness.
+6. SportsMeta should be described as the internal sports identity and artwork service inside the overall PVTKRRX stack, not as a random unrelated external product.
+7. Copy must not imply that PVTKRRX itself has an internal paid artwork tier.
+8. When the free/paid art split is mentioned, the truthful current wording is:
+
+   * every PVTKRRX user gets the same public SportsMeta SVG/default artwork
+   * premium poster-grade artwork lives on the separate SportsMeta member install
+   * PVTKRRX does not currently switch artwork by entitlement
+9. If a surface cannot prove a SportsMeta entitlement enforcement point, it must not claim "paid-only posters inside PVTKRRX".
 
 Approved framing:
 
 * sports is one of the clearest differentiators
 * sports belongs alongside movies, TV, and library
+* PVTKRRX is the Stremio-facing addon and SportsMeta is the sports identity/artwork service in the same product stack
 
 ## 10. Privacy and control rules
 

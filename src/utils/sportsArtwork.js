@@ -44,6 +44,8 @@ function resolveLeague(input = {}) {
 function buildVariantUrl(variant, input = {}) {
   const baseUrl = resolveSportsMetaBaseUrl(input)
   const canonicalId = resolveCanonicalId(input)
+  // PVTKRRX intentionally emits only the public SportsMeta asset surface.
+  // Member-token artwork stays on the separate SportsMeta addon/install.
   if (canonicalId) {
     const canonical = buildSportsMetaAssetUrl(baseUrl, variant, canonicalId)
     if (canonical) return canonical

@@ -1,6 +1,6 @@
 # PVTKRRX Architecture
 
-Updated: 2026-04-11
+Updated: 2026-04-23
 
 ## Canonical Sources
 
@@ -44,16 +44,16 @@ Self-hosted server mode uses the same Express runtime on a VPS/seedbox, but with
 
 ## SportsMeta Boundary
 
-SportsMeta is not a subsection of the public `www.pvtkrrx.cc` app.
+SportsMeta and PVTKRRX are two coordinated services in the same PVTKRRX product stack. They share ownership, the Contabo VM, and the Caddy edge, but they run as distinct addons with distinct runtime boundaries.
 
-- SportsMeta owns the separate hostname `https://sportsmeta.pvtkrrx.cc`
-- SportsMeta owns `sportsmeta.service`, the SportsMeta SQLite DB, asset cache, member-token routes, and Stripe billing
-- SportsMeta owns sports identity resolution, artwork selection, paid TheSportsDB usage, and the default/free sport poster SVG routes
-- PVTKRRX stays the separate stream addon and only consumes canonical `sportsmeta:event:` ids when a sports row resolves cleanly
-- unresolved sports rows in PVTKRRX still point at SportsMeta-owned default `/asset/default/{variant}/{sport}?league=...` artwork instead of local fallback generation
-- the old integrated `/sportsmeta/*` draft inside this repo is removed from the live product boundary; legacy `pvtkrrx` sports artwork endpoints now return `HTTP 410 Gone`
+- PVTKRRX is the Stremio-facing stream addon. It owns install surfaces, route selection, `/file`, `/playback`, qBittorrent/Prowlarr integration, and the sports/movie/TV/library catalog emitted to Stremio.
+- SportsMeta is the sports identity and artwork service. It owns the public `sportsmeta:` id space, `manifest` / `catalog` / `meta` / `event` / `resolve` endpoints, the SportsMeta SQLite DB, the asset cache, the member-token routes, and Stripe billing.
+- PVTKRRX depends on SportsMeta for sports identity resolution and sports artwork URLs. It does not own those decisions and does not ship its own sports artwork generator anymore.
+- PVTKRRX consumes only the public, unauthenticated SportsMeta asset routes — `https://sportsmeta.pvtkrrx.cc/asset/{variant}/{id}` when a canonical id is known and `https://sportsmeta.pvtkrrx.cc/asset/default/{variant}/{sport}?league=...` when it is not. Both return themed SVG today, and both are served to every PVTKRRX user without any PVTKRRX-side entitlement check.
+- The paid side of the stack (real poster/background/logo raster art plus the full member lookup routes) is a separate SportsMeta member install (`Plus` / `Pro` plans at `https://sportsmeta.pvtkrrx.cc/pricing`). That member install is a different Stremio addon; it is not a tier inside PVTKRRX.
+- The old integrated `/sportsmeta/*` draft inside this repo is removed from the live product boundary; legacy `pvtkrrx` sports artwork endpoints now return `HTTP 410 Gone`.
 
-Shared Contabo hosting and same-box network access are infrastructure couplings, not proof that the products are one runtime.
+Shared Contabo hosting and same-box network access are infrastructure couplings. They do not merge the two services into one addon, and they do not move SportsMeta's billing/member model into PVTKRRX.
 
 ## Components
 
@@ -139,7 +139,7 @@ The current desktop popup copy still says `LAN Bridge`; the configure flow and h
 4. PVTKRRX's live sports catalog/meta surface now stays on generated SVG poster/background cards with sport-specific theming.
 5. The manifest now exposes a dedicated top-level `sports` surface with an `All Sports` catalog plus sport-family catalogs such as `Football`, `Motorsport`, and `MMA`.
 6. Each sport-family catalog uses the third-column `genre` dropdown for narrower league/team filters.
-7. Sports artwork — canonical posters, backgrounds, logos, and the default-sport SVG fallbacks — is always served by SportsMeta at `https://sportsmeta.pvtkrrx.cc/asset/...`. PVTKRRX no longer generates or proxies sports images itself, and the paid TheSportsDB key lives exclusively in SportsMeta.
+7. Sports artwork — canonical posters, backgrounds, logos, and the default-sport SVG fallbacks — is always served by SportsMeta at `https://sportsmeta.pvtkrrx.cc/asset/...`. PVTKRRX no longer generates or proxies sports images itself, the paid TheSportsDB key lives exclusively in SportsMeta, and the addon emits only the public SportsMeta asset surface rather than member-token artwork routes.
 8. Library items expose completed qBittorrent content through the same addon surface.
 
 ## Storage Model
