@@ -10,6 +10,18 @@ Before changing homepage or configure wording, read `docs/copy.md` first. That f
 
 ## Public Host Check
 
+Verified directly on 2026-04-23 after manual Coolify API redeploy `c307hqn7q8dep83d4lbahr6l`:
+
+- `https://www.pvtkrrx.cc/` returned `200` and now serves `og:image` / `twitter:image` = `https://www.pvtkrrx.cc/social/pvtkrrx-home.png`
+- `https://www.pvtkrrx.cc/runbooks` returned `200` and now serves canonical `/runbooks` plus `https://www.pvtkrrx.cc/social/pvtkrrx-runbooks.png`
+- `https://www.pvtkrrx.cc/sports` returned `200` and now serves canonical `/sports` plus `https://www.pvtkrrx.cc/social/pvtkrrx-sports.png`
+- `https://www.pvtkrrx.cc/sitemap.xml` returned `200` and now exposes `lastmod 2026-04-23`
+- `https://www.pvtkrrx.cc/site.webmanifest` returned `200`
+- `https://www.pvtkrrx.cc/social/pvtkrrx-home.png` returned `200` with `Content-Type: image/png`
+- `https://www.pvtkrrx.cc/apple-touch-icon.png` returned `200` with `Content-Type: image/png`
+- `https://www.pvtkrrx.cc/health` with `Accept: text/html` returned `200`, HTML `robots=noindex,nofollow,noarchive`, and header `X-Robots-Tag: noindex, nofollow, noarchive`
+- `https://www.pvtkrrx.cc/version-status.json` returned `currentVersion = 1.1.34`, `latestVersion = 1.1.34`, and `updateAvailable = false`
+
 Verified directly on 2026-04-08:
 
 - Canonical public host: `https://www.pvtkrrx.cc`
@@ -47,13 +59,13 @@ Verified in the repo and on Contabo before changing anything:
 - `vercel.json` still maps `/configure` and `/runbooks`, but the old preview deployment is currently dead
 - `public/index.html` is the current landing page
 - public canonical/OG metadata plus `robots.txt`/`sitemap.xml` now point at `https://www.pvtkrrx.cc`
-- repo SEO asset pass prepared on 2026-04-23:
+- repo + live SEO asset pass completed on 2026-04-23:
   - page-specific OG/Twitter images now live in `public/social/`
   - `public/site.webmanifest` plus explicit favicon / apple-touch-icon links are now part of the site head
   - `runbooks.html` now has canonical + social metadata parity with the homepage and sports page
   - `/configure` and `/health` now carry both HTML `robots` tags and `X-Robots-Tag` headers so non-index pages stay non-index
 - Contabo Caddy currently routes `pvtkrrx.cc` / `www.pvtkrrx.cc` to Docker alias `pvtkrrx:3000`
-- Docker alias `pvtkrrx` currently belongs to Coolify container `w14jewmw5ubscrxh8zzfhq7d-080959859728`
+- Docker alias `pvtkrrx` currently belongs to Coolify container `w14jewmw5ubscrxh8zzfhq7d-130633962848` on image `w14jewmw5ubscrxh8zzfhq7d:e5e2e9f553ae19debdac3f4fdbe164e63fc4a1eb`
 - A separate `pvtkrrx.service` runtime is active on Contabo with `WorkingDirectory=/opt/pvtkrrx` and port `7000`, but it is not the public site path while Caddy still targets the Docker alias
 - `/opt/stack/sites/pvtkrrx` is an on-box mirror/worktree, not the public-serving path by itself
 

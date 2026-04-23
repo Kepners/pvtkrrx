@@ -1,10 +1,46 @@
 # PVTKRRX Project Status
 
-Updated: 2026-04-22
+Updated: 2026-04-23
 
 ## Current Stage
 
 PVTKRRX is in a working `1.1.34` state on the main Windows/local route set.
+
+## 2026-04-23: Public SEO and share-asset pass deployed
+
+- Added generated public site assets for the hosted guide surface:
+  - page-specific social cards in `public/social/`
+  - `public/site.webmanifest`
+  - explicit `favicon.ico`, `favicon-16x16.png`, `favicon-32x32.png`, `apple-touch-icon.png`, and Android icon PNGs
+- Homepage, sports, and runbooks now all expose canonical metadata plus page-specific `og:image` / `twitter:image` URLs.
+- `runbooks.html` now has full metadata parity with the homepage and sports page instead of being a crawlable page with no social metadata.
+- `configure.html` and `health.html` now both carry hard noindex signals in two layers:
+  - HTML `<meta name="robots" content="noindex,nofollow,noarchive">`
+  - response header `X-Robots-Tag: noindex, nofollow, noarchive`
+- `public/sitemap.xml` now carries `lastmod 2026-04-23` for `/`, `/runbooks`, and `/sports`.
+- Added `scripts/generate-social-assets.js` plus `npm run assets:site` so the public icons and share images are reproducible instead of one-off blobs.
+- Expanded `scripts/smoke-config-flow.js` to verify:
+  - homepage/runbooks/sports canonical + social image metadata
+  - `/site.webmanifest`
+  - `/favicon.ico`
+  - `/apple-touch-icon.png`
+  - generated social PNG routes at `1200x630`
+  - `/health` noindex header + meta behavior
+- `npm run smoke:config` passed locally on 2026-04-23 after those checks were added.
+- Live deploy proof on 2026-04-23:
+  - pushed repo commit `e5e2e9f553ae19debdac3f4fdbe164e63fc4a1eb` (`🤖 fix: add site seo and share assets`) to `main`
+  - initial live check showed the public Coolify runtime was still on older image `b696ab0...`
+  - queued manual Coolify API redeploy `c307hqn7q8dep83d4lbahr6l` for app UUID `w14jewmw5ubscrxh8zzfhq7d`
+  - deployment finished successfully at `2026-04-23T13:06:44Z`
+  - live public container is now `w14jewmw5ubscrxh8zzfhq7d-130633962848` on image `w14jewmw5ubscrxh8zzfhq7d:e5e2e9f553ae19debdac3f4fdbe164e63fc4a1eb`
+  - direct public checks after the redeploy confirmed:
+    - `https://www.pvtkrrx.cc/` serves `https://www.pvtkrrx.cc/social/pvtkrrx-home.png`
+    - `https://www.pvtkrrx.cc/runbooks` serves canonical `/runbooks` plus `https://www.pvtkrrx.cc/social/pvtkrrx-runbooks.png`
+    - `https://www.pvtkrrx.cc/sports` serves canonical `/sports` plus `https://www.pvtkrrx.cc/social/pvtkrrx-sports.png`
+    - `https://www.pvtkrrx.cc/site.webmanifest` returns `200`
+    - `https://www.pvtkrrx.cc/apple-touch-icon.png` returns `200 image/png`
+    - `https://www.pvtkrrx.cc/health` HTML returns `X-Robots-Tag: noindex, nofollow, noarchive`
+    - `https://www.pvtkrrx.cc/version-status.json` reports `currentVersion = 1.1.34`, `latestVersion = 1.1.34`, `updateAvailable = false`
 
 ## 2026-04-22: SportsMeta boundary finalised
 
