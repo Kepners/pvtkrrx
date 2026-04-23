@@ -1,6 +1,6 @@
 {
   "name": "pvtkrrx",
-  "version": "1.1.34",
+  "version": "1.1.35",
   "description": "PVTKRRX — Stream from your private tracker seedbox through Stremio",
   "main": "index.js",
   "scripts": {
@@ -13,6 +13,8 @@
     "smoke:parity": "node scripts/smoke-parity-helpers.js",
     "smoke:sports-resolution": "node scripts/smoke-sports-resolution.js",
     "smoke:sports-catalog-seeds": "node scripts/smoke-sports-catalog-seeds.js",
+    "smoke:sports-latency": "node scripts/smoke-sports-catalog-latency.js",
+    "smoke:sports-catalog-latency": "node scripts/smoke-sports-catalog-latency.js",
     "smoke:config": "node scripts/smoke-config-flow.js",
     "smoke:guards": "node scripts/smoke-runtime-guards.js",
     "smoke:selfhost": "node scripts/smoke-selfhost-server.js",

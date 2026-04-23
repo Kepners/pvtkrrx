@@ -39,6 +39,12 @@ const prowlarrSearchInFlight = new Map()
 const PROWLARR_SEARCH_CACHE_TTL_MS = Math.max(15000, parseInt(process.env.PVTKRRX_PROWLARR_CACHE_MS || '120000', 10))
 const PROWLARR_SEARCH_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_PROWLARR_SEARCH_TIMEOUT_MS || '7000', 10))
 const PROWLARR_SEARCH_CACHE_MAX_KEYS = Math.max(50, parseInt(process.env.PVTKRRX_PROWLARR_CACHE_MAX_KEYS || '500', 10))
+const SPORTS_SEED_CONCURRENCY = Math.max(1, parseInt(process.env.PVTKRRX_SPORTS_SEED_CONCURRENCY || '4', 10))
+// Don't re-run a second pass of seed-term queries when the initial browse has
+// already produced enough items to populate the catalog page. The threshold is
+// generous so the enrich pass still fires on sparse browse days but gets
+// skipped when browse alone covered the catalog.
+const SPORTS_SEED_ENRICH_THRESHOLD = Math.max(1, parseInt(process.env.PVTKRRX_SPORTS_SEED_ENRICH_THRESHOLD || '40', 10))
 const SPORTS_CATALOG_CACHE_MAX_AGE = Math.max(
   120,
   parseInt(
@@ -247,8 +253,14 @@ async function cachedProwlarrSearch(config, client, query, cats, type = 'search'
   if (prowlarrSearchInFlight.has(key)) return prowlarrSearchInFlight.get(key)
 
   const fallback = Array.isArray(cached?.value) ? cached.value : []
+  // Give the underlying fetch a small grace window beyond the wrapper budget
+  // so the AbortSignal fires shortly AFTER `settleWithTimeout` has already
+  // returned the fallback. Without this, the Prowlarr client would keep
+  // sockets open on its own hardcoded timeout long after the caller has
+  // given up, consuming Prowlarr capacity and starving parallel seed queries.
+  const searchOptions = { ...options, timeoutMs: PROWLARR_SEARCH_TIMEOUT_MS + 500 }
   const pending = settleWithTimeout(
-    client.search(query, cats, type, options),
+    client.search(query, cats, type, searchOptions),
     PROWLARR_SEARCH_TIMEOUT_MS,
     fallback
   ).then((result) => {
@@ -290,7 +302,8 @@ async function searchSportsCatalogItems(config, torznab, query, limit) {
     'search',
     { useCategories: true }
   )
-  if (strictItems.length >= Math.min(80, limit * 2)) return strictItems
+  const strictEnoughThreshold = Math.max(20, Math.min(80, limit + 10))
+  if (strictItems.length >= strictEnoughThreshold) return strictItems
 
   const broadItems = await cachedProwlarrSearch(
     config,
@@ -426,6 +439,74 @@ function compareItems(a, b, query = '') {
   if (sizeDiff !== 0) return sizeDiff
 
   return String(a.title || '').localeCompare(String(b.title || ''))
+}
+
+function normalizeSportsCatalogItems(items = []) {
+  return (Array.isArray(items) ? items : []).map((item) => {
+    const parsedSportsEvent = parseSportsTitle(item?.title || '', item?.pubDate || item?.publishDate || '')
+    const parsedEvent = !parsedSportsEvent ? parseSportsEventTitle(item?.title || '') : null
+    const effectiveLeague = parsedSportsEvent?.league || parsedEvent?.league || ''
+    return {
+      ...item,
+      trackerSource: {
+        title: item?.title || '',
+        link: item?.link || '',
+        infohash: item?.infohash || '',
+        size: item?.size || 0,
+        seeders: item?.seeders || 0,
+        indexer: item?.indexer || '',
+        pubDate: item?.pubDate || item?.publishDate || '',
+        sportHint: item?.sportHint || ''
+      },
+      trackerSourceType: isSportsCultIndexer(item?.indexer) ? 'sportscult' : 'other',
+      parsedSportsEvent,
+      parsedEvent,
+      mappedLeague: mapLeague(effectiveLeague) || '',
+      sportHint: resolveSportHint({
+        explicitHint: item?.sportHint,
+        categoryHint: sportHintFromLeagueCode(effectiveLeague),
+        title: item?.title
+      })
+    }
+  })
+}
+
+function filterSportsCatalogItems(normalizedItems = [], catalogSportHint = '', requestedDetail = '', limit = 50) {
+  const strictFiltered = normalizedItems.filter(item =>
+    item.trackerSourceType === 'sportscult' &&
+    itemMatchesSportsCatalog(item, catalogSportHint) &&
+    itemMatchesSportsDetail(item, requestedDetail) &&
+    isLikelySportsEventTitle(item.title, item.sportHint) &&
+    !isLikelyPackedReleaseTitle(item.title)
+  )
+
+  let filtered = strictFiltered
+  if (filtered.length < Math.min(12, limit)) {
+    // Strict event-title filter left too few results — relax to sport-hint +
+    // noise rejection so the catalog isn't empty on default browse or sparse
+    // genre/search results.
+    filtered = normalizedItems.filter(item =>
+      item.trackerSourceType === 'sportscult' &&
+      itemMatchesSportsCatalog(item, catalogSportHint) &&
+      itemMatchesSportsDetail(item, requestedDetail) &&
+      !isSportsNoiseTitle(item.title) &&
+      !isLikelyPackedReleaseTitle(item.title)
+    )
+  }
+
+  const suppressedNonSportsCult = normalizedItems.filter(item =>
+    item.trackerSourceType !== 'sportscult' &&
+    itemMatchesSportsCatalog(item, catalogSportHint) &&
+    itemMatchesSportsDetail(item, requestedDetail) &&
+    !isSportsNoiseTitle(item.title) &&
+    !isLikelyPackedReleaseTitle(item.title)
+  ).length
+
+  return {
+    strictFiltered,
+    filtered,
+    suppressedNonSportsCult
+  }
 }
 
 function dedupeByImdbBest(items, query = '') {
@@ -804,78 +885,39 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       const SEED_TERMS = getSportsSearchSeedTerms(catalogSportHint)
       const seedBatches = await mapLimit(
         SEED_TERMS,
-        1,
+        SPORTS_SEED_CONCURRENCY,
         (term) => cachedProwlarrSearch(config, torznab, term, SPORT_CATS)
       )
       items = mergeUniqueProwlarrItems(...seedBatches)
     }
   }
 
-  if (!query && catalogSportHint) {
+  let normalizedItems = normalizeSportsCatalogItems(items)
+  let {
+    strictFiltered,
+    filtered,
+    suppressedNonSportsCult
+  } = filterSportsCatalogItems(normalizedItems, catalogSportHint, requestedDetail, limit)
+
+  // Sport-specific catalogs (football / motorsport / mma / …) enrich the
+  // initial browse with the catalog's own seed terms so they don't collapse
+  // when browse is dominated by another sport. Skip this pass when browse
+  // already produced enough relevant matches for that sport: a raw browse
+  // batch can be large while still being dominated by another sport family.
+  if (!query && catalogSportHint && filtered.length < SPORTS_SEED_ENRICH_THRESHOLD) {
     const seedBatches = await mapLimit(
       getSportsSearchSeedTerms(catalogSportHint),
-      1,
+      SPORTS_SEED_CONCURRENCY,
       (term) => searchSportsCatalogItems(config, torznab, term, limit)
     )
     items = mergeUniqueProwlarrItems(items, ...seedBatches)
+    normalizedItems = normalizeSportsCatalogItems(items)
+    ;({
+      strictFiltered,
+      filtered,
+      suppressedNonSportsCult
+    } = filterSportsCatalogItems(normalizedItems, catalogSportHint, requestedDetail, limit))
   }
-
-  const normalizedItems = items.map(item => {
-    const parsedSportsEvent = parseSportsTitle(item?.title || '', item?.pubDate || item?.publishDate || '')
-    const parsedEvent = !parsedSportsEvent ? parseSportsEventTitle(item?.title || '') : null
-    const effectiveLeague = parsedSportsEvent?.league || parsedEvent?.league || ''
-    return {
-      ...item,
-      trackerSource: {
-        title: item?.title || '',
-        link: item?.link || '',
-        infohash: item?.infohash || '',
-        size: item?.size || 0,
-        seeders: item?.seeders || 0,
-        indexer: item?.indexer || '',
-        pubDate: item?.pubDate || item?.publishDate || '',
-        sportHint: item?.sportHint || ''
-      },
-      trackerSourceType: isSportsCultIndexer(item?.indexer) ? 'sportscult' : 'other',
-      parsedSportsEvent,
-      parsedEvent,
-      mappedLeague: mapLeague(effectiveLeague) || '',
-      sportHint: resolveSportHint({
-        explicitHint: item?.sportHint,
-        categoryHint: sportHintFromLeagueCode(effectiveLeague),
-        title: item?.title
-      })
-    }
-  })
-
-  const strictFiltered = normalizedItems.filter(item =>
-    item.trackerSourceType === 'sportscult' &&
-    itemMatchesSportsCatalog(item, catalogSportHint) &&
-    itemMatchesSportsDetail(item, requestedDetail) &&
-    isLikelySportsEventTitle(item.title, item.sportHint) &&
-    !isLikelyPackedReleaseTitle(item.title)
-  )
-  let filtered = strictFiltered
-  if (filtered.length < Math.min(12, limit)) {
-    // Strict event-title filter left too few results — relax to sport-hint +
-    // noise rejection so the catalog isn't empty on default browse or sparse
-    // genre/search results
-    filtered = normalizedItems.filter(item =>
-      item.trackerSourceType === 'sportscult' &&
-      itemMatchesSportsCatalog(item, catalogSportHint) &&
-      itemMatchesSportsDetail(item, requestedDetail) &&
-      !isSportsNoiseTitle(item.title) &&
-      !isLikelyPackedReleaseTitle(item.title)
-    )
-  }
-
-  const suppressedNonSportsCult = normalizedItems.filter(item =>
-    item.trackerSourceType !== 'sportscult' &&
-    itemMatchesSportsCatalog(item, catalogSportHint) &&
-    itemMatchesSportsDetail(item, requestedDetail) &&
-    !isSportsNoiseTitle(item.title) &&
-    !isLikelyPackedReleaseTitle(item.title)
-  ).length
 
   const skip = parseInt(extra.skip || '0', 10)
   if (filtered.length === 0) {

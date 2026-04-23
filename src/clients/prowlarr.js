@@ -164,9 +164,10 @@ class ProwlarrClient {
     return pending
   }
 
-  async _search(params) {
+  async _search(params, { timeoutMs } = {}) {
     const url = `${this.baseUrl}/api/v1/search?${params}`
-    const res = await fetch(url, { signal: AbortSignal.timeout(TIMEOUT_MS) })
+    const effectiveTimeout = Math.max(1000, Number(timeoutMs) || TIMEOUT_MS)
+    const res = await fetch(url, { signal: AbortSignal.timeout(effectiveTimeout) })
     if (!res.ok) throw new Error(`Prowlarr HTTP ${res.status}`)
     const data = await res.json()
     const categoryLookup = await this._getIndexerCategoryLookup()
@@ -178,14 +179,14 @@ class ProwlarrClient {
     if (options.useCategories && String(cats || '').trim()) {
       params.set('categories', String(cats).trim())
     }
-    return this._search(params)
+    return this._search(params, { timeoutMs: options.timeoutMs })
   }
 
-  async searchImdb(imdbId, _cats, type = 'movie') {
+  async searchImdb(imdbId, _cats, type = 'movie', options = {}) {
     const numericId = String(imdbId).replace(/^tt/i, '')
     const searchType = type === 'series' ? 'tvsearch' : 'movie'
     const params = new URLSearchParams({ query: '', type: searchType, imdbId: numericId, indexerIds: -2, apikey: this.apiKey })
-    return this._search(params)
+    return this._search(params, { timeoutMs: options.timeoutMs })
   }
 
   async caps() {

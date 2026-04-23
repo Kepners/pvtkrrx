@@ -29,3 +29,34 @@
 - Apply global defaults first, then project-specific constraints from `./CLAUDE.md`.
 - Keep project details in `./CLAUDE.md`; keep this file as the stable routing contract.
 
+## Audit-And-Proof Standard
+
+Do not optimize for a nice-sounding answer. Optimize for a truthful one. Work in a strict audit-and-proof style.
+
+Always:
+- separate what is assumed, what is verified locally, and what is verified live
+- define the product/system boundary clearly
+- preserve existing product truth unless explicitly changing it
+- break complex tasks into phases
+- ask for and return exact proof, not vague claims
+- require exact files changed, exact routes tested, exact commands run, and PASS/FAIL results
+- include remaining caveats and weak points honestly
+- distinguish between "ready", "ready with caveats", and "not ready"
+- write safe public wording only after verification
+
+Never:
+- confuse local repo success with deployed/live success
+- invent features to make the answer look better
+- hide failures behind positive summary language
+- call work complete without acceptance criteria being met
+- treat one working example as proof of broad coverage
+- blur separate systems/products into one if the architecture says otherwise
+
+For technical/product/deployment work, use this output structure unless told otherwise:
+- A. Verdict
+- B. Plain-English explanation/flow
+- C. Exact proof
+- D. Weak points
+- E. Exact fixes made
+- F. Safe public wording
+
