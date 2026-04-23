@@ -1,6 +1,6 @@
 # PVTKRRX Website Status
 
-Updated: 2026-04-08
+Updated: 2026-04-23
 
 ## Purpose
 
@@ -47,6 +47,11 @@ Verified in the repo and on Contabo before changing anything:
 - `vercel.json` still maps `/configure` and `/runbooks`, but the old preview deployment is currently dead
 - `public/index.html` is the current landing page
 - public canonical/OG metadata plus `robots.txt`/`sitemap.xml` now point at `https://www.pvtkrrx.cc`
+- repo SEO asset pass prepared on 2026-04-23:
+  - page-specific OG/Twitter images now live in `public/social/`
+  - `public/site.webmanifest` plus explicit favicon / apple-touch-icon links are now part of the site head
+  - `runbooks.html` now has canonical + social metadata parity with the homepage and sports page
+  - `/configure` and `/health` now carry both HTML `robots` tags and `X-Robots-Tag` headers so non-index pages stay non-index
 - Contabo Caddy currently routes `pvtkrrx.cc` / `www.pvtkrrx.cc` to Docker alias `pvtkrrx:3000`
 - Docker alias `pvtkrrx` currently belongs to Coolify container `w14jewmw5ubscrxh8zzfhq7d-080959859728`
 - A separate `pvtkrrx.service` runtime is active on Contabo with `WorkingDirectory=/opt/pvtkrrx` and port `7000`, but it is not the public site path while Caddy still targets the Docker alias

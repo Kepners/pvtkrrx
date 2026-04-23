@@ -5,6 +5,7 @@ const http = require('node:http')
 const https = require('node:https')
 const os = require('node:os')
 const path = require('node:path')
+const sharp = require('sharp')
 const { decrypt, encrypt } = require('../src/utils/crypto')
 const { buildLocalModeUrls } = require('../src/utils/localInstallUrls')
 const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJsonFile')
@@ -85,6 +86,17 @@ function withCsrf(csrf, headers = {}) {
     Cookie: csrf.cookie,
     'X-PVTKRRX-CSRF': csrf.token
   }
+}
+
+async function assertPngResponse(response, label, expectedWidth, expectedHeight) {
+  assert.equal(response.status, 200, `${label} should return 200`)
+  const contentType = String(response.headers.get('content-type') || '')
+  assert.match(contentType, /^image\/png\b/i, `${label} should return image/png`)
+  const buffer = Buffer.from(await response.arrayBuffer())
+  const metadata = await sharp(buffer).metadata()
+  assert.equal(metadata.format, 'png', `${label} should be a PNG`)
+  assert.equal(metadata.width, expectedWidth, `${label} should be ${expectedWidth}px wide`)
+  assert.equal(metadata.height, expectedHeight, `${label} should be ${expectedHeight}px tall`)
 }
 
 async function run() {
@@ -219,6 +231,10 @@ async function run() {
     assert.doesNotMatch(homeHtml, /href="\/configure(?:\?|")/i, 'homepage should not link to configure routes')
     assert.match(homeHtml, /id="siteReleaseCard"/, 'homepage should render a release status card')
     assert.match(homeHtml, /id="siteReleaseLink"/, 'homepage should render a release link')
+    assert.match(homeHtml, /<link rel="canonical" href="https:\/\/www\.pvtkrrx\.cc\/">/i, 'homepage should expose canonical metadata')
+    assert.match(homeHtml, /<meta property="og:image" content="https:\/\/www\.pvtkrrx\.cc\/social\/pvtkrrx-home\.png">/i, 'homepage should expose the dedicated home social image')
+    assert.match(homeHtml, /<link rel="manifest" href="\/site\.webmanifest">/i, 'homepage should link the site web manifest')
+    assert.match(homeHtml, /<link rel="icon" href="\/favicon\.ico" sizes="any">/i, 'homepage should expose the favicon link')
 
     const configureRes = await fetch(`${base}/configure`)
     assert.equal(configureRes.status, 200, 'GET /configure should return 200')
@@ -231,7 +247,9 @@ async function run() {
     )
     assert.doesNotMatch(configureHtml, /SETRUP/i, 'configure page should not contain the SETRUP typo')
     assert.doesNotMatch(configureHtml, /Stremio Seedbox Addon/i, 'configure page should not contain the old generic addon headline')
-    assert.match(configureHtml, /<meta name="robots" content="noindex,nofollow">/i, 'configure page should not be indexable')
+    assert.match(configureHtml, /<meta name="robots" content="noindex,nofollow,noarchive">/i, 'configure page should not be indexable')
+    assert.match(configureHtml, /<meta property="og:image" content="https:\/\/www\.pvtkrrx\.cc\/social\/pvtkrrx-configure\.png">/i, 'configure page should expose the configure social image')
+    assert.equal(String(configureRes.headers.get('x-robots-tag') || '').toLowerCase(), 'noindex, nofollow, noarchive', 'configure page should emit an X-Robots-Tag header')
     assert.doesNotMatch(configureHtml, />Manifest<\/a>/i, 'configure page should not render a manifest nav link')
     assert.match(configureHtml, /Windows Host App/, 'configure page should include the desktop host app console header')
     assert.match(configureHtml, /This page runs on the Windows host\./, 'configure page should include the desktop host app summary copy')
@@ -283,19 +301,50 @@ async function run() {
     assert.match(runbooksHtml, /Seedbox Runbooks/, 'runbooks page should render heading')
     assert.match(runbooksHtml, /Whatbox Runbook/, 'runbooks page should include Whatbox runbook')
     assert.match(runbooksHtml, /Ultra\.cc Runbook/, 'runbooks page should include Ultra.cc runbook')
+    assert.match(runbooksHtml, /<link rel="canonical" href="https:\/\/www\.pvtkrrx\.cc\/runbooks">/i, 'runbooks page should expose canonical metadata')
+    assert.match(runbooksHtml, /<meta property="og:image" content="https:\/\/www\.pvtkrrx\.cc\/social\/pvtkrrx-runbooks\.png">/i, 'runbooks page should expose the runbooks social image')
 
     const sportsRes = await fetch(`${base}/sports`)
     assert.equal(sportsRes.status, 200, 'GET /sports should return 200')
     const sportsHtml = await sportsRes.text()
     assert.match(sportsHtml, /<link rel="canonical" href="https:\/\/www\.pvtkrrx\.cc\/sports">/i, 'sports page should expose canonical metadata')
+    assert.match(sportsHtml, /<meta property="og:image" content="https:\/\/www\.pvtkrrx\.cc\/social\/pvtkrrx-sports\.png">/i, 'sports page should expose the sports social image')
     assert.match(sportsHtml, /Private tracker sports in Stremio/, 'sports page should render the main sports heading')
     assert.match(sportsHtml, /Read Setup Guide/, 'sports page should send visitors to the setup guide')
     assert.match(sportsHtml, /href="\/#routes"/, 'sports page should link back to the public route guide')
     assert.doesNotMatch(sportsHtml, /href="\/configure"/i, 'sports page should not advertise public configure as a primary visitor action')
 
+    const siteManifestRes = await fetch(`${base}/site.webmanifest`)
+    assert.equal(siteManifestRes.status, 200, 'GET /site.webmanifest should return 200')
+    const siteManifest = await siteManifestRes.json()
+    assert.equal(siteManifest.name, 'PVTKRRX')
+    assert.ok(Array.isArray(siteManifest.icons) && siteManifest.icons.some((icon) => icon?.src === '/android-chrome-192x192.png'), 'site web manifest should expose the app icons')
+
+    const faviconRes = await fetch(`${base}/favicon.ico`)
+    assert.equal(faviconRes.status, 200, 'GET /favicon.ico should return 200')
+
+    await assertPngResponse(await fetch(`${base}/apple-touch-icon.png`), 'apple touch icon', 180, 180)
+    await assertPngResponse(await fetch(`${base}/social/pvtkrrx-home.png`), 'home social image', 1200, 630)
+    await assertPngResponse(await fetch(`${base}/social/pvtkrrx-sports.png`), 'sports social image', 1200, 630)
+    await assertPngResponse(await fetch(`${base}/social/pvtkrrx-runbooks.png`), 'runbooks social image', 1200, 630)
+    await assertPngResponse(await fetch(`${base}/social/pvtkrrx-configure.png`), 'configure social image', 1200, 630)
+
+    const healthPageRes = await fetch(`${base}/health`, {
+      headers: { Accept: 'text/html' }
+    })
+    assert.equal(healthPageRes.status, 200, 'GET /health with HTML accept should return 200')
+    const healthHtml = await healthPageRes.text()
+    assert.match(healthHtml, /<meta name="robots" content="noindex,nofollow,noarchive">/i, 'health page should not be indexable')
+    assert.equal(String(healthPageRes.headers.get('x-robots-tag') || '').toLowerCase(), 'noindex, nofollow, noarchive', 'health page should emit an X-Robots-Tag header')
+
+    const healthJsonRes = await fetch(`${base}/health?format=json`)
+    assert.equal(healthJsonRes.status, 200, 'GET /health?format=json should return 200')
+    assert.equal(String(healthJsonRes.headers.get('x-robots-tag') || '').toLowerCase(), 'noindex, nofollow, noarchive', 'health JSON should emit an X-Robots-Tag header')
+
     const sitemapRes = await fetch(`${base}/sitemap.xml`)
     assert.equal(sitemapRes.status, 200, 'GET /sitemap.xml should return 200')
     const sitemapXml = await sitemapRes.text()
+    assert.match(sitemapXml, /<lastmod>2026-04-23<\/lastmod>/, 'sitemap should expose updated lastmod entries')
     assert.match(sitemapXml, /<loc>https:\/\/www\.pvtkrrx\.cc\/sports<\/loc>/, 'sitemap should include the sports page')
 
     const installLauncherRes = await fetch(`${base}/install-selfhost.sh`)

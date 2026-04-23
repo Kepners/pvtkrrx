@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node index.js",
     "dev": "node --watch index.js",
+    "assets:site": "node scripts/generate-social-assets.js",
     "server:setup": "node scripts/server-installer.js",
     "server:legacy-setup": "node scripts/server-setup.js",
     "server:install-service": "node scripts/install-systemd-service.js",

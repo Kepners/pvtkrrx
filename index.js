@@ -365,11 +365,9 @@ function getConfigureBodyClasses(runtimeConfig = {}) {
 function sendConfigurePage(req, res) {
   const runtimeConfig = buildRuntimeAppConfig(req)
   const runtimeBootstrapJson = JSON.stringify(runtimeConfig).replace(/</g, '\\u003c')
-  const runtimeHeadExtras = [
-    '<meta name="robots" content="noindex,nofollow">',
-    `<script>window.__PVTKRRX_RUNTIME_BOOTSTRAP__=${runtimeBootstrapJson};</script>`
-  ].join('')
+  const runtimeHeadExtras = `<script>window.__PVTKRRX_RUNTIME_BOOTSTRAP__=${runtimeBootstrapJson};</script>`
   const runtimeBodyClass = getConfigureBodyClasses(runtimeConfig)
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive')
   res.type('html').send(
     configPageTemplate
       .replace('</head>', `${runtimeHeadExtras}</head>`)
@@ -1172,6 +1170,7 @@ app.post('/auto-provision', requireLocalNetworkRoute, async (req, res) => {
 })
 
 app.get('/health', (req, res) => {
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive')
   const accept = String(req.headers.accept || '')
   const wantsHtml = req.query?.format !== 'json' && accept.includes('text/html')
   if (wantsHtml) {
