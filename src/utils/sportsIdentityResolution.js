@@ -80,8 +80,29 @@ const TRACKER_NOISE_TOKENS = new Set([
   'x265'
 ])
 
+const CLUB_PREFIX_TOKENS = new Set(['fc', 'cf', 'rc', 'sc', 'ac'])
+const SEARCH_TOKEN_STOPWORDS = new Set([
+  'city',
+  'club',
+  'fc',
+  'cf',
+  'rc',
+  'sc',
+  'ac',
+  'real',
+  'sporting',
+  'united',
+  'vs'
+])
+
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
+}
+
+function stripDiacritics(value) {
+  return String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
 }
 
 function isValidResolutionDate(year, month, day) {
@@ -101,7 +122,7 @@ function isValidResolutionDate(year, month, day) {
 }
 
 function normalizeIdentityToken(value) {
-  return normalizeSpace(value)
+  return normalizeSpace(stripDiacritics(value))
     .toLowerCase()
     .replace(/\butd\b/g, 'united')
     .replace(/[^a-z0-9]+/g, ' ')
@@ -150,6 +171,136 @@ function normalizeLeagueLabel(value) {
 
 function normalizeEventNameLabel(value) {
   return normalizeSpace(value)
+}
+
+function simplifyTeamLabel(value = '') {
+  const tokens = splitTrackerTitleTokens(stripDiacritics(value))
+  const cleaned = []
+
+  for (let index = 0; index < tokens.length; index += 1) {
+    const token = normalizeSpace(String(tokens[index] || '').replace(/[^A-Za-z0-9]+/g, ''))
+    const next = String(tokens[index + 1] || '').trim()
+    const lower = normalizeIdentityToken(token)
+    if (!token) continue
+    if (cleaned.length === 0 && CLUB_PREFIX_TOKENS.has(lower)) continue
+    if (
+      isResolutionNoiseToken(token) ||
+      (/^\d{1,2}$/.test(token) && /^\d{1,2}$/.test(next)) ||
+      (/^(19|20)\d{2}$/.test(token) && /^\d{1,2}$/.test(next)) ||
+      ['round', 'main', 'card', 'pre', 'post', 'episode', 'show', 'event', 'fight', 'full', 'replay', 'review', 'preview', 'coverage', 'studio', 'apple', 'tv', 'fubo', 'skynz', 'z3r0', 'nva'].includes(lower)
+    ) {
+      break
+    }
+    cleaned.push(token)
+  }
+
+  return normalizeSpace(cleaned.join(' ')).replace(/\bUtd\b/gi, 'United')
+}
+
+function buildRequestedMatchupDescriptor(params = {}) {
+  const home = simplifyTeamLabel(params.home)
+  const away = simplifyTeamLabel(params.away)
+  return home && away ? `${home} vs ${away}` : ''
+}
+
+function buildLeagueTokenSet(value = '') {
+  return new Set(tokenizeIdentity(value, { keepNumbers: true }))
+}
+
+function buildDescriptorTokens(value = '', options = {}) {
+  const leagueTokens = buildLeagueTokenSet(options.league)
+  return Array.from(new Set(
+    tokenizeIdentity(value, {
+      genericTokens: GENERIC_EVENT_TOKENS,
+      keepNumbers: true
+    }).filter((token) => !leagueTokens.has(token))
+  ))
+}
+
+function hasSpecificDescriptorTokens(tokens = []) {
+  const alphaTokens = tokens.filter((token) => /[a-z]/.test(token))
+  const numericTokens = tokens.filter((token) => /^\d+$/.test(token))
+  return alphaTokens.length >= 2 || (alphaTokens.length >= 1 && numericTokens.length >= 1)
+}
+
+function descriptorTokensFullyMatch(requestedTokens = [], candidateTokens = []) {
+  if (requestedTokens.length === 0) return false
+  return requestedTokens.every((token) => candidateTokens.some((candidate) => tokensLooselyMatch(token, candidate)))
+}
+
+function tokensLooselyMatch(left = '', right = '') {
+  const a = normalizeIdentityToken(left)
+  const b = normalizeIdentityToken(right)
+  if (!a || !b) return false
+  if (a === b) return true
+  if (Math.min(a.length, b.length) >= 4 && (a.includes(b) || b.includes(a))) return true
+  if (Math.min(a.length, b.length) < 6 || Math.abs(a.length - b.length) > 1) return false
+  return levenshteinDistance(a, b) <= 1
+}
+
+function levenshteinDistance(left = '', right = '') {
+  const source = String(left || '')
+  const target = String(right || '')
+  if (!source) return target.length
+  if (!target) return source.length
+
+  const previous = Array.from({ length: target.length + 1 }, (_, index) => index)
+  for (let sourceIndex = 1; sourceIndex <= source.length; sourceIndex += 1) {
+    let diagonal = previous[0]
+    previous[0] = sourceIndex
+    for (let targetIndex = 1; targetIndex <= target.length; targetIndex += 1) {
+      const nextDiagonal = previous[targetIndex]
+      previous[targetIndex] = Math.min(
+        previous[targetIndex] + 1,
+        previous[targetIndex - 1] + 1,
+        diagonal + (source[sourceIndex - 1] === target[targetIndex - 1] ? 0 : 1)
+      )
+      diagonal = nextDiagonal
+    }
+  }
+  return previous[target.length]
+}
+
+function buildSearchTokensForLabel(value = '') {
+  const tokens = tokenizeIdentity(simplifyTeamLabel(value), {
+    keepNumbers: false
+  }).filter((token) => !SEARCH_TOKEN_STOPWORDS.has(token))
+
+  return tokens.sort((left, right) => right.length - left.length)
+}
+
+function buildSearchTermsFromQuery(query = {}) {
+  const params = query?.params || {}
+  const terms = []
+  const seen = new Set()
+  const addTerm = (value = '') => {
+    const normalized = normalizeSpace(value)
+    if (!normalized) return
+    const key = normalized.toLowerCase()
+    if (seen.has(key)) return
+    seen.add(key)
+    terms.push(normalized)
+  }
+
+  if (String(query?.identityType || '').trim() === 'matchup') {
+    for (const teamLabel of [params.home, params.away]) {
+      const tokens = buildSearchTokensForLabel(teamLabel)
+      if (tokens[0]) addTerm(tokens[0])
+    }
+    return terms.slice(0, 2)
+  }
+
+  if (String(query?.identityType || '').trim() === 'event') {
+    const descriptorTokens = buildDescriptorTokens(params.event, { league: params.league })
+    const alphaTokens = descriptorTokens.filter((token) => /[a-z]/.test(token))
+    if (alphaTokens.length > 0) {
+      alphaTokens.sort((left, right) => right.length - left.length)
+      addTerm(alphaTokens[0])
+    }
+    return terms.slice(0, 1)
+  }
+
+  return []
 }
 
 function splitTrackerTitleTokens(value = '') {
@@ -409,7 +560,7 @@ function buildSportsMetaResolutionPlan(availability = {}) {
     parseSportsTitle(trackerTitle, fallbackDate) ||
     null
   const parsedEvent = availability?.parsedEvent ||
-    (!parsedSportsEvent ? parseSportsEventTitle(trackerTitle) : null)
+    (!parsedSportsEvent ? parseSportsEventTitle(trackerTitle, fallbackDate) : null)
   const mappedLeague = normalizeLeagueLabel(
     availability?.mappedLeague ||
     parsedSportsEvent?.league ||
@@ -685,6 +836,83 @@ function verifySportsMetaResolution(query = {}, canonical = {}) {
   }
 }
 
+function verifySportsMetaSearchCandidate(query = {}, canonical = {}) {
+  const baseVerification = verifySportsMetaResolution(query, canonical)
+  if (baseVerification.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED) return baseVerification
+
+  const params = query?.params || {}
+  const canonicalEvent = canonical?.event || {}
+  const identityType = String(query?.identityType || '').trim()
+  const descriptor = identityType === 'matchup'
+    ? buildRequestedMatchupDescriptor(params)
+    : normalizeEventNameLabel(params.event)
+
+  const requestedTokens = buildDescriptorTokens(descriptor, { league: params.league })
+  if (!hasSpecificDescriptorTokens(requestedTokens)) {
+    return {
+      status: SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH,
+      reason: 'insufficient_specificity'
+    }
+  }
+
+  const candidateTokens = buildDescriptorTokens(canonicalEvent.name || canonicalEvent.title, {
+    league: canonicalEvent.league
+  })
+  if (descriptorTokensFullyMatch(requestedTokens, candidateTokens)) {
+    return {
+      status: SPORTS_META_RESOLUTION_STATUS.RESOLVED,
+      reason: 'search_token_match'
+    }
+  }
+
+  return {
+    status: SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH,
+    reason: 'search_descriptor_mismatch'
+  }
+}
+
+async function resolveSportsMetaIdentityBySearch(client, query = {}) {
+  const params = query?.params || {}
+  const sport = normalizeSportKey(params.sport)
+  if (!sport) return null
+
+  const searchTerms = buildSearchTermsFromQuery(query)
+  if (searchTerms.length === 0) return null
+
+  const seenCandidateIds = new Set()
+  for (const term of searchTerms) {
+    let candidates = []
+    try {
+      candidates = await client.searchCatalog(sport, term)
+    } catch (_) {
+      continue
+    }
+
+    for (const candidate of candidates.slice(0, 6)) {
+      const canonicalId = String(candidate?.id || '').trim()
+      if (!canonicalId || !canonicalId.startsWith('sportsmeta:') || seenCandidateIds.has(canonicalId)) continue
+      seenCandidateIds.add(canonicalId)
+
+      const canonical = await client.getEvent(canonicalId)
+      if (!canonical) continue
+
+      const verification = verifySportsMetaSearchCandidate(query, canonical)
+      if (verification.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED) {
+        return {
+          status: verification.status,
+          identityType: query.identityType,
+          query: query.params,
+          reason: verification.reason,
+          canonicalId: String(canonical?.canonicalId || canonical?.event?.id || canonicalId).trim(),
+          canonical
+        }
+      }
+    }
+  }
+
+  return null
+}
+
 async function resolveSportsMetaIdentity(client, availability = {}) {
   const plan = buildSportsMetaResolutionPlan(availability)
   if (plan.attempts.length === 0) {
@@ -736,6 +964,8 @@ async function resolveSportsMetaIdentity(client, availability = {}) {
     } catch (error) {
       const statusCode = Number(error?.status || 0)
       if (statusCode === 409) {
+        const searchResolution = await resolveSportsMetaIdentityBySearch(client, query)
+        if (searchResolution) return searchResolution
         recordFailure({
           status: SPORTS_META_RESOLUTION_STATUS.AMBIGUOUS,
           identityType: query.identityType,
@@ -747,6 +977,8 @@ async function resolveSportsMetaIdentity(client, availability = {}) {
         continue
       }
 
+      const searchResolution = await resolveSportsMetaIdentityBySearch(client, query)
+      if (searchResolution) return searchResolution
       recordFailure({
         status: SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY,
         identityType: query.identityType,
@@ -759,6 +991,8 @@ async function resolveSportsMetaIdentity(client, availability = {}) {
     }
 
     if (!payload) {
+      const searchResolution = await resolveSportsMetaIdentityBySearch(client, query)
+      if (searchResolution) return searchResolution
       recordFailure({
         status: SPORTS_META_RESOLUTION_STATUS.NOT_FOUND,
         identityType: query.identityType,
@@ -782,6 +1016,8 @@ async function resolveSportsMetaIdentity(client, availability = {}) {
       }
     }
 
+    const searchResolution = await resolveSportsMetaIdentityBySearch(client, query)
+    if (searchResolution) return searchResolution
     recordFailure({
       status: verification.status,
       identityType: query.identityType,
@@ -807,5 +1043,6 @@ module.exports = {
   buildSportsMetaResolutionQuery,
   normalizeLeagueLabel,
   resolveSportsMetaIdentity,
-  verifySportsMetaResolution
+  verifySportsMetaResolution,
+  verifySportsMetaSearchCandidate
 }

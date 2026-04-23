@@ -6,6 +6,33 @@ Updated: 2026-04-23
 
 PVTKRRX is in a working `1.1.34` state on the main Windows/local route set.
 
+## 2026-04-23: Final sports closeout pass
+
+- Replaced the stale Windows desktop listener with the current `1.1.34` build and re-proved the real installed listener on `127.0.0.1:7000` / `127.0.0.1:7001`.
+- The working desktop runtime is now the current-user install at `C:\Users\kepne\AppData\Local\Programs\PVTKRRX\`; the stale `C:\Program Files\PVTKRRX` install was removed from the active startup path.
+- Verified local installed desktop sports output on the live listener:
+  - football catalog emits `50` metas with canonical `sportsmeta:event:` ids for resolved rows and SportsMeta default assets for unresolved rows
+  - motorsport catalog emits `50` metas and currently stays fallback/default on the sampled rows
+  - MMA catalog emits `50` metas and now includes canonical `sportsmeta:event:` ids for resolved rows alongside SportsMeta default fallback art
+- The Contabo self-host runtime at `/opt/pvtkrrx` was still behind the desktop resolver pass. Updated the live runtime files directly (`src/clients/sportsmeta.js`, `src/utils/sportsIdentityResolution.js`, `src/utils/sportsTitleParser.js`), restarted `pvtkrrx.service`, and re-proved `https://pvt.kepners.co.uk/selfhost`.
+- Post-restart self-host proof now matches the local contract class:
+  - football catalog emits `50` metas, including canonical `sportsmeta:event:football|2026-04-22|spanish-la-liga|barcelona|celta-vigo`
+  - motorsport catalog emits `50` metas with SportsMeta default fallback art for unresolved rows
+  - MMA catalog emits `50` metas and now includes canonical `sportsmeta:event:mma|2026-04-11|ufc|ufc-327-proch-zka|ulberg`
+  - canonical posters/backgrounds/logos come from `https://sportsmeta.pvtkrrx.cc/asset/...`
+  - fallback posters/backgrounds/logos come from `https://sportsmeta.pvtkrrx.cc/asset/default/...`
+- Resolver quality improved materially on the same 9-sample dirty-title proof set:
+  - detached baseline worktree at repo `HEAD`: `1/9` canonical resolutions
+  - current resolver pass: `5/9` canonical resolutions
+  - remaining weak cases are still mostly motorsport / event-format titles (`PFL Belfast`, `Japanese Grand Prix`, `Supercars Christchurch`, `NASCAR Truck Bristol Qualifying`)
+- Added `npm run smoke:sports-resolution` and kept the sports seed smoke green. The final closeout smoke pass on 2026-04-23 ended with:
+  - PASS: `smoke:sports-resolution`, `smoke:sports-catalog-seeds`, `smoke:config`, `smoke:selfhost`, `smoke:parity`, `smoke:desktop`, `smoke:stremio-link`, `smoke:security`
+- License truth re-confirmed: PVTKRRX is still free on the tested path. `requireConfigSubscription()` remains a pass-through in `src/lib/shared.js`, `/auth/me` no longer returns billing state, and the only remaining "unlock" is the self-host browser password used to reveal disk-backed private server config on a self-hosted `/configure` page.
+- Legacy sports cache cleanup on 2026-04-23:
+  - local desktop runtime no longer has `sports-image-cache/`, `sportsdb-poster-cache.json`, or `sports-cache-autofill-state.json`
+  - live Contabo runtime had one empty legacy directory left at `/opt/pvtkrrx/runtime/sports-image-cache`
+  - removed that empty directory after confirming the live codebase no longer reads or writes legacy sports cache paths
+
 ## 2026-04-23: Public SEO and share-asset pass deployed
 
 - Added generated public site assets for the hosted guide surface:

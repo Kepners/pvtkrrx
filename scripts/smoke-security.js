@@ -152,13 +152,12 @@ async function run() {
     assert.equal(hostSpoofed.status, 403, '#2b spoofed Host must not unlock /network-info on Vercel')
     console.log('✓ #2b spoofed Host cannot unlock /network-info')
 
-    // ── #3a/#3b: get a CSRF token from configure (same as the configure page would) ─
-    const configureRes = await request(port, 'GET', '/configure', null, {
-      Host: CANONICAL_HOST,
-      'X-Forwarded-For': '203.0.113.10'
-    })
-    const csrf = readCsrf(configureRes.headers['set-cookie'])
-    assert.ok(csrf.token, '#3 configure must return CSRF token')
+    // ── #3a/#3b: hosted /configure now redirects away on Vercel, so prove the
+    // actual double-submit contract directly with a matching cookie + header.
+    const csrf = {
+      cookie: 'pvtkrrx_csrf=security-smoke-token-1234567890',
+      token: 'security-smoke-token-1234567890'
+    }
 
     // ── #3a: nip.io loopback target is blocked in hosted test-connection ─────
     const nipIoTest = await request(port, 'POST', '/test-connection', {

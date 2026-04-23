@@ -179,6 +179,31 @@ class SportsMetaClient {
     const payload = await this._requestJson('/resolve', normalizedQuery)
     return normalizeSportsMetaPayload(payload)
   }
+
+  async searchCatalog(sport, search = '', options = {}) {
+    const sportSlug = resolveSportSlug(sport)
+    const normalizedSearch = String(search || '').trim()
+    if (!sportSlug || !normalizedSearch || !this.baseUrl) return []
+
+    const skip = Math.max(0, Number.parseInt(String(options.skip || '0'), 10) || 0)
+    const extra = [`search=${encodeURIComponent(normalizedSearch)}`]
+    if (skip > 0) extra.push(`skip=${skip}`)
+
+    const payload = await this._requestJson(
+      `/catalog/movie/sportsmeta-${encodeURIComponent(sportSlug)}/${extra.join('/')}.json`
+    )
+
+    return Array.isArray(payload?.metas)
+      ? payload.metas
+          .map((meta) => ({
+            id: String(meta?.id || '').trim(),
+            name: String(meta?.name || '').trim(),
+            description: String(meta?.description || '').trim(),
+            releaseInfo: String(meta?.releaseInfo || '').trim()
+          }))
+          .filter((meta) => Boolean(meta.id))
+      : []
+  }
 }
 
 const SUPPORTED_SPORT_SLUGS = new Set([
