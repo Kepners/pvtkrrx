@@ -1486,6 +1486,54 @@ function getConfigIssues(config, options = {}) {
     })
   }
 
+  // Defence-in-depth: a Remote Seedbox hosted-relay token (routeProfile='online'
+  // by explicit user intent) must carry publicly reachable backend URLs.
+  // Loopback/private hosts only make sense on a same-box self-host where the
+  // /server-config path is used, not the /encrypt hosted-relay path this
+  // check gates. Only fire when the incoming request itself is arriving at
+  // a public origin (or we're on the public relay runtime), so that localhost
+  // smoke tests and loopback-origin self-installs are not penalised.
+  const requestHostname = (() => {
+    if (!requestOrigin) return ''
+    try {
+      return String(new URL(requestOrigin).hostname || '').toLowerCase()
+    } catch (_) {
+      return ''
+    }
+  })()
+  const requestArrivesOnPublicRelay = IS_VERCEL_RUNTIME ||
+    (Boolean(requestHostname) && !isBlockedPrivateTargetHost(requestHostname))
+  const explicitRemoteSeedboxIntent = normalizeRouteProfile(safeConfig.routeProfile) === 'online' &&
+    safeConfig.lanPairEnabled === false
+  if (
+    requestArrivesOnPublicRelay &&
+    explicitRemoteSeedboxIntent &&
+    !selfHostDiskConfig &&
+    !localDiskConfig
+  ) {
+    const remoteSeedboxUrlFields = [
+      ['Prowlarr URL', String(safeConfig.jackettUrl || '').trim()],
+      ['qBittorrent URL', String(safeConfig.qbitUrl || '').trim()],
+      ['File Server URL', String(safeConfig.fileServerUrl || '').trim()]
+    ]
+    for (const [label, value] of remoteSeedboxUrlFields) {
+      if (!value) continue
+      let hostname = ''
+      try {
+        hostname = String(new URL(value).hostname || '').toLowerCase()
+      } catch (_) {
+        continue
+      }
+      if (hostname && isBlockedPrivateTargetHost(hostname)) {
+        issues.push({
+          code: 'REMOTE_SEEDBOX_REQUIRES_PUBLIC_URL',
+          message: `${label} points at ${hostname}, which is a private/loopback address. Remote Seedbox through the hosted relay needs a publicly reachable URL. Use PC Local or LAN Bridge for this machine's services, or enter the public URL of your separate seedbox.`
+        })
+        break
+      }
+    }
+  }
+
   return issues
 }
 

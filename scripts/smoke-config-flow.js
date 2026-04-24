@@ -70,6 +70,33 @@ function requestJsonWithHostHeader(port, reqPath, hostHeader) {
   })
 }
 
+function requestJsonWithHeaders(port, method, reqPath, body = null, headers = {}) {
+  return new Promise((resolve, reject) => {
+    const payload = body === null ? null : JSON.stringify(body)
+    const req = http.request({
+      host: '127.0.0.1',
+      port,
+      method,
+      path: reqPath,
+      headers: {
+        ...(payload ? { 'Content-Type': 'application/json' } : {}),
+        ...headers
+      }
+    }, (res) => {
+      let raw = ''
+      res.setEncoding('utf8')
+      res.on('data', chunk => { raw += chunk })
+      res.on('end', () => resolve({
+        status: Number(res.statusCode || 0),
+        json: raw ? JSON.parse(raw) : null
+      }))
+    })
+    req.on('error', reject)
+    if (payload) req.write(payload)
+    req.end()
+  })
+}
+
 function readCsrf(setCookieHeader) {
   const raw = Array.isArray(setCookieHeader) ? setCookieHeader.join('; ') : String(setCookieHeader || '')
   const match = raw.match(/pvtkrrx_csrf=([^;]+)/)
@@ -272,6 +299,10 @@ async function run() {
     assert.match(configureHtml, /href="\/runbooks"/, 'configure page should link to runbooks')
     assert.match(configureHtml, /route-parity\.js/, 'configure page should load shared parity helper')
     assert.match(configureHtml, /SportsMeta service/i, 'configure page should explain that SportsMeta owns sports metadata and artwork')
+    assert.doesNotMatch(configureHtml, /Prowlarr Base URL\s*-\s*<code>http:\/\/localhost:9696<\/code>/i, 'configure page should not present localhost as the default Remote Seedbox truth')
+    assert.match(configureHtml, /Same-host setups use <code>http:\/\/127\.0\.0\.1:9696<\/code>\. Put the reachable URL here if Prowlarr runs on a different seedbox or VPS/i, 'configure page should explain when loopback is valid for Prowlarr')
+    assert.match(configureHtml, /Same-host setups use <code>http:\/\/127\.0\.0\.1:8080<\/code>\. Put the reachable URL here if qBittorrent runs on a different seedbox or VPS/i, 'configure page should explain when loopback is valid for qBittorrent')
+    assert.match(configureHtml, /That looks like this PC's local .*Remote Seedbox through the hosted relay needs a public URL/i, 'configure page should warn about stale PC-local values on the Remote Seedbox route')
 
     const versionStatusRes = await fetch(`${base}/version-status.json`)
     assert.equal(versionStatusRes.status, 200, 'GET /version-status.json should return 200')
@@ -450,6 +481,28 @@ async function run() {
     assert.equal(Boolean(localSavePayload.lanPairRequired), false, 'local config save should keep hybrid LAN fallback optional')
     assert.equal(String(localConfig.routeProfile || ''), 'hybrid', 'local config readback should expose the hybrid home route')
     assert.equal(Boolean(localConfig.lanPairRequired), false, 'local config readback should keep hybrid LAN fallback optional')
+
+    const staleLocalRemoteSeedboxRes = await requestJsonWithHeaders(
+      port,
+      'POST',
+      '/encrypt',
+      {
+        ...sampleConfig,
+        routeProfile: 'online',
+        lanPairEnabled: false,
+        lanPairRequired: false,
+        fileServerUrl: 'https://files.example/media'
+      },
+      {
+        Host: 'www.pvtkrrx.cc',
+        'X-Forwarded-Proto': 'https'
+      }
+    )
+    assert.equal(staleLocalRemoteSeedboxRes.status, 400, 'switching a saved localhost desktop config to explicit Remote Seedbox should be rejected')
+    const staleLocalRemoteSeedboxPayload = staleLocalRemoteSeedboxRes.json || {}
+    assert.equal(staleLocalRemoteSeedboxPayload.notifyUser, true)
+    assert.equal(staleLocalRemoteSeedboxPayload.issueCode, 'REMOTE_SEEDBOX_REQUIRES_PUBLIC_URL')
+    assert.match(String(staleLocalRemoteSeedboxPayload.error || ''), /publicly reachable URL/i)
 
     const localRepairSaveRes = await fetch(`${base}/local-config`, {
       method: 'POST',

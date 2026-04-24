@@ -834,6 +834,16 @@
       display: block !important;
     }
 
+    body.selfhost-seedbox-only .backend-host-static-hint,
+    body.desktop-local-only .backend-host-static-hint {
+      display: block !important;
+    }
+
+    body.selfhost-seedbox-only .backend-host-note:not([hidden]),
+    body.desktop-local-only .backend-host-note:not([hidden]) {
+      display: block !important;
+    }
+
     body.selfhost-seedbox-only #serviceCard-options label[for="maxResults"],
     body.selfhost-seedbox-only #serviceCard-options #maxResults,
     body.selfhost-seedbox-only #serviceCard-options #localHostnameBlock {
@@ -1547,6 +1557,50 @@
     .hint a:hover {
       color: #dffaff;
       border-bottom-color: rgba(0, 246, 255, 0.85);
+    }
+
+    .backend-host-static-hint {
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.68rem;
+      line-height: 1.45;
+      letter-spacing: 0.4px;
+      color: #bcd0dd;
+      margin-top: -0.4rem;
+      margin-bottom: 0.8rem;
+    }
+
+    .backend-host-static-hint code {
+      background: rgba(127, 224, 255, 0.08);
+      color: #dffaff;
+      padding: 0.05rem 0.3rem;
+      border-radius: 3px;
+    }
+
+    .backend-host-note {
+      display: none;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.68rem;
+      line-height: 1.45;
+      margin-top: -0.3rem;
+      margin-bottom: 0.9rem;
+      padding: 0.55rem 0.75rem;
+      border-radius: 6px;
+      border-left: 3px solid rgba(255, 175, 90, 0.8);
+      background: rgba(255, 175, 90, 0.08);
+      color: #f6e0c4;
+      letter-spacing: 0.35px;
+    }
+
+    .backend-host-note:not([hidden]) { display: block; }
+    .backend-host-note.is-separate-host {
+      border-left-color: rgba(255, 118, 118, 0.9);
+      background: rgba(255, 118, 118, 0.08);
+      color: #ffd0d0;
+    }
+    .backend-host-note.is-same-host {
+      border-left-color: rgba(127, 224, 255, 0.75);
+      background: rgba(127, 224, 255, 0.07);
+      color: #cfeaf5;
     }
 
     .provider-preset-panel {
@@ -2608,8 +2662,10 @@
 
       <div class="service-card active" id="serviceCard-prowlarr" data-service-visible="pc lan seedbox">
         <h2>Prowlarr</h2>
-        <label for="jackettUrl">Prowlarr Base URL - <code>http://localhost:9696</code></label>
+        <label for="jackettUrl">Prowlarr Base URL</label>
         <input type="url" id="jackettUrl" placeholder="http://localhost:9696">
+        <p class="backend-host-static-hint" id="jackettUrlStaticHint">Same-host setups use <code>http://127.0.0.1:9696</code>. Put the reachable URL here if Prowlarr runs on a different seedbox or VPS (for example <code>http://seedbox.example.com:9696</code>).</p>
+        <p class="backend-host-note" id="jackettBackendNote" hidden></p>
         <p class="hint">Paste the base URL only. Legacy Torznab/API URLs are auto-normalized.</p>
         <label for="jackettApiKey">API Key</label>
         <input type="text" id="jackettApiKey" placeholder="Your Prowlarr API key">
@@ -2623,6 +2679,8 @@
         <h2>qBittorrent</h2>
         <label for="qbitUrl">WebUI URL</label>
         <input type="url" id="qbitUrl" placeholder="https://qbit.example.com:8080">
+        <p class="backend-host-static-hint" id="qbitUrlStaticHint">Same-host setups use <code>http://127.0.0.1:8080</code>. Put the reachable URL here if qBittorrent runs on a different seedbox or VPS.</p>
+        <p class="backend-host-note" id="qbitBackendNote" hidden></p>
         <div class="row">
           <div>
             <label for="qbitUsername">Username</label>
@@ -2706,6 +2764,7 @@
         </div>
         <label for="fileServerUrl">Public File Server URL</label>
         <input type="url" id="fileServerUrl" placeholder="https://username.seedbox.com/files">
+        <p class="backend-host-note" id="fileServerBackendNote" hidden></p>
         <label for="fileServerAuth">Basic Auth (optional)</label>
         <input type="text" id="fileServerAuth" placeholder="user:password">
         <p class="hint">Leave empty if no authentication required.</p>
@@ -5464,6 +5523,7 @@
       syncInstallTargetUi();
       setInstallModeHint();
       syncConfigureDisclosure();
+      if (typeof updateBackendHostNotes === 'function') updateBackendHostNotes();
     }
 
     function getInstallMode() {
@@ -5519,16 +5579,32 @@
     document.getElementById('jackettUrl').addEventListener('blur', function() {
       this.value = normalizeProwlarrBaseUrl(this.value);
       updateServiceLaunchLinks();
+      updateBackendHostNotes();
     });
-    document.getElementById('jackettUrl').addEventListener('input', updateServiceLaunchLinks);
+    document.getElementById('jackettUrl').addEventListener('input', function() {
+      updateServiceLaunchLinks();
+      updateBackendHostNotes();
+    });
     document.getElementById('jackettApiKey').addEventListener('input', function() {
       markSecretFieldDirty('jackettApiKey');
     });
     document.getElementById('qbitUrl').addEventListener('blur', function() {
       this.value = String(this.value || '').replace(/\/+$/, '');
       updateServiceLaunchLinks();
+      updateBackendHostNotes();
     });
-    document.getElementById('qbitUrl').addEventListener('input', updateServiceLaunchLinks);
+    document.getElementById('qbitUrl').addEventListener('input', function() {
+      updateServiceLaunchLinks();
+      updateBackendHostNotes();
+    });
+    const fileServerUrlInput = document.getElementById('fileServerUrl');
+    if (fileServerUrlInput) {
+      fileServerUrlInput.addEventListener('blur', function() {
+        this.value = String(this.value || '').replace(/\/+$/, '');
+        updateBackendHostNotes();
+      });
+      fileServerUrlInput.addEventListener('input', updateBackendHostNotes);
+    }
     document.getElementById('qbitUsername').addEventListener('input', function() {
       markSecretFieldDirty('qbitUsername');
     });
@@ -5616,6 +5692,7 @@
         refreshLocalStremioStatus();
         updateQuickSetupStatus();
         syncConfigureDisclosure(true);
+        updateBackendHostNotes();
       });
 
     function startPageFlicker() {
@@ -5779,6 +5856,87 @@
     function updateServiceLaunchLinks() {
       updateServiceLaunchLink('openProwlarrLink', document.getElementById('jackettUrl')?.value, 'Open Prowlarr', 'prowlarr');
       updateServiceLaunchLink('openQbitLink', document.getElementById('qbitUrl')?.value, 'Open qBittorrent', 'qbit');
+    }
+
+    function describeBackendHostNote(label, rawValue, target, selfHosted) {
+      const text = String(rawValue || '').trim();
+      if (!text) return null;
+      let parsed;
+      try {
+        parsed = new URL(text);
+      } catch (_) {
+        return null;
+      }
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+      const host = (parsed.hostname || '').toLowerCase();
+      if (!host) return null;
+      const isPrivate = routeParity.isBlockedPrivateTargetHost(host);
+      if (!isPrivate) return null;
+
+      if (target === 'pc') {
+        return {
+          tone: 'same-host',
+          message: `${label} uses ${host}. PC Local expects same-PC backends, so this is correct when ${label} runs on this Windows host.`
+        };
+      }
+
+      if (target === 'lan') {
+        // LAN Bridge playback is served by the Windows host itself via its own
+        // local qBit/Prowlarr; the hosted relay only issues redirects and never
+        // proxies bytes. Loopback/private URLs are correct here.
+        return {
+          tone: 'same-host',
+          message: `${label} uses ${host}. LAN Bridge runs the backend on this Windows host, so a loopback/private URL is correct.`
+        };
+      }
+
+      if (selfHosted) {
+        return {
+          tone: 'separate-host',
+          message: `${label} uses ${host}. This is only valid if ${label} runs on this same server as PVTKRRX. If ${label} runs on a different seedbox or VPS, replace ${host} with the hostname PVTKRRX can reach from this server.`
+        };
+      }
+
+      // Remote Seedbox on a hosted relay (non-self-host): loopback/private hosts
+      // cannot be reached from the public relay, so the URL is definitely wrong
+      // here. This is the stale-local-provision leak case.
+      return {
+        tone: 'separate-host',
+        message: `${label} uses ${host}. That looks like this PC's local ${label} (from PC Local provisioning). Remote Seedbox through the hosted relay needs a public URL. Switch to PC Local or LAN Bridge for this machine's services, or enter the public URL of your separate seedbox.`
+      };
+    }
+
+    function applyBackendHostNote(elementId, label, rawValue, target, selfHosted) {
+      const el = document.getElementById(elementId);
+      if (!el) return;
+      const note = describeBackendHostNote(label, rawValue, target, selfHosted);
+      el.classList.remove('is-separate-host', 'is-same-host');
+      if (!note) {
+        el.hidden = true;
+        el.textContent = '';
+        return;
+      }
+      el.hidden = false;
+      el.textContent = note.message;
+      el.classList.add(note.tone === 'same-host' ? 'is-same-host' : 'is-separate-host');
+    }
+
+    function updateBackendHostNotes() {
+      const target = (typeof getInstallTarget === 'function') ? getInstallTarget() : activeInstallTarget;
+      const selfHosted = serverRuntime.selfHostServerMode === true;
+      applyBackendHostNote('jackettBackendNote', 'Prowlarr', document.getElementById('jackettUrl')?.value, target, selfHosted);
+      applyBackendHostNote('qbitBackendNote', 'qBittorrent', document.getElementById('qbitUrl')?.value, target, selfHosted);
+      const fileServerValue = document.getElementById('fileServerUrl')?.value;
+      if (String(fileServerValue || '').trim()) {
+        applyBackendHostNote('fileServerBackendNote', 'File Server', fileServerValue, target, selfHosted);
+      } else {
+        const fileNote = document.getElementById('fileServerBackendNote');
+        if (fileNote) {
+          fileNote.hidden = true;
+          fileNote.textContent = '';
+          fileNote.classList.remove('is-separate-host', 'is-same-host');
+        }
+      }
     }
 
     async function refreshLocalQbitRuntimeStatus(options = {}) {
@@ -6197,6 +6355,7 @@
       }
       applyProviderPreset(document.getElementById('provider').value, { applyMapping: false });
       updateServiceLaunchLinks();
+      updateBackendHostNotes();
     }
 
     function getConfigTokenFromPath() {
@@ -6212,6 +6371,29 @@
       );
     }
 
+    function urlHostIsPrivate(rawValue) {
+      const text = String(rawValue || '').trim();
+      if (!text) return false;
+      try {
+        const parsed = new URL(text);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return false;
+        const host = String(parsed.hostname || '').toLowerCase();
+        if (!host) return false;
+        return routeParity.isBlockedPrivateTargetHost(host);
+      } catch (_) {
+        return false;
+      }
+    }
+
+    function remoteSeedboxHasStaleLocalUrls(target = getInstallTarget()) {
+      if (target !== 'seedbox') return false;
+      if (isSelfHostedServerRuntime()) return false;
+      const prowlarrUrl = String(document.getElementById('jackettUrl')?.value || '').trim();
+      const qbitUrl = String(document.getElementById('qbitUrl')?.value || '').trim();
+      const fileServerUrl = String(document.getElementById('fileServerUrl')?.value || '').trim();
+      return urlHostIsPrivate(prowlarrUrl) || urlHostIsPrivate(qbitUrl) || urlHostIsPrivate(fileServerUrl);
+    }
+
     function hasMainPathRequirementsFilled(target = getInstallTarget()) {
       const prowlarrUrl = String(document.getElementById('jackettUrl')?.value || '').trim();
       const jackettApiKey = String(document.getElementById('jackettApiKey')?.value || '').trim();
@@ -6221,6 +6403,12 @@
         return false;
       }
       if (target === 'seedbox' && !isSelfHostedServerRuntime() && !fileServerUrl) {
+        return false;
+      }
+      // Stale PC-Local-provisioned localhost URLs must not be silently accepted
+      // as Remote Seedbox requirements; force the user into the connections tab
+      // so they can see the backend-host warning and correct the URLs.
+      if (remoteSeedboxHasStaleLocalUrls(target)) {
         return false;
       }
       return true;
@@ -6239,6 +6427,14 @@
       }
       if (target === 'seedbox' && !isSelfHostedServerRuntime() && !fileServerUrl) {
         return { advancedTab: 'connections', serviceTab: 'files' };
+      }
+      if (remoteSeedboxHasStaleLocalUrls(target)) {
+        const staleTab = urlHostIsPrivate(prowlarrUrl)
+          ? 'prowlarr'
+          : urlHostIsPrivate(qbitUrl)
+            ? 'qbit'
+            : 'files';
+        return { advancedTab: 'connections', serviceTab: staleTab };
       }
       return { advancedTab: 'connections', serviceTab: activeServiceTab || 'prowlarr' };
     }
@@ -6376,7 +6572,7 @@
           if (isPrivateHostname(u.hostname) && !canUsePrivateTargets) {
             return selfHosted
               ? `${label} uses ${u.hostname}. Enter the self-host password or open this page on the server itself to use localhost/private service URLs.`
-              : `${label} uses ${u.hostname}. Remote Seedbox needs public URLs. Use PC Local or LAN Bridge instead.`;
+              : `${label} uses ${u.hostname}. That looks like this PC's local ${label} (from PC Local provisioning). Remote Seedbox through the hosted relay needs a public URL — use PC Local or LAN Bridge for this machine, or replace ${u.hostname} with the public hostname of your separate seedbox.`;
           }
         } catch (e) {
           return `${label} is not a valid URL`;

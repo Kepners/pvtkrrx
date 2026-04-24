@@ -17,6 +17,7 @@
     "smoke:sports-catalog-latency": "node scripts/smoke-sports-catalog-latency.js",
     "smoke:config": "node scripts/smoke-config-flow.js",
     "smoke:guards": "node scripts/smoke-runtime-guards.js",
+    "smoke:remote-seedbox-guard": "node scripts/smoke-remote-seedbox-guard.js",
     "smoke:selfhost": "node scripts/smoke-selfhost-server.js",
     "smoke:lan-pair": "node scripts/smoke-lan-pair-flow.js",
     "smoke:pipeline": "node scripts/smoke-stream-pipeline.js",
