@@ -1,18 +1,18 @@
 const { getMappedLeagueEntry } = require('./leagueMap')
 
-const QUALITY_RE = /^(?:2160p|1080p|720p|576p|540p|480p|sd|hd|fhd|uhd)(?:[a-z]{2})?(?:\d{2,3}(?:fps)?)?$/i
-const SOURCE_RE = /^(?:hdtv|pdtv|sdtv|webrip|webdl|web-dl|web|bluray|bdrip|dvdrip|satfeed|iptv)$/i
+const QUALITY_RE = /^(?:(?:2160p|1080p|1080i|720p|576p|540p|480p|sd|hd|fhd|uhd)(?:[a-z]{1,4})?(?:\d{2,3}(?:fps)?)?|\d{2,3}fps)$/i
+const SOURCE_RE = /^(?:hdtv|pdtv|sdtv|webrip|webdl|web-dl|web|bluray|bdrip|dvdrip|satfeed|iptv|espn(?:p|plus|\+)?|f1tv|nesn|msg|usan?|nbcsn|sportsnet|sn|bally|bein(?:sport)?\d*|skynz|fubo|newvision)$/i
 const CODEC_RE = /^(?:x264|x265|h264|h265|hevc|avc|av1)(?:-.+)?$/i
 const RELEASE_GROUP_RE = /^[A-Z0-9]+-[A-Za-z0-9]+$/
 const HLG_HDR_RE = /^(?:hlg|hdr10?\+?|dovi?|dv|10bit|8bit)$/i
 const GENERIC_SPORT_PREFIX_RE = /^(?:football|soccer|basketball|baseball|cricket|rugby|mma|boxing|wrestling|darts|golf|motorsport|motor|tennis|hockey|ice|american|uefa)$/i
-const LEADING_TEAM_NOISE_RE = /^(?:game|games|match|matches|week|round|heat|session|fight|night|grand|prix|qualifying|practice|sprint|race|card|prelims?|early|cup|bowl|super|opening|closing|ceremony|playoffs?|finals?|semi(?:final)?|quarter(?:final)?|championship|title|event)$/i
+const LEADING_TEAM_NOISE_RE = /^(?:game|games|match|matches|week|round|heat|session|fight|night|grand|prix|qualifying|practice|sprint|race|card|prelims?|early|cup|bowl|super|opening|closing|ceremony|playoffs?|finals?|semi(?:final)?|quarter(?:final)?|championship|title|event|r\d+|gm\d+|g\d+)$/i
 const ROMAN_NUMERAL_RE = /^(?=[ivxlcdm]+$)m{0,4}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})$/i
-const TEAM_BROADCAST_RE = /\b(?:nbc|espn(?:2)?|sky(?:\s*sports?)?|bt(?:\s*sport)?|tnt(?:\s*sports?)?|fox(?:\s*sports?)?|cbs|abc|itv(?:4)?|tsn|bein(?:\s*sports?)?|canal\+?|dazn)\b/gi
+const TEAM_BROADCAST_RE = /\b(?:nbc|nbcsn|espn(?:2|p|plus|\+)?|f1tv|nesn|msg|usan?|sky(?:\s*sports?)?|bt(?:\s*sport)?|tnt(?:\s*sports?)?|fox(?:\s*sports?)?|cbs|abc|itv(?:4)?|tsn|sportsnet|sn|bally|bein(?:\s*sports?)?\d*|canal\+?|dazn|skynz|fubo|newvision)\b/gi
 const TEAM_LANGUAGE_RE = /\b(?:en|english|spanish|french|german|italian|portuguese)\b/gi
 const TEAM_PRESENTATION_RE = /\b(?:condensed(?:\s*game)?|extended(?:\s*highlights?)?|highlights?|replay)\b/gi
-const TEAM_TAIL_NOISE_RE = /^(?:round|matchday|main|card|pre|post|episode|show|event|fight|full|review|preview|highlights?|replay|coverage|studio|apple|tv|fubo|beinsport\d*|skynz|z3r0|nva)$/i
-const EVENT_SOURCE_NOISE_RE = /^(?:apple|tv|fubo|skynz|z3r0|nva)$/i
+const TEAM_TAIL_NOISE_RE = /^(?:round|matchday|main|card|pre|post|episode|show|event|fight|full|review|preview|highlights?|replay|coverage|studio|apple|tv|fubo|beinsport\d*|skynz|z3r0|nva|playoffs?|r\d+|gm\d+|g\d+)$/i
+const EVENT_SOURCE_NOISE_RE = /^(?:apple|tv|fubo|skynz|z3r0|nva|espn(?:p|plus|\+)?|f1tv|nesn|msg|usan?)$/i
 
 // Known league/series tokens that start non-vs event titles
 const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|PFL|Bellator|ONE|MotoGP|NASCAR|IndyCar|WRC|Supercars|Supercars\s*Championship|V8SC|Bathurst|WSBK|WEC|FormulaE|Rally|Dakar|PGA|LPGA|Masters|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
@@ -254,7 +254,7 @@ function normalizeTeamLabel(value) {
       .replace(TEAM_BROADCAST_RE, ' ')
       .replace(TEAM_LANGUAGE_RE, ' ')
       .replace(TEAM_PRESENTATION_RE, ' ')
-      .replace(/\b(?:\d{2,3}fps|fps)\b/gi, ' ')
+      .replace(/\b(?:r\d+|gm\d+|g\d+|\d{2,3}fps|fps)\b/gi, ' ')
   )
 }
 
@@ -271,6 +271,7 @@ function normalizeTeamTokens(tokens) {
     if (!token) continue
     if (
       TEAM_TAIL_NOISE_RE.test(token) ||
+      /^(?:r\d+|gm\d+|g\d+)$/i.test(token) ||
       (/^\d{1,2}$/.test(token) && /^\d{1,2}$/.test(next)) ||
       (/^(19|20)\d{2}$/.test(token) && /^\d{1,2}$/.test(next)) ||
       EVENT_SOURCE_NOISE_RE.test(token)
@@ -549,6 +550,7 @@ function normalizeEventNameTokens(tokens = [], fallbackDate = '') {
     if (/^(?:mp4|mkv|avi|ts|m4v)$/i.test(token)) break
     if (EVENT_SOURCE_NOISE_RE.test(token)) break
     if (/^(19|20)\d{2}$/.test(token) || /^\d{1,2}$/.test(token)) continue
+    if (/^(?:round|session|race)?\d+$/i.test(token) || /^r\d+$/i.test(token)) continue
     if ((lower === 'round' || lower === 'event' || lower === 'episode') && /^\d+$/.test(next)) {
       index += 1
       continue
@@ -558,6 +560,8 @@ function normalizeEventNameTokens(tokens = [], fallbackDate = '') {
       continue
     }
     if (['replay', 'review', 'preview', 'coverage', 'studio'].includes(lower)) continue
+    if (['free', 'practice', 'qualifying', 'qualifier', 'sprint', 'session', 'warmup', 'fp1', 'fp2', 'fp3'].includes(lower)) continue
+    if (lower === 'race' && cleaned.length > 0) continue
     if (lower === 'apple' && /^tv$/i.test(next)) {
       index += 1
       continue

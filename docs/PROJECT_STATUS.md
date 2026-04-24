@@ -6,6 +6,26 @@ Updated: 2026-04-24
 
 PVTKRRX is in a working `1.1.40` state on the main Windows/local and self-host route set. The current sports search contract is that any configured Prowlarr indexer can supply sports catalog and stream availability when the result passes the existing sports filters; SportsCult is no longer the only accepted tracker source.
 
+## 2026-04-25: Sports poster/result backfill hardening
+
+- Reproduced the reported seedbox symptom on `https://pvt.kepners.co.uk/selfhost` before changing code:
+  - the `Levante vs Sevilla` sports catalog row resolved to `sportsmeta:event:football|2026-04-23|spanish-la-liga|levante|sevilla`
+  - the stream route returned one playable source from `SportsCult`
+  - direct Prowlarr checks for `La Liga 2026 Levante Sevilla`, `Levante Sevilla`, and `Levante vs Sevilla` returned only `SportsCult` for the current fixture, even with broad search, so that exact row is not hiding other current tracker sources inside PVTKRRX
+- Added an in-process sports identity backfill queue. When a sports catalog row ships unresolved because the fast identity pass timed out or deferred it, PVTKRRX now queues a background SportsMeta resolution and caches the result so the next catalog refresh can emit the canonical `sportsmeta:` row and member poster URLs.
+- Improved sports title cleanup for tracker/broadcast noise:
+  - `720p60fps`, `720pEN60fps`, `1080p60`, `1080i`, `ESPNP`, `USAN`, `NESN`, `MSG`, `F1TV`, `R1`, `GM3`, playoff wording, and motorsport practice/sprint/qualifying session tokens are stripped from identity matching where appropriate.
+  - MotoGP/session titles now resolve around the event/weekend wording instead of letting the session label block poster recovery.
+- Added sport stream search aliases for canonical rows. The stream path now tries bounded league alias/year/date variants such as `La Liga 2026 Levante Sevilla 23 04`, while keeping a hard query cap so a single Stremio stream request does not fan out indefinitely.
+- Local checks passed:
+  - `node --check` on changed PVTKRRX sports files
+  - `npm run smoke:sports-resolution`
+  - `npm run smoke:pipeline`
+  - `npm run smoke:sports-catalog-seeds`
+  - `npm run smoke:sports-catalog-latency`
+  - `npm run smoke:selfhost`
+  - `npm run smoke:config`
+
 ## 2026-04-24: Sports tracker broad-search release
 
 - Reproduced the user-facing MotoGP/Jerez failure against the live Contabo seedbox before changing release state: Prowlarr category `5060` returned only one `SportsCult` result, while a broad Prowlarr search returned the same event from `SportsCult`, `TorrentLeech`, and `Torrenting`.

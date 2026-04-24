@@ -24,6 +24,10 @@ const {
   resolveSportsMetaIdentity
 } = require('../utils/sportsIdentityResolution')
 const {
+  getCachedSportsIdentityBackfill,
+  queueSportsIdentityBackfills
+} = require('../utils/sportsIdentityBackfill')
+const {
   resolveSportsPosterAsset,
   resolveSportsBackgroundAsset,
   resolveSportsLogoAsset
@@ -1003,6 +1007,11 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
   })
   let identityPassTimedOutCount = 0
   const resolvedIdentityWindow = await mapLimit(identityWindow, SPORTS_IDENTITY_CONCURRENCY, async (group) => {
+    const cachedBackfillResolution = getCachedSportsIdentityBackfill(group)
+    if (cachedBackfillResolution) {
+      return { ...group, sportsMetaResolution: cachedBackfillResolution, sportsMetaBackfill: 'cache' }
+    }
+
     const remaining = SPORTS_IDENTITY_PASS_BUDGET_MS - (Date.now() - identityPassStart)
     if (remaining <= 0) {
       identityPassTimedOutCount += 1
@@ -1028,9 +1037,14 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
   // FALLBACK_ONLY resolution so `encodeCustomId` runs instead of canonical.
   const deferredGroups = groupedAvailability.slice(identityWindowEnd).map((group) => ({
     ...group,
-    sportsMetaResolution: deferredResolution('deferred_beyond_identity_window')
+    sportsMetaResolution: getCachedSportsIdentityBackfill(group) || deferredResolution('deferred_beyond_identity_window')
   }))
   const resolvedIdentityGroups = [...groupedIdentity, ...deferredGroups]
+  const backfillQueued = queueSportsIdentityBackfills({
+    groups: resolvedIdentityGroups,
+    config,
+    reason: 'sports_catalog_unresolved'
+  })
 
   const resolutionCounts = resolvedIdentityWindow.reduce((counts, group) => {
     const state = String(group?.sportsMetaResolution?.status || SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY)
@@ -1039,7 +1053,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
   }, {})
 
   console.log(
-    `[sports-catalog] catalog="${catalogDefinition?.id || 'pvtkrrx-sports'}" query="${query}" prowlarr=${items.length} normalized=${normalizedItems.length} strict=${strictFiltered.length} anchors=${filtered.length} nonSportsCultAccepted=${nonSportsCultAccepted} nonSportsCultRejected=${suppressedNonSportsCult} availabilityGroups=${groupedAvailability.length} identityWindow=${identityWindow.length} identityBudgetMs=${SPORTS_IDENTITY_PASS_BUDGET_MS} identityPassMs=${Date.now() - identityPassStart} identityTimedOut=${identityPassTimedOutCount} deferred=${deferredGroups.length} identityGroups=${groupedIdentity.length} emitted=${resolvedIdentityGroups.length} resolved=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.RESOLVED] || 0} ambiguous=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.AMBIGUOUS] || 0} notFound=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.NOT_FOUND] || 0} weak=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH] || 0} fallback=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY] || 0}`
+    `[sports-catalog] catalog="${catalogDefinition?.id || 'pvtkrrx-sports'}" query="${query}" prowlarr=${items.length} normalized=${normalizedItems.length} strict=${strictFiltered.length} anchors=${filtered.length} nonSportsCultAccepted=${nonSportsCultAccepted} nonSportsCultRejected=${suppressedNonSportsCult} availabilityGroups=${groupedAvailability.length} identityWindow=${identityWindow.length} identityBudgetMs=${SPORTS_IDENTITY_PASS_BUDGET_MS} identityPassMs=${Date.now() - identityPassStart} identityTimedOut=${identityPassTimedOutCount} deferred=${deferredGroups.length} identityGroups=${groupedIdentity.length} emitted=${resolvedIdentityGroups.length} backfillQueued=${backfillQueued} resolved=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.RESOLVED] || 0} ambiguous=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.AMBIGUOUS] || 0} notFound=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.NOT_FOUND] || 0} weak=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH] || 0} fallback=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY] || 0}`
   )
 
   const pageGroups = resolvedIdentityGroups.slice(skip, skip + limit)

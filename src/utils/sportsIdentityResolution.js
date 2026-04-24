@@ -25,12 +25,14 @@ const GENERIC_EVENT_TOKENS = new Set([
   'night',
   'playoff',
   'playoffs',
+  'practice',
   'prelims',
   'prix',
   'qualifying',
   'race',
   'round',
-  'session'
+  'session',
+  'sprint'
 ])
 
 const TRACKER_NOISE_TOKENS = new Set([
@@ -53,8 +55,12 @@ const TRACKER_NOISE_TOKENS = new Set([
   'eng',
   'english',
   'espn',
+  'espnp',
+  'espnplus',
+  'f1tv',
   'extended',
   'fox',
+  'fs1',
   'h264',
   'h265',
   'hdtv',
@@ -62,7 +68,9 @@ const TRACKER_NOISE_TOKENS = new Set([
   'hdr',
   'internal',
   'itv',
+  'msg',
   'multi',
+  'nesn',
   'proper',
   'repack',
   'rip',
@@ -73,6 +81,8 @@ const TRACKER_NOISE_TOKENS = new Set([
   'tnt',
   'tsn',
   'uhd',
+  'usa',
+  'usan',
   'web',
   'webrip',
   'webdl',
@@ -204,7 +214,8 @@ function simplifyTeamLabel(value = '') {
       isResolutionNoiseToken(token) ||
       (/^\d{1,2}$/.test(token) && /^\d{1,2}$/.test(next)) ||
       (/^(19|20)\d{2}$/.test(token) && /^\d{1,2}$/.test(next)) ||
-      ['round', 'main', 'card', 'pre', 'post', 'episode', 'show', 'event', 'fight', 'full', 'replay', 'review', 'preview', 'coverage', 'studio', 'apple', 'tv', 'fubo', 'skynz', 'z3r0', 'nva'].includes(lower)
+      ['round', 'main', 'card', 'pre', 'post', 'episode', 'show', 'event', 'fight', 'full', 'replay', 'review', 'preview', 'coverage', 'studio', 'apple', 'tv', 'fubo', 'skynz', 'z3r0', 'nva', 'playoff', 'playoffs'].includes(lower) ||
+      /^(?:r\d+|gm\d+|g\d+)$/i.test(lower)
     ) {
       break
     }
@@ -392,7 +403,8 @@ function isResolutionNoiseToken(token = '') {
   if (['feed', 'full', 'h', 'live', 'mp1', 'mp2', 'mp3', 'newvision', 'replay', 'stream', 'tptv'].includes(normalized)) return true
   if (/^(?:264|265|x264|x265)$/i.test(normalized)) return true
   if (/^\d{2,3}fps$/i.test(normalized)) return true
-  if (/^(?:2160p|1080p|720p|576p|540p|480p)(?:[a-z]{2})?(?:\d{2,3}(?:fps)?)?$/i.test(normalized)) return true
+  if (/^(?:r\d+|gm\d+|g\d+)$/i.test(normalized)) return true
+  if (/^(?:2160p|1080p|1080i|720p|576p|540p|480p)(?:[a-z]{1,4})?(?:\d{2,3}(?:fps)?)?$/i.test(normalized)) return true
   if (/^(19|20)\d{2}$/.test(normalized) || /^\d{1,2}$/.test(normalized)) return true
   return false
 }

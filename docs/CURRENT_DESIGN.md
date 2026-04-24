@@ -217,6 +217,8 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 - Darts and golf are now recognized as distinct sport categories.
 - Sports catalog grouping uses structured event keys for both vs and non-vs titles, so different quality variants of the same event collapse into one tile.
 - Sports detail pages now carry richer metadata: league, date, event name, sport type label, and multi-line descriptions instead of flat stat lines.
+- Sports catalog identity resolution stays bounded by a fast first-screen budget. Rows that cannot be safely resolved inside that budget remain visible as `pvtkrrx:` fallback rows, then enter an in-process background identity backfill queue. If SportsMeta later resolves that same availability row, PVTKRRX caches the canonical result and the next catalog refresh can emit the `sportsmeta:` id plus canonical/member artwork without making the original Stremio response wait.
+- Sports stream lookup for canonical rows now tries a bounded set of cleaned league aliases, matchup variants, season-year variants, and day/month variants so tracker wording like `La Liga 2026 Levante Sevilla 23 04` can attach to a canonical `Spanish La Liga` event. The query set is capped to protect seedbox latency and Prowlarr capacity.
 - Library items and unresolved sports rows use internal `pvtkrrx:` custom ids inside Stremio responses.
 - Resolved sports rows use canonical `sportsmeta:` ids directly inside Stremio responses.
 - canonical SportsMeta event ids use `sportsmeta:` and are resolved through the separate SportsMeta service boundary

@@ -9,6 +9,11 @@ const {
 const {
   resolveSportsPosterAsset
 } = require('../src/utils/sportsArtwork')
+const {
+  clearSportsIdentityBackfillState,
+  getCachedSportsIdentityBackfill,
+  setCachedSportsIdentityBackfill
+} = require('../src/utils/sportsIdentityBackfill')
 const { parseSportsEventTitle, parseSportsTitle } = require('../src/utils/sportsTitleParser')
 
 const ORIGINAL_FETCH = global.fetch
@@ -239,6 +244,24 @@ async function run() {
   assert.match(fallbackPoster.poster, /\/sports-artwork\/default\/poster\/basketball\.png/, 'fallback sports artwork should stay on the PVTKRRX raster proxy')
   assert.match(fallbackPoster.poster, /title=Atlanta\+Hawks\+vs\+New\+York\+Knicks/, 'fallback sports artwork should carry the game title')
   assert.match(fallbackPoster.poster, /date=2026-04-23/, 'fallback sports artwork should carry the event date')
+
+  const noisyLaLiga = parseSportsTitle('La Liga 2026 Levante vs Sevilla 23 04 720p60fps EN ESPNP', '2026-04-23T12:00:00Z')
+  assert.equal(noisyLaLiga?.date, '2026-04-23', 'sports parser should infer day/month from tracker football titles with broadcast tokens')
+  assert.equal(noisyLaLiga?.homeTeam, 'Levante', 'sports parser should keep the home team after stripping league/year noise')
+  assert.equal(noisyLaLiga?.awayTeam, 'Sevilla', 'sports parser should strip quality/language/broadcast tokens from away team')
+
+  const motogpSession = parseSportsEventTitle('MotoGP 2026 Round04 Spain Jerez FP1 Practice WEB DL 1080p H264 English')
+  assert.equal(motogpSession?.eventName, 'Spain Jerez', 'motorsport parser should strip round/session wording from event names')
+
+  clearSportsIdentityBackfillState()
+  const backfillGroup = {
+    availabilityKey: 'spanish-la-liga-2026-04-22-barcelona-celta-vigo',
+    bestAvailability: footballAvailability
+  }
+  setCachedSportsIdentityBackfill(backfillGroup, footballResolution)
+  const cachedBackfill = getCachedSportsIdentityBackfill(backfillGroup)
+  assert.equal(cachedBackfill?.canonicalId, barcaId, 'background sports identity backfill cache should replay resolved canonical ids')
+  clearSportsIdentityBackfillState()
 
   const mmaResolution = await resolveSportsMetaIdentity(
     client,

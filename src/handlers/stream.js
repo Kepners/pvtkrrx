@@ -21,10 +21,12 @@ const { isCompletedTorrent } = require('../utils/torrentState')
 const { fetchTorrentPayload, inspectTorrentPayload } = require('../utils/torrentPayload')
 const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
 const { applyHostedServiceOverrides } = require('../utils/hostedServiceOverrides')
+const { getMappedLeagueEntry } = require('../utils/leagueMap')
 
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '7000', 10))
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '5000', 10))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '20', 10))
+const STREAM_SPORTS_MAX_SEARCH_QUERIES = Math.max(4, parseInt(process.env.PVTKRRX_STREAM_SPORTS_MAX_SEARCH_QUERIES || '12', 10))
 const TRACKER_LINK_INSPECTION_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_TIMEOUT_MS || '4000', 10))
 const TRACKER_LINK_INSPECTION_CACHE_MS = Math.max(60 * 1000, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_CACHE_MS || String(10 * 60 * 1000), 10))
 
@@ -615,6 +617,11 @@ function buildCustomSearchQueries(info = {}) {
   const sport = String(info.r || '').trim()
   const homeTeam = String(info.o || '').trim()
   const awayTeam = String(info.w || '').trim()
+  const eventDate = extractSportsDate(info.e || info.p || '', info.p || '')
+  const eventYear = eventDate ? eventDate.slice(0, 4) : ''
+  const eventDayMonth = eventDate
+    ? `${eventDate.slice(8, 10)} ${eventDate.slice(5, 7)}`
+    : ''
 
   add(info.t)
   add(displayName)
@@ -622,11 +629,46 @@ function buildCustomSearchQueries(info = {}) {
   if (sport && displayName) add(`${sport} ${displayName}`)
   if (homeTeam && awayTeam) {
     const matchup = `${homeTeam} vs ${awayTeam}`
+    const flatMatchup = `${homeTeam} ${awayTeam}`
     add(matchup)
     if (league) add(`${league} ${matchup}`)
+    for (const leagueAlias of buildSportsLeagueSearchAliases(league)) {
+      add(`${leagueAlias} ${matchup}`)
+      add(`${leagueAlias} ${flatMatchup}`)
+      if (eventYear) {
+        add(`${leagueAlias} ${eventYear} ${matchup}`)
+        add(`${leagueAlias} ${eventYear} ${flatMatchup}`)
+      }
+      if (eventYear && eventDayMonth) {
+        add(`${leagueAlias} ${eventYear} ${matchup} ${eventDayMonth}`)
+        add(`${leagueAlias} ${eventYear} ${flatMatchup} ${eventDayMonth}`)
+      }
+    }
   }
 
-  return queries
+  return queries.slice(0, STREAM_SPORTS_MAX_SEARCH_QUERIES)
+}
+
+function buildSportsLeagueSearchAliases(league = '') {
+  const raw = String(league || '').trim()
+  if (!raw) return []
+  const entry = getMappedLeagueEntry(raw)
+  const values = [
+    raw,
+    entry?.name,
+    entry?.code,
+    ...(Array.isArray(entry?.aliases) ? entry.aliases : [])
+  ]
+  const seen = new Set()
+  const aliases = []
+  for (const value of values) {
+    const normalized = normalizeSearchQuery(value)
+    const key = normalized.toLowerCase()
+    if (!normalized || seen.has(key)) continue
+    seen.add(key)
+    aliases.push(normalized)
+  }
+  return aliases
 }
 
 async function loadSportsMetaInfo(config = {}, id = '') {

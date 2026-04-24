@@ -66,6 +66,7 @@ The shared Contabo VM does not make them the same product.
   - keep the tracker row visible if it is available
   - keep fallback naming/art conservative
   - do not assign a fake canonical event or misleading artwork
+- PVTKRRX may retry missed identity enrichment in a short-lived, in-process background backfill cache after the catalog response has already been returned. That cache stores SportsMeta resolution outcomes only; it does not make PVTKRRX an artwork database owner and it does not create sports rows without Prowlarr availability.
 - Any configured Prowlarr indexer can create catalog and stream availability when the returned title passes PVTKRRX's sports filters.
   Category `5060` searches remain the first pass; sparse exact stream searches can also use a broad Prowlarr fallback so sports releases filed under general TV categories are not hidden.
 
