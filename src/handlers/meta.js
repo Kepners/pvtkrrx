@@ -72,8 +72,9 @@ async function loadCanonicalSportsMeta(config = {}, canonicalId = '') {
   }
 }
 
-function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, config = {}) {
+function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, config = {}, requestedType = '') {
   const canonicalEvent = canonical?.event || {}
+  const metaType = String(requestedType || canonicalEvent?.type || 'sports').trim() || 'sports'
   const sportHint = resolveSportHint({
     explicitHint: canonicalEvent?.sport,
     title: canonicalEvent?.title || canonicalEvent?.name
@@ -96,7 +97,7 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, 
   const logo = String(logoResolved || '').trim() || BRAND_LOGO
   const meta = {
     id: requestedId,
-    type: String(canonicalEvent?.type || 'movie').trim() || 'movie',
+    type: metaType,
     name: displayTitle,
     description: String(canonicalEvent?.description || '').trim(),
     poster,
@@ -123,7 +124,7 @@ async function handleMeta(config, type, id, context = {}) {
     if (id.startsWith('sportsmeta:')) {
       const canonical = await loadCanonicalSportsMeta(config, id)
       if (canonical) {
-        return buildCanonicalSportsMetaResponse(canonical, id, baseUrl, config)
+        return buildCanonicalSportsMetaResponse(canonical, id, baseUrl, config, type)
       }
     }
 

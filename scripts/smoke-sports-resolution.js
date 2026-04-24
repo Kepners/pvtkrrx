@@ -1,6 +1,7 @@
 const assert = require('node:assert/strict')
 
 const { SportsMetaClient } = require('../src/clients/sportsmeta')
+const { handleMeta } = require('../src/handlers/meta')
 const {
   SPORTS_META_RESOLUTION_STATUS,
   resolveSportsMetaIdentity
@@ -200,6 +201,14 @@ async function run() {
   assert.equal(fetchCounts.get(`https://sportsmeta.test/event/${encodeURIComponent(barcaId)}`) || 0, 1, 'football fallback search should cache repeated canonical event fetches')
   assert.equal(fetchCounts.get(`https://sportsmeta.test/event/${encodeURIComponent(barcaOtherId)}`) || 0, 0, 'football fallback search should skip mismatched-date candidates before fetching canonical events')
   assert.equal(fetchCounts.get(`https://sportsmeta.test/event/${encodeURIComponent(barcaWomenId)}`) || 0, 0, 'football fallback search should not walk unrelated same-term candidates')
+
+  const sportsMetaResponse = await handleMeta(
+    { sportsmetaBaseUrl: 'https://sportsmeta.test' },
+    'sports',
+    barcaId,
+    { baseUrl: 'https://addon.test' }
+  )
+  assert.equal(sportsMetaResponse.meta?.type, 'sports', 'canonical SportsMeta rows requested on the sports surface must return meta.type=sports')
 
   const mmaResolution = await resolveSportsMetaIdentity(
     client,

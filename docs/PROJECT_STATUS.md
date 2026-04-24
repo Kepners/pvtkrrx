@@ -6,6 +6,26 @@ Updated: 2026-04-24
 
 PVTKRRX is in a working `1.1.35` state on the main Windows/local and self-host route set, with the remaining sports catalog reliability failure materially reduced by a portable repo/runtime fix.
 
+## 2026-04-24: Contabo self-host canonical sports meta type hotfix
+
+- New live regression reproduced on the Contabo self-host route after installer and manifest success: canonical sports catalog rows were emitted as Stremio `type: "sports"`, but the canonical `sportsmeta:event:` meta branch returned `meta.type: "movie"` because it inherited SportsMeta's internal event type.
+- Exact failing row traced before the fix:
+  - catalog: `GET https://pvt.kepners.co.uk/selfhost/catalog/sports/pvtkrrx-sports.json?mode=hosted`
+  - id: `sportsmeta:event:basketball|2026-04-23|nba|atlanta-hawks|new-york-knicks`
+  - catalog type: `sports`
+  - meta: `GET https://pvt.kepners.co.uk/selfhost/meta/sports/sportsmeta%3Aevent%3Abasketball%7C2026-04-23%7Cnba%7Catlanta-hawks%7Cnew-york-knicks.json?mode=hosted`
+  - pre-fix meta response returned `meta.type: "movie"`, which mismatched the requested Stremio sports surface.
+- Fixed `src/handlers/meta.js` so canonical SportsMeta meta responses preserve the requested route type, while keeping the canonical id, name, description, and artwork path unchanged.
+- Added a regression assertion to `scripts/smoke-sports-resolution.js` proving a SportsMeta payload with internal `event.type: "movie"` still returns `meta.type: "sports"` when requested through the PVTKRRX sports surface.
+- Deployed the one-file runtime hotfix to `/opt/pvtkrrx/src/handlers/meta.js`, backed up the previous live file under `/opt/pvtkrrx-backups/20260424-202150-meta-type-hotfix/`, and restarted `pvtkrrx.service`.
+- Post-fix live proof on the same Contabo route:
+  - same catalog row still exists with `type: "sports"`
+  - same meta URL returns `200 application/json` with `meta.type: "sports"`
+  - canonical poster proxy returns `200 image/png`
+- Local guard checks passed:
+  - `npm run smoke:sports-resolution`
+  - `npm run smoke:selfhost`
+
 ## 2026-04-24: Portable sports catalog reliability fix
 
 - Reproduced the remaining runtime failure on the supported product surfaces before changing code:
