@@ -38,7 +38,7 @@ PVTKRRX connects private tracker and seedbox infrastructure to Stremio without u
 2. Route-first configure UI with advanced/manual tabs hidden by default.
 3. Local config save for the host-PC runtime.
 4. Hosted token encryption for non-local installs.
-5. Sports catalog with SportsMeta-backed sports identity resolution plus SportsMeta-owned canonical and default SVG artwork URLs.
+5. Sports catalog with SportsMeta-backed sports identity resolution plus client-safe PVTKRRX `/sports-artwork/...png` URLs backed by SportsMeta-owned canonical and default public artwork routes.
 6. Movie and TV stream resolution using Prowlarr/Torznab-compatible search plus Cinemeta metadata assistance.
 7. Seedbox library browsing from qBittorrent state.
 8. Built-in `/file` serving with range support when the host can read the file locally.

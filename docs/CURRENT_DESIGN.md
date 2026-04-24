@@ -62,10 +62,10 @@ Canonical product truth (verified 2026-04-23):
 
 - The stack is two coordinated services in one PVTKRRX product family. They are co-owned, co-hosted on Contabo, and deliberately designed to work together, but they are not one binary and not one addon.
 - **PVTKRRX** is the Stremio-facing stream addon at `https://www.pvtkrrx.cc` and on the Windows desktop runtime. It owns install routes (`PC Local`, `LAN Bridge`, `Remote Seedbox`), catalog emission, `/file`, `/playback`, qBittorrent/Prowlarr integration, and stream attachment.
-- **SportsMeta** is the sports identity and artwork service at `https://sportsmeta.pvtkrrx.cc`. It owns the canonical `sportsmeta:` id space, sports resolution, the SQLite DB, the asset cache, public SVG asset routes, member-token routes, and Stripe billing.
-- PVTKRRX consumes only the public SportsMeta asset routes for every user: `https://sportsmeta.pvtkrrx.cc/asset/{variant}/{sportsmeta:event:...}` for resolved events and `https://sportsmeta.pvtkrrx.cc/asset/default/{variant}/{sport}?league=...` for unresolved fallbacks. Both return themed SVG on the public surface today. SportsMeta now attaches `X-SportsMeta-Asset-Class`, `X-SportsMeta-Entitlement`, `X-SportsMeta-Source`, and `X-SportsMeta-Gated` response headers on every asset route; PVTKRRX responses inherit `asset-class = default-svg` or `public-canonical-svg` because PVTKRRX only calls the public routes.
+- **SportsMeta** is the sports identity and artwork service at `https://sportsmeta.pvtkrrx.cc`. It owns the canonical `sportsmeta:` id space, sports resolution, the SQLite DB, the asset cache, public asset routes, member-token routes, and Stripe billing.
+- PVTKRRX still consumes only the public SportsMeta asset routes upstream for every user: `https://sportsmeta.pvtkrrx.cc/asset/{variant}/{sportsmeta:event:...}` for resolved events and `https://sportsmeta.pvtkrrx.cc/asset/default/{variant}/{sport}?league=...` for unresolved fallbacks. Those upstream public routes still return themed SVG today. The PVTKRRX addon surface no longer hands those raw SVG URLs to Stremio directly; it now emits `/sports-artwork/id/...png` and `/sports-artwork/default/...png` URLs on the active addon origin, and those proxy routes fetch the public SportsMeta asset surface and rasterize it to PNG. SportsMeta still attaches `X-SportsMeta-Asset-Class`, `X-SportsMeta-Entitlement`, `X-SportsMeta-Source`, and `X-SportsMeta-Gated` response headers on every upstream asset route.
 - SportsMeta now exposes `/proof` and `/member/:token/proof` as the truthful artwork proof surfaces. Those pages prove the actual asset class, content type, entitlement state, and route visibility on the SportsMeta side. They do not change the PVTKRRX runtime contract.
-- **Every PVTKRRX user — free, unconfigured, desktop, hosted, self-host — gets the same SportsMeta SVG artwork.** There is no user-entitlement branch inside PVTKRRX. `requireConfigSubscription` in `src/lib/shared.js` is a pass-through middleware, `package.json` has no billing dependency, and `src/utils/sportsArtwork.js` branches on whether a canonical id is known, not on who the user is.
+- **Every PVTKRRX user — free, unconfigured, desktop, hosted, self-host — gets the same public SportsMeta artwork, now delivered as client-safe PNG proxy URLs on the PVTKRRX addon origin.** There is no user-entitlement branch inside PVTKRRX. `requireConfigSubscription` in `src/lib/shared.js` is a pass-through middleware, `package.json` has no billing dependency, and `src/utils/sportsArtwork.js` branches on whether a canonical id is known, not on who the user is.
 - Real poster/background/logo raster artwork plus the full member lookup routes (`/resolve`, `/event`, `/event/:id/assets`) are a separate SportsMeta `Plus` / `Pro` product on the SportsMeta pricing page (`https://sportsmeta.pvtkrrx.cc/pricing`). The paid half of the stack is live on SportsMeta, not inside PVTKRRX: verified on 2026-04-23, the pricing page exposes paid plan actions, `POST /billing/checkout` returns a live Stripe Checkout session, and valid member routes return premium member-scoped URLs and raster artwork. PVTKRRX does not mint, forward, or consume those member tokens today.
 - So the product-level statement "SVG for everyone, real posters for paying customers" is a **stack-level truth that runs through two separate Stremio addons**, not a free/paid split inside PVTKRRX. Any doc, copy, or UI that implies PVTKRRX has an internal paid artwork tier is drift and should be read as historical intent.
 - If SportsMeta billing state changes, PVTKRRX behavior does not change. PVTKRRX stream routes are free on every install surface tested here.
@@ -77,13 +77,13 @@ SportsMeta is now the separate metadata/artwork product boundary.
 - live host: `https://sportsmeta.pvtkrrx.cc`
 - live service: `sportsmeta.service`
 - SportsMeta owns canonical `sportsmeta:` ids, metadata routes, artwork routes, member-token routes, and billing
-- SportsMeta owns paid TheSportsDB usage plus the default/free sport poster/background/logo SVG routes
+- SportsMeta owns paid TheSportsDB usage plus the public upstream sport poster/background/logo routes that PVTKRRX rasterizes for client-safe delivery
 - PVTKRRX stays the separate stream addon and only consumes canonical `sportsmeta:event:` ids on resolved sports rows
 - the old integrated `/sportsmeta/*` draft inside this repo, the embedded `SportsDbClient`, the `sports-image-cache/` runtime directory, `sportsdb-poster-cache.json`, the `/thumb/sports/...` + `/image/sports/...` PVTKRRX-generated artwork routes, and the `PVTKRRX_EXPERIMENTAL_INTERNAL_SPORTSMETA` escape hatch were all removed on 2026-04-22; any remaining request to those paths returns `HTTP 410 Gone`
 - for every sports availability group the catalog now resolves against SportsMeta and emits:
   - a canonical `sportsmeta:event:...` id when SportsMeta resolves the tracker item to one event, or
-  - a `pvtkrrx:...` custom id when resolution fails, paired with SportsMeta's default-sport poster URL (`https://sportsmeta.pvtkrrx.cc/asset/default/{variant}/{sport}?league=...`) so the Stremio surface never shows a raw placeholder for a real fixture
-- PVTKRRX meta (`handleMeta`) proxies `sportsmeta:event:` ids straight to SportsMeta for canonical event detail and asset URLs; `pvtkrrx:sports:...` ids build the same SportsMeta default-asset URLs from the encoded sport/league hints, so there is a single authoritative source of sports artwork
+  - a `pvtkrrx:...` custom id when resolution fails, paired with a PVTKRRX `/sports-artwork/default/...png` proxy URL backed by SportsMeta's default upstream asset surface so the Stremio surface never shows a raw placeholder for a real fixture
+- PVTKRRX meta (`handleMeta`) still loads canonical event detail from SportsMeta for `sportsmeta:event:` ids, and both canonical plus fallback branches now build the same PVTKRRX `/sports-artwork/...png` URLs from the encoded sport/league hints, so there is a single authoritative upstream source of sports artwork plus a client-safe addon-facing transport
 
 Shared Contabo hosting still exists:
 
@@ -184,14 +184,14 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
   - `backgroundImage`
   - `logo`
 - Sports catalog artwork now follows a SportsMeta-owned event contract instead of PVTKRRX-generated league cards:
-  - resolved sports rows use SportsMeta canonical `/asset/{variant}/{sportsmeta:event:...}` URLs
-  - unresolved sports rows use SportsMeta default `/asset/default/{variant}/{sport}?league=...` URLs
+  - resolved sports rows use PVTKRRX `/sports-artwork/id/{variant}/{sportsmeta:event:...}.png` URLs backed by the public SportsMeta canonical asset route
+  - unresolved sports rows use PVTKRRX `/sports-artwork/default/{variant}/{sport}.png?league=...` URLs backed by the public SportsMeta default asset route
 - `backgroundImage` and `logo` stay separate from the portrait poster contract, but SportsMeta now owns those decisions too.
 - When Prowlarr has no indexers or cannot be reached, empty movie, TV, and sports catalogs now return a setup-needed placeholder card instead of a blank grid, so the user gets a useful recovery cue in Stremio.
 - PVTKRRX no longer generates its own live sports poster/background cards and no longer maintains a local TheSportsDB cache or sports poster package path.
 - Licensed real imagery remains SportsMeta-owned on its own paid/member routes instead of being surfaced directly from the free PVTKRRX catalog/meta path.
 - `npm run server:setup` and `npm run server:install-service` now treat SportsMeta as the sports metadata/artwork dependency; they do not prompt for a TheSportsDB key or local sports poster package path anymore.
-- Legacy `/image/sports/...` request handling and the old 15-minute sports-cache autofill job were removed from the live runtime; clients should consume SportsMeta asset URLs directly.
+- Legacy `/image/sports/...` request handling and the old 15-minute sports-cache autofill job were removed from the live runtime; clients should consume the current PVTKRRX `/sports-artwork/...png` proxy URLs, which in turn consume SportsMeta upstream.
 - The old `sports-image-cache/` runtime store is historical, not part of the live SportsMeta-owned sports path.
 - Sports catalog inclusion is availability-driven:
   - SportsCult / Prowlarr decides whether a row exists at all.

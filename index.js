@@ -104,6 +104,16 @@ app.use(express.json({
   }
 }))
 
+function getSportsArtworkBaseUrl(req) {
+  const requestBaseUrl = getPublicBaseUrl(req)
+  const configAlias = String(req.params?.config || '').trim().toLowerCase()
+  const relayBase = normalizeRelayUrl(req.config?.lanPairRelayUrl || '')
+  if (configAlias === 'local' && !isSameHostRequest(req) && relayBase) {
+    return relayBase
+  }
+  return requestBaseUrl
+}
+
 // ─── CORS ───────────────────────────────────────────────────
 app.use((req, res, next) => {
   const sensitiveCorsRoute = isSensitiveCorsRoute(req)
@@ -955,6 +965,34 @@ app.get([
   '/image/sports/:variant/:token'
 ], (_req, res) => {
   res.status(410).send('pvtkrrx sports artwork moved to sportsmeta.pvtkrrx.cc')
+})
+
+// Sports artwork raster proxy. SportsMeta returns image/svg+xml for every
+// asset URL and Stremio mobile/tablet clients do not render SVG posters, so
+// PVTKRRX fetches the SVG and rasterizes it to PNG per variant. Keeps the
+// emitted poster/background/logo URLs on the same public host as the catalog
+// and meta responses.
+const {
+  handleDefaultSportsArtwork,
+  handleCanonicalSportsArtwork
+} = require('./src/handlers/sportsArtworkProxy')
+
+app.get('/sports-artwork/default/:variant/:sport', async (req, res) => {
+  try {
+    await handleDefaultSportsArtwork(req, res, {})
+  } catch (err) {
+    console.warn(`[sports-artwork] default handler error: ${err.message}`)
+    if (!res.headersSent) res.status(502).type('text/plain').send('sports artwork error')
+  }
+})
+
+app.get('/sports-artwork/id/:variant/:canonicalId', async (req, res) => {
+  try {
+    await handleCanonicalSportsArtwork(req, res, {})
+  } catch (err) {
+    console.warn(`[sports-artwork] canonical handler error: ${err.message}`)
+    if (!res.headersSent) res.status(502).type('text/plain').send('sports artwork error')
+  }
 })
 
 // ─── POST /encrypt — server-side config encryption ─────────
@@ -1879,7 +1917,7 @@ app.get('/manifest.json', (req, res) => {
 app.get('/catalog/:type/:id.json', withLegacyRootLocalConfig, requireConfigSubscription, async (req, res) => {
   console.warn(`[stremio] compat root catalog type=${req.params.type} id=${req.params.id} from=${requestClientLabel(req)} -> /local`)
   const result = await handleCatalog(req.config, req.params.type, req.params.id, null, {
-    baseUrl: getPublicBaseUrl(req)
+    baseUrl: getSportsArtworkBaseUrl(req)
   })
   console.log(`[stremio] compat root catalog result type=${req.params.type} id=${req.params.id} metas=${result?.metas?.length || 0}`)
   const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
@@ -1894,7 +1932,7 @@ app.get('/catalog/:type/:id.json', withLegacyRootLocalConfig, requireConfigSubsc
 app.get('/catalog/:type/:id/:extra.json', withLegacyRootLocalConfig, requireConfigSubscription, async (req, res) => {
   console.warn(`[stremio] compat root catalog type=${req.params.type} id=${req.params.id} extra=${req.params.extra} from=${requestClientLabel(req)} -> /local`)
   const result = await handleCatalog(req.config, req.params.type, req.params.id, req.params.extra, {
-    baseUrl: getPublicBaseUrl(req)
+    baseUrl: getSportsArtworkBaseUrl(req)
   })
   console.log(`[stremio] compat root catalog result type=${req.params.type} id=${req.params.id} metas=${result?.metas?.length || 0}`)
   const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
@@ -1920,7 +1958,7 @@ app.get('/stream/:type/:id.json', withLegacyRootLocalConfig, requireConfigSubscr
 app.get('/meta/:type/:id.json', withLegacyRootLocalConfig, requireConfigSubscription, async (req, res) => {
   console.warn(`[stremio] compat root meta type=${req.params.type} id=${req.params.id} from=${requestClientLabel(req)} -> /local`)
   const result = await handleMeta(req.config, req.params.type, req.params.id, {
-    baseUrl: getPublicBaseUrl(req)
+    baseUrl: getSportsArtworkBaseUrl(req)
   })
   applyHostedRouteCacheHeaders(req, res, 0, {
     sMaxAge: 300,
@@ -1933,7 +1971,7 @@ app.get('/meta/:type/:id.json', withLegacyRootLocalConfig, requireConfigSubscrip
 app.get('/:config/catalog/:type/:id.json', withConfig, requireConfigSubscription, maybeLanPairRedirect('catalog'), async (req, res) => {
   console.log(`[stremio] ← catalog   type=${req.params.type} id=${req.params.id} from=${req.ip || req.socket?.remoteAddress || '?'}`)
   const result = await handleCatalog(req.config, req.params.type, req.params.id, null, {
-    baseUrl: getPublicBaseUrl(req)
+    baseUrl: getSportsArtworkBaseUrl(req)
   })
   console.log(`[stremio] → catalog   type=${req.params.type} id=${req.params.id} metas=${result?.metas?.length || 0}`)
   const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
@@ -1948,7 +1986,7 @@ app.get('/:config/catalog/:type/:id.json', withConfig, requireConfigSubscription
 app.get('/:config/catalog/:type/:id/:extra.json', withConfig, requireConfigSubscription, maybeLanPairRedirect('catalog'), async (req, res) => {
   console.log(`[stremio] ← catalog   type=${req.params.type} id=${req.params.id} extra=${req.params.extra} from=${req.ip || req.socket?.remoteAddress || '?'}`)
   const result = await handleCatalog(req.config, req.params.type, req.params.id, req.params.extra, {
-    baseUrl: getPublicBaseUrl(req)
+    baseUrl: getSportsArtworkBaseUrl(req)
   })
   console.log(`[stremio] → catalog   type=${req.params.type} id=${req.params.id} metas=${result?.metas?.length || 0}`)
   const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
@@ -1974,7 +2012,7 @@ app.get('/:config/stream/:type/:id.json', withConfig, requireConfigSubscription,
 app.get('/:config/meta/:type/:id.json', withConfig, requireConfigSubscription, maybeLanPairRedirect('meta'), async (req, res) => {
   console.log(`[stremio] ← meta     type=${req.params.type} id=${req.params.id} from=${req.ip || req.socket?.remoteAddress || '?'}`)
   const result = await handleMeta(req.config, req.params.type, req.params.id, {
-    baseUrl: getPublicBaseUrl(req)
+    baseUrl: getSportsArtworkBaseUrl(req)
   })
   applyHostedRouteCacheHeaders(req, res, 0, {
     sMaxAge: 300,

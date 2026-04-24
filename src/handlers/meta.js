@@ -82,6 +82,7 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, 
   const eventDate = String(canonicalEvent?.date || '').trim()
   const displayTitle = String(canonicalEvent?.name || canonicalEvent?.title || requestedId).trim() || requestedId
   const artworkInput = {
+    baseUrl: String(baseUrl || '').replace(/\/+$/, ''),
     sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
     canonicalId: String(canonicalEvent?.id || canonical?.canonicalId || requestedId || '').trim(),
     sportHint,
@@ -218,6 +219,7 @@ async function handleCustomMeta(config, id, context = {}) {
   const eventName = String(canonicalEvent?.title || canonicalEvent?.name || sportsArtwork?.eventName || '').trim()
 
   const artworkInput = {
+    baseUrl: String(baseUrl || '').replace(/\/+$/, ''),
     sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
     canonicalId: canonicalId && resolutionStatus === 'resolved' ? canonicalId : '',
     sportHint: resolvedSportHint,

@@ -841,7 +841,7 @@ async function handleCatalog(config, type, id, extraStr, context = {}) {
     }
     const sportsCatalogDefinition = findSportsDiscoveryCatalog(id)
     if (sportsCatalogDefinition) {
-      return await sportsCatalog(effectiveConfig, extra, opts, type, sportsCatalogDefinition)
+      return await sportsCatalog(effectiveConfig, extra, opts, type, sportsCatalogDefinition, { baseUrl: opts.baseUrl })
     }
 
     switch (id) {
@@ -860,7 +860,8 @@ async function handleCatalog(config, type, id, extraStr, context = {}) {
   }
 }
 
-async function sportsCatalog(config, extra, options = {}, catalogType = 'movie', catalogDefinition = null) {
+async function sportsCatalog(config, extra, options = {}, catalogType = 'movie', catalogDefinition = null, context = {}) {
+  const addonBaseUrl = String(context?.baseUrl || options?.baseUrl || '').replace(/\/+$/, '')
   const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
   const sportsMeta = new SportsMetaClient({
     baseUrl: config?.sportsmetaBaseUrl
@@ -996,6 +997,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
 
     const canonicalCatalogIdForArtwork = String(sportsMetaResolution?.canonicalId || '').trim()
     const artworkInput = {
+      baseUrl: addonBaseUrl,
       sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
       canonicalId: sportsMetaResolution?.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED
         ? canonicalCatalogIdForArtwork
