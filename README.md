@@ -53,7 +53,7 @@ See [docs/LAN_BRIDGE_PROCESS.md](docs/LAN_BRIDGE_PROCESS.md) for the legacy/manu
 | Feature | Status |
 |---------|--------|
 | Sports discovery catalogs (All Sports, Football, Motorsport, MMA, etc.) | Working |
-| Sports artwork enrichment | Working. PVTKRRX always serves the free public SportsMeta asset routes (themed SVG — canonical when the event resolves, default when it doesn't), for every user, with no in-addon free/paid split. Real poster/background/logo artwork is sold by the separate SportsMeta member install (`Plus` / `Pro` tiers at `https://sportsmeta.pvtkrrx.cc/pricing`) and is delivered there, not inside PVTKRRX. |
+| Sports artwork enrichment | Working. PVTKRRX always serves the free public SportsMeta asset routes (themed SVG — canonical when the event resolves, default when it doesn't), for every user, with no in-addon free/paid split. Real poster/background/logo artwork is sold by the separate SportsMeta member install (`Plus` / `Pro` tiers at `https://sportsmeta.pvtkrrx.cc/pricing`) and is delivered there, not inside PVTKRRX. SportsMeta now exposes `/proof` and `/member/:token/proof` so the actual asset class and entitlement path can be verified directly on the SportsMeta side. |
 | Movie/TV streams from private trackers | Working |
 | Sports contamination filter | Working (SportsCult excluded from movie searches) |
 | Already-downloaded files | Working (built-in file server with Range support) |
