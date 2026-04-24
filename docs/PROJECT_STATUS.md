@@ -4,7 +4,22 @@ Updated: 2026-04-24
 
 ## Current Stage
 
-PVTKRRX is in a working `1.1.35` state on the main Windows/local and self-host route set, with the remaining sports catalog reliability failure materially reduced by a portable repo/runtime fix.
+PVTKRRX is in a working `1.1.38` state on the main Windows/local and self-host route set. The current sports search contract is that any configured Prowlarr indexer can supply sports catalog and stream availability when the result passes the existing sports filters; SportsCult is no longer the only accepted tracker source.
+
+## 2026-04-24: Sports tracker broad-search release
+
+- Reproduced the user-facing MotoGP/Jerez failure against the live Contabo seedbox before changing release state: Prowlarr category `5060` returned only one `SportsCult` result, while a broad Prowlarr search returned the same event from `SportsCult`, `TorrentLeech`, and `Torrenting`.
+- Updated the sports catalog path so accepted sports availability can come from any configured Prowlarr indexer, not just `SportsCult`.
+- Updated the sports stream path so sparse sports-category lookups fall back to a broad Prowlarr search, merge unique results, and keep the existing packed/unverified torrent suppression.
+- Deployed the hotfix to `/opt/pvtkrrx` on the Contabo self-host runtime and re-proved the same MotoGP/Jerez stream route returns three tracker rows: `SportsCult`, `TorrentLeech`, and `Torrenting`.
+- Cut release `1.1.38` for the Windows EXE line and self-host update line so installed seedboxes can update from the published GitHub release.
+- Local release checks passed:
+  - `npm run smoke:pipeline`
+  - `npm run smoke:sports-catalog-seeds`
+  - `npm run smoke:sports-resolution`
+  - `npm run smoke:selfhost`
+  - `npm run smoke:config`
+  - `npm run dist:win`
 
 ## 2026-04-24: Contabo self-host canonical sports meta type hotfix
 
