@@ -1,8 +1,4 @@
 const DEFAULT_PAIR_RELAY_URL = 'https://www.pvtkrrx.cc'
-const LEGACY_PAIR_RELAY_HOSTS = new Set([
-  'pvtkrrx.vercel.app',
-  'www.pvtkrrx.vercel.app'
-])
 
 function normalizeBaseUrl(input) {
   return String(input || '').trim().replace(/\/+$/, '')
@@ -14,9 +10,6 @@ function normalizeCandidateRelayUrl(input) {
   try {
     const parsed = new URL(raw)
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return ''
-    if (LEGACY_PAIR_RELAY_HOSTS.has(String(parsed.host || '').toLowerCase())) {
-      return DEFAULT_PAIR_RELAY_URL
-    }
     return `${parsed.protocol}//${parsed.host}`
   } catch (_) {
     return ''

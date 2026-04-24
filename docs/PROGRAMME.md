@@ -13,7 +13,7 @@ Keep it as project history; do not treat it as the live implementation map for t
 
 ## Executive Summary
 
-PVTKRRX is built in 5 phases following the clockrr pattern (Express + stremio-addon-sdk hybrid on Vercel). Phase 0 lays the foundation (project scaffold, encryption, manifest). Phases 1-2 build the core clients and handlers. Phase 3 integrates everything into the Express/SDK entry point with the config page. Phase 4 is deploy and verify. Sports catalog is prioritised throughout per MD Directive #1.
+PVTKRRX was originally planned in 5 phases following the clockrr pattern (Express + stremio-addon-sdk hybrid on a hosted Express runtime). Phase 0 lays the foundation (project scaffold, encryption, manifest). Phases 1-2 build the core clients and handlers. Phase 3 integrates everything into the Express/SDK entry point with the config page. Phase 4 is deploy and verify. Sports catalog is prioritised throughout per MD Directive #1.
 
 ---
 
@@ -25,7 +25,7 @@ PVTKRRX is built in 5 phases following the clockrr pattern (Express + stremio-ad
 |------|-------------|------------|-------------|
 | 0.1 | `package.json` — 3 deps: stremio-addon-sdk, express, fast-xml-parser | None | package.json |
 | 0.2 | `npm install` — lock dependencies | 0.1 | package-lock.json |
-| 0.3 | `vercel.json` — catch-all to index.js | None | vercel.json |
+| 0.3 | Hosted catch-all routing to `index.js` | None | routing config |
 | 0.4 | `src/utils/crypto.js` — AES-256-GCM encrypt/decrypt, SHA-256 key derivation from ENCRYPTION_SECRET | None | crypto.js |
 | 0.5 | `src/config/manifest.js` — Stremio manifest with 4 catalogs (sports, movies, TV, library), configurable + configurationRequired. Sports catalog MUST declare `extra` with genre options (Football, F1, UFC, NBA, Cricket, Rugby, Tennis), search, and skip fields. | None | manifest.js |
 | 0.6 | `src/config/categories.js` — Torznab category constants (5060 sports, 2000 movies, 5000 TV, etc.) | None | categories.js |
@@ -84,19 +84,19 @@ PVTKRRX is built in 5 phases following the clockrr pattern (Express + stremio-ad
 
 ## Phase 4: Deploy & Verify (Half Day)
 
-**Goal:** Live on Vercel. Working with real Stremio client. All acceptance criteria met.
+**Goal:** Live on the public hosted runtime. Working with real Stremio client. All acceptance criteria met.
 
 | Task | Description | Depends On | Deliverable |
 |------|-------------|------------|-------------|
-| 4.1 | Set `ENCRYPTION_SECRET` env var in Vercel dashboard | None | Env var configured |
-| 4.2 | Deploy via `npx vercel --prod` or git push | All Phase 3 | Live at pvtkrrx.vercel.app |
+| 4.1 | Set `ENCRYPTION_SECRET` env var in the active host environment | None | Env var configured |
+| 4.2 | Deploy through the configured host | All Phase 3 | Live at www.pvtkrrx.cc |
 | 4.3 | Verify: config page at `/configure` | 4.2 | Working config page |
 | 4.4 | Verify: install addon in Stremio desktop | 4.3 | Addon installed |
 | 4.5 | Verify: Sports catalog loads results | 4.4 | Sports browsing works |
 | 4.6 | Verify: Movies/TV search returns streams | 4.4 | IMDb matching works |
 | 4.7 | Verify: Library shows downloaded content | 4.4 | qBit integration works |
 | 4.8 | Verify: Click stream → playback works (both on-seedbox and Comet pattern) | 4.4 | End-to-end playback |
-| 4.9 | Verify: Vercel stays within 10s timeout | 4.2 | No timeout errors |
+| 4.9 | Verify: hosted runtime stays within the configured timeout budget | 4.2 | No timeout errors |
 | 4.10 | Write README.md with install instructions | 4.8 | Documentation |
 
 **Checkpoint:** All 10 acceptance criteria from SCOPE_OF_WORKS.md pass.
@@ -131,7 +131,7 @@ Phase 4 (Deploy & Verify) — needs everything
 
 ```
  1. package.json
- 2. vercel.json
+ 2. hosted routing config
  3. src/config/categories.js
  4. src/config/providers.js
  5. src/utils/crypto.js
@@ -158,7 +158,7 @@ Phase 4 (Deploy & Verify) — needs everything
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
 | Torznab XML varies by indexer | Medium | High | Defensive parsing with try/catch, test against multiple Jackett indexers |
-| Vercel 10s timeout hit on slow trackers | Medium | High | Jackett `&timeout=6`, AbortController at 7s, `Promise.allSettled()` partial results |
+| Hosted runtime timeout hit on slow trackers | Medium | High | Jackett `&timeout=6`, AbortController at 7s, `Promise.allSettled()` partial results |
 | qBit WebUI API version differences | Low | Medium | Use v2 API only (standard since qBit 4.1), fail gracefully on unknown responses |
 | Sports content has no IMDb IDs | Certain | Medium | Custom ID scheme (pvtkrrx- prefix + base64url encoded info), meta handler decodes |
 | Configure page tested only in Chrome | Medium | Low | Standard HTML/CSS/JS, no framework, should work everywhere |

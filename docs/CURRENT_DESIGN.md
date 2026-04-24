@@ -12,6 +12,7 @@ If another document disagrees with this file, this file wins unless that documen
 PVTKRRX is one codebase with three active runtime pieces:
 
 1. Optional hosted relay on the public site (`https://www.pvtkrrx.cc` today, fronted by Caddy into the live hosted Express runtime, currently the Contabo Coolify app alias `pvtkrrx:3000`):
+   - should run with `PVTKRRX_HOSTED_RELAY=true` so public hosted routes stay guide/token/ready-file-first and do not serve local-only `/file` or `/playback`
    - serves hosted manifests plus the public guide pages
    - serves `/version-status.json` so the public site can compare the live build against the latest GitHub release
    - encrypts hosted config tokens
@@ -142,7 +143,6 @@ Verified on 2026-04-08:
 - `https://www.pvtkrrx.cc/sitemap.xml` now includes `/sports`
 - `https://www.pvtkrrx.cc/local/install` returns `403` from the public internet because it is a same-host/local-network helper route
 - `https://www.pvtkrrx.cc/sportsmeta/...` is not a supported public production surface; the integrated draft is disabled by default in this repo
-- `https://pvtkrrx.vercel.app` is not canonical and returned Vercel `DEPLOYMENT_NOT_FOUND`
 - 2026-04-06 homepage verification on the canonical host confirmed the refactored landing page markers are live: `truth-band` and `Where does playback happen` are present, while legacy `meta-grid` and `hero-chip` markers are absent
 
 Contabo runtime note:
@@ -309,7 +309,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 5. Root `/manifest.json` must remain a bootstrap manifest, not a real catalog-bearing route manifest.
 6. Internal notes may still use older wording, but `LAN Bridge` is the intended user-facing name for the synced home-device route.
 7. The repo contains historical planning docs from February 2026; they are useful for project history, not as the live architecture.
-8. Use `https://www.pvtkrrx.cc` as the canonical hosted base; the old `https://pvtkrrx.vercel.app` hostname is not part of the supported install surface.
+8. Use `https://www.pvtkrrx.cc` as the canonical hosted base.
 9. If the goal is to keep PVTKRRX out of the request path after setup, use explicit self-hosted server mode and a user-owned HTTPS origin.
 10. The public website is docs-first and guide-only; private configuration belongs on the Windows host runtime or the user's own self-host server.
 

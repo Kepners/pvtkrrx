@@ -2,13 +2,13 @@ const path = require('path')
 const { hasAccessibleLocalFile } = require('./localStorageRoots')
 const { mapPath, mapAbsolutePath } = require('./pathMapper')
 
-function isVercelRuntime(options = {}) {
-  if (typeof options.isVercelRuntime === 'boolean') return options.isVercelRuntime
-  return Boolean(process.env.VERCEL)
+function isHostedRelayRuntime(options = {}) {
+  if (typeof options.isHostedRelayRuntime === 'boolean') return options.isHostedRelayRuntime
+  return /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_HOSTED_RELAY || '').trim())
 }
 
 function canServePlaybackRoute(configToken, options = {}) {
-  return !isVercelRuntime(options) || String(configToken || '') === 'local'
+  return !isHostedRelayRuntime(options) || String(configToken || '') === 'local'
 }
 
 function requiresExternalFileServerAuth(config = {}) {
@@ -100,7 +100,7 @@ function buildExternalFileUrl(config, torrent, fileName, options = {}) {
 }
 
 function buildPlaybackFileUrl(config, configToken, baseUrl, hash, torrent, fileName, options = {}) {
-  if (isVercelRuntime(options)) {
+  if (isHostedRelayRuntime(options)) {
     return buildExternalFileUrl(config, torrent, fileName, options)
   }
 

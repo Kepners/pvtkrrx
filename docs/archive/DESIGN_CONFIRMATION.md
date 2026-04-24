@@ -51,7 +51,7 @@ Follow the 8-step checklist in section 8:
 5. Config Page (terminal-style form)
 6. Polish (animations, scroll effects, hover states)
 7. Performance (optimize noise.gif, lazy load, Lighthouse >90)
-8. Deploy (Vercel, test, launch)
+8. Deploy (hosted runtime, test, launch)
 
 **Do NOT skip steps.** Each builds on the previous.
 

@@ -21,8 +21,6 @@
 
 ## Verified Public State
 
-- `https://pvtkrrx.vercel.app/` returned `404`
-- Response header included `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`
 - `https://www.pvtkrrx.cc/` returned `200`
 - `https://www.pvtkrrx.cc/configure` returned `200`
 - `https://www.pvtkrrx.cc/runbooks` returned `200`
@@ -32,7 +30,6 @@
 
 Meaning:
 
-- The old `pvtkrrx.vercel.app` hostname is dead and should not be treated as the live product
 - The canonical host is `https://www.pvtkrrx.cc`
 - The public `403` on `/local/install` is expected because that route is local-only
 - The homepage still should not advertise `/local/install` as a public CTA

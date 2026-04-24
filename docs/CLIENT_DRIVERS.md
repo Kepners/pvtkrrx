@@ -33,13 +33,13 @@ Use it for project history, not as the live description of the current route and
 - Movies and TV resolve via IMDb matching through Jackett/Prowlarr
 - Already-downloaded content streams instantly from the user's seedbox
 - Not-yet-downloaded content can be added to qBittorrent from within Stremio
-- Runs free on Vercel Hobby tier
+- Runs free on original zero-cost hosted target
 
 ### Constraints & Preferences
-- Budget: **Zero operational cost** — Vercel Hobby tier, no paid services
+- Budget: **Zero operational cost** — original zero-cost hosted target, no paid services
 - Timeline: **ASAP** — estimated 3-4 days for MVP
 - Technology: **stremio-addon-sdk + Express** — proven pattern from client's clockrr project
-- Hosting: **Vercel** — as specified in the original spec
+- Hosting: **public hosted runtime** — as specified in the original spec
 
 ---
 
@@ -47,7 +47,7 @@ Use it for project history, not as the live description of the current route and
 
 | Decision | Client Choice | Notes |
 |----------|---------------|-------|
-| Platform | Stremio Addon (web-hosted) | Vercel serverless |
+| Platform | Stremio Addon (web-hosted) | hosted Express runtime |
 | Tech stack | stremio-addon-sdk + Express (clockrr pattern) | Client's proven pattern |
 | Distribution | Stremio addon install URL | `stremio://` protocol link from config page |
 | Pricing | Free | Community tool |
@@ -69,7 +69,7 @@ Mr Gurr (Managing Director) issued 5 binding directives:
 | 1 | **Sports catalog is #1 priority** | Unique differentiator vs Torrentio/Jackettio/Comet |
 | 2 | **Zero content proxying is non-negotiable** | ~5-10KB JSON/XML only, video streams direct from seedbox |
 | 3 | **Config page must be dead simple and trustworthy** | Users are handing over seedbox credentials |
-| 4 | **Ship for Vercel Hobby tier with aggressive timeouts** | 10s function limit, 100K invocations/month |
+| 4 | **Ship for original zero-cost hosted target with aggressive timeouts** | 10s function limit, 100K invocations/month |
 | 5 | **Use the clockrr architecture pattern** | Client's proven deployment — lowest risk path |
 
 ---
@@ -82,9 +82,9 @@ Mr Gurr (Managing Director) issued 5 binding directives:
 | xml2js vs fast-xml-parser | Colin, Peter | fast-xml-parser (smaller, faster) | Unanimous |
 | Sports ID encoding (security) | Colin, Mr Gurr | Remove API key from ID — encode only {title, infohash, tracker, size, seeders} | Mr Gurr |
 | Prowlarr in v1 | Colin, Peter | Yes — same Torznab protocol, rename JackettClient → TorznabClient | Glen |
-| In-memory cache on serverless | Peter, Colin | Useless on Vercel (cold starts kill cache). Accept stateless. | Peter |
+| In-memory cache on serverless | Peter, Colin | Useless on a cold-starting hosted runtime. Accept stateless. | Peter |
 | qBit auth strategy | Peter, Stewart | Login-per-request (unavoidable on serverless) | Peter |
-| Download polling approach | Colin, Peter, Client | Historical plan only: Comet playback pattern — stream URL points to /playback endpoint, triggers qBit download, polls, 302 redirects to file. Superseded on hosted Vercel Remote Seedbox by ready-file-first fail-fast behavior. | Colin |
+| Download polling approach | Colin, Peter, Client | Historical plan only: Comet playback pattern — stream URL points to /playback endpoint, triggers qBit download, polls, 302 redirects to file. Superseded on hosted Remote Seedbox by ready-file-first fail-fast behavior. | Colin |
 | File server auth | Colin | Use proxyHeaders behaviorHint for Basic Auth — credentials never in URL | Colin |
 | Config middleware | Colin, Peter | withConfig Express middleware — decrypt once, pass req.config to all handlers | Colin |
 | Timeout budget | Colin, Stewart | Jackett 7s + &timeout=6 param, qBit 5s, Cinemeta 3s — fits 10s Hobby tier | Colin |

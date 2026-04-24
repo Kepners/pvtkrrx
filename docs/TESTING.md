@@ -2,7 +2,7 @@
 
 This is the current verification guide for the active route model.
 
-Do not use the old Jackett/Vercel MVP checklist as current truth. The live product is Prowlarr/qBittorrent-first, with PC Local, LAN Bridge, and Remote Seedbox routes.
+Do not use the old Jackett/public-host MVP checklist as current truth. The live product is Prowlarr/qBittorrent-first, with PC Local, LAN Bridge, and Remote Seedbox routes.
 
 ## Baseline Setup
 

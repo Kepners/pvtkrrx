@@ -72,7 +72,8 @@ function getStreamSourceOptions(configToken) {
 }
 
 function canServeBuiltinFileRoute(configToken) {
-  return String(configToken || '') === 'local' || !process.env.VERCEL
+  const hostedRelayRuntime = /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_HOSTED_RELAY || '').trim())
+  return String(configToken || '') === 'local' || !hostedRelayRuntime
 }
 
 function buildDirectLocalFileUrl(playbackBaseUrl, configToken, hash, filePath) {

@@ -13,9 +13,9 @@ const { findAvailableTcpPort, isTcpPortAvailable } = require('../src/utils/provi
 const CANONICAL_HOST = 'www.pvtkrrx.cc'
 const CANONICAL_ORIGIN = `https://${CANONICAL_HOST}`
 
-function loadApp(vercelEnabled) {
-  if (vercelEnabled) process.env.VERCEL = '1'
-  else delete process.env.VERCEL
+function loadApp(hostedRelayEnabled) {
+  if (hostedRelayEnabled) process.env.PVTKRRX_HOSTED_RELAY = '1'
+  else delete process.env.PVTKRRX_HOSTED_RELAY
   process.env.PVTKRRX_RUNTIME_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-runtime-guards-'))
   delete require.cache[require.resolve('../index')]
   delete require.cache[require.resolve('../src/lib/shared')]
@@ -153,7 +153,7 @@ async function run() {
         'X-Forwarded-For': '203.0.113.10'
       }
     )
-    assert.equal(hostedPlayback.status, 403, 'hosted /playback should fail fast on Vercel runtime')
+    assert.equal(hostedPlayback.status, 403, 'hosted /playback should fail fast on hosted relay runtime')
     assert.match(String(hostedPlayback.json?.error || ''), /disabled on hosted runtime/i)
 
     const hostedConfigure = await request(

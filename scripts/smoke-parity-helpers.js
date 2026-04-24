@@ -56,7 +56,7 @@ function run() {
     lanPairId: 'pair_id',
     lanPairKey: 'pair_key',
     lanPairOwnerId: 'pair_owner',
-    lanPairRelayUrl: 'https://pvtkrrx.vercel.app',
+    lanPairRelayUrl: 'https://www.pvtkrrx.cc',
     localHostname: 'pvtkrrx.local',
     localHostnameCustom: true,
     fileServerUrl: 'https://files.example/media'
@@ -74,9 +74,9 @@ function run() {
   const remoteSeedboxWithRelay = stripRemoteSeedboxLanFields({
     lanPairId: 'pair_id',
     lanPairKey: 'pair_key',
-    lanPairRelayUrl: 'https://pvtkrrx.vercel.app'
+    lanPairRelayUrl: 'https://www.pvtkrrx.cc'
   }, { keepRelayUrl: true })
-  assert.equal(remoteSeedboxWithRelay.lanPairRelayUrl, 'https://pvtkrrx.vercel.app')
+  assert.equal(remoteSeedboxWithRelay.lanPairRelayUrl, 'https://www.pvtkrrx.cc')
   assert.equal(remoteSeedboxWithRelay.lanPairId, undefined)
   assert.equal(remoteSeedboxWithRelay.lanPairKey, undefined)
 

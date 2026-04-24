@@ -75,7 +75,7 @@ Non-negotiable protocol and product rules:
 - hosted config tokens must be encrypted
 - playback/file state must use opaque tokens, not plain base64 JSON
 - sensitive hosted routes must keep origin checks, CSRF protection where appropriate, rate limits, and public-target-only connection testing
-- do not assume Vercel is the required host; the canonical hosted base today is https://www.pvtkrrx.cc
+- do not assume any specific managed host is required; the canonical hosted base today is https://www.pvtkrrx.cc
 
 Core integration requirements:
 - Prowlarr integration must be first-class:

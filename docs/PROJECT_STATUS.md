@@ -216,7 +216,7 @@ The practical reading of the project today is:
 - non-vs event lookup now also tries stripped event-name queries (`Japanese Grand Prix`, `Fight Night 270`, etc.) so `Race`, `Qualifying`, `Practice`, `Sprint`, and `Main Card` suffixes stop blocking artwork recovery
 - empty movie, TV, and sports catalogs now return a setup-needed placeholder when Prowlarr has no indexers or cannot be reached, instead of showing blank `EmptyContent`
 - the Windows installer/build flow is reproducible again
-- `https://www.pvtkrrx.cc` is the live public relay; `https://pvtkrrx.vercel.app` is currently a dead preview hostname returning Vercel `DEPLOYMENT_NOT_FOUND`
+- `https://www.pvtkrrx.cc` is the live public relay.
 - the homepage refactor is now live on the canonical host, including the `truth-band` layout and the `Where does playback happen` section
 - the current public route still serves through Contabo Caddy into the Coolify alias `pvtkrrx:3000`; do not treat `/opt/stack/sites/pvtkrrx` or `/opt/pvtkrrx` as the live public path without checking the reverse proxy target first
 - `https://www.pvtkrrx.cc/manifest.json` remains a setup/bootstrap manifest only; the real public self-host addon surface for the Contabo `systemd` runtime is `https://pvt.kepners.co.uk/selfhost/manifest.json?mode=hosted`
@@ -380,7 +380,7 @@ The practical reading of the project today is:
 
 ## Work Carried Out On 2026-03-31
 
-- `169a2e4` documented the live public-host truth table, dead preview-host status, and website audit state across the main docs set.
+- `169a2e4` documented the live public-host truth table and website audit state across the main docs set.
 - `e50a6b0` rewrote the homepage around clearer product positioning, route comparison, requirements, and sports proofing.
 - `9c18996` and `9b93f03` added explicit self-hosted server setup: localhost/private service validation for self-host installs, browser password flow, disk-backed `/selfhost` manifests, server setup scripts, and optional `systemd` install support.
 - `d174bd2` added provider-specific runbook presets to the runbooks/configure surface.
@@ -442,7 +442,7 @@ These items are verified in the current workspace or by direct client/log proof:
 - `npm run smoke:config`, `npm run smoke:desktop`, `npm run smoke:stremio-link`, `npm run smoke:lan-pair`, `npm run smoke:guards`, `npm run smoke:security`, `npm run smoke:pipeline`, `npm run smoke:playback`, and `npm run smoke:sports` all passed again on 2026-03-30
 - root `/manifest.json` returns the bootstrap manifest (`com.kepners.pvtkrrx.bootstrap`) with no catalogs/resources and `configurationRequired=true`
 - 2026-03-31 public host check: `https://www.pvtkrrx.cc/`, `/configure`, `/runbooks`, `/manifest.json`, and `/health` all returned `200` from the live public host; `/local/install` returned `403` as expected for a local-only helper route
-- 2026-03-31 preview-host check: `https://pvtkrrx.vercel.app/` returned `404` with `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`, so treat it as stale and non-canonical
+- 2026-03-31 public host check confirmed `https://www.pvtkrrx.cc/` as the canonical live public host.
 - 2026-04-06 homepage verification against `https://www.pvtkrrx.cc/` confirmed the refactor is now live: `truth-band` and `Where does playback happen` are present, while legacy `meta-grid` and `hero-chip` markers are absent
 - 2026-04-06 Contabo runtime verification showed the public route still enters through Caddy and targets the Coolify alias `pvtkrrx:3000`; the separate `pvtkrrx.service` host runtime at `/opt/pvtkrrx` on `:7000` is not the public route unless Caddy is repointed
 - 2026-04-07 public-site cleanup: the public website stopped advertising `/configure` as a public entry point, `GET /configure` now redirects remote/public requests back to the guide-only site, the bootstrap manifest now identifies remote root installs as `PVTKRRX Website Only`, and runbooks/homepage copy now point users to the Windows host runtime or their own self-host server for real setup
@@ -601,7 +601,7 @@ These items should still be treated as open until captured on real clients:
    - Full code trace confirmed route detection (`getInstallMode` + `getManifest` profile assignment), stream emission per route, 307 LAN redirect mechanics, and `/file`/`/playback` route guards.
    - All three routes expose the same sports-first discovery catalog family plus movies, tv, and library — no per-route catalog filtering.
    - LAN Bridge 307-redirects rewrite the token path to `/local/...?mode=local`, giving LAN devices full PC Local playback after redirect.
-   - Remote Seedbox on Vercel: `/file` and `/playback` return 403 for non-local tokens; ready-file-first via `fileServerUrl`.
+   - Remote Seedbox on hosted relay: `/file` and `/playback` return 403 for non-local tokens; ready-file-first via `fileServerUrl`.
    - Auth-protected file servers: tracker `/playback` suppressed on non-local routes because redirect can't forward `proxyHeaders`.
    - Packed RAR: emitted only when all volumes 100% complete; suppressed at stream emission for tracker first-click; `/playback` fails fast for incomplete archives.
    - Explicit capability matrix now in `docs/ROUTE_FRAMEWORK.md`.

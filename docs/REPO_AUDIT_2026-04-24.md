@@ -9,7 +9,7 @@ The GitHub root was carrying local editor files, runtime logs, stale MVP notes, 
 ## Verified Locally
 
 - `README.md` was about 39 KB and mixed user-facing setup with internal/live deployment notes.
-- `TESTING.md` still described the old Jackett/Vercel MVP workflow and did not match the current Prowlarr, Contabo/Coolify, Windows local, LAN Bridge, and self-host model.
+- `TESTING.md` still described the old Jackett/public-host MVP workflow and did not match the current Prowlarr, Contabo/Coolify, Windows local, LAN Bridge, and self-host model.
 - Tracked files ignored by current `.gitignore` included:
   - `.runtime/addon.log`
   - `.runtime/fileserver.log`

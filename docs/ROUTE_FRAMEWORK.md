@@ -14,7 +14,6 @@ If you want the app to keep running without ongoing dependence on PVTKRRX infras
 ## Hosted Base
 
 - The canonical public host is `https://www.pvtkrrx.cc`.
-- The old preview host `https://pvtkrrx.vercel.app` returned Vercel `DEPLOYMENT_NOT_FOUND` on 2026-03-31 and is not part of the supported install surface.
 
 ## Archive Source Note
 

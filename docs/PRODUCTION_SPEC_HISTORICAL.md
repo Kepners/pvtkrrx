@@ -16,10 +16,10 @@ Do not use it as the live source for the current dependency list, packaging layo
 ## 1. Build Requirements
 
 ### Development Environment
-- Node.js 18+ (Vercel runtime)
+- Node.js 18+ (hosted runtime)
 - npm for package management
 - Git for version control
-- Vercel CLI for deployment (`npx vercel`)
+- Deployment through the active host for `https://www.pvtkrrx.cc`
 
 ### Dependencies (3 total)
 | Package | Version | Purpose |
@@ -55,27 +55,21 @@ Do not use it as the live source for the current dependency list, packaging layo
 | Environment | Purpose | URL |
 |-------------|---------|-----|
 | Development | Local testing | `http://localhost:7000` |
-| Production | Live addon | `https://pvtkrrx.vercel.app` |
+| Production | Live addon | `https://www.pvtkrrx.cc` |
 
-### Vercel Configuration
-```json
-{
-  "version": 2,
-  "builds": [{ "src": "index.js", "use": "@vercel/node" }],
-  "routes": [{ "src": "/(.*)", "dest": "/index.js" }]
-}
-```
+### Historical Hosted Configuration
+The original plan used a single hosted catch-all route to `index.js`. That provider-specific configuration is retired and is not part of the current production source of truth.
 
 ### Environment Variables
 | Variable | Required | Purpose |
 |----------|----------|---------|
 | `ENCRYPTION_SECRET` | Yes | AES-256-GCM key derivation seed |
-| `VERCEL` | Auto-set | Vercel sets this — used to skip `app.listen()` |
+| `PVTKRRX_HOSTED_RELAY` | Yes on the public hosted runtime | Explicitly marks the public relay surface so local-only route guards stay active |
 
 ### Deployment Process
-1. `git push origin main` — Vercel auto-deploys from GitHub
-2. Or `npx vercel --prod` for manual deployment
-3. Set `ENCRYPTION_SECRET` in Vercel dashboard → Settings → Environment Variables
+1. `git push origin main` — the configured production host deploys from GitHub
+2. Set `ENCRYPTION_SECRET` in the active host environment variables
+3. Set `PVTKRRX_HOSTED_RELAY=true` on the public hosted runtime
 
 ## 3. File Structure
 
@@ -103,12 +97,12 @@ pvtkrrx/
 ├── public/
 │   ├── configure.html         # Configuration page
 │   └── logo.ico               # Addon logo
-├── vercel.json                # Vercel deployment config
+├── hosted runtime configuration
 ├── package.json               # Dependencies
 └── README.md                  # Documentation
 ```
 
-**Note:** Spec proposed `api/[...path].js` (Vercel catch-all pattern) but we're using `index.js` with `vercel.json` catch-all route instead — matches the clockrr pattern exactly.
+**Note:** Spec proposed `api/[...path].js` catch-all routing, but the original implementation used `index.js` plus a hosted routing file instead.
 
 ## 4. Entry Point Pattern (index.js)
 
@@ -182,7 +176,7 @@ app.use(getRouter(builder.getInterface()));
 
 module.exports = app;
 
-if (!process.env.VERCEL) {
+if (!process.env.PVTKRRX_HOSTED_RELAY) {
   app.listen(7000, () => console.log('PVTKRRX running on http://localhost:7000'));
 }
 ```
@@ -190,7 +184,7 @@ if (!process.env.VERCEL) {
 ## 5. Distribution
 
 ### How Users Get It
-1. User visits `https://pvtkrrx.vercel.app/configure`
+1. User visits `https://www.pvtkrrx.cc/configure`
 2. Enters seedbox credentials (Jackett URL, qBit URL, file server URL)
 3. Clicks "Test Connection" to validate
 4. Clicks "Generate Install Link"
@@ -199,7 +193,7 @@ if (!process.env.VERCEL) {
 7. Addon appears in Stremio with 4 catalogs
 
 ### Update Mechanism
-- Vercel auto-deploys from `main` branch on push
+- The configured production host deploys from `main` branch on push
 - Addon updates are instant — no user action needed
 - Users' encrypted tokens remain valid across deployments (same `ENCRYPTION_SECRET`)
 - If `ENCRYPTION_SECRET` changes, all users must reconfigure (documented in README)
@@ -209,7 +203,7 @@ if (!process.env.VERCEL) {
 ```
 Level 0: Foundation
   ├── package.json + npm install
-  ├── vercel.json
+  ├── hosted runtime configuration
   ├── src/utils/crypto.js (encrypt/decrypt)
   └── src/config/manifest.js
 
@@ -235,7 +229,7 @@ Level 4: Integration
 
 Level 5: Deploy
   ├── Local testing (http://localhost:7000)
-  ├── Vercel deployment
+  ├── hosted runtime deployment
   └── Stremio install verification
 ```
 
@@ -265,7 +259,7 @@ Based on Colin's Stremio behavior research. This is the industry-standard patter
 {
   name: "📥 1080p BluRay",
   description: "250 seeders | 12.5 GB | Click to stream",
-  url: "https://pvtkrrx.vercel.app/{token}/playback/{encodedInfo}",
+  url: "https://www.pvtkrrx.cc/{token}/playback/{encodedInfo}",
   // User clicks → Stremio shows loading spinner
   // Playback endpoint: triggers qBit download → polls → 302 redirects to file
   // User experience: loading spinner → playback starts
@@ -273,7 +267,7 @@ Based on Colin's Stremio behavior research. This is the industry-standard patter
 }
 ```
 
-Historical note: the snippet above describes the original MVP plan. The live hosted Vercel `Remote Seedbox` route is now ready-file-first and does not generally expose hosted tracker `/playback` buffering.
+Historical note: the snippet above describes the original MVP plan. The live hosted `Remote Seedbox` route is now ready-file-first and does not generally expose hosted tracker `/playback` buffering.
 
 ### Historical Playback Endpoint Flow
 ```
@@ -304,7 +298,7 @@ Credentials never appear in the URL. Works on desktop and mobile Stremio clients
 
 | Risk | Impact | Mitigation |
 |------|--------|------------|
-| Vercel cold starts (~500ms) | Slower first request | fast-xml-parser helps minimize bundle size |
+| Hosted runtime cold starts (~500ms) | Slower first request | fast-xml-parser helps minimize bundle size |
 | Users with slow seedbox connections | Timeouts hit before results return | Promise.allSettled() returns partial results |
 | Torznab XML format varies by indexer | Parsing failures | Robust parser with try/catch, test against multiple indexers |
 | express@5 breaking changes | Unexpected behavior | Pin to ^5.2.1, clockrr uses same version |

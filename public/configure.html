@@ -2902,10 +2902,6 @@
     const runtimeBootstrap = window.__PVTKRRX_RUNTIME_BOOTSTRAP__ || {};
     const defaultLocalHostname = 'pvtkrrx.local';
     const defaultLanPairRelayUrl = 'https://www.pvtkrrx.cc';
-    const legacyRelayHosts = new Set([
-      'pvtkrrx.vercel.app',
-      'www.pvtkrrx.vercel.app'
-    ]);
     let activeLocalHostname = defaultLocalHostname;
     let activeInstallTarget = runtimeBootstrap.selfHostServerMode === true
       ? 'seedbox'
@@ -3985,7 +3981,6 @@
       try {
         const url = new URL(text);
         if (url.protocol !== 'http:' && url.protocol !== 'https:') return fallback;
-        if (legacyRelayHosts.has(String(url.host || '').toLowerCase())) return defaultLanPairRelayUrl;
         return `${url.protocol}//${url.host}`;
       } catch (_) {
         return fallback;

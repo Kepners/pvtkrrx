@@ -493,7 +493,7 @@ setInterval(() => {
   - [ ] Lighthouse score >90
 
 - [ ] **Step 8: Deploy**
-  - [ ] Deploy to Vercel
+  - [ ] Deploy to hosted runtime
   - [ ] Test on real devices (desktop, tablet, mobile)
   - [ ] Get client approval
   - [ ] Launch

@@ -8,7 +8,7 @@
 - 5 output documents + 3 project file updates produced
 
 ## Client Corrections (Important for Future)
-1. **SDK vs Raw Express** — Client's clockrr project proves stremio-addon-sdk + Express works on Vercel. Don't second-guess this.
+1. **SDK vs Raw Express** — Client's clockrr project proves stremio-addon-sdk + Express works on hosted relay. Don't second-guess this.
 2. **Stremio behavior** — Research how Stremio actually works before proposing solutions. Stremio re-queries addons naturally via cacheMaxAge.
 3. **User hosting** — Client is NOT hosting anything. Each user has their own Jackett, qBit, file server. The addon is a pure bridge.
 

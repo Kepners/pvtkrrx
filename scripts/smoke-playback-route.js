@@ -11,7 +11,7 @@ process.env.STREAM_WAIT_TIMEOUT_MS = '50'
 process.env.STREAM_WAIT_INTERVAL_MS = '10'
 process.env.STREAM_RANGE_WAIT_TIMEOUT_MS = '100'
 process.env.STREAM_RANGE_WAIT_INTERVAL_MS = '10'
-delete process.env.VERCEL
+delete process.env.PVTKRRX_HOSTED_RELAY
 
 const { encrypt } = require('../src/utils/crypto')
 const { encodePlaybackStateToken, encodeFileStateToken } = require('../src/utils/opaqueState')

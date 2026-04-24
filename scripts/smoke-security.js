@@ -20,8 +20,8 @@ const path = require('node:path')
 
 process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'local-smoke-secret-12345678901234567890'
 process.env.PVTKRRX_RUNTIME_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-security-'))
-// Simulate hosted Vercel runtime so local-only route guards are active
-process.env.VERCEL = '1'
+// Simulate hosted relay runtime so local-only route guards are active
+process.env.PVTKRRX_HOSTED_RELAY = '1'
 
 const { encrypt } = require('../src/utils/crypto')
 const { encodePlaybackStateToken } = require('../src/utils/opaqueState')
@@ -141,7 +141,7 @@ async function run() {
       Host: CANONICAL_HOST,
       'X-Forwarded-For': '127.0.0.1'
     })
-    assert.equal(xffSpoofed.status, 403, '#2a spoofed XFF must not unlock /local-config on Vercel')
+    assert.equal(xffSpoofed.status, 403, '#2a spoofed XFF must not unlock /local-config on hosted relay')
     console.log('✓ #2a spoofed X-Forwarded-For cannot unlock /local-config')
 
     // ── #2b: spoofed Host must NOT unlock local-only routes ──────────────────
@@ -149,10 +149,10 @@ async function run() {
       Host: '192.168.1.1:7000',
       'X-Real-IP': '192.168.1.50'
     })
-    assert.equal(hostSpoofed.status, 403, '#2b spoofed Host must not unlock /network-info on Vercel')
+    assert.equal(hostSpoofed.status, 403, '#2b spoofed Host must not unlock /network-info on hosted relay')
     console.log('✓ #2b spoofed Host cannot unlock /network-info')
 
-    // ── #3a/#3b: hosted /configure now redirects away on Vercel, so prove the
+    // ── #3a/#3b: hosted /configure now redirects away on hosted relay, so prove the
     // actual double-submit contract directly with a matching cookie + header.
     const csrf = {
       cookie: 'pvtkrrx_csrf=security-smoke-token-1234567890',
@@ -200,7 +200,7 @@ async function run() {
     const pairKey = 'test-security-pair-key-value-here'
     const ownerId = 'security-smoke-owner-id-1234567890'
 
-    // Heartbeat: socket IS 127.0.0.1 but VERCEL=1 → require /pair/heartbeat to not be behind requireLocalNetworkRoute
+    // Heartbeat: socket IS 127.0.0.1 but hosted relay=1 → require /pair/heartbeat to not be behind requireLocalNetworkRoute
     const heartbeatRes = await request(port, 'POST', '/pair/heartbeat', {
       pairId,
       pairKey,
@@ -233,7 +233,7 @@ async function run() {
     const legacyPlaybackRes = await request(port, 'GET', `/${token}/playback/${legacyPayload}`, null, {
       Host: CANONICAL_HOST
     })
-    // On Vercel the playback route should 403 (disabled); on local it should also 403 (invalid token)
+    // On hosted relay the playback route should 403 (disabled); on local it should also 403 (invalid token)
     assert.ok(
       legacyPlaybackRes.status === 403 || legacyPlaybackRes.status === 400,
       `#6 legacy base64-JSON playback token must be rejected (got ${legacyPlaybackRes.status})`

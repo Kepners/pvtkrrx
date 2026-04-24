@@ -12,7 +12,7 @@ For current stage and active work, see `docs/PROJECT_STATUS.md`.
 
 #### Phase 0: Foundation (6 files)
 - ✅ `package.json` — 3 dependencies: stremio-addon-sdk, express, fast-xml-parser
-- ✅ `vercel.json` — Serverless deployment config
+- ✅ original hosted routing config
 - ✅ `src/utils/crypto.js` — AES-256-GCM encryption with SHA-256 key derivation
 - ✅ `src/config/manifest.js` — 4 catalogs with sports genre extras
 - ✅ `src/config/categories.js` — Torznab category constants (movies, TV, sports)
@@ -71,7 +71,7 @@ For current stage and active work, see `docs/PROJECT_STATUS.md`.
 ### 🎬 **Comet Playback Pattern**
 - Stream URL points to `/playback` endpoint
 - Triggers qBit download if not on seedbox
-- Polls every 3s for up to 6s (within Vercel 10s timeout budget)
+- Polls every 3s for up to 6s (within the original hosted runtime timeout budget)
 - 302 redirect to file server URL when ready
 - 504 JSON error if timeout (download continues in background)
 
@@ -103,7 +103,7 @@ For current stage and active work, see `docs/PROJECT_STATUS.md`.
 
 ### Request Flow
 ```
-User → Stremio → https://pvtkrrx.vercel.app/{token}/catalog/tv/pvtkrrx-sports.json
+User → Stremio → https://www.pvtkrrx.cc/{token}/catalog/tv/pvtkrrx-sports.json
                          ↓
                   withConfig middleware (decrypt token → req.config)
                          ↓
@@ -138,7 +138,7 @@ User clicks stream → Stremio requests /playback/{info}
 ```
 
 ### Tech Stack
-- **Node.js 18+** (Vercel runtime)
+- **Node.js 18+** (hosted runtime)
 - **Express 5.2.1** (async route handlers, modern middleware)
 - **stremio-addon-sdk 1.6.10** (manifest + fallback router)
 - **fast-xml-parser 4.5.0** (Torznab XML parsing, 3x smaller than xml2js)
@@ -159,8 +159,8 @@ User clicks stream → Stremio requests /playback/{info}
 7. Test all 10 acceptance criteria (see [TESTING.md](TESTING.md))
 
 ### Then Production Deployment
-1. Deploy to Vercel: `vercel --prod`
-2. Set ENCRYPTION_SECRET in Vercel environment variables
+1. Deploy to the configured hosted runtime
+2. Set ENCRYPTION_SECRET in the hosted runtime environment variables
 3. Update config with real seedbox credentials
 4. Test with actual private tracker content
 
@@ -171,7 +171,7 @@ User clicks stream → Stremio requests /playback/{info}
 pvtkrrx/
 ├── index.js                    # Express + SDK entry point
 ├── package.json                # Dependencies
-├── vercel.json                 # Vercel config
+├── original hosted routing config
 ├── public/
 │   └── configure.html          # Config page
 ├── src/

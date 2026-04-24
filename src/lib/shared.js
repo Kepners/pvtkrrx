@@ -49,11 +49,12 @@ const {
 
 loadLocalEnv()
 
-const IS_VERCEL_RUNTIME = Boolean(process.env.VERCEL)
-const SELF_HOST_SERVER_MODE = (
-  !IS_VERCEL_RUNTIME &&
-  /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_SELF_HOST_MODE || '').trim())
+const EXPLICIT_SELF_HOST_SERVER_MODE = /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_SELF_HOST_MODE || '').trim())
+const IS_HOSTED_RELAY_RUNTIME = (
+  !EXPLICIT_SELF_HOST_SERVER_MODE &&
+  /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_HOSTED_RELAY || '').trim())
 )
+const SELF_HOST_SERVER_MODE = !IS_HOSTED_RELAY_RUNTIME && EXPLICIT_SELF_HOST_SERVER_MODE
 const STREAM_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_WAIT_TIMEOUT_MS || '90000', 10)
 const STREAM_WAIT_INTERVAL_MS = parseInt(process.env.STREAM_WAIT_INTERVAL_MS || '2000', 10)
 const STREAM_RANGE_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_RANGE_WAIT_TIMEOUT_MS || '45000', 10)
@@ -296,7 +297,7 @@ function isCompatibleLocalServiceUrl(currentUrl, discoveredUrl) {
 
 async function ensureBootLanAccess(logger = console) {
   const safeLogger = createRedactingLogger(logger)
-  if (process.platform !== 'win32' || IS_VERCEL_RUNTIME) return null
+  if (process.platform !== 'win32' || IS_HOSTED_RELAY_RUNTIME) return null
   if (bootLanAccessPromise) return bootLanAccessPromise
 
   bootLanAccessPromise = (async () => {
@@ -743,7 +744,7 @@ function getClientIp(req) {
 }
 
 function isSameHostRequest(req) {
-  if (IS_VERCEL_RUNTIME) return false
+  if (IS_HOSTED_RELAY_RUNTIME) return false
   const clientIp = getSocketIp(req)
   if (!clientIp) return false
   if (isLoopbackIp(clientIp)) return true
@@ -1310,7 +1311,7 @@ function requestHostname(req) {
 }
 
 function isLocalNetworkRequest(req) {
-  if (IS_VERCEL_RUNTIME) return false
+  if (IS_HOSTED_RELAY_RUNTIME) return false
   const clientIp = getSocketIp(req)
   return Boolean(clientIp) && (isLoopbackIp(clientIp) || isLikelyLanHost(clientIp))
 }
@@ -1483,7 +1484,7 @@ function getConfigIssues(config, options = {}) {
   const missingFileServerUrl = !String(safeConfig.fileServerUrl || '').trim()
   const relayTargetsDifferentOrigin = Boolean(requestOrigin && relayOrigin && relayOrigin !== requestOrigin)
 
-  if (usingHostedProfile && missingFileServerUrl && !selfHostDiskConfig && !localDiskConfig && (IS_VERCEL_RUNTIME || relayTargetsDifferentOrigin)) {
+  if (usingHostedProfile && missingFileServerUrl && !selfHostDiskConfig && !localDiskConfig && (IS_HOSTED_RELAY_RUNTIME || relayTargetsDifferentOrigin)) {
     issues.push({
       code: 'HOSTED_FILE_SERVER_REQUIRED',
       message: 'Hosted profile needs an HTTPS File Server URL for completed-file playback. Add your seedbox file server URL or use a direct-host/LAN profile.'
@@ -1505,7 +1506,7 @@ function getConfigIssues(config, options = {}) {
       return ''
     }
   })()
-  const requestArrivesOnPublicRelay = IS_VERCEL_RUNTIME ||
+  const requestArrivesOnPublicRelay = IS_HOSTED_RELAY_RUNTIME ||
     (Boolean(requestHostname) && !isBlockedPrivateTargetHost(requestHostname))
   const explicitRemoteSeedboxIntent = normalizeRouteProfile(safeConfig.routeProfile) === 'online' &&
     safeConfig.lanPairEnabled === false
@@ -1835,7 +1836,7 @@ function shouldRepairLocalProwlarrConfig(config = {}) {
 
 async function repairLocalProwlarrConfig(config = loadLocalConfigFile(), logger = console, reason = 'boot') {
   const snapshot = config && typeof config === 'object' ? { ...config } : null
-  if (!snapshot || process.platform !== 'win32' || IS_VERCEL_RUNTIME) return snapshot
+  if (!snapshot || process.platform !== 'win32' || IS_HOSTED_RELAY_RUNTIME) return snapshot
   if (!shouldRepairLocalProwlarrConfig(snapshot)) return snapshot
   if (localConfigRepairPromise) return localConfigRepairPromise
 
@@ -2415,7 +2416,7 @@ module.exports = {
   STREMIO_AUTH_KEY_REGEX,
   STREMIO_AUTH_KEY_CAPTURE_PATTERN,
   STREMIO_AUTH_SCAN_DIRS_OVERRIDE,
-  IS_VERCEL_RUNTIME,
+  IS_HOSTED_RELAY_RUNTIME,
   SELF_HOST_SERVER_MODE,
   SENSITIVE_WEB_ORIGINS,
   CSRF_COOKIE_NAME,

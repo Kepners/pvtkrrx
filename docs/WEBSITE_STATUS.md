@@ -25,7 +25,6 @@ Verified directly on 2026-04-23 after manual Coolify API redeploy `c307hqn7q8dep
 Verified directly on 2026-04-08:
 
 - Canonical public host: `https://www.pvtkrrx.cc`
-- Old preview host: `https://pvtkrrx.vercel.app`
 - `https://www.pvtkrrx.cc/` returned `200`
 - `https://www.pvtkrrx.cc/configure` returned `302`
 - `https://www.pvtkrrx.cc/sports` returned `200`
@@ -34,7 +33,6 @@ Verified directly on 2026-04-08:
 - `https://www.pvtkrrx.cc/health` returned `200`
 - `https://www.pvtkrrx.cc/local/install` returned `403`
 - `https://www.pvtkrrx.cc/sitemap.xml` includes `/sports`
-- `https://pvtkrrx.vercel.app/` returned `404` with `X-Vercel-Error: DEPLOYMENT_NOT_FOUND`
 - Homepage markers on `https://www.pvtkrrx.cc/` now confirm the refactor is live:
   - `truth-band` present
   - `Where does playback happen` present
@@ -44,7 +42,6 @@ Verified directly on 2026-04-08:
 Interpretation:
 
 - The audit claim that `/runbooks`, `/manifest.json`, and `/health` are missing is false for the canonical host.
-- That claim is true only for the dead `pvtkrrx.vercel.app` preview hostname.
 - `/local/install` returning `403` on the public host is expected because it is a same-host/local-network helper route.
 - Public `/configure` now redirects back to the guide-only homepage instead of acting as a public setup surface.
 - `/sports` is now a dedicated public guide page with canonical metadata and guide-only CTAs.
@@ -56,7 +53,7 @@ Interpretation:
 Verified in the repo and on Contabo before changing anything:
 
 - `index.js` already defines `/configure`, `/:config/configure`, `/sports`, `/runbooks`, `/seedbox-runbooks`, `/health`, `/manifest.json`, `/:config/manifest.json`, `/local/install`, and the hosted self-host launcher route at `/install-selfhost.sh` plus `/install.sh`
-- `vercel.json` still maps `/configure` and `/runbooks`, but the old preview deployment is currently dead
+- Public routing is owned by Contabo Caddy and the Coolify app target, not a preview deployment file.
 - `public/index.html` is the current landing page
 - public canonical/OG metadata plus `robots.txt`/`sitemap.xml` now point at `https://www.pvtkrrx.cc`
 - repo + live SEO asset pass completed on 2026-04-23:
@@ -131,6 +128,6 @@ Main clarity gaps:
 
 - Route audit complete
 - Public host check complete
-- Canonical host vs dead preview host now documented
+- Canonical host status now documented
 - Cloud homepage cleanup is live on the canonical host
 - Next pass should browser-check the live homepage on desktop/mobile and keep infra notes aligned if the runtime target changes

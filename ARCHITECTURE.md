@@ -163,7 +163,7 @@ The desktop popup, configure UI, and public guide should use `LAN Bridge` for th
 4. Hosted relay responses may redirect into the local runtime, but they should not become the video proxy.
 5. Hosted connection checks may validate public endpoints from the configure page, but they must not probe loopback/LAN/private targets.
 6. There is no `.pvtk` file format in the live code; the repo uses `pvtkrrx:` ids inside addon responses.
-7. `https://www.pvtkrrx.cc` is the canonical public host; the dead `https://pvtkrrx.vercel.app` preview is not part of the supported install surface.
+7. `https://www.pvtkrrx.cc` is the canonical public host; retired preview hosts are not part of the supported install surface.
 
 ## Build And Packaging
 

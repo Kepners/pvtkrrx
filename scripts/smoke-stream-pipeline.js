@@ -265,7 +265,7 @@ async function withScenario(setup, run) {
 }
 
 async function run() {
-  const originalVercel = process.env.VERCEL
+  const originalHostedRelay = process.env.PVTKRRX_HOSTED_RELAY
   const originalExperimentalRar = process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS
   const originalHostedGateway = process.env.PVTKRRX_HOST_GATEWAY_HOST
   const orphanRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-stream-pipeline-'))
@@ -275,7 +275,7 @@ async function run() {
 
   try {
     await withScenario(async () => {
-      process.env.VERCEL = '1'
+      process.env.PVTKRRX_HOSTED_RELAY = '1'
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem()]
       QBitClient.prototype.torrents = async () => []
       CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
@@ -287,20 +287,20 @@ async function run() {
         makeBaseConfig(),
         'movie',
         'tt1234567',
-        'https://pvtkrrx.vercel.app',
+        'https://www.pvtkrrx.cc',
         'remote-token'
       )
 
-      assert.equal(result.streams.filter(stream => stream.url).length, 0, '#1 hosted Vercel remote must suppress dead tracker /playback streams')
+      assert.equal(result.streams.filter(stream => stream.url).length, 0, '#1 hosted relay remote must suppress dead tracker /playback streams')
       const readyNotice = findNoticeStream(result.streams, 'hosted-ready-only')
-      assert.ok(readyNotice, '#1 hosted Vercel remote should explain ready-file-first suppression')
+      assert.ok(readyNotice, '#1 hosted relay remote should explain ready-file-first suppression')
       assert.match(String(readyNotice?.name || ''), /Ready Files Only/i, '#1 notice title should read like a user-facing limitation')
       assert.match(String(readyNotice?.description || ''), /already ready to play/i, '#1 notice should explain the ready-file-only rule plainly')
       assert.match(String(readyNotice?.description || ''), /PC Local, LAN Bridge, or self-hosted playback/i, '#1 notice should point users to an actionable route')
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem()]
       QBitClient.prototype.torrents = async () => []
       CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
@@ -354,7 +354,7 @@ async function run() {
     )
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent().hash, link: '' })]
       QBitClient.prototype.torrents = async () => [matchedTorrent()]
       QBitClient.prototype.files = async () => [matchedFile()]
@@ -379,7 +379,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      process.env.VERCEL = '1'
+      process.env.PVTKRRX_HOSTED_RELAY = '1'
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent().hash, link: '' })]
       QBitClient.prototype.torrents = async () => [matchedTorrent({ progress: 1 })]
       QBitClient.prototype.files = async () => [matchedFile({ progress: 1 })]
@@ -391,7 +391,7 @@ async function run() {
         }),
         'movie',
         'tt1234567',
-        'https://pvtkrrx.vercel.app',
+        'https://www.pvtkrrx.cc',
         'remote-token'
       )
 
@@ -403,7 +403,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem()]
       QBitClient.prototype.torrents = async () => []
       CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
@@ -425,7 +425,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent().hash, link: '' })]
       QBitClient.prototype.torrents = async () => [matchedTorrent()]
       QBitClient.prototype.files = async () => [matchedFile()]
@@ -450,7 +450,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      process.env.VERCEL = '1'
+      process.env.PVTKRRX_HOSTED_RELAY = '1'
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem()]
       QBitClient.prototype.torrents = async () => []
       CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
@@ -476,7 +476,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent().hash, link: '' })]
       QBitClient.prototype.torrents = async () => [matchedTorrent()]
       QBitClient.prototype.files = async () => [matchedFile()]
@@ -508,7 +508,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       QBitClient.prototype.torrents = async () => []
       QBitClient.prototype.files = async () => []
       ProwlarrClient.prototype.search = async () => []
@@ -541,7 +541,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent().hash, link: '' })]
       QBitClient.prototype.torrents = async () => [matchedTorrent()]
       QBitClient.prototype.files = async () => packedArchiveFilesPartial()
@@ -562,7 +562,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       delete process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent({ progress: 1 }).hash, link: '' })]
       QBitClient.prototype.torrents = async () => [matchedTorrent({ progress: 1 })]
@@ -584,7 +584,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS = 'true'
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent({ progress: 1 }).hash, link: '' })]
       QBitClient.prototype.torrents = async () => [matchedTorrent({ progress: 1 })]
@@ -612,7 +612,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       const torrent = matchedTorrent({
         progress: 1,
         save_path: orphanRoot,
@@ -650,7 +650,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       QBitClient.prototype.torrents = async () => [matchedTorrent()]
       QBitClient.prototype.files = async () => packedArchiveFilesPartial()
       ProwlarrClient.prototype.search = async () => []
@@ -670,7 +670,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       QBitClient.prototype.torrents = async () => []
       QBitClient.prototype.files = async () => []
       ProwlarrClient.prototype.search = async () => []
@@ -698,7 +698,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       QBitClient.prototype.torrents = async () => []
       QBitClient.prototype.files = async () => []
       ProwlarrClient.prototype.search = async () => []
@@ -727,7 +727,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       QBitClient.prototype.torrents = async () => []
       QBitClient.prototype.files = async () => []
       ProwlarrClient.prototype.search = async () => [
@@ -772,7 +772,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       QBitClient.prototype.torrents = async () => []
       QBitClient.prototype.files = async () => []
       ProwlarrClient.prototype.search = async () => [
@@ -807,7 +807,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       const payload = buildTorrentPayload([
         { path: 'Sports.RS.2026.Home.Club.vs.Away.Club.720p.mp4', length: 3_600_000_000 }
       ])
@@ -860,7 +860,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       delete process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS
       const payload = buildTorrentPayload([
         { path: 'Release/release.rar', length: 100_000_000 },
@@ -903,7 +903,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       process.env.PVTKRRX_HOST_GATEWAY_HOST = '10.0.1.1'
       QBitClient.prototype.torrents = async function () {
         assert.equal(this.url, 'http://10.0.1.1:8090', '#4l qBit should use the hosted gateway override instead of container loopback')
@@ -948,7 +948,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       QBitClient.prototype.torrents = async () => []
       QBitClient.prototype.files = async () => []
       ProwlarrClient.prototype.search = async (_query, _cats, _type, options = {}) => {
@@ -1007,7 +1007,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       clearSportsAvailabilityAnchors()
       const anchorKey = setSportsAvailabilityAnchor({
         title: 'Premier.League.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-SC',
@@ -1059,7 +1059,7 @@ async function run() {
     })
 
     await withScenario(async () => {
-      delete process.env.VERCEL
+      delete process.env.PVTKRRX_HOSTED_RELAY
       clearSportsAvailabilityAnchors()
       QBitClient.prototype.torrents = async () => []
       QBitClient.prototype.files = async () => []
@@ -1124,8 +1124,8 @@ async function run() {
   } finally {
     resetMocks()
     clearSportsAvailabilityAnchors()
-    if (originalVercel === undefined) delete process.env.VERCEL
-    else process.env.VERCEL = originalVercel
+    if (originalHostedRelay === undefined) delete process.env.PVTKRRX_HOSTED_RELAY
+    else process.env.PVTKRRX_HOSTED_RELAY = originalHostedRelay
     if (originalExperimentalRar === undefined) delete process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS
     else process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS = originalExperimentalRar
     if (originalHostedGateway === undefined) delete process.env.PVTKRRX_HOST_GATEWAY_HOST

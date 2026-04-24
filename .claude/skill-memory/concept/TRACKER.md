@@ -27,7 +27,7 @@
 - Use stremio-addon-sdk + Express (clockrr pattern)
 - fast-xml-parser (not xml2js)
 - AES-256-GCM encryption
-- Vercel Hobby tier ($0)
+- original zero-cost hosted target ($0)
 - Sports catalog = #1 priority
 - Prowlarr via shared Torznab protocol
 - Source Available license

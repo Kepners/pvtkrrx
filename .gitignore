@@ -1,5 +1,4 @@
 node_modules/
-.vercel/
 .env
 
 # Local editor/workspace state
@@ -30,5 +29,3 @@ website/
 # Electron build output
 dist/
 Dist/
-
-.vercel

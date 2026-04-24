@@ -407,8 +407,8 @@ async function run() {
     assert.equal(localInstallUrls.stremioHttps, 'stremio://127.0.0.1:7001/local/manifest.json?mode=local')
     assert.notEqual(localInstallUrls.stremio, localInstallUrls.stremioHttps)
     assert.equal(normalizeRelayUrl(''), DEFAULT_PAIR_RELAY_URL)
-    assert.equal(normalizeRelayUrl('https://pvtkrrx.vercel.app'), DEFAULT_PAIR_RELAY_URL)
-    assert.equal(normalizeRelayUrl('https://www.pvtkrrx.vercel.app'), DEFAULT_PAIR_RELAY_URL)
+    assert.equal(normalizeRelayUrl('https://www.pvtkrrx.cc'), DEFAULT_PAIR_RELAY_URL)
+    assert.equal(normalizeRelayUrl('https://www.pvtkrrx.cc/'), DEFAULT_PAIR_RELAY_URL)
 
     const stremioStatusRes = await fetch(`${base}/auth/stremio/local-status`)
     assert.equal(stremioStatusRes.status, 200, 'GET /auth/stremio/local-status should return 200 on the host PC')
@@ -761,7 +761,7 @@ async function run() {
         ...sampleConfig,
         lanPairEnabled: false,
         lanPairRequired: false,
-        lanPairRelayUrl: 'https://pvtkrrx.vercel.app'
+        lanPairRelayUrl: 'https://www.pvtkrrx.cc'
       })
     })
     assert.equal(hostedMissingFileServerRes.status, 400, 'hosted relay config without file server should be rejected')
@@ -780,7 +780,7 @@ async function run() {
       lanPairRequired: false,
       lanPairId: 'pair_remote_should_strip',
       lanPairKey: 'pair_key_should_strip',
-      lanPairRelayUrl: 'https://pvtkrrx.vercel.app'
+      lanPairRelayUrl: 'https://www.pvtkrrx.cc'
     }
     const remoteSeedboxEncryptRes = await fetch(`${base}/encrypt`, {
       method: 'POST',
@@ -803,7 +803,7 @@ async function run() {
       ...sampleConfig,
       lanPairEnabled: false,
       lanPairRequired: false,
-      lanPairRelayUrl: 'https://pvtkrrx.vercel.app'
+      lanPairRelayUrl: 'https://www.pvtkrrx.cc'
     }, process.env.ENCRYPTION_SECRET))
     const legacyHostedManifestRes = await fetch(`${base}/${legacyHostedToken}/manifest.json?mode=hosted`)
     assert.equal(legacyHostedManifestRes.status, 200, 'legacy hosted token manifest should still resolve')

@@ -8,7 +8,7 @@ process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'selfhost-smoke
 process.env.AUTH_TOKEN_SECRET = process.env.AUTH_TOKEN_SECRET || 'selfhost-auth-secret-12345678901234567890'
 process.env.PVTKRRX_SELF_HOST_MODE = 'true'
 process.env.PVTKRRX_PUBLIC_BASE_URL = 'https://seedbox.example.com'
-delete process.env.VERCEL
+delete process.env.PVTKRRX_HOSTED_RELAY
 process.env.PVTKRRX_RUNTIME_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-selfhost-'))
 
 const GOOD_AUTH_KEY = 'good-authkey-1234567890'

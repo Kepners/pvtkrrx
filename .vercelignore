@@ -1,8 +1,0 @@
-node_modules
-.runtime
-.playwright-mcp
-dist
-website
-pvtkrrx-web
-*.exe
-*.msi

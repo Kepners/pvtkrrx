@@ -30,7 +30,7 @@ const {
   // State & singletons
   lanPairStore, accountStore, stremioLinkStore, rateLimiters,
   watchedDeleteTimers, watchedDeleteInFlight,
-  IS_VERCEL_RUNTIME, SELF_HOST_SERVER_MODE, DEFAULT_LOCAL_HOSTNAME,
+  IS_HOSTED_RELAY_RUNTIME, SELF_HOST_SERVER_MODE, DEFAULT_LOCAL_HOSTNAME,
   STREAM_WAIT_TIMEOUT_MS, STREAM_WAIT_INTERVAL_MS,
   STREAM_RANGE_WAIT_TIMEOUT_MS, STREAM_RANGE_WAIT_INTERVAL_MS,
   STREAM_READY_START_FRACTION, STREAM_PRIORITIZE_LAST_PIECES,
@@ -2176,7 +2176,7 @@ app.post('/:config/qbit/postprocess', withConfig, requireLocalQbitControl, async
 // Used when no external fileServerUrl is configured (e.g. local qBit setup).
 app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('file'), async (req, res) => {
   try {
-    if (IS_VERCEL_RUNTIME && req.params.config !== 'local') {
+    if (IS_HOSTED_RELAY_RUNTIME && req.params.config !== 'local') {
       return res.status(403).json({
         error: 'Built-in file serving is disabled on hosted runtime',
         detail: 'Use File Server URL or LAN Pair local relay for playback'
@@ -2471,7 +2471,7 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
 // ─── Playback endpoint — Comet pattern ──────────────────────
 app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('playback'), async (req, res) => {
   try {
-    if (IS_VERCEL_RUNTIME && req.params.config !== 'local') {
+    if (IS_HOSTED_RELAY_RUNTIME && req.params.config !== 'local') {
       return res.status(403).json({
         error: 'Built-in playback buffering is disabled on hosted runtime',
         detail: 'Use File Server URL or LAN Pair local relay for playback'

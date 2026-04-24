@@ -30,7 +30,7 @@ The prestart meeting reviewed Peter's Implementation Programme (PROGRAMME.md) ag
 - All 10 acceptance criteria from SCOPE_OF_WORKS.md mapped to specific tasks
 - Programme verified against clockrr source code (exact pattern match)
 - Critical path identified: Phase 2 handlers (depend on all 3 clients)
-- Top risks: Torznab XML variance, Vercel 10s timeout, custom sports ID scheme
+- Top risks: Torznab XML variance, hosted runtime timeout, custom sports ID scheme
 - Key insight: "Don't rush Phase 3 — integration is where bugs hide"
 
 ### Colin (CTO) — BUILD-READY WITH 4 FIXES

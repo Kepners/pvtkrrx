@@ -146,6 +146,8 @@ npm run dist:win
 
 See [docs/TESTING.md](docs/TESTING.md) for the current verification guide.
 
+Hosted relay deployments should set `PVTKRRX_HOSTED_RELAY=true`. That keeps the public relay in guide/token mode and prevents it from serving local-only `/file` or `/playback` routes.
+
 ## Repository Map
 
 | Path | Purpose |
