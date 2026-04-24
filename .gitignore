@@ -2,6 +2,10 @@ node_modules/
 .vercel/
 .env
 
+# Local editor/workspace state
+.vscode/
+*.code-workspace
+
 # Reference images and screenshots
 *.png
 *.jpg

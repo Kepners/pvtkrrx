@@ -1,6 +1,6 @@
 # PVTKRRX Architecture
 
-Updated: 2026-04-23
+Updated: 2026-04-24
 
 ## Canonical Sources
 
@@ -26,7 +26,7 @@ Stremio client
    |                                         - /network-info
    |                                         - qBit/Prowlarr access
    |
-   +-- Hybrid Home / Remote Seedbox ---------> Hosted relay (https://www.pvtkrrx.cc)
+   +-- LAN Bridge / Remote Seedbox ----------> Hosted relay (https://www.pvtkrrx.cc)
                                              - Contabo Caddy -> live Express runtime
                                              - current public target: Coolify alias pvtkrrx:3000
                                              - hosted manifests/config tokens
@@ -76,13 +76,13 @@ Shared Contabo hosting and same-box network access are infrastructure couplings.
 
 ## Route Model
 
-`Hybrid Home` is the current name for the hosted home-device route.
-Legacy `LAN Bridge` strings still exist in some live UI/help surfaces and in the internal `lanPair*` field names, but they refer to the same hosted home-device path unless the docs explicitly call out the older strict-LAN profile.
+`LAN Bridge` is the current user-facing name for the hosted home-device route.
+The current LAN Bridge behavior is implemented by the code-facing `routeProfile=hybrid` profile. Older docs and some internal strings may still say `Hybrid Home`; treat that as naming drift unless a section explicitly describes the old strict LAN-only profile behind `routeProfile=lan`.
 
 | Route | Install surface | Runtime dependency | Intended device |
 |---|---|---|---|
 | `PC Local` | Local manifest on `127.0.0.1` | Local runtime only | The host Windows PC |
-| `Hybrid Home` | Hosted manifest with `lanPair*` fields | Hosted relay + live desktop heartbeat, with cloud fallback when configured | Other home devices on the same account |
+| `LAN Bridge` | Hosted manifest with `lanPair*` fields | Hosted relay + live desktop heartbeat, with cloud fallback when configured | Other home devices on the same account |
 | `Remote Seedbox` | Hosted manifest with public playback config | Hosted relay + public ready-file playback endpoints | Away-from-home / public route |
 
 ## Main Flows
@@ -91,8 +91,8 @@ Legacy `LAN Bridge` strings still exist in some live UI/help surfaces and in the
 
 1. User opens `/configure`.
 2. User selects a route card:
-   - Windows desktop/local runtime: `PC Local` or `Hybrid Home`
-   - Hosted public relay: `PC Local`, `Hybrid Home`, or `Remote Seedbox`
+   - Windows desktop/local runtime: `PC Local` or `LAN Bridge`
+   - Hosted public relay: `PC Local`, `LAN Bridge`, or `Remote Seedbox`
    - Explicit self-host server runtime: `Remote Seedbox` only
 3. The page focuses on the next action for that route.
 4. Manual/fallback controls stay hidden in `Hidden Setup Tabs`.
@@ -113,9 +113,9 @@ Legacy `LAN Bridge` strings still exist in some live UI/help surfaces and in the
    - recent runtime logs and clipboard export
 5. `Remote Seedbox` is intentionally not surfaced in the Windows EXE anymore; it belongs to the hosted/self-host server runtime.
 
-The current desktop popup copy still says `LAN Bridge`; the configure flow and hosted profile behavior now treat that route as `Hybrid Home`.
+The desktop popup, configure UI, and public guide should use `LAN Bridge` for the home-device route.
 
-### Hybrid Home Resolve
+### LAN Bridge Resolve
 
 1. Desktop runtime gathers LAN endpoints from `/network-info`.
 2. Desktop posts `pairId`, `pairKey`, and endpoints to `POST /pair/heartbeat`.
@@ -128,7 +128,7 @@ The current desktop popup copy still says `LAN Bridge`; the configure flow and h
 
 1. Stream handler resolves content from Prowlarr search plus qBittorrent state.
 2. Completed local files prefer `/file/:info`.
-3. Not-ready content uses `/playback/:info` only on playback-capable runtimes such as `PC Local`, `Hybrid Home` after local redirect, or self-hosted installs that actually serve `/playback`; once qBittorrent exposes the target file on a built-in playback-capable runtime, `/playback` immediately hands off to `/file/:info` so the shared file route can keep the player request alive while bytes arrive.
+3. Not-ready content uses `/playback/:info` only on playback-capable runtimes such as `PC Local`, `LAN Bridge` after local redirect, or self-hosted installs that actually serve `/playback`; once qBittorrent exposes the target file on a built-in playback-capable runtime, `/playback` immediately hands off to `/file/:info` so the shared file route can keep the player request alive while bytes arrive.
 4. External `fileServerUrl` is optional and mainly used when the local runtime cannot read the file directly.
 5. Hosted runtime fails fast rather than buffering or serving local-only playback.
 6. Completed local playback now correctly checks torrent completion state before redirecting to `/file`.
@@ -159,7 +159,7 @@ The current desktop popup copy still says `LAN Bridge`; the configure flow and h
 
 1. Raw `192.168.x.x` addon installs are not the supported Stremio install path.
 2. `PC Local` is same-host only.
-3. `Hybrid Home` needs the desktop app alive and heartbeating.
+3. `LAN Bridge` needs the desktop app alive and heartbeating for the home-network path.
 4. Hosted relay responses may redirect into the local runtime, but they should not become the video proxy.
 5. Hosted connection checks may validate public endpoints from the configure page, but they must not probe loopback/LAN/private targets.
 6. There is no `.pvtk` file format in the live code; the repo uses `pvtkrrx:` ids inside addon responses.

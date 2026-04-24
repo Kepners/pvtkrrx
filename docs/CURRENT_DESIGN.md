@@ -123,7 +123,7 @@ Operational behavior:
   - runtime log copy/open actions
   - explicit `Minimize`, `Send To Tray`, and `Exit App` actions
 - The configure page now mirrors that local-runtime visibility with a live qBittorrent status panel that shows the effective save path, incomplete path, fallback storage roots, and whether PVTKRRX currently manages the qBit completion hook.
-- Disk-backed Windows host configs now auto-upgrade older strict `LAN Bridge` local state to the current `Hybrid Home` fallback profile on load/save, so stale desktop configs stop failing closed when the host app is offline and the user intended cloud fallback.
+- Disk-backed Windows host configs now auto-upgrade older strict LAN-only local state to the current fallback-capable `LAN Bridge` profile (`routeProfile=hybrid`) on load/save, so stale desktop configs stop failing closed when the host app is offline and the user intended cloud fallback.
 - Hybrid hosted tokens can now adopt an account-linked hosted cloud profile on fallback, so the home-device route stops reusing dead desktop-local `127.0.0.1` backend URLs once the LAN pair is stale or offline.
 - The public homepage, sports page, and runbooks now use the brand-led `PVTKRRX` guide surface, point users at docs instead of `/configure`, and keep the locked route vocabulary (`PC Local`, `LAN Bridge`, `Remote Seedbox`).
 - The public homepage now shows a live release-status card driven by `/version-status.json`, and the Windows desktop shell shows the same release check in the popup.

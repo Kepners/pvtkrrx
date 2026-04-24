@@ -1,6 +1,6 @@
 # Stremio Install Protocol Tracker (Truth Table)
 
-Updated: 2026-04-06
+Updated: 2026-04-24
 
 ## Why this file exists
 
@@ -36,16 +36,16 @@ Link: https://github.com/Stremio/stremio-addon-client
 | `stremio://192.168.50.48:7000/local/manifest.json?mode=local` | FAIL | Ends up treated as `https://192.168.50.48:7000/...` and fails |
 | `https://192.168.50.48:7000/local/manifest.json?mode=local` | FAIL | Port `7000` is HTTP, not TLS |
 | Browser test: `http://192.168.50.48:7000/local/manifest.json?mode=local` | PASS | Confirms server + firewall path, not Stremio install acceptance |
-| `stremio://www.pvtkrrx.cc/{token}/manifest.json?mode=hosted` for `Hybrid Home` | PASS* | Correct synced route for other devices; uses LAN redirect at home and hosted fallback away |
-| Hosted `Hybrid Home` browsed on the host Windows desktop | WRONG ROUTE | The host desktop should use `PC Local` instead |
+| `stremio://www.pvtkrrx.cc/{token}/manifest.json?mode=hosted` for `LAN Bridge` | PASS* | Correct synced route for other devices; uses LAN redirect at home and hosted fallback away |
+| Hosted `LAN Bridge` browsed on the host Windows desktop | WRONG ROUTE | The host desktop should use `PC Local` instead |
 
 ## Conclusion
 
 - LAN reachability and Stremio addon-install rules are separate problems.
 - Raw LAN HTTP addon installs are still not the supported primary Stremio path.
 - `PC Local` is the only supported same-PC route.
-- `Hybrid Home` is the main synced route for the user's other devices on the same Stremio account.
-- If the host desktop shows `Failed to fetch` while browsing `Hybrid Home`, the fix is to use `PC Local` on that host, not to keep debugging the hosted route as if it were down.
+- `LAN Bridge` is the main synced route for the user's other devices on the same Stremio account.
+- If the host desktop shows `Failed to fetch` while browsing `LAN Bridge`, the fix is to use `PC Local` on that host, not to keep debugging the hosted route as if it were down.
 
 ## Real Client Result (Current)
 
@@ -66,12 +66,12 @@ Link: https://github.com/Stremio/stremio-addon-client
    - Stable copy/paste route: `http://127.0.0.1:7000/local/manifest.json?mode=local`
    - Real same-PC addon for movies, TV, sports, and library
 2. Hosted synced mode (phone/TV/account-sync on the same Stremio account):
-   - `Hybrid Home`
+   - `LAN Bridge`
    - Primary install link should be `stremio://www.pvtkrrx.cc/{token}/manifest.json?mode=hosted`
    - The plain `https://www.pvtkrrx.cc/{token}/manifest.json?mode=hosted` value is manual fallback only when Stremio explicitly shows an `Add Addon URL` box
    - Hosted requests 307-redirect to the active LAN endpoint when the host pair is online and the request is still on the home network
 3. Legacy/manual strict LAN mode:
-   - `LAN Bridge`
+   - code profile `routeProfile=lan`
    - Same hosted install shape, but fail-closed when the LAN pair is offline
 4. Hosted public mode:
    - `Remote Seedbox`
@@ -82,10 +82,10 @@ See also: `docs/ROUTE_FRAMEWORK.md`
 
 ## Current UX Shape
 
-- Configure now opens with three main route cards: `PC Local`, `Hybrid Home`, and `Remote Seedbox`.
+- Configure now opens with three main route cards: `PC Local`, `LAN Bridge`, and `Remote Seedbox`.
 - Each route shows a simplified next-step panel first.
 - Fallback/manual tools are hidden under `Hidden Setup Tabs`.
-- `Hybrid Home` setup tells the user to sign into Stremio on the host PC first, because the local host session is reused whenever possible.
+- `LAN Bridge` setup tells the user to sign into Stremio on the host PC first, because the local host session is reused whenever possible.
 - The desktop popup repeats the same rule and sends the user to the right setup page per route.
 
 ## Heartbeat / Desktop Notes
@@ -137,6 +137,6 @@ Get-Content "$env:APPDATA\PVTKRRX\runtime\logs\desktop-$(Get-Date -Format yyyy-M
 
 ## Remaining Sign-Off Blockers
 
-1. One extra Android TV or Android mobile `Hybrid Home` browse/play pass using the latest `1.1.33` desktop build for cross-client parity.
+1. One extra Android TV or Android mobile `LAN Bridge` browse/play pass using the latest desktop build for cross-client parity.
 2. One real public `Remote Seedbox` playback success.
 3. One auth-protected external file-server playback success on a real client.

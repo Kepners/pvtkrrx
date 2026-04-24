@@ -44,7 +44,7 @@
 | Item | Value |
 |------|-------|
 | Type | Stremio Addon |
-| Version | 1.1.34 |
+| Version | 1.1.38 |
 | Repo | github.com/Kepners/pvtkrrx |
 | Hosting | Contabo VPS via Caddy -> Coolify hosted relay + Local Windows runtime + optional Linux self-host runtime |
 | Framework | stremio-addon-sdk + Express v5 hybrid |
@@ -66,7 +66,7 @@
 
 ### Install Routes
 1. **PC Local** — same-PC addon via `127.0.0.1:7000`
-2. **Hybrid Home** — hosted manifest + desktop heartbeat → 307 redirect to LAN for other home devices
+2. **LAN Bridge** — hosted manifest + desktop heartbeat → 307 redirect to LAN for other home devices
 3. **Remote Seedbox** — hosted manifest + public HTTPS playback endpoints
 
 ---
@@ -214,5 +214,5 @@ Never push to a different branch expecting the live site to update.
 
 ---
 
-*Created: February 8, 2026 | Updated: April 6, 2026*
+*Created: February 8, 2026 | Updated: April 24, 2026*
 
