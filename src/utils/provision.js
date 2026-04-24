@@ -536,10 +536,13 @@ async function discoverProwlarrConfig(options = {}) {
   const apiKey = parseXmlValue(xml, 'ApiKey')
   const port = parseInt(parseXmlValue(xml, 'Port') || '9696', 10)
   const urlBase = parseXmlValue(xml, 'UrlBase')
-  const url = `http://127.0.0.1:${Number.isFinite(port) ? port : 9696}${urlBase ? `/${String(urlBase).replace(/^\/+/, '')}` : ''}`.replace(/\/+$/, '')
+  const installed = Boolean(cfg || hints?.serviceExists || (hints?.exePaths || []).length)
+  const url = installed
+    ? `http://127.0.0.1:${Number.isFinite(port) ? port : 9696}${urlBase ? `/${String(urlBase).replace(/^\/+/, '')}` : ''}`.replace(/\/+$/, '')
+    : ''
 
   return {
-    installed: Boolean(cfg || hints?.serviceExists || (hints?.exePaths || []).length),
+    installed,
     running: Boolean(hints?.running),
     url,
     apiKey,
@@ -720,10 +723,11 @@ async function discoverQbitConfig(options = {}) {
   const localHostAuth = parseIniValue(iniText, 'WebUI\\LocalHostAuth')
   const queueingSystemEnabled = parseIniValue(iniText, 'Session\\QueueingSystemEnabled') || parseIniValue(iniText, 'QueueingSystemEnabled')
 
+  const installed = Boolean(cfg || (hints?.exePaths || []).length || hints?.running)
   return {
-    installed: Boolean(cfg || (hints?.exePaths || []).length || hints?.running),
+    installed,
     running: Boolean(hints?.running),
-    url: `http://127.0.0.1:${Number.isFinite(port) ? port : 8080}`,
+    url: installed ? `http://127.0.0.1:${Number.isFinite(port) ? port : 8080}` : '',
     username,
     savePath,
     localHostAuthDisabled: String(localHostAuth || '').toLowerCase() === 'false',

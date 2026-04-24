@@ -146,10 +146,20 @@ async function run() {
       'Self-host config password',
       existingSelfHostPassword || randomSecret()
     )
+    const prowlarrDetectedHere = Boolean(prowlarr.installed)
+    const qbitDetectedHere = Boolean(qbit.installed)
+    if (!prowlarrDetectedHere) {
+      console.log('Prowlarr not detected on this host.')
+      console.log('  Enter the URL PVTKRRX can reach. Only use 127.0.0.1/localhost if Prowlarr is on this same server.')
+    }
+    const jackettUrlDefaultSource = prowlarrDetectedHere
+      ? String(prowlarr.url || existingConfig?.jackettUrl || 'http://localhost:9696').trim()
+      : String(existingConfig?.jackettUrl || '').trim()
     const jackettUrl = await promptValue(
       rl,
       'Prowlarr URL',
-      String(prowlarr.url || existingConfig?.jackettUrl || 'http://localhost:9696').trim()
+      jackettUrlDefaultSource,
+      { allowEmpty: !prowlarrDetectedHere }
     )
     const jackettApiKey = await promptValue(
       rl,
@@ -157,15 +167,23 @@ async function run() {
       String(existingConfig?.jackettApiKey || '').trim(),
       { allowEmpty: true }
     )
+    if (!qbitDetectedHere) {
+      console.log('qBittorrent not detected on this host.')
+      console.log('  Enter the URL PVTKRRX can reach. Only use 127.0.0.1/localhost if qBittorrent is on this same server.')
+    }
+    const qbitUrlDefaultSource = qbitDetectedHere
+      ? String(
+          (process.env.PVTKRRX_QBIT_WEBUI_PORT ? `http://127.0.0.1:${process.env.PVTKRRX_QBIT_WEBUI_PORT}` : '') ||
+          qbit.url ||
+          existingConfig?.qbitUrl ||
+          'http://localhost:8080'
+        ).trim()
+      : String(existingConfig?.qbitUrl || '').trim()
     const qbitUrl = await promptValue(
       rl,
       'qBittorrent URL',
-      String(
-        (process.env.PVTKRRX_QBIT_WEBUI_PORT ? `http://127.0.0.1:${process.env.PVTKRRX_QBIT_WEBUI_PORT}` : '') ||
-        qbit.url ||
-        existingConfig?.qbitUrl ||
-        'http://localhost:8080'
-      ).trim()
+      qbitUrlDefaultSource,
+      { allowEmpty: !qbitDetectedHere }
     )
     const qbitUsername = await promptValue(
       rl,

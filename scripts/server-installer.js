@@ -927,10 +927,23 @@ async function run() {
       defaultAllowedWebOrigins
     )
 
+    const prowlarrDetectedHere = Boolean(prowlarr.installed)
+    const qbitDetectedHere = Boolean(qbit.installed)
+    if (prowlarrDetectedHere) {
+      console.log('Prowlarr detected on this host. The suggested URL points to this server (loopback).')
+    } else {
+      console.log('Prowlarr was NOT detected on this host.')
+      console.log('  Enter the URL PVTKRRX can reach (e.g. http://seedbox.example.com:9696)')
+      console.log('  Only enter http://127.0.0.1:9696 if Prowlarr really runs on this same server.')
+    }
+    const jackettUrlDefault = prowlarrDetectedHere
+      ? sanitizeHttpUrlDefault(prowlarr.url || existingConfig?.jackettUrl || '', 'http://localhost:9696')
+      : sanitizeHttpUrlDefault(existingConfig?.jackettUrl || '', '', { allowEmpty: true })
     const jackettUrl = await promptHttpUrl(
       rl,
       'Prowlarr URL',
-      sanitizeHttpUrlDefault(prowlarr.url || existingConfig?.jackettUrl || '', 'http://localhost:9696')
+      jackettUrlDefault,
+      { allowEmpty: !prowlarrDetectedHere && !jackettUrlDefault }
     )
     const jackettApiKey = await promptValue(
       rl,
@@ -938,10 +951,21 @@ async function run() {
       String(existingConfig?.jackettApiKey || '').trim(),
       { allowEmpty: true }
     )
+    if (qbitDetectedHere) {
+      console.log('qBittorrent detected on this host. The suggested URL points to this server (loopback).')
+    } else {
+      console.log('qBittorrent was NOT detected on this host.')
+      console.log('  Enter the URL PVTKRRX can reach (e.g. http://seedbox.example.com:8080)')
+      console.log('  Only enter http://127.0.0.1:<port> if qBittorrent really runs on this same server.')
+    }
+    const qbitUrlDefault = qbitDetectedHere
+      ? sanitizeHttpUrlDefault(preferredQbitUrl || existingConfig?.qbitUrl || '', preferredQbitUrl)
+      : sanitizeHttpUrlDefault(existingConfig?.qbitUrl || '', '', { allowEmpty: true })
     const qbitUrl = await promptHttpUrl(
       rl,
       'qBittorrent URL',
-      sanitizeHttpUrlDefault(preferredQbitUrl || existingConfig?.qbitUrl || '', preferredQbitUrl)
+      qbitUrlDefault,
+      { allowEmpty: !qbitDetectedHere && !qbitUrlDefault }
     )
     const qbitUsername = await promptValue(
       rl,
@@ -1249,28 +1273,56 @@ async function runAuto() {
     envQbitPort || normalizePortNumber(qbit.port || '', 0) || 8080
   )
 
-  let jackettUrl = sanitizeHttpUrlDefault(prowlarr.url || existingConfig?.jackettUrl || '', 'http://localhost:9696')
+  const prowlarrDetectedHere = Boolean(prowlarr.installed)
+  const qbitDetectedHere = Boolean(qbit.installed)
+  const existingJackettUrl = String(existingConfig?.jackettUrl || '').trim()
+  const existingQbitUrl = String(existingConfig?.qbitUrl || '').trim()
+
+  let jackettUrl = ''
+  if (prowlarr.url) {
+    jackettUrl = sanitizeHttpUrlDefault(prowlarr.url, '', { allowEmpty: true })
+  } else if (existingJackettUrl) {
+    jackettUrl = sanitizeHttpUrlDefault(existingJackettUrl, '', { allowEmpty: true })
+  }
   let jackettApiKey = String(prowlarr.apiKey || existingConfig?.jackettApiKey || '').trim()
-  let qbitUrl = sanitizeHttpUrlDefault(preferredQbitUrl || qbit.url || existingConfig?.qbitUrl || '', preferredQbitUrl)
+  let qbitUrl = ''
+  if (qbitDetectedHere) {
+    qbitUrl = sanitizeHttpUrlDefault(preferredQbitUrl || qbit.url || '', '', { allowEmpty: true })
+  } else if (existingQbitUrl) {
+    qbitUrl = sanitizeHttpUrlDefault(existingQbitUrl, '', { allowEmpty: true })
+  }
   let qbitUsername = String(qbit.username || existingConfig?.qbitUsername || '').trim()
   let qbitPassword = String(existingConfig?.qbitPassword || '').trim()
 
-  if (prowlarr.configPath) {
-    console.log(`✓ Prowlarr detected at ${prowlarr.configPath}`)
-    console.log(`  URL: ${jackettUrl}`)
+  if (prowlarrDetectedHere) {
+    console.log(`✓ Prowlarr detected on this host${prowlarr.configPath ? ` at ${prowlarr.configPath}` : ''}`)
+    console.log(`  URL: ${jackettUrl || '(none)'}`)
     if (jackettApiKey) console.log(`  API key: ${jackettApiKey.slice(0, 8)}...`)
+  } else if (existingJackettUrl) {
+    console.log(`• Prowlarr not detected on this host. Keeping saved URL: ${existingJackettUrl}`)
+    console.log('  If Prowlarr runs on a different seedbox or VPS, leave this saved URL in place.')
+    console.log('  If you intended Prowlarr to be on this server, install it locally and re-run the installer.')
   } else {
-    console.log('⚠ Prowlarr config not found, using default URL. Configure later via /configure.')
+    console.log('⚠ Prowlarr not detected on this host and no saved URL present.')
+    console.log('  Leaving Prowlarr URL empty. Set it later in /configure:')
+    console.log('    • http://127.0.0.1:9696 only if Prowlarr is on this same server')
+    console.log('    • http://<seedbox-hostname>:<port> if Prowlarr runs elsewhere')
   }
 
-  if (qbit.configPath) {
-    console.log(`✓ qBittorrent detected at ${qbit.configPath}`)
-    console.log(`  URL: ${qbitUrl}`)
+  if (qbitDetectedHere) {
+    console.log(`✓ qBittorrent detected on this host${qbit.configPath ? ` at ${qbit.configPath}` : ''}`)
+    console.log(`  URL: ${qbitUrl || '(none)'}`)
     if (qbitUsername) console.log(`  Username: ${qbitUsername}`)
     if (qbit.savePath) console.log(`  Save path: ${qbit.savePath}`)
     if (qbit.localHostAuthDisabled) console.log('  Localhost auth: disabled')
+  } else if (existingQbitUrl) {
+    console.log(`• qBittorrent not detected on this host. Keeping saved URL: ${existingQbitUrl}`)
+    console.log('  If qBittorrent runs on a different seedbox or VPS, leave this saved URL in place.')
   } else {
-    console.log('⚠ qBittorrent config not found, using default URL. Configure later via /configure.')
+    console.log('⚠ qBittorrent not detected on this host and no saved URL present.')
+    console.log('  Leaving qBittorrent URL empty. Set it later in /configure:')
+    console.log('    • http://127.0.0.1:8080 only if qBittorrent is on this same server')
+    console.log('    • http://<seedbox-hostname>:<port> if qBittorrent runs elsewhere')
   }
 
   // ── Secrets ──

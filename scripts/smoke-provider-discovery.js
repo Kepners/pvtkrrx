@@ -11,7 +11,12 @@ async function run() {
   const originalEnv = {
     PVTKRRX_PROWLARR_DATA: process.env.PVTKRRX_PROWLARR_DATA,
     PVTKRRX_QBIT_DATA: process.env.PVTKRRX_QBIT_DATA,
-    PVTKRRX_QBIT_USER: process.env.PVTKRRX_QBIT_USER
+    PVTKRRX_QBIT_USER: process.env.PVTKRRX_QBIT_USER,
+    HOME: process.env.HOME,
+    USERPROFILE: process.env.USERPROFILE,
+    APPDATA: process.env.APPDATA,
+    LOCALAPPDATA: process.env.LOCALAPPDATA,
+    ProgramData: process.env.ProgramData
   }
 
   try {
@@ -66,6 +71,29 @@ Session\\DefaultSavePath=${downloadsDir}
     assert.equal(qbit.savePath, downloadsDir)
     assert.equal(qbit.localHostAuthDisabled, true)
 
+    const isolatedEnvRoot = path.join(tempRoot, 'isolated-env')
+    fs.mkdirSync(isolatedEnvRoot, { recursive: true })
+    process.env.PVTKRRX_PROWLARR_DATA = path.join(isolatedEnvRoot, 'missing-prowlarr')
+    process.env.PVTKRRX_QBIT_DATA = path.join(isolatedEnvRoot, 'missing-qbit')
+    process.env.PVTKRRX_QBIT_USER = ''
+    process.env.HOME = isolatedEnvRoot
+    process.env.USERPROFILE = isolatedEnvRoot
+    process.env.APPDATA = isolatedEnvRoot
+    process.env.LOCALAPPDATA = isolatedEnvRoot
+    process.env.ProgramData = isolatedEnvRoot
+
+    const missingProwlarr = await discoverProwlarrConfig({ useHints: false })
+    const missingQbit = await discoverQbitConfig({ useHints: false })
+
+    assert.equal(missingProwlarr.installed, false)
+    assert.equal(missingProwlarr.url, '', 'discovery must not invent a localhost Prowlarr URL when nothing was detected on this host')
+    assert.equal(missingProwlarr.apiKey, '')
+
+    assert.equal(missingQbit.installed, false)
+    assert.equal(missingQbit.url, '', 'discovery must not invent a localhost qBittorrent URL when nothing was detected on this host')
+    assert.equal(missingQbit.username, '')
+    assert.equal(missingQbit.savePath, '')
+
     console.log('Provider discovery smoke passed')
   } finally {
     if (originalEnv.PVTKRRX_PROWLARR_DATA === undefined) delete process.env.PVTKRRX_PROWLARR_DATA
@@ -76,6 +104,21 @@ Session\\DefaultSavePath=${downloadsDir}
 
     if (originalEnv.PVTKRRX_QBIT_USER === undefined) delete process.env.PVTKRRX_QBIT_USER
     else process.env.PVTKRRX_QBIT_USER = originalEnv.PVTKRRX_QBIT_USER
+
+    if (originalEnv.HOME === undefined) delete process.env.HOME
+    else process.env.HOME = originalEnv.HOME
+
+    if (originalEnv.USERPROFILE === undefined) delete process.env.USERPROFILE
+    else process.env.USERPROFILE = originalEnv.USERPROFILE
+
+    if (originalEnv.APPDATA === undefined) delete process.env.APPDATA
+    else process.env.APPDATA = originalEnv.APPDATA
+
+    if (originalEnv.LOCALAPPDATA === undefined) delete process.env.LOCALAPPDATA
+    else process.env.LOCALAPPDATA = originalEnv.LOCALAPPDATA
+
+    if (originalEnv.ProgramData === undefined) delete process.env.ProgramData
+    else process.env.ProgramData = originalEnv.ProgramData
 
     try {
       fs.rmSync(tempRoot, { recursive: true, force: true })
