@@ -442,6 +442,7 @@ setup_qbittorrent_service() {
   local unit_path="/etc/systemd/system/qbittorrent-nox.service"
   local service_was_active=0
   ensure_qbittorrent_user
+  local qbit_conf="$QBIT_DATA_DIR/.config/qBittorrent/qBittorrent.conf"
 
   local requested_port
   requested_port="$(normalize_port "$QBIT_PORT")"
@@ -449,24 +450,47 @@ setup_qbittorrent_service() {
     requested_port=8080
   fi
 
-  local selected_port
-  selected_port="$(pick_available_port "$requested_port" 8085 8090 8095 8100 8180)"
-  if [ -z "$selected_port" ]; then
-    echo "Could not find a free qBittorrent WebUI port near $requested_port" >&2
-    exit 1
+  local active_unit_port=""
+  if [ -f "$unit_path" ] && systemctl is-active --quiet qbittorrent-nox 2>/dev/null; then
+    service_was_active=1
+    active_unit_port="$(grep -oE -- '--webui-port[= ]+[0-9]+' "$unit_path" 2>/dev/null | tail -1 | grep -oE '[0-9]+$' || true)"
+    active_unit_port="$(normalize_port "$active_unit_port")"
   fi
-  if [ "$selected_port" != "$requested_port" ]; then
-    echo "✓ qBittorrent WebUI port moved to $selected_port to avoid a conflict"
+
+  local configured_port=""
+  if [ -f "$qbit_conf" ]; then
+    configured_port="$(grep -m1 -oE 'WebUI\\Port=[0-9]+' "$qbit_conf" 2>/dev/null | grep -oE '[0-9]+$' || true)"
+    configured_port="$(normalize_port "$configured_port")"
+  fi
+
+  local selected_port
+  if [ "$service_was_active" -eq 1 ] && [ -n "$active_unit_port" ]; then
+    selected_port="$active_unit_port"
+    if [ "$selected_port" != "$requested_port" ]; then
+      echo "✓ Keeping active qBittorrent WebUI port $selected_port"
+    fi
+  elif [ "$service_was_active" -eq 1 ] && [ -n "$configured_port" ]; then
+    selected_port="$configured_port"
+    if [ "$selected_port" != "$requested_port" ]; then
+      echo "✓ Keeping configured qBittorrent WebUI port $selected_port"
+    fi
+  else
+    selected_port="$(pick_available_port "$requested_port" 8085 8090 8095 8100 8180)"
+    if [ -z "$selected_port" ]; then
+      echo "Could not find a free qBittorrent WebUI port near $requested_port" >&2
+      exit 1
+    fi
+    if [ "$selected_port" != "$requested_port" ]; then
+      echo "✓ qBittorrent WebUI port moved to $selected_port to avoid a conflict"
+    fi
   fi
   QBIT_PORT="$selected_port"
 
-  local qbit_conf="$QBIT_DATA_DIR/.config/qBittorrent/qBittorrent.conf"
   if [ -f "$qbit_conf" ]; then
     write_ini_value "$qbit_conf" 'WebUI\Port' "$QBIT_PORT"
   fi
 
   if [ -f "$unit_path" ] && systemctl is-active --quiet qbittorrent-nox 2>/dev/null; then
-    service_was_active=1
     echo "✓ qBittorrent service already running"
   else
     # Create downloads dir

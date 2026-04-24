@@ -4,7 +4,7 @@ Updated: 2026-04-24
 
 ## Current Stage
 
-PVTKRRX is in a working `1.1.39` state on the main Windows/local and self-host route set. The current sports search contract is that any configured Prowlarr indexer can supply sports catalog and stream availability when the result passes the existing sports filters; SportsCult is no longer the only accepted tracker source.
+PVTKRRX is in a working `1.1.40` state on the main Windows/local and self-host route set. The current sports search contract is that any configured Prowlarr indexer can supply sports catalog and stream availability when the result passes the existing sports filters; SportsCult is no longer the only accepted tracker source.
 
 ## 2026-04-24: Sports tracker broad-search release
 
@@ -12,8 +12,9 @@ PVTKRRX is in a working `1.1.39` state on the main Windows/local and self-host r
 - Updated the sports catalog path so accepted sports availability can come from any configured Prowlarr indexer, not just `SportsCult`.
 - Updated the sports stream path so sparse sports-category lookups fall back to a broad Prowlarr search, merge unique results, and keep the existing packed/unverified torrent suppression.
 - Deployed the hotfix to `/opt/pvtkrrx` on the Contabo self-host runtime and re-proved the same MotoGP/Jerez stream route returns three tracker rows: `SportsCult`, `TorrentLeech`, and `Torrenting`.
-- Cut release `1.1.39` for the Windows EXE line and self-host update line so installed seedboxes can update from the published GitHub release. `1.1.38` was superseded after live installer proof exposed a non-fatal Prowlarr download-client sync failure that could still make the self-host installer exit non-zero.
+- Cut release `1.1.40` for the Windows EXE line and self-host update line so installed seedboxes can update from the published GitHub release. `1.1.38` was superseded after live installer proof exposed a non-fatal Prowlarr download-client sync failure that could still make the self-host installer exit non-zero; `1.1.39` was superseded after live proof showed the shell installer could treat qBittorrent's already-active WebUI port as a conflict and save the wrong qBit URL.
 - Updated `scripts/server-installer.js --auto` so optional Prowlarr/qBittorrent download-client sync failures warn and continue, matching the interactive installer behavior and preserving the app update.
+- Updated `scripts/install-selfhost.sh` so existing active qBittorrent installs keep their systemd/configured WebUI port instead of being moved to a guessed fallback port during updates.
 - Local release checks passed:
   - `npm run smoke:pipeline`
   - `npm run smoke:sports-catalog-seeds`
@@ -21,6 +22,7 @@ PVTKRRX is in a working `1.1.39` state on the main Windows/local and self-host r
   - `npm run smoke:selfhost`
   - `npm run smoke:config`
   - `node scripts/smoke-prowlarr-qbit-link.js`
+  - `(Get-Content scripts\install-selfhost.sh -Raw) -replace "\`r", "" | bash -n`
   - `npm run dist:win`
 
 ## 2026-04-24: Contabo self-host canonical sports meta type hotfix
