@@ -4,7 +4,7 @@ Updated: 2026-04-24
 
 ## Current Stage
 
-PVTKRRX is in a working `1.1.38` state on the main Windows/local and self-host route set. The current sports search contract is that any configured Prowlarr indexer can supply sports catalog and stream availability when the result passes the existing sports filters; SportsCult is no longer the only accepted tracker source.
+PVTKRRX is in a working `1.1.39` state on the main Windows/local and self-host route set. The current sports search contract is that any configured Prowlarr indexer can supply sports catalog and stream availability when the result passes the existing sports filters; SportsCult is no longer the only accepted tracker source.
 
 ## 2026-04-24: Sports tracker broad-search release
 
@@ -12,13 +12,15 @@ PVTKRRX is in a working `1.1.38` state on the main Windows/local and self-host r
 - Updated the sports catalog path so accepted sports availability can come from any configured Prowlarr indexer, not just `SportsCult`.
 - Updated the sports stream path so sparse sports-category lookups fall back to a broad Prowlarr search, merge unique results, and keep the existing packed/unverified torrent suppression.
 - Deployed the hotfix to `/opt/pvtkrrx` on the Contabo self-host runtime and re-proved the same MotoGP/Jerez stream route returns three tracker rows: `SportsCult`, `TorrentLeech`, and `Torrenting`.
-- Cut release `1.1.38` for the Windows EXE line and self-host update line so installed seedboxes can update from the published GitHub release.
+- Cut release `1.1.39` for the Windows EXE line and self-host update line so installed seedboxes can update from the published GitHub release. `1.1.38` was superseded after live installer proof exposed a non-fatal Prowlarr download-client sync failure that could still make the self-host installer exit non-zero.
+- Updated `scripts/server-installer.js --auto` so optional Prowlarr/qBittorrent download-client sync failures warn and continue, matching the interactive installer behavior and preserving the app update.
 - Local release checks passed:
   - `npm run smoke:pipeline`
   - `npm run smoke:sports-catalog-seeds`
   - `npm run smoke:sports-resolution`
   - `npm run smoke:selfhost`
   - `npm run smoke:config`
+  - `node scripts/smoke-prowlarr-qbit-link.js`
   - `npm run dist:win`
 
 ## 2026-04-24: Contabo self-host canonical sports meta type hotfix

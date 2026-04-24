@@ -1422,9 +1422,10 @@ async function runAuto() {
     queueingEnabled: Boolean(qbit.queueingEnabled)
   })
   if (!prowlarrSync.ok) {
-    throw new Error(`Prowlarr qBittorrent download client sync failed: ${prowlarrSync.message}`)
+    console.warn(`Prowlarr qBittorrent download client: ${prowlarrSync.message}`)
+  } else {
+    console.log(`✓ Prowlarr qBittorrent download client ${prowlarrSync.action}`)
   }
-  console.log(`✓ Prowlarr qBittorrent download client ${prowlarrSync.action}`)
 
   console.log('')
   console.log(`✓ Config saved to ${localConfigPath}`)
