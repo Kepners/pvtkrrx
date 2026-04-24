@@ -658,6 +658,53 @@ function sourceItemKey(item = {}) {
     .toLowerCase()
 }
 
+function isSportsStreamInfo(info = {}) {
+  return String(info?.k || '').trim().toLowerCase() === 'sports' ||
+    String(info?.x || '').trim().startsWith('sportsmeta:') ||
+    Boolean(String(info?.ak || '').trim())
+}
+
+function mergeUniqueSourceItems(...batches) {
+  const byKey = new Map()
+  for (const batch of batches) {
+    for (const item of (Array.isArray(batch) ? batch : [])) {
+      const key = sourceItemKey(item) ||
+        `${String(item?.indexer || '').trim().toLowerCase()}|${String(item?.title || '').trim().toLowerCase()}`
+      if (!key || byKey.has(key)) continue
+      byKey.set(key, item)
+    }
+  }
+  return [...byKey.values()]
+}
+
+async function runSportsProwlarrSearch(torznab, query, useCategories, contextLabel) {
+  const mode = useCategories ? `cats="${SPORT_CATS}" useCategories=true` : 'cats="all" useCategories=false'
+  console.log(`[stream] ${contextLabel} query="${query}" ${mode}`)
+  const searchResult = await settleWithTimeout(
+    torznab.search(query, SPORT_CATS, 'search', {
+      useCategories,
+      timeoutMs: STREAM_TITLE_FALLBACK_TIMEOUT_MS + 500
+    }),
+    STREAM_TITLE_FALLBACK_TIMEOUT_MS,
+    []
+  )
+  if (searchResult.timedOut) {
+    console.warn(`[stream] ${contextLabel} timed out after ${STREAM_TITLE_FALLBACK_TIMEOUT_MS}ms (${mode})`)
+  }
+  if (searchResult.error) {
+    console.error(`[stream] ${contextLabel} error (${mode}):`, searchResult.error?.message)
+  }
+  return Array.isArray(searchResult.value) ? searchResult.value : []
+}
+
+async function searchSportsProwlarrVariants(torznab, query, contextLabel) {
+  const categoryItems = await runSportsProwlarrSearch(torznab, query, true, contextLabel)
+  const broadItems = categoryItems.length < Math.min(10, STREAM_MAX_CANDIDATES)
+    ? await runSportsProwlarrSearch(torznab, query, false, `${contextLabel} broad fallback`)
+    : []
+  return mergeUniqueSourceItems(categoryItems, broadItems)
+}
+
 async function buildSupplementalSportsStreams({
   info,
   torznab,
@@ -677,42 +724,41 @@ async function buildSupplementalSportsStreams({
   }
 
   const targetEvent = buildStructuredSportsTarget(info)
-  if (!targetEvent?.date || !targetEvent?.homeTeam || !targetEvent?.awayTeam) return []
+  const queries = buildCustomSearchQueries(info)
+  const ranked = []
+  const rankedKeys = new Set()
 
-  const searchQuery = `${targetEvent.homeTeam} vs ${targetEvent.awayTeam}`
-  console.log(`[stream] Supplemental sports search query="${searchQuery}" cats="${SPORT_CATS}" useCategories=true`)
-  const searchResult = await settleWithTimeout(
-    torznab.search(searchQuery, SPORT_CATS, 'search', { useCategories: true }),
-    STREAM_TITLE_FALLBACK_TIMEOUT_MS,
-    []
-  )
-  const items = Array.isArray(searchResult.value) ? searchResult.value : []
-  if (searchResult.timedOut) {
-    console.warn(`[stream] Supplemental sports search timed out after ${STREAM_TITLE_FALLBACK_TIMEOUT_MS}ms`)
-  }
-  if (searchResult.error) {
-    console.error('[stream] Supplemental sports search error:', searchResult.error?.message)
-  }
+  for (const query of queries) {
+    const items = await searchSportsProwlarrVariants(torznab, query, 'Supplemental sports search')
+    for (const item of items) {
+      const key = sourceItemKey(item) ||
+        `${String(item?.indexer || '').trim().toLowerCase()}|${String(item?.title || '').trim().toLowerCase()}`
+      if (!key || rankedKeys.has(key)) continue
+      rankedKeys.add(key)
 
-  const ranked = items
-    .filter(item => !isSportsOnlyIndexer(item.indexer))
-    .filter(item => !isLikelyPackedReleaseTitle(item.title))
-    .filter(item => Boolean(item?.link || item?.infohash))
-    .map(item => {
-      const parsedEvent = parseLooseSportsEventTitle(item.title, item.pubDate)
-      if (!parsedEvent) return null
-
-      const dateDistance = sportsDateDistanceDays(targetEvent.date, parsedEvent.date)
-      const teamHits = sportsTeamMatchCount(targetEvent, parsedEvent)
-      if (dateDistance > 1 || teamHits < 1) return null
-
-      return {
-        item,
-        score: (teamHits * 100000000) + ((dateDistance === 0 ? 2 : 1) * 10000000) + scoreCandidate(item)
+      if (isLikelyPackedReleaseTitle(item.title)) {
+        ranked.push({ item, score: scoreCandidate(item), packed: true })
+        continue
       }
-    })
-    .filter(Boolean)
-    .sort((a, b) => b.score - a.score)
+      if (!Boolean(item?.link || item?.infohash)) continue
+      if (!similarTitle(item.title, query) && !similarTitle(item.title, info?.t || info?.n || '')) continue
+
+      let score = scoreCandidate(item)
+      if (targetEvent?.date && targetEvent?.homeTeam && targetEvent?.awayTeam) {
+        const parsedEvent = parseLooseSportsEventTitle(item.title, item.pubDate)
+        if (parsedEvent) {
+          const dateDistance = sportsDateDistanceDays(targetEvent.date, parsedEvent.date)
+          const teamHits = sportsTeamMatchCount(targetEvent, parsedEvent)
+          if (dateDistance > 1 || teamHits < 1) continue
+          score += (teamHits * 100000000) + ((dateDistance === 0 ? 2 : 1) * 10000000)
+        }
+      }
+
+      ranked.push({ item, score })
+    }
+  }
+
+  ranked.sort((a, b) => b.score - a.score)
 
   const deduped = []
   for (const entry of ranked) {
@@ -751,7 +797,7 @@ async function buildSupplementalSportsStreams({
       streams.push(buildOnTrackerStream(
         item,
         playbackUrl,
-        parse(item.title || searchQuery),
+        parse(item.title || queries[0] || ''),
         streamSourceOptions
       ))
     } catch (_) {
@@ -1079,9 +1125,7 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
   const streamSourceOptions = getStreamSourceOptions(configToken)
   const trackerPlaybackRestriction = getTrackerPlaybackRestriction(effectiveConfig, configToken)
   const trackerPlaybackEnabled = !trackerPlaybackRestriction
-  const allowSupplementalNonSportsCult = Boolean(availabilityAnchorKey) &&
-    String(resolvedInfo.q || '').trim().toLowerCase() === 'resolved' &&
-    String(resolvedInfo.x || '').trim().startsWith('sportsmeta:')
+  const allowSupplementalSportsResults = isSportsStreamInfo(resolvedInfo)
   const noticeCounts = createNoticeCounts()
   let torrents = []
   if (qbit) {
@@ -1199,7 +1243,7 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
     }
   }
 
-  if (allowSupplementalNonSportsCult) {
+  if (allowSupplementalSportsResults) {
     try {
       const supplementalStreams = await buildSupplementalSportsStreams({
         info: resolvedInfo,
@@ -1221,7 +1265,7 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
     }
   }
 
-  if (streams.length === 0 && torznab) {
+  if (streams.length === 0 && torznab && !allowSupplementalSportsResults) {
     const targetTitles = buildCustomSearchQueries(resolvedInfo)
     const primaryTargetTitle = normalizeSearchQuery(resolvedInfo.t || resolvedInfo.n || '')
     const seen = new Set()
@@ -1238,7 +1282,7 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
 
       const filtered = results.filter(r => {
         if (!r?.link) return false
-        if (!allowSupplementalNonSportsCult && !isSportsCultIndexer(r.indexer)) return false
+        if (!allowSupplementalSportsResults && !isSportsCultIndexer(r.indexer)) return false
         if (infoHash && String(r.infohash || '').toLowerCase() === infoHash) return true
         if (isLikelyPackedReleaseTitle(r.title)) return false
         return (

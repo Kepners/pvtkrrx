@@ -767,8 +767,8 @@ async function run() {
         'local'
       )
 
-      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4h packed non-SportsCult supplemental sports torrents should not leak into generic tracker playback')
-      assert.equal(findNoticeStream(result.streams, 'packed-archive-live-unsupported'), undefined, '#4h packed non-SportsCult supplemental sports torrents should stay suppressed entirely without a SportsCult anchor')
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4h packed supplemental sports torrents should not leak into generic tracker playback')
+      assert.ok(findNoticeStream(result.streams, 'packed-archive-live-unsupported'), '#4h packed supplemental sports torrents should surface the packed-release notice')
     })
 
     await withScenario(async () => {
@@ -802,8 +802,8 @@ async function run() {
         'local'
       )
 
-      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4i unverified non-SportsCult supplemental sports torrents should not be advertised as playable')
-      assert.equal(findNoticeStream(result.streams, 'tracker-link-unverified'), undefined, '#4i unverified non-SportsCult supplemental sports torrents should stay suppressed entirely without a SportsCult anchor')
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4i unverified supplemental sports torrents should not be advertised as playable')
+      assert.ok(findNoticeStream(result.streams, 'tracker-link-unverified'), '#4i unverified supplemental sports torrents should surface the tracker-link notice')
     })
 
     await withScenario(async () => {
@@ -949,6 +949,65 @@ async function run() {
 
     await withScenario(async () => {
       delete process.env.VERCEL
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      ProwlarrClient.prototype.search = async (_query, _cats, _type, options = {}) => {
+        const sportscult = trackerItem({
+          title: 'MotoGP 2026 Round04 Spain Jerez Practice WEB DL 1080p H264 English MWR',
+          link: 'https://tracker.example/download/motogp-sportscult.torrent',
+          infohash: '',
+          indexer: 'SportsCult',
+          seeders: 16
+        })
+        if (options.useCategories) return [sportscult]
+        return [
+          sportscult,
+          trackerItem({
+            title: 'MotoGP 2026 Round04 Spain Jerez Practice WEB-DL 1080p H264 English-MWR',
+            link: 'https://tracker.example/download/motogp-torrentleech.torrent',
+            infohash: '',
+            indexer: 'TorrentLeech',
+            seeders: 8
+          }),
+          trackerItem({
+            title: 'MotoGP 2026 Round04 Spain Jerez Practice WEB-DL 1080p H264 English-MWR',
+            link: 'https://tracker.example/download/motogp-torrenting.torrent',
+            infohash: '',
+            indexer: 'Torrenting',
+            seeders: 2
+          })
+        ]
+      }
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([
+        { path: 'MotoGP.2026.Round04.Spain.Jerez.Practice.1080p.mkv', length: 3_100_000_000 }
+      ]))
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'sports',
+        customPackedId({
+          t: 'MotoGP 2026 Round04 Spain Jerez Practice WEB DL 1080p H264 English MWR',
+          n: 'MotoGP 2026 Round04 Spain Jerez Practice',
+          h: '',
+          l: 'https://tracker.example/download/motogp-sportscult.torrent',
+          i: 'SportsCult',
+          r: 'motorsport'
+        }),
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      const playbackLinks = result.streams
+        .filter(stream => /\/playback\//.test(String(stream?.url || '')))
+        .map(stream => String(decodeOpaquePlaybackState(stream?.url || '')?.l || ''))
+      assert.equal(playbackLinks.length, 3, '#4m sports streams should include category and broad Prowlarr matches')
+      assert.ok(playbackLinks.includes('https://tracker.example/download/motogp-sportscult.torrent'), '#4m keeps the original SportsCult source')
+      assert.ok(playbackLinks.includes('https://tracker.example/download/motogp-torrentleech.torrent'), '#4m includes broad TorrentLeech sports source')
+      assert.ok(playbackLinks.includes('https://tracker.example/download/motogp-torrenting.torrent'), '#4m includes broad Torrenting sports source')
+    })
+
+    await withScenario(async () => {
+      delete process.env.VERCEL
       clearSportsAvailabilityAnchors()
       const anchorKey = setSportsAvailabilityAnchor({
         title: 'Premier.League.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-SC',
@@ -1027,7 +1086,7 @@ async function run() {
         'local'
       )
 
-      assert.equal(withoutAnchor.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4n non-SportsCult search results should not surface without a resolved SportsCult anchor')
+      assert.equal(withoutAnchor.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 1, '#4n matching sports search results should surface without requiring a SportsCult anchor')
 
       const anchorKey = setSportsAvailabilityAnchor({
         title: 'Premier.League.2026.03.15.Arsenal.vs.Chelsea.1080p.HDTV.x264-SC',
@@ -1058,7 +1117,7 @@ async function run() {
       const playbackLinks = playbackStates.map((state) => String(state?.l || ''))
 
       assert.ok(playbackLinks.includes('https://tracker.example/download/arsenal-chelsea-sportscult.torrent'), '#4n resolved anchors should retain the original SportsCult playback source')
-      assert.ok(playbackLinks.includes('https://tracker.example/download/arsenal-chelsea-general.torrent'), '#4n non-SportsCult streams may attach only after a resolved SportsCult anchor exists')
+      assert.ok(playbackLinks.includes('https://tracker.example/download/arsenal-chelsea-general.torrent'), '#4n non-SportsCult streams may attach alongside the original sports source')
     })
 
     console.log('Smoke stream pipeline passed')

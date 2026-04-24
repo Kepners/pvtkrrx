@@ -516,7 +516,6 @@ function normalizeSportsCatalogItems(items = []) {
 
 function filterSportsCatalogItems(normalizedItems = [], catalogSportHint = '', requestedDetail = '', limit = 50) {
   const strictFiltered = normalizedItems.filter(item =>
-    item.trackerSourceType === 'sportscult' &&
     itemMatchesSportsCatalog(item, catalogSportHint) &&
     itemMatchesSportsDetail(item, requestedDetail) &&
     isLikelySportsEventTitle(item.title, item.sportHint) &&
@@ -529,7 +528,6 @@ function filterSportsCatalogItems(normalizedItems = [], catalogSportHint = '', r
     // noise rejection so the catalog isn't empty on default browse or sparse
     // genre/search results.
     filtered = normalizedItems.filter(item =>
-      item.trackerSourceType === 'sportscult' &&
       itemMatchesSportsCatalog(item, catalogSportHint) &&
       itemMatchesSportsDetail(item, requestedDetail) &&
       !isSportsNoiseTitle(item.title) &&
@@ -537,17 +535,20 @@ function filterSportsCatalogItems(normalizedItems = [], catalogSportHint = '', r
     )
   }
 
-  const suppressedNonSportsCult = normalizedItems.filter(item =>
+  const nonSportsCultCandidates = normalizedItems.filter(item =>
     item.trackerSourceType !== 'sportscult' &&
     itemMatchesSportsCatalog(item, catalogSportHint) &&
     itemMatchesSportsDetail(item, requestedDetail) &&
     !isSportsNoiseTitle(item.title) &&
     !isLikelyPackedReleaseTitle(item.title)
   ).length
+  const nonSportsCultAccepted = filtered.filter(item => item.trackerSourceType !== 'sportscult').length
+  const suppressedNonSportsCult = Math.max(0, nonSportsCultCandidates - nonSportsCultAccepted)
 
   return {
     strictFiltered,
     filtered,
+    nonSportsCultAccepted,
     suppressedNonSportsCult
   }
 }
@@ -940,6 +941,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
   let {
     strictFiltered,
     filtered,
+    nonSportsCultAccepted,
     suppressedNonSportsCult
   } = filterSportsCatalogItems(normalizedItems, catalogSportHint, requestedDetail, limit)
 
@@ -959,6 +961,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     ;({
       strictFiltered,
       filtered,
+      nonSportsCultAccepted,
       suppressedNonSportsCult
     } = filterSportsCatalogItems(normalizedItems, catalogSportHint, requestedDetail, limit))
   }
@@ -1036,7 +1039,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
   }, {})
 
   console.log(
-    `[sports-catalog] catalog="${catalogDefinition?.id || 'pvtkrrx-sports'}" query="${query}" prowlarr=${items.length} normalized=${normalizedItems.length} strict=${strictFiltered.length} anchors=${filtered.length} suppressedNonSportsCult=${suppressedNonSportsCult} availabilityGroups=${groupedAvailability.length} identityWindow=${identityWindow.length} identityBudgetMs=${SPORTS_IDENTITY_PASS_BUDGET_MS} identityPassMs=${Date.now() - identityPassStart} identityTimedOut=${identityPassTimedOutCount} deferred=${deferredGroups.length} identityGroups=${groupedIdentity.length} emitted=${resolvedIdentityGroups.length} resolved=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.RESOLVED] || 0} ambiguous=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.AMBIGUOUS] || 0} notFound=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.NOT_FOUND] || 0} weak=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH] || 0} fallback=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY] || 0}`
+    `[sports-catalog] catalog="${catalogDefinition?.id || 'pvtkrrx-sports'}" query="${query}" prowlarr=${items.length} normalized=${normalizedItems.length} strict=${strictFiltered.length} anchors=${filtered.length} nonSportsCultAccepted=${nonSportsCultAccepted} nonSportsCultRejected=${suppressedNonSportsCult} availabilityGroups=${groupedAvailability.length} identityWindow=${identityWindow.length} identityBudgetMs=${SPORTS_IDENTITY_PASS_BUDGET_MS} identityPassMs=${Date.now() - identityPassStart} identityTimedOut=${identityPassTimedOutCount} deferred=${deferredGroups.length} identityGroups=${groupedIdentity.length} emitted=${resolvedIdentityGroups.length} resolved=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.RESOLVED] || 0} ambiguous=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.AMBIGUOUS] || 0} notFound=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.NOT_FOUND] || 0} weak=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH] || 0} fallback=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY] || 0}`
   )
 
   const pageGroups = resolvedIdentityGroups.slice(skip, skip + limit)

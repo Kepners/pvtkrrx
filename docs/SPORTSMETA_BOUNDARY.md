@@ -38,7 +38,7 @@ The shared Contabo VM does not make them the same product.
 
 ## Availability Vs Identity Rule
 
-- SportsCult / Prowlarr is the availability truth inside PVTKRRX sports browsing:
+- Prowlarr is the availability truth inside PVTKRRX sports browsing:
   - whether a row exists right now
   - torrent title, size, seeders, infohash, and download source
   - whether a stream can actually be offered
@@ -47,9 +47,9 @@ The shared Contabo VM does not make them the same product.
   - canonical naming, alias handling, ambiguity handling, and grouping ids
   - canonical artwork and metadata for resolved events
 - SportsMeta must not create sports catalog rows by itself inside PVTKRRX.
-  If SportsMeta knows an event exists but SportsCult / Prowlarr does not return a matching tracker item, that event must not appear in the user-facing PVTKRRX catalog.
+  If SportsMeta knows an event exists but Prowlarr does not return a matching tracker item from the user's configured indexers, that event must not appear in the user-facing PVTKRRX catalog.
 - PVTKRRX now enforces this as an explicit pipeline:
-  - fetch SportsCult availability
+  - fetch Prowlarr sports availability
   - parse tracker title hints
   - resolve through SportsMeta when hints are strong enough
   - enrich the already-available row if resolution is safe
@@ -65,8 +65,8 @@ The shared Contabo VM does not make them the same product.
   - keep the tracker row visible if it is available
   - keep fallback naming/art conservative
   - do not assign a fake canonical event or misleading artwork
-- Non-SportsCult indexers may only attach later as supplemental stream candidates after a SportsCult-backed row has already resolved safely to one canonical event.
-  They must not create independent catalog identity inside PVTKRRX.
+- Any configured Prowlarr indexer can create catalog and stream availability when the returned title passes PVTKRRX's sports filters.
+  Category `5060` searches remain the first pass; sparse exact stream searches can also use a broad Prowlarr fallback so sports releases filed under general TV categories are not hidden.
 
 ## Failure Rules
 
