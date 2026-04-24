@@ -40,17 +40,42 @@ const PROWLARR_SEARCH_CACHE_TTL_MS = Math.max(15000, parseInt(process.env.PVTKRR
 const PROWLARR_SEARCH_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_PROWLARR_SEARCH_TIMEOUT_MS || '7000', 10))
 const PROWLARR_SEARCH_CACHE_MAX_KEYS = Math.max(50, parseInt(process.env.PVTKRRX_PROWLARR_CACHE_MAX_KEYS || '500', 10))
 const SPORTS_SEED_CONCURRENCY = Math.max(1, parseInt(process.env.PVTKRRX_SPORTS_SEED_CONCURRENCY || '4', 10))
+const SPORTS_SEED_QUERY_TIMEOUT_MS = Math.max(
+  800,
+  parseInt(process.env.PVTKRRX_SPORTS_SEED_QUERY_TIMEOUT_MS || '1500', 10)
+)
 // Don't re-run a second pass of seed-term queries when the initial browse has
-// already produced enough items to populate the catalog page. The threshold is
-// generous so the enrich pass still fires on sparse browse days but gets
-// skipped when browse alone covered the catalog.
-const SPORTS_SEED_ENRICH_THRESHOLD = Math.max(1, parseInt(process.env.PVTKRRX_SPORTS_SEED_ENRICH_THRESHOLD || '40', 10))
+// already produced enough items to paint a usable first screen. Do not wait
+// for a near-full page before returning to tablet/home-device clients.
+const SPORTS_SEED_ENRICH_THRESHOLD = Math.max(1, parseInt(process.env.PVTKRRX_SPORTS_SEED_ENRICH_THRESHOLD || '12', 10))
 const SPORTS_CATALOG_CACHE_MAX_AGE = Math.max(
   120,
   parseInt(
     process.env.PVTKRRX_SPORTS_CATALOG_CACHE_MAX_AGE || process.env.PVTKRRX_SPORTS_CACHE_MAX_AGE || '600',
     10
   )
+)
+// Overfetch beyond the emitted page so `mergeSportsIdentityGroups` can still
+// collapse within-page canonical-id duplicates. Kept small: each extra group
+// is up to ~6 serialized SportsMeta HTTP calls in the worst case, and each
+// one is wall-clock latency on the tablet first-screen path.
+const SPORTS_IDENTITY_PAGE_OVERFETCH = Math.max(
+  0,
+  parseInt(process.env.PVTKRRX_SPORTS_IDENTITY_OVERFETCH || '5', 10)
+)
+// Identity resolution is network-bound against SportsMeta. 16 inflight is
+// comfortable for the hosted service and halves wall time vs the old default.
+const SPORTS_IDENTITY_CONCURRENCY = Math.max(
+  2,
+  parseInt(process.env.PVTKRRX_SPORTS_IDENTITY_CONCURRENCY || '16', 10)
+)
+// Hard wall-clock ceiling on the entire identity-resolution pass. Any group
+// that hasn't resolved in time ships with a FALLBACK_ONLY status and a
+// `pvtkrrx:` custom id. Caps tablet first-screen latency under variable
+// real-world SportsMeta/Prowlarr response times.
+const SPORTS_IDENTITY_PASS_BUDGET_MS = Math.max(
+  500,
+  parseInt(process.env.PVTKRRX_SPORTS_IDENTITY_BUDGET_MS || '1000', 10)
 )
 const DEBUG_SPORTS_RESOLUTION = /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_DEBUG_SPORTS_RESOLUTION || '').trim())
 
@@ -253,15 +278,19 @@ async function cachedProwlarrSearch(config, client, query, cats, type = 'search'
   if (prowlarrSearchInFlight.has(key)) return prowlarrSearchInFlight.get(key)
 
   const fallback = Array.isArray(cached?.value) ? cached.value : []
+  const effectiveTimeoutMs = Math.max(
+    1000,
+    Number(options?.timeoutMs) || PROWLARR_SEARCH_TIMEOUT_MS
+  )
   // Give the underlying fetch a small grace window beyond the wrapper budget
   // so the AbortSignal fires shortly AFTER `settleWithTimeout` has already
   // returned the fallback. Without this, the Prowlarr client would keep
   // sockets open on its own hardcoded timeout long after the caller has
   // given up, consuming Prowlarr capacity and starving parallel seed queries.
-  const searchOptions = { ...options, timeoutMs: PROWLARR_SEARCH_TIMEOUT_MS + 500 }
+  const searchOptions = { ...options, timeoutMs: effectiveTimeoutMs + 500 }
   const pending = settleWithTimeout(
     client.search(query, cats, type, searchOptions),
-    PROWLARR_SEARCH_TIMEOUT_MS,
+    effectiveTimeoutMs,
     fallback
   ).then((result) => {
     const value = Array.isArray(result?.value) ? result.value : fallback
@@ -312,6 +341,20 @@ async function searchSportsCatalogItems(config, torznab, query, limit) {
     SPORT_CATS
   )
   return mergeUniqueProwlarrItems(strictItems, broadItems)
+}
+
+async function searchSportsCatalogSeedItems(config, torznab, query) {
+  return cachedProwlarrSearch(
+    config,
+    torznab,
+    query,
+    SPORT_CATS,
+    'search',
+    {
+      useCategories: true,
+      timeoutMs: SPORTS_SEED_QUERY_TIMEOUT_MS
+    }
+  )
 }
 
 async function mapLimit(items, limit, mapper) {
@@ -887,7 +930,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       const seedBatches = await mapLimit(
         SEED_TERMS,
         SPORTS_SEED_CONCURRENCY,
-        (term) => cachedProwlarrSearch(config, torznab, term, SPORT_CATS)
+        (term) => searchSportsCatalogSeedItems(config, torznab, term)
       )
       items = mergeUniqueProwlarrItems(...seedBatches)
     }
@@ -909,7 +952,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     const seedBatches = await mapLimit(
       getSportsSearchSeedTerms(catalogSportHint),
       SPORTS_SEED_CONCURRENCY,
-      (term) => searchSportsCatalogItems(config, torznab, term, limit)
+      (term) => searchSportsCatalogSeedItems(config, torznab, term)
     )
     items = mergeUniqueProwlarrItems(items, ...seedBatches)
     normalizedItems = normalizeSportsCatalogItems(items)
@@ -935,30 +978,65 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
   }
 
   const groupedAvailability = groupSportsAvailabilityItems(filtered.sort((a, b) => compareItems(a, b, query)), query)
-  const resolvedAvailabilityGroups = await mapLimit(groupedAvailability, 6, async (group) => {
-    const sportsMetaResolution = await resolveSportsMetaIdentity(sportsMeta, group.bestAvailability)
-    const resolvedGroup = {
-      ...group,
-      sportsMetaResolution
+  // First-screen latency fix: resolve canonical SportsMeta identity only for
+  // the window that will actually be emitted (plus a small overfetch so
+  // `mergeSportsIdentityGroups` can still collapse within-page duplicates).
+  // Groups beyond the window keep the fallback `pvtkrrx:` custom id they
+  // already fall back to — a later meta/stream request re-resolves lazily
+  // against the 60s SportsMeta cache.
+  const identityWindowEnd = Math.max(
+    0,
+    Math.min(groupedAvailability.length, skip + limit + SPORTS_IDENTITY_PAGE_OVERFETCH)
+  )
+  const identityWindow = groupedAvailability.slice(0, identityWindowEnd)
+  const identityPassStart = Date.now()
+  const deferredResolution = (reason) => ({
+    status: SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY,
+    identityType: 'deferred',
+    query: {},
+    reason,
+    canonicalId: '',
+    canonical: null
+  })
+  let identityPassTimedOutCount = 0
+  const resolvedIdentityWindow = await mapLimit(identityWindow, SPORTS_IDENTITY_CONCURRENCY, async (group) => {
+    const remaining = SPORTS_IDENTITY_PASS_BUDGET_MS - (Date.now() - identityPassStart)
+    if (remaining <= 0) {
+      identityPassTimedOutCount += 1
+      return { ...group, sportsMetaResolution: deferredResolution('identity_budget_exhausted') }
     }
+    const outcome = await settleWithTimeout(
+      resolveSportsMetaIdentity(sportsMeta, group.bestAvailability, { fastFail: true }),
+      remaining,
+      null
+    )
+    const sportsMetaResolution = outcome.timedOut || !outcome.value
+      ? deferredResolution(outcome.timedOut ? 'identity_budget_exhausted' : 'identity_resolve_failed')
+      : outcome.value
+    if (outcome.timedOut) identityPassTimedOutCount += 1
+    const resolvedGroup = { ...group, sportsMetaResolution }
     logSportsAvailabilityResolution(resolvedGroup)
     return resolvedGroup
   })
-  const groupedIdentity = mergeSportsIdentityGroups(resolvedAvailabilityGroups, query)
-  // Emit every group. Resolved groups get a canonical `sportsmeta:` id and
-  // SportsMeta canonical artwork. Unresolved groups still emit with a
-  // `pvtkrrx:` custom id and the SportsMeta default poster for the sport —
-  // never a silently dropped item.
-  const resolvedIdentityGroups = groupedIdentity
+  const groupedIdentity = mergeSportsIdentityGroups(resolvedIdentityWindow, query)
+  // Emit resolved-window groups first (canonical ids where available), then
+  // append deferred groups with fallback custom ids so the catalog still
+  // shows the full page on sparse days. Deferred groups carry a
+  // FALLBACK_ONLY resolution so `encodeCustomId` runs instead of canonical.
+  const deferredGroups = groupedAvailability.slice(identityWindowEnd).map((group) => ({
+    ...group,
+    sportsMetaResolution: deferredResolution('deferred_beyond_identity_window')
+  }))
+  const resolvedIdentityGroups = [...groupedIdentity, ...deferredGroups]
 
-  const resolutionCounts = resolvedAvailabilityGroups.reduce((counts, group) => {
+  const resolutionCounts = resolvedIdentityWindow.reduce((counts, group) => {
     const state = String(group?.sportsMetaResolution?.status || SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY)
     counts[state] = (counts[state] || 0) + 1
     return counts
   }, {})
 
   console.log(
-    `[sports-catalog] catalog="${catalogDefinition?.id || 'pvtkrrx-sports'}" query="${query}" prowlarr=${items.length} normalized=${normalizedItems.length} strict=${strictFiltered.length} anchors=${filtered.length} suppressedNonSportsCult=${suppressedNonSportsCult} availabilityGroups=${groupedAvailability.length} identityGroups=${groupedIdentity.length} emitted=${resolvedIdentityGroups.length} resolved=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.RESOLVED] || 0} ambiguous=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.AMBIGUOUS] || 0} notFound=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.NOT_FOUND] || 0} weak=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH] || 0} fallback=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY] || 0}`
+    `[sports-catalog] catalog="${catalogDefinition?.id || 'pvtkrrx-sports'}" query="${query}" prowlarr=${items.length} normalized=${normalizedItems.length} strict=${strictFiltered.length} anchors=${filtered.length} suppressedNonSportsCult=${suppressedNonSportsCult} availabilityGroups=${groupedAvailability.length} identityWindow=${identityWindow.length} identityBudgetMs=${SPORTS_IDENTITY_PASS_BUDGET_MS} identityPassMs=${Date.now() - identityPassStart} identityTimedOut=${identityPassTimedOutCount} deferred=${deferredGroups.length} identityGroups=${groupedIdentity.length} emitted=${resolvedIdentityGroups.length} resolved=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.RESOLVED] || 0} ambiguous=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.AMBIGUOUS] || 0} notFound=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.NOT_FOUND] || 0} weak=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH] || 0} fallback=${resolutionCounts[SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY] || 0}`
   )
 
   const pageGroups = resolvedIdentityGroups.slice(skip, skip + limit)

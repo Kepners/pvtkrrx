@@ -991,7 +991,7 @@ async function resolveSportsMetaIdentityBySearch(client, query = {}) {
   return null
 }
 
-async function resolveSportsMetaIdentity(client, availability = {}) {
+async function resolveSportsMetaIdentity(client, availability = {}, options = {}) {
   const plan = buildSportsMetaResolutionPlan(availability)
   if (plan.attempts.length === 0) {
     const query = plan.fallback
@@ -1003,6 +1003,22 @@ async function resolveSportsMetaIdentity(client, availability = {}) {
       canonicalId: '',
       canonical: null
     }
+  }
+
+  // fastFail path — used by the sports catalog first-screen. When the
+  // structured tracker-title parse already produced a matchup/event attempt,
+  // skip the ~12 heuristic_league_split / heuristic_vs_separator variants
+  // (they re-shape the same tokens and rarely succeed where the structured
+  // attempt failed) and defer the searchCatalog fallback to a single run
+  // after all attempts fail. Cuts 80%+ of SportsMeta round trips per group
+  // on the common 404 path without changing meta-route behavior.
+  const fastFail = Boolean(options?.fastFail)
+  let attempts = plan.attempts
+  if (fastFail) {
+    const structured = plan.attempts.filter(
+      (attempt) => !String(attempt?.reason || '').startsWith('heuristic_')
+    )
+    if (structured.length > 0) attempts = structured
   }
 
   let bestFailure = null
@@ -1021,7 +1037,12 @@ async function resolveSportsMetaIdentity(client, availability = {}) {
     }
   }
 
-  for (const query of plan.attempts) {
+  const runSearchFallback = async (query) => {
+    if (fastFail) return null
+    return resolveSportsMetaIdentityBySearch(client, query)
+  }
+
+  for (const query of attempts) {
     const params = query?.params || {}
     if (query.identityType === 'matchup') {
       if (!params.date || !params.home || !params.away || (!params.league && !params.sport)) {
@@ -1042,7 +1063,7 @@ async function resolveSportsMetaIdentity(client, availability = {}) {
     } catch (error) {
       const statusCode = Number(error?.status || 0)
       if (statusCode === 409) {
-        const searchResolution = await resolveSportsMetaIdentityBySearch(client, query)
+        const searchResolution = await runSearchFallback(query)
         if (searchResolution) return searchResolution
         recordFailure({
           status: SPORTS_META_RESOLUTION_STATUS.AMBIGUOUS,
@@ -1055,7 +1076,7 @@ async function resolveSportsMetaIdentity(client, availability = {}) {
         continue
       }
 
-      const searchResolution = await resolveSportsMetaIdentityBySearch(client, query)
+      const searchResolution = await runSearchFallback(query)
       if (searchResolution) return searchResolution
       recordFailure({
         status: SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY,
@@ -1069,7 +1090,7 @@ async function resolveSportsMetaIdentity(client, availability = {}) {
     }
 
     if (!payload) {
-      const searchResolution = await resolveSportsMetaIdentityBySearch(client, query)
+      const searchResolution = await runSearchFallback(query)
       if (searchResolution) return searchResolution
       recordFailure({
         status: SPORTS_META_RESOLUTION_STATUS.NOT_FOUND,
@@ -1094,7 +1115,7 @@ async function resolveSportsMetaIdentity(client, availability = {}) {
       }
     }
 
-    const searchResolution = await resolveSportsMetaIdentityBySearch(client, query)
+    const searchResolution = await runSearchFallback(query)
     if (searchResolution) return searchResolution
     recordFailure({
       status: verification.status,
@@ -1104,6 +1125,13 @@ async function resolveSportsMetaIdentity(client, availability = {}) {
       canonicalId: String(payload?.canonicalId || payload?.event?.id || '').trim(),
       canonical: payload
     })
+  }
+
+  // fastFail defers search to one terminal attempt so we still try the
+  // catalog search path once per group instead of 5-12 times.
+  if (fastFail && attempts.length > 0) {
+    const searchResolution = await resolveSportsMetaIdentityBySearch(client, attempts[0])
+    if (searchResolution) return searchResolution
   }
 
   return bestFailure || {
