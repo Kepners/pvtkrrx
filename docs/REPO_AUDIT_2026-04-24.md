@@ -50,7 +50,7 @@ The GitHub root was carrying local editor files, runtime logs, stale MVP notes, 
 - The three user-facing routes are `PC Local`, `LAN Bridge`, and `Remote Seedbox`.
 - Current `LAN Bridge` behavior is still implemented internally as `routeProfile=hybrid`.
 - Hosted Remote Seedbox remains ready-file-first unless the runtime is explicitly self-hosted and playback-capable.
-- SportsMeta remains the separate sports identity/artwork/billing service. PVTKRRX does not currently have its own paid stream-addon unlock gate.
+- SportsMeta remains the separate sports identity/artwork/billing service. PVTKRRX does not currently require payment before the stream addon works.
 
 ## Remaining Caveats
 

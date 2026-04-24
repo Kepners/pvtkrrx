@@ -87,17 +87,17 @@ The hosted public relay does not proxy video bytes and does not queue-and-buffer
 
 ## Billing And Unlocks
 
-There is no paid PVTKRRX stream-addon unlock gate in the current repo.
+PVTKRRX does not currently require payment before the stream addon works.
 
 Current behavior:
 
 - PVTKRRX stream routes are free on the tested paths.
 - Stremio account linking is used for account-aware route setup and LAN Bridge/cloud fallback, not as a payment gate.
-- The self-host server password unlocks private server administration on your own runtime, not paid service access.
+- The self-host server password opens private server administration on your own runtime. It is not a paid service login.
 - SportsMeta is a separate companion sports identity/artwork service at `https://sportsmeta.pvtkrrx.cc`.
 - SportsMeta paid member routes are separate from the PVTKRRX stream addon. PVTKRRX itself currently consumes the public SportsMeta artwork surface and proxies it as client-safe PNG artwork.
 
-Practical answer: to use PVTKRRX, configure your own Prowlarr/qBittorrent setup and install the route that matches your playback path. There is no in-app "unlock PVTKRRX" purchase flow to complete first.
+Practical answer: to use PVTKRRX, configure your own Prowlarr/qBittorrent setup and install the route that matches your playback path. There is no in-app purchase step to complete first.
 
 ## What Appears In Stremio
 
