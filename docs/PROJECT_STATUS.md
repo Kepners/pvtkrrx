@@ -4,7 +4,7 @@ Updated: 2026-04-24
 
 ## Current Stage
 
-PVTKRRX is in a working `1.1.40` state on the main Windows/local and self-host route set. The current sports search contract is that any configured Prowlarr indexer can supply sports catalog and stream availability when the result passes the existing sports filters; SportsCult is no longer the only accepted tracker source.
+PVTKRRX is in a working `1.1.41` state on the main Windows/local and self-host route set. The current sports search contract is that any configured Prowlarr indexer can supply sports catalog and stream availability when the result passes the existing sports filters; SportsCult is no longer the only accepted tracker source.
 
 ## 2026-04-25: Sports poster/result backfill hardening
 
@@ -25,6 +25,13 @@ PVTKRRX is in a working `1.1.40` state on the main Windows/local and self-host r
   - `npm run smoke:sports-catalog-latency`
   - `npm run smoke:selfhost`
   - `npm run smoke:config`
+- Release follow-up:
+  - bumped PVTKRRX to `1.1.41`
+  - rebuilt the Windows EXE line with `npm run dist:win`
+  - published GitHub desktop release `v1.1.41` with `latest.yml`, setup EXE, blockmap, and portable EXE assets
+  - published self-host prerelease `v1.12.26-selfhost`
+  - updated the Contabo self-host runtime from `v1.12.26-selfhost`; `https://pvt.kepners.co.uk/version-status.json` reports `currentVersion=1.1.41`, `latestVersion=1.1.41`, and `updateAvailable=false`
+  - `https://www.pvtkrrx.cc/version-status.json` also reports `currentVersion=1.1.41`, `latestVersion=1.1.41`, and `updateAvailable=false`
 
 ## 2026-04-24: Sports tracker broad-search release
 
