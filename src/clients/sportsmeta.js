@@ -308,14 +308,46 @@ function buildSportsMetaAssetUrl(baseUrl, variant, canonicalId) {
   return `${base}/asset/${encodeURIComponent(v)}/${encodeURIComponent(id)}`
 }
 
-function buildSportsMetaDefaultAssetUrl(baseUrl, variant, sport, league = '') {
+function normalizeSportsMetaMemberToken(value) {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  try {
+    const parsed = new URL(raw)
+    const match = parsed.pathname.match(/\/member\/([^/?#]+)/i)
+    if (match?.[1]) return decodeURIComponent(match[1]).trim()
+  } catch (_) {}
+  const pathMatch = raw.match(/\/member\/([^/?#\s]+)/i)
+  if (pathMatch?.[1]) {
+    try {
+      return decodeURIComponent(pathMatch[1]).trim()
+    } catch (_) {
+      return pathMatch[1].trim()
+    }
+  }
+  return raw.replace(/^bearer\s+/i, '').trim()
+}
+
+function buildSportsMetaMemberAssetUrl(baseUrl, memberToken, variant, canonicalId) {
+  const base = getPublicSportsMetaBaseUrl(baseUrl)
+  const token = normalizeSportsMetaMemberToken(memberToken)
+  const v = String(variant || '').trim()
+  const id = String(canonicalId || '').trim()
+  if (!base || !token || !v || !id) return ''
+  return `${base}/member/${encodeURIComponent(token)}/asset/${encodeURIComponent(v)}/${encodeURIComponent(id)}`
+}
+
+function buildSportsMetaDefaultAssetUrl(baseUrl, variant, sport, league = '', options = {}) {
   const base = getPublicSportsMetaBaseUrl(baseUrl)
   const v = String(variant || '').trim()
   const slug = resolveSportSlug(sport)
   if (!base || !v || !slug) return ''
   const url = new URL(`${base}/asset/default/${encodeURIComponent(v)}/${encodeURIComponent(slug)}`)
   const leagueValue = String(league || '').trim()
+  const titleValue = String(options?.title || '').trim()
+  const dateValue = String(options?.date || '').trim()
   if (leagueValue) url.searchParams.set('league', leagueValue)
+  if (titleValue) url.searchParams.set('title', titleValue)
+  if (dateValue) url.searchParams.set('date', dateValue)
   return url.toString()
 }
 
@@ -323,9 +355,11 @@ module.exports = {
   DEFAULT_BASE_URL,
   buildSportsMetaAssetUrl,
   buildSportsMetaDefaultAssetUrl,
+  buildSportsMetaMemberAssetUrl,
   getPublicSportsMetaBaseUrl,
   normalizeSportsMetaPayload,
   normalizeSportsMetaResolveQuery,
+  normalizeSportsMetaMemberToken,
   resolveSportSlug,
   SportsMetaClient
 }

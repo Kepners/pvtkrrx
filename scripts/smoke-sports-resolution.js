@@ -6,6 +6,9 @@ const {
   SPORTS_META_RESOLUTION_STATUS,
   resolveSportsMetaIdentity
 } = require('../src/utils/sportsIdentityResolution')
+const {
+  resolveSportsPosterAsset
+} = require('../src/utils/sportsArtwork')
 const { parseSportsEventTitle, parseSportsTitle } = require('../src/utils/sportsTitleParser')
 
 const ORIGINAL_FETCH = global.fetch
@@ -209,6 +212,33 @@ async function run() {
     { baseUrl: 'https://addon.test' }
   )
   assert.equal(sportsMetaResponse.meta?.type, 'sports', 'canonical SportsMeta rows requested on the sports surface must return meta.type=sports')
+
+  const paidSportsMetaResponse = await handleMeta(
+    {
+      sportsmetaBaseUrl: 'https://sportsmeta.test',
+      sportsPosterMemberToken: 'https://sportsmeta.test/member/sm_paid_poster_token'
+    },
+    'sports',
+    barcaId,
+    { baseUrl: 'https://addon.test' }
+  )
+  assert.equal(
+    paidSportsMetaResponse.meta?.poster,
+    `https://sportsmeta.test/member/sm_paid_poster_token/asset/poster/${encodeURIComponent(barcaId)}`,
+    'paid sports configs must emit direct SportsMeta member poster URLs for canonical sports art'
+  )
+
+  const fallbackPoster = resolveSportsPosterAsset({
+    baseUrl: 'https://addon.test',
+    sportsmetaBaseUrl: 'https://sportsmeta.test',
+    sportHint: 'basketball',
+    league: 'NBA',
+    title: 'Atlanta Hawks vs New York Knicks',
+    date: '2026-04-23'
+  })
+  assert.match(fallbackPoster.poster, /\/sports-artwork\/default\/poster\/basketball\.png/, 'fallback sports artwork should stay on the PVTKRRX raster proxy')
+  assert.match(fallbackPoster.poster, /title=Atlanta\+Hawks\+vs\+New\+York\+Knicks/, 'fallback sports artwork should carry the game title')
+  assert.match(fallbackPoster.poster, /date=2026-04-23/, 'fallback sports artwork should carry the event date')
 
   const mmaResolution = await resolveSportsMetaIdentity(
     client,

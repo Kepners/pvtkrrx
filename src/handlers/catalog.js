@@ -1080,11 +1080,14 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     const artworkInput = {
       baseUrl: addonBaseUrl,
       sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
+      sportsPosterMemberToken: config?.sportsPosterMemberToken,
       canonicalId: sportsMetaResolution?.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED
         ? canonicalCatalogIdForArtwork
         : '',
       sportHint: resolvedSportHint,
-      league
+      league,
+      title: displayTitle,
+      date: eventDate
     }
     const { poster: posterUrl, posterShape } = resolveSportsPosterAsset(artworkInput)
     const backgroundUrl = resolveSportsBackgroundAsset(artworkInput)

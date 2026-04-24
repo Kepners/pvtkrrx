@@ -43,11 +43,14 @@ function normalizeVariant(value) {
   return ALLOWED_VARIANTS.has(v) ? v : ''
 }
 
-function buildUpstreamUrl({ kind, variant, canonicalId, sport, league, sportsmetaBaseUrl }) {
+function buildUpstreamUrl({ kind, variant, canonicalId, sport, league, title, date, sportsmetaBaseUrl }) {
   if (kind === 'id') {
     return buildSportsMetaAssetUrl(sportsmetaBaseUrl || '', variant, canonicalId)
   }
-  return buildSportsMetaDefaultAssetUrl(sportsmetaBaseUrl || '', variant, sport, league || '')
+  return buildSportsMetaDefaultAssetUrl(sportsmetaBaseUrl || '', variant, sport, league || '', {
+    title,
+    date
+  })
 }
 
 async function fetchUpstream(url) {
@@ -134,8 +137,16 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant }) {
   }
 }
 
-function buildDefaultArtworkCacheKey({ variant, sportSlug, league, sportsmetaBaseUrl }) {
-  return `default|${variant}|${sportSlug}|${(league || '').trim().toLowerCase()}|${(sportsmetaBaseUrl || '').trim().toLowerCase()}`
+function buildDefaultArtworkCacheKey({ variant, sportSlug, league, title, date, sportsmetaBaseUrl }) {
+  return [
+    'default',
+    variant,
+    sportSlug,
+    (league || '').trim().toLowerCase(),
+    (title || '').trim().toLowerCase(),
+    (date || '').trim().toLowerCase(),
+    (sportsmetaBaseUrl || '').trim().toLowerCase()
+  ].join('|')
 }
 
 function buildCanonicalArtworkCacheKey({ variant, canonicalId, sportsmetaBaseUrl }) {
@@ -151,15 +162,19 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
     return
   }
   const league = String(req.query?.league || '').trim()
+  const title = String(req.query?.title || '').trim()
+  const date = String(req.query?.date || '').trim()
   const sportsmetaBaseUrl = resolveSportsmetaBaseUrlFromConfig(config)
   const upstreamUrl = buildUpstreamUrl({
     kind: 'default',
     variant,
     sport: sportSlug,
     league,
+    title,
+    date,
     sportsmetaBaseUrl
   })
-  const cacheKey = buildDefaultArtworkCacheKey({ variant, sportSlug, league, sportsmetaBaseUrl })
+  const cacheKey = buildDefaultArtworkCacheKey({ variant, sportSlug, league, title, date, sportsmetaBaseUrl })
   await sendArtwork(res, { cacheKey, upstreamUrl, variant })
 }
 

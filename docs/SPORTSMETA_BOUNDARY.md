@@ -1,6 +1,6 @@
 # SportsMeta Boundary
 
-Updated: 2026-04-23
+Updated: 2026-04-24
 
 ## Live Truth
 
@@ -27,7 +27,8 @@ The shared Contabo VM does not make them the same product.
 - internal `pvtkrrx:` ids for its own sports/library rows
 - tracker availability anchoring plus `pvtkrrx:` fallback ids for unresolved sports rows
 - rendering SportsMeta-owned public canonical or default artwork URLs on addon responses without making independent sports artwork decisions
-- no SportsMeta member token issuance, forwarding, or entitlement-aware asset selection
+- storing an optional Sports Posters member token in encrypted config and emitting SportsMeta member artwork URLs for sports poster/background/logo assets only
+- no SportsMeta member token issuance, Stripe billing ownership, or local entitlement validation
 - qBittorrent/Prowlarr integration and actual stream attachment
 
 ## Id Rules
@@ -78,9 +79,19 @@ The shared Contabo VM does not make them the same product.
 
 ### If a SportsMeta licence is revoked
 
-- SportsMeta member routes degrade to free behavior or fail with member-token errors, depending on token state
+- SportsMeta member image routes degrade to free artwork or fail with member-token errors, depending on route and token state
 - public/free SportsMeta routes remain available
 - PVTKRRX configured stream routes remain free and are not blocked by SportsMeta billing state
+
+## Paid Sports Posters Boundary
+
+- PVTKRRX remains free.
+- Sports Posters is a SportsMeta entitlement for sports artwork only.
+- Paid PVTKRRX configs may store `sportsPosterMemberToken`, normalized from either a raw token or a `/member/:token` SportsMeta URL.
+- For canonical `sportsmeta:` sports rows, PVTKRRX emits direct SportsMeta member URLs for poster, background, and logo artwork.
+- Free/fallback sports artwork stays on the PVTKRRX `/sports-artwork/...png` raster proxy, which calls SportsMeta public/default assets and carries the event title/date when known.
+- Stripe is never called by PVTKRRX while catalog/meta/artwork routes are being served.
+- SportsMeta validates the member token locally, reads its SQLite catalogue locally, and streams cached raster assets from `/opt/sportsmeta/data/assets/cache`.
 
 ## Shared But Acceptable Coupling
 

@@ -2787,7 +2787,10 @@
         <h2>Settings</h2>
         <label for="maxResults">Max Results Per Search</label>
         <input type="number" id="maxResults" value="50" min="10" max="200">
-        <p class="hint">Sports metadata and artwork are served by the SportsMeta service (https://sportsmeta.pvtkrrx.cc). PVTKRRX no longer needs a TheSportsDB key or a local poster package - it just consumes SportsMeta canonical ids and the public SportsMeta asset URLs. Any paid SportsMeta member install or billing lives on SportsMeta, not in this configure flow.</p>
+        <p class="hint">Sports metadata and free artwork are served by the SportsMeta service. PVTKRRX stays free; the optional Sports Posters token only upgrades sports poster, background, and logo artwork.</p>
+        <label for="sportsPosterMemberToken">Sports Posters Token (optional)</label>
+        <input type="text" id="sportsPosterMemberToken" placeholder="Paste your SportsMeta member URL or token">
+        <p class="hint">Use this only after subscribing to Sports Posters. It applies to PC Local, LAN Bridge, and Remote Seedbox installs, and only affects sports artwork.</p>
         <div id="localHostnameBlock">
           <label for="localHostname">Local Hostname (.local alias)</label>
           <input type="text" id="localHostname" value="pvtkrrx.local" placeholder="pvtkrrx.local">
@@ -2989,13 +2992,15 @@
       qbitUsername: false,
       qbitPassword: false,
       fileServerAuth: false,
+      sportsPosterMemberToken: false,
       lanPairKey: false
     };
     const secretFieldDirty = {
       jackettApiKey: false,
       qbitUsername: false,
       qbitPassword: false,
-      fileServerAuth: false
+      fileServerAuth: false,
+      sportsPosterMemberToken: false
     };
     let stremioAuthKeyPollTimer = null;
     let stremioAuthKeyPollUntil = 0;
@@ -3485,7 +3490,8 @@
         jackettApiKey: 'Saved securely on this host. Leave blank to keep.',
         qbitUsername: 'Saved securely on this host. Leave blank to keep.',
         qbitPassword: 'Saved securely on this host. Leave blank to keep.',
-        fileServerAuth: 'Saved securely on this host. Leave blank to keep.'
+        fileServerAuth: 'Saved securely on this host. Leave blank to keep.',
+        sportsPosterMemberToken: 'Saved securely on this host. Leave blank to keep.'
       };
       Object.entries(placeholders).forEach(([field, placeholder]) => {
         const el = document.getElementById(field);
@@ -3506,7 +3512,8 @@
         jackettApiKey: savedSecretState.jackettApiKey && !secretFieldDirty.jackettApiKey && !String(document.getElementById('jackettApiKey').value || '').trim(),
         qbitUsername: savedSecretState.qbitUsername && !secretFieldDirty.qbitUsername && !String(document.getElementById('qbitUsername').value || '').trim(),
         qbitPassword: savedSecretState.qbitPassword && !secretFieldDirty.qbitPassword && !String(document.getElementById('qbitPassword').value || '').trim(),
-        fileServerAuth: savedSecretState.fileServerAuth && !secretFieldDirty.fileServerAuth && !String(document.getElementById('fileServerAuth').value || '').trim()
+        fileServerAuth: savedSecretState.fileServerAuth && !secretFieldDirty.fileServerAuth && !String(document.getElementById('fileServerAuth').value || '').trim(),
+        sportsPosterMemberToken: savedSecretState.sportsPosterMemberToken && !secretFieldDirty.sportsPosterMemberToken && !String(document.getElementById('sportsPosterMemberToken').value || '').trim()
       };
     }
 
@@ -5614,6 +5621,9 @@
     document.getElementById('fileServerAuth').addEventListener('input', function() {
       markSecretFieldDirty('fileServerAuth');
     });
+    document.getElementById('sportsPosterMemberToken').addEventListener('input', function() {
+      markSecretFieldDirty('sportsPosterMemberToken');
+    });
     const qbitAutoExtractToggle = document.getElementById('qbitAutoExtractEnabled');
     if (qbitAutoExtractToggle) {
       qbitAutoExtractToggle.dataset.userTouched = 'false';
@@ -6287,6 +6297,7 @@
         provider: document.getElementById('provider').value,
         fileServerUrl: fileServerUrlInput ? fileServerUrlInput.replace(/\/+$/, '') : '',
         fileServerAuth: document.getElementById('fileServerAuth').value.trim(),
+        sportsPosterMemberToken: document.getElementById('sportsPosterMemberToken').value.trim(),
         pathMapping: {
           from: document.getElementById('pathFrom').value,
           to: document.getElementById('pathTo').value

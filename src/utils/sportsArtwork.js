@@ -1,6 +1,7 @@
 const {
   buildSportsMetaAssetUrl,
   buildSportsMetaDefaultAssetUrl,
+  buildSportsMetaMemberAssetUrl,
   resolveSportSlug
 } = require('../clients/sportsmeta')
 
@@ -46,6 +47,36 @@ function resolveLeague(input = {}) {
   )
 }
 
+function resolveTitle(input = {}) {
+  return normalizeSpace(
+    input?.title ||
+    input?.name ||
+    input?.displayTitle ||
+    input?.sportsArtwork?.eventName ||
+    ''
+  )
+}
+
+function resolveDate(input = {}) {
+  return normalizeSpace(
+    input?.date ||
+    input?.eventDate ||
+    input?.releaseInfo ||
+    input?.sportsArtwork?.eventDate ||
+    ''
+  )
+}
+
+function resolveSportsPosterMemberToken(input = {}) {
+  return normalizeSpace(
+    input?.sportsPosterMemberToken ||
+    input?.sportsmetaMemberToken ||
+    input?.memberToken ||
+    input?.config?.sportsPosterMemberToken ||
+    ''
+  )
+}
+
 // SportsMeta returns image/svg+xml for every asset URL — default and canonical
 // — and Stremio mobile/tablet clients do not render SVG posters. To keep the
 // tablet route rendering real artwork, emit a PVTKRRX-hosted raster proxy URL
@@ -61,8 +92,12 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
   const sportSlug = resolveSportSlug(resolveSport(input))
   if (!sportSlug) return ''
   const league = resolveLeague(input)
+  const title = resolveTitle(input)
+  const date = resolveDate(input)
   const url = new URL(`${addonBase}/sports-artwork/default/${encodeURIComponent(variant)}/${encodeURIComponent(sportSlug)}.png`)
   if (league) url.searchParams.set('league', league)
+  if (title) url.searchParams.set('title', title)
+  if (date) url.searchParams.set('date', date)
   return url.toString()
 }
 
@@ -74,10 +109,23 @@ function buildSportsMetaDirectUrl(variant, input = {}) {
     if (canonical) return canonical
   }
   const sport = resolveSport(input)
-  return buildSportsMetaDefaultAssetUrl(sportsmetaBaseUrl, variant, sport, resolveLeague(input))
+  return buildSportsMetaDefaultAssetUrl(sportsmetaBaseUrl, variant, sport, resolveLeague(input), {
+    title: resolveTitle(input),
+    date: resolveDate(input)
+  })
+}
+
+function buildSportsMetaMemberDirectUrl(variant, input = {}) {
+  const sportsmetaBaseUrl = resolveSportsMetaBaseUrl(input)
+  const canonicalId = resolveCanonicalId(input)
+  const memberToken = resolveSportsPosterMemberToken(input)
+  if (!canonicalId || !memberToken) return ''
+  return buildSportsMetaMemberAssetUrl(sportsmetaBaseUrl, memberToken, variant, canonicalId)
 }
 
 function buildVariantUrl(variant, input = {}) {
+  const memberUrl = buildSportsMetaMemberDirectUrl(variant, input)
+  if (memberUrl) return memberUrl
   // Prefer PVTKRRX-hosted raster when we have a public addon base URL — that
   // is the client-safe form for every route (catalog + meta responses go to
   // Stremio clients that may not render SVG). Fall back to the direct

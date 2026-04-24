@@ -85,9 +85,12 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, 
   const artworkInput = {
     baseUrl: String(baseUrl || '').replace(/\/+$/, ''),
     sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
+    sportsPosterMemberToken: config?.sportsPosterMemberToken,
     canonicalId: String(canonicalEvent?.id || canonical?.canonicalId || requestedId || '').trim(),
     sportHint,
-    league
+    league,
+    title: displayTitle,
+    date: eventDate
   }
   const posterResolved = resolveSportsPosterAsset(artworkInput)
   const backgroundResolved = resolveSportsBackgroundAsset(artworkInput)
@@ -222,9 +225,12 @@ async function handleCustomMeta(config, id, context = {}) {
   const artworkInput = {
     baseUrl: String(baseUrl || '').replace(/\/+$/, ''),
     sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
+    sportsPosterMemberToken: config?.sportsPosterMemberToken,
     canonicalId: canonicalId && resolutionStatus === 'resolved' ? canonicalId : '',
     sportHint: resolvedSportHint,
-    league
+    league,
+    title: displayTitle,
+    date: eventDate
   }
   const posterResolved = isSports
     ? resolveSportsPosterAsset(artworkInput)
