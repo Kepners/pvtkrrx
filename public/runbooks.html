@@ -248,7 +248,8 @@
       background: rgba(2, 8, 18, 0.58);
     }
 
-    .nav a:hover {
+    .nav a:hover,
+    .nav a.active {
       color: #fff;
       border-color: rgba(255, 0, 212, 0.55);
       box-shadow: 0 0 0 2px rgba(255, 0, 212, 0.18), 0 0 14px rgba(0, 246, 255, 0.3);
@@ -778,6 +779,24 @@
       color: #d2e4ff;
     }
 
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    footer a {
+      color: #bfd6ff;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(0, 246, 255, 0.28);
+      transition: color 0.18s ease, border-color 0.18s ease;
+    }
+
+    footer a:hover {
+      color: #fff;
+      border-color: rgba(255, 0, 212, 0.48);
+    }
+
     body.glitch-burst .glitch-flash {
       opacity: 1;
     }
@@ -961,8 +980,10 @@
       <nav class="nav">
         <a href="/">Home</a>
         <a href="/sports">Sports</a>
-        <a href="/runbooks">Runbooks</a>
-        <a href="/#faq">FAQ</a>
+        <a href="/clockrr">Clockrr</a>
+        <a class="active" href="/runbooks" aria-current="page">Runbooks</a>
+        <a href="/blog">Blog</a>
+        <a href="/faq">FAQ</a>
         <a href="/health">Health</a>
       </nav>
     </header>
@@ -1448,10 +1469,17 @@ PORT=7000 npm run server:setup</code></pre>
     </section>
 
     <footer>
-      <span class="relay glitch-text" data-text="GLITCH RELAY // PVTKRRX runbook matrix for active provider docs.">GLITCH RELAY // PVTKRRX runbook matrix for active provider docs.</span>
-      <span class="glitch-text" data-text="If your provider changed features, update this page before deployment.">If your provider changed features, update this page before deployment.</span>
-      <span><a href="/clockrr">Clockrr</a></span>
-      <span><a href="mailto:kepners@pvtkrrx.cc">Contact</a></span>
+      <span class="relay glitch-text" data-text="PVTKRRX / Private Tracker Bridge / Source Available">PVTKRRX / Private Tracker Bridge / Source Available</span>
+      <span class="footer-links">
+        <a href="/">Home</a>
+        <a href="/sports">Sports</a>
+        <a href="/clockrr">Clockrr</a>
+        <a href="/runbooks">Runbooks</a>
+        <a href="/blog">Blog</a>
+        <a href="/faq">FAQ</a>
+        <a href="/health">Health</a>
+        <a href="mailto:kepners@pvtkrrx.cc">Contact</a>
+      </span>
     </footer>
   </main>
   <script>

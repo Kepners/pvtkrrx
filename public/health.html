@@ -215,6 +215,13 @@
       background: rgba(2, 8, 18, 0.58);
     }
 
+    .nav a:hover,
+    .nav a.active {
+      color: #fff;
+      border-color: rgba(255, 0, 212, 0.55);
+      box-shadow: 0 0 0 2px rgba(255, 0, 212, 0.18), 0 0 14px rgba(0, 246, 255, 0.3);
+    }
+
     .panel {
       margin-top: 14px;
       border: 1px solid var(--line-soft);
@@ -347,6 +354,24 @@
       color: #8ca0c8;
     }
 
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    footer a {
+      color: #bfd6ff;
+      text-decoration: none;
+      border-bottom: 1px solid rgba(0, 246, 255, 0.28);
+      transition: color 0.18s ease, border-color 0.18s ease;
+    }
+
+    footer a:hover {
+      color: #fff;
+      border-color: rgba(255, 0, 212, 0.48);
+    }
+
     @keyframes spin-a { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
     @keyframes spin-b { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
     @keyframes spin-c { from { transform: translate(-50%, -50%) rotate(0deg); } to { transform: translate(-50%, -50%) rotate(360deg); } }
@@ -397,10 +422,11 @@
       <nav class="nav">
         <a href="/">Home</a>
         <a href="/sports">Sports</a>
-        <a href="/runbooks">Runbooks</a>
         <a href="/clockrr">Clockrr</a>
-        <a href="/#faq">FAQ</a>
-        <a href="/health">Health</a>
+        <a href="/runbooks">Runbooks</a>
+        <a href="/blog">Blog</a>
+        <a href="/faq">FAQ</a>
+        <a class="active" href="/health" aria-current="page">Health</a>
       </nav>
     </header>
 
@@ -417,10 +443,17 @@
     </section>
 
     <footer>
-      <span>PVTKRRX / Source Available / Operator Controlled</span>
-      <span>Status endpoint remains at `/health?format=json`</span>
-      <span><a href="/clockrr">Clockrr</a></span>
-      <span><a href="mailto:kepners@pvtkrrx.cc">Contact</a></span>
+      <span>PVTKRRX / Private Tracker Bridge / Source Available</span>
+      <span class="footer-links">
+        <a href="/">Home</a>
+        <a href="/sports">Sports</a>
+        <a href="/clockrr">Clockrr</a>
+        <a href="/runbooks">Runbooks</a>
+        <a href="/blog">Blog</a>
+        <a href="/faq">FAQ</a>
+        <a href="/health">Health</a>
+        <a href="mailto:kepners@pvtkrrx.cc">Contact</a>
+      </span>
     </footer>
   </main>
 

@@ -22,6 +22,14 @@ Verified directly on 2026-04-23 after manual Coolify API redeploy `c307hqn7q8dep
 - `https://www.pvtkrrx.cc/health` with `Accept: text/html` returned `200`, HTML `robots=noindex,nofollow,noarchive`, and header `X-Robots-Tag: noindex, nofollow, noarchive`
 - `https://www.pvtkrrx.cc/version-status.json` returned `currentVersion = 1.1.34`, `latestVersion = 1.1.34`, and `updateAvailable = false`
 
+Repo update prepared on 2026-04-25:
+
+- New crawlable pages are wired locally at `/blog` and `/faq`.
+- Public nav/footer links now use the same main set across home, sports, Clockrr, runbooks, health, and configure surfaces: Home, Sports, Clockrr, Runbooks, Blog, FAQ, Health, Contact.
+- `/clockrr` now uses the same PVTKRRX-styled public shell and includes horizontal movie and TV example tickers.
+- `/sports` copy now reflects the current SportsMeta split: PVTKRRX stream routes stay free, SportsMeta public remains SVG-first, and Plus/Pro member artwork stays on SportsMeta routes.
+- `public/sitemap.xml` now includes `/blog` and `/faq` with `lastmod 2026-04-25`.
+
 Verified directly on 2026-04-08:
 
 - Canonical public host: `https://www.pvtkrrx.cc`
@@ -52,7 +60,7 @@ Interpretation:
 
 Verified in the repo and on Contabo before changing anything:
 
-- `index.js` already defines `/configure`, `/:config/configure`, `/sports`, `/runbooks`, `/seedbox-runbooks`, `/health`, `/manifest.json`, `/:config/manifest.json`, `/local/install`, and the hosted self-host launcher route at `/install-selfhost.sh` plus `/install.sh`
+- `index.js` already defines `/configure`, `/:config/configure`, `/sports`, `/clockrr`, `/blog`, `/faq`, `/runbooks`, `/seedbox-runbooks`, `/health`, `/manifest.json`, `/:config/manifest.json`, `/local/install`, and the hosted self-host launcher route at `/install-selfhost.sh` plus `/install.sh`
 - Public routing is owned by Contabo Caddy and the Coolify app target, not a preview deployment file.
 - `public/index.html` is the current landing page
 - public canonical/OG metadata plus `robots.txt`/`sitemap.xml` now point at `https://www.pvtkrrx.cc`
@@ -99,9 +107,12 @@ Main clarity gaps:
 - Removed the route comparison section from the public cloud homepage
 - Added "What you need" section
 - Added dedicated sports proof section
-- Reworked `/sports` into the public Sports Posters page with canonical metadata, PVTKRRX-styled presentation, and checkout buttons that call `/sports/billing/checkout`
+- Reworked `/sports` into the public SportsMeta status page with canonical metadata, PVTKRRX-styled presentation, links to SportsMeta pricing/proof, and clear Free / Plus / Pro boundaries.
 - Public `sitemap.xml` now includes `/sports`
-- Moved `Manifest` and `Health` links out of the main nav and into the footer utility area
+- Moved `Manifest` out of the main nav; `Health` remains as the explicit operator utility link.
+- Added `/clockrr`, `/blog`, and `/faq` to the public site surface.
+- Reworked `/clockrr` to match the PVTKRRX visual shell and added movie/TV ticker rows for common Clockrr use cases.
+- Updated `/sports` public copy away from the old monthly/yearly Sports Posters offer and onto the current SportsMeta Free / Plus / Pro status.
 
 ## Suggested Homepage Shape
 

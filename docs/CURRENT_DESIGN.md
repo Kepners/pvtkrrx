@@ -126,7 +126,7 @@ Operational behavior:
 - The configure page now mirrors that local-runtime visibility with a live qBittorrent status panel that shows the effective save path, incomplete path, fallback storage roots, and whether PVTKRRX currently manages the qBit completion hook.
 - Disk-backed Windows host configs now auto-upgrade older strict LAN-only local state to the current fallback-capable `LAN Bridge` profile (`routeProfile=hybrid`) on load/save, so stale desktop configs stop failing closed when the host app is offline and the user intended cloud fallback.
 - Hybrid hosted tokens can now adopt an account-linked hosted cloud profile on fallback, so the home-device route stops reusing dead desktop-local `127.0.0.1` backend URLs once the LAN pair is stale or offline.
-- The public homepage, sports page, and runbooks now use the brand-led `PVTKRRX` guide surface, point users at docs instead of `/configure`, and keep the locked route vocabulary (`PC Local`, `LAN Bridge`, `Remote Seedbox`).
+- The public homepage, sports page, Clockrr page, blog, FAQ, and runbooks now use the brand-led `PVTKRRX` guide surface, point users at docs instead of public `/configure`, and keep the locked route vocabulary (`PC Local`, `LAN Bridge`, `Remote Seedbox`).
 - The public homepage now shows a live release-status card driven by `/version-status.json`, and the Windows desktop shell shows the same release check in the popup.
 - Legacy `Hybrid Home` wording may still appear in older docs or internal notes. Treat that as terminology drift, not a different route model, unless a doc explicitly calls out the older naming history.
 
@@ -136,11 +136,14 @@ Verified on 2026-04-08:
 
 - `https://www.pvtkrrx.cc/` returns the landing page (`200`)
 - `https://www.pvtkrrx.cc/configure` no longer serves the public setup UI; public requests redirect back to the guide-only site
-- `https://www.pvtkrrx.cc/sports` returns the public Sports Posters / sports page (`200`) and exposes checkout buttons that proxy checkout creation to SportsMeta while keeping stream playback free
+- `https://www.pvtkrrx.cc/sports` returns the public SportsMeta status page (`200`) and links to SportsMeta pricing/proof while keeping PVTKRRX stream playback free
+- `https://www.pvtkrrx.cc/clockrr` returns the public Clockrr family page (`200`) for the separate Stremio subtitle clock addon
+- `https://www.pvtkrrx.cc/blog` returns the crawlable blog/status notes page (`200`)
+- `https://www.pvtkrrx.cc/faq` returns the crawlable FAQ page (`200`)
 - `https://www.pvtkrrx.cc/runbooks` returns the runbooks page (`200`)
 - `https://www.pvtkrrx.cc/manifest.json` returns the bootstrap manifest (`200`)
 - `https://www.pvtkrrx.cc/health` returns health JSON (`200`) or the health page when the client asks for HTML
-- `https://www.pvtkrrx.cc/sitemap.xml` now includes `/sports`
+- `https://www.pvtkrrx.cc/sitemap.xml` now includes `/sports`, `/clockrr`, `/blog`, and `/faq`
 - `https://www.pvtkrrx.cc/local/install` returns `403` from the public internet because it is a same-host/local-network helper route
 - `https://www.pvtkrrx.cc/sportsmeta/...` is not a supported public production surface; the integrated draft is disabled by default in this repo
 - 2026-04-06 homepage verification on the canonical host confirmed the refactored landing page markers are live: `truth-band` and `Where does playback happen` are present, while legacy `meta-grid` and `hero-chip` markers are absent
