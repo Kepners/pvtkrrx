@@ -54,6 +54,16 @@ Windows build check:
 npm run dist:win
 ```
 
+Windows installer path guard:
+
+```bash
+npm run smoke:win-installer-path
+```
+
+Run this before and after any manual Windows installer test. A root-level `C:\Program` directory is a failure, because Windows can treat it as an ambiguous prefix for unquoted `C:\Program Files\...` startup paths and show a boot warning.
+
+Do not run silent NSIS installer checks with a PowerShell `Start-Process -ArgumentList` array that expands `/D=C:\Program Files\PVTKRRX`. If a silent install path override is needed for automation, use the installer default path or a disposable no-space path, then run the path guard above.
+
 ## Route Acceptance Checks
 
 ### PC Local
