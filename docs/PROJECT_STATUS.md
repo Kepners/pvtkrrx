@@ -1,10 +1,41 @@
 # PVTKRRX Project Status
 
-Updated: 2026-04-24
+Updated: 2026-04-25
 
 ## Current Stage
 
-PVTKRRX is in a working `1.1.41` state on the main Windows/local and self-host route set. The current sports search contract is that any configured Prowlarr indexer can supply sports catalog and stream availability when the result passes the existing sports filters; SportsCult is no longer the only accepted tracker source.
+PVTKRRX is in a synchronized `1.1.43` state across the Windows desktop release, hosted `www.pvtkrrx.cc` runtime, and Contabo self-host seedbox runtime. The self-host Stremio install route now uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+
+## 2026-04-25: 1.1.43 release and live sync
+
+- Shipped the self-host install identity fix as:
+  - desktop/latest release: `v1.1.43`
+  - self-host/seedbox release: `v1.12.28-selfhost`
+  - release commit: `6c0711ad4e78d6ca366d9f568d718d9736f5fb6a`
+- Windows release assets published on `v1.1.43`:
+  - `latest.yml`
+  - `PVTKRRX-Setup-1.1.43.exe`
+  - `PVTKRRX-Setup-1.1.43.exe.blockmap`
+  - `PVTKRRX.1.1.43.exe`
+  - `install-selfhost.sh`
+- Self-host/seedbox prerelease `v1.12.28-selfhost` is published with `install-selfhost.sh`.
+- Hosted runtime sync:
+  - initial Coolify deployment `473` for commit `6c0711a` failed during `npm ci`
+  - forced rebuild deployment `474` finished successfully
+  - live public container is `w14jewmw5ubscrxh8zzfhq7d-074521578672`
+  - live public image is `w14jewmw5ubscrxh8zzfhq7d:6c0711ad4e78d6ca366d9f568d718d9736f5fb6a`
+  - `https://www.pvtkrrx.cc/version-status.json` reports `currentVersion=1.1.43`, `latestVersion=1.1.43`, and `updateAvailable=false`
+  - `https://www.pvtkrrx.cc/manifest.json` reports `version=1.1.43`
+  - `https://www.pvtkrrx.cc/download/windows/setup` redirects to the `v1.1.43` setup asset
+  - `https://www.pvtkrrx.cc/download/windows/portable` redirects to the `v1.1.43` portable asset
+- Contabo self-host runtime sync:
+  - updated `/opt/pvtkrrx` using installer tag `v1.12.28-selfhost`
+  - backup/log directory: `/opt/pvtkrrx-backups/20260425-095155-v1.1.43-release-sync`
+  - `/opt/pvtkrrx/package.json` reports `version: 1.1.43`
+  - `pvtkrrx.service`, `qbittorrent-nox.service`, and `prowlarr.service` are active
+  - `https://pvt.kepners.co.uk/version-status.json` reports `currentVersion=1.1.43`, `latestVersion=1.1.43`, and `updateAvailable=false`
+  - `https://pvt.kepners.co.uk/selfhost/manifest.json?mode=hosted` reports id `com.kepners.pvtkrrx.selfhost`, version `1.1.43`, `behaviorHints.configurationRequired=false`, `behaviorHints.configurable=true`, and `20` catalogs
+  - unauthenticated `https://pvt.kepners.co.uk/selfhost/config.json` still returns `401`
 
 ## 2026-04-25: Self-host Stremio install identity separation
 
