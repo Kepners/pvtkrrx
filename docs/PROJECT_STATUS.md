@@ -6,6 +6,13 @@ Updated: 2026-04-24
 
 PVTKRRX is in a working `1.1.41` state on the main Windows/local and self-host route set. The current sports search contract is that any configured Prowlarr indexer can supply sports catalog and stream availability when the result passes the existing sports filters; SportsCult is no longer the only accepted tracker source.
 
+## 2026-04-25: Self-host Stremio install identity separation
+
+- Reproduced the install-management symptom against the live self-host route: `https://pvt.kepners.co.uk/selfhost/manifest.json?mode=hosted` returned a configured manifest (`configurationRequired=false`) but still used addon id `com.kepners.pvtkrrx.online`.
+- Root cause: that id is also used by hosted Remote Seedbox token manifests. If Stremio already has an older `com.kepners.pvtkrrx.online` install, opening the self-host URL can show the existing addon as `Configure` / `Uninstall` instead of storing the self-host URL as a separate install.
+- Local fix: explicit self-host disk-backed manifests now use `com.kepners.pvtkrrx.selfhost`; hosted Remote Seedbox token manifests continue to use `com.kepners.pvtkrrx.online`.
+- User-facing implication: after this fix is live, the self-host server link may need one fresh install because the addon id changed. Old hosted/temporary PVTKRRX entries can be removed from Stremio once the self-host entry is present.
+
 ## 2026-04-25: Self-host password recovery and manifest retrofit hardening
 
 - Live symptom reproduced on `https://pvt.kepners.co.uk/configure`: the browser had a stale self-host password and `/selfhost/config.json` returned `401 Valid self-host password required`.

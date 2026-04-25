@@ -37,6 +37,7 @@ Link: https://github.com/Stremio/stremio-addon-client
 | `https://192.168.50.48:7000/local/manifest.json?mode=local` | FAIL | Port `7000` is HTTP, not TLS |
 | Browser test: `http://192.168.50.48:7000/local/manifest.json?mode=local` | PASS | Confirms server + firewall path, not Stremio install acceptance |
 | `stremio://www.pvtkrrx.cc/{token}/manifest.json?mode=hosted` for `LAN Bridge` | PASS* | Correct synced route for other devices; uses LAN redirect at home and hosted fallback away |
+| `stremio://your-domain/selfhost/manifest.json?mode=hosted` for explicit self-host | PASS* | Stable self-host server install; uses dedicated manifest id `com.kepners.pvtkrrx.selfhost` so it does not collide with hosted Remote Seedbox tokens |
 | Hosted `LAN Bridge` browsed on the host Windows desktop | WRONG ROUTE | The host desktop should use `PC Local` instead |
 
 ## Conclusion
@@ -77,6 +78,10 @@ Link: https://github.com/Stremio/stremio-addon-client
    - `Remote Seedbox`
    - Use HTTPS-hosted manifest URL with public ready-file playback endpoints
    - Treat hosted `Remote Seedbox` as ready-file-first unless playback is self-hosted elsewhere
+5. Explicit self-host server mode:
+   - Stable addon URL: `https://your-domain/selfhost/manifest.json?mode=hosted`
+   - Manifest id: `com.kepners.pvtkrrx.selfhost`
+   - The separate id is intentional; it prevents Stremio from treating the self-host server install as the same addon as an older hosted Remote Seedbox token.
 
 See also: `docs/ROUTE_FRAMEWORK.md`
 

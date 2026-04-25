@@ -295,7 +295,7 @@ async function run() {
       }
     )
     assert.equal(manifestRes.status, 200)
-    assert.equal(manifestRes.json?.id, 'com.kepners.pvtkrrx.online')
+    assert.equal(manifestRes.json?.id, 'com.kepners.pvtkrrx.selfhost')
     assert.equal(manifestRes.json?.name, 'PVTKRRX ☁️')
     assert.equal(manifestRes.json?.behaviorHints?.configurationRequired, false)
     assert.equal(String(manifestRes.headers['cache-control'] || '').toLowerCase(), 'no-store')

@@ -23,7 +23,7 @@ PVTKRRX is one codebase with three active runtime pieces:
 2. Self-hosted server mode on a VPS/seedbox (`PVTKRRX_SELF_HOST_MODE=true`):
    - serves its own `/configure` page and static UI
    - saves a disk-backed server config into the runtime directory
-   - exposes a stable `/selfhost/manifest.json?mode=hosted`
+   - exposes a stable `/selfhost/manifest.json?mode=hosted` manifest with addon id `com.kepners.pvtkrrx.selfhost`
    - can mint short-lived Stremio link sessions that persist the linked `stremioUserId` back into the disk-backed `selfhost` config
    - can validate localhost/private Prowlarr and qBittorrent URLs only for same-host requests or browser sessions that present the self-host password
    - now has a one-command Linux installer that bootstraps the app directory, bundled Node runtime, `.env`, stable runtime dir, saved self-host config, password, and optional `systemd` service
@@ -318,7 +318,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 ## Manifest Update Model
 
 - App/server code and saved disk-backed config are deliberately more changeable than the Stremio manifest. Handler fixes, stream behavior, catalog contents, SportsMeta resolution, and self-host config edits apply on the next addon request when the installed route is stable.
-- The explicit self-host route is the most retroactive path: an installed `https://your-domain/selfhost/manifest.json?mode=hosted` addon keeps using the current `local-config.json` on the server. Saving backend URL or secret changes does not require a reinstall unless the manifest contract itself changes.
+- The explicit self-host route is the most retroactive path: an installed `https://your-domain/selfhost/manifest.json?mode=hosted` addon keeps using the current `local-config.json` on the server. Its manifest id is `com.kepners.pvtkrrx.selfhost`, separate from hosted Remote Seedbox token installs (`com.kepners.pvtkrrx.online`), so Stremio can store both identities without confusing a self-host refresh for an older hosted token. Saving backend URL or secret changes does not require a reinstall unless the manifest contract itself changes.
 - A manifest refresh is still required when the addon contract changes: addon id, top-level `types`, declared `resources`, catalog ids, catalog extras, or route identity. Stremio clients can cache that contract.
 - Hosted token installs are less retroactive than self-host disk config because the encrypted URL token carries a snapshot of config. Server-side handler fixes apply immediately, but config changes need a refreshed token unless the route uses account-linked hosted takeover state.
 

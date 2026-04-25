@@ -75,7 +75,7 @@ Use this when your own server or seedbox should own the runtime and keep operati
 curl -fsSL https://www.pvtkrrx.cc/install-selfhost.sh | sudo bash
 ```
 
-The installer sets up the app, Node runtime, production dependencies, saved server config, optional `systemd` service, and a stable `/selfhost/manifest.json?mode=hosted` install path.
+The installer sets up the app, Node runtime, production dependencies, saved server config, optional `systemd` service, and a stable `/selfhost/manifest.json?mode=hosted` install path. That self-host install uses its own Stremio addon id, separate from hosted Remote Seedbox token installs.
 
 Self-hosted server mode can use private or localhost Prowlarr/qBittorrent URLs after server-admin authentication, but the Stremio-facing install origin still needs a real public HTTPS hostname.
 

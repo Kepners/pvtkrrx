@@ -1701,6 +1701,8 @@ function getManifest(req) {
   let profile = 'online'
   if (mode === 'local') {
     profile = 'local'
+  } else if (isSelfHostConfigAlias(req?.params?.config)) {
+    profile = 'selfhost'
   } else if (req?.params?.config && req.params.config !== 'local') {
     profile = resolveHostedProfile(req?.config || {})
   }
@@ -1708,6 +1710,8 @@ function getManifest(req) {
   const idSuffix = profile
   const nameLabel = profile === 'local'
     ? 'PC Local'
+    : profile === 'selfhost'
+      ? 'Self-Hosted Server'
     : profile === 'hybrid'
       ? 'Hybrid Home'
     : profile === 'lan'
@@ -1754,11 +1758,16 @@ function getManifest(req) {
     }
   }
 
+  if (profile === 'selfhost') {
+    return {
+      ...nextManifest,
+      description: 'Self-hosted server addon. Browse movies, TV, sports, and library, and stream directly from your seedbox.'
+    }
+  }
+
   return {
     ...nextManifest,
-    description: SELF_HOST_SERVER_MODE
-      ? 'Self-hosted server addon. Browse movies, TV, sports, and library, and stream directly from your seedbox.'
-      : 'Remote Seedbox addon for ready-file playback away from home. Browse movies, TV, sports, and library through your configured public file server.'
+    description: 'Remote Seedbox addon for ready-file playback away from home. Browse movies, TV, sports, and library through your configured public file server.'
   }
 }
 
