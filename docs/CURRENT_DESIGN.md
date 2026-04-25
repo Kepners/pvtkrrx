@@ -137,7 +137,7 @@ Verified on 2026-04-08:
 - `https://www.pvtkrrx.cc/` returns the landing page (`200`)
 - `https://www.pvtkrrx.cc/configure` no longer serves the public setup UI; public requests redirect back to the guide-only site
 - `https://www.pvtkrrx.cc/sports` returns the public SportsMeta status page (`200`) and links to SportsMeta pricing/proof while keeping PVTKRRX stream playback free
-- `https://www.pvtkrrx.cc/clockrr` returns the public Clockrr family page (`200`) for the separate Stremio subtitle clock addon
+- `https://www.pvtkrrx.cc/clockrr` returns the public Clockrr family page (`200`) for the separate Stremio subtitle clock addon and shows aggregate telemetry-derived movie/TV top-ten ticker rows
 - `https://www.pvtkrrx.cc/blog` returns the crawlable blog/status notes page (`200`)
 - `https://www.pvtkrrx.cc/faq` returns the crawlable FAQ page (`200`)
 - `https://www.pvtkrrx.cc/runbooks` returns the runbooks page (`200`)
