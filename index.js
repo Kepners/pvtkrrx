@@ -194,6 +194,15 @@ const PUBLIC_DOWNLOAD_BASE_URL = normalizeBaseUrl(
   process.env.PVTKRRX_PUBLIC_DOWNLOAD_BASE_URL ||
   'https://www.pvtkrrx.cc'
 ) || 'https://www.pvtkrrx.cc'
+const SPORTSMETA_CHECKOUT_BASE_URL = normalizeBaseUrl(
+  process.env.PVTKRRX_SPORTSMETA_CHECKOUT_BASE_URL ||
+  process.env.PVTKRRX_SPORTSMETA_BASE_URL ||
+  'https://sportsmeta.pvtkrrx.cc'
+) || 'https://sportsmeta.pvtkrrx.cc'
+const SPORTSMETA_CHECKOUT_TIMEOUT_MS = Math.max(
+  2000,
+  parseInt(process.env.PVTKRRX_SPORTSMETA_CHECKOUT_TIMEOUT_MS || '10000', 10)
+)
 const VERSION_STATUS_CACHE_MS = Math.max(60000, parseInt(process.env.PVTKRRX_VERSION_STATUS_CACHE_MS || '300000', 10))
 let versionStatusCache = {
   fetchedAt: 0,
@@ -223,6 +232,14 @@ function queueAnalyticsEvent(req, eventName, data = {}, options = {}) {
     dedupeKey: options.dedupeKey,
     dedupeWindowMs: options.dedupeWindowMs
   })
+}
+
+function normalizeSportsPostersInterval(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (normalized === 'monthly') return 'month'
+  if (normalized === 'annually' || normalized === 'annual' || normalized === 'yearly') return 'year'
+  if (normalized === 'month' || normalized === 'year') return normalized
+  return ''
 }
 
 app.use(express.static(publicDir, {
@@ -261,6 +278,66 @@ app.get('/:config/configure', (req, res) => {
 app.get('/sports', (req, res) => {
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
   res.sendFile(sportsPage)
+})
+app.post('/sports/billing/checkout', async (req, res) => {
+  res.setHeader('Cache-Control', 'no-store')
+
+  const clientIp = getClientIp(req)
+  const limit = rateLimiters.sportsmeta.consume(`${clientIp || 'unknown'}:checkout`)
+  if (!limit.allowed) {
+    res.setHeader('Retry-After', String(limit.retryAfterSeconds))
+    return res.status(429).json({ ok: false, error: 'too_many_requests' })
+  }
+
+  const interval = normalizeSportsPostersInterval(req.body?.interval || req.body?.billingInterval)
+  if (!interval) {
+    return res.status(400).json({ ok: false, error: 'invalid_interval' })
+  }
+
+  const checkoutEndpoint = `${SPORTSMETA_CHECKOUT_BASE_URL}/billing/checkout`
+  try {
+    const upstream = await fetch(checkoutEndpoint, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'accept': 'application/json'
+      },
+      body: JSON.stringify({
+        tierId: 'posters',
+        interval
+      }),
+      signal: AbortSignal.timeout(SPORTSMETA_CHECKOUT_TIMEOUT_MS)
+    })
+
+    const text = await upstream.text()
+    let payload = {}
+    try {
+      payload = text ? JSON.parse(text) : {}
+    } catch (_) {
+      payload = { ok: false, error: 'invalid_sportsmeta_response' }
+    }
+
+    if (!upstream.ok) {
+      return res.status(upstream.status).json({
+        ok: false,
+        error: payload.error || 'sportsmeta_checkout_failed',
+        message: payload.message || ''
+      })
+    }
+
+    return res.status(200).json({
+      ok: Boolean(payload.ok),
+      url: String(payload.url || ''),
+      sessionId: String(payload.sessionId || '')
+    })
+  } catch (err) {
+    console.warn(`[sports-checkout] SportsMeta checkout proxy failed: ${err.message}`)
+    return res.status(502).json({
+      ok: false,
+      error: 'sportsmeta_checkout_unavailable',
+      message: 'Sports checkout is temporarily unavailable.'
+    })
+  }
 })
 app.get('/runbooks', (req, res) => {
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })

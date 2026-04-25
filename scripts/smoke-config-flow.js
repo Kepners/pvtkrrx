@@ -353,9 +353,10 @@ async function run() {
     const sportsHtml = await sportsRes.text()
     assert.match(sportsHtml, /<link rel="canonical" href="https:\/\/www\.pvtkrrx\.cc\/sports">/i, 'sports page should expose canonical metadata')
     assert.match(sportsHtml, /<meta property="og:image" content="https:\/\/www\.pvtkrrx\.cc\/social\/pvtkrrx-sports\.png">/i, 'sports page should expose the sports social image')
-    assert.match(sportsHtml, /Private tracker sports in Stremio/, 'sports page should render the main sports heading')
-    assert.match(sportsHtml, /Read Setup Guide/, 'sports page should send visitors to the setup guide')
-    assert.match(sportsHtml, /href="\/#routes"/, 'sports page should link back to the public route guide')
+    assert.match(sportsHtml, /Sports Posters/, 'sports page should render the Sports Posters offer')
+    assert.match(sportsHtml, /data-checkout-interval="month"/, 'sports page should expose monthly checkout')
+    assert.match(sportsHtml, /data-checkout-interval="year"/, 'sports page should expose yearly checkout')
+    assert.match(sportsHtml, /\/sports\/billing\/checkout/, 'sports page should use the PVTKRRX checkout proxy')
     assert.doesNotMatch(sportsHtml, /href="\/configure"/i, 'sports page should not advertise public configure as a primary visitor action')
 
     const siteManifestRes = await fetch(`${base}/site.webmanifest`)

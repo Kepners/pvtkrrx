@@ -95,6 +95,7 @@ Current behavior:
 - Stremio account linking is used for account-aware route setup and LAN Bridge/cloud fallback, not as a payment gate.
 - The self-host server password opens private server administration on your own runtime. It is not a paid service login.
 - SportsMeta is a separate companion sports identity/artwork service at `https://sportsmeta.pvtkrrx.cc`.
+- `https://www.pvtkrrx.cc/sports` is the public PVTKRRX-facing Sports Posters page. Its checkout buttons create SportsMeta Stripe Checkout sessions through a narrow proxy, while SportsMeta still owns member tokens, entitlement checks, and premium artwork routes.
 - SportsMeta paid member routes are separate from the PVTKRRX stream addon. PVTKRRX itself currently consumes the public SportsMeta artwork surface and proxies it as client-safe PNG artwork.
 
 Practical answer: to use PVTKRRX, configure your own Prowlarr/qBittorrent setup and install the route that matches your playback path. There is no in-app purchase step to complete first.

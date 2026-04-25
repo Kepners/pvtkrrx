@@ -13,18 +13,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="robots" content="index,follow,max-image-preview:large">
   <meta name="theme-color" content="#080a12">
-  <title>PVTKRRX Sports | Private Tracker Sports in Stremio</title>
+  <title>Sports Posters | PVTKRRX Sports Artwork Upgrade</title>
   <link rel="canonical" href="https://www.pvtkrrx.cc/sports">
   <link rel="icon" href="/favicon.ico" sizes="any">
   <link rel="icon" type="image/svg+xml" href="/logo.svg">
   <link rel="apple-touch-icon" href="/apple-touch-icon.png">
   <link rel="manifest" href="/site.webmanifest">
-  <meta name="description" content="Sports catalog for Stremio from your private trackers. Genre filtering, artwork enrichment, and metadata — football, F1, UFC, NBA, cricket, rugby, tennis, and more. No debrid. No third-party media host.">
+  <meta name="description" content="Sports Posters is the optional SportsMeta artwork upgrade for PVTKRRX sports. PVTKRRX streaming stays free; paid access only upgrades sports poster, background, and logo artwork.">
   <meta property="og:site_name" content="PVTKRRX">
   <meta property="og:type" content="website">
   <meta property="og:url" content="https://www.pvtkrrx.cc/sports">
-  <meta property="og:title" content="PVTKRRX — Private Tracker Sports in Stremio">
-  <meta property="og:description" content="Sports catalog for Stremio from your private trackers. Genre filtering, artwork enrichment, and metadata. No debrid. No third-party media host.">
+  <meta property="og:title" content="Sports Posters - PVTKRRX Sports Artwork Upgrade">
+  <meta property="og:description" content="Optional SportsMeta artwork upgrade for PVTKRRX sports. Streams stay free; paid access only upgrades sports poster, background, and logo artwork.">
   <meta property="og:image" content="https://www.pvtkrrx.cc/social/pvtkrrx-sports.png">
   <meta property="og:image:secure_url" content="https://www.pvtkrrx.cc/social/pvtkrrx-sports.png">
   <meta property="og:image:type" content="image/png">
@@ -32,8 +32,8 @@
   <meta property="og:image:height" content="630">
   <meta property="og:image:alt" content="PVTKRRX sports share image for private tracker sports inside Stremio.">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:title" content="PVTKRRX — Private Tracker Sports in Stremio">
-  <meta name="twitter:description" content="Sports catalog for Stremio from your private trackers. Genre filtering, artwork enrichment, and metadata. No debrid. No third-party media host.">
+  <meta name="twitter:title" content="Sports Posters - PVTKRRX Sports Artwork Upgrade">
+  <meta name="twitter:description" content="Optional SportsMeta artwork upgrade for PVTKRRX sports. Streams stay free; paid access only upgrades sports poster, background, and logo artwork.">
   <meta name="twitter:image" content="https://www.pvtkrrx.cc/social/pvtkrrx-sports.png">
   <meta name="twitter:image:alt" content="PVTKRRX sports share image for private tracker sports inside Stremio.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -53,6 +53,7 @@
       --muted: #8ca0c8;
       --line: rgba(0, 246, 255, 0.35);
       --line-soft: rgba(0, 246, 255, 0.18);
+      --panel: rgba(4, 8, 18, 0.74);
     }
 
     * {
@@ -61,12 +62,29 @@
       padding: 0;
     }
 
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
     html,
     body {
       min-height: 100%;
     }
 
+    html {
+      background: var(--bg-0);
+    }
+
     body {
+      min-height: 100vh;
       font-family: "Rajdhani", sans-serif;
       color: var(--text);
       background:
@@ -101,49 +119,89 @@
       transform: translate(-50%, -50%);
       border-radius: 999px;
       mix-blend-mode: screen;
-      opacity: 0.14;
+      opacity: 0.18;
+      filter: blur(1px);
     }
 
     .vortex-layer.one {
       background:
         repeating-radial-gradient(circle at center, rgba(0, 246, 255, 0.55) 0 2px, transparent 2px 16px),
-        conic-gradient(from 0deg, transparent, rgba(0, 246, 255, 0.18), transparent, rgba(255, 0, 212, 0.16), transparent);
-      animation: spin-a 22s linear infinite;
+        conic-gradient(from 0deg, transparent, rgba(0, 246, 255, 0.22), transparent, rgba(255, 0, 212, 0.2), transparent);
+      animation: vortex-spin-a 20s linear infinite, vortex-pulse 8s ease-in-out infinite;
     }
 
     .vortex-layer.two {
       background:
-        repeating-radial-gradient(circle at center, rgba(0, 255, 102, 0.35) 0 1px, transparent 1px 15px),
-        conic-gradient(from 130deg, transparent, rgba(255, 49, 95, 0.16), transparent, rgba(0, 246, 255, 0.16), transparent);
-      animation: spin-b 36s linear infinite reverse;
-      opacity: 0.11;
+        repeating-radial-gradient(circle at center, rgba(0, 255, 102, 0.4) 0 1px, transparent 1px 14px),
+        conic-gradient(from 120deg, transparent, rgba(255, 19, 79, 0.22), transparent, rgba(0, 168, 255, 0.2), transparent);
+      animation: vortex-spin-b 28s linear infinite reverse, vortex-pulse 10s ease-in-out infinite 0.8s;
+      opacity: 0.14;
     }
 
-    @keyframes spin-a { to { transform: translate(-50%, -50%) rotate(360deg); } }
-    @keyframes spin-b { to { transform: translate(-50%, -50%) rotate(-360deg); } }
+    .vortex-layer.three {
+      background:
+        repeating-radial-gradient(circle at center, rgba(255, 0, 212, 0.45) 0 1px, transparent 1px 13px),
+        conic-gradient(from 220deg, transparent, rgba(0, 255, 102, 0.24), transparent, rgba(0, 168, 255, 0.2), transparent);
+      animation: vortex-spin-c 35s linear infinite, vortex-pulse 12s ease-in-out infinite 1.4s;
+      opacity: 0.12;
+    }
+
+    .particles {
+      z-index: 2;
+      overflow: hidden;
+    }
+
+    .particle {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: var(--size);
+      height: var(--size);
+      border-radius: 2px;
+      opacity: 0.55;
+      background: hsl(var(--hue), 100%, 62%);
+      box-shadow:
+        0 0 10px hsla(var(--hue), 100%, 62%, 0.75),
+        0 0 22px hsla(var(--hue), 100%, 62%, 0.45);
+      transform: translate3d(var(--x), var(--y), 0) scale(0.65);
+      animation: particle-drift var(--dur) linear infinite;
+      animation-delay: var(--delay);
+    }
 
     .scanlines {
-      z-index: 8;
-      background: repeating-linear-gradient(0deg, transparent, transparent 1px, rgba(0, 0, 0, 0.035) 1px, rgba(0, 0, 0, 0.035) 2px);
+      z-index: 6;
+      opacity: 0.28;
+      background:
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.06) 0 1px, transparent 1px 3px),
+        repeating-linear-gradient(90deg, rgba(0, 246, 255, 0.04) 0 1px, transparent 1px 2px);
+      animation: scan-drift 8s linear infinite;
     }
 
     .noise {
       z-index: 7;
-      opacity: 0.028;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-      background-repeat: repeat;
-      background-size: 256px;
+      opacity: 0.05;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='84' height='84' viewBox='0 0 84 84'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='84' height='84' filter='url(%23n)'/%3E%3C/svg%3E");
+      animation: noise-jump 0.2s steps(2) infinite;
     }
 
-    main {
-      position: relative;
-      z-index: 6;
-      max-width: 900px;
+    .glitch-flash {
+      z-index: 8;
+      opacity: 0;
+      background:
+        linear-gradient(90deg, rgba(255, 19, 79, 0.16), transparent 25%, rgba(0, 246, 255, 0.14) 56%, transparent 82%),
+        radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.18), transparent 58%);
+      mix-blend-mode: screen;
+      transition: opacity 90ms linear;
+    }
+
+    .shell {
+      width: min(1200px, 94vw);
       margin: 0 auto;
-      padding: 14px 14px 40px;
+      padding: 22px 0 44px;
+      position: relative;
+      z-index: 10;
     }
 
-    /* ── Topbar ── */
     .topbar {
       border: 1px solid rgba(0, 246, 255, 0.2);
       background: rgba(6, 9, 16, 0.74);
@@ -189,6 +247,7 @@
       gap: 8px;
       flex-wrap: wrap;
       justify-content: flex-end;
+      min-width: 0;
     }
 
     .nav a {
@@ -207,57 +266,377 @@
       background: rgba(2, 8, 18, 0.58);
     }
 
-    .nav a:hover {
+    .nav a:hover,
+    .nav a.active {
       color: #fff;
       border-color: rgba(255, 0, 212, 0.55);
       box-shadow: 0 0 0 2px rgba(255, 0, 212, 0.18), 0 0 14px rgba(0, 246, 255, 0.3);
       transform: translateY(-1px);
     }
 
-    /* ── Hero ── */
     .hero {
-      margin-top: 48px;
-      text-align: center;
-      margin-bottom: 48px;
+      min-height: 68vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      position: relative;
+      container-type: inline-size;
     }
 
-    .hero-kicker {
+    .hero::before {
+      content: "";
+      position: absolute;
+      inset: 3% 0;
+      border: 1px solid rgba(0, 246, 255, 0.18);
+      border-radius: 18px;
+      background:
+        radial-gradient(700px 360px at 52% 42%, rgba(0, 168, 255, 0.15), transparent 66%),
+        radial-gradient(560px 240px at 45% 55%, rgba(255, 0, 212, 0.09), transparent 60%);
+      z-index: 0;
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+        0 0 30px rgba(0, 168, 255, 0.14);
+    }
+
+    .hero-core {
+      width: min(100%, 1080px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      margin: 0 auto;
+      padding: 0 20px;
+      position: relative;
+      z-index: 1;
+      animation: core-flicker 5.2s infinite;
+    }
+
+    .kicker {
+      font-family: "IBM Plex Mono", monospace;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+      font-size: clamp(10px, 1.35vw, 13px);
+      color: #8ce1ff;
+      margin-bottom: 14px;
+      text-shadow: 0 0 12px rgba(0, 246, 255, 0.52);
+    }
+
+    .logo {
+      position: relative;
+      display: inline-block;
+      width: max-content;
+      max-width: 100%;
+      margin-inline: auto;
+      font-family: "Orbitron", sans-serif;
+      font-size: clamp(52px, 13cqi, 142px);
+      font-weight: 900;
+      letter-spacing: 4px;
+      line-height: 0.9;
+      text-transform: uppercase;
+      white-space: nowrap;
+      color: #d9ebff;
+      text-shadow:
+        0 0 8px rgba(255, 255, 255, 0.9),
+        0 0 26px rgba(0, 246, 255, 0.66),
+        0 0 54px rgba(0, 168, 255, 0.5),
+        0 0 82px rgba(255, 0, 212, 0.28);
+      transform-style: preserve-3d;
+      animation: rgb-jitter 2.8s infinite steps(2, end);
+      overflow-wrap: anywhere;
+    }
+
+    .logo-frame {
+      width: 100%;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding-inline: clamp(4px, 1.6cqi, 18px);
+    }
+
+    .logo > span {
+      position: relative;
+      display: inline-block;
+      background: linear-gradient(180deg, #f7fcff 0%, #c9e6ff 55%, #b4d9ff 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 2px 0 rgba(255, 255, 255, 0.16));
+    }
+
+    .logo::before,
+    .logo::after {
+      content: attr(data-text);
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      mix-blend-mode: screen;
+    }
+
+    .logo::before {
+      color: var(--cyan);
+      transform: translate3d(-3px, 1px, 0);
+      text-shadow: -2px 0 0 rgba(0, 246, 255, 0.7);
+      animation: glitch-slice-a 2100ms infinite steps(2, end);
+      opacity: 0.85;
+    }
+
+    .logo::after {
+      color: var(--red);
+      transform: translate3d(3px, -1px, 0);
+      text-shadow: 2px 0 0 rgba(255, 19, 79, 0.72);
+      animation: glitch-slice-b 2700ms infinite steps(2, end);
+      opacity: 0.8;
+    }
+
+    .logo-grid {
+      margin-top: 10px;
+      height: 2px;
+      width: min(860px, 88%);
+      background: linear-gradient(90deg, transparent, rgba(0, 246, 255, 0.9), rgba(255, 0, 212, 0.76), transparent);
+      margin-inline: auto;
+      box-shadow: 0 0 18px rgba(0, 246, 255, 0.72);
+      animation: line-flicker 1700ms infinite;
+    }
+
+    .tagline {
+      margin: 16px auto 22px;
+      max-width: 900px;
+      color: #c4d5ef;
+      font-family: "IBM Plex Mono", monospace;
+      letter-spacing: 1.2px;
+      text-transform: uppercase;
+      line-height: 1.5;
+      font-size: clamp(12px, 1.7vw, 16px);
+      text-shadow: 0 0 14px rgba(0, 168, 255, 0.35);
+      overflow-wrap: anywhere;
+    }
+
+    .cta-row {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      min-height: 44px;
+      padding: 0 16px;
+      border-radius: 10px;
+      text-decoration: none;
       font-family: "IBM Plex Mono", monospace;
       font-size: 12px;
-      letter-spacing: 2px;
+      letter-spacing: 1px;
       text-transform: uppercase;
-      color: var(--cyan);
-      margin-bottom: 12px;
+      border: 1px solid transparent;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.18s ease;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      cursor: pointer;
     }
 
-    .hero-title {
+    .btn-primary {
+      color: #001419;
+      border-color: rgba(0, 246, 255, 0.85);
+      background: linear-gradient(125deg, rgba(0, 246, 255, 0.95), rgba(0, 255, 102, 0.9));
+      box-shadow: 0 0 16px rgba(0, 246, 255, 0.42), 0 0 34px rgba(0, 255, 102, 0.25);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-2px) scale(1.01);
+      box-shadow: 0 0 22px rgba(0, 246, 255, 0.58), 0 0 44px rgba(0, 255, 102, 0.32);
+    }
+
+    .btn-secondary {
+      color: #c8deff;
+      border-color: rgba(255, 0, 212, 0.45);
+      background: rgba(8, 12, 24, 0.7);
+      box-shadow: inset 0 0 0 1px rgba(0, 246, 255, 0.1);
+    }
+
+    .btn-secondary:hover {
+      border-color: rgba(0, 246, 255, 0.56);
+      box-shadow: 0 0 0 2px rgba(255, 0, 212, 0.16), 0 0 16px rgba(0, 246, 255, 0.33);
+      transform: translateY(-2px);
+    }
+
+    .btn:disabled {
+      opacity: 0.58;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .signal-row {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: -18px;
+      position: relative;
+      z-index: 2;
+    }
+
+    .signal-card,
+    .section-block,
+    .feature-card,
+    .sport-chip,
+    .step-card {
+      border: 1px solid var(--line-soft);
+      background:
+        radial-gradient(360px 180px at 0% 0%, rgba(0, 246, 255, 0.08), transparent 68%),
+        var(--panel);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+
+    .signal-card {
+      min-height: 92px;
+      border-radius: 11px;
+      padding: 14px 12px;
+    }
+
+    .signal-value {
       font-family: "Orbitron", sans-serif;
-      font-size: clamp(28px, 5vw, 48px);
-      font-weight: 800;
-      letter-spacing: 2px;
+      font-size: clamp(19px, 2.8vw, 28px);
+      letter-spacing: 1px;
       color: #f4f8ff;
-      text-shadow: 0 0 28px rgba(0, 246, 255, 0.25);
-      margin-bottom: 16px;
+      text-shadow: 0 0 14px rgba(0, 246, 255, 0.22);
     }
 
-    .hero-copy {
-      max-width: 680px;
-      margin: 0 auto;
-      color: #bfd0ec;
-      font-size: 17px;
-      line-height: 1.65;
+    .signal-label {
+      margin-top: 6px;
+      color: #9bb2db;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 0.7px;
+      line-height: 1.45;
+      text-transform: uppercase;
     }
 
-    /* ── Section blocks ── */
-    .section-block {
-      margin-bottom: 32px;
+    .plan-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .plan-card {
+      min-height: 100%;
       border: 1px solid var(--line-soft);
       border-radius: 11px;
-      padding: 28px 24px 24px;
+      padding: 18px 14px 16px;
       background:
-        radial-gradient(420px 180px at 8% 0%, rgba(0, 246, 255, 0.08), transparent 70%),
-        rgba(4, 8, 18, 0.72);
+        radial-gradient(360px 180px at 0% 0%, rgba(0, 246, 255, 0.08), transparent 68%),
+        var(--panel);
       box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    }
+
+    .plan-card.featured {
+      border-color: rgba(0, 255, 102, 0.42);
+      background:
+        radial-gradient(420px 190px at 0% 0%, rgba(0, 255, 102, 0.1), transparent 68%),
+        radial-gradient(360px 180px at 100% 0%, rgba(255, 0, 212, 0.08), transparent 70%),
+        var(--panel);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.025),
+        0 0 22px rgba(0, 255, 102, 0.1);
+    }
+
+    .plan-badge {
+      display: inline-flex;
+      border: 1px solid rgba(0, 246, 255, 0.28);
+      border-radius: 999px;
+      padding: 5px 9px;
+      color: #bfd6ff;
+      background: rgba(2, 8, 18, 0.58);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 10px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+    }
+
+    .plan-name {
+      font-family: "Orbitron", sans-serif;
+      font-size: clamp(21px, 3vw, 31px);
+      letter-spacing: 1px;
+      color: #f4f8ff;
+      margin-bottom: 8px;
+      text-shadow: 0 0 14px rgba(0, 246, 255, 0.2);
+    }
+
+    .plan-price {
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 12px 0 10px;
+    }
+
+    .plan-price strong {
+      font-family: "Orbitron", sans-serif;
+      font-size: clamp(30px, 5vw, 48px);
+      letter-spacing: 1px;
+      color: #f4f8ff;
+      text-shadow: 0 0 18px rgba(0, 246, 255, 0.25);
+    }
+
+    .plan-price span,
+    .plan-copy,
+    .plan-list {
+      color: #c8dafa;
+    }
+
+    .plan-copy {
+      font-size: 15px;
+      line-height: 1.55;
+    }
+
+    .plan-list {
+      margin: 14px 0 0;
+      padding-left: 18px;
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .plan-list li + li {
+      margin-top: 6px;
+    }
+
+    .plan-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .checkout-notice {
+      display: none;
+      margin-top: 14px;
+      border: 1px solid rgba(255, 0, 212, 0.28);
+      border-radius: 10px;
+      padding: 10px 12px;
+      color: #ffd7f7;
+      background: rgba(8, 12, 24, 0.7);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      letter-spacing: 0.5px;
+      line-height: 1.45;
+    }
+
+    .checkout-notice.visible {
+      display: block;
+    }
+
+    .section-block {
+      margin-top: 32px;
+      border-radius: 11px;
+      padding: 20px 16px 18px;
+    }
+
+    .section-head {
+      margin-bottom: 14px;
     }
 
     .section-kicker {
@@ -266,148 +645,190 @@
       letter-spacing: 1.1px;
       text-transform: uppercase;
       color: #9bdcff;
-      margin-bottom: 8px;
+      margin-bottom: 5px;
     }
 
     .section-title {
       font-family: "Orbitron", sans-serif;
-      font-size: clamp(20px, 3.2vw, 28px);
+      font-size: clamp(22px, 3.6vw, 32px);
       letter-spacing: 1px;
       color: #f4f8ff;
-      margin-bottom: 12px;
+      margin-bottom: 6px;
       text-shadow: 0 0 14px rgba(0, 246, 255, 0.2);
+      overflow-wrap: anywhere;
     }
 
     .section-copy {
-      max-width: 720px;
+      max-width: 900px;
       color: #bfd0ec;
       font-size: 15px;
-      line-height: 1.65;
+      line-height: 1.58;
     }
 
-    /* ── Genre grid ── */
-    .genre-grid {
+    .sports-grid {
+      margin-top: 12px;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
       gap: 10px;
-      margin-top: 20px;
     }
 
-    .genre-chip {
-      border: 1px solid var(--line-soft);
-      border-radius: 10px;
-      padding: 14px 12px;
-      text-align: center;
-      background: rgba(4, 8, 18, 0.74);
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+    .sport-chip {
+      border-radius: 11px;
+      padding: 14px 12px 12px;
       transition: all 0.18s ease;
+      min-height: 74px;
     }
 
-    .genre-chip:hover {
+    .sport-chip:hover,
+    .feature-card:hover,
+    .step-card:hover {
       transform: translateY(-2px);
-      border-color: rgba(0, 246, 255, 0.4);
+      border-color: rgba(0, 246, 255, 0.42);
       box-shadow: 0 0 16px rgba(0, 168, 255, 0.18);
     }
 
-    .genre-name {
+    .sport-kicker {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 10px;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+      color: #8ce1ff;
+      margin-bottom: 6px;
+    }
+
+    .sport-name,
+    .feature-title,
+    .step-title {
       font-family: "Orbitron", sans-serif;
-      font-size: 13px;
-      letter-spacing: 0.6px;
+      letter-spacing: 1px;
       color: #f4f8ff;
     }
 
-    /* ── Feature cards ── */
+    .sport-name {
+      font-size: 18px;
+    }
+
     .feature-grid {
+      margin-top: 12px;
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 14px;
-      margin-top: 20px;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
     }
 
     .feature-card {
-      border: 1px solid var(--line-soft);
       border-radius: 11px;
-      padding: 20px 16px 16px;
-      background:
-        radial-gradient(360px 180px at 0% 0%, rgba(0, 246, 255, 0.08), transparent 68%),
-        rgba(4, 8, 18, 0.74);
-      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02);
+      padding: 16px 14px 14px;
       transition: all 0.18s ease;
-    }
-
-    .feature-card:hover {
-      transform: translateY(-2px);
-      border-color: rgba(0, 246, 255, 0.4);
-      box-shadow: 0 0 16px rgba(0, 168, 255, 0.18);
     }
 
     .feature-title {
-      font-family: "Orbitron", sans-serif;
-      font-size: 18px;
-      letter-spacing: 0.8px;
-      color: #f4f8ff;
-      margin-bottom: 10px;
+      font-size: 19px;
+      margin-bottom: 8px;
     }
 
-    .feature-card p {
+    .feature-copy,
+    .step-copy {
       color: #c8dafa;
       font-size: 14px;
-      line-height: 1.55;
+      line-height: 1.5;
     }
 
-    /* ── Truth note ── */
-    .truth-note {
-      margin-top: 10px;
-      padding: 14px 16px;
-      border-left: 2px solid rgba(0, 246, 255, 0.3);
-      color: #9bb2db;
-      font-size: 13px;
-      line-height: 1.55;
-      font-family: "IBM Plex Mono", monospace;
-      letter-spacing: 0.4px;
+    .step-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 12px;
     }
 
-    /* ── CTA ── */
-    .cta-block {
-      margin-top: 48px;
-      text-align: center;
-    }
-
-    .cta-block p {
-      color: #bfd0ec;
-      font-size: 15px;
-      line-height: 1.6;
-      margin-bottom: 16px;
-    }
-
-    .cta-link {
-      display: inline-block;
-      text-decoration: none;
-      border: 1px solid rgba(0, 246, 255, 0.4);
-      border-radius: 999px;
-      padding: 10px 24px;
-      color: #fff;
-      font-family: "IBM Plex Mono", monospace;
-      font-size: 13px;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      background: rgba(0, 168, 255, 0.12);
+    .step-card {
+      border-radius: 11px;
+      padding: 16px 14px;
       transition: all 0.18s ease;
     }
 
-    .cta-link:hover {
-      border-color: rgba(255, 0, 212, 0.55);
-      box-shadow: 0 0 0 2px rgba(255, 0, 212, 0.18), 0 0 18px rgba(0, 246, 255, 0.3);
-      transform: translateY(-1px);
+    .step-index {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px;
+      height: 26px;
+      margin-bottom: 10px;
+      border: 1px solid rgba(0, 246, 255, 0.35);
+      border-radius: 999px;
+      color: #001419;
+      background: linear-gradient(125deg, rgba(0, 246, 255, 0.95), rgba(0, 255, 102, 0.9));
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      font-weight: 700;
     }
 
-    .cta-link + .cta-link {
-      margin-left: 12px;
+    .step-title {
+      font-size: 16px;
+      margin-bottom: 8px;
     }
 
-    /* ── Footer ── */
+    .truth-band {
+      margin-top: 32px;
+      border: 1px solid rgba(255, 0, 212, 0.28);
+      border-radius: 12px;
+      padding: 18px 16px;
+      background:
+        radial-gradient(480px 200px at 100% 10%, rgba(255, 0, 212, 0.13), transparent 72%),
+        rgba(8, 12, 24, 0.7);
+      box-shadow:
+        inset 0 0 0 1px rgba(0, 246, 255, 0.06),
+        0 0 22px rgba(255, 0, 212, 0.1);
+    }
+
+    .truth-kicker {
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+      color: #ffb5f0;
+      margin-bottom: 8px;
+    }
+
+    .truth-text {
+      color: #c8dafa;
+      font-size: 15px;
+      line-height: 1.6;
+    }
+
+    .truth-text strong {
+      color: #f4f8ff;
+    }
+
+    .inline-code {
+      font-family: "IBM Plex Mono", monospace;
+      color: #e5f5ff;
+      background: rgba(3, 16, 32, 0.78);
+      padding: 1px 5px;
+      border-radius: 4px;
+      border: 1px solid rgba(0, 246, 255, 0.2);
+      font-size: 0.86em;
+    }
+
+    .bottom-cta {
+      margin-top: 32px;
+      text-align: center;
+      border: 1px solid rgba(0, 246, 255, 0.18);
+      border-radius: 18px;
+      padding: 28px 18px;
+      background:
+        radial-gradient(700px 280px at 50% 0%, rgba(0, 168, 255, 0.12), transparent 70%),
+        rgba(6, 9, 16, 0.68);
+      box-shadow:
+        inset 0 0 0 1px rgba(255, 255, 255, 0.03),
+        0 0 22px rgba(0, 168, 255, 0.14);
+    }
+
+    .bottom-cta .section-copy {
+      margin: 0 auto 16px;
+    }
+
     footer {
-      margin-top: 48px;
+      margin-top: 44px;
       padding: 16px 0 0;
       border-top: 1px solid var(--line-soft);
       display: flex;
@@ -424,6 +845,7 @@
     .footer-links {
       display: flex;
       gap: 14px;
+      flex-wrap: wrap;
     }
 
     .footer-links a {
@@ -436,10 +858,124 @@
       color: var(--cyan);
     }
 
-    /* ── Responsive ── */
+    @keyframes vortex-spin-a {
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes vortex-spin-b {
+      to { transform: translate(-50%, -50%) rotate(-360deg); }
+    }
+
+    @keyframes vortex-spin-c {
+      to { transform: translate(-50%, -50%) rotate(360deg); }
+    }
+
+    @keyframes vortex-pulse {
+      0%, 100% { scale: 1; opacity: 0.15; }
+      50% { scale: 1.04; opacity: 0.22; }
+    }
+
+    @keyframes particle-drift {
+      0% {
+        transform: translate3d(var(--x), var(--y), 0) scale(0.65) rotate(0deg);
+        opacity: 0;
+      }
+      12% { opacity: 0.55; }
+      100% {
+        transform: translate3d(calc(var(--x) + 18vw), -12vh, 0) scale(1.1) rotate(190deg);
+        opacity: 0;
+      }
+    }
+
+    @keyframes scan-drift {
+      to { transform: translateY(12px); }
+    }
+
+    @keyframes noise-jump {
+      to { transform: translate3d(-2%, 1%, 0); }
+    }
+
+    @keyframes rgb-jitter {
+      0%, 100% { transform: translate3d(0, 0, 0); }
+      22% { transform: translate3d(1px, -1px, 0); }
+      23% { transform: translate3d(-1px, 1px, 0); }
+      24% { transform: translate3d(0, 0, 0); }
+      68% { transform: translate3d(-1px, 0, 0); }
+      69% { transform: translate3d(1px, 1px, 0); }
+      70% { transform: translate3d(0, 0, 0); }
+    }
+
+    @keyframes glitch-slice-a {
+      0%, 100% { clip-path: inset(0 0 0 0); }
+      5% { clip-path: inset(8% 0 72% 0); transform: translate(-5px, 1px); }
+      9% { clip-path: inset(0 0 0 0); transform: translate(-3px, 1px); }
+      38% { clip-path: inset(42% 0 32% 0); transform: translate(-6px, -1px); }
+      42% { clip-path: inset(0 0 0 0); transform: translate(-3px, 1px); }
+      73% { clip-path: inset(16% 0 58% 0); transform: translate(-4px, 0); }
+      77% { clip-path: inset(0 0 0 0); transform: translate(-3px, 1px); }
+    }
+
+    @keyframes glitch-slice-b {
+      0%, 100% { clip-path: inset(0 0 0 0); }
+      6% { clip-path: inset(14% 0 65% 0); transform: translate(5px, -1px); }
+      10% { clip-path: inset(0 0 0 0); transform: translate(3px, -1px); }
+      46% { clip-path: inset(26% 0 48% 0); transform: translate(4px, 0); }
+      48% { clip-path: inset(0 0 0 0); transform: translate(3px, -1px); }
+      84% { clip-path: inset(36% 0 38% 0); transform: translate(5px, 0); }
+      88% { clip-path: inset(0 0 0 0); transform: translate(3px, -1px); }
+    }
+
+    @keyframes core-flicker {
+      0%, 100% { opacity: 1; }
+      3% { opacity: 0.97; }
+      4% { opacity: 1; }
+      40% { opacity: 0.99; }
+      41% { opacity: 1; }
+      78% { opacity: 0.97; }
+      80% { opacity: 1; }
+    }
+
+    @keyframes line-flicker {
+      0%, 100% { opacity: 0.9; }
+      12% { opacity: 0.4; }
+      14% { opacity: 0.95; }
+      53% { opacity: 0.48; }
+      55% { opacity: 0.9; }
+      78% { opacity: 0.35; }
+      81% { opacity: 0.95; }
+    }
+
+    body.glitch-burst .glitch-flash {
+      opacity: 1;
+    }
+
+    @media (max-width: 1000px) {
+      .signal-row,
+      .feature-grid,
+      .plan-grid,
+      .step-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .hero {
+        min-height: 64vh;
+      }
+    }
+
     @media (max-width: 700px) {
+      .shell {
+        width: min(100% - 22px, 1200px);
+        padding-top: 14px;
+      }
+
       .topbar {
         border-radius: 11px;
+        align-items: flex-start;
+        flex-wrap: wrap;
+      }
+
+      .brand {
+        width: 100%;
       }
 
       .brand-text {
@@ -447,43 +983,142 @@
         letter-spacing: 0.8px;
       }
 
+      .nav {
+        width: 100%;
+        justify-content: flex-start;
+        gap: 6px;
+      }
+
+      .nav a {
+        font-size: 10px;
+        letter-spacing: 0.7px;
+        padding: 6px 8px;
+      }
+
       .hero {
-        margin-top: 32px;
-        margin-bottom: 32px;
+        min-height: 58vh;
       }
 
-      .genre-grid {
-        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+      .hero::before {
+        inset: 4% 0;
       }
 
-      .feature-grid {
+      .logo {
+        letter-spacing: 1.5px;
+        font-size: clamp(42px, 14cqi, 64px);
+      }
+
+      .kicker {
+        max-width: 34ch;
+        margin-inline: auto;
+        letter-spacing: 1.2px;
+        line-height: 1.5;
+      }
+
+      .tagline {
+        max-width: 96%;
+        letter-spacing: 0.7px;
+      }
+
+      .cta-row {
+        flex-direction: column;
+        width: 100%;
+      }
+
+      .btn {
+        width: 100%;
+      }
+
+      .signal-row,
+      .feature-grid,
+      .plan-grid,
+      .step-grid {
         grid-template-columns: 1fr;
       }
 
-      .cta-link + .cta-link {
-        margin-left: 0;
-        margin-top: 10px;
+      .sports-grid {
+        grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+      }
+
+      footer {
+        align-items: flex-start;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .hero-core {
+        padding-inline: 14px;
+      }
+
+      .logo {
+        font-size: clamp(34px, 10.5cqi, 40px);
+        letter-spacing: 1px;
+      }
+
+      .kicker {
+        max-width: 30ch;
+        letter-spacing: 1px;
+      }
+
+      .tagline {
+        max-width: 31ch;
+        font-size: 11px;
+        letter-spacing: 0.45px;
+      }
+
+      .section-title {
+        font-size: 20px;
+        letter-spacing: 0.4px;
+        line-height: 1.25;
+      }
+
+      .section-copy,
+      .plan-copy {
+        font-size: 14px;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation: none !important;
+        transition: none !important;
+      }
+
+      .vortex-layer {
+        opacity: 0.08;
+      }
+
+      .scanlines,
+      .noise,
+      .particles,
+      .glitch-flash {
+        display: none;
       }
     }
   </style>
 </head>
 <body>
-  <div class="vortex">
+  <div class="vortex" aria-hidden="true">
     <div class="vortex-layer one"></div>
     <div class="vortex-layer two"></div>
+    <div class="vortex-layer three"></div>
   </div>
-  <div class="scanlines"></div>
-  <div class="noise"></div>
+  <div class="particles" aria-hidden="true"></div>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div class="noise" aria-hidden="true"></div>
+  <div class="glitch-flash" aria-hidden="true"></div>
 
-  <main>
+  <main class="shell">
     <header class="topbar">
       <div class="brand">
         <span class="brand-dot"></span>
         <div class="brand-text">PVTKRRX / Sports</div>
       </div>
-      <nav class="nav">
+      <nav class="nav" aria-label="Primary navigation">
         <a href="/">Home</a>
-        <a href="/sports">Sports</a>
+        <a class="active" href="/sports" aria-current="page">Sports</a>
         <a href="/runbooks">Runbooks</a>
         <a href="/#faq">FAQ</a>
         <a href="/health">Health</a>
@@ -491,75 +1126,175 @@
     </header>
 
     <section class="hero">
-      <div class="hero-kicker">Sports Support</div>
-      <h1 class="hero-title">Private tracker sports in Stremio</h1>
-      <p class="hero-copy">
-        If your trackers carry sports releases, PVTKRRX surfaces them in Stremio alongside movies, TV, and your library. Sports is a first-class catalog — not an afterthought.
-      </p>
+      <div class="hero-core">
+        <p class="kicker">SportsMeta Artwork For PVTKRRX Sports</p>
+        <div class="logo-frame">
+          <h1 class="logo" data-text="SPORTS"><span>SPORTS</span><span class="sr-only"> - Sports Posters artwork upgrade for PVTKRRX sports</span></h1>
+        </div>
+        <div class="logo-grid"></div>
+        <p class="tagline">
+          PVTKRRX stays free. Sports Posters only upgrades sports poster, background, and logo artwork.
+        </p>
+        <p class="kicker" style="margin-top:-4px">Sports streams stay on your route. Stripe checkout and artwork entitlements stay with SportsMeta.</p>
+        <div class="cta-row">
+          <button class="btn btn-primary" type="button" data-checkout-interval="month" data-umami-event="cta_sports_posters_monthly" data-umami-event-page="sports" data-umami-event-section="hero">Monthly GBP 2.99</button>
+          <button class="btn btn-secondary" type="button" data-checkout-interval="year" data-umami-event="cta_sports_posters_yearly" data-umami-event-page="sports" data-umami-event-section="hero">Yearly GBP 24.99</button>
+        </div>
+        <div class="checkout-notice" id="checkoutNotice" role="status" aria-live="polite"></div>
+      </div>
     </section>
 
-    <section class="section-block">
-      <div class="section-kicker">Genre Filtering</div>
-      <h2 class="section-title">Browse by sport</h2>
-      <p class="section-copy">
-        Sports has its own top-level catalog in Stremio with genre filtering. Results come from the tracker side you already control — not a separate service.
-      </p>
-      <div class="genre-grid">
-        <div class="genre-chip"><div class="genre-name">Football</div></div>
-        <div class="genre-chip"><div class="genre-name">F1</div></div>
-        <div class="genre-chip"><div class="genre-name">UFC</div></div>
-        <div class="genre-chip"><div class="genre-name">NBA</div></div>
-        <div class="genre-chip"><div class="genre-name">Cricket</div></div>
-        <div class="genre-chip"><div class="genre-name">Rugby</div></div>
-        <div class="genre-chip"><div class="genre-name">Tennis</div></div>
-        <div class="genre-chip"><div class="genre-name">Boxing</div></div>
-        <div class="genre-chip"><div class="genre-name">Golf</div></div>
-        <div class="genre-chip"><div class="genre-name">Baseball</div></div>
-        <div class="genre-chip"><div class="genre-name">Cycling</div></div>
-        <div class="genre-chip"><div class="genre-name">Darts</div></div>
-        <div class="genre-chip"><div class="genre-name">Snooker</div></div>
+    <section class="section-block" id="plans">
+      <div class="section-head">
+        <div class="section-kicker">Plans</div>
+        <h2 class="section-title">Free streams. Optional paid sports artwork.</h2>
+        <p class="section-copy">
+          This public URL is the PVTKRRX-facing SportsMeta offer. PVTKRRX streaming remains free; the paid subscription only changes the sports artwork served from SportsMeta member routes.
+        </p>
+      </div>
+      <div class="plan-grid">
+        <article class="plan-card">
+          <span class="plan-badge">Baseline</span>
+          <h3 class="plan-name">Free</h3>
+          <div class="plan-price">
+            <strong>GBP 0</strong>
+            <span>forever</span>
+          </div>
+          <p class="plan-copy">Use the public SportsMeta install for canonical sports metadata and generated SVG artwork placeholders. PVTKRRX works without paying.</p>
+          <div class="plan-actions">
+            <a class="btn btn-secondary" href="https://sportsmeta.pvtkrrx.cc/manifest.json" data-umami-event="cta_open_free_manifest" data-umami-event-page="sports" data-umami-event-section="plans">Open Free Manifest</a>
+          </div>
+          <ul class="plan-list">
+            <li>Public SportsMeta install URL</li>
+            <li>Canonical <span class="inline-code">sportsmeta:</span> IDs</li>
+            <li>SVG-only public artwork routes</li>
+            <li>PVTKRRX streams stay free</li>
+          </ul>
+        </article>
+
+        <article class="plan-card featured">
+          <span class="plan-badge">Sports only</span>
+          <h3 class="plan-name">Sports Posters</h3>
+          <div class="plan-price">
+            <strong>GBP 2.99</strong>
+            <span>per month, or GBP 24.99/year</span>
+          </div>
+          <p class="plan-copy">Upgrade sports artwork while keeping PVTKRRX free. SportsMeta serves poster, background, and logo artwork from the member install after checkout.</p>
+          <div class="plan-actions">
+            <button class="btn btn-primary" type="button" data-checkout-interval="month" data-umami-event="cta_sports_posters_monthly" data-umami-event-page="sports" data-umami-event-section="plans">Monthly GBP 2.99</button>
+            <button class="btn btn-secondary" type="button" data-checkout-interval="year" data-umami-event="cta_sports_posters_yearly" data-umami-event-page="sports" data-umami-event-section="plans">Yearly GBP 24.99</button>
+          </div>
+          <ul class="plan-list">
+            <li>Sports poster, background, and logo artwork</li>
+            <li>Works with PC Local, LAN Bridge, and Remote Seedbox installs</li>
+            <li>Images validate the member token locally, not through live Stripe calls</li>
+            <li>Monthly or yearly Stripe subscription management</li>
+          </ul>
+        </article>
       </div>
     </section>
 
     <section class="section-block">
-      <div class="section-kicker">What You Get</div>
-      <h2 class="section-title">Catalog, artwork, and metadata</h2>
+      <div class="section-head">
+        <div class="section-kicker">Browse By Sport</div>
+        <h2 class="section-title">Sports gets its own Stremio surface</h2>
+        <p class="section-copy">
+          PVTKRRX separates sports discovery from movie and TV discovery. Your sports tracker results appear in sports catalogs with genre filtering, while the main movie and TV rows stay clean.
+        </p>
+      </div>
+      <div class="sports-grid">
+        <article class="sport-chip"><div class="sport-kicker">Football</div><div class="sport-name">Football</div></article>
+        <article class="sport-chip"><div class="sport-kicker">Racing</div><div class="sport-name">F1</div></article>
+        <article class="sport-chip"><div class="sport-kicker">Fight Cards</div><div class="sport-name">UFC</div></article>
+        <article class="sport-chip"><div class="sport-kicker">Basketball</div><div class="sport-name">NBA</div></article>
+        <article class="sport-chip"><div class="sport-kicker">Cricket</div><div class="sport-name">Cricket</div></article>
+        <article class="sport-chip"><div class="sport-kicker">Rugby</div><div class="sport-name">Rugby</div></article>
+        <article class="sport-chip"><div class="sport-kicker">Tennis</div><div class="sport-name">Tennis</div></article>
+        <article class="sport-chip"><div class="sport-kicker">Boxing</div><div class="sport-name">Boxing</div></article>
+        <article class="sport-chip"><div class="sport-kicker">Golf</div><div class="sport-name">Golf</div></article>
+        <article class="sport-chip"><div class="sport-kicker">Baseball</div><div class="sport-name">Baseball</div></article>
+        <article class="sport-chip"><div class="sport-kicker">Cycling</div><div class="sport-name">Cycling</div></article>
+        <article class="sport-chip"><div class="sport-kicker">Darts</div><div class="sport-name">Darts</div></article>
+        <article class="sport-chip"><div class="sport-kicker">Snooker</div><div class="sport-name">Snooker</div></article>
+        <article class="sport-chip"><div class="sport-kicker">Hockey</div><div class="sport-name">Hockey</div></article>
+        <article class="sport-chip"><div class="sport-kicker">Wrestling</div><div class="sport-name">WWE</div></article>
+        <article class="sport-chip"><div class="sport-kicker">All Sports</div><div class="sport-name">More</div></article>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-head">
+        <div class="section-kicker">What You Get</div>
+        <h2 class="section-title">Tracker-first sports, presented properly</h2>
+        <p class="section-copy">
+          The content source is still your own tracker stack. PVTKRRX handles the Stremio addon surface, route choice, stream attachment, and sports-specific catalog shape.
+        </p>
+      </div>
       <div class="feature-grid">
         <article class="feature-card">
           <div class="feature-title">Sports Catalog</div>
-          <p>Sports appears as a top-level catalog in Stremio. Browse, filter by genre, and search — the same way you use movies and TV. All results come from your own trackers.</p>
+          <p class="feature-copy">Sports appears as a first-class catalog alongside movies, TV, and library. Browse by sport family and narrow results inside Stremio.</p>
         </article>
         <article class="feature-card">
-          <div class="feature-title">Artwork Enrichment</div>
-          <p>Sports metadata, posters, logos, and backgrounds come from the SportsMeta companion addon. Every PVTKRRX user gets the same public SportsMeta SVG artwork today; premium poster-grade art is a separate SportsMeta member surface, not a hidden PVTKRRX tier.</p>
+          <div class="feature-title">SportsMeta Identity</div>
+          <p class="feature-copy">Canonical <span class="inline-code">sportsmeta:</span> IDs and artwork come from SportsMeta, the companion identity and artwork service in the same product stack.</p>
         </article>
         <article class="feature-card">
-          <div class="feature-title">Contamination Filter</div>
-          <p>Sports indexers are automatically excluded from movie and TV searches. Your film results stay clean — sports content only appears in the sports catalog.</p>
-        </article>
-        <article class="feature-card">
-          <div class="feature-title">One Addon Family</div>
-          <p>Sports, movies, TV, and your downloaded library all live in one addon. Already-downloaded files sit alongside new releases. No separate install required.</p>
+          <div class="feature-title">Clean Separation</div>
+          <p class="feature-copy">Sports-only indexers stay out of movie and TV search paths, so match packs, race weekends, and fight cards do not pollute normal discovery.</p>
         </article>
       </div>
     </section>
 
     <section class="section-block">
-      <div class="section-kicker">How It Works</div>
-      <h2 class="section-title">Your trackers, your sports</h2>
-      <p class="section-copy">
-        PVTKRRX searches your Prowlarr indexers for sports releases and presents them in Stremio with enriched metadata. The content comes from the trackers you already have access to — PVTKRRX is the bridge, not the source.
-      </p>
-      <div class="truth-note">
-        Sports support depends on your tracker catalogue. PVTKRRX is not a live sports service or a separate content provider. It surfaces what your trackers carry. Premium SportsMeta artwork can be proved on SportsMeta's own `/proof` and member proof routes, but PVTKRRX itself still emits only the public SportsMeta artwork surface.
+      <div class="section-head">
+        <div class="section-kicker">Flow</div>
+        <h2 class="section-title">How sports moves through the stack</h2>
+      </div>
+      <div class="step-grid">
+        <article class="step-card">
+          <span class="step-index">1</span>
+          <div class="step-title">You configure</div>
+          <p class="step-copy">Point PVTKRRX at Prowlarr and qBittorrent, then choose PC Local, LAN Bridge, or Remote Seedbox.</p>
+        </article>
+        <article class="step-card">
+          <span class="step-index">2</span>
+          <div class="step-title">Trackers answer</div>
+          <p class="step-copy">Sports releases come from the trackers you already have access to through your own Prowlarr setup.</p>
+        </article>
+        <article class="step-card">
+          <span class="step-index">3</span>
+          <div class="step-title">SportsMeta resolves</div>
+          <p class="step-copy">Where possible, sports rows attach to stable SportsMeta event identities and artwork surfaces.</p>
+        </article>
+        <article class="step-card">
+          <span class="step-index">4</span>
+          <div class="step-title">Stremio plays</div>
+          <p class="step-copy">Playback still follows your selected route. PVTKRRX does not host the media or replace your infrastructure.</p>
+        </article>
       </div>
     </section>
 
-    <div class="cta-block">
-      <p>Ready to bring sports into the same addon family as movies, TV, and your library?</p>
-      <a href="/runbooks" class="cta-link" data-umami-event="cta_read_setup_guide" data-umami-event-page="sports" data-umami-event-section="cta">Read Setup Guide</a>
-      <a href="/#routes" class="cta-link" data-umami-event="cta_choose_route" data-umami-event-page="sports" data-umami-event-section="cta">Choose Your Route</a>
-    </div>
+    <section class="truth-band">
+      <div class="truth-kicker">Boundary</div>
+      <p class="truth-text">
+        <strong>PVTKRRX is the stream addon.</strong> It searches your tracker setup and attaches playable streams.
+        <strong> SportsMeta is the companion sports identity and artwork service.</strong> It owns canonical sports metadata and artwork routes on its own hostname.
+        PVTKRRX consumes the public SportsMeta surface, but PVTKRRX itself is not a live sports service, debrid service, media host, or paid artwork entitlement tier.
+      </p>
+    </section>
+
+    <section class="bottom-cta">
+      <div class="section-kicker">Checkout</div>
+      <h2 class="section-title">Upgrade the artwork, not the stream addon</h2>
+      <p class="section-copy">
+        Sports Posters is optional. PVTKRRX keeps working without it, and payment does not change where playback comes from. It only unlocks SportsMeta member artwork for sports posters, backgrounds, and logos.
+      </p>
+      <div class="cta-row">
+        <button class="btn btn-primary" type="button" data-checkout-interval="month" data-umami-event="cta_sports_posters_monthly" data-umami-event-page="sports" data-umami-event-section="bottom">Monthly GBP 2.99</button>
+        <button class="btn btn-secondary" type="button" data-checkout-interval="year" data-umami-event="cta_sports_posters_yearly" data-umami-event-page="sports" data-umami-event-section="bottom">Yearly GBP 24.99</button>
+      </div>
+    </section>
 
     <footer>
       <div>
@@ -573,6 +1308,96 @@
       </div>
     </footer>
   </main>
+
+  <script>
+    const particles = document.querySelector('.particles');
+    const hueSet = [190, 203, 136, 345, 302];
+
+    for (let i = 0; i < 46; i += 1) {
+      const node = document.createElement('span');
+      const size = 1 + Math.random() * 3.5;
+      const x = `${Math.random() * 100}vw`;
+      const y = `${70 + Math.random() * 45}vh`;
+      const dur = `${8 + Math.random() * 11}s`;
+      const delay = `${-Math.random() * 12}s`;
+      const hue = hueSet[Math.floor(Math.random() * hueSet.length)];
+      node.className = 'particle';
+      node.style.setProperty('--size', `${size}px`);
+      node.style.setProperty('--x', x);
+      node.style.setProperty('--y', y);
+      node.style.setProperty('--dur', dur);
+      node.style.setProperty('--delay', delay);
+      node.style.setProperty('--hue', String(hue));
+      particles.appendChild(node);
+    }
+
+    function scheduleBurst() {
+      const wait = 8000 + Math.random() * 7000;
+      window.setTimeout(() => {
+        document.body.classList.add('glitch-burst');
+        window.setTimeout(() => {
+          document.body.classList.remove('glitch-burst');
+        }, 140);
+        scheduleBurst();
+      }, wait);
+    }
+
+    function setCheckoutNotice(message, visible) {
+      const notice = document.getElementById('checkoutNotice');
+      if (!notice) return;
+      notice.textContent = message || '';
+      notice.classList.toggle('visible', Boolean(visible && message));
+    }
+
+    function setCheckoutButtonsDisabled(disabled) {
+      document.querySelectorAll('[data-checkout-interval]').forEach((button) => {
+        button.disabled = Boolean(disabled);
+      });
+    }
+
+    async function startCheckout(interval) {
+      const billingInterval = String(interval || '').trim();
+      if (!billingInterval) return;
+      setCheckoutButtonsDisabled(true);
+      setCheckoutNotice('Creating secure Stripe checkout...', true);
+      try {
+        const response = await fetch('/sports/billing/checkout', {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'accept': 'application/json'
+          },
+          body: JSON.stringify({
+            tierId: 'posters',
+            interval: billingInterval
+          })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || !payload.url) {
+          throw new Error(payload.message || payload.error || 'Checkout could not be created.');
+        }
+        window.location.href = payload.url;
+      } catch (error) {
+        setCheckoutButtonsDisabled(false);
+        setCheckoutNotice(error.message || 'Checkout could not be created.', true);
+      }
+    }
+
+    document.querySelectorAll('[data-checkout-interval]').forEach((button) => {
+      button.addEventListener('click', () => startCheckout(button.dataset.checkoutInterval));
+    });
+
+    scheduleBurst();
+  </script>
   <script src="/analytics.js" defer></script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebPage",
+    "name": "Sports Posters",
+    "url": "https://www.pvtkrrx.cc/sports",
+    "description": "Optional SportsMeta artwork subscription for PVTKRRX sports poster, background, and logo artwork."
+  }
+  </script>
 </body>
 </html>

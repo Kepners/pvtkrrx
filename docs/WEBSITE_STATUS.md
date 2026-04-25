@@ -1,6 +1,6 @@
 # PVTKRRX Website Status
 
-Updated: 2026-04-23
+Updated: 2026-04-25
 
 ## Purpose
 
@@ -44,7 +44,7 @@ Interpretation:
 - The audit claim that `/runbooks`, `/manifest.json`, and `/health` are missing is false for the canonical host.
 - `/local/install` returning `403` on the public host is expected because it is a same-host/local-network helper route.
 - Public `/configure` now redirects back to the guide-only homepage instead of acting as a public setup surface.
-- `/sports` is now a dedicated public guide page with canonical metadata and guide-only CTAs.
+- `/sports` is now the public PVTKRRX-facing Sports Posters page. It uses the main PVTKRRX visual language and relays checkout creation to SportsMeta, while stream playback stays free.
 - The public homepage should stay an entry point, not a route picker; route-specific guidance belongs inside the Windows host app or the user's own self-host server.
 - The homepage refactor is now live on the canonical host, not just in the local worktree.
 
@@ -74,7 +74,7 @@ Current state:
 - Visual direction is on-brand
 - Homepage copy should stay cloud-friendly and avoid route-picker language above the fold
 - The README explains the product faster and with more trust than the landing page
-- Sports is now a real public page, but it still needs a real device/browser pass after the latest deploy
+- Sports is now the public Sports Posters entrypoint, but it still needs a real device/browser pass after the latest deploy
 
 Main clarity gaps:
 
@@ -87,7 +87,7 @@ Main clarity gaps:
 1. Keep the public homepage focused on docs and route guidance rather than raw runtime controls.
 2. Keep route-specific guidance inside `/configure` and the app, not on the landing page.
 3. Leave the public homepage copy in plain English and keep the CTA stack short.
-4. Browser-check the live homepage and sports page on real desktop/mobile devices after the latest deploy.
+4. Browser-check the live homepage and Sports Posters page on real desktop/mobile devices after the latest deploy.
 5. Reduce operator-facing nav noise on the homepage. `Manifest` and `Health` are useful, but they should not compete with the main user journey.
 
 ## Implemented And Live
@@ -99,7 +99,7 @@ Main clarity gaps:
 - Removed the route comparison section from the public cloud homepage
 - Added "What you need" section
 - Added dedicated sports proof section
-- Added a dedicated public `/sports` page with canonical metadata and guide-only CTAs
+- Reworked `/sports` into the public Sports Posters page with canonical metadata, PVTKRRX-styled presentation, and checkout buttons that call `/sports/billing/checkout`
 - Public `sitemap.xml` now includes `/sports`
 - Moved `Manifest` and `Health` links out of the main nav and into the footer utility area
 

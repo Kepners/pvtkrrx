@@ -23,6 +23,15 @@ PVTKRRX is in a working `1.1.41` state on the main Windows/local and self-host r
   - `npm run smoke:selfhost`
 - Live `/opt/pvtkrrx` hotfix applied with backup at `/opt/pvtkrrx-backups/20260425-082950-selfhost-admin-password-ui`; `pvtkrrx.service` restarted active.
 
+## 2026-04-25: Public Sports Posters URL alignment
+
+- `https://www.pvtkrrx.cc/sports` is now the intended public PVTKRRX-facing Sports Posters page.
+- The page uses the same dark neon PVTKRRX visual language as the existing homepage and keeps the sports/product boundary explicit: PVTKRRX streaming stays free, while paid Sports Posters only upgrades sports poster, background, and logo artwork.
+- Added a narrow hosted relay endpoint, `POST /sports/billing/checkout`, which proxies `posters` checkout creation to SportsMeta with `interval=month|year`. Stripe keys, member tokens, entitlement checks, premium artwork bytes, portal handling, and webhooks remain in SportsMeta.
+- Local proof used a mock SportsMeta checkout server and passed:
+  - `GET /sports` returned `200` and rendered the Sports Posters checkout controls.
+  - `POST /sports/billing/checkout` forwarded `tierId=posters` and `interval=year`, then returned the mock Stripe checkout URL.
+
 ## 2026-04-25: Sports poster/result backfill hardening
 
 - Reproduced the reported seedbox symptom on `https://pvt.kepners.co.uk/selfhost` before changing code:
