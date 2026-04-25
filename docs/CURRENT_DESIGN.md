@@ -188,7 +188,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
   - `backgroundImage`
   - `logo`
 - Sports catalog artwork now follows a SportsMeta-owned event contract instead of PVTKRRX-generated league cards:
-  - sports catalog browse tiles use landscape-shaped `/sports-artwork/.../landscape/...png` URLs as the Stremio `poster` value with `posterShape: landscape`, so the main Discover grid does not stretch portrait posters into wide sports cards
+  - sports catalog browse tiles use portrait/square `/sports-artwork/.../poster/...png` URLs as the Stremio `poster` value with `posterShape: poster`, so Discover rows keep Stremio's poster contract instead of stretching wallpaper art into poster tiles
   - sports detail metadata keeps portrait `/sports-artwork/.../poster/...png` for the event poster and uses landscape artwork for the Stremio background
   - resolved sports rows use PVTKRRX `/sports-artwork/id/{variant}/{sportsmeta:event:...}.png` URLs backed by the selected SportsMeta canonical/member asset route
   - unresolved sports rows use PVTKRRX `/sports-artwork/default/{variant}/{sport}.png?league=...` URLs backed by the public SportsMeta default asset route
@@ -311,7 +311,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 - Current release numbering is app-aligned across surfaces:
   - desktop/latest release tag: `vX.Y.Z`
   - self-host/seedbox release tag: `vX.Y.Z-selfhost`
-- For app version `1.1.48`, the current tags are `v1.1.48` and `v1.1.48-selfhost`.
+- For app version `1.1.49`, the current tags are `v1.1.49` and `v1.1.49-selfhost`.
 - Legacy `v1.12.x-selfhost` tags were an old self-host-only counter. They remain published only so older pinned installer commands keep working. Do not create new `v1.12.x-selfhost` tags, and do not use them as the preferred install/update target.
 - A self-host tag and its paired desktop tag must resolve to the same Git revision before the release is described as synchronized.
 

@@ -52,6 +52,19 @@ async function runCatalogSeedCase({ catalogId, expectedNames, expectedSeedQuerie
 
   assert.ok(Array.isArray(result?.metas), `${catalogId} should return a metas array`)
   assert.ok(result.metas.length > 0, `${catalogId} should emit seeded sport rows on empty browse`)
+  for (const meta of result.metas) {
+    assert.equal(meta?.posterShape, 'poster', `${catalogId} should emit portrait/square sports browse posters`)
+    assert.match(
+      String(meta?.poster || ''),
+      /\/sports-artwork\/(?:id|default)\/poster\//,
+      `${catalogId} sports browse poster should use the poster artwork variant`
+    )
+    assert.doesNotMatch(
+      String(meta?.poster || ''),
+      /\/sports-artwork\/(?:id|default)\/landscape\//,
+      `${catalogId} sports browse poster should not use the landscape artwork variant`
+    )
+  }
   for (const expectedName of expectedNames) {
     assert.ok(
       result.metas.some((meta) => String(meta?.name || '').includes(expectedName)),

@@ -4,7 +4,22 @@ Updated: 2026-04-25
 
 ## Current Stage
 
-PVTKRRX is being advanced from the synchronized `1.1.44` state to `1.1.48` for the Android/Stremio playback-source and sports artwork hotfix. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+PVTKRRX is being advanced from the synchronized `1.1.48` state to `1.1.49` for the sports Discover poster-shape correction. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+
+## 2026-04-25: v1.1.49 sports Discover poster-shape correction
+
+- Product rule clarified after the live screenshot review: sports Discover rows are meant to use portrait/square poster tiles, not landscape wallpaper tiles.
+- Root cause: the `1.1.45` sports artwork hotfix routed the landscape proxy URL into the catalog `poster` field and emitted `posterShape: landscape`, which made Stremio's Discover poster row warp sports artwork.
+- Repo fix: sports catalog rows now emit `/sports-artwork/.../poster/...png` in `poster` with `posterShape: poster`; landscape/background artwork stays on the `background` field for detail/backdrop use.
+- Added smoke coverage in `smoke:sports-catalog-seeds` so sports browse rows fail if the catalog poster regresses back to a landscape artwork URL.
+- Local proof passed:
+  - `npm run smoke:sports-catalog-seeds`
+  - `npm run smoke:sports-resolution`
+  - `npm run smoke:sports-artwork`
+  - `npm run smoke:pipeline`
+  - `npm run smoke:config`
+  - `(Get-Content scripts\install-selfhost.sh -Raw) -replace "\r", "" | bash -n`
+  - `npm run dist:win`
 
 ## 2026-04-25: v1.1.48 MotoGP wrong-source follow-up
 
@@ -41,7 +56,7 @@ PVTKRRX is being advanced from the synchronized `1.1.44` state to `1.1.48` for t
   - TV title fallback now retries broad search after a categorized Prowlarr rejection.
   - exact TV episode matches can survive partial title-token overlap, so localized tracker titles such as `Oak Island E Il Tesoro Maledetto S12E17` are not discarded only because they miss the English word `Curse`.
   - non-matchup sports supplemental searches now validate event/session/location tokens before attaching extra MotoGP/F1-style results, so a different race/weekend cannot win just because it has more seeders.
-  - sports browse catalog rows now use landscape artwork for the Stremio tile `poster` with `posterShape: landscape`; sports detail metadata keeps portrait poster artwork and landscape background artwork.
+  - sports browse catalog rows were switched to landscape artwork in this release, but that was corrected in `1.1.49`; current sports browse rows use portrait/square poster artwork with `posterShape: poster`, while sports detail metadata keeps portrait poster artwork and landscape background artwork.
   - member SportsMeta artwork now goes through the PVTKRRX `/sports-artwork/...png` raster proxy, so poster/background/logo variants are normalized before Stremio renders them.
 - Local proof passed:
   - `npm run smoke:pipeline`
