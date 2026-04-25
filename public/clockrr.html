@@ -1,0 +1,795 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-L0PH4EQEVN"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-L0PH4EQEVN');
+  </script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <meta name="theme-color" content="#080a12">
+  <title>Clockrr | Stremio Subtitle Clock Addon</title>
+  <link rel="canonical" href="https://www.pvtkrrx.cc/clockrr">
+  <link rel="icon" href="/favicon.ico" sizes="any">
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta name="description" content="Clockrr is a separate Stremio subtitle addon that adds a configurable clock overlay using a WebVTT subtitle track. Hosted on Contabo at clockrr.pvtkrrx.cc.">
+  <meta property="og:site_name" content="PVTKRRX">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://www.pvtkrrx.cc/clockrr">
+  <meta property="og:title" content="Clockrr - Stremio Subtitle Clock Addon">
+  <meta property="og:description" content="A separate Stremio subtitle addon for a configurable clock overlay. No catalogs, no streams, no media hosting.">
+  <meta property="og:image" content="https://raw.githubusercontent.com/Kepners/clockrr/master/logo.ico">
+  <meta property="og:image:secure_url" content="https://raw.githubusercontent.com/Kepners/clockrr/master/logo.ico">
+  <meta property="og:image:alt" content="Clockrr addon icon.">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Clockrr - Stremio Subtitle Clock Addon">
+  <meta name="twitter:description" content="Clockrr adds a configurable clock overlay to Stremio using a subtitle track. It is separate from the PVTKRRX private-tracker addon.">
+  <meta name="twitter:image" content="https://raw.githubusercontent.com/Kepners/clockrr/master/logo.ico">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;800;900&family=Rajdhani:wght@500;700&family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-0: #010203;
+      --bg-1: #080a12;
+      --bg-2: #0d1019;
+      --cyan: #00f6ff;
+      --green: #70f8ba;
+      --grape: #7c62d4;
+      --lime: #cafe48;
+      --text: #d8e4ff;
+      --muted: #8ca0c8;
+      --line: rgba(0, 246, 255, 0.32);
+      --line-soft: rgba(0, 246, 255, 0.16);
+      --panel: rgba(4, 8, 18, 0.74);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    html,
+    body {
+      min-height: 100%;
+    }
+
+    html {
+      background: var(--bg-0);
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: "Rajdhani", sans-serif;
+      color: var(--text);
+      background:
+        linear-gradient(rgba(0, 246, 255, 0.04) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 246, 255, 0.035) 1px, transparent 1px),
+        radial-gradient(circle at 50% 0%, rgba(124, 98, 212, 0.18), transparent 40%),
+        var(--bg-0);
+      background-size: 42px 42px, 42px 42px, auto, auto;
+      overflow-x: hidden;
+    }
+
+    a {
+      color: inherit;
+    }
+
+    .scanlines,
+    .noise {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .scanlines {
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.035) 0,
+        rgba(255, 255, 255, 0.035) 1px,
+        transparent 1px,
+        transparent 4px
+      );
+      mix-blend-mode: overlay;
+      opacity: 0.35;
+    }
+
+    .noise {
+      background-image: radial-gradient(rgba(255,255,255,0.08) 0.7px, transparent 0.7px);
+      background-size: 7px 7px;
+      opacity: 0.18;
+    }
+
+    .shell {
+      position: relative;
+      z-index: 2;
+      width: min(1160px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 44px;
+    }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      padding: 13px 0 26px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-width: 0;
+    }
+
+    .brand-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: var(--green);
+      box-shadow: 0 0 18px var(--green);
+      flex: 0 0 auto;
+    }
+
+    .brand-text,
+    .nav,
+    .kicker,
+    .section-kicker,
+    code {
+      font-family: "IBM Plex Mono", monospace;
+    }
+
+    .brand-text {
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0;
+      text-transform: uppercase;
+      overflow-wrap: anywhere;
+    }
+
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+      gap: 12px;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    .nav a {
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .nav a:hover,
+    .nav a.active {
+      color: var(--cyan);
+    }
+
+    .hero {
+      min-height: 470px;
+      display: grid;
+      align-items: center;
+      padding: 64px 0 58px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.75fr);
+      gap: 34px;
+      align-items: center;
+    }
+
+    .kicker,
+    .section-kicker {
+      color: var(--green);
+      font-size: 12px;
+      line-height: 1.4;
+      text-transform: uppercase;
+      letter-spacing: 0;
+    }
+
+    .logo {
+      margin-top: 16px;
+      font-family: "Orbitron", sans-serif;
+      font-size: clamp(58px, 11vw, 132px);
+      line-height: 0.9;
+      letter-spacing: 0;
+      color: #f3f9ff;
+      text-shadow:
+        0 0 12px rgba(0, 246, 255, 0.65),
+        0 0 34px rgba(124, 98, 212, 0.5);
+    }
+
+    .tagline {
+      margin-top: 22px;
+      max-width: 720px;
+      font-size: clamp(24px, 4vw, 46px);
+      line-height: 1.02;
+      color: #fff;
+      font-weight: 700;
+    }
+
+    .hero-copy {
+      margin-top: 16px;
+      max-width: 690px;
+      color: var(--muted);
+      font-size: 20px;
+      line-height: 1.45;
+    }
+
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 24px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 44px;
+      padding: 12px 20px;
+      border: 1px solid var(--line);
+      border-radius: 4px;
+      color: #fff;
+      text-decoration: none;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      text-transform: uppercase;
+      transition: border-color 0.15s, transform 0.15s, background 0.15s;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      border-color: var(--green);
+    }
+
+    .btn-primary {
+      background: rgba(0, 246, 255, 0.13);
+      box-shadow: 0 0 24px rgba(0, 246, 255, 0.17);
+    }
+
+    .btn-secondary {
+      background: rgba(124, 98, 212, 0.14);
+    }
+
+    .clock-panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      padding: 24px;
+      box-shadow: 0 0 34px rgba(0, 246, 255, 0.12);
+    }
+
+    .clock-face {
+      position: relative;
+      aspect-ratio: 1 / 1;
+      display: grid;
+      place-items: center;
+      border: 1px solid rgba(112, 248, 186, 0.28);
+      background:
+        linear-gradient(90deg, transparent 49%, rgba(0, 246, 255, 0.12) 50%, transparent 51%),
+        linear-gradient(transparent 49%, rgba(0, 246, 255, 0.12) 50%, transparent 51%),
+        rgba(1, 2, 3, 0.72);
+    }
+
+    .clock-face img {
+      width: 84px;
+      height: 84px;
+      object-fit: contain;
+      border-radius: 10px;
+      margin-bottom: 18px;
+      image-rendering: auto;
+    }
+
+    .clock-time {
+      position: absolute;
+      top: 24px;
+      right: 24px;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: clamp(24px, 4vw, 42px);
+      color: var(--lime);
+      text-shadow: 0 0 14px rgba(202, 254, 72, 0.6);
+    }
+
+    .clock-caption {
+      position: absolute;
+      left: 24px;
+      right: 24px;
+      bottom: 24px;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.35;
+    }
+
+    .section-block {
+      padding: 36px 0;
+      border-top: 1px solid var(--line-soft);
+    }
+
+    .section-head {
+      max-width: 760px;
+      margin-bottom: 22px;
+    }
+
+    .section-title {
+      margin-top: 8px;
+      font-family: "Orbitron", sans-serif;
+      font-size: clamp(30px, 5vw, 52px);
+      line-height: 1.05;
+      letter-spacing: 0;
+      color: #fff;
+    }
+
+    .section-copy {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 19px;
+      line-height: 1.48;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .info-card,
+    .step-card,
+    .truth-band {
+      border: 1px solid var(--line-soft);
+      background: rgba(4, 8, 18, 0.7);
+      padding: 20px;
+    }
+
+    .info-title,
+    .step-title {
+      color: #fff;
+      font-family: "Orbitron", sans-serif;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+
+    .info-copy,
+    .step-copy,
+    .truth-text {
+      margin-top: 8px;
+      color: var(--muted);
+      font-size: 17px;
+      line-height: 1.45;
+    }
+
+    .step-index {
+      display: inline-flex;
+      width: 28px;
+      height: 28px;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 12px;
+      border: 1px solid var(--line);
+      color: var(--green);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+    }
+
+    .table-wrap {
+      overflow-x: auto;
+      border: 1px solid var(--line-soft);
+      background: rgba(4, 8, 18, 0.7);
+    }
+
+    table {
+      width: 100%;
+      min-width: 720px;
+      border-collapse: collapse;
+      font-size: 16px;
+    }
+
+    th,
+    td {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--line-soft);
+      text-align: left;
+      vertical-align: top;
+    }
+
+    th {
+      color: var(--green);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+      text-transform: uppercase;
+    }
+
+    td {
+      color: var(--text);
+    }
+
+    code {
+      color: var(--lime);
+      font-size: 0.92em;
+      overflow-wrap: anywhere;
+    }
+
+    .truth-band {
+      margin-top: 8px;
+      border-color: rgba(112, 248, 186, 0.34);
+    }
+
+    footer {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 16px;
+      padding-top: 34px;
+      border-top: 1px solid var(--line-soft);
+      color: var(--muted);
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 12px;
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+
+    .footer-links a {
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    .footer-links a:hover {
+      color: var(--cyan);
+    }
+
+    @media (max-width: 860px) {
+      .topbar,
+      .hero-grid {
+        display: block;
+      }
+
+      .nav {
+        justify-content: flex-start;
+        margin-top: 14px;
+      }
+
+      .clock-panel {
+        margin-top: 30px;
+      }
+
+      .grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .shell {
+        width: min(100% - 24px, 1160px);
+      }
+
+      .hero {
+        min-height: auto;
+        padding-top: 34px;
+      }
+
+      .logo {
+        font-size: 50px;
+      }
+
+      .tagline {
+        font-size: 28px;
+      }
+
+      .hero-copy,
+      .section-copy {
+        font-size: 17px;
+      }
+
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="scanlines" aria-hidden="true"></div>
+  <div class="noise" aria-hidden="true"></div>
+
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-dot"></span>
+        <div class="brand-text">PVTKRRX / Separate Addon Page</div>
+      </div>
+      <nav class="nav">
+        <a href="/">Home</a>
+        <a href="/sports">Sports</a>
+        <a href="/runbooks">Runbooks</a>
+        <a class="active" href="/clockrr" aria-current="page">Clockrr</a>
+        <a href="/health">Health</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div class="hero-grid">
+        <div>
+          <p class="kicker">Separate Stremio Subtitle Addon</p>
+          <h1 class="logo" data-text="CLOCKRR"><span>Clockrr</span><span class="sr-only"> - Stremio subtitle clock addon</span></h1>
+          <p class="tagline">A configurable clock overlay for Stremio, delivered as a subtitle track.</p>
+          <p class="hero-copy">
+            Clockrr is not PVTKRRX playback, not a tracker bridge, and not a media host. It is a separate addon that exposes Stremio's <code>subtitles</code> resource for movies and series.
+          </p>
+          <div class="cta-row">
+            <a class="btn btn-primary" href="stremio://clockrr.pvtkrrx.cc/manifest.json" data-umami-event="cta_clockrr_install" data-umami-event-page="clockrr" data-umami-event-section="hero">Open In Stremio</a>
+            <a class="btn btn-secondary" href="https://clockrr.pvtkrrx.cc/configure" data-umami-event="cta_clockrr_configure" data-umami-event-page="clockrr" data-umami-event-section="hero">Configure Clockrr</a>
+          </div>
+        </div>
+        <aside class="clock-panel" aria-label="Clockrr subtitle preview">
+          <div class="clock-face">
+            <img src="https://raw.githubusercontent.com/Kepners/clockrr/master/logo.ico" alt="Clockrr icon">
+            <div class="clock-time">12:08</div>
+            <p class="clock-caption">Subtitle cue preview: the clock appears at the top right using WebVTT cue positioning. Client rendering can vary.</p>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-head">
+        <div class="section-kicker">Install</div>
+        <h2 class="section-title">Current public Clockrr URL</h2>
+        <p class="section-copy">
+          The verified Contabo-hosted install surface is <code>https://clockrr.pvtkrrx.cc/manifest.json</code>. Stremio remote addon installs require HTTPS; local HTTP is only suitable for loopback testing.
+        </p>
+      </div>
+      <div class="grid">
+        <article class="info-card">
+          <div class="info-title">Install URL</div>
+          <p class="info-copy"><code>https://clockrr.pvtkrrx.cc/manifest.json</code></p>
+        </article>
+        <article class="info-card">
+          <div class="info-title">Configure URL</div>
+          <p class="info-copy"><code>https://clockrr.pvtkrrx.cc/configure</code></p>
+        </article>
+        <article class="info-card">
+          <div class="info-title">Runtime</div>
+          <p class="info-copy">Contabo VPS, Docker, Caddy, standalone Clockrr service.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-head">
+        <div class="section-kicker">Manifest</div>
+        <h2 class="section-title">What Clockrr declares to Stremio</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Field</th>
+              <th>Current value</th>
+              <th>Meaning</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>ID</td>
+              <td><code>com.kepners.flashclock</code></td>
+              <td>Separate manifest identity from PVTKRRX.</td>
+            </tr>
+            <tr>
+              <td>Name</td>
+              <td><code>Clockrr (Top Right)</code></td>
+              <td>The subtitle track label exposed to Stremio.</td>
+            </tr>
+            <tr>
+              <td>Version</td>
+              <td><code>1.0.0</code></td>
+              <td>Current manifest version.</td>
+            </tr>
+            <tr>
+              <td>Resources</td>
+              <td><code>subtitles</code></td>
+              <td>Clockrr serves subtitle tracks only.</td>
+            </tr>
+            <tr>
+              <td>Types</td>
+              <td><code>movie</code>, <code>series</code></td>
+              <td>Clockrr can be selected during movie and series playback.</td>
+            </tr>
+            <tr>
+              <td>Catalogs</td>
+              <td><code>[]</code></td>
+              <td>Clockrr does not add Discover rows.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-head">
+        <div class="section-kicker">How It Works</div>
+        <h2 class="section-title">Subtitle track, not video playback</h2>
+      </div>
+      <div class="grid">
+        <article class="step-card">
+          <span class="step-index">1</span>
+          <div class="step-title">Install</div>
+          <p class="step-copy">Install Clockrr's manifest in Stremio from the public HTTPS URL.</p>
+        </article>
+        <article class="step-card">
+          <span class="step-index">2</span>
+          <div class="step-title">Select Subtitle</div>
+          <p class="step-copy">During movie or series playback, choose the Clockrr subtitle track from Stremio's subtitle menu.</p>
+        </article>
+        <article class="step-card">
+          <span class="step-index">3</span>
+          <div class="step-title">Read The Clock</div>
+          <p class="step-copy">Clockrr serves a generated WebVTT file so the time appears as subtitle cues in the top-right area.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-head">
+        <div class="section-kicker">Configuration</div>
+        <h2 class="section-title">Current configurable options</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Option</th>
+              <th>Values</th>
+              <th>Default</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Time format</td>
+              <td><code>24h</code>, <code>12h</code></td>
+              <td><code>24h</code></td>
+            </tr>
+            <tr>
+              <td>Flash duration</td>
+              <td><code>3</code>, <code>5</code>, <code>10</code>, <code>15</code>, <code>30</code>, <code>60</code> seconds</td>
+              <td><code>10</code></td>
+            </tr>
+            <tr>
+              <td>Repeat interval</td>
+              <td><code>10</code>, <code>20</code>, <code>30</code>, <code>60</code>, <code>120</code>, <code>300</code> seconds</td>
+              <td><code>60</code></td>
+            </tr>
+            <tr>
+              <td>Display mode</td>
+              <td><code>flash</code>, <code>always-on</code>, <code>subliminal</code></td>
+              <td><code>flash</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-head">
+        <div class="section-kicker">Endpoints</div>
+        <h2 class="section-title">Routes Clockrr actually uses</h2>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Endpoint</th>
+              <th>Purpose</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>/manifest.json</code></td>
+              <td>Stremio addon manifest.</td>
+              <td>Working on <code>clockrr.pvtkrrx.cc</code>.</td>
+            </tr>
+            <tr>
+              <td><code>/subtitles/:type/:id.json</code></td>
+              <td>Returns the Clockrr subtitle track for supported media types.</td>
+              <td>Working for <code>movie</code> and <code>series</code>.</td>
+            </tr>
+            <tr>
+              <td><code>/flashclock.vtt</code></td>
+              <td>Generated WebVTT clock cues.</td>
+              <td>Working with one-hour public cache headers.</td>
+            </tr>
+            <tr>
+              <td><code>/configure</code></td>
+              <td>Clockrr configuration page.</td>
+              <td>Working on the Clockrr origin.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="section-block">
+      <div class="section-head">
+        <div class="section-kicker">Limitations</div>
+        <h2 class="section-title">What not to overclaim</h2>
+      </div>
+      <div class="grid">
+        <article class="info-card">
+          <div class="info-title">Not Live Ticking</div>
+          <p class="info-copy">The WebVTT file is generated from the request time plus playback offset. It is not a continuously ticking browser overlay.</p>
+        </article>
+        <article class="info-card">
+          <div class="info-title">Client Rendering Varies</div>
+          <p class="info-copy">Clockrr asks for top-right cue positioning, but subtitle rendering is ultimately controlled by the Stremio client and player.</p>
+        </article>
+        <article class="info-card">
+          <div class="info-title">No Catalog Or Stream</div>
+          <p class="info-copy">Clockrr does not provide movie rows, metadata pages, or playable media streams. It only provides subtitles.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="truth-band">
+      <div class="section-kicker">Boundary</div>
+      <p class="truth-text">
+        <strong>Clockrr is separate from PVTKRRX.</strong> PVTKRRX remains the private-tracker and seedbox bridge for Stremio: no debrid, no third-party media host, your hardware, your trackers. Clockrr is hosted in the same operator space for now, but it keeps its own manifest identity, routes, runtime, and user expectations.
+      </p>
+    </section>
+
+    <footer>
+      <div>
+        <span>PVTKRRX / Private Tracker Bridge / Clockrr Separate Addon</span>
+      </div>
+      <div class="footer-links">
+        <a href="/">Home</a>
+        <a href="/sports">Sports</a>
+        <a href="/runbooks">Runbooks</a>
+        <a href="/health">Health</a>
+        <a href="mailto:kepners@pvtkrrx.cc">Contact</a>
+      </div>
+    </footer>
+  </main>
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Clockrr",
+    "applicationCategory": "MultimediaApplication",
+    "operatingSystem": "Stremio",
+    "url": "https://www.pvtkrrx.cc/clockrr",
+    "installUrl": "https://clockrr.pvtkrrx.cc/manifest.json",
+    "description": "Clockrr is a separate Stremio subtitle addon that adds a configurable clock overlay using generated WebVTT subtitles."
+  }
+  </script>
+</body>
+</html>

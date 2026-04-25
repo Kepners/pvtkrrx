@@ -184,6 +184,7 @@ const configPage = path.join(publicDir, 'configure.html')
 const configPageTemplate = fs.readFileSync(configPage, 'utf8')
 const runbooksPage = path.join(publicDir, 'runbooks.html')
 const sportsPage = path.join(publicDir, 'sports.html')
+const clockrrPage = path.join(publicDir, 'clockrr.html')
 const healthPage = path.join(publicDir, 'health.html')
 const STREMIO_LINK_SESSION_TTL_SECONDS = Math.max(300, parseInt(process.env.PVTKRRX_STREMIO_LINK_SESSION_TTL_SECONDS || '1800', 10))
 const GITHUB_OWNER = 'Kepners'
@@ -278,6 +279,10 @@ app.get('/:config/configure', (req, res) => {
 app.get('/sports', (req, res) => {
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
   res.sendFile(sportsPage)
+})
+app.get('/clockrr', (req, res) => {
+  setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
+  res.sendFile(clockrrPage)
 })
 app.post('/sports/billing/checkout', async (req, res) => {
   res.setHeader('Cache-Control', 'no-store')
