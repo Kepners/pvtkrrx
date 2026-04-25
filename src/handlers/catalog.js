@@ -44,10 +44,10 @@ const prowlarrSearchInFlight = new Map()
 const PROWLARR_SEARCH_CACHE_TTL_MS = Math.max(15000, parseInt(process.env.PVTKRRX_PROWLARR_CACHE_MS || '120000', 10))
 const PROWLARR_SEARCH_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_PROWLARR_SEARCH_TIMEOUT_MS || '7000', 10))
 const PROWLARR_SEARCH_CACHE_MAX_KEYS = Math.max(50, parseInt(process.env.PVTKRRX_PROWLARR_CACHE_MAX_KEYS || '500', 10))
-const SPORTS_SEED_CONCURRENCY = Math.max(1, parseInt(process.env.PVTKRRX_SPORTS_SEED_CONCURRENCY || '4', 10))
+const SPORTS_SEED_CONCURRENCY = Math.max(1, parseInt(process.env.PVTKRRX_SPORTS_SEED_CONCURRENCY || '2', 10))
 const SPORTS_SEED_QUERY_TIMEOUT_MS = Math.max(
   800,
-  parseInt(process.env.PVTKRRX_SPORTS_SEED_QUERY_TIMEOUT_MS || '1500', 10)
+  parseInt(process.env.PVTKRRX_SPORTS_SEED_QUERY_TIMEOUT_MS || '2500', 10)
 )
 // Don't re-run a second pass of seed-term queries when the initial browse has
 // already produced enough items to paint a usable first screen. Do not wait

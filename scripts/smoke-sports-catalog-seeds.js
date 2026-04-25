@@ -3,6 +3,7 @@ const assert = require('node:assert/strict')
 const { ProwlarrClient } = require('../src/clients/prowlarr')
 const { handleCatalog } = require('../src/handlers/catalog')
 const { buildSportsPrewarmJobs } = require('../src/utils/sportsCatalogPrewarm')
+const { resolveSportHint } = require('../src/utils/sportsRules')
 
 const ORIGINAL_SEARCH = ProwlarrClient.prototype.search
 const ORIGINAL_FETCH = global.fetch
@@ -63,6 +64,7 @@ async function runCatalogSeedCase({ catalogId, expectedNames, expectedSeedQuerie
       `${catalogId} should query Prowlarr with the ${expectedQuery} seed term`
     )
   }
+  return result
 }
 
 async function run() {
@@ -74,6 +76,22 @@ async function run() {
   assert.ok(
     prewarmJobs.some((job) => job.id === 'pvtkrrx-sports-football' && !job.extra),
     'sports prewarm should prepare sport-specific catalogs before tablet browse'
+  )
+  assert.equal(
+    resolveSportHint({
+      categoryHint: 'motorsport',
+      title: 'EFL Championship 2026 04 17 Blackburn vs Coventry Full Broadcast 720p50 x264 EN SKY'
+    }),
+    'football',
+    'strong league words in sports titles should override conflicting tracker category hints'
+  )
+  assert.equal(
+    resolveSportHint({
+      categoryHint: 'motorsport',
+      title: 'ELC 2026 Leicester City vs Milwall 720p50 x264'
+    }),
+    'football',
+    'common tracker typo league codes should not leak football rows into motorsport'
   )
 
   global.fetch = async (input) => {
@@ -100,7 +118,7 @@ async function run() {
     })
   ]
 
-  await runCatalogSeedCase({
+  const motorsportResult = await runCatalogSeedCase({
     catalogId: 'pvtkrrx-sports-motorsport',
     expectedNames: ['Formula 1', 'MotoGP'],
     expectedSeedQueries: ['Formula 1', 'MotoGP', 'NASCAR', 'Supercars'],
@@ -113,6 +131,16 @@ async function run() {
         })
       ]],
       ['MotoGP', [
+        trackerItem('EFL Championship 2026 04 17 Blackburn vs Coventry Full Broadcast 720p50 x264 EN SKY', {
+          sportHint: 'motorsport',
+          pubDate: '2026-04-17T12:00:00.000Z',
+          seeders: 99
+        }),
+        trackerItem('ELC 2026 Leicester City vs Milwall 720p50 x264', {
+          sportHint: 'motorsport',
+          pubDate: '2026-04-17T12:00:00.000Z',
+          seeders: 98
+        }),
         trackerItem('MotoGP Qatar Grand Prix Race Replay 1080p', {
           sportHint: 'motorsport',
           pubDate: '2026-04-07T12:00:00.000Z'
@@ -122,6 +150,11 @@ async function run() {
       ['Supercars', []]
     ])
   })
+  const motorsportNames = (motorsportResult.metas || []).map((meta) => String(meta?.name || ''))
+  assert.ok(
+    !motorsportNames.some((name) => /Blackburn|Coventry|EFL Championship|Leicester|Milwall/i.test(name)),
+    'motorsport catalog should reject football rows even when the tracker category hint says motorsport'
+  )
 
   await runCatalogSeedCase({
     catalogId: 'pvtkrrx-sports-mma',

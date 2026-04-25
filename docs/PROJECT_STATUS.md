@@ -37,6 +37,17 @@ PVTKRRX is in a synchronized `1.1.44` state across the Windows desktop release, 
   - no probed route contained the bad Ghanaian Chelsea pairing (`Berekum Chelsea` / `Medeama`)
 - Caveat: this makes the server index/prewarm real and improves first-screen poster visibility, but it does not make Sports Posters commercially complete. Premier League search is now cleaner but still has zero pairable poster rows because the remaining tracker titles are mostly undated matchday labels; pairing those without dates would risk wrong posters. This is a live self-host/runtime hotfix on top of app version `1.1.44`; no new Windows EXE or paired release tag was cut.
 
+### Follow-up live audit on 2026-04-25
+
+- Additional Contabo backups from the follow-up deploy: `/opt/pvtkrrx-backups/20260425-201848-sports-hint-conflict`, `/opt/pvtkrrx-backups/20260425-203144-sports-hint-elc`, and `/opt/pvtkrrx-backups/20260425-204236-sports-prewarm-throttle`.
+- Conflicting Prowlarr category hints no longer override strong title league/sport signals, so `EFL`/`ELC` football tracker rows do not leak into the Motorsport catalog.
+- Boot sports prewarm now starts after 60s, runs 24 priority jobs, and uses lower seed-query concurrency. Prowlarr and PVTKRRX were restarted to clear the stuck live search queue.
+- Latest boot prewarm proof: `[sports-prewarm] finished reason=server-boot jobs=24 ok=24 failed=0 metas=712 cacheBefore=120 cacheAfter=292 queuedAfterCatalog=0 remainingQueue=0 ms=51098`.
+- Latest all-default live pass: all 17 configured sport default catalogs returned HTTP `200`; All Sports `50/20`, Football `34/8`, Motorsport `12/1`, MMA `50/1`, Basketball `13/1`, Rugby `3/2`, Baseball `15/5`, Hockey `12/3`, where the second number is canonical/member-poster rows.
+- Current weak/default-empty surfaces: Boxing, Golf, and Cycling returned `0` default rows; American Football, Cricket, Tennis, Darts, Snooker, and Wrestling returned rows but no canonical/member-poster rows in the default pass.
+- Latest common all-sports search proof: Premier League `22/0`, Formula 1 `43/0`, UFC `46/1`, NBA `50/12`, NFL `50/0`, IPL `50/0`, MotoGP `50/1`, WWE `15/0`, PDC `50/0`.
+- Commercial-readiness caveat still stands: the server is now indexing and pairing what can be safely paired, but several sports/leagues still need better SportsMeta coverage/title parsing before this is chargeable as a complete Sports Posters product.
+
 ## 2026-04-25: v44 sports tablet artwork and stream hotfix
 
 - Reproduced the tablet-facing seedbox failure against the live self-host route before changing stream behavior:

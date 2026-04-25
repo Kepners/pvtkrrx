@@ -57,15 +57,33 @@ function addPrewarmJob(jobs, seen, catalogId, extra = '') {
 function buildSportsPrewarmJobs(options = {}) {
   const maxJobs = Math.max(
     1,
-    Number(options.maxJobs || process.env.PVTKRRX_SPORTS_PREWARM_MAX_JOBS || 32) || 32
+    Number(options.maxJobs || process.env.PVTKRRX_SPORTS_PREWARM_MAX_JOBS || 24) || 24
   )
   const jobs = []
   const seen = new Set()
   const seedTerms = []
   const seedSeen = new Set()
+  const allSportsCatalog = SPORTS_DISCOVERY_CATALOGS.find((catalog) => catalog.id === 'pvtkrrx-sports')
+
+  addPrewarmJob(jobs, seen, 'pvtkrrx-sports')
+
+  const highPriorityTerms = [
+    ...(Array.isArray(allSportsCatalog?.detailOptions) ? allSportsCatalog.detailOptions : []),
+    ...(Array.isArray(allSportsCatalog?.seedTerms) ? allSportsCatalog.seedTerms : [])
+  ]
+  for (const term of highPriorityTerms) {
+    const cleanTerm = String(term || '').trim()
+    const key = cleanTerm.toLowerCase()
+    if (!cleanTerm || seedSeen.has(key)) continue
+    seedSeen.add(key)
+    addPrewarmJob(jobs, seen, 'pvtkrrx-sports', `search=${encodeURIComponent(cleanTerm)}`)
+  }
 
   for (const catalog of SPORTS_DISCOVERY_CATALOGS) {
     addPrewarmJob(jobs, seen, catalog.id)
+  }
+
+  for (const catalog of SPORTS_DISCOVERY_CATALOGS) {
     for (const term of getSportsSearchSeedTerms(catalog.sportHint)) {
       const cleanTerm = String(term || '').trim()
       const key = cleanTerm.toLowerCase()
@@ -102,7 +120,7 @@ async function prewarmSportsCatalogIndex(config = {}, options = {}) {
   )
   const backfillWaitMs = Math.max(
     0,
-    Number(options.backfillWaitMs || process.env.PVTKRRX_SPORTS_PREWARM_BACKFILL_WAIT_MS || 60000) || 60000
+    Number(options.backfillWaitMs || process.env.PVTKRRX_SPORTS_PREWARM_BACKFILL_WAIT_MS || 30000) || 30000
   )
   const started = Date.now()
   const beforeStats = getSportsIdentityBackfillStats()
@@ -178,11 +196,11 @@ function scheduleSportsCatalogPrewarm(config = {}, logger = console, reason = 'b
 
   const delayMs = Math.max(
     0,
-    Number(options.delayMs ?? process.env.PVTKRRX_SPORTS_PREWARM_DELAY_MS ?? 20000) || 20000
+    Number(options.delayMs ?? process.env.PVTKRRX_SPORTS_PREWARM_DELAY_MS ?? 60000) || 60000
   )
   const intervalMs = Math.max(
     0,
-    Number(options.intervalMs ?? process.env.PVTKRRX_SPORTS_PREWARM_INTERVAL_MS ?? 1800000) || 1800000
+    Number(options.intervalMs ?? process.env.PVTKRRX_SPORTS_PREWARM_INTERVAL_MS ?? 3600000) || 3600000
   )
 
   const run = (runReason) => {
