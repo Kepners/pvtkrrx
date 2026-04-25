@@ -79,6 +79,12 @@ The installer sets up the app, Node runtime, production dependencies, saved serv
 
 Self-hosted server mode can use private or localhost Prowlarr/qBittorrent URLs after server-admin authentication, but the Stremio-facing install origin still needs a real public HTTPS hostname.
 
+## Release Tags
+
+Release numbering is app-aligned. The Windows/desktop release uses `vX.Y.Z`; the paired self-host/seedbox release uses `vX.Y.Z-selfhost`. For example, app version `1.1.44` is released as `v1.1.44` and `v1.1.44-selfhost`.
+
+Older `v1.12.x-selfhost` tags are legacy compatibility tags from the previous self-host-only counter. They are kept so pinned installer commands do not break, but new installs and updates should use the app-aligned self-host tag.
+
 ### Hosted Remote Seedbox
 
 Use this only when playback endpoints are intentionally public and reachable over HTTPS.

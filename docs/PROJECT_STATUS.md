@@ -4,7 +4,31 @@ Updated: 2026-04-25
 
 ## Current Stage
 
-PVTKRRX is in a synchronized `1.1.43` state across the Windows desktop release, hosted `www.pvtkrrx.cc` runtime, and Contabo self-host seedbox runtime. The self-host Stremio install route now uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+PVTKRRX is in a synchronized `1.1.44` state across the Windows desktop release, hosted `www.pvtkrrx.cc` runtime, and Contabo self-host seedbox runtime. Release numbering is now app-aligned: desktop/latest is `v1.1.44`, self-host/seedbox is `v1.1.44-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+
+## 2026-04-25: 1.1.44 self-host release numbering correction
+
+- Corrected the confusing split numbering that made `1.1.44`, `v1.12.29-selfhost`, and `1.1.42` look like competing current releases.
+- Current release identity is now:
+  - desktop/latest release: `v1.1.44`
+  - self-host/seedbox release: `v1.1.44-selfhost`
+  - legacy compatibility alias: `v1.12.29-selfhost`, retitled as legacy and mapped to app `1.1.44`
+  - release commit for all three tags: `dfb013b15819ee70037f2877b195a3cf077f2ad2`
+- New rule: future self-host releases use `vX.Y.Z-selfhost` for the same app version. Do not issue new `v1.12.x-selfhost` counter tags.
+- GitHub release proof:
+  - `v1.1.44-selfhost` is published as a prerelease with `install-selfhost.sh`
+  - `v1.1.44`, `v1.1.44-selfhost`, and `v1.12.29-selfhost` all resolve to commit `dfb013b15819ee70037f2877b195a3cf077f2ad2`
+  - old `v1.12.29-selfhost` remains available only so older pinned installer commands do not break
+- Contabo self-host restore proof after the accidental `v1.12.27-selfhost` / app `1.1.42` downgrade:
+  - restored `/opt/pvtkrrx` using installer tag `v1.1.44-selfhost`
+  - backup path: `/opt/pvtkrrx-backups/20260425-134046-restore-v1.1.44-selfhost/pvtkrrx-code-pre-v1.1.44-selfhost.tgz`
+  - `/opt/pvtkrrx/package.json` reports `version: 1.1.44`
+  - `pvtkrrx.service`, `qbittorrent-nox.service`, and `prowlarr.service` are active
+  - `https://pvt.kepners.co.uk/version-status.json` reports `currentVersion=1.1.44`, `latestVersion=1.1.44`, and `updateAvailable=false`
+  - `https://pvt.kepners.co.uk/selfhost/manifest.json?mode=hosted` reports id `com.kepners.pvtkrrx.selfhost`, version `1.1.44`, and `behaviorHints.configurationRequired=false`
+  - unauthenticated `https://pvt.kepners.co.uk/selfhost/config.json` still returns `401`
+- Hosted/public proof:
+  - `https://www.pvtkrrx.cc/version-status.json` reports `currentVersion=1.1.44`, `latestVersion=1.1.44`, and `updateAvailable=false`
 
 ## 2026-04-25: 1.1.43 release and live sync
 

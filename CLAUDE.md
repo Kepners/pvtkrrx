@@ -204,6 +204,8 @@ Never push to a different branch expecting the live site to update.
 - When the user says `release`, `publish`, `ship`, `issue a new revision`, or otherwise asks for the latest install/build, default to checking and updating both release surfaces together unless they explicitly scope the request:
   - hosted/cloud runtime and its GitHub release/tag state
   - Windows desktop EXE artifacts (`dist/`, `dist/releases/<version>/`, `latest.yml`, setup EXE, portable EXE)
+- Release numbers must be app-aligned across surfaces. Use desktop tag `vX.Y.Z` and self-host tag `vX.Y.Z-selfhost` for the same app/package version.
+- Do not create new `v1.12.x-selfhost` tags. Those tags are legacy historical self-host counter tags only; keep them available for older pinned installer commands, but do not present them as the current numbering model.
 - Do not call a PVTKRRX release complete if GitHub/cloud moved but the EXE line did not, or if the EXE line moved but the hosted/cloud release/tag line did not.
 - After a release request, explicitly verify:
   - GitHub `main` revision vs release tag revision
@@ -214,5 +216,5 @@ Never push to a different branch expecting the live site to update.
 
 ---
 
-*Created: February 8, 2026 | Updated: April 24, 2026*
+*Created: February 8, 2026 | Updated: April 25, 2026*
 
