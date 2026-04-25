@@ -1388,6 +1388,7 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
   }
 
   let infoHash = String(resolvedInfo.h || '').toLowerCase()
+  const hasInitialExplicitInfoHash = Boolean(infoHash)
   const directLink = String(resolvedInfo.l || '')
   const seenSourceKeys = new Set()
   if (infoHash) seenSourceKeys.add(infoHash)
@@ -1423,7 +1424,8 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
       matched = torrents.find(t => t.hash.toLowerCase() === infoHash) || null
     }
   }
-  if (!matched) matched = findTorrentByTitle(torrents, resolvedInfo.t)
+  const hasExplicitTrackerSource = Boolean(infoHash || directLink)
+  if (!matched && !hasExplicitTrackerSource) matched = findTorrentByTitle(torrents, resolvedInfo.t)
   if (matched?.hash) seenSourceKeys.add(String(matched.hash).toLowerCase())
 
   const parsed = parse(resolvedInfo.t)
@@ -1522,7 +1524,11 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
     }
   }
 
-  if (allowSupplementalSportsResults) {
+  const skipSupplementalSportsResults = streams.length > 0 &&
+    Boolean(availabilityAnchorKey) &&
+    hasInitialExplicitInfoHash
+
+  if (allowSupplementalSportsResults && !skipSupplementalSportsResults) {
     try {
       const supplementalDeadlineMs = Date.now() + STREAM_SPORTS_SUPPLEMENTAL_BUDGET_MS
       const supplementalStreams = await buildSupplementalSportsStreams({

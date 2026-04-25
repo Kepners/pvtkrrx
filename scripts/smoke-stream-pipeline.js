@@ -1245,6 +1245,62 @@ async function run() {
       assert.ok(!playbackLinks.includes('https://tracker.example/download/motogp-usa-race.torrent'), '#4p different MotoGP event/session should not attach just because it has more seeders')
     })
 
+    await withScenario(async () => {
+      delete process.env.PVTKRRX_HOSTED_RELAY
+      clearSportsAvailabilityAnchors()
+      const selectedHash = '5210cbc4b81a59e14b61f87e89af6e5cc8576b64'
+      const wrongLocalHash = 'b176088dfb0b58cb59a1a5148f122d13347b2039'
+      resolvedSportsAnchorKey = setSportsAvailabilityAnchor({
+        title: 'MotoGP 2026 Round04 Spain Jerez Sprint TNT WEB DL 1080p H264 DDP5 1 English MWR',
+        link: 'https://tracker.example/download/motogp-spain-sprint-selected.torrent',
+        infohash: selectedHash,
+        size: 3_600_000_000,
+        seeders: 14,
+        indexer: 'SportsCult',
+        pubDate: '2026-04-25T12:00:00Z',
+        sportHint: 'motorsport'
+      })
+      QBitClient.prototype.torrents = async () => [
+        matchedTorrent({
+          hash: wrongLocalHash,
+          name: 'MotoGP 2026 Round04 Spain Jerez Sprint TNT WEB DL 1080p H264 DDP5 1 English MWR',
+          progress: 1
+        })
+      ]
+      QBitClient.prototype.files = async () => {
+        throw new Error('wrong qBit title match should not be inspected')
+      }
+      ProwlarrClient.prototype.search = async () => {
+        throw new Error('resolved hash-backed sports anchors should not wait for supplemental search')
+      }
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([
+        { path: 'MotoGP.2026.Round04.Spain.Jerez.Sprint.Selected.1080p.mkv', length: 3_600_000_000 }
+      ]))
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'sports',
+        customSportsId({
+          q: 'resolved',
+          x: 'sportsmeta:event:motorsport|2026-04-25|motogp|spain-sprint-race',
+          ak: resolvedSportsAnchorKey,
+          r: 'motorsport',
+          e: '2026-04-25',
+          u: 'MotoGP',
+          o: '',
+          w: ''
+        }),
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      const playbackLinks = result.streams
+        .filter(stream => /\/playback\//.test(String(stream?.url || '')))
+        .map(stream => String(decodeOpaquePlaybackState(stream?.url || '')?.l || ''))
+      assert.deepEqual(playbackLinks, ['https://tracker.example/download/motogp-spain-sprint-selected.torrent'], '#4q explicit hash-backed sports anchors should keep the selected source and skip wrong qBit title matches')
+      assert.equal(result.streams.filter(stream => /\/file\//.test(String(stream?.url || ''))).length, 0, '#4q wrong local qBit title matches must not emit ready-file playback')
+    })
+
     console.log('Smoke stream pipeline passed')
   } finally {
     resetMocks()

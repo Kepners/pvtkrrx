@@ -4,14 +4,22 @@ Updated: 2026-04-25
 
 ## Current Stage
 
-PVTKRRX is being advanced from the synchronized `1.1.44` state to `1.1.47` for the Android/Stremio playback-source and sports artwork hotfix. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+PVTKRRX is being advanced from the synchronized `1.1.44` state to `1.1.48` for the Android/Stremio playback-source and sports artwork hotfix. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+
+## 2026-04-25: v1.1.48 MotoGP wrong-source follow-up
+
+- Live self-host proof on `1.1.47` showed the Oak Island Movie/TV source route was fixed, but the first resolved MotoGP SportsMeta row still hit a stream timeout after matching a different same-title qBittorrent torrent by title.
+- Root cause: resolved sports rows with an explicit tracker hash could still fall through to qBit title matching when that exact hash was not already present locally.
+- Repo fix: explicit tracker-hash sports anchors no longer title-match a different local qBit torrent, and once their selected tracker source is emitted they skip slow supplemental sports searches.
+- Added smoke coverage for the wrong-source case: selected MotoGP Spain Sprint hash present, wrong same-title qBit torrent present, and supplemental search forbidden.
+- This supersedes `1.1.47` as the final playback-source release for the MotoGP repro.
 
 ## 2026-04-25: v1.1.47 live Prowlarr timeout follow-up
 
 - Live direct Prowlarr proof showed `The Curse of Oak Island S12E17` does exist, but the broad title search takes about 9 seconds on the Contabo stack.
 - PVTKRRX's previous Movie/TV fallback budget was 5 seconds, so it timed out before the correct source could be filtered and emitted.
 - Repo fix: Movie/TV upstream search default budget is now 10s and title fallback budget is now 12s, while the strict episode/title filtering from `1.1.45`/`1.1.46` still prevents wrong-episode matches.
-- This is the release that should be treated as the final Movie/TV source-chip fix for the Oak Island repro.
+- This remains the Movie/TV source-chip fix for the Oak Island repro, but the overall screenshot hotfix is superseded by `1.1.48` because MotoGP needed the wrong-source guard above.
 
 ## 2026-04-25: v1.1.46 live TV-source follow-up
 
