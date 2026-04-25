@@ -1054,6 +1054,42 @@ function findTorrentByTitle(torrents, targetTitle) {
   return bestScore >= Math.max(2, Math.ceil(words.length * 0.6)) ? best : null
 }
 
+function buildQbitTitleFallbackItems(torrents, contentTitle, options = {}) {
+  if (!contentTitle || !Array.isArray(torrents) || torrents.length === 0) return []
+  const items = []
+  const seen = new Set()
+
+  for (const torrent of torrents) {
+    const hash = String(torrent?.hash || '').trim().toLowerCase()
+    const title = String(torrent?.name || '').trim()
+    if (!hash || !title || seen.has(hash)) continue
+    if (!titleRelevant(title, contentTitle, options)) continue
+    if (
+      options?.type === 'series' &&
+      options?.season &&
+      options?.episode &&
+      !matchesEpisode(title, options.season, options.episode)
+    ) {
+      continue
+    }
+
+    seen.add(hash)
+    items.push({
+      title,
+      infohash: hash,
+      link: '',
+      size: Number(torrent?.size || torrent?.total_size || 0),
+      seeders: 0,
+      indexer: 'qBittorrent'
+    })
+  }
+
+  if (items.length > 0) {
+    console.log(`[stream] qBit title fallback matched ${items.length} torrent(s)`)
+  }
+  return items
+}
+
 // Keep only results where the significant words from the query appear in the result title.
 // Prevents sports indexers returning F1/Olympics results when searching for a movie.
 function titleWords(value) {
@@ -1212,6 +1248,13 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
 
   jackettItems = applyFilters(jackettItems)
 
+  // Build hash lookup from qBit early so completed/in-progress local torrents can
+  // still surface when Prowlarr is slow, empty, or rejects categorized TV search.
+  const qbitMap = new Map()
+  for (const t of qbitTorrents) {
+    qbitMap.set(String(t.hash || '').toLowerCase(), t)
+  }
+
   // Fallback: title search if IMDB search returned nothing useful after filtering.
   // Use generic type=search — private trackers (HD-Torrents, SpeedCD) only support type=search.
   if (jackettItems.length === 0 && contentTitle) {
@@ -1230,10 +1273,8 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
     ? jackettItems.filter(item => matchesEpisode(item.title, season, episode))
     : jackettItems
 
-  // Build hash lookup from qBit
-  const qbitMap = new Map()
-  for (const t of qbitTorrents) {
-    qbitMap.set(t.hash.toLowerCase(), t)
+  if (filtered.length === 0 && contentTitle && qbitTorrents.length > 0) {
+    filtered = buildQbitTitleFallbackItems(qbitTorrents, contentTitle, { type, season, episode })
   }
 
   filtered = preferSeededResults(filtered, 'imdb candidates', (item) => {

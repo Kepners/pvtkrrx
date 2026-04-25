@@ -4,7 +4,17 @@ Updated: 2026-04-25
 
 ## Current Stage
 
-PVTKRRX is being advanced from the synchronized `1.1.44` state to `1.1.45` for the Android/Stremio playback-source and sports artwork hotfix. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+PVTKRRX is being advanced from the synchronized `1.1.44` state to `1.1.46` for the Android/Stremio playback-source and sports artwork hotfix. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+
+## 2026-04-25: v1.1.46 live TV-source follow-up
+
+- Live verification of `1.1.45` on Contabo still returned `0` streams for `https://pvt.kepners.co.uk/selfhost/stream/series/tt3455408:12:17.json?mode=hosted`.
+- The remaining live root cause was different from the original filter bug: Prowlarr broad TV title fallback timed out repeatedly, while qBittorrent already reported candidate torrents for the request.
+- Repo fix:
+  - Movie/TV stream handling now builds strict qBittorrent title fallback items when Prowlarr is empty, rejected, or slow.
+  - Series fallback requires the exact `SxxEyy` marker plus the same partial title-token rules used for localized tracker titles, so downloaded `Oak Island ... S12E17` torrents can surface without accepting a different episode.
+  - Added smoke coverage for this qBit-only localized TV episode path.
+- This follow-up is the release that should be treated as satisfying the missing PVTKRRX Movie/TV source acceptance check.
 
 ## 2026-04-25: v1.1.45 playback source and sports artwork hotfix
 

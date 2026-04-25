@@ -251,6 +251,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 - Non-matchup sports supplemental searches, including MotoGP/F1-style events, validate event/session/location tokens before attaching extra tracker results. A high-seeder result from a different race, practice, sprint, or weekend should not attach to the selected sports tile merely because the broad title is similar.
 - Matching sports streams can come from any configured Prowlarr indexer. Packed archives and unverified tracker links are still suppressed or surfaced as notice rows instead of being advertised as playable.
 - TV episode title fallback retries broad Prowlarr search when categorized TV search is rejected, and exact `SxxEyy` matches can pass with partial title-token overlap so localized titles such as `Oak Island E Il Tesoro Maledetto S12E17` still surface PVTKRRX streams for the correct episode.
+- If Prowlarr is empty or slow but qBittorrent already has a strict title/episode match, Movie/TV routes can emit that local torrent as a PVTKRRX stream instead of hiding the source list.
 - Stream rows now expose emoji state badges (`⬇️` download-and-play, `⏳` buffering, `✅` downloaded, `📦` extracted), a visible origin badge (`[PC]` for host-PC playback or `[SERVER]` for remote/server playback), and a film-icon container badge (`🎬MKV`, `🎬MP4`, etc.) in the addon `name`. The description switches from `Download and play` to `Downloaded — ready to play` once the file is ready and also states whether the host PC or remote server is serving it.
 - Packed RAR releases (`.rar/.r00/.r01/...`):
   - Official Stremio archive-source support is real: `rarUrls` is part of the addon/core contract and is routed through the client's local streaming server.
@@ -309,7 +310,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 - Current release numbering is app-aligned across surfaces:
   - desktop/latest release tag: `vX.Y.Z`
   - self-host/seedbox release tag: `vX.Y.Z-selfhost`
-- For app version `1.1.44`, the current tags are `v1.1.44` and `v1.1.44-selfhost`.
+- For app version `1.1.46`, the current tags are `v1.1.46` and `v1.1.46-selfhost`.
 - Legacy `v1.12.x-selfhost` tags were an old self-host-only counter. They remain published only so older pinned installer commands keep working. Do not create new `v1.12.x-selfhost` tags, and do not use them as the preferred install/update target.
 - A self-host tag and its paired desktop tag must resolve to the same Git revision before the release is described as synchronized.
 

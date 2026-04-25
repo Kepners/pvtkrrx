@@ -1162,6 +1162,38 @@ async function run() {
 
     await withScenario(async () => {
       delete process.env.PVTKRRX_HOSTED_RELAY
+      QBitClient.prototype.torrents = async () => [
+        matchedTorrent({
+          hash: '89abcdef012345670123456789abcdef01234567',
+          name: 'Oak Island E Il Tesoro Maledetto S12E17 Un mistero lungo 230 anni WEB DL 1080p AAC',
+          progress: 1
+        })
+      ]
+      QBitClient.prototype.files = async () => [
+        matchedFile({
+          name: 'Oak.Island.E.Il.Tesoro.Maledetto.S12E17.1080p.mkv',
+          size: 1_660_000_000,
+          progress: 1
+        })
+      ]
+      CinemetaClient.prototype.getSeries = async () => ({ name: 'The Curse of Oak Island' })
+      ProwlarrClient.prototype.searchImdb = async () => []
+      ProwlarrClient.prototype.search = async () => []
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'series',
+        'tt3455408:12:17',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.ok(result.streams.some(stream => /\/file\//.test(String(stream?.url || ''))), '#4o2 qBit title fallback should emit a ready file stream when Prowlarr is empty')
+      assert.ok(result.streams.every(stream => String(stream?.name || '').startsWith('PVTKRRX ') || !stream?.name), '#4o2 qBit title fallback should keep PVTKRRX source naming')
+    })
+
+    await withScenario(async () => {
+      delete process.env.PVTKRRX_HOSTED_RELAY
       QBitClient.prototype.torrents = async () => []
       QBitClient.prototype.files = async () => []
       ProwlarrClient.prototype.search = async () => [
