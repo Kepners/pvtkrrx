@@ -149,6 +149,21 @@ async function run() {
   assert.equal(String(deniedRes.body?.error || ''), 'Valid self-host password required')
 
   nextCalled = false
+  const staleReq = {
+    headers: { 'x-pvtkrrx-admin-token': 'stale-browser-password' },
+    socket: { remoteAddress: '203.0.113.10' },
+    connection: { remoteAddress: '203.0.113.10' },
+    get: () => 'seedbox.example'
+  }
+  const staleRes = makeMockRes()
+  shared.requireServerAdminToken(staleReq, staleRes, () => {
+    nextCalled = true
+  })
+  assert.equal(nextCalled, false, 'remote self-host request with a stale browser password should not pass middleware')
+  assert.equal(staleRes.statusCode, 401)
+  assert.equal(String(staleRes.body?.error || ''), 'Valid self-host password required')
+
+  nextCalled = false
   const allowedReq = {
     headers: { 'x-pvtkrrx-admin-token': selfHostPassword },
     socket: { remoteAddress: '203.0.113.10' },

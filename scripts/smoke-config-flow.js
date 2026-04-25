@@ -10,6 +10,7 @@ const { decrypt, encrypt } = require('../src/utils/crypto')
 const { buildLocalModeUrls } = require('../src/utils/localInstallUrls')
 const { loadSecureJsonFile, saveSecureJsonFile } = require('../src/utils/secureJsonFile')
 const { DEFAULT_PAIR_RELAY_URL, normalizeRelayUrl } = require('../src/utils/relayUrl')
+const { resolveExistingSelfHostPassword } = require('./server-installer')
 
 const LOCAL_SMOKE_SECRET = 'local-smoke-secret-12345678901234567890'
 const RELAY_SMOKE_SECRET = 'relay-smoke-secret-12345678901234567890'
@@ -139,6 +140,18 @@ async function run() {
   const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-auth-scan-'))
   const runtimeDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-config-flow-'))
   const localConfigPath = path.join(runtimeDir, 'local-config.json')
+  const selfHostPasswordPath = path.join(runtimeDir, 'server-admin-token')
+  fs.writeFileSync(selfHostPasswordPath, 'kept-selfhost-password\n', { encoding: 'utf8', mode: 0o600 })
+  assert.equal(
+    resolveExistingSelfHostPassword(runtimeDir, {}),
+    'kept-selfhost-password',
+    'self-host installer should preserve an existing runtime password file when env has no password'
+  )
+  assert.equal(
+    resolveExistingSelfHostPassword(runtimeDir, { PVTKRRX_SELF_HOST_PASSWORD: 'env-selfhost-password' }),
+    'env-selfhost-password',
+    'self-host installer should prefer explicit env password over runtime password file'
+  )
   const relayEncryptBodies = []
   const relayPairStatus = new Map()
   const scanDir = path.join(tempRoot, 'leveldb')
@@ -842,6 +855,7 @@ async function run() {
     assert.match(tokenConfigureHtml, /<h1 class="logo-title" data-text="PVTKRRX"><span>PVTKRRX<\/span>(?:<span class="sr-only">[\s\S]*?<\/span>)?<\/h1>/)
     assert.match(tokenConfigureHtml, /Your hardware, your trackers.*configure the bridge to Stremio/i)
     assert.match(tokenConfigureHtml, /maybePrefillFromToken/, 'token configure page should include prefill loader')
+    assert.match(tokenConfigureHtml, /clearRejectedServerAdminToken/, 'configure page should clear stale self-host passwords after rejection')
 
     const tokenConfigRes = await fetch(`${base}/${token}/config.json`)
     assert.equal(tokenConfigRes.status, 200, 'GET /:token/config.json should return 200')

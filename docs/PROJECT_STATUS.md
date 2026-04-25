@@ -6,6 +6,23 @@ Updated: 2026-04-24
 
 PVTKRRX is in a working `1.1.41` state on the main Windows/local and self-host route set. The current sports search contract is that any configured Prowlarr indexer can supply sports catalog and stream availability when the result passes the existing sports filters; SportsCult is no longer the only accepted tracker source.
 
+## 2026-04-25: Self-host password recovery and manifest retrofit hardening
+
+- Live symptom reproduced on `https://pvt.kepners.co.uk/configure`: the browser had a stale self-host password and `/selfhost/config.json` returned `401 Valid self-host password required`.
+- Proved the saved server config was still present and healthy: `/app-config.json` reported `serverConfigConfigured=true`, and `/selfhost/config.json` returned the saved Prowlarr/qBittorrent readback when called with the current server-side self-host password.
+- Copied the current unlock URL to the Windows clipboard without printing the password into chat.
+- Patched the configure page so a rejected self-host password clears the stale browser-stored password instead of retrying it on every load.
+- Patched the self-host installers to preserve an existing runtime `server-admin-token` file when `.env` does not already contain `PVTKRRX_SELF_HOST_PASSWORD` / `PVTKRRX_SERVER_ADMIN_TOKEN`, preventing accidental admin-password rotation on future installer runs.
+- Clarified the self-host manifest model in the UI and docs: the installed `/selfhost/manifest.json?mode=hosted` route is stable and uses the current saved server config on the next request; Stremio refresh is only needed for a new device or a manifest contract change.
+- Local proof passed:
+  - `node --check scripts/server-installer.js`
+  - `node --check scripts/server-setup.js`
+  - `node --check scripts/smoke-config-flow.js`
+  - `node --check scripts/smoke-selfhost-server.js`
+  - `npm run smoke:config`
+  - `npm run smoke:selfhost`
+- Live `/opt/pvtkrrx` hotfix applied with backup at `/opt/pvtkrrx-backups/20260425-082950-selfhost-admin-password-ui`; `pvtkrrx.service` restarted active.
+
 ## 2026-04-25: Sports poster/result backfill hardening
 
 - Reproduced the reported seedbox symptom on `https://pvt.kepners.co.uk/selfhost` before changing code:

@@ -725,6 +725,14 @@ function defaultServiceName() {
   ).trim() || 'pvtkrrx'
 }
 
+function resolveExistingSelfHostPassword(runtimeDir, env = process.env) {
+  const state = ensureServerAdminToken(runtimeDir, {
+    env,
+    createIfMissing: false
+  })
+  return String(state?.token || '').trim()
+}
+
 function deriveDisplayOrigin(publicBaseUrl, port) {
   const publicOrigin = normalizeOrigin(publicBaseUrl)
   if (publicOrigin) return publicOrigin
@@ -793,11 +801,7 @@ async function run() {
   }
   const existingSecret = String(mergedEnv.ENCRYPTION_SECRET || '').trim()
   const existingAuthSecret = String(mergedEnv.AUTH_TOKEN_SECRET || '').trim()
-  const existingSelfHostPassword = String(
-    mergedEnv.PVTKRRX_SELF_HOST_PASSWORD ||
-    mergedEnv.PVTKRRX_SERVER_ADMIN_TOKEN ||
-    ''
-  ).trim()
+  const existingSelfHostPassword = resolveExistingSelfHostPassword(defaultRuntimeDir, mergedEnv)
   const existingPort = Number.parseInt(String(mergedEnv.PORT || '7000').trim(), 10) || 7000
   const existingHttpsPort = Number.parseInt(String(mergedEnv.HTTPS_PORT || '7001').trim(), 10) || 7001
   const existingPublicBaseUrl = normalizeBaseUrl(mergedEnv.PVTKRRX_PUBLIC_BASE_URL || '')
@@ -1224,11 +1228,7 @@ async function runAuto() {
   const mergedEnv = { ...envFromFile, ...process.env, PVTKRRX_RUNTIME_DIR: defaultRuntimeDir }
   const existingSecret = String(mergedEnv.ENCRYPTION_SECRET || '').trim()
   const existingAuthSecret = String(mergedEnv.AUTH_TOKEN_SECRET || '').trim()
-  const existingSelfHostPassword = String(
-    mergedEnv.PVTKRRX_SELF_HOST_PASSWORD ||
-    mergedEnv.PVTKRRX_SERVER_ADMIN_TOKEN ||
-    ''
-  ).trim()
+  const existingSelfHostPassword = resolveExistingSelfHostPassword(defaultRuntimeDir, mergedEnv)
   const existingConfig = loadExistingServerConfig(defaultRuntimeDir, existingSecret)
   const bundledNodePath = String(process.env.PVTKRRX_NODE_PATH || process.execPath).trim() || process.execPath
   const httpPort = Number.parseInt(String(mergedEnv.PORT || '7000').trim(), 10) || 7000
@@ -1491,6 +1491,7 @@ module.exports = {
   normalizeOriginList,
   resolveSelfHostHttpsMode,
   resolveInstallPlaybackBaseUrl,
+  resolveExistingSelfHostPassword,
   parseDotEnvFile,
   parseHttpUrl,
   updateDotEnvFile,

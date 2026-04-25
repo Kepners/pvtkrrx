@@ -3086,6 +3086,18 @@
       }
     }
 
+    function clearRejectedServerAdminToken(message) {
+      persistServerAdminToken('');
+      const input = document.getElementById('serverAdminToken');
+      if (input) input.value = '';
+      serverRuntime.serverConfigLoaded = false;
+      updateServerAdminUi();
+      setServerAdminStatus(
+        'err',
+        message || 'Self-host password rejected. The stale browser-stored password was cleared; paste the current password or open the latest setup link.'
+      );
+    }
+
     async function unlockSelfHostBrowser() {
       const input = document.getElementById('serverAdminToken');
       const normalized = String(input?.value || '').trim();
@@ -5377,7 +5389,7 @@
           setSimpleFlowStatus(
             'ok',
             isSelfHostedServerRuntime()
-              ? 'Server install links are ready. This self-hosted server will keep using the saved config after reboot.'
+              ? 'Server install link is stable. The existing self-host addon uses the saved server config on its next request; refresh Stremio only when the manifest itself changes.'
               : 'Remote Seedbox links are ready. Use them only on clients that should hit your public playback endpoints.'
           );
         } else if (installStatusText) {
@@ -6515,7 +6527,7 @@
         if (res.status === 401 && serverRuntime.selfHostServerMode) {
           serverRuntime.serverConfigLoaded = false;
           if (getServerAdminToken()) {
-            setServerAdminStatus('err', 'Self-host password rejected. Could not load the saved self-host config.');
+            clearRejectedServerAdminToken('Self-host password rejected. The saved browser password was cleared; paste the current self-host password or open the latest setup link.');
           } else {
             updateServerAdminUi();
           }
@@ -6733,7 +6745,7 @@
           const hostedPayload = routeParity.stripRemoteSeedboxLanFields(config, { keepRelayUrl: true });
 
           if (serverRuntime.selfHostServerMode) {
-          if (!(await ensureSelfHostAdminAccess('save this self-hosted server config'))) {
+            if (!(await ensureSelfHostAdminAccess('save this self-hosted server config'))) {
               return setStatus('installStatus', 'err', 'Self-host password required to save the self-hosted server config.');
             }
 
@@ -6745,7 +6757,7 @@
             const saveData = await saveRes.json().catch(() => ({}));
             if (!saveRes.ok || saveData.error) {
               if (saveRes.status === 401) {
-                setServerAdminStatus('err', 'Self-host password rejected.');
+                clearRejectedServerAdminToken('Self-host password rejected. The stale browser-stored password was cleared; paste the current password before saving again.');
               }
               return setStatus('installStatus', 'err', saveData.error || 'Failed to save self-hosted server config');
             }
@@ -6778,7 +6790,7 @@
 
             document.getElementById('installLink').style.display = 'block';
             syncInstallTargetUi();
-            setStatus('installStatus', 'ok', 'Remote Seedbox route ready on this self-hosted server. The saved config is now stored locally and will be reused on every server boot.');
+            setStatus('installStatus', 'ok', 'Remote Seedbox route ready on this self-hosted server. The existing self-host addon uses this saved server config on its next request; install or refresh in Stremio only if this is a new device or the manifest contract changed.');
           } else {
             const res = await fetch('/encrypt', {
               method: 'POST',

@@ -102,6 +102,14 @@ function loadExistingServerConfig(runtimeDir, secret) {
   }
 }
 
+function resolveExistingSelfHostPassword(runtimeDir, env = process.env) {
+  const state = ensureServerAdminToken(runtimeDir, {
+    env,
+    createIfMissing: false
+  })
+  return String(state?.token || '').trim()
+}
+
 async function run() {
   const repoRoot = path.resolve(__dirname, '..')
   const envPath = path.join(repoRoot, '.env')
@@ -112,11 +120,7 @@ async function run() {
   }
   const runtimeDir = resolveRuntimeDir(mergedEnv)
   const existingSecret = String(mergedEnv.ENCRYPTION_SECRET || '').trim()
-  const existingSelfHostPassword = String(
-    mergedEnv.PVTKRRX_SELF_HOST_PASSWORD ||
-    mergedEnv.PVTKRRX_SERVER_ADMIN_TOKEN ||
-    ''
-  ).trim()
+  const existingSelfHostPassword = resolveExistingSelfHostPassword(runtimeDir, mergedEnv)
   const existingConfig = loadExistingServerConfig(runtimeDir, existingSecret)
 
   const rl = readline.createInterface({ input, output })
