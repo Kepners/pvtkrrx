@@ -1120,6 +1120,99 @@ async function run() {
       assert.ok(playbackLinks.includes('https://tracker.example/download/arsenal-chelsea-general.torrent'), '#4n non-SportsCult streams may attach alongside the original sports source')
     })
 
+    await withScenario(async () => {
+      delete process.env.PVTKRRX_HOSTED_RELAY
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      CinemetaClient.prototype.getSeries = async () => ({ name: 'The Curse of Oak Island' })
+      ProwlarrClient.prototype.searchImdb = async () => []
+      ProwlarrClient.prototype.search = async (query, _cats, _type, options = {}) => {
+        if (options.useCategories) throw new Error('Prowlarr HTTP 400')
+        if (String(query || '').toLowerCase() === 'oak island') {
+          return [
+            trackerItem({
+              title: 'Oak Island E Il Tesoro Maledetto S12E17 Un mistero lungo 230 anni WEB DL 1080p AAC',
+              link: 'https://tracker.example/download/oak-island-s12e17.torrent',
+              size: 1_660_000_000,
+              seeders: 9,
+              indexer: 'TorrentGalaxy'
+            })
+          ]
+        }
+        return []
+      }
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([
+        { path: 'Oak.Island.E.Il.Tesoro.Maledetto.S12E17.1080p.mkv', length: 1_660_000_000 }
+      ]))
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'series',
+        'tt3455408:12:17',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      const playbackLinks = result.streams
+        .filter(stream => /\/playback\//.test(String(stream?.url || '')))
+        .map(stream => String(decodeOpaquePlaybackState(stream?.url || '')?.l || ''))
+      assert.ok(playbackLinks.includes('https://tracker.example/download/oak-island-s12e17.torrent'), '#4o localized TV episode fallback should survive category 400 and still emit PVTKRRX playback')
+      assert.ok(result.streams.every(stream => String(stream?.name || '').startsWith('PVTKRRX ') || !stream?.name), '#4o localized TV streams should keep PVTKRRX source naming')
+    })
+
+    await withScenario(async () => {
+      delete process.env.PVTKRRX_HOSTED_RELAY
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      ProwlarrClient.prototype.search = async () => [
+        trackerItem({
+          title: 'MotoGP 2026 Round03 USA Race WEB DL 1080p H264 English MWR',
+          link: 'https://tracker.example/download/motogp-usa-race.torrent',
+          indexer: 'TorrentLeech',
+          seeders: 200
+        }),
+        trackerItem({
+          title: 'MotoGP 2026 Round04 Spain Jerez Sprint WEB-DL 1080p H264 English-MWR',
+          link: 'https://tracker.example/download/motogp-spain-sprint-mirror.torrent',
+          indexer: 'TorrentLeech',
+          seeders: 12
+        })
+      ]
+      global.fetch = async (url) => {
+        const target = String(url || '')
+        const path = target.includes('usa-race')
+          ? 'MotoGP.2026.Round03.USA.Race.1080p.mkv'
+          : target.includes('mirror')
+            ? 'MotoGP.2026.Round04.Spain.Jerez.Sprint.Mirror.1080p.mkv'
+            : 'MotoGP.2026.Round04.Spain.Jerez.Sprint.1080p.mkv'
+        return createFetchResponse(buildTorrentPayload([
+          { path, length: 3_100_000_000 }
+        ]))
+      }
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'sports',
+        customPackedId({
+          t: 'MotoGP 2026 Round04 Spain Jerez Sprint WEB DL 1080p H264 English MWR',
+          n: 'Spain Sprint Race',
+          h: '',
+          l: 'https://tracker.example/download/motogp-spain-sprint.torrent',
+          i: 'SportsCult',
+          r: 'motorsport'
+        }),
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      const playbackLinks = result.streams
+        .filter(stream => /\/playback\//.test(String(stream?.url || '')))
+        .map(stream => String(decodeOpaquePlaybackState(stream?.url || '')?.l || ''))
+      assert.ok(playbackLinks.includes('https://tracker.example/download/motogp-spain-sprint.torrent'), '#4p selected MotoGP source should stay present')
+      assert.ok(playbackLinks.includes('https://tracker.example/download/motogp-spain-sprint-mirror.torrent'), '#4p same-event MotoGP mirror should stay present')
+      assert.ok(!playbackLinks.includes('https://tracker.example/download/motogp-usa-race.torrent'), '#4p different MotoGP event/session should not attach just because it has more seeders')
+    })
+
     console.log('Smoke stream pipeline passed')
   } finally {
     resetMocks()

@@ -4,7 +4,24 @@ Updated: 2026-04-25
 
 ## Current Stage
 
-PVTKRRX is in a synchronized `1.1.44` state across the Windows desktop release, hosted `www.pvtkrrx.cc` runtime, and Contabo self-host seedbox runtime. Release numbering is now app-aligned: desktop/latest is `v1.1.44`, self-host/seedbox is `v1.1.44-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+PVTKRRX is being advanced from the synchronized `1.1.44` state to `1.1.45` for the Android/Stremio playback-source and sports artwork hotfix. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+
+## 2026-04-25: v1.1.45 playback source and sports artwork hotfix
+
+- Reproduced the missing PVTKRRX source-chip issue against the live self-host route before changing code:
+  - `https://pvt.kepners.co.uk/selfhost/manifest.json?mode=hosted` advertised `movie,series,sports` and stream resource types correctly.
+  - `https://pvt.kepners.co.uk/selfhost/stream/series/tt3455408:12:17.json?mode=hosted` returned `0` streams.
+  - live logs showed the title fallback for `The Curse of Oak Island` hit `Prowlarr HTTP 400` on categorized TV search, then stopped.
+- Root causes fixed in repo:
+  - TV title fallback now retries broad search after a categorized Prowlarr rejection.
+  - exact TV episode matches can survive partial title-token overlap, so localized tracker titles such as `Oak Island E Il Tesoro Maledetto S12E17` are not discarded only because they miss the English word `Curse`.
+  - non-matchup sports supplemental searches now validate event/session/location tokens before attaching extra MotoGP/F1-style results, so a different race/weekend cannot win just because it has more seeders.
+  - sports browse catalog rows now use landscape artwork for the Stremio tile `poster` with `posterShape: landscape`; sports detail metadata keeps portrait poster artwork and landscape background artwork.
+  - member SportsMeta artwork now goes through the PVTKRRX `/sports-artwork/...png` raster proxy, so poster/background/logo variants are normalized before Stremio renders them.
+- Local proof passed:
+  - `npm run smoke:pipeline`
+  - `npm run smoke:sports-resolution`
+  - `npm run smoke:sports-artwork`
 
 ## 2026-04-25: Sports tablet search/poster prewarm hotfix
 

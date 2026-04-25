@@ -292,8 +292,8 @@ async function run() {
   )
   assert.equal(
     paidSportsMetaResponse.meta?.poster,
-    `https://sportsmeta.test/member/sm_paid_poster_token/asset/poster/${encodeURIComponent(barcaId)}`,
-    'paid sports configs must emit direct SportsMeta member poster URLs for canonical sports art'
+    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}`,
+    'paid sports configs must emit PVTKRRX raster-proxy poster URLs for canonical sports art'
   )
 
   const fallbackPoster = resolveSportsPosterAsset({

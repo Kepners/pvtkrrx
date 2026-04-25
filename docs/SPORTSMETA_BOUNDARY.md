@@ -89,8 +89,8 @@ The shared Contabo VM does not make them the same product.
 - PVTKRRX remains free.
 - Sports Posters is a SportsMeta entitlement for sports artwork only.
 - Paid PVTKRRX configs may store `sportsPosterMemberToken`, normalized from either a raw token or a `/member/:token` SportsMeta URL.
-- For canonical `sportsmeta:` sports rows, PVTKRRX emits direct SportsMeta member URLs for poster, background, and logo artwork.
-- Free/fallback sports artwork stays on the PVTKRRX `/sports-artwork/...png` raster proxy, which calls SportsMeta public/default assets and carries the event title/date when known.
+- For canonical `sportsmeta:` sports rows, PVTKRRX emits PVTKRRX `/sports-artwork/...png` raster-proxy URLs. When a `sportsPosterMemberToken` is present, the proxy fetches the matching SportsMeta member asset upstream and normalizes it to the declared poster, landscape, background, or logo dimensions before Stremio sees it.
+- Free/fallback sports artwork stays on the same PVTKRRX `/sports-artwork/...png` raster proxy, which calls SportsMeta public/default assets and carries the event title/date when known.
 - Stripe is never called by PVTKRRX while catalog/meta/artwork routes are being served.
 - SportsMeta validates the member token locally, reads its SQLite catalogue locally, and streams cached raster assets from `/opt/sportsmeta/data/assets/cache`.
 

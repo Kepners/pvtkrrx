@@ -14,7 +14,7 @@ const {
 const { isSportsCultIndexer, isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { buildOnSeedboxStream, buildOnBufferingStream, buildOnArchiveStream, buildOnTrackerStream, buildInfoStream, findVideoFile, findPackedArchiveFiles, arePackedArchiveFilesReady, findEpisodeFile, sortStreams } = require('../utils/streams')
 const { encodePlaybackStateToken, encodeFileStateToken } = require('../utils/opaqueState')
-const { parseSportsTitle } = require('../utils/sportsTitleParser')
+const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
 const { buildPlaybackFileUrl, canEmitTrackerPlayback, getTrackerPlaybackRestriction } = require('../utils/fileServing')
 const { decodeCustomId } = require('../utils/customId')
 const { isCompletedTorrent } = require('../utils/torrentState')
@@ -490,6 +490,74 @@ function sportsTeamMatchCount(targetEvent, candidateEvent) {
   return checks.filter(Boolean).length
 }
 
+const NON_MATCHUP_SESSION_WORDS = new Set([
+  'practice',
+  'qualifying',
+  'qualifier',
+  'sprint',
+  'race',
+  'press',
+  'conference',
+  'warmup',
+  'warm-up',
+  'fp1',
+  'fp2',
+  'fp3'
+])
+
+function tokenizeSportsEventName(value) {
+  return normalizeForMatch(value)
+    .split(/\s+/)
+    .filter(token =>
+      token.length > 2 &&
+      !['motogp', 'formula', 'grand', 'prix', 'round', 'event', 'main', 'card'].includes(token)
+    )
+}
+
+function sportsSessionTokens(value) {
+  const tokens = tokenizeSportsEventName(value)
+  const sessions = tokens.filter(token => NON_MATCHUP_SESSION_WORDS.has(token))
+  if (sessions.includes('qualifier')) sessions.push('qualifying')
+  if (sessions.includes('warm')) sessions.push('warmup')
+  return [...new Set(sessions)]
+}
+
+function sportsLocationTokens(value) {
+  return tokenizeSportsEventName(value)
+    .filter(token => !NON_MATCHUP_SESSION_WORDS.has(token))
+}
+
+function tokenOverlapCount(left = [], right = []) {
+  const rightSet = new Set(right)
+  return left.reduce((count, token) => count + (rightSet.has(token) ? 1 : 0), 0)
+}
+
+function nonMatchupSportsEventMatches(targetEvent = {}, candidateEvent = {}) {
+  const targetName = String(targetEvent?.eventName || '').trim()
+  const candidateName = String(candidateEvent?.eventName || '').trim()
+  if (!targetName || !candidateName) return false
+
+  const targetSessions = sportsSessionTokens(targetName)
+  if (targetSessions.length > 0) {
+    const candidateSessions = sportsSessionTokens(candidateName)
+    if (tokenOverlapCount(targetSessions, candidateSessions) === 0) return false
+  }
+
+  const targetLocations = sportsLocationTokens(targetName)
+  const candidateLocations = sportsLocationTokens(candidateName)
+  if (targetLocations.length > 0 && candidateLocations.length > 0) {
+    const required = Math.min(2, targetLocations.length)
+    if (tokenOverlapCount(targetLocations, candidateLocations) < required) return false
+  }
+
+  if (targetEvent?.date && candidateEvent?.date) {
+    const dateDistance = sportsDateDistanceDays(targetEvent.date, candidateEvent.date)
+    if (dateDistance > 3) return false
+  }
+
+  return true
+}
+
 function buildStructuredSportsTarget(info = {}) {
   const explicitDate = extractSportsDate(info.e, info.p)
   const explicitHomeTeam = String(info.o || '').trim()
@@ -504,7 +572,18 @@ function buildStructuredSportsTarget(info = {}) {
     }
   }
 
-  return parseSportsTitle(info.t || '', info.p || '') || parseLooseSportsEventTitle(info.t || '', info.p || '')
+  const structuredMatchup = parseSportsTitle(info.t || '', info.p || '') || parseLooseSportsEventTitle(info.t || '', info.p || '')
+  if (structuredMatchup) return structuredMatchup
+
+  const event = parseSportsEventTitle(info.t || '', info.p || '')
+  if (event) {
+    return {
+      ...event,
+      date: explicitDate || event.date || ''
+    }
+  }
+
+  return null
 }
 
 function humanizeSportsMetaSlug(value) {
@@ -828,6 +907,10 @@ async function buildSupplementalSportsStreams({
           if (dateDistance > 1 || teamHits < 1) continue
           score += (teamHits * 100000000) + ((dateDistance === 0 ? 2 : 1) * 10000000)
         }
+      } else if (targetEvent?.eventName) {
+        const parsedEvent = parseSportsEventTitle(item.title, item.pubDate)
+        if (!parsedEvent || !nonMatchupSportsEventMatches(targetEvent, parsedEvent)) continue
+        score += 50000000
       }
 
       ranked.push({ item, score })
@@ -973,12 +1056,89 @@ function findTorrentByTitle(torrents, targetTitle) {
 
 // Keep only results where the significant words from the query appear in the result title.
 // Prevents sports indexers returning F1/Olympics results when searching for a movie.
-function titleRelevant(resultTitle, queryTitle) {
-  const clean = s => s.toLowerCase().replace(/[^\w\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !TITLE_RELEVANT_STOPWORDS.has(w))
+function titleWords(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter(w => w.length > 2 && !TITLE_RELEVANT_STOPWORDS.has(w))
+}
+
+function titleRelevant(resultTitle, queryTitle, options = {}) {
+  const clean = titleWords
   const queryWords = clean(queryTitle)
   if (queryWords.length === 0) return true
   const resultLower = resultTitle.toLowerCase()
-  return queryWords.every(w => resultLower.includes(w))
+  const hits = queryWords.reduce((acc, word) => acc + (resultLower.includes(word) ? 1 : 0), 0)
+  if (queryWords.every(w => resultLower.includes(w))) return true
+
+  // TV trackers often carry localized titles while preserving the exact
+  // SxxEyy marker. Keep those results if at least two distinctive title words
+  // still match, e.g. "Oak Island E Il Tesoro Maledetto S12E17" for
+  // "The Curse of Oak Island".
+  if (
+    options?.type === 'series' &&
+    options?.season &&
+    options?.episode &&
+    matchesEpisode(resultTitle, options.season, options.episode)
+  ) {
+    return hits >= Math.min(2, queryWords.length)
+  }
+
+  return false
+}
+
+function buildTitleFallbackQueries(contentTitle, type) {
+  const normalized = normalizeSearchQuery(contentTitle)
+  const queries = []
+  const seen = new Set()
+  const add = (value) => {
+    const query = normalizeSearchQuery(value)
+    const key = query.toLowerCase()
+    if (!query || seen.has(key)) return
+    seen.add(key)
+    queries.push(query)
+  }
+
+  add(normalized)
+  if (type === 'series') {
+    const words = titleWords(normalized)
+    if (words.length >= 2) add(words.slice(-2).join(' '))
+    if (words.length >= 3) add(words.slice(0, 3).join(' '))
+  }
+
+  return queries
+}
+
+async function searchTitleFallback(torznab, query, cats) {
+  console.log(`[stream] Title fallback query="${query}" cats="${cats}" useCategories=true`)
+  const categorized = await settleWithTimeout(
+    torznab.search(query, cats, 'search', { useCategories: Boolean(String(cats || '').trim()) }),
+    STREAM_TITLE_FALLBACK_TIMEOUT_MS,
+    []
+  )
+  const categorizedItems = Array.isArray(categorized.value) ? categorized.value : []
+  if (categorized.timedOut) {
+    console.warn(`[stream] Title fallback timed out after ${STREAM_TITLE_FALLBACK_TIMEOUT_MS}ms`)
+  }
+  if (categorized.error) {
+    console.error('[stream] Title fallback error:', categorized.error?.message)
+  }
+  if (!categorized.error && !categorized.timedOut && categorizedItems.length > 0) return categorizedItems
+
+  console.log(`[stream] Title fallback broad query="${query}" cats="all" useCategories=false`)
+  const broad = await settleWithTimeout(
+    torznab.search(query, cats, 'search', { useCategories: false }),
+    STREAM_TITLE_FALLBACK_TIMEOUT_MS,
+    []
+  )
+  if (broad.timedOut) {
+    console.warn(`[stream] Title fallback broad timed out after ${STREAM_TITLE_FALLBACK_TIMEOUT_MS}ms`)
+  }
+  if (broad.error) {
+    console.error('[stream] Title fallback broad error:', broad.error?.message)
+  }
+  return mergeUniqueSourceItems(categorizedItems, Array.isArray(broad.value) ? broad.value : [])
 }
 
 async function handleImdbStream(config, type, id, addonUrl, configToken, playbackBaseUrl = addonUrl) {
@@ -1042,7 +1202,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
     }
     if (contentTitle) {
       const before = items.length
-      items = items.filter(item => titleRelevant(item.title, contentTitle))
+      items = items.filter(item => titleRelevant(item.title, contentTitle, { type, season, episode }))
       if (items.length < before) {
         console.log(`[stream] Title filter removed ${before - items.length} irrelevant results (${items.length} kept)`)
       }
@@ -1055,22 +1215,14 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
   // Fallback: title search if IMDB search returned nothing useful after filtering.
   // Use generic type=search — private trackers (HD-Torrents, SpeedCD) only support type=search.
   if (jackettItems.length === 0 && contentTitle) {
-    console.log(`[stream] Falling back to title search: "${contentTitle}"`)
-    console.log(`[stream] Title fallback query="${contentTitle}" cats="${cats}" useCategories=${Boolean(String(cats || '').trim())}`)
-    const fallbackResult = await settleWithTimeout(
-      torznab.search(contentTitle, cats, 'search', { useCategories: Boolean(String(cats || '').trim()) }),
-      STREAM_TITLE_FALLBACK_TIMEOUT_MS,
-      []
-    )
-    const fallbackItems = Array.isArray(fallbackResult.value) ? fallbackResult.value : []
-    if (fallbackResult.timedOut) {
-      console.warn(`[stream] Title fallback timed out after ${STREAM_TITLE_FALLBACK_TIMEOUT_MS}ms`)
+    const fallbackQueries = buildTitleFallbackQueries(contentTitle, type)
+    for (const fallbackQuery of fallbackQueries) {
+      console.log(`[stream] Falling back to title search: "${fallbackQuery}"`)
+      const fallbackItems = await searchTitleFallback(torznab, fallbackQuery, cats)
+      jackettItems = applyFilters(fallbackItems)
+      console.log(`[stream] Title search returned ${jackettItems.length} results after filtering`)
+      if (jackettItems.length > 0) break
     }
-    if (fallbackResult.error) {
-      console.error('[stream] Title fallback error:', fallbackResult.error?.message)
-    }
-    jackettItems = applyFilters(fallbackItems)
-    console.log(`[stream] Title search returned ${jackettItems.length} results after filtering`)
   }
 
   // Filter by episode if series

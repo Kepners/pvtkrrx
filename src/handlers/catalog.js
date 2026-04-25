@@ -30,6 +30,7 @@ const {
 const {
   resolveSportsPosterAsset,
   resolveSportsBackgroundAsset,
+  resolveSportsLandscapeAsset,
   resolveSportsLogoAsset
 } = require('../utils/sportsArtwork')
 const { normalizeSportsEventMetadata } = require('../utils/sportsEventNormalizer')
@@ -1186,10 +1187,13 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     }
     const posterResolved = resolveSportsPosterAsset(artworkInput)
     const { poster: posterUrl, posterShape } = posterResolved
+    const landscapeUrl = resolveSportsLandscapeAsset(artworkInput)
     const backgroundUrl = resolveSportsBackgroundAsset(artworkInput)
     const logoUrl = resolveSportsLogoAsset(artworkInput)
+    const catalogPosterUrl = landscapeUrl || posterUrl
+    const catalogPosterShape = landscapeUrl ? 'landscape' : posterShape
     console.log(
-      `[sports-artwork-select] id="${sportsMetaResolution?.canonicalId || 'fallback'}" selectedArtworkSource=${posterResolved.selectedArtworkSource || ''} posterUrl="${redactArtworkUrl(posterUrl)}" backdropUrl="${redactArtworkUrl(backgroundUrl)}" fallbackReason="${sportsMetaResolution?.reason || ''}"`
+      `[sports-artwork-select] id="${sportsMetaResolution?.canonicalId || 'fallback'}" selectedArtworkSource=${posterResolved.selectedArtworkSource || ''} posterUrl="${redactArtworkUrl(catalogPosterUrl)}" backdropUrl="${redactArtworkUrl(landscapeUrl || backgroundUrl)}" fallbackReason="${sportsMetaResolution?.reason || ''}"`
     )
     const availabilityAnchorKey = setSportsAvailabilityAnchor(availability.trackerSource || availability)
     const canonicalCatalogId = String(sportsMetaResolution?.canonicalId || '').trim()
@@ -1232,11 +1236,11 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       type: mediaType,
       name: displayTitle,
       description: descriptionParts.join(' | '),
-      poster: posterUrl,
-      background: backgroundUrl || undefined,
+      poster: catalogPosterUrl,
+      background: landscapeUrl || backgroundUrl || undefined,
       logo: logoUrl || undefined,
       releaseInfo: eventDate || undefined,
-      posterShape
+      posterShape: catalogPosterShape
     }
   })
 

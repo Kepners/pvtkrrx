@@ -1,7 +1,9 @@
 const sharp = require('sharp')
+const crypto = require('crypto')
 const {
   buildSportsMetaAssetUrl,
   buildSportsMetaDefaultAssetUrl,
+  buildSportsMetaMemberAssetUrl,
   resolveSportSlug
 } = require('../clients/sportsmeta')
 const {
@@ -47,8 +49,12 @@ function normalizeVariant(value) {
   return ALLOWED_VARIANTS.has(v) ? v : ''
 }
 
-function buildUpstreamUrl({ kind, variant, canonicalId, sport, league, title, date, sportsmetaBaseUrl }) {
+function buildUpstreamUrl({ kind, variant, canonicalId, sport, league, title, date, sportsmetaBaseUrl, memberToken }) {
   if (kind === 'id') {
+    if (memberToken) {
+      const memberUrl = buildSportsMetaMemberAssetUrl(sportsmetaBaseUrl || '', memberToken, variant, canonicalId)
+      if (memberUrl) return memberUrl
+    }
     return buildSportsMetaAssetUrl(sportsmetaBaseUrl || '', variant, canonicalId)
   }
   return buildSportsMetaDefaultAssetUrl(sportsmetaBaseUrl || '', variant, sport, league || '', {
@@ -174,6 +180,12 @@ function redactUrl(value) {
     .replace(/([?&](?:token|key|password|secret)=)[^&#]+/ig, '$1[redacted]')
 }
 
+function tokenFingerprint(value = '') {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  return crypto.createHash('sha256').update(raw).digest('hex').slice(0, 16)
+}
+
 async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput }) {
   if (!upstreamUrl) {
     res.status(400).type('text/plain').send('invalid sports artwork request')
@@ -216,8 +228,8 @@ function buildDefaultArtworkCacheKey({ variant, sportSlug, league, title, date, 
   ].join('|')
 }
 
-function buildCanonicalArtworkCacheKey({ variant, canonicalId, sportsmetaBaseUrl }) {
-  return `id|${variant}|${canonicalId}|${(sportsmetaBaseUrl || '').trim().toLowerCase()}`
+function buildCanonicalArtworkCacheKey({ variant, canonicalId, sportsmetaBaseUrl, memberToken }) {
+  return `id|${variant}|${canonicalId}|${(sportsmetaBaseUrl || '').trim().toLowerCase()}|${tokenFingerprint(memberToken)}`
 }
 
 async function handleDefaultSportsArtwork(req, res, config = {}) {
@@ -271,17 +283,19 @@ async function handleCanonicalSportsArtwork(req, res, config = {}) {
     return
   }
   const sportsmetaBaseUrl = resolveSportsmetaBaseUrlFromConfig(config)
+  const memberToken = String(req.query?.token || '').trim()
   const upstreamUrl = buildUpstreamUrl({
     kind: 'id',
     variant,
     canonicalId,
-    sportsmetaBaseUrl
+    sportsmetaBaseUrl,
+    memberToken
   })
   const fallbackInput = buildArtworkInputFromRequest({
     canonicalId,
     source: 'sportsmeta'
   })
-  const cacheKey = buildCanonicalArtworkCacheKey({ variant, canonicalId, sportsmetaBaseUrl })
+  const cacheKey = buildCanonicalArtworkCacheKey({ variant, canonicalId, sportsmetaBaseUrl, memberToken })
   await sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput })
 }
 

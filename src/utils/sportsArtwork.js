@@ -87,7 +87,10 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
   if (!addonBase) return ''
   const canonicalId = resolveCanonicalId(input)
   if (canonicalId) {
-    return `${addonBase}/sports-artwork/id/${encodeURIComponent(variant)}/${encodeURIComponent(canonicalId)}.png`
+    const url = new URL(`${addonBase}/sports-artwork/id/${encodeURIComponent(variant)}/${encodeURIComponent(canonicalId)}.png`)
+    const memberToken = resolveSportsPosterMemberToken(input)
+    if (memberToken) url.searchParams.set('token', memberToken)
+    return url.toString()
   }
   const sportSlug = resolveSportSlug(resolveSport(input))
   if (!sportSlug) return ''
@@ -129,8 +132,6 @@ function buildSportsMetaMemberDirectUrl(variant, input = {}) {
 }
 
 function buildVariantUrl(variant, input = {}) {
-  const memberUrl = buildSportsMetaMemberDirectUrl(variant, input)
-  if (memberUrl) return memberUrl
   // Prefer PVTKRRX-hosted raster when we have a public addon base URL — that
   // is the client-safe form for every route (catalog + meta responses go to
   // Stremio clients that may not render SVG). Fall back to the direct
@@ -138,6 +139,8 @@ function buildVariantUrl(variant, input = {}) {
   // tooling that bypasses the HTTP handlers).
   const rasterUrl = buildPvtkrrxRasterUrl(variant, input)
   if (rasterUrl) return rasterUrl
+  const memberUrl = buildSportsMetaMemberDirectUrl(variant, input)
+  if (memberUrl) return memberUrl
   return buildSportsMetaDirectUrl(variant, input)
 }
 
@@ -160,6 +163,10 @@ function resolveSportsBackgroundAsset(input = {}) {
   return buildVariantUrl('background', input)
 }
 
+function resolveSportsLandscapeAsset(input = {}) {
+  return buildVariantUrl('landscape', input)
+}
+
 function resolveSportsLogoAsset(input = {}) {
   return buildVariantUrl('logo', input)
 }
@@ -167,5 +174,6 @@ function resolveSportsLogoAsset(input = {}) {
 module.exports = {
   resolveSportsPosterAsset,
   resolveSportsBackgroundAsset,
+  resolveSportsLandscapeAsset,
   resolveSportsLogoAsset
 }

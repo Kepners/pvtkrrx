@@ -1202,8 +1202,11 @@
           </div>
           <p class="plan-copy">Plus is the standard member artwork plan. Pro keeps that and adds expanded artwork plus full member lookup routes. Both remain SportsMeta surfaces.</p>
           <div class="plan-actions">
+            <button class="btn btn-primary" type="button" data-checkout-interval="year" data-umami-event="cta_sportsmeta_checkout_year" data-umami-event-page="sports" data-umami-event-section="plans">Start Yearly</button>
+            <button class="btn btn-secondary" type="button" data-checkout-interval="month" data-umami-event="cta_sportsmeta_checkout_month" data-umami-event-page="sports" data-umami-event-section="plans">Start Monthly</button>
             <a class="btn btn-secondary" href="https://sportsmeta.pvtkrrx.cc/pricing" data-umami-event="cta_sportsmeta_pricing" data-umami-event-page="sports" data-umami-event-section="plans">Compare Plus / Pro</a>
           </div>
+          <p class="checkout-notice" id="checkoutNotice" role="status" aria-live="polite"></p>
           <ul class="plan-list">
             <li>Private SportsMeta member install URL</li>
             <li>Poster, background, and logo artwork on member routes</li>
@@ -1367,6 +1370,45 @@
     }
 
     scheduleBurst();
+
+    const checkoutNotice = document.getElementById('checkoutNotice');
+    const checkoutButtons = document.querySelectorAll('[data-checkout-interval]');
+
+    function showCheckoutNotice(message) {
+      if (!checkoutNotice) {
+        return;
+      }
+      checkoutNotice.textContent = message;
+      checkoutNotice.classList.add('visible');
+    }
+
+    checkoutButtons.forEach((button) => {
+      button.addEventListener('click', async () => {
+        const interval = button.dataset.checkoutInterval;
+        button.disabled = true;
+        showCheckoutNotice('Opening SportsMeta checkout...');
+
+        try {
+          const response = await fetch('/sports/billing/checkout', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ interval })
+          });
+          const payload = await response.json().catch(() => ({}));
+
+          if (!response.ok || !payload.url) {
+            throw new Error(payload.error || `Checkout failed with HTTP ${response.status}`);
+          }
+
+          window.location.href = payload.url;
+        } catch (error) {
+          showCheckoutNotice('Checkout is temporarily unavailable. Open SportsMeta Pricing or try again shortly.');
+          button.disabled = false;
+        }
+      });
+    });
   </script>
   <script src="/analytics.js" defer></script>
   <script type="application/ld+json">

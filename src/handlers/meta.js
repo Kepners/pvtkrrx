@@ -9,6 +9,7 @@ const { BRAND_ARTWORK, buildMetaPlaceholder } = require('../utils/metaPlaceholde
 const {
   resolveSportsPosterAsset,
   resolveSportsBackgroundAsset,
+  resolveSportsLandscapeAsset,
   resolveSportsLogoAsset
 } = require('../utils/sportsArtwork')
 const { normalizeSportsEventMetadata } = require('../utils/sportsEventNormalizer')
@@ -107,7 +108,7 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, 
     source: normalizedSportsEvent.source
   }
   const posterResolved = resolveSportsPosterAsset(artworkInput)
-  const backgroundResolved = resolveSportsBackgroundAsset(artworkInput)
+  const backgroundResolved = resolveSportsLandscapeAsset(artworkInput) || resolveSportsBackgroundAsset(artworkInput)
   const logoResolved = resolveSportsLogoAsset(artworkInput)
   const poster = String(posterResolved?.poster || '').trim() || BRAND_POSTER
   const background = String(backgroundResolved || '').trim() || poster
@@ -269,7 +270,7 @@ async function handleCustomMeta(config, id, context = {}) {
     ? resolveSportsPosterAsset(artworkInput)
     : { poster: carriedArtwork || BRAND_POSTER, posterShape: undefined }
   const backgroundResolved = isSports
-    ? resolveSportsBackgroundAsset(artworkInput)
+    ? (resolveSportsLandscapeAsset(artworkInput) || resolveSportsBackgroundAsset(artworkInput))
     : (String(info.b || '').trim() || BRAND_POSTER)
   const logoResolved = isSports
     ? resolveSportsLogoAsset(artworkInput)
