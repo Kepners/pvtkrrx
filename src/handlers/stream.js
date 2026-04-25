@@ -27,6 +27,9 @@ const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_S
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '5000', 10))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '20', 10))
 const STREAM_SPORTS_MAX_SEARCH_QUERIES = Math.max(4, parseInt(process.env.PVTKRRX_STREAM_SPORTS_MAX_SEARCH_QUERIES || '12', 10))
+const STREAM_SPORTS_MAX_SEARCH_QUERIES_WITH_DIRECT = Math.max(1, parseInt(process.env.PVTKRRX_STREAM_SPORTS_MAX_SEARCH_QUERIES_WITH_DIRECT || '3', 10))
+const STREAM_SPORTS_SUPPLEMENTAL_BUDGET_MS = Math.max(2500, parseInt(process.env.PVTKRRX_STREAM_SPORTS_SUPPLEMENTAL_BUDGET_MS || '8000', 10))
+const STREAM_SPORTS_RESPONSE_TIMEOUT_MS = Math.max(5000, parseInt(process.env.PVTKRRX_STREAM_SPORTS_RESPONSE_TIMEOUT_MS || '14000', 10))
 const TRACKER_LINK_INSPECTION_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_TIMEOUT_MS || '4000', 10))
 const TRACKER_LINK_INSPECTION_CACHE_MS = Math.max(60 * 1000, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_CACHE_MS || String(10 * 60 * 1000), 10))
 
@@ -344,11 +347,31 @@ async function handleStream(config, type, id, addonUrl, configToken, playbackBas
   try {
     const effectiveConfig = applyHostedServiceOverrides(config && typeof config === 'object' ? config : {})
     if (id.startsWith('sportsmeta:')) {
-      return await handleSportsMetaStream(effectiveConfig, id, addonUrl, configToken, playbackBaseUrl)
+      const result = await settleWithTimeout(
+        handleSportsMetaStream(effectiveConfig, id, addonUrl, configToken, playbackBaseUrl),
+        STREAM_SPORTS_RESPONSE_TIMEOUT_MS,
+        { streams: [], cacheMaxAge: 0 }
+      )
+      if (result.timedOut) {
+        console.warn(`[stream] sportsmeta response budget exceeded id=${id} timeoutMs=${STREAM_SPORTS_RESPONSE_TIMEOUT_MS}`)
+      }
+      return result.value
     }
 
     if (id.startsWith('pvtkrrx:')) {
-      return await handleCustomStream(effectiveConfig, id, addonUrl, configToken, playbackBaseUrl)
+      const decoded = decodeCustomId(id)
+      if (isSportsStreamInfo(decoded)) {
+        const result = await settleWithTimeout(
+          handleDecodedCustomStream(effectiveConfig, decoded, addonUrl, configToken, playbackBaseUrl),
+          STREAM_SPORTS_RESPONSE_TIMEOUT_MS,
+          { streams: [], cacheMaxAge: 0 }
+        )
+        if (result.timedOut) {
+          console.warn(`[stream] custom sports response budget exceeded id=${id} timeoutMs=${STREAM_SPORTS_RESPONSE_TIMEOUT_MS}`)
+        }
+        return result.value
+      }
+      return await handleDecodedCustomStream(effectiveConfig, decoded, addonUrl, configToken, playbackBaseUrl)
     }
 
     if (id.startsWith('tt')) {
@@ -741,10 +764,10 @@ async function runSportsProwlarrSearch(torznab, query, useCategories, contextLab
 }
 
 async function searchSportsProwlarrVariants(torznab, query, contextLabel) {
-  const categoryItems = await runSportsProwlarrSearch(torznab, query, true, contextLabel)
-  const broadItems = categoryItems.length < Math.min(10, STREAM_MAX_CANDIDATES)
-    ? await runSportsProwlarrSearch(torznab, query, false, `${contextLabel} broad fallback`)
-    : []
+  const [categoryItems, broadItems] = await Promise.all([
+    runSportsProwlarrSearch(torznab, query, true, contextLabel),
+    runSportsProwlarrSearch(torznab, query, false, `${contextLabel} broad fallback`)
+  ])
   return mergeUniqueSourceItems(categoryItems, broadItems)
 }
 
@@ -758,7 +781,9 @@ async function buildSupplementalSportsStreams({
   seenKeys,
   noticeCounts,
   trackerPlaybackEnabled,
-  trackerPlaybackRestriction
+  trackerPlaybackRestriction,
+  existingStreamCount = 0,
+  deadlineMs = 0
 }) {
   if (!torznab) return []
   if (!canEmitTrackerPlayback(config, configToken)) {
@@ -767,11 +792,19 @@ async function buildSupplementalSportsStreams({
   }
 
   const targetEvent = buildStructuredSportsTarget(info)
-  const queries = buildCustomSearchQueries(info)
+  const queryLimit = existingStreamCount > 0
+    ? Math.min(STREAM_SPORTS_MAX_SEARCH_QUERIES_WITH_DIRECT, STREAM_SPORTS_MAX_SEARCH_QUERIES)
+    : STREAM_SPORTS_MAX_SEARCH_QUERIES
+  const queries = buildCustomSearchQueries(info).slice(0, queryLimit)
   const ranked = []
   const rankedKeys = new Set()
+  const hasBudget = (minRemainingMs = 250) => !deadlineMs || Date.now() + minRemainingMs < deadlineMs
 
   for (const query of queries) {
+    if (!hasBudget(750)) {
+      console.warn(`[stream] Supplemental sports search budget exhausted before query="${query}"`)
+      break
+    }
     const items = await searchSportsProwlarrVariants(torznab, query, 'Supplemental sports search')
     for (const item of items) {
       const key = sourceItemKey(item) ||
@@ -815,10 +848,18 @@ async function buildSupplementalSportsStreams({
   const ordered = preferSeededResults(deduped, 'supplemental sports streams')
   const streams = []
   for (const item of ordered) {
+    if (streams.length + existingStreamCount >= STREAM_MAX_CANDIDATES) break
+    if (!hasBudget(500)) {
+      console.warn('[stream] Supplemental sports inspection budget exhausted')
+      break
+    }
     const titleLooksPacked = isLikelyPackedReleaseTitle(item.title)
+    const knownInfoHash = String(item?.infohash || '').toLowerCase()
     const inspection = titleLooksPacked
       ? { packedOnly: true, inspected: false }
-      : await inspectTrackerLink(item.link)
+      : knownInfoHash
+        ? { packedOnly: false, inspected: true, infoHash: knownInfoHash }
+        : await inspectTrackerLink(item.link)
     if (titleLooksPacked || inspection.packedOnly) {
       if (noticeCounts) noticeCounts.packedArchiveLiveUnsupported += 1
       continue
@@ -1258,7 +1299,9 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
   if (streams.length === 0 && directLink && !packedArchivePending) {
     const inspection = directInspection || (likelyPackedDirectRelease
       ? { packedOnly: true, inspected: false }
-      : await inspectTrackerLink(directLink))
+      : infoHash
+        ? { packedOnly: false, inspected: true, infoHash }
+        : await inspectTrackerLink(directLink))
 
     if (inspection.packedOnly) {
       noticeCounts.packedArchiveLiveUnsupported += 1
@@ -1288,6 +1331,7 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
 
   if (allowSupplementalSportsResults) {
     try {
+      const supplementalDeadlineMs = Date.now() + STREAM_SPORTS_SUPPLEMENTAL_BUDGET_MS
       const supplementalStreams = await buildSupplementalSportsStreams({
         info: resolvedInfo,
         torznab,
@@ -1298,7 +1342,9 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
         seenKeys: seenSourceKeys,
         noticeCounts,
         trackerPlaybackEnabled,
-        trackerPlaybackRestriction
+        trackerPlaybackRestriction,
+        existingStreamCount: streams.length,
+        deadlineMs: supplementalDeadlineMs
       })
       if (supplementalStreams.length > 0) {
         streams.push(...supplementalStreams)

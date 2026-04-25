@@ -11,6 +11,7 @@ const {
   resolveSportsBackgroundAsset,
   resolveSportsLogoAsset
 } = require('../utils/sportsArtwork')
+const { normalizeSportsEventMetadata } = require('../utils/sportsEventNormalizer')
 const BRAND_POSTER = BRAND_ARTWORK
 const BRAND_LOGO = BRAND_ARTWORK
 
@@ -82,15 +83,28 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, 
   const league = String(canonicalEvent?.league || '').trim()
   const eventDate = String(canonicalEvent?.date || '').trim()
   const displayTitle = String(canonicalEvent?.name || canonicalEvent?.title || requestedId).trim() || requestedId
+  const normalizedSportsEvent = normalizeSportsEventMetadata({
+    canonicalId: String(canonicalEvent?.id || canonical?.canonicalId || requestedId || '').trim(),
+    canonicalEvent,
+    sportHint,
+    competition: league,
+    eventTitle: displayTitle,
+    date: eventDate,
+    rawTitle: displayTitle,
+    source: 'sportsmeta'
+  })
   const artworkInput = {
     baseUrl: String(baseUrl || '').replace(/\/+$/, ''),
     sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
     sportsPosterMemberToken: config?.sportsPosterMemberToken,
     canonicalId: String(canonicalEvent?.id || canonical?.canonicalId || requestedId || '').trim(),
-    sportHint,
-    league,
-    title: displayTitle,
-    date: eventDate
+    sportHint: sportHint || normalizedSportsEvent.sport,
+    league: normalizedSportsEvent.competition || league,
+    title: normalizedSportsEvent.eventTitle || displayTitle,
+    eventDetail: normalizedSportsEvent.eventDetail || '',
+    date: normalizedSportsEvent.date || eventDate,
+    rawTitle: normalizedSportsEvent.rawTitle,
+    source: normalizedSportsEvent.source
   }
   const posterResolved = resolveSportsPosterAsset(artworkInput)
   const backgroundResolved = resolveSportsBackgroundAsset(artworkInput)
@@ -221,16 +235,35 @@ async function handleCustomMeta(config, id, context = {}) {
   const homeTeam = String(canonicalEvent?.homeTeam || carriedHomeTeam || sportsArtwork?.homeTeam || '').trim()
   const awayTeam = String(canonicalEvent?.awayTeam || carriedAwayTeam || sportsArtwork?.awayTeam || '').trim()
   const eventName = String(canonicalEvent?.title || canonicalEvent?.name || sportsArtwork?.eventName || '').trim()
+  const normalizedSportsEvent = isSports
+    ? normalizeSportsEventMetadata({
+        canonicalId,
+        canonicalEvent,
+        sportHint: resolvedSportHint || carriedSportHint,
+        competition: league,
+        eventTitle: displayTitle,
+        date: eventDate,
+        seeders: Number(info.d || 0) || undefined,
+        size: Number(info.s || 0) > 0 ? formatSize(info.s) : '',
+        rawTitle: info.t || displayTitle,
+        source: canonicalSportsMeta ? 'sportsmeta' : 'prowlarr'
+      })
+    : null
 
   const artworkInput = {
     baseUrl: String(baseUrl || '').replace(/\/+$/, ''),
     sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
     sportsPosterMemberToken: config?.sportsPosterMemberToken,
     canonicalId: canonicalId && resolutionStatus === 'resolved' ? canonicalId : '',
-    sportHint: resolvedSportHint,
-    league,
-    title: displayTitle,
-    date: eventDate
+    sportHint: resolvedSportHint || normalizedSportsEvent?.sport || '',
+    league: normalizedSportsEvent?.competition || league,
+    title: normalizedSportsEvent?.eventTitle || displayTitle,
+    eventDetail: normalizedSportsEvent?.eventDetail || '',
+    date: normalizedSportsEvent?.date || eventDate,
+    seeders: normalizedSportsEvent?.seeders,
+    size: normalizedSportsEvent?.size,
+    rawTitle: normalizedSportsEvent?.rawTitle || info.t || displayTitle,
+    source: normalizedSportsEvent?.source || ''
   }
   const posterResolved = isSports
     ? resolveSportsPosterAsset(artworkInput)

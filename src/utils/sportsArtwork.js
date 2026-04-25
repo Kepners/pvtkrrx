@@ -98,6 +98,11 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
   if (league) url.searchParams.set('league', league)
   if (title) url.searchParams.set('title', title)
   if (date) url.searchParams.set('date', date)
+  if (input?.eventDetail) url.searchParams.set('detail', normalizeSpace(input.eventDetail))
+  if (input?.rawTitle) url.searchParams.set('rawTitle', normalizeSpace(input.rawTitle))
+  if (Number(input?.seeders) > 0) url.searchParams.set('seeders', String(Number(input.seeders)))
+  if (input?.size) url.searchParams.set('size', normalizeSpace(input.size))
+  if (input?.source) url.searchParams.set('source', normalizeSpace(input.source))
   return url.toString()
 }
 
@@ -137,11 +142,17 @@ function buildVariantUrl(variant, input = {}) {
 }
 
 function resolveSportsPosterAsset(input = {}) {
+  const hasMemberUrl = Boolean(buildSportsMetaMemberDirectUrl('poster', input))
   const poster = buildVariantUrl('poster', input)
   return {
     poster,
     posterShape: 'poster',
-    posterMode: resolveCanonicalId(input) ? 'sportsmeta-canonical' : 'sportsmeta-default'
+    posterMode: hasMemberUrl
+      ? 'sportsmeta-member'
+      : resolveCanonicalId(input) ? 'pvtkrrx-proxy-canonical' : 'pvtkrrx-proxy-default',
+    selectedArtworkSource: hasMemberUrl
+      ? 'sportsmeta-member-raster'
+      : resolveCanonicalId(input) ? 'pvtkrrx-canonical-proxy' : 'pvtkrrx-generated-fallback'
   }
 }
 

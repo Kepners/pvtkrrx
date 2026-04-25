@@ -4,6 +4,10 @@ const {
   buildSportsMetaDefaultAssetUrl,
   resolveSportSlug
 } = require('../clients/sportsmeta')
+const {
+  buildArtworkInputFromRequest,
+  renderSportsArtworkSvg
+} = require('../utils/sportsCardArtwork')
 
 const VARIANT_DIMENSIONS = {
   poster: { width: 600, height: 900 },
@@ -65,7 +69,7 @@ async function fetchUpstream(url) {
   }
   const contentType = String(response.headers.get('content-type') || '').toLowerCase()
   const buffer = Buffer.from(await response.arrayBuffer())
-  return { contentType, buffer }
+  return { status: response.status, contentType, buffer }
 }
 
 async function rasterizeToPng(buffer, variant) {
@@ -76,19 +80,66 @@ async function rasterizeToPng(buffer, variant) {
     .toBuffer()
 }
 
-async function loadRaster(cacheKey, upstreamUrl, variant) {
+function shouldRenderLocalFallbackForSvg(variant) {
+  return variant === 'poster' || variant === 'background' || variant === 'landscape'
+}
+
+async function renderLocalFallbackPng(variant, fallbackInput = {}) {
+  const svg = renderSportsArtworkSvg(fallbackInput, variant)
+  return rasterizeToPng(Buffer.from(svg), variant)
+}
+
+async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}) {
   const now = Date.now()
   const hit = rasterCache.get(cacheKey)
   if (hit && hit.expiresAt > now) return hit.value
   if (rasterInFlight.has(cacheKey)) return rasterInFlight.get(cacheKey)
 
   const pending = (async () => {
-    const { contentType, buffer } = await fetchUpstream(upstreamUrl)
-    if (/^image\/(png|jpeg|jpg|webp)/i.test(contentType)) {
-      return { buffer, contentType }
+    try {
+      const { status, contentType, buffer } = await fetchUpstream(upstreamUrl)
+      if (/^image\/(png|jpeg|jpg|webp)/i.test(contentType)) {
+        return {
+          buffer,
+          contentType,
+          selectedArtworkSource: 'sportsmeta-raster',
+          fallbackReason: '',
+          httpStatus: status,
+          upstreamContentType: contentType
+        }
+      }
+      if (/^image\/svg\+xml/i.test(contentType) && shouldRenderLocalFallbackForSvg(variant)) {
+        const png = await renderLocalFallbackPng(variant, fallbackInput)
+        return {
+          buffer: png,
+          contentType: 'image/png',
+          selectedArtworkSource: 'pvtkrrx-generated-card',
+          fallbackReason: 'sportsmeta_svg_layout_replaced',
+          httpStatus: status,
+          upstreamContentType: contentType
+        }
+      }
+      const png = await rasterizeToPng(buffer, variant)
+      return {
+        buffer: png,
+        contentType: 'image/png',
+        selectedArtworkSource: 'sportsmeta-rasterized',
+        fallbackReason: /^image\/svg\+xml/i.test(contentType) ? 'sportsmeta_svg_rasterized' : 'sportsmeta_non_raster_rasterized',
+        httpStatus: status,
+        upstreamContentType: contentType
+      }
+    } catch (error) {
+      if (!shouldRenderLocalFallbackForSvg(variant) && variant !== 'logo') throw error
+      const png = await renderLocalFallbackPng(variant, fallbackInput)
+      return {
+        buffer: png,
+        contentType: 'image/png',
+        selectedArtworkSource: 'pvtkrrx-generated-card',
+        fallbackReason: `upstream_${error?.status || 'error'}`,
+        httpStatus: error?.status || 0,
+        upstreamContentType: ''
+      }
     }
-    const png = await rasterizeToPng(buffer, variant)
-    return { buffer: png, contentType: 'image/png' }
   })()
     .then((value) => {
       rasterCache.set(cacheKey, { value, expiresAt: Date.now() + RASTER_CACHE_TTL_MS })
@@ -117,17 +168,29 @@ function resolveSportsmetaBaseUrlFromConfig(config = {}) {
   return String(config?.sportsmetaBaseUrl || '').trim()
 }
 
-async function sendArtwork(res, { cacheKey, upstreamUrl, variant }) {
+function redactUrl(value) {
+  return String(value || '')
+    .replace(/\/member\/([^/?#]+)\/asset\//i, '/member/[redacted]/asset/')
+    .replace(/([?&](?:token|key|password|secret)=)[^&#]+/ig, '$1[redacted]')
+}
+
+async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput }) {
   if (!upstreamUrl) {
     res.status(400).type('text/plain').send('invalid sports artwork request')
     return
   }
   try {
-    const { buffer, contentType } = await loadRaster(cacheKey, upstreamUrl, variant)
+    const result = await loadRaster(cacheKey, upstreamUrl, variant, fallbackInput)
+    const { buffer, contentType } = result
     res.setHeader('Content-Type', contentType || 'image/png')
     res.setHeader('Content-Length', String(buffer.length))
     res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000, stale-if-error=2592000')
     res.setHeader('X-PVTKRRX-Artwork-Upstream', upstreamUrl)
+    res.setHeader('X-PVTKRRX-Artwork-Source', result.selectedArtworkSource || 'unknown')
+    if (result.fallbackReason) res.setHeader('X-PVTKRRX-Artwork-Fallback', result.fallbackReason)
+    console.log(
+      `[sports-artwork] selectedArtworkSource=${result.selectedArtworkSource || 'unknown'} variant=${variant} artworkUrl=${redactUrl(upstreamUrl)} fallbackReason=${result.fallbackReason || ''} httpStatus=${result.httpStatus || ''} contentType=${result.upstreamContentType || contentType || ''}`
+    )
     res.status(200).end(buffer)
   } catch (err) {
     const status = err?.status === 404 ? 404 : 502
@@ -137,7 +200,7 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant }) {
   }
 }
 
-function buildDefaultArtworkCacheKey({ variant, sportSlug, league, title, date, sportsmetaBaseUrl }) {
+function buildDefaultArtworkCacheKey({ variant, sportSlug, league, title, date, detail, seeders, size, rawTitle, sportsmetaBaseUrl }) {
   return [
     'default',
     variant,
@@ -145,6 +208,10 @@ function buildDefaultArtworkCacheKey({ variant, sportSlug, league, title, date, 
     (league || '').trim().toLowerCase(),
     (title || '').trim().toLowerCase(),
     (date || '').trim().toLowerCase(),
+    (detail || '').trim().toLowerCase(),
+    (seeders || '').trim().toLowerCase(),
+    (size || '').trim().toLowerCase(),
+    (rawTitle || '').trim().toLowerCase(),
     (sportsmetaBaseUrl || '').trim().toLowerCase()
   ].join('|')
 }
@@ -164,6 +231,11 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
   const league = String(req.query?.league || '').trim()
   const title = String(req.query?.title || '').trim()
   const date = String(req.query?.date || '').trim()
+  const detail = String(req.query?.detail || '').trim()
+  const seeders = String(req.query?.seeders || '').trim()
+  const size = String(req.query?.size || '').trim()
+  const rawTitle = String(req.query?.rawTitle || '').trim()
+  const source = String(req.query?.source || 'fallback').trim()
   const sportsmetaBaseUrl = resolveSportsmetaBaseUrlFromConfig(config)
   const upstreamUrl = buildUpstreamUrl({
     kind: 'default',
@@ -174,8 +246,20 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
     date,
     sportsmetaBaseUrl
   })
-  const cacheKey = buildDefaultArtworkCacheKey({ variant, sportSlug, league, title, date, sportsmetaBaseUrl })
-  await sendArtwork(res, { cacheKey, upstreamUrl, variant })
+  const fallbackInput = buildArtworkInputFromRequest({
+    sport: sportSlug,
+    league,
+    title,
+    date,
+    detail,
+    seeders,
+    size,
+    rawTitle,
+    source
+  })
+  if (detail) fallbackInput.eventDetail = detail
+  const cacheKey = buildDefaultArtworkCacheKey({ variant, sportSlug, league, title, date, detail, seeders, size, rawTitle, sportsmetaBaseUrl })
+  await sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput })
 }
 
 async function handleCanonicalSportsArtwork(req, res, config = {}) {
@@ -193,8 +277,12 @@ async function handleCanonicalSportsArtwork(req, res, config = {}) {
     canonicalId,
     sportsmetaBaseUrl
   })
+  const fallbackInput = buildArtworkInputFromRequest({
+    canonicalId,
+    source: 'sportsmeta'
+  })
   const cacheKey = buildCanonicalArtworkCacheKey({ variant, canonicalId, sportsmetaBaseUrl })
-  await sendArtwork(res, { cacheKey, upstreamUrl, variant })
+  await sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput })
 }
 
 module.exports = {

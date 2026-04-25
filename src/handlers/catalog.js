@@ -32,6 +32,7 @@ const {
   resolveSportsBackgroundAsset,
   resolveSportsLogoAsset
 } = require('../utils/sportsArtwork')
+const { normalizeSportsEventMetadata } = require('../utils/sportsEventNormalizer')
 const { buildMetaPlaceholder } = require('../utils/metaPlaceholder')
 const { applyHostedServiceOverrides } = require('../utils/hostedServiceOverrides')
 
@@ -82,6 +83,12 @@ const SPORTS_IDENTITY_PASS_BUDGET_MS = Math.max(
   parseInt(process.env.PVTKRRX_SPORTS_IDENTITY_BUDGET_MS || '1000', 10)
 )
 const DEBUG_SPORTS_RESOLUTION = /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_DEBUG_SPORTS_RESOLUTION || '').trim())
+
+function redactArtworkUrl(value) {
+  return String(value || '')
+    .replace(/\/member\/([^/?#]+)\/asset\//i, '/member/[redacted]/asset/')
+    .replace(/([?&](?:token|key|password|secret)=)[^&#]+/ig, '$1[redacted]')
+}
 
 function isLikelySeriesRelease(title) {
   const value = String(title || '')
@@ -1082,6 +1089,21 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     const fallbackHomeTeam = displaySportsEvent?.homeTeam || parsedSportsEvent?.homeTeam || ''
     const fallbackAwayTeam = displaySportsEvent?.awayTeam || parsedSportsEvent?.awayTeam || ''
     const fallbackEventName = parsedEvent?.eventName || ''
+    const canonicalCatalogIdForArtwork = String(sportsMetaResolution?.canonicalId || '').trim()
+    const normalizedSportsEvent = normalizeSportsEventMetadata({
+      canonicalId: canonicalCatalogIdForArtwork,
+      canonicalEvent,
+      parsedSportsEvent: displaySportsEvent || parsedSportsEvent,
+      parsedEvent,
+      sportHint: resolvedSportHint,
+      competition: league,
+      eventTitle: displayTitle,
+      date: eventDate,
+      seeders: availability.seeders,
+      size: formatSize(availability.size),
+      rawTitle: availability?.title || '',
+      source: canonicalIdentity ? 'sportsmeta' : 'prowlarr'
+    })
     const descriptionParts = [
       `${availability.seeders} seeders`,
       formatSize(availability.size),
@@ -1090,7 +1112,6 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     if (eventDate) descriptionParts.push(eventDate)
     if (league) descriptionParts.push(league)
 
-    const canonicalCatalogIdForArtwork = String(sportsMetaResolution?.canonicalId || '').trim()
     const artworkInput = {
       baseUrl: addonBaseUrl,
       sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
@@ -1098,14 +1119,23 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       canonicalId: sportsMetaResolution?.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED
         ? canonicalCatalogIdForArtwork
         : '',
-      sportHint: resolvedSportHint,
-      league,
-      title: displayTitle,
-      date: eventDate
+      sportHint: resolvedSportHint || normalizedSportsEvent.sport,
+      league: normalizedSportsEvent.competition || league,
+      title: normalizedSportsEvent.eventTitle || displayTitle,
+      eventDetail: normalizedSportsEvent.eventDetail || '',
+      date: normalizedSportsEvent.date || eventDate,
+      seeders: normalizedSportsEvent.seeders,
+      size: normalizedSportsEvent.size,
+      rawTitle: normalizedSportsEvent.rawTitle,
+      source: normalizedSportsEvent.source
     }
-    const { poster: posterUrl, posterShape } = resolveSportsPosterAsset(artworkInput)
+    const posterResolved = resolveSportsPosterAsset(artworkInput)
+    const { poster: posterUrl, posterShape } = posterResolved
     const backgroundUrl = resolveSportsBackgroundAsset(artworkInput)
     const logoUrl = resolveSportsLogoAsset(artworkInput)
+    console.log(
+      `[sports-artwork-select] id="${sportsMetaResolution?.canonicalId || 'fallback'}" selectedArtworkSource=${posterResolved.selectedArtworkSource || ''} posterUrl="${redactArtworkUrl(posterUrl)}" backdropUrl="${redactArtworkUrl(backgroundUrl)}" fallbackReason="${sportsMetaResolution?.reason || ''}"`
+    )
     const availabilityAnchorKey = setSportsAvailabilityAnchor(availability.trackerSource || availability)
     const canonicalCatalogId = String(sportsMetaResolution?.canonicalId || '').trim()
     if (

@@ -6,6 +6,36 @@ Updated: 2026-04-25
 
 PVTKRRX is in a synchronized `1.1.44` state across the Windows desktop release, hosted `www.pvtkrrx.cc` runtime, and Contabo self-host seedbox runtime. Release numbering is now app-aligned: desktop/latest is `v1.1.44`, self-host/seedbox is `v1.1.44-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
 
+## 2026-04-25: v44 sports tablet artwork and stream hotfix
+
+- Reproduced the tablet-facing seedbox failure against the live self-host route before changing stream behavior:
+  - selected item: `sportsmeta:event:football|2026-04-18|english-premier-league|chelsea|manchester-united`
+  - catalog and meta returned valid sports metadata and reachable SportsMeta member JPEG poster/background URLs
+  - `GET https://pvt.kepners.co.uk/selfhost/stream/sports/sportsmeta%3Aevent%3Afootball%7C2026-04-18%7Cenglish-premier-league%7Cchelsea%7Cmanchester-united.json?mode=hosted` did not complete within a 60s probe timeout, leaving Stremio stuck in the addon loading state
+- Root cause: canonical sports stream handling could spend the whole request budget on sequential supplemental Prowlarr searches plus tracker-link inspection even when the catalog carried an availability anchor with a usable infohash/link.
+- Repo fix:
+  - added `scripts/probe-sports-item.js` and `npm run probe:sports-item -- "<ITEM_ID_OR_SLUG>"` for manifest -> catalog -> meta -> artwork -> stream proof
+  - added `src/utils/sportsEventNormalizer.js` so tracker titles become `{ sport, competition, eventTitle, eventDetail, date, seeders, size, rawTitle, source }` before fallback artwork
+  - added `src/utils/sportsCardArtwork.js` and `npm run smoke:sports-artwork` to generate tablet-safe PNG/SVG card previews and assert dimensions, viewBox, line limits, and safe text coordinates
+  - changed the PVTKRRX `/sports-artwork/...png` proxy so SportsMeta raster images still win, but SportsMeta SVG fallback cards are replaced with local tablet-safe generated PNG cards instead of passing through the cramped SVG layout
+  - bounded sports stream handling with a 14s response ceiling, shorter supplemental search plans once a direct anchored stream exists, parallel category/broad sports searches, and no torrent-payload inspection when a trusted Prowlarr infohash is already available
+- Live Contabo self-host hotfix applied to `/opt/pvtkrrx` and `pvtkrrx.service` restarted active.
+  - backup: `/opt/pvtkrrx-backups/20260425-132332-sports-tablet-v44-hotfix`
+  - syntax checks passed on patched live handlers and new utility modules before restart
+- Post-fix live proof on the selected item:
+  - manifest: `https://pvt.kepners.co.uk/selfhost/manifest.json?mode=hosted` returned `200`
+  - catalog: `https://pvt.kepners.co.uk/selfhost/catalog/sports/pvtkrrx-sports.json?mode=hosted` returned `200` with 50 metas
+  - meta: selected Chelsea vs Manchester United meta route returned valid sports meta
+  - poster/background: returned `200 image/jpeg` from SportsMeta member artwork, with the token redacted in logs/probe output
+  - stream: selected stream route returned `200` in `8506ms` with `{ "streams": [...] }`, `6` streams, and public HTTPS `/selfhost/playback/...` stream URLs
+  - generated fallback previews returned `200 image/png` with `X-PVTKRRX-Artwork-Source: pvtkrrx-generated-card` for football, baseball, hockey, and motorsport long-title cases
+- Local proof passed:
+  - `npm run smoke:sports-artwork`
+  - `npm run smoke:sports-resolution`
+  - `npm run smoke:pipeline`
+  - `npm run smoke:sports-catalog-seeds`
+- Caveat: this is a live self-host/runtime hotfix on top of app version `1.1.44`; it has not yet been cut as a new desktop EXE or paired release tag.
+
 ## 2026-04-25: 1.1.44 self-host release numbering correction
 
 - Corrected the confusing split numbering that made `1.1.44`, `v1.12.29-selfhost`, and `1.1.42` look like competing current releases.

@@ -12,6 +12,7 @@
     "server:install-service": "node scripts/install-systemd-service.js",
     "smoke:parity": "node scripts/smoke-parity-helpers.js",
     "smoke:sports-resolution": "node scripts/smoke-sports-resolution.js",
+    "smoke:sports-artwork": "node scripts/smoke-sports-artwork-layout.js",
     "smoke:sports-catalog-seeds": "node scripts/smoke-sports-catalog-seeds.js",
     "smoke:sports-latency": "node scripts/smoke-sports-catalog-latency.js",
     "smoke:sports-catalog-latency": "node scripts/smoke-sports-catalog-latency.js",
@@ -27,6 +28,7 @@
     "smoke:desktop": "node scripts/smoke-desktop-provision.js",
     "smoke:win-installer-path": "node scripts/smoke-win-installer-path.js",
     "smoke:provider-discovery": "node scripts/smoke-provider-discovery.js",
+    "probe:sports-item": "node scripts/probe-sports-item.js",
     "desktop:dev": "electron electron/main.js",
     "dist:win": "node scripts/build-win.js"
   },
