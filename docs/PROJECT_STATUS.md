@@ -4,7 +4,14 @@ Updated: 2026-04-25
 
 ## Current Stage
 
-PVTKRRX is being advanced from the synchronized `1.1.44` state to `1.1.46` for the Android/Stremio playback-source and sports artwork hotfix. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+PVTKRRX is being advanced from the synchronized `1.1.44` state to `1.1.47` for the Android/Stremio playback-source and sports artwork hotfix. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+
+## 2026-04-25: v1.1.47 live Prowlarr timeout follow-up
+
+- Live direct Prowlarr proof showed `The Curse of Oak Island S12E17` does exist, but the broad title search takes about 9 seconds on the Contabo stack.
+- PVTKRRX's previous Movie/TV fallback budget was 5 seconds, so it timed out before the correct source could be filtered and emitted.
+- Repo fix: Movie/TV upstream search default budget is now 10s and title fallback budget is now 12s, while the strict episode/title filtering from `1.1.45`/`1.1.46` still prevents wrong-episode matches.
+- This is the release that should be treated as the final Movie/TV source-chip fix for the Oak Island repro.
 
 ## 2026-04-25: v1.1.46 live TV-source follow-up
 
@@ -14,7 +21,7 @@ PVTKRRX is being advanced from the synchronized `1.1.44` state to `1.1.46` for t
   - Movie/TV stream handling now builds strict qBittorrent title fallback items when Prowlarr is empty, rejected, or slow.
   - Series fallback requires the exact `SxxEyy` marker plus the same partial title-token rules used for localized tracker titles, so downloaded `Oak Island ... S12E17` torrents can surface without accepting a different episode.
   - Added smoke coverage for this qBit-only localized TV episode path.
-- This follow-up is the release that should be treated as satisfying the missing PVTKRRX Movie/TV source acceptance check.
+- This follow-up added the local qBittorrent fallback, but live Oak Island still needed the `1.1.47` Prowlarr timeout budget increase because that episode was not already present in qBittorrent.
 
 ## 2026-04-25: v1.1.45 playback source and sports artwork hotfix
 
