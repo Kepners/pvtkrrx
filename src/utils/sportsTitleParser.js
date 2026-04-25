@@ -1,18 +1,18 @@
 const { getMappedLeagueEntry } = require('./leagueMap')
 
 const QUALITY_RE = /^(?:(?:2160p|1080p|1080i|720p|576p|540p|480p|sd|hd|fhd|uhd)(?:[a-z]{1,4})?(?:\d{2,3}(?:fps)?)?|\d{2,3}fps)$/i
-const SOURCE_RE = /^(?:hdtv|pdtv|sdtv|webrip|webdl|web-dl|web|bluray|bdrip|dvdrip|satfeed|iptv|espn(?:p|plus|\+)?|f1tv|nesn|msg|usan?|nbcsn|sportsnet|sn|bally|bein(?:sport)?\d*|skynz|fubo|newvision)$/i
+const SOURCE_RE = /^(?:hdtv|pdtv|sdtv|webrip|webdl|web-dl|web|bluray|bdrip|dvdrip|satfeed|iptv|espn(?:p|plus|\+)?|f1tv|nesn|msg|usan?|nbcsn|sportsnet|sn|bally|bein(?:sport)?\d*|eurosport|skynz|fubo|newvision)$/i
 const CODEC_RE = /^(?:x264|x265|h264|h265|hevc|avc|av1)(?:-.+)?$/i
 const RELEASE_GROUP_RE = /^[A-Z0-9]+-[A-Za-z0-9]+$/
 const HLG_HDR_RE = /^(?:hlg|hdr10?\+?|dovi?|dv|10bit|8bit)$/i
 const GENERIC_SPORT_PREFIX_RE = /^(?:football|soccer|basketball|baseball|cricket|rugby|mma|boxing|wrestling|darts|golf|motorsport|motor|tennis|hockey|ice|american|uefa)$/i
-const LEADING_TEAM_NOISE_RE = /^(?:game|games|match|matches|week|round|heat|session|fight|night|grand|prix|qualifying|practice|sprint|race|card|prelims?|early|cup|bowl|super|opening|closing|ceremony|playoffs?|finals?|semi(?:final)?|quarter(?:final)?|championship|title|event|r\d+|gm\d+|g\d+)$/i
+const LEADING_TEAM_NOISE_RE = /^(?:game|games|match|matches|week|round|heat|session|fight|night|grand|prix|qualifying|practice|sprint|race|main|card|prelims?|early|cup|bowl|super|opening|closing|ceremony|playoffs?|finals?|semi(?:final)?|quarter(?:final)?|championship|title|event|world|wimbledon|australian|roland|garros|open|us|centre|center|court|heavyweight|middleweight|welterweight|lightweight|featherweight|r\d+|gm\d+|g\d+)$/i
 const ROMAN_NUMERAL_RE = /^(?=[ivxlcdm]+$)m{0,4}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})$/i
-const TEAM_BROADCAST_RE = /\b(?:nbc|nbcsn|espn(?:2|p|plus|\+)?|f1tv|nesn|msg|usan?|yes(?:\s*network)?|sky(?:\s*sports?)?|bt(?:\s*sport)?|tnt(?:\s*sports?)?|fox(?:\s*sports?)?|cbs|abc|itv(?:4)?|tsn|sportsnet|sn|bally|bein(?:\s*sports?)?\d*|canal\+?|dazn|skynz|fubo|newvision)\b/gi
+const TEAM_BROADCAST_RE = /\b(?:nbc|nbcsn|espn(?:2|p|plus|\+)?|f1tv|nesn|msg|usan?|yes(?:\s*network)?|sky(?:\s*sports?)?|bt(?:\s*sport)?|tnt(?:\s*sports?)?|fox(?:\s*sports?)?|cbs|abc|itv(?:4)?|tsn|sportsnet|sn|bally|bein(?:\s*sports?)?\d*|canal\+?|dazn|eurosport|skynz|fubo|newvision)\b/gi
 const TEAM_LANGUAGE_RE = /\b(?:en|english|spanish|french|german|italian|portuguese)\b/gi
 const TEAM_PRESENTATION_RE = /\b(?:condensed(?:\s*game)?|extended(?:\s*highlights?)?|highlights?|replay)\b/gi
-const TEAM_TAIL_NOISE_RE = /^(?:round|matchday|main|card|pre|post|episode|show|event|fight|full|review|preview|highlights?|replay|coverage|studio|apple|tv|fubo|beinsport\d*|skynz|z3r0|nva|playoffs?|r\d+|gm\d+|g\d+)$/i
-const EVENT_SOURCE_NOISE_RE = /^(?:apple|tv|fubo|skynz|z3r0|nva|espn(?:p|plus|\+)?|f1tv|nesn|msg|usan?)$/i
+const TEAM_TAIL_NOISE_RE = /^(?:game|games|round|matchday|main|card|pre|post|episode|show|event|fight|full|review|preview|highlights?|replay|coverage|studio|apple|tv|fubo|beinsport\d*|skynz|z3r0|nva|wrestlemania|centre|center|court|playoffs?|finals?|semi(?:final)?|quarter(?:final)?|r\d+|gm\d+|g\d+)$/i
+const EVENT_SOURCE_NOISE_RE = /^(?:apple|tv|fubo|skynz|z3r0|nva|espn(?:p|plus|\+)?|f1tv|nesn|msg|usan?|eurosport)$/i
 
 // Known league/series tokens that start non-vs event titles
 const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|PFL|Bellator|ONE|MotoGP|NASCAR|IndyCar|WRC|Supercars|Supercars\s*Championship|V8SC|Bathurst|WSBK|WEC|FormulaE|Rally|Dakar|PGA|LPGA|Masters|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
@@ -235,6 +235,8 @@ function trimLeadingTeamNoise(tokens) {
     }
     if (
       LEADING_TEAM_NOISE_RE.test(token) ||
+      GENERIC_SPORT_PREFIX_RE.test(token) ||
+      /^(?:19|20)\d{2}$/.test(token) ||
       /^\d{1,3}$/.test(token) ||
       (strippedNoiseCount > 0 && ROMAN_NUMERAL_RE.test(token))
     ) {
@@ -264,10 +266,11 @@ function normalizeTeamTokens(tokens) {
       .map(normalizeSegment)
       .filter(Boolean)
   )
+  const leadingCleaned = trimLeadingTeamNoise(normalized)
   const trimmed = []
-  for (let index = 0; index < normalized.length; index += 1) {
-    const token = String(normalized[index] || '').trim()
-    const next = String(normalized[index + 1] || '').trim()
+  for (let index = 0; index < leadingCleaned.length; index += 1) {
+    const token = String(leadingCleaned[index] || '').trim()
+    const next = String(leadingCleaned[index + 1] || '').trim()
     if (!token) continue
     if (
       TEAM_TAIL_NOISE_RE.test(token) ||
@@ -280,7 +283,7 @@ function normalizeTeamTokens(tokens) {
     }
     trimmed.push(token)
   }
-  const cleanedLabel = normalizeTeamLabel(trimLeadingTeamNoise(trimmed).join(' '))
+  const cleanedLabel = normalizeTeamLabel(trimmed.join(' '))
   return trimTrailingMetadataTokens(cleanedLabel.split(/\s+/)).join(' ')
 }
 

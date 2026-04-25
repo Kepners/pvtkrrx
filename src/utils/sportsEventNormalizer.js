@@ -70,6 +70,8 @@ const SESSION_WORDS = new Set([
   'fp3'
 ])
 
+const MATCHUP_PREFIX_NOISE_RE = /\b(?:english\s+premier\s+league|premier\s+league|champions\s+league|europa\s+league|la\s+liga|serie\s+a|bundesliga|college\s+football|world\s+series|stanley\s+cup|super\s+league\s+rugby|super\s+league|six\s+nations|premiership\s+rugby|rugby\s+championship|rugby\s+league|test\s+cricket|the\s+ashes|world\s+championship|world\s+matchplay|fight\s+night|main\s+card|main\s+event|regular\s+season|formula\s+1|formula\s+e|tour\s+de\s+france|giro\s+d['’]?italia|vuelta\s+a\s+espana|australian\s+open|roland\s+garros|us\s+open|nhl|mlb|nba|nfl|epl|ipl|odi|t20|atp|wta|pdc|ufc|pfl|wwe|aew|pga|lpga|motogp|nascar|indycar|wrc|wec|bkfc|football|baseball|hockey|basketball|cricket|rugby|tennis|boxing|mma|wrestling|darts|golf|motorsport|playoffs?|finals?|prelims?|heavyweight|matchroom|queensberry|masters|wimbledon|classics|rs)\b/gi
+
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
 }
@@ -119,13 +121,13 @@ function cleanTrackerText(value) {
       .replace(/\b(?:2160p|1080p|1080i|720p|576p|540p|480p)(?:\d{2,3}(?:fps)?)?\b/gi, ' ')
       .replace(/\b\d{2,3}fps\b/gi, ' ')
       .replace(/\b(?:x264|x265|h264|h265|hevc|avc|av1|web(?:rip|dl)?|hdtv|aac|ac3|ddp)\b/gi, ' ')
-      .replace(/\b(?:en|english|fubo|skynz|usan?|yes\s*network|yes|nesn|msg|espn(?:p|plus|\+)?|tnt|sky|nbc|fox|sn|sportsnet)\b/gi, ' ')
+      .replace(/\b(?:en|english|fubo|skynz|usan?|yes\s*network|yes|nesn|msg|espn(?:p|plus|\+)?|tnt|sky|nbc|fox|sn|sportsnet|eurosport)\b/gi, ' ')
   )
 }
 
 function stripMatchupSideNoise(value, side = 'left') {
   let text = cleanTrackerText(value)
-    .replace(/\b(?:nhl|mlb|nba|nfl|epl|premier\s+league|english\s+premier\s+league|football|baseball|hockey|playoffs?|regular\s+season|rs)\b/gi, ' ')
+    .replace(MATCHUP_PREFIX_NOISE_RE, ' ')
     .replace(/\b(?:game|gm|g|r|round)\s*\d+\b/gi, ' ')
     .replace(/\b(?:19|20)\d{2}\b/g, ' ')
     .replace(/\b\d{1,2}\b/g, ' ')

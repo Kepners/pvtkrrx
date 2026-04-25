@@ -34,6 +34,12 @@ PVTKRRX is in a synchronized `1.1.44` state across the Windows desktop release, 
   - `npm run smoke:sports-resolution`
   - `npm run smoke:pipeline`
   - `npm run smoke:sports-catalog-seeds`
+- Follow-up every-sport hardening on 2026-04-25:
+  - widened matchup/title cleanup beyond football/baseball/hockey to cover all configured sports discovery families: football, motorsport, MMA, American football, basketball, cricket, rugby, tennis, boxing, golf, baseball, cycling, darts, snooker, hockey, and wrestling
+  - expanded `npm run smoke:sports-artwork` so every configured sport family has a normalization/layout case and the test fails if a new sports catalog is added without card coverage
+  - redeployed the updated runtime parser/normalizer files to `/opt/pvtkrrx`, restarted `pvtkrrx.service`, and confirmed the service is active
+  - live fallback artwork proof fetched every configured sport family from `https://pvt.kepners.co.uk/sports-artwork/default/poster/<sport>.png`; all returned `200 image/png`, `600x900`, with `X-PVTKRRX-Artwork-Source: pvtkrrx-generated-card`
+  - live stream probes passed for current football, motorsport, baseball, hockey, and rugby catalog/canonical rows; the historical Chelsea vs Manchester United canonical row now returns valid empty `{ "streams": [] }` instead of hanging when no current tracker stream is available
 - Caveat: this is a live self-host/runtime hotfix on top of app version `1.1.44`; it has not yet been cut as a new desktop EXE or paired release tag.
 
 ## 2026-04-25: 1.1.44 self-host release numbering correction

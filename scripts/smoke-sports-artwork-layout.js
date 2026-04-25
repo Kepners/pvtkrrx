@@ -9,6 +9,7 @@ const {
   layoutSportsCard,
   renderSportsArtworkSvg
 } = require('../src/utils/sportsCardArtwork')
+const { SPORTS_DISCOVERY_CATALOGS } = require('../src/config/sportsCatalogs')
 const { normalizeSportsEventMetadata } = require('../src/utils/sportsEventNormalizer')
 
 const PREVIEW_DIR = path.join(process.cwd(), '.runtime', 'sports-artwork-previews')
@@ -98,6 +99,222 @@ const CASES = [
       competition: 'English Premier League',
       eventTitle: 'Nottingham Forest vs Sunderland'
     }
+  },
+  {
+    slug: 'mma-ufc-main-card',
+    input: {
+      rawTitle: 'UFC Fight Night Burns vs Malott Main Card 1080p WEB',
+      sportHint: 'mma',
+      competition: 'UFC Fight Night',
+      eventDetail: 'Main Card',
+      date: '2026-04-25',
+      seeders: 7,
+      size: '6.0 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'MMA',
+      competition: 'UFC Fight Night',
+      eventTitle: 'Burns vs Malott',
+      eventDetail: 'Main Card'
+    }
+  },
+  {
+    slug: 'american-football-nfl-playoffs',
+    input: {
+      rawTitle: 'NFL Playoffs Kansas City Chiefs vs Buffalo Bills 1080p ESPN',
+      sportHint: 'american-football',
+      competition: 'NFL Playoffs',
+      date: '2026-04-25',
+      seeders: 9,
+      size: '7.2 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'American Football',
+      competition: 'NFL Playoffs',
+      eventTitle: 'Kansas City Chiefs vs Buffalo Bills'
+    }
+  },
+  {
+    slug: 'basketball-nba-rivals',
+    input: {
+      rawTitle: 'NBA Boston Celtics vs Los Angeles Lakers 720p TNT',
+      sportHint: 'basketball',
+      competition: 'NBA',
+      date: '2026-04-25',
+      seeders: 11,
+      size: '5.5 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Basketball',
+      competition: 'NBA',
+      eventTitle: 'Boston Celtics vs Los Angeles Lakers'
+    }
+  },
+  {
+    slug: 'cricket-ipl-final',
+    input: {
+      rawTitle: 'IPL Chennai Super Kings vs Mumbai Indians Final 1080p Sky Sports',
+      sportHint: 'cricket',
+      competition: 'IPL',
+      eventDetail: 'Final',
+      date: '2026-04-25',
+      seeders: 5,
+      size: '4.8 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Cricket',
+      competition: 'Indian Premier League',
+      eventTitle: 'Chennai Super Kings vs Mumbai Indians',
+      eventDetail: 'Final'
+    }
+  },
+  {
+    slug: 'rugby-super-league',
+    input: {
+      rawTitle: 'Super League Rugby Leeds Rhinos vs Catalans Dragons 1080p',
+      sportHint: 'rugby',
+      competition: 'Super League Rugby',
+      date: '2026-04-25',
+      seeders: 4,
+      size: '4.1 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Rugby',
+      competition: 'Super League Rugby',
+      eventTitle: 'Leeds Rhinos vs Catalans Dragons'
+    }
+  },
+  {
+    slug: 'tennis-wimbledon-classic',
+    input: {
+      rawTitle: 'Wimbledon Navratilova vs Evert Centre Court 720p',
+      sportHint: 'tennis',
+      competition: 'Wimbledon',
+      eventDetail: 'Centre Court',
+      date: '2026-04-25',
+      seeders: 3,
+      size: '3.7 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Tennis',
+      competition: 'Wimbledon',
+      eventTitle: 'Navratilova vs Evert',
+      eventDetail: 'Centre Court'
+    }
+  },
+  {
+    slug: 'boxing-heavyweight-main-event',
+    input: {
+      rawTitle: 'Boxing Heavyweight Main Event Fury vs Usyk 1080p DAZN',
+      sportHint: 'boxing',
+      competition: 'Heavyweight',
+      eventDetail: 'Main Event',
+      date: '2026-04-25',
+      seeders: 13,
+      size: '8.0 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Boxing',
+      competition: 'Heavyweight',
+      eventTitle: 'Fury vs Usyk',
+      eventDetail: 'Main Event'
+    }
+  },
+  {
+    slug: 'golf-pga-championship',
+    input: {
+      rawTitle: 'PGA Championship Tiger Woods Round 2 1080p Sky Sports',
+      sportHint: 'golf',
+      competition: 'PGA Championship',
+      eventTitle: 'Tiger Woods Round 2',
+      date: '2026-04-25',
+      seeders: 6,
+      size: '5.1 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Golf',
+      competition: 'PGA Championship',
+      eventTitle: 'Tiger Woods Round 2'
+    }
+  },
+  {
+    slug: 'cycling-tour-stage',
+    input: {
+      rawTitle: 'Tour de France Stage 12 Mountain Finish 1080p Eurosport',
+      sportHint: 'cycling',
+      competition: 'Tour de France',
+      eventTitle: 'Stage 12 Mountain Finish',
+      date: '2026-07-14',
+      seeders: 8,
+      size: '6.4 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Cycling',
+      competition: 'Tour de France',
+      eventTitle: 'Stage 12 Mountain Finish'
+    }
+  },
+  {
+    slug: 'darts-world-championship',
+    input: {
+      rawTitle: 'PDC World Championship Luke Littler vs Michael van Gerwen 1080p',
+      sportHint: 'darts',
+      competition: 'PDC World Championship',
+      date: '2026-04-25',
+      seeders: 10,
+      size: '3.3 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Darts',
+      competition: 'PDC World Championship',
+      eventTitle: 'Luke Littler vs Michael van Gerwen'
+    }
+  },
+  {
+    slug: 'snooker-world-championship',
+    input: {
+      rawTitle: 'World Championship Ronnie OSullivan vs Judd Trump 1080p Eurosport',
+      sportHint: 'snooker',
+      competition: 'World Championship',
+      date: '2026-04-25',
+      seeders: 7,
+      size: '4.4 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Snooker',
+      competition: 'World Championship',
+      eventTitle: 'Ronnie OSullivan vs Judd Trump'
+    }
+  },
+  {
+    slug: 'wrestling-wwe-main-event',
+    input: {
+      rawTitle: 'WWE Cody Rhodes vs Roman Reigns WrestleMania Main Event 1080p',
+      sportHint: 'wrestling',
+      competition: 'WWE',
+      eventDetail: 'Main Event',
+      date: '2026-04-25',
+      seeders: 14,
+      size: '9.2 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Wrestling',
+      competition: 'WWE',
+      eventTitle: 'Cody Rhodes vs Roman Reigns',
+      eventDetail: 'Main Event'
+    }
   }
 ]
 
@@ -127,6 +344,14 @@ function countByRole(nodes) {
 
 async function main() {
   fs.mkdirSync(PREVIEW_DIR, { recursive: true })
+
+  const requiredSportHints = SPORTS_DISCOVERY_CATALOGS
+    .map((catalog) => catalog.sportHint)
+    .filter(Boolean)
+  const coveredSportHints = new Set(CASES.map((testCase) => testCase.input.sportHint).filter(Boolean))
+  for (const sportHint of requiredSportHints) {
+    assert.ok(coveredSportHints.has(sportHint), `sports artwork case covers ${sportHint}`)
+  }
 
   for (const testCase of CASES) {
     const normalized = normalizeSportsEventMetadata(testCase.input)
