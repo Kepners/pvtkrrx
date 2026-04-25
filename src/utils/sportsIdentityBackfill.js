@@ -223,11 +223,44 @@ function getSportsIdentityBackfillStats() {
   }
 }
 
+function isSportsIdentityBackfillIdle() {
+  return queue.length === 0 && queuedKeys.size === 0 && activeWorkers === 0 && !timer
+}
+
+function waitForSportsIdentityBackfillIdle(options = {}) {
+  const timeoutMs = Math.max(0, Number(options?.timeoutMs || 0) || 0)
+  const pollMs = Math.max(50, Number(options?.pollMs || 250) || 250)
+  if (!BACKFILL_ENABLED || isSportsIdentityBackfillIdle() || timeoutMs === 0) {
+    return Promise.resolve(getSportsIdentityBackfillStats())
+  }
+
+  scheduleQueueDrain()
+  return new Promise((resolve) => {
+    let finished = false
+    const finish = () => {
+      if (finished) return
+      finished = true
+      clearInterval(interval)
+      clearTimeout(timeout)
+      resolve(getSportsIdentityBackfillStats())
+    }
+
+    const interval = setInterval(() => {
+      if (queue.length > 0 && activeWorkers === 0 && !timer) drainQueue()
+      if (isSportsIdentityBackfillIdle()) finish()
+    }, pollMs)
+    const timeout = setTimeout(finish, timeoutMs)
+    if (typeof interval.unref === 'function') interval.unref()
+    if (typeof timeout.unref === 'function') timeout.unref()
+  })
+}
+
 module.exports = {
   buildSportsIdentityBackfillKey,
   clearSportsIdentityBackfillState,
   getCachedSportsIdentityBackfill,
   getSportsIdentityBackfillStats,
+  waitForSportsIdentityBackfillIdle,
   queueSportsIdentityBackfill,
   queueSportsIdentityBackfills,
   setCachedSportsIdentityBackfill

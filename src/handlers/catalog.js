@@ -9,7 +9,7 @@ const { normalizeSportKey, resolveSportHint, isSportsNoiseTitle, isLikelySportsE
 const { isSportsCultIndexer, isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { formatSize, findVideoFile } = require('../utils/streams')
 const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
-const { getMappedLeagueEntry, mapLeague } = require('../utils/leagueMap')
+const { getMappedLeagueEntry, mapLeague, normalizeLeagueCode } = require('../utils/leagueMap')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { encodeCustomId } = require('../utils/customId')
 const {
@@ -809,6 +809,15 @@ function mergeSportsIdentityGroups(groups, query = '') {
   return [...merged.values()].sort((a, b) => compareItems(a.bestAvailability, b.bestAvailability, query))
 }
 
+function compareSportsIdentityGroupsForCatalog(a, b, query = '') {
+  const aResolved = Boolean(a?.sportsMetaResolution?.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED &&
+    String(a?.sportsMetaResolution?.canonicalId || '').trim())
+  const bResolved = Boolean(b?.sportsMetaResolution?.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED &&
+    String(b?.sportsMetaResolution?.canonicalId || '').trim())
+  if (aResolved !== bResolved) return aResolved ? -1 : 1
+  return compareItems(a?.bestAvailability, b?.bestAvailability, query)
+}
+
 function getCatalogLimit(config) {
   const raw = Number.parseInt(String(config?.maxResults || '50'), 10)
   if (!Number.isFinite(raw)) return 50
@@ -867,6 +876,34 @@ function anyFieldMatchesDetail(fields, detailFilter = '') {
   })
 }
 
+function leagueEntryMatchesField(entry = null, field = '') {
+  if (!entry) return false
+  const normalizedField = normalizeLeagueCode(field)
+  if (!normalizedField) return false
+  const values = [
+    entry.code,
+    entry.name,
+    entry.sportsDbName,
+    ...(Array.isArray(entry.aliases) ? entry.aliases : [])
+  ]
+  return values.some((value) => normalizeLeagueCode(value) === normalizedField)
+}
+
+function textContainsLeagueEntry(entry = null, text = '') {
+  if (!entry) return false
+  const normalizedText = normalizeSearchValue(text)
+  if (!normalizedText) return false
+  const values = [
+    entry.code,
+    entry.name,
+    entry.sportsDbName
+  ]
+  return values.some((value) => {
+    const normalizedValue = normalizeSearchValue(value)
+    return normalizedValue && new RegExp(`(^| )${normalizedValue.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`).test(normalizedText)
+  })
+}
+
 function itemMatchesSportsCatalog(item, sportHint = '') {
   const expectedHint = normalizeSportKey(sportHint)
   if (!expectedHint) return true
@@ -874,7 +911,24 @@ function itemMatchesSportsCatalog(item, sportHint = '') {
 }
 
 function itemMatchesSportsDetail(item, detailFilter = '') {
-  if (!String(detailFilter || '').trim()) return true
+  const filter = String(detailFilter || '').trim()
+  if (!filter) return true
+  const mappedFilterLeague = getMappedLeagueEntry(filter)
+  if (mappedFilterLeague) {
+    const expectedSport = normalizeSportKey(mappedFilterLeague.sportKey)
+    const itemSport = normalizeSportKey(item?.sportHint)
+    if (expectedSport && itemSport && itemSport !== expectedSport) return false
+
+    const leagueFields = [
+      item?.mappedLeague,
+      item?.parsedSportsEvent?.league,
+      item?.parsedEvent?.league
+    ]
+    if (leagueFields.some((field) => leagueEntryMatchesField(mappedFilterLeague, field))) return true
+
+    return Boolean(expectedSport && itemSport === expectedSport && textContainsLeagueEntry(mappedFilterLeague, item?.title))
+  }
+
   return anyFieldMatchesDetail([
     item?.title,
     item?.mappedLeague,
@@ -1047,6 +1101,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     sportsMetaResolution: getCachedSportsIdentityBackfill(group) || deferredResolution('deferred_beyond_identity_window')
   }))
   const resolvedIdentityGroups = [...groupedIdentity, ...deferredGroups]
+    .sort((a, b) => compareSportsIdentityGroupsForCatalog(a, b, query))
   const backfillQueued = queueSportsIdentityBackfills({
     groups: resolvedIdentityGroups,
     config,

@@ -6,6 +6,37 @@ Updated: 2026-04-25
 
 PVTKRRX is in a synchronized `1.1.44` state across the Windows desktop release, hosted `www.pvtkrrx.cc` runtime, and Contabo self-host seedbox runtime. Release numbering is now app-aligned: desktop/latest is `v1.1.44`, self-host/seedbox is `v1.1.44-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
 
+## 2026-04-25: Sports tablet search/poster prewarm hotfix
+
+- Reproduced the tablet-facing complaint against the live Contabo self-host route before this fix: sports search rows were being returned before the SportsMeta identity pass/backfill had paired them, so many visible rows used generated fallback cards instead of member poster URLs.
+  - `search=MotoGP` initially returned current tracker rows but no canonical SportsMeta poster row.
+  - `search=Premier League` initially admitted unrelated `Indian Premier League` cricket rows and had no canonical poster rows.
+  - server logs showed `identity_budget_exhausted` rows and backfill work queued after the catalog response had already been sent.
+- Root cause:
+  - the first catalog response had only a 1s SportsMeta identity budget and no server boot prewarm/index pass
+  - MotoGP tracker titles such as `MotoGP Spain Jerez` were too short for the event parser and were being date-anchored to torrent publish date instead of the real SportsMeta event
+  - known-league search used loose text matching, so `Premier League` matched cricket and Scottish football titles
+  - matchup search fallback could accept a one-team token overlap, which was enough to risk a wrong Chelsea poster pairing
+- Repo fix:
+  - added self-host sports catalog prewarm in `src/utils/sportsCatalogPrewarm.js`, scheduled at boot/config save for the self-host runtime
+  - added backfill idle waiting so the prewarm can leave the identity cache ready for the next tablet browse
+  - tightened MotoGP/motorsport short-title parsing, undated motorsport search, and location-alias matching
+  - tightened known-league filtering so English Premier League search no longer admits IPL or Scottish Women’s Premier League rows
+  - tightened matchup search verification so both teams must loosely match before a search candidate can become canonical
+  - sorted resolved SportsMeta rows before fallback rows inside the emitted sports catalog page
+- Live Contabo self-host hotfix applied directly to `/opt/pvtkrrx` and `pvtkrrx.service` restarted active.
+  - backups include `/opt/pvtkrrx-backups/20260425-193733-sports-search-prewarm-hotfix`, `/opt/pvtkrrx-backups/20260425-194423-sports-prewarm-defaults`, `/opt/pvtkrrx-backups/20260425-194854-sports-parser-verifier`, `/opt/pvtkrrx-backups/20260425-195320-sports-league-filter`, `/opt/pvtkrrx-backups/20260425-195741-sports-canonical-sort`, and `/opt/pvtkrrx-backups/20260425-200314-sports-canonical-sort-bool`
+  - latest boot prewarm proof: `[sports-prewarm] finished reason=server-boot jobs=32 ok=32 failed=0 metas=686 cacheBefore=0 cacheAfter=232 queuedAfterCatalog=70 remainingQueue=0`
+- Final live proof after prewarm:
+  - all sports default: `50` rows, `17` canonical/member-poster rows; first 8 rows were all canonical
+  - football default: `17` rows, `5` canonical/member-poster rows; first 5 rows were canonical
+  - motorsport default: `25` rows, `1` canonical/member-poster row, first row `Spain Sprint Race`
+  - `search=MotoGP`: `50` rows, `1` canonical/member-poster row, first row `Spain Sprint Race`
+  - `search=Champions League`: `45` rows, `1` canonical/member-poster row, first row `Arsenal vs Sporting CP`
+  - `search=Premier League`: `22` rows, `0` canonical/member-poster rows, with `0` IPL rows and `0` Scottish Women’s Premier League rows
+  - no probed route contained the bad Ghanaian Chelsea pairing (`Berekum Chelsea` / `Medeama`)
+- Caveat: this makes the server index/prewarm real and improves first-screen poster visibility, but it does not make Sports Posters commercially complete. Premier League search is now cleaner but still has zero pairable poster rows because the remaining tracker titles are mostly undated matchday labels; pairing those without dates would risk wrong posters. This is a live self-host/runtime hotfix on top of app version `1.1.44`; no new Windows EXE or paired release tag was cut.
+
 ## 2026-04-25: v44 sports tablet artwork and stream hotfix
 
 - Reproduced the tablet-facing seedbox failure against the live self-host route before changing stream behavior:

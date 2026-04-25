@@ -2,6 +2,7 @@ const assert = require('node:assert/strict')
 
 const { ProwlarrClient } = require('../src/clients/prowlarr')
 const { handleCatalog } = require('../src/handlers/catalog')
+const { buildSportsPrewarmJobs } = require('../src/utils/sportsCatalogPrewarm')
 
 const ORIGINAL_SEARCH = ProwlarrClient.prototype.search
 const ORIGINAL_FETCH = global.fetch
@@ -65,11 +66,27 @@ async function runCatalogSeedCase({ catalogId, expectedNames, expectedSeedQuerie
 }
 
 async function run() {
+  const prewarmJobs = buildSportsPrewarmJobs()
+  assert.ok(
+    prewarmJobs.some((job) => job.id === 'pvtkrrx-sports' && job.extra === 'search=MotoGP'),
+    'sports prewarm should prepare common Stremio sports search terms before tablet browse'
+  )
+  assert.ok(
+    prewarmJobs.some((job) => job.id === 'pvtkrrx-sports-football' && !job.extra),
+    'sports prewarm should prepare sport-specific catalogs before tablet browse'
+  )
+
   global.fetch = async (input) => {
     const url = String(input || '')
     if (url.startsWith('https://sportsmeta.test/resolve')) {
       return new Response(JSON.stringify({ error: 'not_found' }), {
         status: 404,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+    if (url.startsWith('https://sportsmeta.test/catalog/')) {
+      return new Response(JSON.stringify({ metas: [] }), {
+        status: 200,
         headers: { 'content-type': 'application/json' }
       })
     }
@@ -127,6 +144,48 @@ async function run() {
       ['ONE Championship', []]
     ])
   })
+
+  const requestedQueries = []
+  ProwlarrClient.prototype.search = async function search(query) {
+    requestedQueries.push(String(query || ''))
+    if (String(query || '') !== 'Premier League') return []
+    return [
+      trackerItem('Indian Premier League 2026 Gujarat Titans vs Royal Challengers Bengaluru 1080p', {
+        sportHint: 'cricket',
+        pubDate: '2026-04-22T12:00:00.000Z'
+      }),
+      trackerItem('Scottish Womens Premier League 2025 26 Show 06 04 2026 1080p', {
+        sportHint: 'football',
+        pubDate: '2026-04-06T12:00:00.000Z'
+      }),
+      trackerItem('EPL Liverpool vs Crystal Palace 25/04/2026 Sky Sports 1080p 50fps', {
+        sportHint: 'football',
+        pubDate: '2026-04-25T12:00:00.000Z'
+      })
+    ]
+  }
+
+  const premierLeagueResult = await handleCatalog(
+    makeConfig(),
+    'sports',
+    'pvtkrrx-sports',
+    'search=Premier%20League',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  )
+  const premierLeagueNames = (premierLeagueResult.metas || []).map((meta) => String(meta?.name || ''))
+  assert.ok(requestedQueries.includes('Premier League'), 'Premier League search should query Prowlarr')
+  assert.ok(
+    premierLeagueNames.some((name) => /(?:Liverpool vs Crystal Palace|Crystal Palace vs Liverpool)/i.test(name)),
+    'Premier League search should keep English Premier League football rows'
+  )
+  assert.ok(
+    !premierLeagueNames.some((name) => /Gujarat Titans|Royal Challengers|Indian Premier League/i.test(name)),
+    'Premier League search should not treat Indian Premier League cricket as English Premier League football'
+  )
+  assert.ok(
+    !premierLeagueNames.some((name) => /Scottish Womens Premier League/i.test(name)),
+    'Premier League search should not treat Scottish Womens Premier League as English Premier League football'
+  )
 
   console.log('Smoke sports catalog seeds passed')
 }

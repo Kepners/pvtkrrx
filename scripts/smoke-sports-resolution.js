@@ -18,7 +18,7 @@ const { parseSportsEventTitle, parseSportsTitle } = require('../src/utils/sports
 
 const ORIGINAL_FETCH = global.fetch
 
-function canonicalPayload({ id, name, league, date, sport }) {
+function canonicalPayload({ id, name, league, date, sport, homeTeam = '', awayTeam = '' }) {
   return {
     ok: true,
     service: 'sportsmeta',
@@ -31,8 +31,8 @@ function canonicalPayload({ id, name, league, date, sport }) {
       sport,
       league,
       date,
-      homeTeam: '',
-      awayTeam: ''
+      homeTeam,
+      awayTeam
     },
     assets: {
       poster: `https://sportsmeta.test/asset/poster/${encodeURIComponent(id)}`,
@@ -60,6 +60,8 @@ async function run() {
   const barcaId = 'sportsmeta:event:football|2026-04-22|spanish-la-liga|barcelona|celta-vigo'
   const barcaOtherId = 'sportsmeta:event:football|2026-04-25|spanish-la-liga|getafe|barcelona'
   const barcaWomenId = 'sportsmeta:event:football|2026-04-25|uefa-womens-champions-league|bayern-munich-women|barcelona-femen'
+  const badChelseaId = 'sportsmeta:event:football|2026-03-24|ghanaian-premier-league|berekum-chelsea|medeama'
+  const motoGpSpainId = 'sportsmeta:event:motorsport|2026-04-25|motogp|spain-sprint-race'
   const fetchCounts = new Map()
 
   const countFetch = (url) => {
@@ -94,6 +96,20 @@ async function run() {
       })
     }
 
+    if (
+      url.pathname === '/catalog/movie/sportsmeta-football/search=arsenal.json' ||
+      url.pathname === '/catalog/movie/sportsmeta-football/search=chelsea.json'
+    ) {
+      return new Response(JSON.stringify({
+        metas: [
+          { id: badChelseaId, name: 'Berekum Chelsea vs Medeama', releaseInfo: '2026-03-24' }
+        ]
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
     if (url.pathname === '/catalog/movie/sportsmeta-mma/search=burns.json') {
       return new Response(JSON.stringify({
         metas: [
@@ -120,6 +136,17 @@ async function run() {
       })
     }
 
+    if (url.pathname === '/catalog/movie/sportsmeta-motorsport/search=spain.json') {
+      return new Response(JSON.stringify({
+        metas: [
+          { id: motoGpSpainId, name: 'Spain Sprint Race', releaseInfo: '2026-04-25' }
+        ]
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
     if (url.pathname === '/event/sportsmeta%3Aevent%3Amma%7C2026-04-16%7Cprofessional-fighters-league%7Cpfl-belfast-kelly%7Cwilson') {
       return new Response(JSON.stringify(canonicalPayload({
         id: 'sportsmeta:event:mma|2026-04-16|professional-fighters-league|pfl-belfast-kelly|wilson',
@@ -139,7 +166,9 @@ async function run() {
         name: 'Barcelona vs Celta Vigo',
         league: 'Spanish La Liga',
         date: '2026-04-22',
-        sport: 'Football'
+        sport: 'Football',
+        homeTeam: 'Barcelona',
+        awayTeam: 'Celta Vigo'
       })), {
         status: 200,
         headers: { 'content-type': 'application/json' }
@@ -152,7 +181,9 @@ async function run() {
         name: 'Getafe vs Barcelona',
         league: 'Spanish La Liga',
         date: '2026-04-25',
-        sport: 'Football'
+        sport: 'Football',
+        homeTeam: 'Getafe',
+        awayTeam: 'Barcelona'
       })), {
         status: 200,
         headers: { 'content-type': 'application/json' }
@@ -165,7 +196,24 @@ async function run() {
         name: 'Bayern Munich Women vs Barcelona Femeni',
         league: 'UEFA Womens Champions League',
         date: '2026-04-25',
-        sport: 'Football'
+        sport: 'Football',
+        homeTeam: 'Bayern Munich Women',
+        awayTeam: 'Barcelona Femeni'
+      })), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
+    if (url.pathname === `/event/${encodeURIComponent(badChelseaId)}`) {
+      return new Response(JSON.stringify(canonicalPayload({
+        id: badChelseaId,
+        name: 'Berekum Chelsea vs Medeama',
+        league: 'Ghanaian Premier League',
+        date: '2026-03-24',
+        sport: 'Football',
+        homeTeam: 'Berekum Chelsea',
+        awayTeam: 'Medeama'
       })), {
         status: 200,
         headers: { 'content-type': 'application/json' }
@@ -178,7 +226,22 @@ async function run() {
         name: 'UFC Fight Night 273 Burns vs Malott',
         league: 'UFC',
         date: '2026-04-18',
-        sport: 'MMA'
+        sport: 'MMA',
+        homeTeam: 'Burns',
+        awayTeam: 'Malott'
+      })), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
+    if (url.pathname === `/event/${encodeURIComponent(motoGpSpainId)}`) {
+      return new Response(JSON.stringify(canonicalPayload({
+        id: motoGpSpainId,
+        name: 'Spain Sprint Race',
+        league: 'MotoGP',
+        date: '2026-04-25',
+        sport: 'Motorsport'
       })), {
         status: 200,
         headers: { 'content-type': 'application/json' }
@@ -250,8 +313,44 @@ async function run() {
   assert.equal(noisyLaLiga?.homeTeam, 'Levante', 'sports parser should keep the home team after stripping league/year noise')
   assert.equal(noisyLaLiga?.awayTeam, 'Sevilla', 'sports parser should strip quality/language/broadcast tokens from away team')
 
+  const womensChampionsTitle = 'UEFA Womens Champions League 2025 26 Quarter Final 1st Leg 24 03 2026 Arsenal vs Chelsea 1080p 50fps EN BBC'
+  const womensChampions = parseSportsTitle(womensChampionsTitle, '2026-04-24T12:00:00Z')
+  assert.equal(womensChampions?.league, 'UEFA Womens Champions League', 'women Champions League titles should keep the full competition label')
+  assert.equal(womensChampions?.date, '2026-03-24', 'women Champions League titles should use the in-title fixture date instead of torrent publish date')
+  assert.equal(womensChampions?.homeTeam, 'Arsenal', 'women Champions League parser should isolate the home team after round/date text')
+  assert.equal(womensChampions?.awayTeam, 'Chelsea', 'women Champions League parser should isolate the away team before quality/source text')
+
+  const wrongChelseaResolution = await resolveSportsMetaIdentity(
+    client,
+    availability(womensChampionsTitle, {
+      sportHint: 'football',
+      mappedLeague: 'UEFA Womens Champions League',
+      pubDate: '2026-04-24T12:00:00.000Z'
+    })
+  )
+  assert.notEqual(
+    wrongChelseaResolution.status,
+    SPORTS_META_RESOLUTION_STATUS.RESOLVED,
+    'matchup search fallback must not pair Arsenal vs Chelsea to an unrelated Chelsea fixture'
+  )
+
   const motogpSession = parseSportsEventTitle('MotoGP 2026 Round04 Spain Jerez FP1 Practice WEB DL 1080p H264 English')
   assert.equal(motogpSession?.eventName, 'Spain Jerez', 'motorsport parser should strip round/session wording from event names')
+
+  const motogpShortTitle = parseSportsEventTitle('MotoGP Spain Jerez', '2026-04-25T12:00:00.000Z')
+  assert.equal(motogpShortTitle?.league, 'MotoGP', 'motorsport parser should accept short league + location titles')
+  assert.equal(motogpShortTitle?.eventName, 'Spain Jerez', 'short MotoGP titles should retain the searchable location')
+
+  const motoGpResolution = await resolveSportsMetaIdentity(
+    client,
+    availability('MotoGP Spain Jerez', {
+      sportHint: 'motorsport',
+      mappedLeague: 'MotoGP',
+      pubDate: '2026-04-24T12:00:00.000Z'
+    })
+  )
+  assert.equal(motoGpResolution.status, SPORTS_META_RESOLUTION_STATUS.RESOLVED, 'MotoGP location aliases should resolve without treating torrent publish date as event date')
+  assert.equal(motoGpResolution.canonicalId, motoGpSpainId, 'MotoGP Spain Jerez should pair with the SportsMeta Spain Sprint Race')
 
   clearSportsIdentityBackfillState()
   const backfillGroup = {

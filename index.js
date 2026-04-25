@@ -18,6 +18,7 @@ const {
   findTorrentForPostProcess
 } = require('./src/utils/qbitAutomation')
 const { getBrowserConfig, trackEvent } = require('./src/utils/analytics')
+const { scheduleSportsCatalogPrewarm } = require('./src/utils/sportsCatalogPrewarm')
 
 // Legacy direct TheSportsDB paths (sports-image cache, 15-min autofill job,
 // /sports/image proxy, and the experimental internal SportsMeta handler) were
@@ -1165,6 +1166,11 @@ app.post('/local-config', requireLocalNetworkRoute, async (req, res) => {
     scheduleLocalProviderWarmup(persisted, console, 'local-config-save').catch(err => {
       console.warn('[config-save] Provider warmup failed:', err.message)
     })
+    scheduleSportsCatalogPrewarm(persisted, console, 'local-config-save', {
+      defaultEnabled: SELF_HOST_SERVER_MODE
+    }).catch(err => {
+      console.warn('[config-save] Sports prewarm failed:', err.message)
+    })
     res.json({
       ok: true,
       ...buildConfigReadback(persisted),
@@ -1190,6 +1196,11 @@ app.post('/server-config', requireCsrfToken, requireServerAdminToken, async (req
     const persisted = saveLocalConfigFile(saved)
     scheduleLocalProviderWarmup(persisted, console, 'server-config-save').catch(err => {
       console.warn('[server-config-save] Provider warmup failed:', err.message)
+    })
+    scheduleSportsCatalogPrewarm(persisted, console, 'server-config-save', {
+      defaultEnabled: SELF_HOST_SERVER_MODE
+    }).catch(err => {
+      console.warn('[server-config-save] Sports prewarm failed:', err.message)
     })
     res.json({
       ok: true,
@@ -2861,7 +2872,14 @@ function startLocalServers(options = {}) {
   if (bootConfig) {
     const warmTimer = setTimeout(() => {
       repairLocalProwlarrConfig(bootConfig, logger, 'server-boot')
-        .then((repairedConfig) => scheduleLocalProviderWarmup(repairedConfig, logger, 'server-boot'))
+        .then((repairedConfig) => {
+          scheduleSportsCatalogPrewarm(repairedConfig, logger, 'server-boot', {
+            defaultEnabled: SELF_HOST_SERVER_MODE
+          }).catch(err => {
+            logger.warn('[boot] Sports prewarm failed:', err.message)
+          })
+          return scheduleLocalProviderWarmup(repairedConfig, logger, 'server-boot')
+        })
         .catch(err => {
           logger.warn('[boot] Provider warmup failed:', err.message)
         })

@@ -186,7 +186,7 @@ function extractResolutionDate(value = '') {
     return `${compact[1]}-${compact[2]}-${compact[3]}`
   }
 
-  const plain = source.match(/\b((?:19|20)\d{2}-\d{2}-\d{2})\b/)
+  const plain = source.match(/\b((?:19|20)\d{2}-\d{2}-\d{2})(?:\b|T)/)
   return plain ? plain[1] : ''
 }
 
@@ -245,6 +245,25 @@ function buildDescriptorTokens(value = '', options = {}) {
   ))
 }
 
+function teamLabelTokensMatch(requestedLabel = '', candidateLabel = '') {
+  const requestedTokens = buildSearchTokensForLabel(requestedLabel)
+  const candidateTokens = buildSearchTokensForLabel(candidateLabel)
+  if (requestedTokens.length === 0 || candidateTokens.length === 0) return false
+  return requestedTokens.every((requested) =>
+    candidateTokens.some((candidate) => tokensLooselyMatch(requested, candidate))
+  )
+}
+
+function matchupTeamsLooselyMatch(params = {}, canonicalEvent = {}) {
+  const homeHome = teamLabelTokensMatch(params.home, canonicalEvent.homeTeam)
+  const awayAway = teamLabelTokensMatch(params.away, canonicalEvent.awayTeam)
+  if (homeHome && awayAway) return true
+
+  const homeAway = teamLabelTokensMatch(params.home, canonicalEvent.awayTeam)
+  const awayHome = teamLabelTokensMatch(params.away, canonicalEvent.homeTeam)
+  return homeAway && awayHome
+}
+
 function hasSpecificDescriptorTokens(tokens = []) {
   const alphaTokens = tokens.filter((token) => /[a-z]/.test(token))
   const numericTokens = tokens.filter((token) => /^\d+$/.test(token))
@@ -254,6 +273,41 @@ function hasSpecificDescriptorTokens(tokens = []) {
 function descriptorTokensFullyMatch(requestedTokens = [], candidateTokens = []) {
   if (requestedTokens.length === 0) return false
   return requestedTokens.every((token) => candidateTokens.some((candidate) => tokensLooselyMatch(token, candidate)))
+}
+
+function hasMotorsportLocationTokenMatch(requestedTokens = [], candidateTokens = []) {
+  const requested = (Array.isArray(requestedTokens) ? requestedTokens : []).filter(Boolean)
+  const candidate = (Array.isArray(candidateTokens) ? candidateTokens : []).filter(Boolean)
+  if (requested.length === 0 || candidate.length === 0) return false
+
+  return requested.some((left) =>
+    candidate.some((right) =>
+      tokensLooselyMatch(left, right) ||
+      motorsportLocationTokensMatch(left, right)
+    )
+  )
+}
+
+function motorsportLocationTokensMatch(left = '', right = '') {
+  const a = normalizeIdentityToken(left)
+  const b = normalizeIdentityToken(right)
+  if (!a || !b) return false
+  if (a === b) return true
+
+  const aliases = {
+    catalonia: ['catalunya', 'barcelona', 'spanish'],
+    france: ['french', 'lemans', 'le', 'mans'],
+    germany: ['german', 'sachsenring'],
+    italy: ['italian', 'mugello', 'misano', 'sanmarino'],
+    netherlands: ['dutch', 'assen'],
+    portugal: ['portuguese', 'portimao', 'algarve'],
+    qatar: ['lusail', 'losail'],
+    spain: ['spanish', 'jerez', 'aragon', 'valencia', 'catalunya', 'barcelona']
+  }
+
+  const leftAliases = aliases[a] || []
+  const rightAliases = aliases[b] || []
+  return leftAliases.includes(b) || rightAliases.includes(a)
 }
 
 function tokensLooselyMatch(left = '', right = '') {
@@ -658,7 +712,7 @@ function buildSportsMetaResolutionPlan(availability = {}) {
 
   if (parsedEvent?.eventName) {
     const eventName = normalizeEventNameLabel(parsedEvent.eventName)
-    const date = normalizeSpace(parsedEvent.date || fallbackDate)
+    const date = normalizeSpace(parsedEvent.date || (sport === 'motorsport' ? '' : fallbackDate))
     addAttempt({
       identityType: 'event',
       params: {
@@ -763,7 +817,8 @@ function buildSportsMetaResolutionQuery(availability = {}) {
       const meaningfulEventTokens = tokenizeIdentity(params.event, {
         genericTokens: GENERIC_EVENT_TOKENS
       })
-      if (params.event && params.date && (params.league || params.sport) && meaningfulEventTokens.length > 0) {
+      const allowUndatedMotorsport = normalizeSportKey(params.sport) === 'motorsport'
+      if (params.event && (params.date || allowUndatedMotorsport) && (params.league || params.sport) && meaningfulEventTokens.length > 0) {
         return attempt
       }
     }
@@ -899,10 +954,39 @@ function verifySportsMetaSearchCandidate(query = {}, canonical = {}) {
   const candidateTokens = buildDescriptorTokens(canonicalEvent.name || canonicalEvent.title, {
     league: canonicalEvent.league
   })
+  if (identityType === 'matchup') {
+    if (matchupTeamsLooselyMatch(params, canonicalEvent)) {
+      return {
+        status: SPORTS_META_RESOLUTION_STATUS.RESOLVED,
+        reason: 'search_team_match'
+      }
+    }
+
+    return {
+      status: SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH,
+      reason: 'search_team_mismatch'
+    }
+  }
+
   if (descriptorTokensFullyMatch(requestedTokens, candidateTokens)) {
     return {
       status: SPORTS_META_RESOLUTION_STATUS.RESOLVED,
       reason: 'search_token_match'
+    }
+  }
+
+  const requestedSport = normalizeSportKey(params.sport)
+  const canonicalSport = normalizeSportKey(canonicalEvent.sport)
+  const baseReason = String(baseVerification?.reason || '').trim()
+  if (
+    identityType === 'event' &&
+    baseReason === 'event_name_mismatch' &&
+    (requestedSport === 'motorsport' || canonicalSport === 'motorsport') &&
+    hasMotorsportLocationTokenMatch(requestedTokens, candidateTokens)
+  ) {
+    return {
+      status: SPORTS_META_RESOLUTION_STATUS.RESOLVED,
+      reason: 'motorsport_location_match'
     }
   }
 
@@ -1064,7 +1148,8 @@ async function resolveSportsMetaIdentity(client, availability = {}, options = {}
       const meaningfulEventTokens = tokenizeIdentity(params.event, {
         genericTokens: GENERIC_EVENT_TOKENS
       })
-      if (!params.event || !params.date || (!params.league && !params.sport) || meaningfulEventTokens.length === 0) {
+      const allowUndatedMotorsport = normalizeSportKey(params.sport) === 'motorsport'
+      if (!params.event || (!params.date && !allowUndatedMotorsport) || (!params.league && !params.sport) || meaningfulEventTokens.length === 0) {
         continue
       }
     }

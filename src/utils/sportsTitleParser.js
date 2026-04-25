@@ -273,6 +273,8 @@ function normalizeTeamTokens(tokens) {
     const next = String(leadingCleaned[index + 1] || '').trim()
     if (!token) continue
     if (
+      isMetadataToken(token) ||
+      parseSingleDateToken(token) ||
       TEAM_TAIL_NOISE_RE.test(token) ||
       /^(?:r\d+|gm\d+|g\d+)$/i.test(token) ||
       (/^\d{1,2}$/.test(token) && /^\d{1,2}$/.test(next)) ||
@@ -474,23 +476,29 @@ function parseFlexibleMatchupTitle(title, fallbackDate = '') {
   const seasonInfo = useLeadingDate
     ? { tokens: preTeamTokens, yearHint: leadingDate.date.slice(0, 4) }
     : stripLeadingSeasonTokens(preTeamTokens)
+  const preSeparatorDate = useLeadingDate
+    ? null
+    : findTrailingDateSpan(seasonInfo.tokens, seasonInfo.yearHint, fallbackDate)
 
   const homeTeamTokens = useLeadingDate
     ? preTeamTokens.slice(leadingDate.nextIndex)
-    : seasonInfo.tokens
+    : (preSeparatorDate && preSeparatorDate.nextIndex < seasonInfo.tokens.length
+      ? seasonInfo.tokens.slice(preSeparatorDate.nextIndex)
+      : seasonInfo.tokens)
   const dateHint = String(
     (useLeadingDate ? leadingDate?.date?.slice(0, 4) : '') ||
+    preSeparatorDate?.date?.slice(0, 4) ||
     seasonInfo.yearHint ||
     ''
   ).trim()
-  const trailingDate = useLeadingDate
-    ? null
-    : findTrailingDateSpan(afterSeparator, dateHint, fallbackDate)
+  const trailingDate = (!useLeadingDate && !preSeparatorDate)
+    ? findTrailingDateSpan(afterSeparator, dateHint, fallbackDate)
+    : null
 
   const awayTeamTokens = trailingDate
     ? afterSeparator.slice(0, trailingDate.startIndex)
     : afterSeparator
-  const date = (useLeadingDate ? leadingDate?.date : '') || trailingDate?.date || extractFallbackDate(fallbackDate)
+  const date = (useLeadingDate ? leadingDate?.date : '') || preSeparatorDate?.date || trailingDate?.date || extractFallbackDate(fallbackDate)
 
   const homeTeam = normalizeTeamTokens(homeTeamTokens)
   const awayTeam = normalizeTeamTokens(awayTeamTokens)
@@ -635,7 +643,7 @@ function parseSportsEventTitle(title, fallbackDate = '') {
   if (!raw) return null
 
   const tokens = splitEventTitleTokens(raw)
-  if (tokens.length < 4) return null
+  if (tokens.length < 2) return null
 
   const leagueStart = resolveEventLeagueStart(tokens)
   if (!leagueStart) return null

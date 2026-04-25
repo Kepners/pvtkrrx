@@ -13,6 +13,12 @@ const LEAGUE_MAP = Object.freeze({
     sportsDbSport: 'Soccer',
     aliases: ['Champions League', 'UCL']
   },
+  uwcl: {
+    name: 'UEFA Womens Champions League',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['Womens Champions League', "UEFA Women's Champions League", "Women's Champions League", 'UWCL']
+  },
   uel: {
     name: 'UEFA Europa League',
     idLeague: '4481',
