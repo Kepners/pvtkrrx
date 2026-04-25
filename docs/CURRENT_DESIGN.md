@@ -144,6 +144,7 @@ Verified on 2026-04-08:
 - `https://www.pvtkrrx.cc/manifest.json` returns the bootstrap manifest (`200`)
 - `https://www.pvtkrrx.cc/health` returns health JSON (`200`) or the health page when the client asks for HTML
 - `https://www.pvtkrrx.cc/sitemap.xml` now includes `/sports`, `/clockrr`, `/blog`, and `/faq`
+- Shared public footers link to `https://discord.gg/jPj8sV3nRs` for chat.
 - `https://www.pvtkrrx.cc/local/install` returns `403` from the public internet because it is a same-host/local-network helper route
 - `https://www.pvtkrrx.cc/sportsmeta/...` is not a supported public production surface; the integrated draft is disabled by default in this repo
 - 2026-04-06 homepage verification on the canonical host confirmed the refactored landing page markers are live: `truth-band` and `Where does playback happen` are present, while legacy `meta-grid` and `hero-chip` markers are absent

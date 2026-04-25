@@ -64,6 +64,7 @@
     html,
     body {
       min-height: 100%;
+      overflow-x: hidden;
     }
 
     body {
@@ -476,6 +477,7 @@
 
     table {
       width: 100%;
+      table-layout: fixed;
       border-collapse: collapse;
       border: 1px solid rgba(0, 246, 255, 0.2);
       background: rgba(4, 8, 18, 0.7);
@@ -487,6 +489,8 @@
       text-align: left;
       vertical-align: top;
       border: 1px solid rgba(0, 246, 255, 0.15);
+      overflow-wrap: anywhere;
+      word-break: break-word;
     }
 
     th {
@@ -922,7 +926,13 @@
       }
 
       .logo {
+        font-size: 46px;
         letter-spacing: 2px;
+      }
+
+      .logo::before,
+      .logo::after {
+        font-size: inherit;
       }
 
       .topbar {
@@ -1478,7 +1488,7 @@ PORT=7000 npm run server:setup</code></pre>
         <a href="/blog">Blog</a>
         <a href="/faq">FAQ</a>
         <a href="/health">Health</a>
-        <a href="mailto:kepners@pvtkrrx.cc">Contact</a>
+        <a href="https://discord.gg/jPj8sV3nRs" target="_blank" rel="noopener noreferrer">Chat</a>
       </span>
     </footer>
   </main>

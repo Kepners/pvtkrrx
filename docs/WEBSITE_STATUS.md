@@ -25,7 +25,8 @@ Verified directly on 2026-04-23 after manual Coolify API redeploy `c307hqn7q8dep
 Repo update prepared on 2026-04-25:
 
 - New crawlable pages are wired locally at `/blog` and `/faq`.
-- Public nav/footer links now use the same main set across home, sports, Clockrr, runbooks, health, and configure surfaces: Home, Sports, Clockrr, Runbooks, Blog, FAQ, Health, Contact.
+- Public nav/footer links now use the same main set across home, sports, Clockrr, runbooks, health, and configure surfaces: Home, Sports, Clockrr, Runbooks, Blog, FAQ, Health, Chat.
+- The shared chat link is `https://discord.gg/jPj8sV3nRs`.
 - `/clockrr` now uses the same PVTKRRX-styled public shell and includes horizontal movie and TV example tickers.
 - `/sports` copy now reflects the current SportsMeta split: PVTKRRX stream routes stay free, SportsMeta public remains SVG-first, and Plus/Pro member artwork stays on SportsMeta routes.
 - `public/sitemap.xml` now includes `/blog` and `/faq` with `lastmod 2026-04-25`.
@@ -113,6 +114,7 @@ Main clarity gaps:
 - Added `/clockrr`, `/blog`, and `/faq` to the public site surface.
 - Reworked `/clockrr` to match the PVTKRRX visual shell and added movie/TV ticker rows for common Clockrr use cases.
 - Updated `/sports` public copy away from the old monthly/yearly Sports Posters offer and onto the current SportsMeta Free / Plus / Pro status.
+- Added the Discord chat URL to the shared footer and FAQ.
 
 ## Suggested Homepage Shape
 

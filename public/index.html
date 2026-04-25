@@ -76,6 +76,7 @@
     html,
     body {
       min-height: 100%;
+      overflow-x: hidden;
     }
 
     body {
@@ -1045,7 +1046,13 @@
       }
 
       .logo {
+        font-size: 46px;
         letter-spacing: 2px;
+      }
+
+      .logo::before,
+      .logo::after {
+        font-size: inherit;
       }
 
       .tagline {
@@ -1289,7 +1296,7 @@
         <a href="/blog">Blog</a>
         <a href="/faq">FAQ</a>
         <a href="/health">Health</a>
-        <a href="mailto:kepners@pvtkrrx.cc">Contact</a>
+        <a href="https://discord.gg/jPj8sV3nRs" target="_blank" rel="noopener noreferrer">Chat</a>
       </div>
     </footer>
   </main>
