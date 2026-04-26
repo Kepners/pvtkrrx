@@ -1139,7 +1139,7 @@
         </p>
         <p class="kicker" style="margin-top:-4px">Sports Posters belongs to SportsMeta. It does not turn PVTKRRX into a paid stream addon.</p>
         <div class="cta-row">
-          <a class="btn btn-primary" href="https://sportsmeta.pvtkrrx.cc/pricing" data-umami-event="cta_sportsmeta_pricing" data-umami-event-page="sports" data-umami-event-section="hero">Open SportsMeta Pricing</a>
+          <a class="btn btn-primary" href="#plans" data-umami-event="cta_sports_posters_plans" data-umami-event-page="sports" data-umami-event-section="hero">Start Sports Posters</a>
           <a class="btn btn-secondary" href="https://sportsmeta.pvtkrrx.cc/proof" data-umami-event="cta_sportsmeta_proof" data-umami-event-page="sports" data-umami-event-section="hero">Open Proof Page</a>
         </div>
       </div>
@@ -1150,7 +1150,7 @@
         <div class="section-kicker">Current Split</div>
         <h2 class="section-title">PVTKRRX streams stay free. SportsMeta owns the artwork plan.</h2>
         <p class="section-copy">
-          This page is the PVTKRRX-facing status summary. The actual SportsMeta pricing and entitlement routes live on <code>sportsmeta.pvtkrrx.cc</code>.
+          This is the PVTKRRX-facing Sports Posters page. SportsMeta owns the checkout and entitlement routes on <code>sportsmeta.pvtkrrx.cc</code>.
         </p>
       </div>
       <div class="plan-grid">
@@ -1203,7 +1203,7 @@
           <p class="plan-copy">Sports Posters is the single paid artwork membership. It covers poster, background, logo, landscape, and other Stremio-compatible sports image fields when SportsMeta can safely resolve them.</p>
           <div class="plan-actions">
             <button class="btn btn-primary" type="button" data-checkout-interval="year" data-umami-event="cta_sportsmeta_checkout_year" data-umami-event-page="sports" data-umami-event-section="plans">Start Yearly</button>
-            <a class="btn btn-secondary" href="https://sportsmeta.pvtkrrx.cc/pricing" data-umami-event="cta_sportsmeta_pricing" data-umami-event-page="sports" data-umami-event-section="plans">View Sports Posters</a>
+            <a class="btn btn-secondary" href="https://sportsmeta.pvtkrrx.cc/pricing" data-umami-event="cta_sportsmeta_checkout" data-umami-event-page="sports" data-umami-event-section="plans">Checkout on SportsMeta</a>
           </div>
           <p class="checkout-notice" id="checkoutNotice" role="status" aria-live="polite"></p>
           <ul class="plan-list">
@@ -1307,13 +1307,13 @@
     </section>
 
     <section class="bottom-cta">
-      <div class="section-kicker">Current SportsMeta Pricing</div>
-      <h2 class="section-title">Open Sports Posters on SportsMeta</h2>
+      <div class="section-kicker">SportsMeta Checkout</div>
+      <h2 class="section-title">One public page. One SportsMeta checkout.</h2>
       <p class="section-copy">
         SportsMeta Free stays public and SVG-only. Sports Posters is the single paid artwork membership for poster, background, logo, landscape, and other Stremio-compatible sports image fields.
       </p>
       <div class="cta-row">
-        <a class="btn btn-primary" href="https://sportsmeta.pvtkrrx.cc/pricing" data-umami-event="cta_sportsmeta_pricing" data-umami-event-page="sports" data-umami-event-section="bottom">Open SportsMeta Pricing</a>
+        <a class="btn btn-primary" href="https://sportsmeta.pvtkrrx.cc/pricing" data-umami-event="cta_sportsmeta_checkout" data-umami-event-page="sports" data-umami-event-section="bottom">Open SportsMeta Checkout</a>
         <a class="btn btn-secondary" href="https://sportsmeta.pvtkrrx.cc/proof" data-umami-event="cta_sportsmeta_proof" data-umami-event-page="sports" data-umami-event-section="bottom">Open SportsMeta Proof</a>
       </div>
     </section>
@@ -1403,7 +1403,7 @@
 
           window.location.href = payload.url;
         } catch (error) {
-          showCheckoutNotice('Checkout is temporarily unavailable. Open SportsMeta Pricing or try again shortly.');
+          showCheckoutNotice('Checkout is temporarily unavailable. Open SportsMeta Checkout or try again shortly.');
           button.disabled = false;
         }
       });

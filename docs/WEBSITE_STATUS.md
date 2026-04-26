@@ -108,7 +108,7 @@ Main clarity gaps:
 - Removed the route comparison section from the public cloud homepage
 - Added "What you need" section
 - Added dedicated sports proof section
-- Reworked `/sports` into the public SportsMeta status page with canonical metadata, PVTKRRX-styled presentation, links to SportsMeta pricing/proof, and clear Free / Sports Posters boundaries.
+- Reworked `/sports` into the single public Sports Posters page with canonical metadata, PVTKRRX-styled presentation, links to SportsMeta checkout/proof, and clear Free / Sports Posters boundaries.
 - Public `sitemap.xml` now includes `/sports`
 - Moved `Manifest` out of the main nav; `Health` remains as the explicit operator utility link.
 - Added `/clockrr`, `/blog`, and `/faq` to the public site surface.
