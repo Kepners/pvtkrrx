@@ -1,4 +1,10 @@
 const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const os = require('node:os')
+const path = require('node:path')
+
+const persistentBackfillRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-sports-backfill-'))
+process.env.PVTKRRX_SPORTS_IDENTITY_BACKFILL_FILE = path.join(persistentBackfillRoot, 'sports-identity-backfill-cache.json')
 
 const { SportsMetaClient } = require('../src/clients/sportsmeta')
 const { handleMeta } = require('../src/handlers/meta')
@@ -12,6 +18,7 @@ const {
 const {
   clearSportsIdentityBackfillState,
   getCachedSportsIdentityBackfill,
+  getSportsIdentityBackfillStats,
   setCachedSportsIdentityBackfill
 } = require('../src/utils/sportsIdentityBackfill')
 const { parseSportsEventTitle, parseSportsTitle } = require('../src/utils/sportsTitleParser')
@@ -296,6 +303,24 @@ async function run() {
     'paid sports configs must emit PVTKRRX raster-proxy poster URLs for canonical sports art'
   )
 
+  const previousEnvMemberToken = process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN
+  process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN = 'https://sportsmeta.test/member/sm_env_poster_token'
+  try {
+    const envTokenPoster = resolveSportsPosterAsset({
+      baseUrl: 'https://addon.test',
+      sportsmetaBaseUrl: 'https://sportsmeta.test',
+      canonicalId: barcaId
+    })
+    assert.equal(
+      envTokenPoster.poster,
+      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_env_poster_token')}`,
+      'PVTKRRX should prefer SportsMeta member artwork when a runtime env token is configured'
+    )
+  } finally {
+    if (previousEnvMemberToken === undefined) delete process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN
+    else process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN = previousEnvMemberToken
+  }
+
   const fallbackPoster = resolveSportsPosterAsset({
     baseUrl: 'https://addon.test',
     sportsmetaBaseUrl: 'https://sportsmeta.test',
@@ -360,6 +385,9 @@ async function run() {
   setCachedSportsIdentityBackfill(backfillGroup, footballResolution)
   const cachedBackfill = getCachedSportsIdentityBackfill(backfillGroup)
   assert.equal(cachedBackfill?.canonicalId, barcaId, 'background sports identity backfill cache should replay resolved canonical ids')
+  const backfillStats = getSportsIdentityBackfillStats()
+  assert.equal(backfillStats.persistentCache, true, 'background sports identity backfill cache should be persistence-capable')
+  assert.match(backfillStats.persistentCacheFile, /sports-identity-backfill-cache\.json$/, 'persistent backfill cache should have a stable file path')
   clearSportsIdentityBackfillState()
 
   const mmaResolution = await resolveSportsMetaIdentity(
@@ -394,4 +422,5 @@ run()
   })
   .finally(() => {
     global.fetch = ORIGINAL_FETCH
+    fs.rmSync(persistentBackfillRoot, { recursive: true, force: true })
   })

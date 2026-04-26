@@ -174,6 +174,16 @@ function resolveSportsmetaBaseUrlFromConfig(config = {}) {
   return String(config?.sportsmetaBaseUrl || '').trim()
 }
 
+function resolveSportsPosterMemberToken(config = {}, req = null) {
+  return String(
+    req?.query?.token ||
+    config?.sportsPosterMemberToken ||
+    process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN ||
+    process.env.SPORTSMETA_MEMBER_TOKEN ||
+    ''
+  ).trim()
+}
+
 function redactUrl(value) {
   return String(value || '')
     .replace(/\/member\/([^/?#]+)\/asset\//i, '/member/[redacted]/asset/')
@@ -283,7 +293,7 @@ async function handleCanonicalSportsArtwork(req, res, config = {}) {
     return
   }
   const sportsmetaBaseUrl = resolveSportsmetaBaseUrlFromConfig(config)
-  const memberToken = String(req.query?.token || '').trim()
+  const memberToken = resolveSportsPosterMemberToken(config, req)
   const upstreamUrl = buildUpstreamUrl({
     kind: 'id',
     variant,

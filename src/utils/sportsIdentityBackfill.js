@@ -1,8 +1,12 @@
+const fs = require('fs')
+const path = require('path')
 const { SportsMetaClient } = require('../clients/sportsmeta')
 const {
   SPORTS_META_RESOLUTION_STATUS,
   resolveSportsMetaIdentity
 } = require('./sportsIdentityResolution')
+const { resolveRuntimeDir } = require('./runtimeDir')
+const { loadSecureJsonFile, saveSecureJsonFile } = require('./secureJsonFile')
 
 const BACKFILL_ENABLED = !/^(0|false|no|off)$/i.test(String(process.env.PVTKRRX_SPORTS_IDENTITY_BACKFILL || 'true').trim())
 const BACKFILL_CACHE_TTL_MS = Math.max(
@@ -29,12 +33,27 @@ const BACKFILL_START_DELAY_MS = Math.max(
   0,
   parseInt(process.env.PVTKRRX_SPORTS_IDENTITY_BACKFILL_DELAY_MS || '250', 10)
 )
+const BACKFILL_PERSIST_ENABLED = !/^(0|false|no|off)$/i.test(String(process.env.PVTKRRX_SPORTS_IDENTITY_BACKFILL_PERSIST || 'true').trim())
+const BACKFILL_PERSIST_SAVE_DELAY_MS = Math.max(
+  50,
+  parseInt(process.env.PVTKRRX_SPORTS_IDENTITY_BACKFILL_PERSIST_DELAY_MS || '500', 10)
+)
 
 const cache = new Map()
 const queue = []
 const queuedKeys = new Set()
 let activeWorkers = 0
 let timer = null
+let persistentHydrated = false
+let persistentSaveTimer = null
+let persistentDisabledReason = ''
+let persistentWarned = false
+
+function resolveBackfillCacheFilePath() {
+  const explicit = String(process.env.PVTKRRX_SPORTS_IDENTITY_BACKFILL_FILE || '').trim()
+  if (explicit) return explicit
+  return path.join(resolveRuntimeDir(), 'sports-identity-backfill-cache.json')
+}
 
 function normalizeKeyPart(value) {
   return String(value || '')
@@ -95,7 +114,72 @@ function pruneBackfillCache(now = Date.now()) {
   }
 }
 
+function hydratePersistentBackfillCache() {
+  if (persistentHydrated || !BACKFILL_PERSIST_ENABLED) return
+  persistentHydrated = true
+  const filePath = resolveBackfillCacheFilePath()
+  try {
+    const parsed = loadSecureJsonFile(filePath, { defaultValue: null })
+    const entries = Array.isArray(parsed?.entries) ? parsed.entries : []
+    const now = Date.now()
+    for (const entry of entries) {
+      const key = String(entry?.key || '').trim()
+      const expiresAt = Number(entry?.expiresAt || 0)
+      const resolution = entry?.resolution
+      if (!key || !resolution || typeof resolution !== 'object' || expiresAt <= now) continue
+      cache.set(key, {
+        resolution: { ...resolution },
+        expiresAt,
+        touchedAt: Number(entry?.touchedAt || now) || now
+      })
+    }
+    pruneBackfillCache(now)
+  } catch (error) {
+    persistentDisabledReason = `hydrate_failed:${String(error?.message || error || '').trim()}`
+    if (!persistentWarned) {
+      persistentWarned = true
+      console.warn(`[sports-backfill] persistent cache disabled: ${persistentDisabledReason}`)
+    }
+  }
+}
+
+function flushPersistentBackfillCache() {
+  if (!BACKFILL_PERSIST_ENABLED || persistentDisabledReason) return
+  const filePath = resolveBackfillCacheFilePath()
+  try {
+    pruneBackfillCache(Date.now())
+    const entries = Array.from(cache.entries()).map(([key, entry]) => ({
+      key,
+      resolution: entry.resolution,
+      expiresAt: entry.expiresAt,
+      touchedAt: entry.touchedAt
+    }))
+    saveSecureJsonFile(filePath, {
+      version: 1,
+      savedAt: Date.now(),
+      entries
+    })
+  } catch (error) {
+    persistentDisabledReason = `save_failed:${String(error?.message || error || '').trim()}`
+    if (!persistentWarned) {
+      persistentWarned = true
+      console.warn(`[sports-backfill] persistent cache disabled: ${persistentDisabledReason}`)
+    }
+  }
+}
+
+function schedulePersistentBackfillSave() {
+  if (!BACKFILL_PERSIST_ENABLED || persistentDisabledReason) return
+  if (persistentSaveTimer) return
+  persistentSaveTimer = setTimeout(() => {
+    persistentSaveTimer = null
+    flushPersistentBackfillCache()
+  }, BACKFILL_PERSIST_SAVE_DELAY_MS)
+  if (typeof persistentSaveTimer.unref === 'function') persistentSaveTimer.unref()
+}
+
 function getCachedSportsIdentityBackfill(group = {}) {
+  hydratePersistentBackfillCache()
   const key = buildSportsIdentityBackfillKey(group)
   if (!key) return null
 
@@ -112,6 +196,7 @@ function getCachedSportsIdentityBackfill(group = {}) {
 }
 
 function setCachedSportsIdentityBackfill(group = {}, resolution = {}) {
+  hydratePersistentBackfillCache()
   const key = buildSportsIdentityBackfillKey(group)
   if (!key || !resolution || typeof resolution !== 'object') return ''
 
@@ -125,6 +210,7 @@ function setCachedSportsIdentityBackfill(group = {}, resolution = {}) {
     touchedAt: now
   })
   pruneBackfillCache(now)
+  schedulePersistentBackfillSave()
   return key
 }
 
@@ -211,15 +297,30 @@ function clearSportsIdentityBackfillState() {
   activeWorkers = 0
   if (timer) clearTimeout(timer)
   timer = null
+  if (persistentSaveTimer) clearTimeout(persistentSaveTimer)
+  persistentSaveTimer = null
+  if (BACKFILL_PERSIST_ENABLED && !persistentDisabledReason) {
+    try {
+      const filePath = resolveBackfillCacheFilePath()
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
+    } catch (_) {
+      // best-effort cleanup for tests and operator resets
+    }
+  }
 }
 
 function getSportsIdentityBackfillStats() {
+  hydratePersistentBackfillCache()
   return {
     enabled: BACKFILL_ENABLED,
     cacheEntries: cache.size,
     queueEntries: queue.length,
     queuedKeys: queuedKeys.size,
-    activeWorkers
+    activeWorkers,
+    persistentCache: BACKFILL_PERSIST_ENABLED,
+    persistentCacheFile: BACKFILL_PERSIST_ENABLED ? resolveBackfillCacheFilePath() : '',
+    persistentCacheReady: BACKFILL_PERSIST_ENABLED && !persistentDisabledReason,
+    persistentDisabledReason
   }
 }
 

@@ -44,7 +44,7 @@
 | Item | Value |
 |------|-------|
 | Type | Stremio Addon |
-| Version | 1.1.49 |
+| Version | 1.1.50 |
 | Repo | github.com/Kepners/pvtkrrx |
 | Hosting | Contabo VPS via Caddy -> Coolify hosted relay + Local Windows runtime + optional Linux self-host runtime |
 | Framework | stremio-addon-sdk + Express v5 hybrid |
@@ -216,5 +216,5 @@ Never push to a different branch expecting the live site to update.
 
 ---
 
-*Created: February 8, 2026 | Updated: April 25, 2026*
+*Created: February 8, 2026 | Updated: April 26, 2026*
 

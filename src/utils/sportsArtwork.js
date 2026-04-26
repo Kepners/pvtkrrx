@@ -73,6 +73,8 @@ function resolveSportsPosterMemberToken(input = {}) {
     input?.sportsmetaMemberToken ||
     input?.memberToken ||
     input?.config?.sportsPosterMemberToken ||
+    process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN ||
+    process.env.SPORTSMETA_MEMBER_TOKEN ||
     ''
   )
 }

@@ -1,10 +1,24 @@
 # PVTKRRX Project Status
 
-Updated: 2026-04-25
+Updated: 2026-04-26
 
 ## Current Stage
 
-PVTKRRX is being advanced from the synchronized `1.1.48` state to `1.1.49` for the sports Discover poster-shape correction. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+PVTKRRX is being advanced from the synchronized `1.1.49` state to `1.1.50` for proactive sports artwork pairing, member raster token usage, persistent sports identity backfill, and sports artwork audit proof. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+
+## 2026-04-26: v1.1.50 proactive sports artwork pairing
+
+- SportsMeta resolver changes are paired with PVTKRRX changes for availability-driven sports rows: Prowlarr/qBittorrent still decide whether a row exists, while SportsMeta now resolves identity and artwork more proactively without guessing below threshold.
+- PVTKRRX sports artwork proxy now prefers SportsMeta member raster routes whenever `sportsPosterMemberToken`, `PVTKRRX_SPORTSMETA_MEMBER_TOKEN`, or `SPORTSMETA_MEMBER_TOKEN` is configured, while preserving the public SVG/generated fallback path when no member token exists.
+- PVTKRRX sports identity backfill now persists to the runtime directory by default, so startup/prewarm work can survive process restarts instead of only helping the first in-memory response window.
+- Added `npm run audit:sports-artwork` to sample live-style sports catalog rows and report poster/background URLs, asset source headers, dimensions, fallback status, and mismatch reasons.
+- Local proof passed before release prep:
+  - `npm run smoke:sports-resolution`
+  - `npm run smoke:sports-artwork`
+  - `npm run smoke:sports-catalog-seeds`
+  - `npm run smoke:sports-catalog-latency`
+  - `node --check scripts/audit-sports-artwork.js`
+  - `node --check src\utils\sportsIdentityBackfill.js`
 
 ## 2026-04-25: v1.1.49 sports Discover poster-shape correction
 
