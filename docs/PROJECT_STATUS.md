@@ -4,7 +4,14 @@ Updated: 2026-04-26
 
 ## Current Stage
 
-PVTKRRX is being advanced from the synchronized `1.1.49` state to `1.1.50` for proactive sports artwork pairing, member raster token usage, persistent sports identity backfill, and sports artwork audit proof. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+PVTKRRX is being advanced from the synchronized `1.1.50` state to `1.1.51` for the final Sports Posters entitlement-copy correction after the proactive sports artwork pairing release. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+
+## 2026-04-26: v1.1.51 Sports Posters entitlement-copy correction
+
+- PVTKRRX `/sports` now presents one paid SportsMeta artwork entitlement, `Sports Posters`, instead of the stale Plus/Pro split.
+- Public copy now states the real product scope: poster, background, logo, landscape, and other Stremio-compatible sports image fields when SportsMeta can safely resolve them.
+- The PVTKRRX-facing sports page no longer advertises a monthly checkout path or a non-existent expanded Pro level.
+- This release is paired with SportsMeta commit `c310d45`, which normalizes legacy `plus`/`pro` tier ids to the single Sports Posters entitlement and prevents landscape SportsDB thumb/banner images from being served raw as posters.
 
 ## 2026-04-26: v1.1.50 proactive sports artwork pairing
 

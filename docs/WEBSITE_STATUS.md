@@ -28,7 +28,7 @@ Repo update prepared on 2026-04-25:
 - Public nav/footer links now use the same main set across home, sports, Clockrr, runbooks, health, and configure surfaces: Home, Sports, Clockrr, Runbooks, Blog, FAQ, Health, Chat.
 - The shared chat link is `https://discord.gg/jPj8sV3nRs`.
 - `/clockrr` now uses the same PVTKRRX-styled public shell and includes horizontal movie and TV top-ten tickers derived from aggregate Clockrr subtitle request telemetry.
-- `/sports` copy now reflects the current SportsMeta split: PVTKRRX stream routes stay free, SportsMeta public remains SVG-first, and Plus/Pro member artwork stays on SportsMeta routes.
+- `/sports` copy now reflects the current SportsMeta split: PVTKRRX stream routes stay free, SportsMeta public remains SVG-first, and Sports Posters member artwork stays on SportsMeta routes.
 - `public/sitemap.xml` now includes `/blog` and `/faq` with `lastmod 2026-04-25`.
 
 Verified directly on 2026-04-08:
@@ -108,12 +108,12 @@ Main clarity gaps:
 - Removed the route comparison section from the public cloud homepage
 - Added "What you need" section
 - Added dedicated sports proof section
-- Reworked `/sports` into the public SportsMeta status page with canonical metadata, PVTKRRX-styled presentation, links to SportsMeta pricing/proof, and clear Free / Plus / Pro boundaries.
+- Reworked `/sports` into the public SportsMeta status page with canonical metadata, PVTKRRX-styled presentation, links to SportsMeta pricing/proof, and clear Free / Sports Posters boundaries.
 - Public `sitemap.xml` now includes `/sports`
 - Moved `Manifest` out of the main nav; `Health` remains as the explicit operator utility link.
 - Added `/clockrr`, `/blog`, and `/faq` to the public site surface.
 - Reworked `/clockrr` to match the PVTKRRX visual shell and added movie/TV ticker rows from aggregate Clockrr subtitle request telemetry. The public display uses resolvable IMDb/TMDB-style media titles and excludes raw provider-only/unresolved IDs.
-- Updated `/sports` public copy away from the old monthly/yearly Sports Posters offer and onto the current SportsMeta Free / Plus / Pro status.
+- Updated `/sports` public copy onto the current SportsMeta Free / Sports Posters status.
 - Added the Discord chat URL to the shared footer and FAQ.
 
 ## Suggested Homepage Shape

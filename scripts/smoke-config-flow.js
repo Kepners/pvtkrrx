@@ -354,8 +354,9 @@ async function run() {
     assert.match(sportsHtml, /<link rel="canonical" href="https:\/\/www\.pvtkrrx\.cc\/sports">/i, 'sports page should expose canonical metadata')
     assert.match(sportsHtml, /<meta property="og:image" content="https:\/\/www\.pvtkrrx\.cc\/social\/pvtkrrx-sports\.png">/i, 'sports page should expose the sports social image')
     assert.match(sportsHtml, /Sports Posters/, 'sports page should render the Sports Posters offer')
-    assert.match(sportsHtml, /data-checkout-interval="month"/, 'sports page should expose monthly checkout')
+    assert.doesNotMatch(sportsHtml, /data-checkout-interval="month"/, 'sports page should not advertise unavailable monthly checkout')
     assert.match(sportsHtml, /data-checkout-interval="year"/, 'sports page should expose yearly checkout')
+    assert.doesNotMatch(sportsHtml, /Plus \/ Pro|Compare Plus|Pro adds/i, 'sports page should not advertise stale Plus/Pro tiers')
     assert.match(sportsHtml, /\/sports\/billing\/checkout/, 'sports page should use the PVTKRRX checkout proxy')
     assert.doesNotMatch(sportsHtml, /href="\/configure"/i, 'sports page should not advertise public configure as a primary visitor action')
 
