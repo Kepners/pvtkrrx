@@ -47,6 +47,12 @@ const LEAGUE_MAP = Object.freeze({
     sportsDbSport: 'Soccer',
     aliases: ['Bundesliga']
   },
+  facup: {
+    name: 'FA Cup',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['English FA Cup', 'The FA Cup', 'Football Association Cup']
+  },
   ligue1: {
     name: 'French Ligue 1',
     idLeague: '4334',

@@ -93,17 +93,25 @@ const TRACKER_NOISE_TOKENS = new Set([
 const CLUB_PREFIX_TOKENS = new Set(['fc', 'cf', 'rc', 'sc', 'ac'])
 const SEARCH_TOKEN_STOPWORDS = new Set([
   'at',
+  'aew',
   'city',
   'club',
+  'epl',
+  'fa',
   'fc',
   'cf',
   'rc',
   'sc',
   'ac',
+  'f1',
   'first',
   'fourth',
   'leg',
   'legs',
+  'mlb',
+  'nba',
+  'nfl',
+  'nhl',
   'of',
   'quarterfinal',
   'quarterfinals',
@@ -117,6 +125,7 @@ const SEARCH_TOKEN_STOPWORDS = new Set([
   'the',
   'third',
   'united',
+  'ufc',
   'vs',
   'women',
   'womens'
@@ -229,6 +238,77 @@ function buildRequestedMatchupDescriptor(params = {}) {
   const home = simplifyTeamLabel(params.home)
   const away = simplifyTeamLabel(params.away)
   return home && away ? `${home} vs ${away}` : ''
+}
+
+function daysBetweenDates(left = '', right = '') {
+  const a = normalizeSpace(left).slice(0, 10)
+  const b = normalizeSpace(right).slice(0, 10)
+  if (!/^(?:19|20)\d{2}-\d{2}-\d{2}$/.test(a) || !/^(?:19|20)\d{2}-\d{2}-\d{2}$/.test(b)) return Infinity
+  const leftMs = Date.parse(`${a}T00:00:00Z`)
+  const rightMs = Date.parse(`${b}T00:00:00Z`)
+  if (!Number.isFinite(leftMs) || !Number.isFinite(rightMs)) return Infinity
+  return Math.abs(Math.round((leftMs - rightMs) / 86400000))
+}
+
+function datesMatchForIdentity(identityType = '', requestedDate = '', candidateDate = '') {
+  const requested = normalizeSpace(requestedDate).slice(0, 10)
+  const candidate = normalizeSpace(candidateDate).slice(0, 10)
+  if (!requested || !candidate) return false
+  if (requested === candidate) return true
+  return String(identityType || '').trim() === 'single_team' && daysBetweenDates(requested, candidate) <= 1
+}
+
+function looksLikeCompetitionLabel(label = '', league = '') {
+  const normalizedLabel = normalizeIdentityToken(label)
+  const normalizedLeague = normalizeIdentityToken(league)
+  if (!normalizedLabel || !normalizedLeague) return false
+  if (normalizedLabel === normalizedLeague) return true
+
+  const labelTokens = tokenizeIdentity(label, { keepNumbers: false })
+  const leagueTokens = new Set(tokenizeIdentity(league, { keepNumbers: false }))
+  if (labelTokens.length === 0 || leagueTokens.size === 0) return false
+  return labelTokens.every((token) => leagueTokens.has(token) || GENERIC_EVENT_TOKENS.has(token))
+}
+
+function removeLeagueTokens(tokens = [], league = '') {
+  const span = findLeagueTokenSpan(tokens, league)
+  if (!span) return tokens
+  return [
+    ...tokens.slice(0, span.start),
+    ...tokens.slice(span.end)
+  ]
+}
+
+function extractSingleTeamCompetitionCandidate({ trackerTitle = '', league = '', fallbackDate = '', home = '', away = '' } = {}) {
+  const normalizedLeague = normalizeLeagueLabel(league)
+  if (!normalizedLeague) return ''
+
+  const parsedHome = normalizeCandidateLabel(splitTrackerTitleTokens(home))
+  const parsedAway = normalizeCandidateLabel(splitTrackerTitleTokens(away))
+  if (parsedHome && parsedAway) {
+    if (looksLikeCompetitionLabel(parsedHome, normalizedLeague) && !looksLikeCompetitionLabel(parsedAway, normalizedLeague)) return parsedAway
+    if (looksLikeCompetitionLabel(parsedAway, normalizedLeague) && !looksLikeCompetitionLabel(parsedHome, normalizedLeague)) return parsedHome
+  }
+
+  const title = normalizeSpace(String(trackerTitle || '').replace(/[._]+/g, ' '))
+  const separatorMatch = title.match(/(.+?)\b(?:vs\.?|v|@)\b(.+)/i)
+  if (!separatorMatch) return ''
+
+  const eventDate = extractResolutionDate(title) || extractResolutionDate(fallbackDate)
+  const leftTokens = trimResolutionCandidateTokens(
+    removeLeagueTokens(stripResolutionDateTokens(splitTrackerTitleTokens(separatorMatch[1]), eventDate), normalizedLeague)
+  )
+  const rightTokens = trimResolutionCandidateTokens(
+    removeLeagueTokens(stripResolutionDateTokens(splitTrackerTitleTokens(separatorMatch[2]), eventDate), normalizedLeague)
+  )
+  const leftLabel = normalizeCandidateLabel(leftTokens)
+  const rightLabel = normalizeCandidateLabel(rightTokens)
+
+  if (!leftLabel && rightLabel) return rightLabel
+  if (leftLabel && !rightLabel) return leftLabel
+  if (looksLikeCompetitionLabel(leftLabel, normalizedLeague) && rightLabel) return rightLabel
+  if (looksLikeCompetitionLabel(rightLabel, normalizedLeague) && leftLabel) return leftLabel
+  return ''
 }
 
 function buildLeagueTokenSet(value = '') {
@@ -379,6 +459,12 @@ function buildSearchTermsFromQuery(query = {}) {
       if (tokens[0]) addTerm(tokens[0])
     }
     return terms.slice(0, 2)
+  }
+
+  if (String(query?.identityType || '').trim() === 'single_team') {
+    const tokens = buildSearchTokensForLabel(params.team)
+    if (tokens[0]) addTerm(tokens[0])
+    return terms.slice(0, 1)
   }
 
   if (String(query?.identityType || '').trim() === 'event') {
@@ -674,7 +760,7 @@ function buildSportsMetaResolutionPlan(availability = {}) {
   const addAttempt = (attempt = {}) => {
     const params = {
       ...(attempt?.params || {}),
-      ...(['matchup', 'event'].includes(String(attempt?.identityType || '').trim())
+      ...(['matchup', 'event', 'single_team'].includes(String(attempt?.identityType || '').trim())
         ? { recordType: 'event' }
         : {})
     }
@@ -707,6 +793,28 @@ function buildSportsMetaResolutionPlan(availability = {}) {
         away: normalizeSpace(parsedSportsEvent.awayTeam)
       },
       reason: 'structured_matchup'
+    })
+  }
+
+  const singleTeamCandidate = extractSingleTeamCompetitionCandidate({
+    trackerTitle,
+    fallbackDate,
+    league: mappedLeague,
+    home: parsedSportsEvent?.homeTeam || '',
+    away: parsedSportsEvent?.awayTeam || ''
+  })
+  if (singleTeamCandidate) {
+    addAttempt({
+      identityType: 'single_team',
+      params: {
+        recordType: 'event',
+        title: trackerTitle,
+        date: normalizeSpace(parsedSportsEvent?.date || fallbackDate),
+        sport,
+        league: mappedLeague,
+        team: singleTeamCandidate
+      },
+      reason: 'single_team_competition_matchup'
     })
   }
 
@@ -822,6 +930,13 @@ function buildSportsMetaResolutionQuery(availability = {}) {
         return attempt
       }
     }
+
+    if (attempt.identityType === 'single_team') {
+      const teamTokens = buildSearchTokensForLabel(params.team)
+      if (params.team && params.date && (params.league || params.sport) && teamTokens.length > 0) {
+        return attempt
+      }
+    }
   }
 
   return plan.fallback
@@ -881,7 +996,7 @@ function verifySportsMetaResolution(query = {}, canonical = {}) {
 
   const requestedDate = normalizeSpace(params.date).slice(0, 10)
   const canonicalDate = normalizeSpace(canonicalEvent.date).slice(0, 10)
-  if (requestedDate && canonicalDate && requestedDate !== canonicalDate) {
+  if (requestedDate && canonicalDate && !datesMatchForIdentity(identityType, requestedDate, canonicalDate)) {
     return {
       status: SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH,
       reason: 'date_mismatch'
@@ -908,6 +1023,27 @@ function verifySportsMetaResolution(query = {}, canonical = {}) {
     return {
       status: SPORTS_META_RESOLUTION_STATUS.RESOLVED,
       reason: ''
+    }
+  }
+
+  if (identityType === 'single_team') {
+    const requestedTeam = normalizeSpace(params.team)
+    if (
+      !requestedTeam ||
+      (
+        !teamLabelTokensMatch(requestedTeam, canonicalEvent.homeTeam) &&
+        !teamLabelTokensMatch(requestedTeam, canonicalEvent.awayTeam)
+      )
+    ) {
+      return {
+        status: SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH,
+        reason: 'single_team_mismatch'
+      }
+    }
+
+    return {
+      status: SPORTS_META_RESOLUTION_STATUS.RESOLVED,
+      reason: requestedDate && canonicalDate && requestedDate !== canonicalDate ? 'single_team_date_window_match' : 'single_team_match'
     }
   }
 
@@ -1003,12 +1139,17 @@ function extractCanonicalEventDate(value = '') {
 
 function shortlistSportsMetaSearchCandidates(query = {}, candidates = []) {
   const params = query?.params || {}
+  const identityType = String(query?.identityType || '').trim()
   const requestedDate = extractResolutionDate(params.date || '')
-  const descriptor = String(query?.identityType || '').trim() === 'matchup'
+  const descriptor = identityType === 'matchup'
     ? buildRequestedMatchupDescriptor(params)
+    : identityType === 'single_team'
+      ? normalizeSpace(params.team)
     : normalizeEventNameLabel(params.event)
   const requestedTokens = buildDescriptorTokens(descriptor, { league: params.league })
-  const hasSpecificRequestedTokens = hasSpecificDescriptorTokens(requestedTokens)
+  const hasSpecificRequestedTokens = identityType === 'single_team'
+    ? requestedTokens.some((token) => /[a-z]/.test(token) && token.length >= 4)
+    : hasSpecificDescriptorTokens(requestedTokens)
 
   const scored = (Array.isArray(candidates) ? candidates : [])
     .map((candidate) => {
@@ -1016,7 +1157,7 @@ function shortlistSportsMetaSearchCandidates(query = {}, candidates = []) {
       if (!canonicalId || !canonicalId.startsWith('sportsmeta:')) return null
 
       const candidateDate = extractResolutionDate(candidate?.releaseInfo || '') || extractCanonicalEventDate(canonicalId)
-      if (requestedDate && (!candidateDate || candidateDate !== requestedDate)) return null
+      if (requestedDate && (!candidateDate || !datesMatchForIdentity(identityType, requestedDate, candidateDate))) return null
 
       const candidateTokens = hasSpecificRequestedTokens
         ? buildDescriptorTokens(candidate?.name || candidate?.description || '', { league: params.league })
@@ -1027,6 +1168,7 @@ function shortlistSportsMetaSearchCandidates(query = {}, candidates = []) {
 
       let score = 0
       if (requestedDate && candidateDate === requestedDate) score += 3
+      else if (requestedDate && datesMatchForIdentity(identityType, requestedDate, candidateDate)) score += 2
       if (fullDescriptorMatch) score += 3
       else if (partialDescriptorMatch) score += 1
 
@@ -1152,6 +1294,22 @@ async function resolveSportsMetaIdentity(client, availability = {}, options = {}
       if (!params.event || (!params.date && !allowUndatedMotorsport) || (!params.league && !params.sport) || meaningfulEventTokens.length === 0) {
         continue
       }
+    } else if (query.identityType === 'single_team') {
+      const teamTokens = buildSearchTokensForLabel(params.team)
+      if (!params.team || !params.date || (!params.league && !params.sport) || teamTokens.length === 0) {
+        continue
+      }
+      const searchResolution = await resolveSportsMetaIdentityBySearch(client, query)
+      if (searchResolution) return searchResolution
+      recordFailure({
+        status: SPORTS_META_RESOLUTION_STATUS.NOT_FOUND,
+        identityType: query.identityType,
+        query: query.params,
+        reason: 'single_team_not_found',
+        canonicalId: '',
+        canonical: null
+      })
+      continue
     }
 
     let payload = null

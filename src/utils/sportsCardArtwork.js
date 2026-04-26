@@ -123,21 +123,54 @@ function layoutSportsCard(input = {}, variant = 'poster') {
     }
   }
 
-  const titleLines = wrapText(normalized.eventTitle, maxWidth, titleSize, 2)
+  const competitionLines = wrapText(normalized.competition, maxWidth, competitionSize, isPoster ? 2 : 1)
+  const titleLines = wrapText(normalized.eventTitle, maxWidth, titleSize, isPoster ? 4 : 3)
   const lines = [
-    { role: 'sport', text: wrapText(normalized.sport, maxWidth, sportSize, 1)[0] || 'Sports', x: safe, y: isPoster ? 94 : 146, fontSize: sportSize, weight: 800 },
-    { role: 'competition', text: wrapText(normalized.competition, maxWidth, competitionSize, 1)[0] || '', x: safe, y: isPoster ? 154 : 230, fontSize: competitionSize, weight: 700 },
-    ...titleLines.map((text, index) => ({
+    { role: 'sport', text: wrapText(normalized.sport, maxWidth, sportSize, 1)[0] || 'Sports', x: safe, y: isPoster ? 86 : 146, fontSize: sportSize, weight: 800 }
+  ]
+
+  const competitionStartY = isPoster ? 136 : 230
+  competitionLines.forEach((text, index) => {
+    lines.push({
+      role: 'competition',
+      text,
+      x: safe,
+      y: competitionStartY + index * Math.round(competitionSize * 1.18),
+      fontSize: competitionSize,
+      weight: 700
+    })
+  })
+
+  const titleStartY = isPoster ? 286 : 486
+  const titleStep = Math.round(titleSize * 1.18)
+  titleLines.forEach((text, index) => {
+    lines.push({
       role: 'eventTitle',
       text,
       x: safe,
-      y: (isPoster ? 314 : 486) + index * Math.round(titleSize * 1.24),
+      y: titleStartY + index * titleStep,
       fontSize: titleSize,
       weight: 850
-    })),
-    { role: 'eventDetail', text: wrapText(normalized.eventDetail || '', maxWidth, detailSize, 1)[0] || '', x: safe, y: isPoster ? 510 : 760, fontSize: detailSize, weight: 650 },
-    { role: 'footer', text: wrapText(footer, maxWidth, footerSize, 1)[0] || '', x: safe, y: dimensions.height - safe - 18, fontSize: footerSize, weight: 600 }
-  ].filter((line) => line.text)
+    })
+  })
+
+  const footerY = dimensions.height - safe - 18
+  const detailText = wrapText(normalized.eventDetail || '', maxWidth, detailSize, 1)[0] || ''
+  const detailY = titleStartY + (titleLines.length * titleStep) + (isPoster ? 42 : 58)
+  if (detailText && detailY < footerY - Math.round(detailSize * 1.7)) {
+    lines.push({
+      role: 'eventDetail',
+      text: detailText,
+      x: safe,
+      y: detailY,
+      fontSize: detailSize,
+      weight: 650
+    })
+  }
+  const footerText = wrapText(footer, maxWidth, footerSize, 1)[0] || ''
+  if (footerText) {
+    lines.push({ role: 'footer', text: footerText, x: safe, y: footerY, fontSize: footerSize, weight: 600 })
+  }
 
   return { normalized, dimensions, safe, lines }
 }

@@ -9,6 +9,7 @@ const {
   layoutSportsCard,
   renderSportsArtworkSvg
 } = require('../src/utils/sportsCardArtwork')
+const { handleCanonicalSportsArtwork } = require('../src/handlers/sportsArtworkProxy')
 const { SPORTS_DISCOVERY_CATALOGS } = require('../src/config/sportsCatalogs')
 const { normalizeSportsEventMetadata } = require('../src/utils/sportsEventNormalizer')
 
@@ -342,6 +343,134 @@ function countByRole(nodes) {
   }, {})
 }
 
+function pngDimensions(buffer) {
+  return {
+    width: buffer.readUInt32BE(16),
+    height: buffer.readUInt32BE(20)
+  }
+}
+
+function makeMockResponse() {
+  return {
+    statusCode: 0,
+    headers: {},
+    body: null,
+    setHeader(name, value) {
+      this.headers[String(name).toLowerCase()] = String(value)
+    },
+    status(code) {
+      this.statusCode = code
+      return this
+    },
+    type(value) {
+      this.setHeader('Content-Type', value)
+      return this
+    },
+    send(value) {
+      this.body = Buffer.isBuffer(value) ? value : Buffer.from(String(value || ''))
+      return this
+    },
+    end(value) {
+      this.body = Buffer.isBuffer(value) ? value : Buffer.from(value || '')
+      return this
+    }
+  }
+}
+
+function teamBadgeSvg(label, fill) {
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+    <rect width="256" height="256" rx="40" fill="${fill}"/>
+    <circle cx="128" cy="128" r="92" fill="rgba(255,255,255,0.16)" stroke="#fff" stroke-width="8"/>
+    <text x="128" y="146" text-anchor="middle" font-family="Arial Black, Arial" font-size="58" font-weight="900" fill="#fff">${label}</text>
+  </svg>`
+}
+
+async function assertTeamBadgeArtworkProxy() {
+  const originalFetch = global.fetch
+  const canonicalId = 'sportsmeta:event:hockey|2026-04-25|nhl|utah-mammoth|vegas-golden-knights'
+  const dimensions = {
+    poster: { width: 600, height: 900 },
+    landscape: { width: 1280, height: 720 }
+  }
+  try {
+    global.fetch = async (input) => {
+      const url = new URL(String(input))
+      if (
+        url.pathname === `/member/test-token/asset/poster/${encodeURIComponent(canonicalId)}` ||
+        url.pathname === `/member/test-token/asset/landscape/${encodeURIComponent(canonicalId)}`
+      ) {
+        return new Response('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900"></svg>', {
+          status: 200,
+          headers: {
+            'content-type': 'image/svg+xml',
+            'x-sportsmeta-generated-asset': 'true'
+          }
+        })
+      }
+      if (url.pathname === `/event/${encodeURIComponent(canonicalId)}`) {
+        return new Response(JSON.stringify({
+          ok: true,
+          event: {
+            id: canonicalId,
+            title: 'Utah Mammoth vs Vegas Golden Knights',
+            sport: 'Hockey',
+            league: 'NHL',
+            date: '2026-04-25',
+            homeTeam: 'Utah Mammoth',
+            awayTeam: 'Vegas Golden Knights'
+          },
+          assets: {
+            homeBadge: `https://sportsmeta.test/member/test-token/asset/homeBadge/${encodeURIComponent(canonicalId)}`,
+            awayBadge: `https://sportsmeta.test/member/test-token/asset/awayBadge/${encodeURIComponent(canonicalId)}`
+          }
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      }
+      if (url.pathname === `/member/test-token/asset/homeBadge/${encodeURIComponent(canonicalId)}`) {
+        return new Response(teamBadgeSvg('UTA', '#155e75'), {
+          status: 200,
+          headers: { 'content-type': 'image/svg+xml' }
+        })
+      }
+      if (url.pathname === `/member/test-token/asset/awayBadge/${encodeURIComponent(canonicalId)}`) {
+        return new Response(teamBadgeSvg('VGK', '#92400e'), {
+          status: 200,
+          headers: { 'content-type': 'image/svg+xml' }
+        })
+      }
+      throw new Error(`Unexpected sports artwork proxy fetch: ${url.toString()}`)
+    }
+
+    for (const variant of Object.keys(dimensions)) {
+      const response = makeMockResponse()
+      await handleCanonicalSportsArtwork(
+        {
+          params: {
+            variant,
+            canonicalId: `${encodeURIComponent(canonicalId)}.png`
+          },
+          query: {}
+        },
+        response,
+        {
+          sportsmetaBaseUrl: 'https://sportsmeta.test',
+          sportsPosterMemberToken: 'test-token'
+        }
+      )
+      assert.equal(response.statusCode, 200, `team badge ${variant} proxy should return 200`)
+      assert.equal(response.headers['content-type'], 'image/png', `team badge ${variant} proxy should return PNG`)
+      assert.equal(response.headers['x-pvtkrrx-artwork-source'], `pvtkrrx-team-badge-${variant}`, `team badge ${variant} proxy should replace generated/SVG art`)
+      assert.match(response.headers['x-pvtkrrx-artwork-fallback'] || '', /team_badges/, `team badge ${variant} proxy should report fallback reason`)
+      assert.ok(Buffer.isBuffer(response.body), `team badge ${variant} proxy should return bytes`)
+      assert.deepEqual(pngDimensions(response.body), dimensions[variant], `team badge ${variant} dimensions`)
+    }
+  } finally {
+    global.fetch = originalFetch
+  }
+}
+
 async function main() {
   fs.mkdirSync(PREVIEW_DIR, { recursive: true })
 
@@ -374,8 +503,8 @@ async function main() {
     assert.ok(nodes.length > 0, `${testCase.slug} text nodes`)
     const counts = countByRole(nodes)
     assert.ok((counts.sport || 0) <= 1, `${testCase.slug} sport max lines`)
-    assert.ok((counts.competition || 0) <= 1, `${testCase.slug} competition max lines`)
-    assert.ok((counts.eventTitle || 0) <= 2, `${testCase.slug} eventTitle max lines`)
+    assert.ok((counts.competition || 0) <= 2, `${testCase.slug} competition max lines`)
+    assert.ok((counts.eventTitle || 0) <= 4, `${testCase.slug} eventTitle max lines`)
     assert.ok((counts.eventDetail || 0) <= 1, `${testCase.slug} eventDetail max lines`)
     assert.ok((counts.footer || 0) <= 1, `${testCase.slug} footer max lines`)
 
@@ -385,12 +514,20 @@ async function main() {
       assert.ok(node.y >= layout.safe, `${testCase.slug} y safe ${node.role}`)
       assert.ok(node.y <= DIMENSIONS.poster.height - layout.safe, `${testCase.slug} y max ${node.role}`)
     }
+    for (let index = 1; index < nodes.length; index += 1) {
+      assert.ok(
+        nodes[index].y - nodes[index - 1].y >= 20,
+        `${testCase.slug} text rows should not overlap (${nodes[index - 1].role} -> ${nodes[index].role})`
+      )
+    }
 
     const svgPath = path.join(PREVIEW_DIR, `${testCase.slug}.svg`)
     const pngPath = path.join(PREVIEW_DIR, `${testCase.slug}.png`)
     fs.writeFileSync(svgPath, svg)
     await sharp(Buffer.from(svg)).png().toFile(pngPath)
   }
+
+  await assertTeamBadgeArtworkProxy()
 
   console.log(`Sports artwork layout smoke passed. Previews: ${PREVIEW_DIR}`)
 }

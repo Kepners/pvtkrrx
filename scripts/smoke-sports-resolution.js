@@ -68,6 +68,8 @@ async function run() {
   const barcaOtherId = 'sportsmeta:event:football|2026-04-25|spanish-la-liga|getafe|barcelona'
   const barcaWomenId = 'sportsmeta:event:football|2026-04-25|uefa-womens-champions-league|bayern-munich-women|barcelona-femen'
   const badChelseaId = 'sportsmeta:event:football|2026-03-24|ghanaian-premier-league|berekum-chelsea|medeama'
+  const faCupChelseaLeedsId = 'sportsmeta:event:football|2026-04-26|fa-cup|chelsea|leeds-united'
+  const mlbRoyalsAngelsId = 'sportsmeta:event:baseball|2026-04-25|mlb|kansas-city-royals|los-angeles-angels'
   const motoGpSpainId = 'sportsmeta:event:motorsport|2026-04-25|motogp|spain-sprint-race'
   const fetchCounts = new Map()
 
@@ -109,7 +111,23 @@ async function run() {
     ) {
       return new Response(JSON.stringify({
         metas: [
+          { id: faCupChelseaLeedsId, name: 'Chelsea vs Leeds United', releaseInfo: '2026-04-26' },
           { id: badChelseaId, name: 'Berekum Chelsea vs Medeama', releaseInfo: '2026-03-24' }
+        ]
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
+    if (
+      url.pathname === '/catalog/movie/sportsmeta-baseball/search=royals.json' ||
+      url.pathname === '/catalog/movie/sportsmeta-baseball/search=angels.json' ||
+      url.pathname === '/catalog/movie/sportsmeta-baseball/search=los.json'
+    ) {
+      return new Response(JSON.stringify({
+        metas: [
+          { id: mlbRoyalsAngelsId, name: 'Kansas City Royals vs Los Angeles Angels', releaseInfo: '2026-04-25' }
         ]
       }), {
         status: 200,
@@ -221,6 +239,36 @@ async function run() {
         sport: 'Football',
         homeTeam: 'Berekum Chelsea',
         awayTeam: 'Medeama'
+      })), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
+    if (url.pathname === `/event/${encodeURIComponent(faCupChelseaLeedsId)}`) {
+      return new Response(JSON.stringify(canonicalPayload({
+        id: faCupChelseaLeedsId,
+        name: 'Chelsea vs Leeds United',
+        league: 'FA Cup',
+        date: '2026-04-26',
+        sport: 'Football',
+        homeTeam: 'Chelsea',
+        awayTeam: 'Leeds United'
+      })), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
+    if (url.pathname === `/event/${encodeURIComponent(mlbRoyalsAngelsId)}`) {
+      return new Response(JSON.stringify(canonicalPayload({
+        id: mlbRoyalsAngelsId,
+        name: 'Kansas City Royals vs Los Angeles Angels',
+        league: 'MLB',
+        date: '2026-04-25',
+        sport: 'Baseball',
+        homeTeam: 'Kansas City Royals',
+        awayTeam: 'Los Angeles Angels'
       })), {
         status: 200,
         headers: { 'content-type': 'application/json' }
@@ -358,6 +406,32 @@ async function run() {
     SPORTS_META_RESOLUTION_STATUS.RESOLVED,
     'matchup search fallback must not pair Arsenal vs Chelsea to an unrelated Chelsea fixture'
   )
+
+  const oneTeamFaCup = parseSportsTitle('Football FA Cup vs Chelsea 2026 04 25 1080p', '2026-04-25T12:00:00Z')
+  assert.equal(oneTeamFaCup?.league, 'FA Cup', 'FA Cup tracker rows should keep FA Cup as the competition')
+  assert.equal(oneTeamFaCup?.awayTeam, 'Chelsea', 'FA Cup one-team tracker rows should preserve the real team token')
+
+  const faCupResolution = await resolveSportsMetaIdentity(
+    client,
+    availability('Football FA Cup vs Chelsea 2026 04 25 1080p', {
+      sportHint: 'football',
+      mappedLeague: 'FA Cup',
+      pubDate: '2026-04-25T12:00:00.000Z'
+    })
+  )
+  assert.equal(faCupResolution.status, SPORTS_META_RESOLUTION_STATUS.RESOLVED, 'one-team FA Cup rows should resolve through same/next-day team search')
+  assert.equal(faCupResolution.canonicalId, faCupChelseaLeedsId, 'FA Cup vs Chelsea should pair to the proved Chelsea vs Leeds United event')
+
+  const mlbResolution = await resolveSportsMetaIdentity(
+    client,
+    availability('Kansas City Royals vs Los Angeles Angels MLB 2026 04 25', {
+      sportHint: 'baseball',
+      mappedLeague: 'MLB',
+      pubDate: '2026-04-25T12:00:00.000Z'
+    })
+  )
+  assert.equal(mlbResolution.status, SPORTS_META_RESOLUTION_STATUS.RESOLVED, 'MLB rows with trailing league text should resolve to SportsMeta events')
+  assert.equal(mlbResolution.canonicalId, mlbRoyalsAngelsId, 'MLB Royals vs Angels should pair to the canonical MLB event')
 
   const motogpSession = parseSportsEventTitle('MotoGP 2026 Round04 Spain Jerez FP1 Practice WEB DL 1080p H264 English')
   assert.equal(motogpSession?.eventName, 'Spain Jerez', 'motorsport parser should strip round/session wording from event names')
