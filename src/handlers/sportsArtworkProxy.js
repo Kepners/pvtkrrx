@@ -11,6 +11,10 @@ const {
   buildArtworkInputFromRequest,
   renderSportsArtworkSvg
 } = require('../utils/sportsCardArtwork')
+const {
+  readSportsArtworkDiskCache,
+  writeSportsArtworkDiskCache
+} = require('../utils/sportsArtworkDiskCache')
 
 const VARIANT_DIMENSIONS = {
   poster: { width: 600, height: 900 },
@@ -20,6 +24,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
+const LOCAL_ARTWORK_RENDER_VERSION = '20260427-visual-v3'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -404,8 +409,18 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
 async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, teamPosterContext = {}) {
   const now = Date.now()
   const hit = rasterCache.get(cacheKey)
-  if (hit && hit.expiresAt > now) return hit.value
+  if (hit && hit.expiresAt > now) return { ...hit.value, cacheLayer: hit.value.cacheLayer || 'memory' }
   if (rasterInFlight.has(cacheKey)) return rasterInFlight.get(cacheKey)
+
+  const diskHit = await readSportsArtworkDiskCache(cacheKey)
+  if (diskHit) {
+    rasterCache.set(cacheKey, {
+      value: diskHit,
+      expiresAt: Date.now() + RASTER_CACHE_TTL_MS
+    })
+    trimCache()
+    return diskHit
+  }
 
   const pending = (async () => {
     try {
@@ -477,9 +492,14 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
     }
   })()
     .then((value) => {
-      rasterCache.set(cacheKey, { value, expiresAt: Date.now() + RASTER_CACHE_TTL_MS })
+      const cachedValue = { ...value, cacheLayer: value.cacheLayer || 'rendered' }
+      rasterCache.set(cacheKey, { value: cachedValue, expiresAt: Date.now() + RASTER_CACHE_TTL_MS })
       trimCache()
-      return value
+      writeSportsArtworkDiskCache(cacheKey, cachedValue, {
+        ttlMs: RASTER_CACHE_TTL_MS,
+        maxEntries: RASTER_CACHE_MAX_KEYS
+      }).catch(() => {})
+      return cachedValue
     })
     .finally(() => {
       rasterInFlight.delete(cacheKey)
@@ -538,9 +558,10 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
     res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000, stale-if-error=2592000')
     res.setHeader('X-PVTKRRX-Artwork-Upstream', redactUrl(upstreamUrl))
     res.setHeader('X-PVTKRRX-Artwork-Source', result.selectedArtworkSource || 'unknown')
+    res.setHeader('X-PVTKRRX-Artwork-Cache', result.cacheLayer || 'rendered')
     if (result.fallbackReason) res.setHeader('X-PVTKRRX-Artwork-Fallback', result.fallbackReason)
     console.log(
-      `[sports-artwork] selectedArtworkSource=${result.selectedArtworkSource || 'unknown'} variant=${variant} artworkUrl=${redactUrl(upstreamUrl)} fallbackReason=${result.fallbackReason || ''} httpStatus=${result.httpStatus || ''} contentType=${result.upstreamContentType || contentType || ''}`
+      `[sports-artwork] selectedArtworkSource=${result.selectedArtworkSource || 'unknown'} variant=${variant} cache=${result.cacheLayer || 'rendered'} artworkUrl=${redactUrl(upstreamUrl)} fallbackReason=${result.fallbackReason || ''} httpStatus=${result.httpStatus || ''} contentType=${result.upstreamContentType || contentType || ''}`
     )
     res.status(200).end(buffer)
   } catch (err) {
@@ -553,6 +574,7 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
 
 function buildDefaultArtworkCacheKey({ variant, sportSlug, league, title, date, detail, seeders, size, rawTitle, sportsmetaBaseUrl }) {
   return [
+    LOCAL_ARTWORK_RENDER_VERSION,
     'default',
     variant,
     sportSlug,
@@ -568,7 +590,7 @@ function buildDefaultArtworkCacheKey({ variant, sportSlug, league, title, date, 
 }
 
 function buildCanonicalArtworkCacheKey({ variant, canonicalId, sportsmetaBaseUrl, memberToken }) {
-  return `id|${variant}|${canonicalId}|${(sportsmetaBaseUrl || '').trim().toLowerCase()}|${tokenFingerprint(memberToken)}`
+  return `${LOCAL_ARTWORK_RENDER_VERSION}|id|${variant}|${canonicalId}|${(sportsmetaBaseUrl || '').trim().toLowerCase()}|${tokenFingerprint(memberToken)}`
 }
 
 async function handleDefaultSportsArtwork(req, res, config = {}) {

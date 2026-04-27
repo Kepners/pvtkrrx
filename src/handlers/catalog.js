@@ -9,6 +9,7 @@ const { normalizeSportKey, resolveSportHint, isSportsNoiseTitle, isLikelySportsE
 const { isSportsCultIndexer, isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 const { formatSize, findVideoFile } = require('../utils/streams')
 const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
+const { parseSportsTorrentProfile, rankSportsTorrent } = require('../utils/sportsTorrentProfile')
 const { getMappedLeagueEntry, mapLeague, normalizeLeagueCode } = require('../utils/leagueMap')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { encodeCustomId } = require('../utils/customId')
@@ -481,6 +482,9 @@ function compareItems(a, b, query = '') {
   const relDiff = relevanceScore(b.title, query) - relevanceScore(a.title, query)
   if (relDiff !== 0) return relDiff
 
+  const sportsRankDiff = sportsTorrentRankScore(b, query) - sportsTorrentRankScore(a, query)
+  if (sportsRankDiff !== 0) return sportsRankDiff
+
   const dateDiff = toTimestamp(b.pubDate) - toTimestamp(a.pubDate)
   if (dateDiff !== 0) return dateDiff
 
@@ -494,6 +498,18 @@ function compareItems(a, b, query = '') {
   if (sizeDiff !== 0) return sizeDiff
 
   return String(a.title || '').localeCompare(String(b.title || ''))
+}
+
+function sportsTorrentRankScore(item = {}, query = '') {
+  if (!item || typeof item !== 'object') return 0
+  if (!item.sportsProfile && !Number.isFinite(Number(item.sportsRank))) return 0
+  return rankSportsTorrent(item, query, {
+    profile: item.sportsProfile,
+    parsedSportsEvent: item.parsedSportsEvent,
+    parsedEvent: item.parsedEvent,
+    sportHint: item.sportHint,
+    today: currentUtcDateString()
+  })
 }
 
 function currentUtcDateString() {
@@ -546,6 +562,12 @@ function normalizeSportsCatalogItems(items = []) {
     const parsedSportsEvent = parseSportsTitle(item?.title || '', item?.pubDate || item?.publishDate || '')
     const parsedEvent = !parsedSportsEvent ? parseSportsEventTitle(item?.title || '') : null
     const effectiveLeague = parsedSportsEvent?.league || parsedEvent?.league || ''
+    const sportsProfile = parseSportsTorrentProfile(item, {
+      parsedSportsEvent,
+      parsedEvent,
+      sportHint: item?.sportHint,
+      league: effectiveLeague
+    })
     return {
       ...item,
       trackerSource: {
@@ -561,6 +583,14 @@ function normalizeSportsCatalogItems(items = []) {
       trackerSourceType: isSportsCultIndexer(item?.indexer) ? 'sportscult' : 'other',
       parsedSportsEvent,
       parsedEvent,
+      sportsProfile,
+      sportsRank: rankSportsTorrent(item, '', {
+        profile: sportsProfile,
+        parsedSportsEvent,
+        parsedEvent,
+        sportHint: item?.sportHint,
+        today: currentUtcDateString()
+      }),
       mappedLeague: mapLeague(effectiveLeague) || '',
       sportHint: resolveSportHint({
         explicitHint: item?.sportHint,

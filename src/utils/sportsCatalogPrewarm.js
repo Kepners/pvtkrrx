@@ -16,6 +16,22 @@ function parseBooleanEnv(value, fallback = false) {
   return fallback
 }
 
+function normalizeBaseUrl(value = '') {
+  return String(value || '').trim().replace(/\/+$/, '')
+}
+
+function resolveArtworkPrewarmBaseUrl(config = {}, options = {}) {
+  return normalizeBaseUrl(
+    options.artworkBaseUrl ||
+    process.env.PVTKRRX_SPORTS_PREWARM_BASE_URL ||
+    process.env.PVTKRRX_PUBLIC_BASE_URL ||
+    process.env.PVTKRRX_PLAYBACK_BASE_URL ||
+    config.publicBaseUrl ||
+    config.playbackBaseUrl ||
+    ''
+  )
+}
+
 function hasSportsProviderConfig(config = {}) {
   return Boolean(
     String(config?.jackettUrl || '').trim() &&
@@ -38,6 +54,51 @@ function mapLimit(items, limit, mapper) {
 
   return Promise.all(Array.from({ length: Math.max(1, limit) }, () => worker()))
     .then(() => out)
+}
+
+function collectSportsArtworkUrls(metas = []) {
+  const urls = []
+  const seen = new Set()
+  const fields = ['poster', 'background', 'logo', 'landscape']
+  for (const meta of Array.isArray(metas) ? metas : []) {
+    for (const field of fields) {
+      const url = String(meta?.[field] || '').trim()
+      if (!url || seen.has(url) || !/\/sports-artwork\//i.test(url)) continue
+      seen.add(url)
+      urls.push(url)
+    }
+  }
+  return urls
+}
+
+async function prewarmSportsArtworkUrls(urls = [], options = {}) {
+  const source = Array.isArray(urls) ? urls : []
+  if (source.length === 0) return { requested: 0, ok: 0, failed: 0 }
+  const concurrency = Math.max(
+    1,
+    Number(options.concurrency || process.env.PVTKRRX_SPORTS_PREWARM_ARTWORK_CONCURRENCY || 3) || 3
+  )
+  const timeoutMs = Math.max(
+    1500,
+    Number(options.timeoutMs || process.env.PVTKRRX_SPORTS_PREWARM_ARTWORK_TIMEOUT_MS || 8000) || 8000
+  )
+  const results = await mapLimit(source, concurrency, async (url) => {
+    try {
+      const response = await fetch(url, {
+        headers: { accept: 'image/png,image/jpeg,image/*' },
+        signal: AbortSignal.timeout(timeoutMs)
+      })
+      return { ok: response.ok }
+    } catch (_) {
+      return { ok: false }
+    }
+  })
+  const ok = results.filter((result) => result?.ok).length
+  return {
+    requested: source.length,
+    ok,
+    failed: source.length - ok
+  }
 }
 
 function addPrewarmJob(jobs, seen, catalogId, extra = '') {
@@ -124,22 +185,55 @@ async function prewarmSportsCatalogIndex(config = {}, options = {}) {
   )
   const started = Date.now()
   const beforeStats = getSportsIdentityBackfillStats()
+  const artworkBaseUrl = resolveArtworkPrewarmBaseUrl(config, options)
+  const artworkPrewarmEnabled = parseBooleanEnv(
+    process.env.PVTKRRX_SPORTS_PREWARM_ARTWORK,
+    Boolean(artworkBaseUrl)
+  )
+  const artworkLimit = Math.max(
+    0,
+    Number(options.artworkLimit || process.env.PVTKRRX_SPORTS_PREWARM_ARTWORK_LIMIT || 180) || 180
+  )
+  const artworkSeen = new Set()
+  let artworkRequested = 0
+  let artworkOk = 0
+  let artworkFailed = 0
 
   if (logger?.log) {
-    logger.log(`[sports-prewarm] starting reason=${reason} jobs=${jobs.length} concurrency=${concurrency}`)
+    logger.log(
+      `[sports-prewarm] starting reason=${reason} jobs=${jobs.length} concurrency=${concurrency} ` +
+      `artwork=${artworkPrewarmEnabled && artworkBaseUrl ? 'on' : 'off'}`
+    )
   }
 
   const results = await mapLimit(jobs, concurrency, async (job) => {
     const jobStart = Date.now()
     try {
       const result = await handleCatalog(config, job.type, job.id, job.extra, {
-        baseUrl: ''
+        baseUrl: artworkPrewarmEnabled && artworkBaseUrl ? artworkBaseUrl : ''
       })
+      let artwork = { requested: 0, ok: 0, failed: 0 }
+      if (artworkPrewarmEnabled && artworkBaseUrl && artworkLimit > 0) {
+        const candidateUrls = collectSportsArtworkUrls(result?.metas)
+        const urls = []
+        for (const url of candidateUrls) {
+          if (artworkSeen.has(url) || artworkSeen.size >= artworkLimit) continue
+          artworkSeen.add(url)
+          urls.push(url)
+        }
+        artwork = await prewarmSportsArtworkUrls(urls, options.artwork || {})
+        artworkRequested += artwork.requested
+        artworkOk += artwork.ok
+        artworkFailed += artwork.failed
+      }
       return {
         ok: true,
         id: job.id,
         extra: job.extra,
         metas: Array.isArray(result?.metas) ? result.metas.length : 0,
+        artworkRequested: artwork.requested,
+        artworkOk: artwork.ok,
+        artworkFailed: artwork.failed,
         ms: Date.now() - jobStart
       }
     } catch (error) {
@@ -167,7 +261,8 @@ async function prewarmSportsCatalogIndex(config = {}, options = {}) {
       `[sports-prewarm] finished reason=${reason} jobs=${results.length} ok=${ok} failed=${failed} metas=${metas} ` +
       `cacheBefore=${beforeStats.cacheEntries} cacheAfter=${afterBackfillStats.cacheEntries} ` +
       `queuedAfterCatalog=${afterCatalogStats.queueEntries + afterCatalogStats.activeWorkers} ` +
-      `remainingQueue=${afterBackfillStats.queueEntries + afterBackfillStats.activeWorkers} ms=${elapsed}`
+      `remainingQueue=${afterBackfillStats.queueEntries + afterBackfillStats.activeWorkers} ` +
+      `artworkRequested=${artworkRequested} artworkOk=${artworkOk} artworkFailed=${artworkFailed} ms=${elapsed}`
     )
   }
 
@@ -185,7 +280,14 @@ async function prewarmSportsCatalogIndex(config = {}, options = {}) {
     elapsed,
     beforeStats,
     afterCatalogStats,
-    afterBackfillStats
+    afterBackfillStats,
+    artwork: {
+      enabled: artworkPrewarmEnabled && Boolean(artworkBaseUrl),
+      baseUrl: artworkBaseUrl,
+      requested: artworkRequested,
+      ok: artworkOk,
+      failed: artworkFailed
+    }
   }
 }
 

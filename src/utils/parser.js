@@ -16,6 +16,8 @@ function parse(title) {
 }
 
 function extractQuality(t) {
+  if (/\b(?:2160p|4k|uhd)\b/i.test(t)) return '2160p'
+  if (/\b1080i\b/i.test(t)) return '1080i'
   if (/2160p/i.test(t)) return '2160p'
   if (/1080p/i.test(t)) return '1080p'
   if (/720p/i.test(t)) return '720p'

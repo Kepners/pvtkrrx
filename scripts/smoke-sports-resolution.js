@@ -24,6 +24,7 @@ const {
 const { encodeCustomId } = require('../src/utils/customId')
 const { normalizeSportsEventMetadata } = require('../src/utils/sportsEventNormalizer')
 const { parseSportsEventTitle, parseSportsTitle } = require('../src/utils/sportsTitleParser')
+const { parseSportsTorrentProfile, rankSportsTorrent } = require('../src/utils/sportsTorrentProfile')
 
 const ORIGINAL_FETCH = global.fetch
 
@@ -465,7 +466,7 @@ async function run() {
   )
   assert.equal(
     paidSportsMetaResponse.meta?.poster,
-    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}&v=20260427-visual-v2`,
+    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}&v=20260427-visual-v3`,
     'paid sports configs must emit PVTKRRX raster-proxy poster URLs for canonical sports art'
   )
 
@@ -479,7 +480,7 @@ async function run() {
     })
     assert.equal(
       envTokenPoster.poster,
-      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_env_poster_token')}&v=20260427-visual-v2`,
+      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_env_poster_token')}&v=20260427-visual-v3`,
       'PVTKRRX should prefer SportsMeta member artwork when a runtime env token is configured'
     )
   } finally {
@@ -679,6 +680,115 @@ async function run() {
   )
   assert.equal(motoGpResolution.status, SPORTS_META_RESOLUTION_STATUS.RESOLVED, 'MotoGP location aliases should resolve without treating torrent publish date as event date')
   assert.equal(motoGpResolution.canonicalId, motoGpSpainId, 'MotoGP Spain Jerez should pair with the SportsMeta Spain Sprint Race')
+
+  const motogpTntProfile = parseSportsTorrentProfile({
+    title: 'MotoGP 2026 Round04 Spain Jerez Race TNT WEB DL 1080p H264 DDP5 1 English MWR',
+    pubDate: '2026-04-26T12:00:00.000Z',
+    sportHint: 'motorsport',
+    seeders: 5
+  })
+  assert.equal(motogpTntProfile.league, 'MotoGP', 'Prowlarr MotoGP rows should classify as MotoGP')
+  assert.equal(motogpTntProfile.event, 'Spain Jerez', 'Prowlarr MotoGP rows should not leak TNT into the event name')
+  assert.equal(motogpTntProfile.session, 'Race', 'Prowlarr MotoGP rows should expose the session')
+  assert.equal(motogpTntProfile.broadcast, 'TNT', 'Prowlarr MotoGP rows should keep broadcast separately')
+  assert.equal(motogpTntProfile.release_group, 'MWR', 'Prowlarr MotoGP rows should keep the real release group')
+
+  const mlbRsProfile = parseSportsTorrentProfile({
+    title: 'MLB 26 04 2026 RS Miami Marlins vs San Francisco Giants 720p60 EN NBCSBA',
+    pubDate: '2026-04-26T12:00:00.000Z',
+    sportHint: 'baseball',
+    seeders: 10
+  })
+  assert.equal(mlbRsProfile.league, 'MLB', 'Prowlarr MLB rows should classify as MLB')
+  assert.equal(mlbRsProfile.home_team, 'Miami Marlins', 'Prowlarr MLB rows should strip RS regular-season noise from home team')
+  assert.equal(mlbRsProfile.away_team, 'San Francisco Giants', 'Prowlarr MLB rows should keep the away team clean')
+
+  const iplMatchProfile = parseSportsTorrentProfile({
+    title: 'IPL 2026 M13 Rajasthan Royals vs Mumbai Indians Full Match Replay Sky Sports NZ WEB DL 1080p50FPS Jinx8004',
+    pubDate: '2026-04-07T12:00:00.000Z',
+    sportHint: 'cricket',
+    seeders: 2
+  })
+  assert.equal(iplMatchProfile.league, 'Indian Premier League', 'Prowlarr IPL rows should classify as Indian Premier League')
+  assert.equal(iplMatchProfile.home_team, 'Rajasthan Royals', 'Prowlarr IPL rows should strip match-number noise from home team')
+  assert.equal(iplMatchProfile.away_team, 'Mumbai Indians', 'Prowlarr IPL rows should keep the away team clean')
+
+  const iplKayoProfile = parseSportsTorrentProfile({
+    title: 'IPL 2026 M30 Gujarat Titans v Mumbai Indians Kayo Sport 1080p50 H 264',
+    pubDate: '2026-04-20T12:00:00.000Z',
+    sportHint: 'cricket',
+    seeders: 2
+  })
+  assert.equal(iplKayoProfile.league, 'Indian Premier League', 'Prowlarr IPL Kayo rows should classify as Indian Premier League')
+  assert.equal(iplKayoProfile.home_team, 'Gujarat Titans', 'Prowlarr IPL Kayo rows should strip match-number noise from home team')
+  assert.equal(iplKayoProfile.away_team, 'Mumbai Indians', 'Prowlarr IPL Kayo rows should strip Kayo Sport from away team')
+  assert.equal(iplKayoProfile.broadcast, 'Kayo Sports', 'Prowlarr IPL Kayo rows should keep Kayo as broadcast metadata')
+
+  const wweProfile = parseSportsTorrentProfile({
+    title: 'WWE SmackDown 2026 04 24 1080p WEB h264 HEEL',
+    pubDate: '2026-04-24T12:00:00.000Z',
+    sportHint: 'wrestling',
+    seeders: 7
+  })
+  assert.equal(wweProfile.league, 'WWE', 'Prowlarr WWE rows should classify as WWE')
+  assert.equal(wweProfile.event, 'SmackDown', 'Prowlarr WWE rows should keep the show name as the event')
+
+  const superRugbyProfile = parseSportsTorrentProfile({
+    title: 'Super Rugby 2026 Hurricanes vs Brumbies 25 04 1080p50fps',
+    pubDate: '2026-04-26T12:00:00.000Z',
+    sportHint: 'rugby',
+    seeders: 1
+  })
+  assert.equal(superRugbyProfile.league, 'Super Rugby', 'Prowlarr Super Rugby rows should not map to rugby league')
+  assert.equal(superRugbyProfile.home_team, 'Hurricanes', 'Prowlarr Super Rugby rows should keep home team clean')
+
+  const basketballChampionsProfile = parseSportsTorrentProfile({
+    title: '2026 Basketball Champions League of Americas F4 SF Boca Juniors (Arg) vs Flamengo (Bra)',
+    pubDate: '2026-04-17T12:00:00.000Z',
+    sportHint: 'football',
+    seeders: 0
+  })
+  assert.equal(basketballChampionsProfile.sport, 'basketball', 'basketball league words should override a wrong football tracker hint')
+  assert.equal(basketballChampionsProfile.league, 'Basketball Champions League Americas', 'Basketball Champions League rows should classify as basketball')
+  assert.equal(basketballChampionsProfile.home_team, 'Boca Juniors Arg', 'Basketball Champions League rows should strip final-four round noise from home team')
+
+  const basketballChampionsGeneralProfile = parseSportsTorrentProfile({
+    title: 'Basketball Champions League Quarter Final 2026 La Laguna Tenerife vs Galatasaray Game 3 15 04 720pEN60fps',
+    pubDate: '2026-04-15T12:00:00.000Z',
+    sportHint: 'football',
+    seeders: 1
+  })
+  assert.equal(basketballChampionsGeneralProfile.sport, 'basketball', 'Basketball Champions League general rows should override wrong football hints')
+  assert.equal(basketballChampionsGeneralProfile.league, 'Basketball Champions League', 'Basketball Champions League should not map to UEFA Champions League')
+  assert.equal(basketballChampionsGeneralProfile.home_team, 'La Laguna Tenerife', 'Basketball Champions League should preserve the home team')
+  assert.equal(basketballChampionsGeneralProfile.away_team, 'Galatasaray', 'Basketball Champions League should preserve the away team')
+
+  const pgaPrefixedProfile = parseSportsTorrentProfile({
+    title: 'Golf PGA Tour Valero Texas Open Day 2 03 04 1080pEN50fps Sky Sports Golf',
+    pubDate: '2026-04-03T12:00:00.000Z',
+    sportHint: 'golf',
+    seeders: 1
+  })
+  assert.equal(pgaPrefixedProfile.league, 'PGA Tour', 'Golf-prefixed PGA Tour rows should keep PGA Tour as the league')
+  assert.equal(pgaPrefixedProfile.event, 'Valero Texas Open Day', 'Golf-prefixed PGA Tour rows should preserve the event label')
+  assert.equal(pgaPrefixedProfile.broadcast, 'Sky Sports', 'Golf-prefixed PGA Tour rows should keep Sky as broadcast metadata')
+
+  const oldArchiveRank = rankSportsTorrent({
+    title: 'Formula1 2017 Round 8 Azerbaijan GP Race 1080p WEB DL H264',
+    pubDate: '2026-04-26T12:00:00.000Z',
+    sportHint: 'motorsport',
+    seeders: 18
+  }, 'Formula 1', { today: '2026-04-27' })
+  const currentMotogpRank = rankSportsTorrent({
+    title: 'MotoGP Brazil Race 1080p',
+    pubDate: '2026-04-25T12:00:00.000Z',
+    sportHint: 'motorsport',
+    seeders: 1
+  }, 'MotoGP', { today: '2026-04-27' })
+  assert.ok(
+    currentMotogpRank > oldArchiveRank,
+    'sports torrent ranking should not let old archive seasons outrank current sports rows just because they were uploaded recently'
+  )
 
   clearSportsIdentityBackfillState()
   const backfillGroup = {

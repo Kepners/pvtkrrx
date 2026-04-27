@@ -324,7 +324,7 @@ const CASES = [
     },
     expected: {
       sport: 'Rugby',
-      competition: 'Super League Rugby',
+      competition: 'English Rugby League Super League',
       eventTitle: 'Leeds Rhinos vs Catalans Dragons'
     }
   },
@@ -744,9 +744,32 @@ async function main() {
 
     assert.ok(
       nodes.some((node) => node.role === 'visual-versus' || node.role === 'sport-motif') ||
-        /data-role="(?:matchup-visual|sport-visual)"/.test(svg),
+        /data-role="(?:matchup-visual|sport-visual|competition-poster-visual)"/.test(svg),
       `${testCase.slug} poster should include a visible event/sport motif`
     )
+
+    if (!nodes.some((node) => node.role === 'visual-versus')) {
+      assert.ok(
+        nodes.some((node) => node.role === 'competition-mark'),
+        `${testCase.slug} fallback poster should include a competition mark`
+      )
+    }
+
+    if (testCase.slug.includes('motogp') || testCase.slug.includes('motorsport')) {
+      assert.ok(
+        nodes.some((node) => node.role === 'competition-mark' && /motogp|f1|formula/i.test(node.text)) ||
+          /MotoGP|F1|FORMULA/i.test(svg),
+        `${testCase.slug} motorsport fallback should expose the competition, not a generic race card`
+      )
+    }
+
+    if (testCase.slug.includes('nba-playoffs')) {
+      assert.ok(
+        nodes.some((node) => node.role === 'competition-mark' && /NBA|PLAYOFFS/i.test(node.text)) ||
+          /NBA PLAYOFFS/i.test(svg),
+        `${testCase.slug} NBA Playoffs fallback should expose the competition mark`
+      )
+    }
 
     const svgPath = path.join(PREVIEW_DIR, `${testCase.slug}.svg`)
     const pngPath = path.join(PREVIEW_DIR, `${testCase.slug}.png`)

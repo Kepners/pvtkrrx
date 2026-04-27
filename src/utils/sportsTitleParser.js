@@ -1,21 +1,21 @@
 const { getMappedLeagueEntry } = require('./leagueMap')
 
 const QUALITY_RE = /^(?:(?:2160p|1080p|1080i|720p|576p|540p|480p|sd|hd|fhd|uhd)(?:[a-z]{1,4})?(?:\d{2,3}(?:fps)?)?|\d{2,3}fps)$/i
-const SOURCE_RE = /^(?:hdtv|pdtv|sdtv|webrip|webdl|web-dl|web|bluray|bdrip|dvdrip|satfeed|iptv|espn(?:p|plus|\+)?|f1tv|nesn|msg|usan?|nbcsn|sportsnet|sn|bally|bein(?:sport)?\d*|eurosport|skynz|fubo|newvision)$/i
+const SOURCE_RE = /^(?:hdtv|pdtv|sdtv|webrip|webdl|web-dl|web|bluray|bdrip|dvdrip|satfeed|iptv|espn(?:p|plus|\+)?|f1tv|fs1|nesn|msg|usan?|nbcsn|nbcsba|nbcsca|sportsnet|sn|sny|snla|snp|bally|bein(?:sport)?\d*|eurosport|skynz|kayo|fubo|newvision|tnt|fox|bbc|itv|cbs|abc|peacock|atvp?|apple)$/i
 const CODEC_RE = /^(?:x264|x265|h264|h265|hevc|avc|av1)(?:-.+)?$/i
 const RELEASE_GROUP_RE = /^[A-Z0-9]+-[A-Za-z0-9]+$/
 const HLG_HDR_RE = /^(?:hlg|hdr10?\+?|dovi?|dv|10bit|8bit)$/i
 const GENERIC_SPORT_PREFIX_RE = /^(?:football|soccer|basketball|baseball|cricket|rugby|mma|boxing|wrestling|darts|golf|motorsport|motor|tennis|hockey|ice|american|uefa)$/i
-const LEADING_TEAM_NOISE_RE = /^(?:game|games|match|matches|week|round|heat|session|fight|night|grand|prix|qualifying|practice|sprint|race|main|card|prelims?|early|cup|bowl|super|opening|closing|ceremony|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|championship|title|event|world|wimbledon|australian|roland|garros|open|us|east|west|centre|center|court|heavyweight|middleweight|welterweight|lightweight|featherweight|qf|sf|r\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
+const LEADING_TEAM_NOISE_RE = /^(?:game|games|match|matches|week|round|heat|session|fight|night|grand|prix|qualifying|practice|sprint|race|main|card|prelims?|early|cup|bowl|super|opening|closing|ceremony|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|championship|title|event|world|wimbledon|australian|roland|garros|open|us|east|west|centre|center|court|heavyweight|middleweight|welterweight|lightweight|rs|qf|sf|f\d*|r\d+|m\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
 const ROMAN_NUMERAL_RE = /^(?=[ivxlcdm]+$)m{0,4}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})$/i
-const TEAM_BROADCAST_RE = /\b(?:nbc|nbcsn|espn(?:2|p|plus|\+)?|f1tv|nesn|msg|usan?|yes(?:\s*network)?|sky(?:\s*sports?)?|bt(?:\s*sport)?|tnt(?:\s*sports?)?|fox(?:\s*sports?)?|cbs|abc|itv(?:4)?|tsn|sportsnet|sn|bally|bein(?:\s*sports?)?\d*|canal\+?|dazn|eurosport|skynz|fubo|newvision)\b/gi
+const TEAM_BROADCAST_RE = /\b(?:nbc|nbcsn|espn(?:2|p|plus|\+)?|f1tv|nesn|msg|usan?|yes(?:\s*network)?|sky(?:\s*sports?)?|bt(?:\s*sport)?|tnt(?:\s*sports?)?|fox(?:\s*sports?)?|cbs|abc|itv(?:4)?|tsn|sportsnet|sn|bally|bein(?:\s*sports?)?\d*|canal\+?|dazn|eurosport|skynz|kayo(?:\s*sports?)?|fubo|newvision)\b/gi
 const TEAM_LANGUAGE_RE = /\b(?:en|english|spanish|french|german|italian|portuguese)\b/gi
 const TEAM_PRESENTATION_RE = /\b(?:condensed(?:\s*game)?|extended(?:\s*highlights?)?|highlights?|replay)\b/gi
-const TEAM_TAIL_NOISE_RE = /^(?:game|games|round|matchday|main|card|pre|post|episode|show|event|fight|full|review|preview|highlights?|replay|coverage|studio|apple|tv|fubo|beinsport\d*|skynz|z3r0|nva|wrestlemania|east|west|centre|center|court|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|qf|sf|r\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
-const EVENT_SOURCE_NOISE_RE = /^(?:apple|tv|fubo|skynz|z3r0|nva|espn(?:p|plus|\+)?|f1tv|nesn|msg|usan?|eurosport)$/i
+const TEAM_TAIL_NOISE_RE = /^(?:game|games|round|matchday|main|card|pre|post|episode|show|event|fight|full|review|preview|highlights?|replay|coverage|studio|apple|tv|fubo|beinsport\d*|skynz|z3r0|nva|wrestlemania|east|west|centre|center|court|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|rs|qf|sf|f\d*|r\d+|m\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
+const EVENT_SOURCE_NOISE_RE = /^(?:apple|tv|atvp?|fubo|skynz|kayo|z3r0|nva|espn(?:p|plus|\+)?|f1tv|fs1|nesn|msg|usan?|nbc(?:sn|sba|sca)?|sny|snla|snp|sky|sports|fox|bbc|itv|cbs|abc|tnt|peacock|eurosport|nordic)$/i
 
 // Known league/series tokens that start non-vs event titles
-const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|PFL|Bellator|ONE|MotoGP|Moto\s*GP|NASCAR|IndyCar|WRC|Supercars|Supercars\s*Championship|V8SC|Bathurst|WSBK|WEC|FormulaE|Rally|Dakar|PGA|PGA\s*Tour|LPGA|LPGA\s*Tour|Masters|IPL|Indian\s*Premier\s*League|MLS|Major\s*League\s*Soccer|MLB|Major\s*League\s*Baseball|NBA|NBA\s*Playoffs|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
+const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|PFL|Bellator|ONE|WWE|AEW|TNA|ROH|NJPW|MotoGP|Moto\s*GP|NASCAR|IndyCar|WRC|Supercars|Supercars\s*Championship|V8SC|Bathurst|WSBK|WEC|FormulaE|Rally|Dakar|PGA|PGA\s*Tour|LPGA|LPGA\s*Tour|Masters|IPL|IPLM\d+|Indian\s*Premier\s*League|MLS|Major\s*League\s*Soccer|MLB|Major\s*League\s*Baseball|NCAA\s*Baseball|World\s*Baseball\s*Classic|NBA|NBA\s*Playoffs|EuroLeague|EasyCredit\s*BBL|Basketball\s*Champions\s*League(?:\s*of\s*Americas)?|Super\s*Rugby|MLR|Major\s*League\s*Rugby|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
 
 function normalizeSegment(value) {
   return String(value || '')
@@ -66,7 +66,7 @@ function splitEventTitleTokens(raw) {
 function splitMatchupTitleTokens(raw) {
   return String(raw || '')
     .replace(/[()[\]{}]/g, ' ')
-    .replace(/[._/\\:-]+/g, ' ')
+    .replace(/[._/\\:,-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .split(/\s+/)
@@ -83,8 +83,17 @@ function resolveEventLeagueStart(tokens = []) {
     const compact = slice.join('')
     if (EVENT_LEAGUE_RE.test(spaced) || EVENT_LEAGUE_RE.test(compact)) {
       bestMatch = {
-        leagueToken: spaced,
+        leagueToken: /^iplm\d+$/i.test(compact) ? 'IPL' : spaced,
         nextIndex: count
+      }
+    }
+  }
+  if (!bestMatch && parts.length > 1 && GENERIC_SPORT_PREFIX_RE.test(parts[0])) {
+    const afterPrefix = resolveEventLeagueStart(parts.slice(1))
+    if (afterPrefix) {
+      bestMatch = {
+        leagueToken: afterPrefix.leagueToken,
+        nextIndex: afterPrefix.nextIndex + 1
       }
     }
   }
@@ -178,6 +187,23 @@ function findLeadingLeagueSpan(tokens = []) {
     .filter(Boolean)
   if (parts.length === 0) return null
 
+  if (/^(19|20)\d{2}$/.test(parts[0]) && parts.length > 1) {
+    const afterYear = findLeadingLeagueSpan(parts.slice(1))
+    if (afterYear) {
+      return {
+        league: afterYear.league,
+        nextIndex: afterYear.nextIndex + 1
+      }
+    }
+  }
+
+  if (/^iplm\d+$/i.test(parts[0])) {
+    return {
+      league: 'Indian Premier League',
+      nextIndex: 1
+    }
+  }
+
   let best = null
   const maxParts = Math.min(parts.length, 6)
   for (let count = 1; count <= maxParts; count += 1) {
@@ -263,6 +289,8 @@ function normalizeTeamLabel(value) {
   return normalizeSegment(
     String(value || '')
       .replace(/\([^)]*\)/g, ' ')
+      .replace(/\b\d+\s+of\s+\d+\b/gi, ' ')
+      .replace(/\b(?:iplm?\d+|m\d+)\b/gi, ' ')
       .replace(/\b(?:m4rtyr|thecig|mwr|billie|mgp|ntb|ctrlhd|deflate|organic|tgx|nf|int)\b.*$/gi, ' ')
       .replace(TEAM_BROADCAST_RE, ' ')
       .replace(TEAM_LANGUAGE_RE, ' ')
@@ -580,11 +608,16 @@ function normalizeEventNameTokens(tokens = [], fallbackDate = '') {
     if (EVENT_SOURCE_NOISE_RE.test(token)) break
     if (/^(19|20)\d{2}$/.test(token) || /^\d{1,2}$/.test(token)) continue
     if (/^(?:round|session|race)?\d+$/i.test(token) || /^r\d+$/i.test(token)) continue
+    if (/^m\d+$/i.test(token)) continue
     if ((lower === 'round' || lower === 'event' || lower === 'episode') && /^\d+$/.test(next)) {
       index += 1
       continue
     }
     if (lower === 'full' && /^race$/i.test(next)) {
+      index += 1
+      continue
+    }
+    if (lower === 'warm' && /^up$/i.test(next)) {
       index += 1
       continue
     }

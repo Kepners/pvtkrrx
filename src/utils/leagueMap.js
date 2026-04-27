@@ -81,6 +81,12 @@ const LEAGUE_MAP = Object.freeze({
     sportsDbSport: 'Basketball',
     aliases: ['NBA Postseason', 'National Basketball Association Playoffs']
   },
+  basketballchampionsleague: {
+    name: 'Basketball Champions League',
+    sportKey: 'basketball',
+    sportsDbSport: 'Basketball',
+    aliases: ['BCL']
+  },
   nfl: {
     name: 'NFL',
     idLeague: '4391',
@@ -279,6 +285,18 @@ const LEAGUE_MAP = Object.freeze({
     sportsDbSport: 'Baseball',
     aliases: ['Major League Baseball']
   },
+  ncaabaseball: {
+    name: 'NCAA Baseball',
+    sportKey: 'baseball',
+    sportsDbSport: 'Baseball',
+    aliases: ['College Baseball']
+  },
+  worldbaseballclassic: {
+    name: 'World Baseball Classic',
+    sportKey: 'baseball',
+    sportsDbSport: 'Baseball',
+    aliases: ['WBC']
+  },
   nhl: {
     name: 'NHL',
     idLeague: '4380',
@@ -329,11 +347,42 @@ const LEAGUE_MAP = Object.freeze({
     aliases: ['National Rugby League', 'Australian National Rugby League']
   },
   superrugby: {
+    name: 'Super Rugby',
+    idLeague: '4505',
+    sportKey: 'rugby',
+    sportsDbSport: 'Rugby',
+    aliases: ['Super Rugby Pacific']
+  },
+  superleaguerugby: {
     name: 'English Rugby League Super League',
     idLeague: '4415',
     sportKey: 'rugby',
     sportsDbSport: 'Rugby',
-    aliases: ['Super League', 'Rugby Super League']
+    aliases: ['Super League', 'Rugby Super League', 'Super League Rugby']
+  },
+  mlr: {
+    name: 'Major League Rugby',
+    sportKey: 'rugby',
+    sportsDbSport: 'Rugby',
+    aliases: ['MLR']
+  },
+  easycreditbbl: {
+    name: 'EasyCredit BBL',
+    sportKey: 'basketball',
+    sportsDbSport: 'Basketball',
+    aliases: ['Easycredit BBL Germany', 'Basketball Bundesliga']
+  },
+  bclamericas: {
+    name: 'Basketball Champions League Americas',
+    sportKey: 'basketball',
+    sportsDbSport: 'Basketball',
+    aliases: ['Basketball Champions League of Americas', 'BCL Americas']
+  },
+  slb: {
+    name: 'Super League Basketball',
+    sportKey: 'basketball',
+    sportsDbSport: 'Basketball',
+    aliases: ['SLB']
   },
   atp: {
     name: 'ATP World Tour',

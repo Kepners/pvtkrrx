@@ -63,9 +63,9 @@ function detectStrongSportHintFromTitle(title) {
   const rules = [
     ['darts', /\b(?:pdc|bdo|darts|premier[\s._-]*league[\s._-]*darts)\b/i],
     ['cricket', /\b(?:cricket|ipl|indian[\s._-]*premier[\s._-]*league|t20|odi|ashes|big[\s._-]*bash|the[\s._-]*hundred)\b/i],
+    ['basketball', /\b(?:basketball[\s._-]*champions[\s._-]*league|easycredit[\s._-]*bbl|nba(?:[\s._-]*(?:playoffs?|postseason))?|wnba|euroleague|ncaa[\s._-]*basketball|slb)\b/i],
     ['football', /\b(?:efl|elc|epl|mls|major[\s._-]*league[\s._-]*soccer|uefa|english[\s._-]*football[\s._-]*league|la[\s._-]*liga|serie[\s._-]*a|bundesliga|champions[\s._-]*league|europa[\s._-]*league|conference[\s._-]*league|fa[\s._-]*cup|carabao[\s._-]*cup|community[\s._-]*shield)\b/i],
     ['american-football', /\b(?:nfl|ncaaf|ncaa[\s._-]*football|college[\s._-]*football|super[\s._-]*bowl|cfl|ufl|xfl)\b/i],
-    ['basketball', /\b(?:nba(?:[\s._-]*(?:playoffs?|postseason))?|wnba|euroleague|ncaa[\s._-]*basketball)\b/i],
     ['baseball', /\b(?:mlb|major[\s._-]*league[\s._-]*baseball|baseball)\b/i],
     ['hockey', /\b(?:nhl|ice[\s._-]*hockey)\b/i],
     ['tennis', /\b(?:atp|wta|wimbledon|roland[\s._-]*garros|us[\s._-]*open|australian[\s._-]*open|davis[\s._-]*cup|laver[\s._-]*cup)\b/i],
@@ -95,6 +95,8 @@ function resolveSportHint(input = {}) {
   if (explicit) return explicit
 
   if (category) return category
+
+  if (strongTitle) return strongTitle
 
   const titleDetected = normalizeSportKey(detectSport(input.title || ''))
   if (titleDetected) return titleDetected

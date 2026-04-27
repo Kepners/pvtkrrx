@@ -157,9 +157,79 @@ function splitMatchup(title = '') {
   return { left, right }
 }
 
+const COMPETITION_MARK_RULES = [
+  { pattern: /\bformula\s*1\b|\bf1\b/i, label: 'F1' },
+  { pattern: /\bformula\s*e\b/i, label: 'FE' },
+  { pattern: /\bmotogp\b|\bmoto\s*gp\b/i, label: 'MotoGP' },
+  { pattern: /\bwrc\b|world\s+rally/i, label: 'WRC' },
+  { pattern: /\bnascar\b/i, label: 'NASCAR' },
+  { pattern: /\bindy\s*car\b|\bindycar\b/i, label: 'INDYCAR' },
+  { pattern: /\bnba\s+playoffs?\b/i, label: 'NBA PLAYOFFS' },
+  { pattern: /\bnba\b/i, label: 'NBA' },
+  { pattern: /\bmlb\b|major\s+league\s+baseball/i, label: 'MLB' },
+  { pattern: /\bnhl\b/i, label: 'NHL' },
+  { pattern: /\bnfl\b/i, label: 'NFL' },
+  { pattern: /\bfa\s+cup\b/i, label: 'FA CUP' },
+  { pattern: /\bmls\b|major\s+league\s+soccer/i, label: 'MLS' },
+  { pattern: /\bipl\b|indian\s+premier\s+league/i, label: 'IPL' },
+  { pattern: /\bpga\s+tour\b/i, label: 'PGA TOUR' },
+  { pattern: /\bpga\b/i, label: 'PGA' },
+  { pattern: /\bufc\b/i, label: 'UFC' },
+  { pattern: /\bwwe\b/i, label: 'WWE' },
+  { pattern: /\baew\b/i, label: 'AEW' },
+  { pattern: /\bafl\b/i, label: 'AFL' },
+  { pattern: /\bwimbledon\b/i, label: 'WIMBLEDON' },
+  { pattern: /\bpremier\s+league\b/i, label: 'PREMIER LEAGUE' },
+  { pattern: /\bchampions\s+league\b/i, label: 'CHAMPIONS LEAGUE' },
+  { pattern: /\beuropa\s+league\b/i, label: 'EUROPA LEAGUE' },
+  { pattern: /\bserie\s+a\b/i, label: 'SERIE A' },
+  { pattern: /\bbundesliga\b/i, label: 'BUNDESLIGA' },
+  { pattern: /\bla\s+liga\b/i, label: 'LA LIGA' }
+]
+
 function colorFromText(text = '', fallback = '#1f6f50') {
   const colors = ['#0f766e', '#1d4ed8', '#b91c1c', '#7c2d12', '#4338ca', '#047857', '#be123c', '#0369a1']
   return colors[hashString(text) % colors.length] || fallback
+}
+
+function isGenericCompetition(value = '', sport = '') {
+  const clean = normalizeSpace(value).toLowerCase()
+  const sportClean = normalizeSpace(sport).toLowerCase()
+  if (!clean) return true
+  return clean === sportClean || clean === 'sports' || clean === 'sport'
+}
+
+function resolveCompetitionMark({ sport = '', competition = '', title = '', detail = '' } = {}) {
+  const haystack = normalizeSpace([competition, title, detail, sport].filter(Boolean).join(' '))
+  for (const rule of COMPETITION_MARK_RULES) {
+    if (rule.pattern.test(haystack)) return rule.label
+  }
+
+  const preferred = !isGenericCompetition(competition, sport)
+    ? competition
+    : sport || title || 'Sports'
+  const clean = normalizeSpace(preferred)
+  if (!clean) return 'SPORTS'
+  if (clean.length <= 14) return clean.toUpperCase()
+  return initialsFor(clean)
+}
+
+function renderPosterMarkLines({ mark, cx, y, width, isPoster, fill = '#ffffff' }) {
+  const lines = wrapText(mark, width, isPoster ? 62 : 92, isPoster ? 2 : 1)
+  const fontSize = Math.round(isPoster ? (lines.length > 1 ? 58 : 74) : 86)
+  const lineHeight = Math.round(fontSize * 1.02)
+  return lines.map((line, index) => renderTextLine({
+    role: 'competition-mark',
+    text: line,
+    x: cx,
+    y: y + (index * lineHeight),
+    fontSize,
+    weight: 900,
+    anchor: 'middle',
+    fill,
+    stroke: '#020617',
+    strokeWidth: isPoster ? 9 : 11
+  }, width)).join('\n  ')
 }
 
 function buildFooter(normalized = {}) {
@@ -348,14 +418,14 @@ function renderSportMotif({ sport, competition, title, x, y, width, height, base
   const cx = Math.round(x + width / 2)
   const cy = Math.round(y + height * 0.45)
   const r = Math.round(Math.min(width, height) * (isPoster ? 0.25 : 0.28))
-  const label = initialsFor(competition || sport || title)
-  const common = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="rgba(15,23,42,0.62)" stroke="${highlight}" stroke-width="8"/>`
+  const mark = resolveCompetitionMark({ sport, competition, title })
+  const titleLines = wrapText(title, width - 82, isPoster ? 28 : 38, isPoster ? 2 : 2)
   const lowerLabel = wrapText(competition || sport, width - 64, isPoster ? 25 : 34, 2)
     .map((line, index) => renderTextLine({
-      role: 'visual-team',
+      role: 'visual-competition',
       text: line,
       x: cx,
-      y: Math.round(y + height * 0.78) + (index * (isPoster ? 30 : 40)),
+      y: Math.round(y + height * (isPoster ? 0.78 : 0.77)) + (index * (isPoster ? 30 : 40)),
       fontSize: isPoster ? 25 : 34,
       weight: 850,
       anchor: 'middle',
@@ -365,38 +435,62 @@ function renderSportMotif({ sport, competition, title, x, y, width, height, base
     }, width - 96)).join('\n  ')
 
   const sportKey = normalizeSpace(sport).toLowerCase()
-  let motif = ''
+  const markY = Math.round(y + height * (isPoster ? 0.36 : 0.43))
+  const posterMark = renderPosterMarkLines({
+    mark,
+    cx,
+    y: markY,
+    width: width - 76,
+    isPoster,
+    fill: '#ffffff'
+  })
+  const titleText = titleLines.map((line, index) => renderTextLine({
+    role: 'visual-event-title',
+    text: line,
+    x: cx,
+    y: Math.round(y + height * (isPoster ? 0.62 : 0.64)) + (index * (isPoster ? 31 : 42)),
+    fontSize: isPoster ? 28 : 38,
+    weight: 850,
+    anchor: 'middle',
+    fill: '#f8fafc',
+    stroke: 'rgba(0,0,0,0.45)',
+    strokeWidth: 5
+  }, width - 96)).join('\n  ')
+
+  let icon = ''
   if (/baseball/.test(sportKey)) {
-    motif = `<circle cx="${cx}" cy="${cy}" r="${r * 0.82}" fill="#f8fafc"/>
-      <path d="M ${cx - r * 0.32} ${cy - r * 0.7} C ${cx - r * 0.08} ${cy - r * 0.28}, ${cx - r * 0.08} ${cy + r * 0.28}, ${cx - r * 0.32} ${cy + r * 0.7}" fill="none" stroke="#dc2626" stroke-width="9" stroke-dasharray="12 14"/>
-      <path d="M ${cx + r * 0.32} ${cy - r * 0.7} C ${cx + r * 0.08} ${cy - r * 0.28}, ${cx + r * 0.08} ${cy + r * 0.28}, ${cx + r * 0.32} ${cy + r * 0.7}" fill="none" stroke="#dc2626" stroke-width="9" stroke-dasharray="12 14"/>`
+    const iconY = Math.round(y + height * 0.28)
+    const iconR = Math.round(r * 0.48)
+    icon = `<circle cx="${cx}" cy="${iconY}" r="${iconR}" fill="#f8fafc" opacity="0.95"/>
+      <path d="M ${cx - iconR * 0.38} ${iconY - iconR * 0.78} C ${cx - iconR * 0.1} ${iconY - iconR * 0.28}, ${cx - iconR * 0.1} ${iconY + iconR * 0.28}, ${cx - iconR * 0.38} ${iconY + iconR * 0.78}" fill="none" stroke="#dc2626" stroke-width="6" stroke-dasharray="9 11"/>
+      <path d="M ${cx + iconR * 0.38} ${iconY - iconR * 0.78} C ${cx + iconR * 0.1} ${iconY - iconR * 0.28}, ${cx + iconR * 0.1} ${iconY + iconR * 0.28}, ${cx + iconR * 0.38} ${iconY + iconR * 0.78}" fill="none" stroke="#dc2626" stroke-width="6" stroke-dasharray="9 11"/>`
   } else if (/basketball/.test(sportKey)) {
-    motif = `<circle cx="${cx}" cy="${cy}" r="${r * 0.84}" fill="#f97316" stroke="#111827" stroke-width="7"/>
-      <path d="M ${cx - r * 0.82} ${cy} H ${cx + r * 0.82} M ${cx} ${cy - r * 0.82} V ${cy + r * 0.82}" stroke="#111827" stroke-width="7"/>
-      <path d="M ${cx - r * 0.54} ${cy - r * 0.65} C ${cx - r * 0.18} ${cy - r * 0.18}, ${cx - r * 0.18} ${cy + r * 0.18}, ${cx - r * 0.54} ${cy + r * 0.65} M ${cx + r * 0.54} ${cy - r * 0.65} C ${cx + r * 0.18} ${cy - r * 0.18}, ${cx + r * 0.18} ${cy + r * 0.18}, ${cx + r * 0.54} ${cy + r * 0.65}" fill="none" stroke="#111827" stroke-width="7"/>`
+    const iconY = Math.round(y + height * 0.28)
+    const iconR = Math.round(r * 0.48)
+    icon = `<circle cx="${cx}" cy="${iconY}" r="${iconR}" fill="#f97316" stroke="#111827" stroke-width="6" opacity="0.92"/>
+      <path d="M ${cx - iconR} ${iconY} H ${cx + iconR} M ${cx} ${iconY - iconR} V ${iconY + iconR}" stroke="#111827" stroke-width="5"/>
+      <path d="M ${cx - iconR * 0.62} ${iconY - iconR * 0.78} C ${cx - iconR * 0.2} ${iconY - iconR * 0.22}, ${cx - iconR * 0.2} ${iconY + iconR * 0.22}, ${cx - iconR * 0.62} ${iconY + iconR * 0.78} M ${cx + iconR * 0.62} ${iconY - iconR * 0.78} C ${cx + iconR * 0.2} ${iconY - iconR * 0.22}, ${cx + iconR * 0.2} ${iconY + iconR * 0.22}, ${cx + iconR * 0.62} ${iconY + iconR * 0.78}" fill="none" stroke="#111827" stroke-width="5"/>`
   } else if (/football|rugby|american/.test(sportKey)) {
-    motif = `<rect x="${x + 24}" y="${y + 42}" width="${width - 48}" height="${height - 108}" rx="14" fill="rgba(22,101,52,0.54)" stroke="rgba(255,255,255,0.38)" stroke-width="5"/>
-      <line x1="${cx}" y1="${y + 42}" x2="${cx}" y2="${y + height - 66}" stroke="rgba(255,255,255,0.42)" stroke-width="5"/>
-      <ellipse cx="${cx}" cy="${cy}" rx="${r * 1.02}" ry="${r * 0.48}" fill="${accent}" stroke="#f8fafc" stroke-width="8"/>
-      <line x1="${cx - r * 0.38}" y1="${cy}" x2="${cx + r * 0.38}" y2="${cy}" stroke="#f8fafc" stroke-width="6"/>
-      <line x1="${cx}" y1="${cy - r * 0.24}" x2="${cx}" y2="${cy + r * 0.24}" stroke="#f8fafc" stroke-width="4"/>`
+    icon = `<rect x="${x + 26}" y="${y + 32}" width="${width - 52}" height="${Math.round(height * 0.3)}" rx="14" fill="rgba(22,101,52,0.48)" stroke="rgba(255,255,255,0.24)" stroke-width="4"/>
+      <line x1="${cx}" y1="${y + 32}" x2="${cx}" y2="${y + 32 + Math.round(height * 0.3)}" stroke="rgba(255,255,255,0.32)" stroke-width="4"/>
+      <circle cx="${cx}" cy="${y + 32 + Math.round(height * 0.15)}" r="${Math.round(height * 0.07)}" fill="none" stroke="rgba(255,255,255,0.42)" stroke-width="4"/>`
   } else if (/motor/.test(sportKey)) {
-    motif = `<path d="M ${x + width * 0.15} ${cy + r * 0.28} C ${x + width * 0.36} ${y + 88}, ${x + width * 0.62} ${y + height - 98}, ${x + width * 0.84} ${cy - r * 0.2}" fill="none" stroke="${highlight}" stroke-width="18" stroke-linecap="round"/>
-      <path d="M ${x + width * 0.15} ${cy + r * 0.28} C ${x + width * 0.36} ${y + 88}, ${x + width * 0.62} ${y + height - 98}, ${x + width * 0.84} ${cy - r * 0.2}" fill="none" stroke="#111827" stroke-width="8" stroke-linecap="round"/>
-      <rect x="${cx - r * 0.7}" y="${cy - r * 0.45}" width="${r * 1.4}" height="${r * 0.9}" rx="22" fill="rgba(255,255,255,0.9)"/>
-      ${renderTextLine({ role: 'sport-motif', text: 'RACE', x: cx, y: cy + 12, fontSize: Math.round(r * 0.28), weight: 900, anchor: 'middle', fill: '#111827' }, r * 1.1)}`
+    icon = `<path d="M ${x + width * 0.14} ${y + height * 0.26} C ${x + width * 0.34} ${y + 58}, ${x + width * 0.64} ${y + height * 0.42}, ${x + width * 0.86} ${y + height * 0.2}" fill="none" stroke="${highlight}" stroke-width="16" stroke-linecap="round"/>
+      <path d="M ${x + width * 0.14} ${y + height * 0.26} C ${x + width * 0.34} ${y + 58}, ${x + width * 0.64} ${y + height * 0.42}, ${x + width * 0.86} ${y + height * 0.2}" fill="none" stroke="#111827" stroke-width="7" stroke-linecap="round"/>`
   } else if (/tennis|snooker|golf|darts|hockey/.test(sportKey)) {
-    motif = `${common}
-      ${renderTextLine({ role: 'sport-motif', text: label, x: cx, y: cy + Math.round(r * 0.2), fontSize: Math.round(r * 0.58), weight: 900, anchor: 'middle', fill: '#ffffff' }, r * 1.4)}
-      <path d="M ${cx - r * 0.74} ${cy + r * 0.68} H ${cx + r * 0.74}" stroke="${accent}" stroke-width="10" stroke-linecap="round"/>`
+    icon = `<circle cx="${cx}" cy="${Math.round(y + height * 0.28)}" r="${Math.round(r * 0.48)}" fill="rgba(15,23,42,0.62)" stroke="${highlight}" stroke-width="7"/>
+      <path d="M ${cx - r * 0.46} ${y + height * 0.28 + r * 0.32} H ${cx + r * 0.46}" stroke="${accent}" stroke-width="9" stroke-linecap="round"/>`
   } else {
-    motif = `${common}
-      ${renderTextLine({ role: 'sport-motif', text: label, x: cx, y: cy + Math.round(r * 0.2), fontSize: Math.round(r * 0.56), weight: 900, anchor: 'middle', fill: '#ffffff' }, r * 1.4)}`
+    icon = `<circle cx="${cx}" cy="${Math.round(y + height * 0.28)}" r="${Math.round(r * 0.48)}" fill="rgba(15,23,42,0.62)" stroke="${highlight}" stroke-width="7"/>`
   }
 
-  return `<g data-role="sport-visual">
+  return `<g data-role="competition-poster-visual">
     <rect x="${x}" y="${y}" width="${width}" height="${height}" rx="18" fill="${base}" opacity="0.35"/>
-    ${motif}
+    <rect x="${x + 18}" y="${y + 18}" width="${width - 36}" height="${height - 36}" rx="16" fill="rgba(15,23,42,0.28)" stroke="rgba(255,255,255,0.12)" stroke-width="3"/>
+    <path d="M ${x + 18} ${y + height * 0.78} L ${x + width - 18} ${y + height * 0.22}" stroke="rgba(255,255,255,0.16)" stroke-width="${isPoster ? 18 : 26}" stroke-linecap="round"/>
+    ${icon}
+    ${posterMark}
+    ${titleText}
     ${lowerLabel}
   </g>`
 }
