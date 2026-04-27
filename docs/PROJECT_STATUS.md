@@ -4,7 +4,13 @@ Updated: 2026-04-27
 
 ## Current Stage
 
-PVTKRRX is on the synchronized `1.1.56` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+PVTKRRX is on the synchronized `1.1.57` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+
+## 2026-04-27: v1.1.57 FA Cup round-marker parser correction
+
+- Supersedes `1.1.56` because the live targeted audit found FA Cup rows with round markers such as `QF West Ham Utd vs Leeds Utd` could still render as `Leeds Utd vs QF`.
+- Sports title parsing now strips `QF`/`SF` round abbreviations without stripping real directional team names such as `West Ham`.
+- Added a regression proving `FA Cup 2026 05 04 QF West Ham Utd vs Leeds Utd` parses as `West Ham Utd vs Leeds Utd`.
 
 ## 2026-04-27: v1.1.56 sports parser, artwork, and detail metadata repair
 

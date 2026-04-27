@@ -567,6 +567,10 @@ async function run() {
     date: '2026-04-25'
   })
   assert.equal(oneTeamFaCupNormalized.eventTitle, 'Chelsea', 'FA Cup one-team fallback cards should not invent a fake FA Cup vs Chelsea matchup')
+  const faCupRoundParsed = parseSportsTitle('FA Cup 2026 05 04 QF West Ham Utd vs Leeds Utd 1080pEN50fps', '2026-05-04T12:00:00.000Z')
+  assert.equal(faCupRoundParsed?.league, 'FA Cup', 'FA Cup rows with round abbreviations should keep FA Cup as the competition')
+  assert.equal(faCupRoundParsed?.homeTeam, 'West Ham Utd', 'FA Cup parser should keep West Ham when stripping QF round noise')
+  assert.equal(faCupRoundParsed?.awayTeam, 'Leeds Utd', 'FA Cup parser should keep the away team after QF round noise')
 
   const faCupResolution = await resolveSportsMetaIdentity(
     client,

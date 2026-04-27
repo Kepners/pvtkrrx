@@ -6,12 +6,12 @@ const CODEC_RE = /^(?:x264|x265|h264|h265|hevc|avc|av1)(?:-.+)?$/i
 const RELEASE_GROUP_RE = /^[A-Z0-9]+-[A-Za-z0-9]+$/
 const HLG_HDR_RE = /^(?:hlg|hdr10?\+?|dovi?|dv|10bit|8bit)$/i
 const GENERIC_SPORT_PREFIX_RE = /^(?:football|soccer|basketball|baseball|cricket|rugby|mma|boxing|wrestling|darts|golf|motorsport|motor|tennis|hockey|ice|american|uefa)$/i
-const LEADING_TEAM_NOISE_RE = /^(?:game|games|match|matches|week|round|heat|session|fight|night|grand|prix|qualifying|practice|sprint|race|main|card|prelims?|early|cup|bowl|super|opening|closing|ceremony|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|championship|title|event|world|wimbledon|australian|roland|garros|open|us|east|west|centre|center|court|heavyweight|middleweight|welterweight|lightweight|featherweight|r\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
+const LEADING_TEAM_NOISE_RE = /^(?:game|games|match|matches|week|round|heat|session|fight|night|grand|prix|qualifying|practice|sprint|race|main|card|prelims?|early|cup|bowl|super|opening|closing|ceremony|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|championship|title|event|world|wimbledon|australian|roland|garros|open|us|east|west|centre|center|court|heavyweight|middleweight|welterweight|lightweight|featherweight|qf|sf|r\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
 const ROMAN_NUMERAL_RE = /^(?=[ivxlcdm]+$)m{0,4}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})$/i
 const TEAM_BROADCAST_RE = /\b(?:nbc|nbcsn|espn(?:2|p|plus|\+)?|f1tv|nesn|msg|usan?|yes(?:\s*network)?|sky(?:\s*sports?)?|bt(?:\s*sport)?|tnt(?:\s*sports?)?|fox(?:\s*sports?)?|cbs|abc|itv(?:4)?|tsn|sportsnet|sn|bally|bein(?:\s*sports?)?\d*|canal\+?|dazn|eurosport|skynz|fubo|newvision)\b/gi
 const TEAM_LANGUAGE_RE = /\b(?:en|english|spanish|french|german|italian|portuguese)\b/gi
 const TEAM_PRESENTATION_RE = /\b(?:condensed(?:\s*game)?|extended(?:\s*highlights?)?|highlights?|replay)\b/gi
-const TEAM_TAIL_NOISE_RE = /^(?:game|games|round|matchday|main|card|pre|post|episode|show|event|fight|full|review|preview|highlights?|replay|coverage|studio|apple|tv|fubo|beinsport\d*|skynz|z3r0|nva|wrestlemania|east|west|centre|center|court|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|r\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
+const TEAM_TAIL_NOISE_RE = /^(?:game|games|round|matchday|main|card|pre|post|episode|show|event|fight|full|review|preview|highlights?|replay|coverage|studio|apple|tv|fubo|beinsport\d*|skynz|z3r0|nva|wrestlemania|east|west|centre|center|court|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|qf|sf|r\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
 const EVENT_SOURCE_NOISE_RE = /^(?:apple|tv|fubo|skynz|z3r0|nva|espn(?:p|plus|\+)?|f1tv|nesn|msg|usan?|eurosport)$/i
 
 // Known league/series tokens that start non-vs event titles
@@ -229,9 +229,19 @@ function trimLeadingTeamNoise(tokens) {
   let strippedNoiseCount = 0
   while (parts.length > 1) {
     const token = String(parts[0] || '').trim()
+    const next = String(parts[1] || '').trim()
     if (!token) {
       parts.shift()
       continue
+    }
+    if (/^(?:east|west)$/i.test(token)) {
+      const nextIsRoundNoise = Boolean(
+        LEADING_TEAM_NOISE_RE.test(next) ||
+        GENERIC_SPORT_PREFIX_RE.test(next) ||
+        /^(?:19|20)\d{2}$/.test(next) ||
+        /^\d{1,3}$/.test(next)
+      )
+      if (!nextIsRoundNoise) break
     }
     if (
       LEADING_TEAM_NOISE_RE.test(token) ||
@@ -274,10 +284,16 @@ function normalizeTeamTokens(tokens) {
     const token = String(leadingCleaned[index] || '').trim()
     const next = String(leadingCleaned[index + 1] || '').trim()
     if (!token) continue
+    const isDirectionalTeamPrefix = /^(?:east|west)$/i.test(token) && Boolean(next) && !(
+      LEADING_TEAM_NOISE_RE.test(next) ||
+      GENERIC_SPORT_PREFIX_RE.test(next) ||
+      /^(?:19|20)\d{2}$/.test(next) ||
+      /^\d{1,3}$/.test(next)
+    )
     if (
       isMetadataToken(token) ||
       parseSingleDateToken(token) ||
-      TEAM_TAIL_NOISE_RE.test(token) ||
+      (TEAM_TAIL_NOISE_RE.test(token) && !isDirectionalTeamPrefix) ||
       /^(?:r\d+|gm\d+|g\d+)$/i.test(token) ||
       (/^\d{1,2}$/.test(token) && /^\d{1,2}$/.test(next)) ||
       (/^(19|20)\d{2}$/.test(token) && /^\d{1,2}$/.test(next)) ||
