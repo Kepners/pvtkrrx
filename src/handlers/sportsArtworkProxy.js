@@ -93,6 +93,29 @@ async function rasterizeToPng(buffer, variant) {
     .toBuffer()
 }
 
+async function readRasterDimensions(buffer) {
+  try {
+    const metadata = await sharp(buffer).metadata()
+    return {
+      width: Number(metadata.width || 0),
+      height: Number(metadata.height || 0)
+    }
+  } catch (_) {
+    return { width: 0, height: 0 }
+  }
+}
+
+function isExpectedRasterLayout(variant, dimensions = {}) {
+  const width = Number(dimensions.width || 0)
+  const height = Number(dimensions.height || 0)
+  if (!width || !height) return false
+  const ratio = width / height
+  if (variant === 'poster') return height >= width && ratio >= 0.55 && ratio <= 1.05
+  if (variant === 'landscape' || variant === 'background') return width > height && ratio >= 1.55 && ratio <= 1.9
+  if (variant === 'logo') return ratio >= 0.7 && ratio <= 1.3
+  return true
+}
+
 function shouldRenderLocalFallbackForSvg(variant) {
   return variant === 'poster' || variant === 'background' || variant === 'landscape'
 }
@@ -347,6 +370,37 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     .toBuffer()
 }
 
+async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterContext = {}, status = 0, contentType = '', reason = 'sportsmeta_layout_replaced' } = {}) {
+  if (['poster', 'landscape', 'background'].includes(variant) && teamPosterContext?.canonicalId) {
+    const teamPoster = await renderTeamBadgeArtworkPng({
+      canonicalId: teamPosterContext.canonicalId,
+      sportsmetaBaseUrl: teamPosterContext.sportsmetaBaseUrl,
+      memberToken: teamPosterContext.memberToken,
+      variant
+    })
+    if (teamPoster) {
+      return {
+        buffer: teamPoster,
+        contentType: 'image/png',
+        selectedArtworkSource: `pvtkrrx-team-badge-${variant}`,
+        fallbackReason: `${reason}_with_team_badges`,
+        httpStatus: status,
+        upstreamContentType: contentType
+      }
+    }
+  }
+
+  const png = await renderLocalFallbackPng(variant, fallbackInput)
+  return {
+    buffer: png,
+    contentType: 'image/png',
+    selectedArtworkSource: 'pvtkrrx-generated-card',
+    fallbackReason: reason,
+    httpStatus: status,
+    upstreamContentType: contentType
+  }
+}
+
 async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, teamPosterContext = {}) {
   const now = Date.now()
   const hit = rasterCache.get(cacheKey)
@@ -358,24 +412,28 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
       const { status, contentType, buffer, headers } = await fetchUpstream(upstreamUrl)
       const generatedAsset = /^true$/i.test(String(headers?.['x-sportsmeta-generated-asset'] || ''))
       if (['poster', 'landscape', 'background'].includes(variant) && (generatedAsset || /^image\/svg\+xml/i.test(contentType)) && teamPosterContext?.canonicalId) {
-        const teamPoster = await renderTeamBadgeArtworkPng({
-          canonicalId: teamPosterContext.canonicalId,
-          sportsmetaBaseUrl: teamPosterContext.sportsmetaBaseUrl,
-          memberToken: teamPosterContext.memberToken,
-          variant
+        const teamPosterFallback = await renderLayoutFallback({
+          variant,
+          fallbackInput,
+          teamPosterContext,
+          status,
+          contentType,
+          reason: generatedAsset ? 'sportsmeta_generated_replaced' : 'sportsmeta_svg_replaced'
         })
-        if (teamPoster) {
-          return {
-            buffer: teamPoster,
-            contentType: 'image/png',
-            selectedArtworkSource: `pvtkrrx-team-badge-${variant}`,
-            fallbackReason: generatedAsset ? 'sportsmeta_generated_replaced_with_team_badges' : 'sportsmeta_svg_replaced_with_team_badges',
-            httpStatus: status,
-            upstreamContentType: contentType
-          }
-        }
+        if (teamPosterFallback.selectedArtworkSource !== 'pvtkrrx-generated-card') return teamPosterFallback
       }
       if (/^image\/(png|jpeg|jpg|webp)/i.test(contentType)) {
+        const dimensions = await readRasterDimensions(buffer)
+        if (!isExpectedRasterLayout(variant, dimensions) && shouldRenderLocalFallbackForSvg(variant)) {
+          return renderLayoutFallback({
+            variant,
+            fallbackInput,
+            teamPosterContext,
+            status,
+            contentType,
+            reason: `sportsmeta_${variant}_raster_layout_replaced`
+          })
+        }
         return {
           buffer,
           contentType,

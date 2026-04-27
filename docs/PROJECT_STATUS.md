@@ -4,7 +4,13 @@ Updated: 2026-04-27
 
 ## Current Stage
 
-PVTKRRX is on the synchronized `1.1.52` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+PVTKRRX is on the synchronized `1.1.53` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+
+## 2026-04-27: v1.1.53 SportsMeta raster landscape guard
+
+- PVTKRRX now validates proxied SportsMeta raster dimensions before returning them to Stremio.
+- Invalid member landscape/background rasters such as ultra-wide team banners are replaced with a generated 16:9 team-badge landscape when canonical team data is available, or with the generated sports card fallback otherwise.
+- Added a sports artwork smoke regression for an invalid `1000x185` member landscape returning a `1280x720` team-badge PNG instead of passing the banner through.
 
 ## 2026-04-27: v1.1.52 sports Discover stale canonical ranking correction
 

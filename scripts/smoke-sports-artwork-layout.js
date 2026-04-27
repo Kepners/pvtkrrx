@@ -388,10 +388,19 @@ function teamBadgeSvg(label, fill) {
 async function assertTeamBadgeArtworkProxy() {
   const originalFetch = global.fetch
   const canonicalId = 'sportsmeta:event:hockey|2026-04-25|nhl|utah-mammoth|vegas-golden-knights'
+  const invalidLandscapeCanonicalId = 'sportsmeta:event:rugby|2026-04-26|major-league-rugby|old-glory-dc|california-legion'
   const dimensions = {
     poster: { width: 600, height: 900 },
     landscape: { width: 1280, height: 720 }
   }
+  const invalidLandscapeRaster = await sharp({
+    create: {
+      width: 1000,
+      height: 185,
+      channels: 3,
+      background: '#17324d'
+    }
+  }).jpeg().toBuffer()
   try {
     global.fetch = async (input) => {
       const url = new URL(String(input))
@@ -405,6 +414,12 @@ async function assertTeamBadgeArtworkProxy() {
             'content-type': 'image/svg+xml',
             'x-sportsmeta-generated-asset': 'true'
           }
+        })
+      }
+      if (url.pathname === `/member/test-token/asset/landscape/${encodeURIComponent(invalidLandscapeCanonicalId)}`) {
+        return new Response(invalidLandscapeRaster, {
+          status: 200,
+          headers: { 'content-type': 'image/jpeg' }
         })
       }
       if (url.pathname === `/event/${encodeURIComponent(canonicalId)}`) {
@@ -428,13 +443,40 @@ async function assertTeamBadgeArtworkProxy() {
           headers: { 'content-type': 'application/json' }
         })
       }
-      if (url.pathname === `/member/test-token/asset/homeBadge/${encodeURIComponent(canonicalId)}`) {
+      if (url.pathname === `/event/${encodeURIComponent(invalidLandscapeCanonicalId)}`) {
+        return new Response(JSON.stringify({
+          ok: true,
+          event: {
+            id: invalidLandscapeCanonicalId,
+            title: 'Old Glory DC vs California Legion',
+            sport: 'Rugby',
+            league: 'Major League Rugby',
+            date: '2026-04-26',
+            homeTeam: 'Old Glory DC',
+            awayTeam: 'California Legion'
+          },
+          assets: {
+            homeBadge: `https://sportsmeta.test/member/test-token/asset/homeBadge/${encodeURIComponent(invalidLandscapeCanonicalId)}`,
+            awayBadge: `https://sportsmeta.test/member/test-token/asset/awayBadge/${encodeURIComponent(invalidLandscapeCanonicalId)}`
+          }
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      }
+      if (
+        url.pathname === `/member/test-token/asset/homeBadge/${encodeURIComponent(canonicalId)}` ||
+        url.pathname === `/member/test-token/asset/homeBadge/${encodeURIComponent(invalidLandscapeCanonicalId)}`
+      ) {
         return new Response(teamBadgeSvg('UTA', '#155e75'), {
           status: 200,
           headers: { 'content-type': 'image/svg+xml' }
         })
       }
-      if (url.pathname === `/member/test-token/asset/awayBadge/${encodeURIComponent(canonicalId)}`) {
+      if (
+        url.pathname === `/member/test-token/asset/awayBadge/${encodeURIComponent(canonicalId)}` ||
+        url.pathname === `/member/test-token/asset/awayBadge/${encodeURIComponent(invalidLandscapeCanonicalId)}`
+      ) {
         return new Response(teamBadgeSvg('VGK', '#92400e'), {
           status: 200,
           headers: { 'content-type': 'image/svg+xml' }
@@ -466,6 +508,31 @@ async function assertTeamBadgeArtworkProxy() {
       assert.ok(Buffer.isBuffer(response.body), `team badge ${variant} proxy should return bytes`)
       assert.deepEqual(pngDimensions(response.body), dimensions[variant], `team badge ${variant} dimensions`)
     }
+
+    const invalidLandscapeResponse = makeMockResponse()
+    await handleCanonicalSportsArtwork(
+      {
+        params: {
+          variant: 'landscape',
+          canonicalId: `${encodeURIComponent(invalidLandscapeCanonicalId)}.png`
+        },
+        query: {}
+      },
+      invalidLandscapeResponse,
+      {
+        sportsmetaBaseUrl: 'https://sportsmeta.test',
+        sportsPosterMemberToken: 'test-token'
+      }
+    )
+    assert.equal(invalidLandscapeResponse.statusCode, 200, 'invalid member landscape proxy should return 200')
+    assert.equal(invalidLandscapeResponse.headers['content-type'], 'image/png', 'invalid member landscape proxy should return PNG')
+    assert.equal(invalidLandscapeResponse.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-team-badge-landscape', 'invalid member landscape should be replaced with a team-badge landscape')
+    assert.match(
+      invalidLandscapeResponse.headers['x-pvtkrrx-artwork-fallback'] || '',
+      /sportsmeta_landscape_raster_layout_replaced_with_team_badges/,
+      'invalid member landscape should report the layout fallback reason'
+    )
+    assert.deepEqual(pngDimensions(invalidLandscapeResponse.body), dimensions.landscape, 'invalid member landscape fallback dimensions')
   } finally {
     global.fetch = originalFetch
   }
