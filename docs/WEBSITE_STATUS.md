@@ -1,6 +1,36 @@
 # PVTKRRX Website Status
 
-Updated: 2026-04-25
+Updated: 2026-04-27
+
+## 2026-04-27 First-Screen Clarity Deploy
+
+- Public review target: `https://www.pvtkrrx.cc/`.
+- Five-second verdict before the pass: the visual direction was strong, but the first screen over-weighted the giant logo and split the next action across "Read Setup Guide", "Choose Your Route", and "Download Windows App".
+- Homepage fix shipped in repo commit `c8e0a1f0706185324f1638ee96e3ca2e95edb8cc` (`fix: clarify website first-screen flow`):
+  - reduced the oversized hero logo so the product explanation and CTA are visible sooner
+  - clarified the first-screen setup flow as Windows host + Prowlarr + qBittorrent + Stremio
+  - made `Download Windows App` the primary homepage CTA
+  - renamed the route picker CTA to `Find My Setup Type`
+  - preserved the public copy rules from `docs/copy.md` around private trackers, no debrid, no third-party media host, and user-owned hardware
+- Other public pages reviewed and patched for mobile containment:
+  - `/sports`
+  - `/clockrr`
+  - `/runbooks`
+  - `/blog`
+  - `/faq`
+  - `/health`
+- Shared fix pattern: constrain the public shell to `min(100%, calc(100vw - 24px))`, let the brand wrap, use a two-column mobile nav, and force long hero/page text to wrap instead of widening the viewport.
+- Deployment proof:
+  - Coolify auto-deploy `521` picked up commit `c8e0a1f0706185324f1638ee96e3ca2e95edb8cc` but failed during Docker layer export.
+  - The failure was not caused by the changed HTML/CSS; the app had already completed `npm ci` and failed while exporting layers with the root filesystem at 93% used and 24.43 GB of reclaimable Docker build cache.
+  - Docker build cache was pruned on Contabo, increasing free root space from 19 GB to 38 GB.
+  - Forced Coolify redeploy `522` (`prjcwwgdmatomps4bowbvj2u`) finished successfully at `2026-04-27T19:00:34Z`.
+  - Running public container after rollout: `w14jewmw5ubscrxh8zzfhq7d-185605543304`.
+  - Running public image after rollout: `w14jewmw5ubscrxh8zzfhq7d:c8e0a1f0706185324f1638ee96e3ca2e95edb8cc`.
+- Live checks after rollout:
+  - `/` returned `200` and contained `home_primary`, `Find My Setup Type`, and the mobile shell fix marker.
+  - `/sports`, `/clockrr`, `/runbooks`, `/blog`, and `/faq` returned `200` and contained the mobile shell fix marker.
+  - Browser mobile pass at `390x844` reported `scrollWidth=390` and `bodyScrollWidth=390` for `/`, `/sports`, `/clockrr`, `/runbooks`, `/blog`, `/faq`, and `/health`.
 
 ## Purpose
 
