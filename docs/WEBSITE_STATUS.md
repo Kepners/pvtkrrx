@@ -20,13 +20,13 @@ Updated: 2026-04-27
   - `/faq`
   - `/health`
 - Shared fix pattern: constrain the public shell to `min(100%, calc(100vw - 24px))`, let the brand wrap, use a two-column mobile nav, and force long hero/page text to wrap instead of widening the viewport.
-- Deployment proof:
+- Website-code deployment proof:
   - Coolify auto-deploy `521` picked up commit `c8e0a1f0706185324f1638ee96e3ca2e95edb8cc` but failed during Docker layer export.
   - The failure was not caused by the changed HTML/CSS; the app had already completed `npm ci` and failed while exporting layers with the root filesystem at 93% used and 24.43 GB of reclaimable Docker build cache.
   - Docker build cache was pruned on Contabo, increasing free root space from 19 GB to 38 GB.
   - Forced Coolify redeploy `522` (`prjcwwgdmatomps4bowbvj2u`) finished successfully at `2026-04-27T19:00:34Z`.
-  - Running public container after rollout: `w14jewmw5ubscrxh8zzfhq7d-185605543304`.
-  - Running public image after rollout: `w14jewmw5ubscrxh8zzfhq7d:c8e0a1f0706185324f1638ee96e3ca2e95edb8cc`.
+  - The public HTML/CSS behavior change is from commit `c8e0a1f0706185324f1638ee96e3ca2e95edb8cc`.
+  - Later docs-only commits may advance the Coolify image tag without changing the public page output; final runtime image tags belong in the Contabo `BRAIN.md` deploy log.
 - Live checks after rollout:
   - `/` returned `200` and contained `home_primary`, `Find My Setup Type`, and the mobile shell fix marker.
   - `/sports`, `/clockrr`, `/runbooks`, `/blog`, and `/faq` returned `200` and contained the mobile shell fix marker.
