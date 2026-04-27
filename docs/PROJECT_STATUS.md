@@ -4,7 +4,13 @@ Updated: 2026-04-27
 
 ## Current Stage
 
-PVTKRRX is on the synchronized `1.1.54` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+PVTKRRX is on the synchronized `1.1.55` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+
+## 2026-04-27: v1.1.55 bracketed tracker matchup artwork correction
+
+- Supersedes `1.1.54` because the first live proof still showed ugly generated cards for tracker titles that hid the actual matchup inside an unmatched bracket, such as `{San Antonio Spurs @ Portland Trail Blazers ...`.
+- Sports event normalization now uses loose matchup extraction even when a broader sports parser has already classified the row, prefers bracketed `{home @ away}` text, and strips common release-group suffixes before building generated poster initials.
+- Added a sports artwork smoke regression for the NBA Playoffs tracker format so generated fallback posters use `San Antonio Spurs vs Portland Trail Blazers` instead of tracker-title initials.
 
 ## 2026-04-27: v1.1.54 generated sports artwork visual correction
 

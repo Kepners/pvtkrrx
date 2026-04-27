@@ -155,6 +155,23 @@ const CASES = [
     }
   },
   {
+    slug: 'basketball-bracketed-tracker-matchup',
+    input: {
+      rawTitle: 'NBA Playoffs 2026 / 1st Round / West / Game 4 / 26 04 2026 / {San Antonio Spurs @ Portland Trail Blazers m4rtyr',
+      sportHint: 'basketball',
+      competition: 'NBA',
+      date: '2026-04-26',
+      seeders: 29,
+      size: '7.8 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Basketball',
+      competition: 'NBA',
+      eventTitle: 'San Antonio Spurs vs Portland Trail Blazers'
+    }
+  },
+  {
     slug: 'cricket-ipl-final',
     input: {
       rawTitle: 'IPL Chennai Super Kings vs Mumbai Indians Final 1080p Sky Sports',

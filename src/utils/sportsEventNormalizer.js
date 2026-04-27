@@ -72,6 +72,8 @@ const SESSION_WORDS = new Set([
 
 const MATCHUP_PREFIX_NOISE_RE = /\b(?:english\s+premier\s+league|premier\s+league|champions\s+league|europa\s+league|la\s+liga|serie\s+a|bundesliga|college\s+football|world\s+series|stanley\s+cup|super\s+league\s+rugby|super\s+league|six\s+nations|premiership\s+rugby|rugby\s+championship|rugby\s+league|test\s+cricket|the\s+ashes|world\s+championship|world\s+matchplay|fight\s+night|main\s+card|main\s+event|regular\s+season|formula\s+1|formula\s+e|tour\s+de\s+france|giro\s+d['’]?italia|vuelta\s+a\s+espana|australian\s+open|roland\s+garros|us\s+open|nhl|mlb|nba|nfl|epl|ipl|odi|t20|atp|wta|pdc|ufc|pfl|wwe|aew|pga|lpga|motogp|nascar|indycar|wrc|wec|bkfc|football|baseball|hockey|basketball|cricket|rugby|tennis|boxing|mma|wrestling|darts|golf|motorsport|playoffs?|finals?|prelims?|heavyweight|matchroom|queensberry|masters|wimbledon|classics|rs)\b/gi
 
+const RELEASE_GROUP_NOISE_RE = /\b(?:m4rtyr|thecig|mwr|billie|mgp|ntb|ctrlhd|deflate|organic|tgx|nf|int)\b.*$/i
+
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
 }
@@ -127,6 +129,8 @@ function cleanTrackerText(value) {
 
 function stripMatchupSideNoise(value, side = 'left') {
   let text = cleanTrackerText(value)
+    .replace(/[{}\[\]()]/g, ' ')
+    .replace(RELEASE_GROUP_NOISE_RE, ' ')
     .replace(MATCHUP_PREFIX_NOISE_RE, ' ')
     .replace(/\b(?:game|gm|g|r|round)\s*\d+\b/gi, ' ')
     .replace(/\b(?:19|20)\d{2}\b/g, ' ')
@@ -143,7 +147,14 @@ function stripMatchupSideNoise(value, side = 'left') {
 
 function parseLooseMatchup(rawTitle = '') {
   const cleaned = String(rawTitle || '').replace(/[._]+/g, ' ')
-  const match = cleaned.match(/(.+?)\b(?:vs\.?|v|@)\b(.+)/i)
+  const closedBracketedMatchup = [...cleaned.matchAll(/[\[{(]([^{}[\]()]{3,160})[\]})]/g)]
+    .map((match) => match[1])
+    .find((value) => /\s+(?:vs\.?|v\.?|@)\s+/i.test(value))
+  const openBracketedMatchup = cleaned.match(/[\[{(]([^{}[\]()]{3,160})$/)?.[1] || ''
+  const bracketedMatchup = closedBracketedMatchup ||
+    (/\s+(?:vs\.?|v\.?|@)\s+/i.test(openBracketedMatchup) ? openBracketedMatchup : '')
+  const matchupText = bracketedMatchup || cleaned
+  const match = matchupText.match(/(.+?)\s+(?:vs\.?|v\.?|@)\s+(.+)/i)
   if (!match) return null
   const homeTeam = stripMatchupSideNoise(match[1], 'left')
   const awayTeam = stripMatchupSideNoise(match[2], 'right')
@@ -248,7 +259,7 @@ function normalizeSportsEventMetadata(input = {}) {
   const canonicalParsed = parseSportsMetaCanonicalId(input.canonicalId || canonicalEvent.id || '')
   const parsedSportsEvent = input.parsedSportsEvent || parseSportsTitle(rawTitle, input.date || input.pubDate || '') || null
   const parsedEvent = input.parsedEvent || (!parsedSportsEvent ? parseSportsEventTitle(rawTitle, input.date || input.pubDate || '') : null)
-  const looseMatchup = !parsedSportsEvent ? parseLooseMatchup(rawTitle) : null
+  const looseMatchup = parseLooseMatchup(rawTitle)
   const rawLeague = normalizeSpace(
     input.competition ||
     input.league ||
