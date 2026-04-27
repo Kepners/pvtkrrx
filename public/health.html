@@ -194,6 +194,8 @@
       color: #d2e4ff;
       text-shadow: 0 0 8px rgba(0, 168, 255, 0.45);
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .nav {
@@ -399,6 +401,47 @@
       30% { transform: translate(-2px, 1px); }
       31% { transform: translate(3px, -1px); }
       85% { transform: translate(-1px, 0); }
+    }
+
+    @media (max-width: 700px) {
+      .shell {
+        width: min(100%, calc(100vw - 24px));
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+
+      .brand {
+        width: 100%;
+      }
+
+      .brand-text {
+        white-space: normal;
+        line-height: 1.35;
+      }
+
+      .nav {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+        gap: 7px;
+        justify-content: stretch;
+      }
+
+      .nav a {
+        padding: 7px 6px;
+        text-align: center;
+        font-size: 10px;
+        letter-spacing: 0.6px;
+      }
+
+      .panel,
+      footer {
+        overflow-wrap: anywhere;
+      }
     }
   </style>
 </head>

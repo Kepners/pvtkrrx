@@ -342,24 +342,53 @@
 
     @media (max-width: 560px) {
       .shell {
-        width: min(100% - 24px, 1160px);
+        width: min(100%, calc(100vw - 24px));
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+
+      .brand-text {
+        white-space: normal;
+        line-height: 1.35;
+      }
+
+      .nav {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+        gap: 7px;
+      }
+
+      .nav a {
+        padding: 7px 6px;
+        text-align: center;
+        font-size: 10px;
+        letter-spacing: 0.6px;
       }
 
       .hero {
         padding-top: 48px;
+        overflow: hidden;
       }
 
       h1 {
-        font-size: 52px;
+        font-size: clamp(42px, 14vw, 52px);
+        overflow-wrap: anywhere;
       }
 
       .tagline {
-        font-size: 28px;
+        font-size: 26px;
+        overflow-wrap: anywhere;
       }
 
       .intro,
       .faq-answer {
         font-size: 17px;
+        overflow-wrap: anywhere;
       }
     }
   </style>

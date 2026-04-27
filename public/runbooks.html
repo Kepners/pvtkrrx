@@ -917,8 +917,13 @@
     }
 
     @media (max-width: 720px) {
+      .shell {
+        width: min(100%, calc(100vw - 24px));
+      }
+
       .hero {
         padding: 1.3rem 0.9rem 1.16rem;
+        overflow: hidden;
       }
 
       .panel {
@@ -926,7 +931,8 @@
       }
 
       .logo {
-        font-size: 46px;
+        max-width: 100%;
+        font-size: clamp(36px, 11vw, 46px);
         letter-spacing: 2px;
       }
 
@@ -937,11 +943,38 @@
 
       .topbar {
         border-radius: 11px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
       }
 
       .brand-text {
         font-size: 11px;
         letter-spacing: 0.8px;
+        white-space: normal;
+        line-height: 1.35;
+      }
+
+      .nav {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        width: 100%;
+        gap: 7px;
+        justify-content: stretch;
+      }
+
+      .nav a {
+        padding: 7px 6px;
+        text-align: center;
+        font-size: 10px;
+        letter-spacing: 0.6px;
+      }
+
+      .hero h1,
+      .hero p,
+      .panel,
+      .runbook-card {
+        overflow-wrap: anywhere;
       }
 
       .runbook-grid {

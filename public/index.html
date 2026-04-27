@@ -235,6 +235,8 @@
       color: #d2e4ff;
       text-shadow: 0 0 8px rgba(0, 168, 255, 0.45);
       white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .nav {
@@ -322,8 +324,8 @@
       width: max-content;
       margin-inline: auto;
       font-family: "Orbitron", sans-serif;
-      font-size: clamp(64px, 17vw, 220px);
-      font-size: clamp(64px, 22cqi, 220px);
+      font-size: clamp(54px, 13vw, 160px);
+      font-size: clamp(54px, 17cqi, 160px);
       font-weight: 900;
       letter-spacing: 4px;
       line-height: 0.9;
@@ -391,7 +393,7 @@
     }
 
     .tagline {
-      margin: 16px auto 22px;
+      margin: 18px auto 8px;
       max-width: 900px;
       color: #c4d5ef;
       font-family: "IBM Plex Mono", monospace;
@@ -400,6 +402,27 @@
       line-height: 1.5;
       font-size: clamp(12px, 1.7vw, 16px);
       text-shadow: 0 0 14px rgba(0, 168, 255, 0.35);
+    }
+
+    .hero-kicker {
+      color: #b7f5ff;
+      font-size: clamp(12px, 1.65vw, 16px);
+      letter-spacing: 2.4px;
+      margin-bottom: 16px;
+    }
+
+    .hero-setup-line {
+      max-width: 840px;
+      margin: 0 auto 18px;
+      color: #d7e7ff;
+      font-size: clamp(14px, 1.8vw, 18px);
+      line-height: 1.5;
+      text-shadow: 0 0 14px rgba(0, 168, 255, 0.28);
+    }
+
+    .hero-proof {
+      margin-top: 0;
+      margin-bottom: 18px;
     }
 
     .cta-row {
@@ -1032,21 +1055,60 @@
     }
 
     @media (max-width: 700px) {
+      .shell {
+        width: min(100%, calc(100vw - 24px));
+      }
+
       .topbar {
         border-radius: 11px;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+      }
+
+      .brand {
+        width: 100%;
       }
 
       .brand-text {
         font-size: 11px;
         letter-spacing: 0.8px;
+        white-space: normal;
+        line-height: 1.35;
+      }
+
+      .nav {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 7px;
+        justify-content: stretch;
+        width: 100%;
+      }
+
+      .nav a {
+        padding: 7px 6px;
+        text-align: center;
+        font-size: 10px;
+        letter-spacing: 0.6px;
       }
 
       .hero::before {
         inset: 3% 0;
       }
 
+      .hero-core {
+        width: 100%;
+        padding: 0 12px;
+        overflow: hidden;
+      }
+
+      .logo-frame {
+        overflow: hidden;
+      }
+
       .logo {
-        font-size: 46px;
+        max-width: 100%;
+        font-size: clamp(34px, 11vw, 42px);
         letter-spacing: 2px;
       }
 
@@ -1056,15 +1118,49 @@
       }
 
       .tagline {
+        overflow-wrap: anywhere;
         max-width: 96%;
+        margin-top: 14px;
+      }
+
+      .hero-kicker,
+      .hero-setup-line,
+      .hero-proof {
+        max-width: 100%;
+        overflow-wrap: anywhere;
+      }
+
+      .hero-kicker {
+        letter-spacing: 1.4px;
+      }
+
+      .hero-proof {
+        font-size: 10px;
+        letter-spacing: 0.9px;
+        line-height: 1.55;
       }
 
       .cta-row {
         flex-direction: column;
+        width: min(100%, 260px);
+        margin-inline: auto;
       }
 
       .btn {
         width: 100%;
+      }
+
+      .site-release {
+        width: min(100%, 330px);
+        border-radius: 14px;
+        font-size: 10px;
+        line-height: 1.45;
+        overflow: hidden;
+      }
+
+      .site-release span,
+      .site-release a {
+        overflow-wrap: anywhere;
       }
 
       .needs-grid {
@@ -1123,7 +1219,7 @@
 
     <section class="hero">
       <div class="hero-core">
-        <p class="kicker">Private Trackers Inside Stremio</p>
+        <p class="kicker hero-kicker">Private Trackers Inside Stremio</p>
         <div class="logo-frame">
           <h1 class="logo" data-text="PVTKRRX"><span>PVTKRRX</span><span class="sr-only"> — Stremio Addon for Private Trackers</span></h1>
         </div>
@@ -1131,22 +1227,23 @@
         <p class="tagline">
           Your hardware, your trackers. Prowlarr and qBittorrent into Stremio.
         </p>
-        <p class="kicker" style="margin-top:-4px">No debrid. No third-party media host. Sports, movies, TV, and library in one addon family.</p>
+        <p class="hero-setup-line">Install the Windows host, connect Prowlarr and qBittorrent, then add the right route to Stremio.</p>
+        <p class="kicker hero-proof">No debrid. No third-party media host. Sports, movies, TV, and library in one addon family.</p>
         <div class="cta-row">
-          <a class="btn btn-primary" href="/runbooks" data-umami-event="cta_read_setup_guide" data-umami-event-page="home" data-umami-event-section="hero">Read Setup Guide</a>
-          <a class="btn btn-secondary" href="#routes" data-umami-event="cta_choose_route" data-umami-event-page="home" data-umami-event-section="hero">Choose Your Route</a>
+          <a class="btn btn-primary" href="https://www.pvtkrrx.cc/download/windows/setup?source=home_primary" target="_blank" rel="noopener noreferrer" data-umami-event="cta_download_windows" data-umami-event-page="home" data-umami-event-section="hero">Download Windows App</a>
+          <a class="btn btn-secondary" href="#routes" data-umami-event="cta_find_setup_type" data-umami-event-page="home" data-umami-event-section="hero">Find My Setup Type</a>
         </div>
         <div class="site-release" id="siteReleaseCard">
           <span class="site-release-dot" id="siteReleaseDot"></span>
           <span id="siteReleaseText">Checking release...</span>
-          <a id="siteReleaseLink" href="https://www.pvtkrrx.cc/download/windows/setup?source=home_release_card" target="_blank" rel="noopener noreferrer" data-umami-event="cta_download_windows" data-umami-event-page="home" data-umami-event-section="hero_release">Download Windows App</a>
+          <a id="siteReleaseLink" href="https://www.pvtkrrx.cc/download/windows/setup?source=home_release_card" target="_blank" rel="noopener noreferrer" data-umami-event="cta_download_windows" data-umami-event-page="home" data-umami-event-section="hero_release">Windows Release</a>
         </div>
       </div>
     </section>
 
     <section class="section-block" id="routes">
       <div class="section-head">
-        <div class="section-kicker">Choose Your Route</div>
+        <div class="section-kicker">Find Your Setup Type</div>
         <h2 class="section-title">Where does playback happen?</h2>
         <p class="section-copy">This website is guide-only. Configure on the Windows host runtime for <strong>PC Local</strong> and <strong>LAN Bridge</strong>, or on your own HTTPS server origin for <strong>Remote Seedbox</strong>.</p>
       </div>
@@ -1346,7 +1443,7 @@
         link.href = resolvedDownloadUrl;
       } else if (hasWindowsSetupDownload && status === 'up-to-date') {
         text.textContent = `v${currentVersion} · Up to date`;
-        link.textContent = 'Download Windows App';
+        link.textContent = target.sourceParam === 'home_release_card' ? 'Windows Release' : 'Download Windows App';
         link.href = resolvedDownloadUrl;
       } else {
         text.textContent = `v${currentVersion}`;

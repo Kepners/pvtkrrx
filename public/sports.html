@@ -964,14 +964,15 @@
 
     @media (max-width: 700px) {
       .shell {
-        width: min(100% - 22px, 1200px);
+        width: min(100%, calc(100vw - 24px));
         padding-top: 14px;
       }
 
       .topbar {
         border-radius: 11px;
-        align-items: flex-start;
-        flex-wrap: wrap;
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
       }
 
       .brand {
@@ -981,18 +982,23 @@
       .brand-text {
         font-size: 11px;
         letter-spacing: 0.8px;
+        white-space: normal;
+        line-height: 1.35;
       }
 
       .nav {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
         width: 100%;
-        justify-content: flex-start;
-        gap: 6px;
+        justify-content: stretch;
+        gap: 7px;
       }
 
       .nav a {
         font-size: 10px;
         letter-spacing: 0.7px;
-        padding: 6px 8px;
+        padding: 7px 6px;
+        text-align: center;
       }
 
       .hero {
@@ -1004,8 +1010,9 @@
       }
 
       .logo {
+        max-width: 100%;
         letter-spacing: 1.5px;
-        font-size: clamp(42px, 14cqi, 64px);
+        font-size: clamp(38px, 11vw, 54px);
       }
 
       .kicker {
@@ -1013,11 +1020,13 @@
         margin-inline: auto;
         letter-spacing: 1.2px;
         line-height: 1.5;
+        overflow-wrap: anywhere;
       }
 
       .tagline {
         max-width: 96%;
         letter-spacing: 0.7px;
+        overflow-wrap: anywhere;
       }
 
       .cta-row {
