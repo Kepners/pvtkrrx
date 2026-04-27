@@ -496,6 +496,51 @@ function compareItems(a, b, query = '') {
   return String(a.title || '').localeCompare(String(b.title || ''))
 }
 
+function currentUtcDateString() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function normalizeIsoDate(value) {
+  const match = String(value || '').trim().match(/^(\d{4})-(\d{2})-(\d{2})/)
+  return match ? `${match[1]}-${match[2]}-${match[3]}` : ''
+}
+
+function sportsIdentityGroupEventDate(group = {}) {
+  const resolution = group?.sportsMetaResolution || {}
+  const canonical = resolution?.canonical || {}
+  const canonicalEvent = canonical?.event || {}
+  const sportsArtwork = canonical?.sportsArtwork || {}
+  const parsedSportsEvent = group?.parsedSportsEvent || group?.bestAvailability?.parsedSportsEvent || null
+  const parsedEvent = group?.parsedEvent || group?.bestAvailability?.parsedEvent || null
+
+  return normalizeIsoDate(
+    canonicalEvent.date ||
+    sportsArtwork.eventDate ||
+    parsedSportsEvent?.date ||
+    parsedEvent?.date
+  )
+}
+
+function sportsCatalogDateBucket(eventDate, today = currentUtcDateString()) {
+  const date = normalizeIsoDate(eventDate)
+  if (!date) return 1
+  return date >= today ? 0 : 2
+}
+
+function compareSportsIdentityGroupFreshness(a = {}, b = {}, today = currentUtcDateString()) {
+  const aDate = sportsIdentityGroupEventDate(a)
+  const bDate = sportsIdentityGroupEventDate(b)
+  const aBucket = sportsCatalogDateBucket(aDate, today)
+  const bBucket = sportsCatalogDateBucket(bDate, today)
+  if (aBucket !== bBucket) return aBucket - bBucket
+  if (!aDate || !bDate) return 0
+
+  if (aBucket === 0) {
+    return aDate.localeCompare(bDate)
+  }
+  return bDate.localeCompare(aDate)
+}
+
 function normalizeSportsCatalogItems(items = []) {
   return (Array.isArray(items) ? items : []).map((item) => {
     const parsedSportsEvent = parseSportsTitle(item?.title || '', item?.pubDate || item?.publishDate || '')
@@ -811,12 +856,21 @@ function mergeSportsIdentityGroups(groups, query = '') {
 }
 
 function compareSportsIdentityGroupsForCatalog(a, b, query = '') {
+  const relDiff = relevanceScore(b?.bestAvailability?.title, query) - relevanceScore(a?.bestAvailability?.title, query)
+  if (relDiff !== 0) return relDiff
+
+  const freshnessDiff = compareSportsIdentityGroupFreshness(a, b)
+  if (freshnessDiff !== 0) return freshnessDiff
+
+  const availabilityDiff = compareItems(a?.bestAvailability, b?.bestAvailability, query)
+  if (availabilityDiff !== 0) return availabilityDiff
+
   const aResolved = Boolean(a?.sportsMetaResolution?.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED &&
     String(a?.sportsMetaResolution?.canonicalId || '').trim())
   const bResolved = Boolean(b?.sportsMetaResolution?.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED &&
     String(b?.sportsMetaResolution?.canonicalId || '').trim())
   if (aResolved !== bResolved) return aResolved ? -1 : 1
-  return compareItems(a?.bestAvailability, b?.bestAvailability, query)
+  return 0
 }
 
 function getCatalogLimit(config) {

@@ -39,6 +39,13 @@ function makeConfig() {
   }
 }
 
+function isoDateOffset(days) {
+  const date = new Date()
+  date.setUTCHours(0, 0, 0, 0)
+  date.setUTCDate(date.getUTCDate() + Number(days || 0))
+  return date.toISOString().slice(0, 10)
+}
+
 async function runCatalogSeedCase({ catalogId, expectedNames, expectedSeedQueries, queryResults }) {
   const requestedQueries = []
   ProwlarrClient.prototype.search = async function search(query) {
@@ -167,6 +174,80 @@ async function run() {
   assert.ok(
     !motorsportNames.some((name) => /Blackburn|Coventry|EFL Championship|Leicester|Milwall/i.test(name)),
     'motorsport catalog should reject football rows even when the tracker category hint says motorsport'
+  )
+
+  const staleMotoGpDate = isoDateOffset(-1)
+  const staleMotoGpTitleDate = staleMotoGpDate.replace(/-/g, ' ')
+  global.fetch = async (input) => {
+    const url = new URL(String(input || ''))
+    if (url.origin === 'https://sportsmeta.test' && url.pathname === '/resolve') {
+      const eventName = `${url.searchParams.get('event') || ''} ${url.searchParams.get('title') || ''}`
+      if (/spain/i.test(eventName)) {
+        return new Response(JSON.stringify({
+          event: {
+            id: `sportsmeta:event:motorsport|${staleMotoGpDate}|motogp|spain-sprint-race`,
+            type: 'movie',
+            name: 'Spain Sprint Race',
+            title: 'Spain Sprint Race',
+            sport: 'Motorsport',
+            league: 'MotoGP',
+            date: staleMotoGpDate,
+            eventId: 'stale-motogp-spain'
+          },
+          assets: {}
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      }
+      return new Response(JSON.stringify({ error: 'not_found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+    if (url.origin === 'https://sportsmeta.test' && url.pathname.startsWith('/catalog/')) {
+      return new Response(JSON.stringify({ metas: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+    throw new Error(`Unexpected fetch in smoke-sports-catalog-seeds: ${url.toString()}`)
+  }
+  ProwlarrClient.prototype.search = async function search(query) {
+    if (String(query || '') !== 'MotoGP') return []
+    return [
+      trackerItem(`MotoGP ${staleMotoGpTitleDate} Spain Sprint Race 1080p`, {
+        sportHint: 'motorsport',
+        pubDate: `${isoDateOffset(0)}T12:00:00.000Z`,
+        seeders: 200
+      }),
+      trackerItem('MotoGP Brazil Race 1080p', {
+        sportHint: 'motorsport',
+        pubDate: `${isoDateOffset(-2)}T12:00:00.000Z`,
+        seeders: 1
+      })
+    ]
+  }
+  const rankingConfig = makeConfig()
+  rankingConfig.jackettUrl = 'https://prowlarr-ranking.example'
+  const staleResolvedRankingResult = await handleCatalog(
+    rankingConfig,
+    'sports',
+    'pvtkrrx-sports-motorsport',
+    '',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  )
+  const staleResolvedRankingNames = (staleResolvedRankingResult.metas || []).map((meta) => String(meta?.name || ''))
+  assert.ok(staleResolvedRankingNames.length >= 2, 'motorsport ranking regression should emit both MotoGP rows')
+  assert.match(
+    staleResolvedRankingNames[0],
+    /Brazil/i,
+    'sports browse should not pin a stale resolved MotoGP event above fresher undated availability'
+  )
+  assert.doesNotMatch(
+    staleResolvedRankingNames[0],
+    /Spain Sprint Race/i,
+    'stale resolved SportsMeta rows should be a tie-break, not the first catalog sort key'
   )
 
   await runCatalogSeedCase({
