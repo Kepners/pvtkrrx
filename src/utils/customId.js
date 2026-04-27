@@ -15,6 +15,7 @@ function compactSportsPayload(payload = {}) {
     t: displayTitle,
     s: Number(payload.s || 0) || 0,
     d: Number(payload.d || 0) || 0,
+    c: Number(payload.c || 0) || 0,
     r: String(payload.r || '').trim()
   }
 
@@ -31,16 +32,20 @@ function compactSportsPayload(payload = {}) {
   const eventDate = String(payload.e || '').trim()
   const eventId = String(payload.v || '').trim()
   const leagueCode = String(payload.u || '').trim()
+  const league = String(payload.g || '').trim()
   const homeTeam = String(payload.o || '').trim()
   const awayTeam = String(payload.w || '').trim()
+  const eventDetail = String(payload.j || '').trim()
   const canonicalId = String(payload.x || '').trim()
   const resolutionStatus = String(payload.q || '').trim()
   const availabilityAnchorKey = String(payload.ak || '').trim()
   if (eventDate) compact.e = eventDate
   if (eventId) compact.v = eventId
   if (leagueCode) compact.u = leagueCode
+  if (league) compact.g = league
   if (homeTeam) compact.o = homeTeam
   if (awayTeam) compact.w = awayTeam
+  if (eventDetail) compact.j = eventDetail
   if (canonicalId) compact.x = canonicalId
   if (resolutionStatus) compact.q = resolutionStatus
   if (availabilityAnchorKey) compact.ak = availabilityAnchorKey

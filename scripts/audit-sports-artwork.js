@@ -5,6 +5,18 @@ const sharp = require('sharp')
 const DEFAULT_MANIFEST_URL = 'https://pvt.kepners.co.uk/selfhost/manifest.json?mode=hosted'
 const REQUEST_TIMEOUT_MS = Math.max(2000, Number(process.env.PVTKRRX_AUDIT_TIMEOUT_MS || 15000) || 15000)
 const SAMPLE_LIMIT = Math.max(1, Number(process.env.PVTKRRX_AUDIT_LIMIT || 50) || 50)
+const TARGET_TERMS = Object.freeze([
+  'PGA',
+  'PGA Tour',
+  'IPL',
+  'Indian Premier League',
+  'MLS',
+  'Major League Soccer',
+  'FA Cup',
+  'MLB',
+  'NBA Playoffs',
+  'MotoGP'
+])
 
 function stripTrailingSlash(value) {
   return String(value || '').trim().replace(/\/+$/, '')
@@ -35,6 +47,12 @@ function buildRouteContext(manifestUrl) {
 function catalogUrl(routeBase, catalog, querySuffix, extra = '') {
   const extraPath = extra ? `/${extra}` : ''
   return `${routeBase}/catalog/${encodeURIComponent(catalog.type || 'sports')}/${encodeURIComponent(catalog.id)}${extraPath}.json${querySuffix || ''}`
+}
+
+function targetedTerms() {
+  const explicit = String(process.env.PVTKRRX_AUDIT_TARGET_TERMS || '').trim()
+  if (!explicit) return TARGET_TERMS
+  return explicit.split(',').map((term) => term.trim()).filter(Boolean)
 }
 
 function redactUrl(value) {
@@ -154,13 +172,16 @@ async function main() {
 
   const metas = (Array.isArray(catalogResult.json?.metas) ? catalogResult.json.metas : []).slice(0, SAMPLE_LIMIT)
   const rows = []
-  for (const meta of metas) {
+  const inspectMeta = async (meta, contextLabel = '') => {
     const poster = await inspectImage(meta.poster)
     const background = await inspectImage(meta.background)
     const resolved = String(meta.id || '').startsWith('sportsmeta:')
     const row = {
+      context: contextLabel,
       id: String(meta.id || ''),
       name: String(meta.name || ''),
+      genres: Array.isArray(meta.genres) ? meta.genres.join(', ') : '',
+      releaseInfo: String(meta.releaseInfo || ''),
       resolved,
       posterShape: String(meta.posterShape || ''),
       posterUrl: redactUrl(meta.poster),
@@ -177,11 +198,43 @@ async function main() {
     rows.push(row)
   }
 
+  for (const meta of metas) {
+    await inspectMeta(meta, 'first-page')
+  }
+
+  const targeted = []
+  const targetedSampleLimit = Math.max(1, Number(process.env.PVTKRRX_AUDIT_TARGET_LIMIT || 5) || 5)
+  for (const term of targetedTerms()) {
+    const extraPath = `search=${encodeURIComponent(term)}`
+    const targetUrl = catalogUrl(context.routeBase, catalog, context.querySuffix, extraPath)
+    const targetResult = await fetchJson(targetUrl, `catalog ${catalog.id} ${term}`)
+    const targetRows = []
+    if (targetResult.ok) {
+      for (const meta of (Array.isArray(targetResult.json?.metas) ? targetResult.json.metas : []).slice(0, targetedSampleLimit)) {
+        await inspectMeta(meta, `search:${term}`)
+        targetRows.push({
+          id: String(meta?.id || ''),
+          name: String(meta?.name || '')
+        })
+      }
+    }
+    targeted.push({
+      term,
+      catalogUrl: targetUrl,
+      ok: targetResult.ok,
+      status: targetResult.status,
+      sampled: targetRows.length,
+      rows: targetRows,
+      error: targetResult.error || ''
+    })
+  }
+
   const summary = {
     ok: true,
     manifestUrl: context.manifestUrl,
     catalogUrl: url,
     sampled: rows.length,
+    firstPageSampled: metas.length,
     resolved: rows.filter((row) => row.resolved).length,
     fallback: rows.filter((row) => !row.resolved).length,
     posterReachable: rows.filter((row) => row.checks.posterReachable).length,
@@ -189,7 +242,8 @@ async function main() {
     backgroundReachable: rows.filter((row) => row.checks.backgroundReachable).length,
     backgroundWide: rows.filter((row) => row.checks.backgroundWide).length,
     generatedFallbacks: rows.filter((row) => row.poster.source === 'pvtkrrx-generated-card' || row.background.source === 'pvtkrrx-generated-card').length,
-    memberUpstreams: rows.filter((row) => /\/member\/\[redacted\]\/asset\//.test(row.poster.upstream) || /\/member\/\[redacted\]\/asset\//.test(row.background.upstream)).length
+    memberUpstreams: rows.filter((row) => /\/member\/\[redacted\]\/asset\//.test(row.poster.upstream) || /\/member\/\[redacted\]\/asset\//.test(row.background.upstream)).length,
+    targeted
   }
 
   console.log('PVTKRRX sports artwork audit')
@@ -199,6 +253,7 @@ async function main() {
   console.log(`posterReachable=${summary.posterReachable}/${summary.sampled} posterPortrait=${summary.posterPortrait}/${summary.sampled}`)
   console.log(`backgroundReachable=${summary.backgroundReachable}/${summary.sampled} backgroundWide=${summary.backgroundWide}/${summary.sampled}`)
   console.log(`generatedFallbacks=${summary.generatedFallbacks} memberUpstreams=${summary.memberUpstreams}`)
+  console.log(`targetedTerms=${targeted.map((entry) => `${entry.term}:${entry.sampled}`).join(', ')}`)
   console.log(JSON.stringify({ summary, rows }, null, 2))
 
   const hardFail = rows.some((row) => !row.checks.posterReachable || !row.checks.posterPortrait || !row.checks.backgroundReachable || !row.checks.backgroundWide)

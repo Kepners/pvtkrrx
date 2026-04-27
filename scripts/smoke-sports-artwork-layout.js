@@ -167,7 +167,24 @@ const CASES = [
     },
     expected: {
       sport: 'Basketball',
-      competition: 'NBA',
+      competition: 'NBA Playoffs',
+      eventTitle: 'San Antonio Spurs vs Portland Trail Blazers'
+    }
+  },
+  {
+    slug: 'basketball-nba-playoffs-required',
+    input: {
+      rawTitle: 'NBA Playoffs 2026 / 1st Round / West / Game 4 / 26 04 2026 / {San Antonio Spurs @ Portland Trail Blazers m4rtyr',
+      sportHint: 'basketball',
+      competition: 'NBA Playoffs',
+      date: '2026-04-26',
+      seeders: 29,
+      size: '7.8 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Basketball',
+      competition: 'NBA Playoffs',
       eventTitle: 'San Antonio Spurs vs Portland Trail Blazers'
     }
   },
@@ -188,6 +205,110 @@ const CASES = [
       competition: 'Indian Premier League',
       eventTitle: 'Chennai Super Kings vs Mumbai Indians',
       eventDetail: 'Final'
+    }
+  },
+  {
+    slug: 'cricket-indian-premier-league-required',
+    input: {
+      rawTitle: 'Indian Premier League 2026 Gujarat Titans vs Royal Challengers Bengaluru 1080p',
+      sportHint: 'cricket',
+      competition: 'Indian Premier League',
+      date: '2026-04-27',
+      seeders: 18,
+      size: '5.4 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Cricket',
+      competition: 'Indian Premier League',
+      eventTitle: 'Gujarat Titans vs Royal Challengers Bengaluru'
+    }
+  },
+  {
+    slug: 'football-mls-required',
+    input: {
+      rawTitle: 'MLS 2026 Atlanta United vs Inter Miami 2026 04 27 1080p',
+      sportHint: 'football',
+      competition: 'MLS',
+      date: '2026-04-27',
+      seeders: 16,
+      size: '6.1 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Football',
+      competition: 'Major League Soccer',
+      eventTitle: 'Atlanta United vs Inter Miami'
+    }
+  },
+  {
+    slug: 'football-fa-cup-single-team-required',
+    input: {
+      rawTitle: 'Football FA Cup vs Chelsea 2026 04 25 1080p',
+      sportHint: 'football',
+      competition: 'FA Cup',
+      date: '2026-04-25',
+      seeders: 26,
+      size: '11.2 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Football',
+      competition: 'FA Cup',
+      eventTitle: 'Chelsea'
+    }
+  },
+  {
+    slug: 'baseball-mlb-required',
+    input: {
+      rawTitle: 'Kansas City Royals vs Los Angeles Angels MLB 2026 04 25',
+      sportHint: 'baseball',
+      competition: 'MLB',
+      date: '2026-04-25',
+      seeders: 12,
+      size: '6.4 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Baseball',
+      competition: 'MLB',
+      eventTitle: 'Kansas City Royals vs Los Angeles Angels'
+    }
+  },
+  {
+    slug: 'golf-pga-tour-required',
+    input: {
+      rawTitle: 'PGA Tour 2026 Zurich Classic Round 3 WEB-DL 1080p',
+      sportHint: 'golf',
+      competition: 'PGA Tour',
+      eventTitle: 'Zurich Classic',
+      date: '2026-04-27',
+      seeders: 7,
+      size: '4.6 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Golf',
+      competition: 'PGA Tour',
+      eventTitle: 'Zurich Classic'
+    }
+  },
+  {
+    slug: 'motorsport-motogp-fp1-required',
+    input: {
+      rawTitle: 'MotoGP 2026 Round04 Spain Jerez FP1 Practice WEB DL 1080p H264 English',
+      sportHint: 'motorsport',
+      competition: 'MotoGP',
+      date: '2026-04-25',
+      seeders: 9,
+      size: '3.6 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Motorsport',
+      competition: 'MotoGP Spain',
+      eventTitle: 'Jerez',
+      eventDetail: 'FP1 Practice'
     }
   },
   {
@@ -576,6 +697,19 @@ async function main() {
     const layout = layoutSportsCard(testCase.input, 'poster')
     assert.equal(layout.dimensions.width, DIMENSIONS.poster.width, `${testCase.slug} poster width`)
     assert.equal(layout.dimensions.height, DIMENSIONS.poster.height, `${testCase.slug} poster height`)
+    for (const variant of ['landscape', 'background']) {
+      const wideLayout = layoutSportsCard(testCase.input, variant)
+      const expectedDimensions = DIMENSIONS[variant]
+      assert.equal(wideLayout.dimensions.width, expectedDimensions.width, `${testCase.slug} ${variant} width`)
+      assert.equal(wideLayout.dimensions.height, expectedDimensions.height, `${testCase.slug} ${variant} height`)
+      assert.ok(
+        wideLayout.dimensions.width > wideLayout.dimensions.height,
+        `${testCase.slug} ${variant} should be 16:9-safe, not a stretched portrait`
+      )
+      const wideSvg = renderSportsArtworkSvg(testCase.input, variant)
+      assert.match(wideSvg, new RegExp(`width="${expectedDimensions.width}"`), `${testCase.slug} ${variant} width attr`)
+      assert.match(wideSvg, new RegExp(`height="${expectedDimensions.height}"`), `${testCase.slug} ${variant} height attr`)
+    }
 
     const svg = renderSportsArtworkSvg(testCase.input, 'poster')
     assert.match(svg, /width="600"/, `${testCase.slug} width attr`)
@@ -609,7 +743,8 @@ async function main() {
     }
 
     assert.ok(
-      nodes.some((node) => node.role === 'visual-versus' || node.role === 'sport-motif'),
+      nodes.some((node) => node.role === 'visual-versus' || node.role === 'sport-motif') ||
+        /data-role="(?:matchup-visual|sport-visual)"/.test(svg),
       `${testCase.slug} poster should include a visible event/sport motif`
     )
 

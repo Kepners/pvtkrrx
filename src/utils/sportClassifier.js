@@ -1,20 +1,20 @@
 const SPORTS = [
-  { key: 'football', keywords: ['football', 'soccer', 'epl', 'premier league', 'la liga', 'serie a', 'bundesliga', 'uefa', 'champions league', 'europa league', 'conference league', 'efl', 'english football league', 'league one', 'league two', 'fa cup', 'carabao cup', 'community shield'] },
-  { key: 'basketball', keywords: ['basketball', 'nba', 'wnba', 'euroleague'] },
-  { key: 'baseball', keywords: ['baseball', 'mlb'] },
+  { key: 'football', keywords: ['football', 'soccer', 'epl', 'premier league', 'mls', 'major league soccer', 'american major league soccer', 'la liga', 'serie a', 'bundesliga', 'uefa', 'champions league', 'europa league', 'conference league', 'efl', 'english football league', 'league one', 'league two', 'fa cup', 'carabao cup', 'community shield'] },
+  { key: 'basketball', keywords: ['basketball', 'nba playoffs', 'nba postseason', 'nba', 'wnba', 'euroleague'] },
+  { key: 'baseball', keywords: ['baseball', 'major league baseball', 'mlb'] },
   { key: 'hockey', keywords: ['hockey', 'nhl', 'ice hockey'] },
   { key: 'american-football', keywords: ['american football', 'nfl', 'ncaa football', 'college football', 'super bowl', 'cfl', 'ufl'] },
   { key: 'mma', keywords: ['mma', 'ufc', 'fight night', 'bellator', 'pfl'] },
   { key: 'boxing', keywords: ['boxing'] },
   { key: 'tennis', keywords: ['tennis', 'atp', 'wta'] },
   { key: 'rugby', keywords: ['rugby'] },
-  { key: 'cricket', keywords: ['cricket', 'ipl', 't20'] },
+  { key: 'cricket', keywords: ['cricket', 'indian premier league', 'ipl', 't20'] },
   { key: 'motorsport', keywords: ['f1', 'formula 1', 'formula1', 'motogp', 'motorsport', 'grand prix', 'indycar', 'wrc', 'nascar', 'supercars', 'v8 supercars', 'bathurst', 'wsbk', 'wec', 'formula e', 'rally', 'dakar', 'sprint cup'] },
   { key: 'cycling', keywords: ['cycling', 'tour de france', 'giro', 'vuelta'] },
   { key: 'wrestling', keywords: ['wwe', 'aew', 'wrestling', 'smackdown', 'raw'] },
   { key: 'darts', keywords: ['darts', 'pdc darts', 'bdo darts', 'premier league darts'] },
   { key: 'snooker', keywords: ['snooker'] },
-  { key: 'golf', keywords: ['golf', 'pga', 'lpga', 'masters'] },
+  { key: 'golf', keywords: ['golf', 'pga tour', 'pga', 'lpga', 'masters'] },
   { key: 'olympics', keywords: ['olympics', 'olympic games'] }
 ]
 

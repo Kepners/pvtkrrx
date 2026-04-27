@@ -21,6 +21,8 @@ const {
   getSportsIdentityBackfillStats,
   setCachedSportsIdentityBackfill
 } = require('../src/utils/sportsIdentityBackfill')
+const { encodeCustomId } = require('../src/utils/customId')
+const { normalizeSportsEventMetadata } = require('../src/utils/sportsEventNormalizer')
 const { parseSportsEventTitle, parseSportsTitle } = require('../src/utils/sportsTitleParser')
 
 const ORIGINAL_FETCH = global.fetch
@@ -70,6 +72,10 @@ async function run() {
   const badChelseaId = 'sportsmeta:event:football|2026-03-24|ghanaian-premier-league|berekum-chelsea|medeama'
   const faCupChelseaLeedsId = 'sportsmeta:event:football|2026-04-26|fa-cup|chelsea|leeds-united'
   const mlbRoyalsAngelsId = 'sportsmeta:event:baseball|2026-04-25|mlb|kansas-city-royals|los-angeles-angels'
+  const nbaPlayoffsSpursBlazersId = 'sportsmeta:event:basketball|2026-04-26|nba-playoffs|san-antonio-spurs|portland-trail-blazers'
+  const mlsAtlantaMiamiId = 'sportsmeta:event:football|2026-04-27|major-league-soccer|atlanta-united|inter-miami'
+  const iplTitansBengaluruId = 'sportsmeta:event:cricket|2026-04-27|indian-premier-league|gujarat-titans|royal-challengers-bengaluru'
+  const pgaZurichClassicId = 'sportsmeta:event:golf|2026-04-27|pga-tour|zurich-classic'
   const motoGpSpainId = 'sportsmeta:event:motorsport|2026-04-25|motogp|spain-sprint-race'
   const fetchCounts = new Map()
 
@@ -128,6 +134,60 @@ async function run() {
       return new Response(JSON.stringify({
         metas: [
           { id: mlbRoyalsAngelsId, name: 'Kansas City Royals vs Los Angeles Angels', releaseInfo: '2026-04-25' }
+        ]
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
+    if (
+      url.pathname === '/catalog/movie/sportsmeta-basketball/search=antonio.json' ||
+      url.pathname === '/catalog/movie/sportsmeta-basketball/search=portland.json'
+    ) {
+      return new Response(JSON.stringify({
+        metas: [
+          { id: nbaPlayoffsSpursBlazersId, name: 'San Antonio Spurs vs Portland Trail Blazers', releaseInfo: '2026-04-26' }
+        ]
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
+    if (
+      url.pathname === '/catalog/movie/sportsmeta-football/search=atlanta.json' ||
+      url.pathname === '/catalog/movie/sportsmeta-football/search=inter.json'
+    ) {
+      return new Response(JSON.stringify({
+        metas: [
+          { id: mlsAtlantaMiamiId, name: 'Atlanta United vs Inter Miami', releaseInfo: '2026-04-27' }
+        ]
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
+    if (
+      url.pathname === '/catalog/movie/sportsmeta-cricket/search=gujarat.json' ||
+      url.pathname === '/catalog/movie/sportsmeta-cricket/search=challengers.json' ||
+      url.pathname === '/catalog/movie/sportsmeta-cricket/search=bengaluru.json'
+    ) {
+      return new Response(JSON.stringify({
+        metas: [
+          { id: iplTitansBengaluruId, name: 'Gujarat Titans vs Royal Challengers Bengaluru', releaseInfo: '2026-04-27' }
+        ]
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
+    if (url.pathname === '/catalog/movie/sportsmeta-golf/search=classic.json') {
+      return new Response(JSON.stringify({
+        metas: [
+          { id: pgaZurichClassicId, name: 'Zurich Classic', releaseInfo: '2026-04-27' }
         ]
       }), {
         status: 200,
@@ -275,6 +335,64 @@ async function run() {
       })
     }
 
+    if (url.pathname === `/event/${encodeURIComponent(nbaPlayoffsSpursBlazersId)}`) {
+      return new Response(JSON.stringify(canonicalPayload({
+        id: nbaPlayoffsSpursBlazersId,
+        name: 'San Antonio Spurs vs Portland Trail Blazers',
+        league: 'NBA Playoffs',
+        date: '2026-04-26',
+        sport: 'Basketball',
+        homeTeam: 'San Antonio Spurs',
+        awayTeam: 'Portland Trail Blazers'
+      })), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
+    if (url.pathname === `/event/${encodeURIComponent(mlsAtlantaMiamiId)}`) {
+      return new Response(JSON.stringify(canonicalPayload({
+        id: mlsAtlantaMiamiId,
+        name: 'Atlanta United vs Inter Miami',
+        league: 'Major League Soccer',
+        date: '2026-04-27',
+        sport: 'Football',
+        homeTeam: 'Atlanta United',
+        awayTeam: 'Inter Miami'
+      })), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
+    if (url.pathname === `/event/${encodeURIComponent(iplTitansBengaluruId)}`) {
+      return new Response(JSON.stringify(canonicalPayload({
+        id: iplTitansBengaluruId,
+        name: 'Gujarat Titans vs Royal Challengers Bengaluru',
+        league: 'Indian Premier League',
+        date: '2026-04-27',
+        sport: 'Cricket',
+        homeTeam: 'Gujarat Titans',
+        awayTeam: 'Royal Challengers Bengaluru'
+      })), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
+    if (url.pathname === `/event/${encodeURIComponent(pgaZurichClassicId)}`) {
+      return new Response(JSON.stringify(canonicalPayload({
+        id: pgaZurichClassicId,
+        name: 'Zurich Classic',
+        league: 'PGA Tour',
+        date: '2026-04-27',
+        sport: 'Golf'
+      })), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
     if (url.pathname === `/event/${encodeURIComponent(burnsId)}`) {
       return new Response(JSON.stringify(canonicalPayload({
         id: burnsId,
@@ -381,6 +499,38 @@ async function run() {
   assert.match(fallbackPoster.poster, /title=Atlanta\+Hawks\+vs\+New\+York\+Knicks/, 'fallback sports artwork should carry the game title')
   assert.match(fallbackPoster.poster, /date=2026-04-23/, 'fallback sports artwork should carry the event date')
 
+  const unresolvedSportsId = encodeCustomId({
+    y: 'sports',
+    k: 'sports',
+    n: 'San Antonio Spurs vs Portland Trail Blazers',
+    t: 'NBA Playoffs 2026 / 1st Round / West / Game 4 / 26 04 2026 / {San Antonio Spurs @ Portland Trail Blazers m4rtyr',
+    r: 'basketball',
+    g: 'NBA Playoffs',
+    e: '2026-04-26',
+    o: 'San Antonio Spurs',
+    w: 'Portland Trail Blazers',
+    j: 'Game 4',
+    d: 29,
+    s: 7_800_000_000,
+    c: 2,
+    q: SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY
+  }, { compact: 'sports', compress: true })
+  const unresolvedSportsMeta = await handleMeta(
+    { sportsmetaBaseUrl: 'https://sportsmeta.test' },
+    'sports',
+    unresolvedSportsId,
+    { baseUrl: 'https://addon.test' }
+  )
+  assert.equal(unresolvedSportsMeta.meta?.posterShape, 'poster', 'unresolved sports detail should keep poster-shaped artwork')
+  assert.match(String(unresolvedSportsMeta.meta?.poster || ''), /\/sports-artwork\/default\/poster\/basketball\.png/, 'unresolved sports detail poster should use the poster variant')
+  assert.match(String(unresolvedSportsMeta.meta?.background || ''), /\/sports-artwork\/default\/landscape\/basketball\.png/, 'unresolved sports detail background should use a 16:9 landscape variant, not the poster')
+  assert.doesNotMatch(String(unresolvedSportsMeta.meta?.background || ''), /\/poster\//, 'sports detail background must not be a blown-up poster')
+  assert.match(String(unresolvedSportsMeta.meta?.description || ''), /Sport: Basketball/, 'sports detail description should include sport')
+  assert.match(String(unresolvedSportsMeta.meta?.description || ''), /League: NBA Playoffs/, 'sports detail description should include league')
+  assert.match(String(unresolvedSportsMeta.meta?.description || ''), /Event: San Antonio Spurs vs Portland Trail Blazers/, 'sports detail description should include event')
+  assert.match(String(unresolvedSportsMeta.meta?.description || ''), /Session: Game 4/, 'sports detail description should include session')
+  assert.match(String(unresolvedSportsMeta.meta?.description || ''), /Availability: 29 seeders \| 7\.8 GB \| 2 sources/, 'sports detail description should include availability facts')
+
   const noisyLaLiga = parseSportsTitle('La Liga 2026 Levante vs Sevilla 23 04 720p60fps EN ESPNP', '2026-04-23T12:00:00Z')
   assert.equal(noisyLaLiga?.date, '2026-04-23', 'sports parser should infer day/month from tracker football titles with broadcast tokens')
   assert.equal(noisyLaLiga?.homeTeam, 'Levante', 'sports parser should keep the home team after stripping league/year noise')
@@ -410,6 +560,13 @@ async function run() {
   const oneTeamFaCup = parseSportsTitle('Football FA Cup vs Chelsea 2026 04 25 1080p', '2026-04-25T12:00:00Z')
   assert.equal(oneTeamFaCup?.league, 'FA Cup', 'FA Cup tracker rows should keep FA Cup as the competition')
   assert.equal(oneTeamFaCup?.awayTeam, 'Chelsea', 'FA Cup one-team tracker rows should preserve the real team token')
+  const oneTeamFaCupNormalized = normalizeSportsEventMetadata({
+    rawTitle: 'Football FA Cup vs Chelsea 2026 04 25 1080p',
+    sportHint: 'football',
+    competition: 'FA Cup',
+    date: '2026-04-25'
+  })
+  assert.equal(oneTeamFaCupNormalized.eventTitle, 'Chelsea', 'FA Cup one-team fallback cards should not invent a fake FA Cup vs Chelsea matchup')
 
   const faCupResolution = await resolveSportsMetaIdentity(
     client,
@@ -432,9 +589,77 @@ async function run() {
   )
   assert.equal(mlbResolution.status, SPORTS_META_RESOLUTION_STATUS.RESOLVED, 'MLB rows with trailing league text should resolve to SportsMeta events')
   assert.equal(mlbResolution.canonicalId, mlbRoyalsAngelsId, 'MLB Royals vs Angels should pair to the canonical MLB event')
+  const mlbParsed = parseSportsTitle('Kansas City Royals vs Los Angeles Angels MLB 2026 04 25', '2026-04-25T12:00:00.000Z')
+  assert.equal(mlbParsed?.awayTeam, 'Los Angeles Angels', 'MLB parser should strip trailing league suffixes from team labels')
+
+  const nbaPlayoffsParsed = parseSportsTitle('NBA Playoffs 2026 / 1st Round / West / Game 4 / 26 04 2026 / {San Antonio Spurs @ Portland Trail Blazers m4rtyr', '2026-04-26T12:00:00.000Z')
+  assert.equal(nbaPlayoffsParsed?.league, 'NBA Playoffs', 'NBA Playoffs tracker rows should keep the postseason competition')
+  assert.equal(nbaPlayoffsParsed?.homeTeam, 'San Antonio Spurs', 'NBA Playoffs parser should isolate the home team')
+  assert.equal(nbaPlayoffsParsed?.awayTeam, 'Portland Trail Blazers', 'NBA Playoffs parser should isolate the away team')
+  const nbaPlayoffsResolution = await resolveSportsMetaIdentity(
+    client,
+    availability('NBA Playoffs 2026 / 1st Round / West / Game 4 / 26 04 2026 / {San Antonio Spurs @ Portland Trail Blazers m4rtyr', {
+      sportHint: 'basketball',
+      mappedLeague: 'NBA Playoffs',
+      pubDate: '2026-04-26T12:00:00.000Z'
+    })
+  )
+  assert.equal(nbaPlayoffsResolution.status, SPORTS_META_RESOLUTION_STATUS.RESOLVED, 'NBA Playoffs tracker rows should resolve as basketball playoff fixtures')
+  assert.equal(nbaPlayoffsResolution.canonicalId, nbaPlayoffsSpursBlazersId, 'NBA Playoffs fixture should pair to the canonical playoff event')
+
+  const mlsParsed = parseSportsTitle('MLS 2026 Atlanta United vs Inter Miami 2026 04 27 1080p', '2026-04-27T12:00:00.000Z')
+  assert.equal(mlsParsed?.league, 'Major League Soccer', 'MLS shorthand should parse as Major League Soccer')
+  assert.equal(mlsParsed?.homeTeam, 'Atlanta United', 'MLS parser should isolate the home team')
+  assert.equal(mlsParsed?.awayTeam, 'Inter Miami', 'MLS parser should isolate the away team')
+  const mlsResolution = await resolveSportsMetaIdentity(
+    client,
+    availability('Major League Soccer 2026 Atlanta United vs Inter Miami 2026 04 27 1080p', {
+      sportHint: 'football',
+      mappedLeague: 'Major League Soccer',
+      pubDate: '2026-04-27T12:00:00.000Z'
+    })
+  )
+  assert.equal(mlsResolution.status, SPORTS_META_RESOLUTION_STATUS.RESOLVED, 'MLS/Major League Soccer rows should resolve as football fixtures')
+  assert.equal(mlsResolution.canonicalId, mlsAtlantaMiamiId, 'MLS fixture should pair to the canonical football event')
+
+  const iplParsed = parseSportsTitle('IPL 2026 Gujarat Titans vs Royal Challengers Bengaluru 1080p', '2026-04-27T12:00:00.000Z')
+  assert.equal(iplParsed?.league, 'Indian Premier League', 'IPL shorthand should parse as Indian Premier League')
+  assert.equal(iplParsed?.homeTeam, 'Gujarat Titans', 'IPL parser should isolate the home team')
+  assert.equal(iplParsed?.awayTeam, 'Royal Challengers Bengaluru', 'IPL parser should isolate the away team')
+  const iplResolution = await resolveSportsMetaIdentity(
+    client,
+    availability('Indian Premier League 2026 Gujarat Titans vs Royal Challengers Bengaluru 1080p', {
+      sportHint: 'cricket',
+      mappedLeague: 'Indian Premier League',
+      pubDate: '2026-04-27T12:00:00.000Z'
+    })
+  )
+  assert.equal(iplResolution.status, SPORTS_META_RESOLUTION_STATUS.RESOLVED, 'IPL rows should resolve as cricket fixtures')
+  assert.equal(iplResolution.canonicalId, iplTitansBengaluruId, 'IPL fixture should pair to the canonical cricket event')
+
+  const pgaParsed = parseSportsEventTitle('PGA Tour 2026 Zurich Classic Round 3 WEB-DL 1080p', '2026-04-27T12:00:00.000Z')
+  assert.equal(pgaParsed?.league, 'PGA Tour', 'PGA Tour rows should parse as golf')
+  assert.equal(pgaParsed?.eventName, 'Zurich Classic', 'PGA Tour parser should preserve the event name')
+  const pgaResolution = await resolveSportsMetaIdentity(
+    client,
+    availability('PGA Tour 2026 Zurich Classic Round 3 WEB-DL 1080p', {
+      sportHint: 'golf',
+      mappedLeague: 'PGA Tour',
+      pubDate: '2026-04-27T12:00:00.000Z'
+    })
+  )
+  assert.equal(pgaResolution.status, SPORTS_META_RESOLUTION_STATUS.RESOLVED, 'PGA Tour rows should resolve as golf events')
+  assert.equal(pgaResolution.canonicalId, pgaZurichClassicId, 'PGA Tour fixture should pair to the canonical golf event')
 
   const motogpSession = parseSportsEventTitle('MotoGP 2026 Round04 Spain Jerez FP1 Practice WEB DL 1080p H264 English')
   assert.equal(motogpSession?.eventName, 'Spain Jerez', 'motorsport parser should strip round/session wording from event names')
+  const motogpNormalized = normalizeSportsEventMetadata({
+    rawTitle: 'MotoGP 2026 Round04 Spain Jerez FP1 Practice WEB DL 1080p H264 English',
+    sportHint: 'motorsport',
+    competition: 'MotoGP',
+    date: '2026-04-25'
+  })
+  assert.equal(motogpNormalized.eventDetail, 'FP1 Practice', 'MotoGP parser should expose compound FP session detail')
 
   const motogpShortTitle = parseSportsEventTitle('MotoGP Spain Jerez', '2026-04-25T12:00:00.000Z')
   assert.equal(motogpShortTitle?.league, 'MotoGP', 'motorsport parser should accept short league + location titles')

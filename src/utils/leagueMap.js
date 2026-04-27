@@ -53,6 +53,13 @@ const LEAGUE_MAP = Object.freeze({
     sportsDbSport: 'Soccer',
     aliases: ['English FA Cup', 'The FA Cup', 'Football Association Cup']
   },
+  mls: {
+    name: 'Major League Soccer',
+    idLeague: '4346',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['MLS', 'American Major League Soccer', 'US Major League Soccer']
+  },
   ligue1: {
     name: 'French Ligue 1',
     idLeague: '4334',
@@ -66,6 +73,13 @@ const LEAGUE_MAP = Object.freeze({
     sportKey: 'basketball',
     sportsDbSport: 'Basketball',
     aliases: ['National Basketball Association']
+  },
+  nbaplayoffs: {
+    name: 'NBA Playoffs',
+    idLeague: '4387',
+    sportKey: 'basketball',
+    sportsDbSport: 'Basketball',
+    aliases: ['NBA Postseason', 'National Basketball Association Playoffs']
   },
   nfl: {
     name: 'NFL',
@@ -221,7 +235,8 @@ const LEAGUE_MAP = Object.freeze({
     name: 'PGA Tour',
     idLeague: '4425',
     sportKey: 'golf',
-    sportsDbSport: 'Golf'
+    sportsDbSport: 'Golf',
+    aliases: ['PGA']
   },
   lpga: {
     name: 'LPGA Tour',

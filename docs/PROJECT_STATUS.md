@@ -4,7 +4,15 @@ Updated: 2026-04-27
 
 ## Current Stage
 
-PVTKRRX is on the synchronized `1.1.55` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+PVTKRRX is on the synchronized `1.1.56` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+
+## 2026-04-27: v1.1.56 sports parser, artwork, and detail metadata repair
+
+- Repairs parser coverage for the required tracker terms: PGA, PGA Tour, IPL, Indian Premier League, MLS, Major League Soccer, FA Cup, MLB, NBA Playoffs, and MotoGP session titles.
+- Sports detail metadata now carries richer left-side facts for both canonical SportsMeta rows and unresolved Prowlarr fallback rows: sport, league, event, session, date, teams, source count, seeders, size, and resolution status where available.
+- Sports detail backgrounds now prefer real landscape/background artwork and default landscape proxy URLs instead of using a portrait poster as the page backdrop.
+- Mandatory regression tests now cover noisy NBA Playoffs, MLB, MLS, IPL, PGA Tour, FA Cup one-team rows, MotoGP compound sessions, and detail-page fallback metadata.
+- Paired SportsMeta resolver update `9efadba` adds matching truth fixtures and tracker-noise normalization for the same mandatory terms.
 
 ## 2026-04-27: v1.1.55 bracketed tracker matchup artwork correction
 

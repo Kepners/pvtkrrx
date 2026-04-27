@@ -70,7 +70,7 @@ const SESSION_WORDS = new Set([
   'fp3'
 ])
 
-const MATCHUP_PREFIX_NOISE_RE = /\b(?:english\s+premier\s+league|premier\s+league|champions\s+league|europa\s+league|la\s+liga|serie\s+a|bundesliga|college\s+football|world\s+series|stanley\s+cup|super\s+league\s+rugby|super\s+league|six\s+nations|premiership\s+rugby|rugby\s+championship|rugby\s+league|test\s+cricket|the\s+ashes|world\s+championship|world\s+matchplay|fight\s+night|main\s+card|main\s+event|regular\s+season|formula\s+1|formula\s+e|tour\s+de\s+france|giro\s+d['’]?italia|vuelta\s+a\s+espana|australian\s+open|roland\s+garros|us\s+open|nhl|mlb|nba|nfl|epl|ipl|odi|t20|atp|wta|pdc|ufc|pfl|wwe|aew|pga|lpga|motogp|nascar|indycar|wrc|wec|bkfc|football|baseball|hockey|basketball|cricket|rugby|tennis|boxing|mma|wrestling|darts|golf|motorsport|playoffs?|finals?|prelims?|heavyweight|matchroom|queensberry|masters|wimbledon|classics|rs)\b/gi
+const MATCHUP_PREFIX_NOISE_RE = /\b(?:english\s+premier\s+league|major\s+league\s+soccer|premier\s+league|champions\s+league|europa\s+league|fa\s+cup|la\s+liga|serie\s+a|bundesliga|college\s+football|world\s+series|stanley\s+cup|super\s+league\s+rugby|super\s+league|six\s+nations|premiership\s+rugby|rugby\s+championship|rugby\s+league|test\s+cricket|indian\s+premier\s+league|the\s+ashes|world\s+championship|world\s+matchplay|fight\s+night|main\s+card|main\s+event|regular\s+season|formula\s+1|formula\s+e|pga\s+tour|tour\s+de\s+france|giro\s+d['’]?italia|vuelta\s+a\s+espana|australian\s+open|roland\s+garros|us\s+open|nhl|mlb|nba|nfl|mls|epl|ipl|odi|t20|atp|wta|pdc|ufc|pfl|wwe|aew|pga|lpga|motogp|nascar|indycar|wrc|wec|bkfc|football|baseball|hockey|basketball|cricket|rugby|tennis|boxing|mma|wrestling|darts|golf|motorsport|playoffs?|postseason|finals?|prelims?|heavyweight|matchroom|queensberry|masters|wimbledon|classics|rs)\b/gi
 
 const RELEASE_GROUP_NOISE_RE = /\b(?:m4rtyr|thecig|mwr|billie|mgp|ntb|ctrlhd|deflate|organic|tgx|nf|int)\b.*$/i
 
@@ -84,7 +84,7 @@ function titleCase(value) {
     .filter(Boolean)
     .map((part) => {
       const upper = part.toUpperCase()
-      if (['EPL', 'FA', 'F1', 'MLB', 'MMA', 'MOTOGP', 'NBA', 'NFL', 'NHL', 'PGA', 'UFC', 'WRC', 'WWE'].includes(upper)) {
+      if (['EPL', 'FA', 'F1', 'IPL', 'MLB', 'MLS', 'MMA', 'MOTOGP', 'NBA', 'NFL', 'NHL', 'PGA', 'UFC', 'WRC', 'WWE'].includes(upper)) {
         return upper === 'MOTOGP' ? 'MotoGP' : upper
       }
       return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
@@ -112,8 +112,20 @@ function normalizeCompetition(value, sportKey = '', rawTitle = '') {
   if (/^nhl$/i.test(competition) && /\bplayoffs?\b/i.test(raw)) {
     competition = 'NHL Playoffs'
   }
+  if (/^nba$/i.test(competition) && /\b(?:playoffs?|postseason)\b/i.test(raw)) {
+    competition = 'NBA Playoffs'
+  }
+  if (/^(mls|american major league soccer)$/i.test(competition)) {
+    competition = 'Major League Soccer'
+  }
 
   return competition
+}
+
+function labelsMatch(left = '', right = '') {
+  const a = normalizeSpace(left).toLowerCase()
+  const b = normalizeSpace(right).toLowerCase()
+  return Boolean(a && b && a === b)
 }
 
 function cleanTrackerText(value) {
@@ -193,8 +205,7 @@ function normalizeMotorsportEvent({ league = '', eventName = '', rawTitle = '' }
   if (SESSION_WORDS.has(String(last || '').toLowerCase())) {
     detail = titleCase(tokens.pop())
   } else {
-    const rawSession = String(rawTitle || '').match(/\b(race|sprint|qualifying|practice|fp[1-3])\b/i)
-    if (rawSession) detail = titleCase(rawSession[1])
+    detail = extractMotorsportSessionDetail(rawTitle)
   }
 
   let competition = leagueLabel
@@ -210,6 +221,21 @@ function normalizeMotorsportEvent({ league = '', eventName = '', rawTitle = '' }
     eventTitle,
     eventDetail: detail
   }
+}
+
+function extractMotorsportSessionDetail(rawTitle = '') {
+  const text = normalizeSpace(String(rawTitle || '').replace(/[._-]+/g, ' '))
+  if (!text) return ''
+  const fpPractice = text.match(/\b(fp[1-3])\s+(practice)\b/i)
+  if (fpPractice) return `${fpPractice[1].toUpperCase()} ${titleCase(fpPractice[2])}`
+  const freePractice = text.match(/\bfree\s+practice\s+([1-3]|one|two|three)\b/i)
+  if (freePractice) return `Free Practice ${titleCase(freePractice[1])}`
+  const rawSession = text.match(/\b(warm\s+up|warmup|qualifying|qualifier|practice|sprint|race|fp[1-3])\b/i)
+  if (!rawSession) return ''
+  const value = rawSession[1].replace(/\s+/g, ' ')
+  if (/^fp[1-3]$/i.test(value)) return value.toUpperCase()
+  if (/^warmup$/i.test(value)) return 'Warm Up'
+  return titleCase(value)
 }
 
 function parseSportsMetaCanonicalId(id = '') {
@@ -284,7 +310,11 @@ function normalizeSportsEventMetadata(input = {}) {
   let eventTitle = normalizeSpace(input.eventTitle || input.name || canonicalEvent.name || canonicalEvent.title || '')
   let eventDetail = normalizeSpace(input.eventDetail || '')
 
-  if (homeTeam && awayTeam) {
+  if (homeTeam && awayTeam && labelsMatch(homeTeam, competition)) {
+    eventTitle = awayTeam
+  } else if (homeTeam && awayTeam && labelsMatch(awayTeam, competition)) {
+    eventTitle = homeTeam
+  } else if (homeTeam && awayTeam) {
     eventTitle = `${homeTeam} vs ${awayTeam}`
   } else if (parsedEvent?.eventName) {
     eventTitle = normalizeSpace(input.eventTitle || parsedEvent.eventName)

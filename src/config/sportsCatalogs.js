@@ -3,15 +3,15 @@ const SPORTS_DISCOVERY_CATALOGS = Object.freeze([
     id: 'pvtkrrx-sports',
     name: 'All Sports',
     sportHint: '',
-    detailOptions: ['Premier League', 'Formula 1', 'UFC', 'NBA', 'NFL', 'IPL', 'MotoGP', 'WWE', 'PDC'],
-    seedTerms: ['Premier League', 'Formula 1', 'UFC', 'NBA', 'NFL', 'IPL']
+    detailOptions: ['Premier League', 'FA Cup', 'MLS', 'Formula 1', 'MotoGP', 'UFC', 'NBA', 'NBA Playoffs', 'NFL', 'MLB', 'IPL', 'PGA Tour', 'WWE', 'PDC'],
+    seedTerms: ['Premier League', 'FA Cup', 'MLS', 'Formula 1', 'MotoGP', 'UFC', 'NBA', 'NBA Playoffs', 'NFL', 'MLB', 'Indian Premier League', 'PGA Tour']
   },
   {
     id: 'pvtkrrx-sports-football',
     name: 'Football',
     sportHint: 'football',
-    detailOptions: ['Premier League', 'Champions League', 'Europa League', 'La Liga', 'Serie A', 'Bundesliga', 'Arsenal', 'Liverpool', 'Manchester United'],
-    seedTerms: ['Premier League', 'Champions League', 'La Liga', 'Serie A']
+    detailOptions: ['Premier League', 'FA Cup', 'MLS', 'Major League Soccer', 'Champions League', 'Europa League', 'La Liga', 'Serie A', 'Bundesliga', 'Arsenal', 'Liverpool', 'Manchester United'],
+    seedTerms: ['Premier League', 'FA Cup', 'MLS', 'Champions League', 'La Liga', 'Serie A']
   },
   {
     id: 'pvtkrrx-sports-motorsport',
@@ -38,15 +38,15 @@ const SPORTS_DISCOVERY_CATALOGS = Object.freeze([
     id: 'pvtkrrx-sports-basketball',
     name: 'Basketball',
     sportHint: 'basketball',
-    detailOptions: ['NBA', 'WNBA', 'EuroLeague', 'NCAA'],
-    seedTerms: ['NBA', 'WNBA', 'EuroLeague']
+    detailOptions: ['NBA', 'NBA Playoffs', 'WNBA', 'EuroLeague', 'NCAA'],
+    seedTerms: ['NBA', 'NBA Playoffs', 'WNBA', 'EuroLeague']
   },
   {
     id: 'pvtkrrx-sports-cricket',
     name: 'Cricket',
     sportHint: 'cricket',
-    detailOptions: ['IPL', 'Test Cricket', 'ODI', 'T20', 'The Ashes'],
-    seedTerms: ['IPL', 'Test Cricket', 'T20']
+    detailOptions: ['IPL', 'Indian Premier League', 'Test Cricket', 'ODI', 'T20', 'The Ashes'],
+    seedTerms: ['IPL', 'Indian Premier League', 'Test Cricket', 'T20']
   },
   {
     id: 'pvtkrrx-sports-rugby',
@@ -80,8 +80,8 @@ const SPORTS_DISCOVERY_CATALOGS = Object.freeze([
     id: 'pvtkrrx-sports-baseball',
     name: 'Baseball',
     sportHint: 'baseball',
-    detailOptions: ['MLB', 'World Series', 'Postseason'],
-    seedTerms: ['MLB', 'World Series']
+    detailOptions: ['MLB', 'Major League Baseball', 'World Series', 'Postseason'],
+    seedTerms: ['MLB', 'Major League Baseball', 'World Series']
   },
   {
     id: 'pvtkrrx-sports-cycling',

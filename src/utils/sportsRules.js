@@ -30,6 +30,9 @@ function normalizeSportKey(value) {
     ['ncaa football', 'american-football'],
     ['soccer', 'football'],
     ['epl', 'football'],
+    ['mls', 'football'],
+    ['major league soccer', 'football'],
+    ['american major league soccer', 'football'],
     ['ufc', 'mma'],
     ['bellator', 'mma'],
     ['pfl', 'mma'],
@@ -38,8 +41,15 @@ function normalizeSportKey(value) {
     ['pdc', 'darts'],
     ['bdo', 'darts'],
     ['pga', 'golf'],
+    ['pga tour', 'golf'],
     ['lpga', 'golf'],
-    ['masters', 'golf']
+    ['masters', 'golf'],
+    ['mlb', 'baseball'],
+    ['major league baseball', 'baseball'],
+    ['nba playoffs', 'basketball'],
+    ['nba postseason', 'basketball'],
+    ['indian premier league', 'cricket'],
+    ['ipl', 'cricket']
   ])
 
   if (aliases.has(raw)) return aliases.get(raw)
@@ -53,17 +63,17 @@ function detectStrongSportHintFromTitle(title) {
   const rules = [
     ['darts', /\b(?:pdc|bdo|darts|premier[\s._-]*league[\s._-]*darts)\b/i],
     ['cricket', /\b(?:cricket|ipl|indian[\s._-]*premier[\s._-]*league|t20|odi|ashes|big[\s._-]*bash|the[\s._-]*hundred)\b/i],
-    ['football', /\b(?:efl|elc|epl|uefa|english[\s._-]*football[\s._-]*league|la[\s._-]*liga|serie[\s._-]*a|bundesliga|champions[\s._-]*league|europa[\s._-]*league|conference[\s._-]*league|fa[\s._-]*cup|carabao[\s._-]*cup|community[\s._-]*shield)\b/i],
+    ['football', /\b(?:efl|elc|epl|mls|major[\s._-]*league[\s._-]*soccer|uefa|english[\s._-]*football[\s._-]*league|la[\s._-]*liga|serie[\s._-]*a|bundesliga|champions[\s._-]*league|europa[\s._-]*league|conference[\s._-]*league|fa[\s._-]*cup|carabao[\s._-]*cup|community[\s._-]*shield)\b/i],
     ['american-football', /\b(?:nfl|ncaaf|ncaa[\s._-]*football|college[\s._-]*football|super[\s._-]*bowl|cfl|ufl|xfl)\b/i],
-    ['basketball', /\b(?:nba|wnba|euroleague|ncaa[\s._-]*basketball)\b/i],
-    ['baseball', /\b(?:mlb|baseball)\b/i],
+    ['basketball', /\b(?:nba(?:[\s._-]*(?:playoffs?|postseason))?|wnba|euroleague|ncaa[\s._-]*basketball)\b/i],
+    ['baseball', /\b(?:mlb|major[\s._-]*league[\s._-]*baseball|baseball)\b/i],
     ['hockey', /\b(?:nhl|ice[\s._-]*hockey)\b/i],
     ['tennis', /\b(?:atp|wta|wimbledon|roland[\s._-]*garros|us[\s._-]*open|australian[\s._-]*open|davis[\s._-]*cup|laver[\s._-]*cup)\b/i],
     ['rugby', /\b(?:rugby|nrl|super[\s._-]*rugby|six[\s._-]*nations|united[\s._-]*rugby[\s._-]*championship)\b/i],
     ['motorsport', /\b(?:f1|formula[\s._-]*1|formula1|motogp|nascar|indycar|wrc|supercars|v8[\s._-]*supercars|bathurst|wsbk|wec|formula[\s._-]*e)\b/i],
     ['mma', /\b(?:ufc|bellator|pfl|fight[\s._-]*night|one[\s._-]*championship)\b/i],
     ['boxing', /\b(?:boxing|matchroom|queensberry|top[\s._-]*rank)\b/i],
-    ['golf', /\b(?:pga|lpga|masters|ryder[\s._-]*cup|open[\s._-]*championship)\b/i],
+    ['golf', /\b(?:pga(?:[\s._-]*tour)?|lpga|masters|ryder[\s._-]*cup|open[\s._-]*championship)\b/i],
     ['cycling', /\b(?:cycling|tour[\s._-]*de[\s._-]*france|giro[\s._-]*d[\s._-]*italia|vuelta)\b/i],
     ['wrestling', /\b(?:wwe|aew|wrestling)\b/i],
     ['snooker', /\bsnooker\b/i]
@@ -117,13 +127,15 @@ function scoreSportsEventSignals(title, sportHint = '') {
   const sport = normalizeSportKey(sportHint)
   if (sport) {
     if (sport === 'tennis' && /\b(?:atp|wta|wimbledon|roland[\s.\-_]*garros|us[\s.\-_]*open|australian[\s.\-_]*open|davis[\s.\-_]*cup|laver[\s.\-_]*cup)\b/i.test(value)) score += 2
-    if (sport === 'football' && /\b(?:epl|premier[\s.\-_]*league|la[\s.\-_]*liga|serie[\s.\-_]*a|bundesliga|champions[\s.\-_]*league|europa[\s.\-_]*league)\b/i.test(value)) score += 2
-    if (sport === 'basketball' && /\b(?:nba|wnba|euroleague|ncaa)\b/i.test(value)) score += 2
+    if (sport === 'football' && /\b(?:epl|mls|major[\s.\-_]*league[\s.\-_]*soccer|premier[\s.\-_]*league|fa[\s.\-_]*cup|la[\s.\-_]*liga|serie[\s.\-_]*a|bundesliga|champions[\s.\-_]*league|europa[\s.\-_]*league)\b/i.test(value)) score += 2
+    if (sport === 'basketball' && /\b(?:nba(?:[\s.\-_]*(?:playoffs?|postseason))?|wnba|euroleague|ncaa)\b/i.test(value)) score += 2
+    if (sport === 'baseball' && /\b(?:mlb|major[\s.\-_]*league[\s.\-_]*baseball)\b/i.test(value)) score += 2
     if (sport === 'american-football' && /\b(?:nfl|ncaa|cfl|ufl)\b/i.test(value)) score += 2
     if (sport === 'motorsport' && /\b(?:f1|formula[\s.\-_]*1|formula1|motogp|nascar|indycar|wrc|supercars|v8[\s.\-_]*supercars|bathurst|wsbk|wec|formula[\s.\-_]*e|grand[\s.\-_]*prix|gp)\b/i.test(value)) score += 2
     if (sport === 'mma' && /\b(?:ufc|bellator|pfl|fight[\s.\-_]*night|one[\s.\-_]*championship)\b/i.test(value)) score += 2
     if (sport === 'darts' && /\b(?:pdc|bdo|darts|premier[\s.\-_]*league[\s.\-_]*darts)\b/i.test(value)) score += 2
-    if (sport === 'golf' && /\b(?:pga|lpga|masters|open[\s.\-_]*championship|ryder[\s.\-_]*cup)\b/i.test(value)) score += 2
+    if (sport === 'cricket' && /\b(?:ipl|indian[\s.\-_]*premier[\s.\-_]*league|t20|odi|ashes)\b/i.test(value)) score += 2
+    if (sport === 'golf' && /\b(?:pga(?:[\s.\-_]*tour)?|lpga|masters|open[\s.\-_]*championship|ryder[\s.\-_]*cup)\b/i.test(value)) score += 2
   }
 
   return score

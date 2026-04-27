@@ -58,6 +58,53 @@ function buildSportsGenres(sportHint, league) {
   return genres
 }
 
+function pushUniqueLine(lines, value) {
+  const text = String(value || '').trim()
+  if (!text) return
+  if (!lines.some((line) => line.toLowerCase() === text.toLowerCase())) lines.push(text)
+}
+
+function buildSportsDescriptionLines(input = {}) {
+  const lines = []
+  const sport = formatSportGenreLabel(input.sportHint || input.sport || '')
+  const league = String(input.league || '').trim()
+  const title = String(input.eventTitle || input.title || '').trim()
+  const detail = String(input.eventDetail || '').trim()
+  const date = String(input.date || '').trim()
+  const homeTeam = String(input.homeTeam || '').trim()
+  const awayTeam = String(input.awayTeam || '').trim()
+  const canonicalDescription = String(input.canonicalDescription || '').trim()
+
+  if (canonicalDescription) {
+    for (const line of canonicalDescription.split(/\r?\n/).map((value) => value.trim()).filter(Boolean)) {
+      pushUniqueLine(lines, line)
+    }
+  }
+
+  if (sport) pushUniqueLine(lines, `Sport: ${sport}`)
+  if (league) pushUniqueLine(lines, `League: ${league}`)
+  if (title) pushUniqueLine(lines, `Event: ${title}`)
+  if (detail) pushUniqueLine(lines, `Session: ${detail}`)
+  if (date) pushUniqueLine(lines, `Date: ${date}`)
+  if (homeTeam && awayTeam) pushUniqueLine(lines, `Teams: ${homeTeam} vs ${awayTeam}`)
+
+  const availability = []
+  if (Number(input.seeders) > 0) availability.push(`${Number(input.seeders)} seeders`)
+  if (input.size) availability.push(String(input.size).trim())
+  if (Number(input.sourceCount) > 0) {
+    const count = Number(input.sourceCount)
+    availability.push(`${count} source${count === 1 ? '' : 's'}`)
+  }
+  if (availability.length > 0) pushUniqueLine(lines, `Availability: ${availability.join(' | ')}`)
+
+  const status = String(input.resolutionStatus || '').trim()
+  const source = String(input.source || '').trim()
+  if (status && status !== 'resolved') pushUniqueLine(lines, `Artwork status: ${status}`)
+  else if (source) pushUniqueLine(lines, `Metadata source: ${source === 'sportsmeta' ? 'SportsMeta' : source}`)
+
+  return lines
+}
+
 async function loadCanonicalSportsMeta(config = {}, canonicalId = '') {
   const normalizedId = String(canonicalId || '').trim()
   if (!normalizedId) return null
@@ -111,13 +158,24 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, 
   const backgroundResolved = resolveSportsLandscapeAsset(artworkInput) || resolveSportsBackgroundAsset(artworkInput)
   const logoResolved = resolveSportsLogoAsset(artworkInput)
   const poster = String(posterResolved?.poster || '').trim() || BRAND_POSTER
-  const background = String(backgroundResolved || '').trim() || poster
+  const background = String(backgroundResolved || '').trim() || BRAND_POSTER
   const logo = String(logoResolved || '').trim() || BRAND_LOGO
+  const descriptionLines = buildSportsDescriptionLines({
+    canonicalDescription: canonicalEvent?.description,
+    sportHint,
+    league: normalizedSportsEvent.competition || league,
+    eventTitle: normalizedSportsEvent.eventTitle || displayTitle,
+    eventDetail: normalizedSportsEvent.eventDetail || '',
+    date: normalizedSportsEvent.date || eventDate,
+    homeTeam: canonicalEvent?.homeTeam,
+    awayTeam: canonicalEvent?.awayTeam,
+    source: 'sportsmeta'
+  })
   const meta = {
     id: requestedId,
     type: metaType,
     name: displayTitle,
-    description: String(canonicalEvent?.description || '').trim(),
+    description: descriptionLines.join('\n'),
     poster,
     background,
     logo
@@ -188,6 +246,7 @@ async function handleCustomMeta(config, id, context = {}) {
   const carriedLeagueCode = String(info.u || '').trim()
   const carriedHomeTeam = String(info.o || '').trim()
   const carriedAwayTeam = String(info.w || '').trim()
+  const carriedEventDetail = String(info.j || '').trim()
   const carriedSportHint = String(info.r || '').trim()
   const canonicalId = String(info.x || '').trim()
   const resolutionStatus = String(info.q || '').trim()
@@ -244,6 +303,7 @@ async function handleCustomMeta(config, id, context = {}) {
         competition: league,
         eventTitle: displayTitle,
         date: eventDate,
+        eventDetail: carriedEventDetail,
         seeders: Number(info.d || 0) || undefined,
         size: Number(info.s || 0) > 0 ? formatSize(info.s) : '',
         rawTitle: info.t || displayTitle,
@@ -276,27 +336,29 @@ async function handleCustomMeta(config, id, context = {}) {
     ? resolveSportsLogoAsset(artworkInput)
     : carriedLogo
   const poster = String(posterResolved?.poster || '').trim() || BRAND_POSTER
-  const background = String(backgroundResolved || '').trim() || poster
+  const background = String(backgroundResolved || '').trim() || (isSports ? BRAND_POSTER : poster)
   const logo = String(logoResolved || '').trim() || BRAND_LOGO
   const posterShape = isSports ? posterResolved?.posterShape : undefined
 
   const sportsGenres = isSports ? buildSportsGenres(resolvedSportHint, league) : []
 
-  const descriptionLines = []
+  let descriptionLines = []
   if (isSports) {
-    const canonicalDescription = String(canonicalEvent?.description || '').trim()
-    if (canonicalDescription) {
-      for (const line of canonicalDescription.split(/\r?\n/).map((value) => value.trim()).filter(Boolean)) {
-        if (!descriptionLines.includes(line)) descriptionLines.push(line)
-      }
-    } else {
-      if (eventName && eventName !== displayTitle) descriptionLines.push(eventName)
-      if (league && !descriptionLines.some(line => line.includes(league))) descriptionLines.push(league)
-      if (eventDate) descriptionLines.push(`Date: ${eventDate}`)
-      if (homeTeam && awayTeam) {
-        descriptionLines.push(`${homeTeam} vs ${awayTeam}`)
-      }
-    }
+    descriptionLines = buildSportsDescriptionLines({
+      canonicalDescription: canonicalEvent?.description,
+      sportHint: resolvedSportHint,
+      league: normalizedSportsEvent?.competition || league,
+      eventTitle: normalizedSportsEvent?.eventTitle || eventName || displayTitle,
+      eventDetail: normalizedSportsEvent?.eventDetail || carriedEventDetail,
+      date: normalizedSportsEvent?.date || eventDate,
+      homeTeam,
+      awayTeam,
+      seeders: Number(info.d || 0) || 0,
+      size: Number(info.s || 0) > 0 ? formatSize(info.s) : '',
+      sourceCount: Number(info.c || 0) || 0,
+      resolutionStatus,
+      source: canonicalSportsMeta ? 'sportsmeta' : 'prowlarr'
+    })
   }
   const statParts = []
   if (Number(info.d) > 0) statParts.push(`${info.d} seeders`)
@@ -305,7 +367,7 @@ async function handleCustomMeta(config, id, context = {}) {
     const count = Number(info.c)
     statParts.push(`${count} source${count === 1 ? '' : 's'}`)
   }
-  if (statParts.length > 0) descriptionLines.push(statParts.join(' | '))
+  if (!isSports && statParts.length > 0) descriptionLines.push(statParts.join(' | '))
   const description = descriptionLines.filter(Boolean).join('\n') || statParts.join(' | ')
 
   const meta = {
