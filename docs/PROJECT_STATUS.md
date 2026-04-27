@@ -4,14 +4,15 @@ Updated: 2026-04-27
 
 ## Current Stage
 
-PVTKRRX is on the synchronized `1.1.51` release line, with post-release sports pairing/ranking fixes being applied to the live sports catalog path. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+PVTKRRX is on the synchronized `1.1.52` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
 
-## 2026-04-27: sports Discover stale canonical ranking correction
+## 2026-04-27: v1.1.52 sports Discover stale canonical ranking correction
 
 - Sports Discover no longer sorts every resolved SportsMeta row ahead of fallback tracker availability.
 - Sports catalog ranking now uses query relevance first, then event freshness (`today/upcoming`, undated availability, stale past events), then normal tracker availability, with resolved SportsMeta identity kept as the final tie-break.
 - This prevents stale canonical motorsport rows such as an older MotoGP sprint from pinning above fresher tracker rows that have not yet paired to SportsMeta.
 - Added a `smoke:sports-catalog-seeds` regression where a stale resolved MotoGP Spain row has better pubDate/seeders than an undated MotoGP Brazil row; the Brazil row must remain first.
+- SportsMeta TV schedule ingest is paired with this release through commit `821b03a`: Contabo fetches TheSportsDB `eventstv.php` by date plus sport, stores paired records/assets server-side, and exposes only cached SportsMeta/PVTKRRX URLs to clients.
 
 ## 2026-04-26: v1.1.51 Sports Posters entitlement-copy correction
 

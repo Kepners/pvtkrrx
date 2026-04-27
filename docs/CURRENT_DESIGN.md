@@ -311,7 +311,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 - Current release numbering is app-aligned across surfaces:
   - desktop/latest release tag: `vX.Y.Z`
   - self-host/seedbox release tag: `vX.Y.Z-selfhost`
-- For app version `1.1.51`, the current tags are `v1.1.51` and `v1.1.51-selfhost`.
+- For app version `1.1.52`, the current tags are `v1.1.52` and `v1.1.52-selfhost`.
 - Legacy `v1.12.x-selfhost` tags were an old self-host-only counter. They remain published only so older pinned installer commands keep working. Do not create new `v1.12.x-selfhost` tags, and do not use them as the preferred install/update target.
 - A self-host tag and its paired desktop tag must resolve to the same Git revision before the release is described as synchronized.
 
