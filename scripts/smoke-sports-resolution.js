@@ -347,7 +347,7 @@ async function run() {
   )
   assert.equal(
     paidSportsMetaResponse.meta?.poster,
-    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}`,
+    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}&v=20260427-visual-v2`,
     'paid sports configs must emit PVTKRRX raster-proxy poster URLs for canonical sports art'
   )
 
@@ -361,7 +361,7 @@ async function run() {
     })
     assert.equal(
       envTokenPoster.poster,
-      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_env_poster_token')}`,
+      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_env_poster_token')}&v=20260427-visual-v2`,
       'PVTKRRX should prefer SportsMeta member artwork when a runtime env token is configured'
     )
   } finally {

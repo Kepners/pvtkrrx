@@ -5,6 +5,8 @@ const {
   resolveSportSlug
 } = require('../clients/sportsmeta')
 
+const SPORTS_ARTWORK_PROXY_VERSION = '20260427-visual-v2'
+
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
 }
@@ -92,6 +94,7 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
     const url = new URL(`${addonBase}/sports-artwork/id/${encodeURIComponent(variant)}/${encodeURIComponent(canonicalId)}.png`)
     const memberToken = resolveSportsPosterMemberToken(input)
     if (memberToken) url.searchParams.set('token', memberToken)
+    url.searchParams.set('v', SPORTS_ARTWORK_PROXY_VERSION)
     return url.toString()
   }
   const sportSlug = resolveSportSlug(resolveSport(input))
@@ -108,6 +111,7 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
   if (Number(input?.seeders) > 0) url.searchParams.set('seeders', String(Number(input.seeders)))
   if (input?.size) url.searchParams.set('size', normalizeSpace(input.size))
   if (input?.source) url.searchParams.set('source', normalizeSpace(input.source))
+  url.searchParams.set('v', SPORTS_ARTWORK_PROXY_VERSION)
   return url.toString()
 }
 

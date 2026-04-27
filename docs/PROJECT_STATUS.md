@@ -4,7 +4,13 @@ Updated: 2026-04-27
 
 ## Current Stage
 
-PVTKRRX is on the synchronized `1.1.53` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+PVTKRRX is on the synchronized `1.1.54` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+
+## 2026-04-27: v1.1.54 generated sports artwork visual correction
+
+- Supersedes `1.1.53` because the dimension guard made many fallback sports posters technically valid but visually worse.
+- Generated fallback sports posters now use a stronger poster composition: matchup split panels, initials, a central `V`, sport-specific motifs for non-matchup events, and a constrained bottom text panel.
+- Sports artwork proxy URLs now carry `v=20260427-visual-v2` so Stremio/client caches refresh the new generated artwork instead of keeping the older text-only poster bytes.
 
 ## 2026-04-27: v1.1.53 SportsMeta raster landscape guard
 

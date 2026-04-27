@@ -581,12 +581,20 @@ async function main() {
       assert.ok(node.y >= layout.safe, `${testCase.slug} y safe ${node.role}`)
       assert.ok(node.y <= DIMENSIONS.poster.height - layout.safe, `${testCase.slug} y max ${node.role}`)
     }
-    for (let index = 1; index < nodes.length; index += 1) {
+    const semanticNodes = nodes
+      .filter((node) => ['sport', 'competition', 'eventTitle', 'eventDetail', 'footer'].includes(node.role))
+      .sort((left, right) => left.y - right.y)
+    for (let index = 1; index < semanticNodes.length; index += 1) {
       assert.ok(
-        nodes[index].y - nodes[index - 1].y >= 20,
-        `${testCase.slug} text rows should not overlap (${nodes[index - 1].role} -> ${nodes[index].role})`
+        semanticNodes[index].y - semanticNodes[index - 1].y >= 20,
+        `${testCase.slug} text rows should not overlap (${semanticNodes[index - 1].role} -> ${semanticNodes[index].role})`
       )
     }
+
+    assert.ok(
+      nodes.some((node) => node.role === 'visual-versus' || node.role === 'sport-motif'),
+      `${testCase.slug} poster should include a visible event/sport motif`
+    )
 
     const svgPath = path.join(PREVIEW_DIR, `${testCase.slug}.svg`)
     const pngPath = path.join(PREVIEW_DIR, `${testCase.slug}.png`)
