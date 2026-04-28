@@ -5,7 +5,7 @@ const {
   resolveSportSlug
 } = require('../clients/sportsmeta')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260428-club-logo-v2'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260428-club-logo-v3'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()

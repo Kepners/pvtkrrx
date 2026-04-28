@@ -26,7 +26,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260428-club-logo-v2'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260428-club-logo-v3'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -179,6 +179,18 @@ function readableAccentFromHex(hex = '#0f766e') {
   const b = parseInt(clean.slice(4, 6), 16)
   const luminance = (0.299 * r) + (0.587 * g) + (0.114 * b)
   return luminance > 150 ? '#1f2937' : '#f8fafc'
+}
+
+function paperAccentFromHex(hex = '#b58b2a') {
+  const clean = String(hex || '').replace(/[^a-f0-9]/gi, '')
+  if (clean.length !== 6) return '#b58b2a'
+  const r = parseInt(clean.slice(0, 2), 16)
+  const g = parseInt(clean.slice(2, 4), 16)
+  const b = parseInt(clean.slice(4, 6), 16)
+  const luminance = (0.299 * r) + (0.587 * g) + (0.114 * b)
+  if (luminance > 180) return '#9a6a16'
+  if (luminance < 35) return '#9a6a16'
+  return `#${clean.toLowerCase()}`
 }
 
 async function dominantColorFromImage(buffer, fallback = '#0f766e') {
@@ -537,7 +549,7 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
   return sharp(Buffer.from(renderTeamSplitBaseSvg(event, normalizedVariant, {
     homeColor: homeBadge.color,
     awayColor: awayBadge.color,
-    accentColor: leagueLogo?.color || readableAccentFromHex(homeBadge.color)
+    accentColor: paperAccentFromHex(leagueLogo?.color || homeBadge.color || readableAccentFromHex(homeBadge.color))
   })))
     .composite(composites)
     .png({ compressionLevel: 9, adaptiveFiltering: true })
