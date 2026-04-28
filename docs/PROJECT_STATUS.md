@@ -6,6 +6,13 @@ Updated: 2026-04-27
 
 PVTKRRX is on the synchronized `1.1.57` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
 
+## 2026-04-28: sports poster artwork repair in progress
+
+- Generated sports fallback artwork now uses sport-specific surfaces such as football pitches, basketball courts, baseball diamonds, hockey rinks, racing circuits, tennis courts, snooker tables, octagons, and rings instead of generic stripe cards.
+- Generated matchup fallbacks no longer render fake acronym logos when real SportsMeta badge images are unavailable; they show the surface, team names, and a centered versus mark.
+- `/sports-artwork/default/...` now carries parsed home/away hints and, when a Sports Posters token is configured, attempts a conservative SportsMeta canonical resolve before falling back to generated artwork.
+- Local proof so far: `npm run smoke:sports-artwork`, `npm run smoke:sports-resolution`, and the `http://127.0.0.1:7099/` artwork debug page with cache version `20260428-surface-v8`.
+
 ## 2026-04-27: v1.1.57 FA Cup round-marker parser correction
 
 - Supersedes `1.1.56` because the live targeted audit found FA Cup rows with round markers such as `QF West Ham Utd vs Leeds Utd` could still render as `Leeds Utd vs QF`.

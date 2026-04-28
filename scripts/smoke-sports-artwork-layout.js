@@ -9,7 +9,7 @@ const {
   layoutSportsCard,
   renderSportsArtworkSvg
 } = require('../src/utils/sportsCardArtwork')
-const { handleCanonicalSportsArtwork } = require('../src/handlers/sportsArtworkProxy')
+const { handleCanonicalSportsArtwork, handleDefaultSportsArtwork } = require('../src/handlers/sportsArtworkProxy')
 const { SPORTS_DISCOVERY_CATALOGS } = require('../src/config/sportsCatalogs')
 const { normalizeSportsEventMetadata } = require('../src/utils/sportsEventNormalizer')
 
@@ -501,6 +501,27 @@ function countByRole(nodes) {
   }, {})
 }
 
+function expectedSurfaceFor(normalized = {}, slug = '') {
+  const text = `${slug} ${normalized.sport || ''} ${normalized.competition || ''} ${normalized.eventTitle || ''}`.toLowerCase()
+  if (/formula|motogp|motor/.test(text)) return 'circuit'
+  if (/american-football|nfl/.test(text)) return 'gridiron'
+  if (/rugby/.test(text)) return 'rugby-pitch'
+  if (/football|premier league|fa cup|mls/.test(text)) return 'football-pitch'
+  if (/hockey|nhl/.test(text)) return 'hockey-rink'
+  if (/basketball|nba/.test(text)) return 'basketball-court'
+  if (/baseball|mlb/.test(text)) return 'baseball-diamond'
+  if (/cricket|ipl/.test(text)) return 'cricket-ground'
+  if (/tennis|wimbledon/.test(text)) return 'tennis-court'
+  if (/snooker/.test(text)) return 'snooker-table'
+  if (/boxing/.test(text)) return 'boxing-ring'
+  if (/mma|ufc/.test(text)) return 'octagon'
+  if (/wrestling|wwe/.test(text)) return 'wrestling-ring'
+  if (/golf|pga/.test(text)) return 'golf-hole'
+  if (/darts|pdc/.test(text)) return 'dartboard'
+  if (/cycling|tour de france/.test(text)) return 'velodrome'
+  return 'sports-field'
+}
+
 function pngDimensions(buffer) {
   return {
     width: buffer.readUInt32BE(16),
@@ -622,6 +643,54 @@ async function assertTeamBadgeArtworkProxy() {
           headers: { 'content-type': 'application/json' }
         })
       }
+      if (url.pathname === '/resolve') {
+        assert.equal(url.searchParams.get('recordType'), 'event', 'default artwork lookup should request an event')
+        assert.equal(url.searchParams.get('sport'), 'hockey', 'default artwork lookup should pass sport')
+        assert.equal(url.searchParams.get('league'), 'NHL', 'default artwork lookup should pass league')
+        assert.equal(url.searchParams.get('home'), 'Utah Mammoth', 'default artwork lookup should pass home team')
+        assert.equal(url.searchParams.get('away'), 'Vegas Golden Knights', 'default artwork lookup should pass away team')
+        return new Response(JSON.stringify({
+          ok: true,
+          event: {
+            id: canonicalId,
+            title: 'Utah Mammoth vs Vegas Golden Knights',
+            sport: 'Hockey',
+            league: 'NHL',
+            date: '2026-04-25',
+            homeTeam: 'Utah Mammoth',
+            awayTeam: 'Vegas Golden Knights'
+          },
+          assets: {
+            poster: `https://sportsmeta.test/member/default-token/asset/poster/${encodeURIComponent(canonicalId)}`,
+            homeBadge: `https://sportsmeta.test/member/default-token/asset/homeBadge/${encodeURIComponent(canonicalId)}`,
+            awayBadge: `https://sportsmeta.test/member/default-token/asset/awayBadge/${encodeURIComponent(canonicalId)}`
+          }
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      }
+      if (url.pathname === `/member/default-token/asset/poster/${encodeURIComponent(canonicalId)}`) {
+        return new Response('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900"></svg>', {
+          status: 200,
+          headers: {
+            'content-type': 'image/svg+xml',
+            'x-sportsmeta-generated-asset': 'true'
+          }
+        })
+      }
+      if (url.pathname === `/member/default-token/asset/homeBadge/${encodeURIComponent(canonicalId)}`) {
+        return new Response(teamBadgeSvg('UTA', '#155e75'), {
+          status: 200,
+          headers: { 'content-type': 'image/svg+xml' }
+        })
+      }
+      if (url.pathname === `/member/default-token/asset/awayBadge/${encodeURIComponent(canonicalId)}`) {
+        return new Response(teamBadgeSvg('VGK', '#92400e'), {
+          status: 200,
+          headers: { 'content-type': 'image/svg+xml' }
+        })
+      }
       if (
         url.pathname === `/member/test-token/asset/homeBadge/${encodeURIComponent(canonicalId)}` ||
         url.pathname === `/member/test-token/asset/homeBadge/${encodeURIComponent(invalidLandscapeCanonicalId)}`
@@ -691,6 +760,33 @@ async function assertTeamBadgeArtworkProxy() {
       'invalid member landscape should report the layout fallback reason'
     )
     assert.deepEqual(pngDimensions(invalidLandscapeResponse.body), dimensions.landscape, 'invalid member landscape fallback dimensions')
+
+    const defaultResolvedResponse = makeMockResponse()
+    await handleDefaultSportsArtwork(
+      {
+        params: {
+          variant: 'poster',
+          sport: 'hockey.png'
+        },
+        query: {
+          league: 'NHL',
+          title: 'Utah Mammoth vs Vegas Golden Knights',
+          date: '2026-04-25',
+          home: 'Utah Mammoth',
+          away: 'Vegas Golden Knights'
+        }
+      },
+      defaultResolvedResponse,
+      {
+        sportsmetaBaseUrl: 'https://sportsmeta.test',
+        sportsPosterMemberToken: 'default-token'
+      }
+    )
+    assert.equal(defaultResolvedResponse.statusCode, 200, 'default artwork resolver should return 200')
+    assert.equal(defaultResolvedResponse.headers['content-type'], 'image/png', 'default artwork resolver should return PNG')
+    assert.equal(defaultResolvedResponse.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-team-badge-poster', 'default artwork resolver should use canonical team badge composition when resolvable')
+    assert.match(defaultResolvedResponse.headers['x-pvtkrrx-artwork-upstream'] || '', /\/member\/\[redacted\]\/asset\/poster\/sportsmeta/, 'default artwork resolver should switch to the member canonical poster route')
+    assert.deepEqual(pngDimensions(defaultResolvedResponse.body), dimensions.poster, 'default artwork resolver poster dimensions')
   } finally {
     global.fetch = originalFetch
   }
@@ -735,6 +831,9 @@ async function main() {
     assert.match(svg, /width="600"/, `${testCase.slug} width attr`)
     assert.match(svg, /height="900"/, `${testCase.slug} height attr`)
     assert.match(svg, /viewBox="0 0 600 900"/, `${testCase.slug} viewBox`)
+    assert.match(svg, /data-role="sport-surface"/, `${testCase.slug} should include a sport-specific surface outline`)
+    assert.match(svg, new RegExp(`data-surface="${expectedSurfaceFor(normalized, testCase.slug)}"`), `${testCase.slug} should use the expected sport surface`)
+    assert.doesNotMatch(svg, /data-role="visual-initials"/, `${testCase.slug} should not render fake acronym logos when real badges are unavailable`)
     assert.doesNotMatch(svg, /720p|Yes Network/i, `${testCase.slug} should not render tracker noise`)
 
     const nodes = textNodes(svg)

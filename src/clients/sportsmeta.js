@@ -345,9 +345,13 @@ function buildSportsMetaDefaultAssetUrl(baseUrl, variant, sport, league = '', op
   const leagueValue = String(league || '').trim()
   const titleValue = String(options?.title || '').trim()
   const dateValue = String(options?.date || '').trim()
+  const homeValue = String(options?.home || options?.homeTeam || '').trim()
+  const awayValue = String(options?.away || options?.awayTeam || '').trim()
   if (leagueValue) url.searchParams.set('league', leagueValue)
   if (titleValue) url.searchParams.set('title', titleValue)
   if (dateValue) url.searchParams.set('date', dateValue)
+  if (homeValue) url.searchParams.set('home', homeValue)
+  if (awayValue) url.searchParams.set('away', awayValue)
   return url.toString()
 }
 

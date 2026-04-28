@@ -16,7 +16,11 @@ const OUT_DIR = path.join(process.cwd(), '.runtime', 'sports-artwork-debug')
 const ASSET_DIR = path.join(OUT_DIR, 'assets')
 const PORT = Math.max(1024, Number(process.env.PVTKRRX_ARTWORK_DEBUG_PORT || 7099) || 7099)
 const HOST = '127.0.0.1'
-const PROXY_VERSION = '20260428-visual-v5'
+const PROXY_VERSION = '20260428-surface-v8'
+const DEBUG_CONFIG = {
+  sportsmetaBaseUrl: process.env.PVTKRRX_SPORTSMETA_BASE_URL || process.env.SPORTSMETA_BASE_URL || 'https://sportsmeta.pvtkrrx.cc',
+  sportsPosterMemberToken: process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN || process.env.SPORTSMETA_MEMBER_TOKEN || ''
+}
 
 const CASES = [
   {
@@ -27,7 +31,7 @@ const CASES = [
     competition: 'Formula 1',
     seeders: 17,
     size: '8.9 GB',
-    note: 'Default fallback route. There is no team badge lookup here; v5 should show a simple F1 mark plus the GP/session.'
+    note: 'Default route. If SportsMeta can resolve this and a member token is configured, the proxy uses member artwork. Otherwise it must show a Formula 1 circuit fallback, not a generic stripe card.'
   },
   {
     slug: 'motogp-brazil',
@@ -48,7 +52,7 @@ const CASES = [
     date: '2026-04-26',
     seeders: 26,
     size: '11.2 GB',
-    note: 'Default fallback route. It has team names, but no canonical SportsMeta ID, so the proxy cannot request homeBadge/awayBadge.'
+    note: 'Default route with teams. The request carries home/away into the proxy so it can resolve to canonical SportsMeta and use real badges when available; otherwise it must show a football-pitch fallback.'
   },
   {
     slug: 'football-man-utd-brentford-canonical',
@@ -108,6 +112,8 @@ function defaultArtworkPath(variant, normalized = {}) {
     league: normalized.competition,
     title: normalized.eventTitle,
     date: normalized.date,
+    home: normalized.homeTeam,
+    away: normalized.awayTeam,
     detail: normalized.eventDetail,
     seeders: normalized.seeders,
     size: normalized.size,
@@ -168,7 +174,7 @@ function renderCard(sample) {
   }
   const badgePath = sample.routeKind === 'canonical-id'
     ? 'canonical -> SportsMeta /event -> homeBadge/awayBadge -> pvtkrrx-team-badge-* if badges exist'
-    : 'default -> no canonical event -> no badge lookup -> pvtkrrx-generated-card'
+    : 'default -> SportsMeta resolve attempt when member token exists -> canonical member badges if resolved -> sport-specific generated surface if not'
 
   return `<article class="case" data-label="${escapeHtml(sample.label)}">
     <div class="case-head">
@@ -208,6 +214,7 @@ function renderCard(sample) {
         <p><strong>Raw:</strong> ${escapeHtml(sample.rawTitle)}</p>
         <p><strong>Badge path:</strong> ${escapeHtml(badgePath)}</p>
         ${sample.canonicalId ? `<p><strong>Canonical ID:</strong> ${escapeHtml(sample.canonicalId)}</p>` : ''}
+        <p><strong>Member token configured:</strong> ${DEBUG_CONFIG.sportsPosterMemberToken ? 'yes' : 'no'}</p>
         <pre>${renderJson(parser)}</pre>
       </section>
     </div>
@@ -364,7 +371,7 @@ function renderHtml(samples = []) {
   <header>
     <div>
       <h1>PVTKRRX Sports Artwork Debug</h1>
-      <p>This shows the exact difference between default fallback cards and canonical team-badge cards. If a row has no SportsMeta canonical ID, PVTKRRX cannot fetch real home/away badges from SportsMeta and must use generated artwork.</p>
+      <p>This shows the exact difference between direct canonical cards and default sports rows. Default rows now attempt a conservative SportsMeta canonical resolve first when a member token is configured; only unresolved rows use the sport-specific generated fallback.</p>
     </div>
     <div class="toolbar">Proxy version ${escapeHtml(PROXY_VERSION)} | ${escapeHtml(new Date().toISOString())}</div>
   </header>
@@ -447,13 +454,13 @@ async function routeArtwork(req, res, url) {
   if (kind === 'default') {
     req.params.variant = variant
     req.params.sport = finalPart
-    await handleDefaultSportsArtwork(req, res, {})
+    await handleDefaultSportsArtwork(req, res, DEBUG_CONFIG)
     return true
   }
   if (kind === 'id') {
     req.params.variant = variant
     req.params.canonicalId = finalPart
-    await handleCanonicalSportsArtwork(req, res, {})
+    await handleCanonicalSportsArtwork(req, res, DEBUG_CONFIG)
     return true
   }
   return false

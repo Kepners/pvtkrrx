@@ -367,8 +367,8 @@ function normalizeSportsEventMetadata(input = {}) {
   }))
   const sport = formatSportLabel(sportKey || input.sport || canonicalParsed?.sportKey) || 'Sports'
   const date = normalizeSpace(input.date || canonicalEvent.date || canonicalParsed?.date || parsedSportsEvent?.date || parsedEvent?.date || '')
-  const homeTeam = normalizeSpace(canonicalEvent.homeTeam || canonicalParsed?.homeTeam || parsedSportsEvent?.homeTeam || looseMatchup?.homeTeam || '')
-  const awayTeam = normalizeSpace(canonicalEvent.awayTeam || canonicalParsed?.awayTeam || parsedSportsEvent?.awayTeam || looseMatchup?.awayTeam || '')
+  const homeTeam = normalizeSpace(input.homeTeam || input.home || canonicalEvent.homeTeam || canonicalParsed?.homeTeam || parsedSportsEvent?.homeTeam || looseMatchup?.homeTeam || '')
+  const awayTeam = normalizeSpace(input.awayTeam || input.away || canonicalEvent.awayTeam || canonicalParsed?.awayTeam || parsedSportsEvent?.awayTeam || looseMatchup?.awayTeam || '')
 
   let competition = normalizeCompetition(rawLeague, sportKey, rawTitle)
   let eventTitle = normalizeSpace(input.eventTitle || input.name || canonicalEvent.name || canonicalEvent.title || '')
@@ -405,6 +405,8 @@ function normalizeSportsEventMetadata(input = {}) {
     sport,
     competition: competition || sport,
     eventTitle,
+    ...(homeTeam ? { homeTeam } : {}),
+    ...(awayTeam ? { awayTeam } : {}),
     ...(eventDetail ? { eventDetail } : {}),
     ...(date ? { date } : {}),
     ...(Number.isFinite(Number(input.seeders)) ? { seeders: Number(input.seeders) } : {}),

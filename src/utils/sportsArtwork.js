@@ -5,7 +5,7 @@ const {
   resolveSportSlug
 } = require('../clients/sportsmeta')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260428-visual-v5'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260428-surface-v8'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
@@ -69,6 +69,24 @@ function resolveDate(input = {}) {
   )
 }
 
+function resolveHomeTeam(input = {}) {
+  return normalizeSpace(
+    input?.homeTeam ||
+    input?.home ||
+    input?.sportsArtwork?.homeTeam ||
+    ''
+  )
+}
+
+function resolveAwayTeam(input = {}) {
+  return normalizeSpace(
+    input?.awayTeam ||
+    input?.away ||
+    input?.sportsArtwork?.awayTeam ||
+    ''
+  )
+}
+
 function resolveSportsPosterMemberToken(input = {}) {
   return normalizeSpace(
     input?.sportsPosterMemberToken ||
@@ -102,10 +120,14 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
   const league = resolveLeague(input)
   const title = resolveTitle(input)
   const date = resolveDate(input)
+  const homeTeam = resolveHomeTeam(input)
+  const awayTeam = resolveAwayTeam(input)
   const url = new URL(`${addonBase}/sports-artwork/default/${encodeURIComponent(variant)}/${encodeURIComponent(sportSlug)}.png`)
   if (league) url.searchParams.set('league', league)
   if (title) url.searchParams.set('title', title)
   if (date) url.searchParams.set('date', date)
+  if (homeTeam) url.searchParams.set('home', homeTeam)
+  if (awayTeam) url.searchParams.set('away', awayTeam)
   if (input?.eventDetail) url.searchParams.set('detail', normalizeSpace(input.eventDetail))
   if (input?.rawTitle) url.searchParams.set('rawTitle', normalizeSpace(input.rawTitle))
   if (Number(input?.seeders) > 0) url.searchParams.set('seeders', String(Number(input.seeders)))

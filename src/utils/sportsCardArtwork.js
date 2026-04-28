@@ -234,6 +234,229 @@ function resolveMotorsportBrandKind(normalized = {}) {
   return ''
 }
 
+function resolveSurfaceKind({ sport = '', competition = '', title = '', detail = '' } = {}) {
+  const haystack = normalizeSpace([sport, competition, title, detail].filter(Boolean).join(' ')).toLowerCase()
+  if (/\b(?:formula\s*1|formula\s*one|f1|motogp|moto\s*gp|wrc|rally|nascar|indycar|grand prix|gp)\b/i.test(haystack)) return 'circuit'
+  if (/\b(?:american football|nfl|super bowl|gridiron)\b/i.test(haystack)) return 'gridiron'
+  if (/\b(?:football|soccer|premier league|epl|fa cup|mls|la liga|serie a|bundesliga|champions league|europa league)\b/i.test(haystack)) return 'football-pitch'
+  if (/\b(?:rugby|six nations|urc|super league|nrl)\b/i.test(haystack)) return 'rugby-pitch'
+  if (/\b(?:ice hockey|hockey|nhl)\b/i.test(haystack)) return 'hockey-rink'
+  if (/\b(?:basketball|nba|wnba|euroleague)\b/i.test(haystack)) return 'basketball-court'
+  if (/\b(?:tennis|wimbledon|atp|wta)\b/i.test(haystack)) return 'tennis-court'
+  if (/\b(?:snooker|billiards|pool)\b/i.test(haystack)) return 'snooker-table'
+  if (/\b(?:boxing)\b/i.test(haystack)) return 'boxing-ring'
+  if (/\b(?:mma|ufc|pfl|bellator|octagon)\b/i.test(haystack)) return 'octagon'
+  if (/\b(?:wrestling|wwe|aew|nxt|raw|smackdown)\b/i.test(haystack)) return 'wrestling-ring'
+  if (/\b(?:baseball|mlb|world series)\b/i.test(haystack)) return 'baseball-diamond'
+  if (/\b(?:cricket|ipl|indian premier league|t20|odi|test match)\b/i.test(haystack)) return 'cricket-ground'
+  if (/\b(?:golf|pga|masters|open championship|ryder cup)\b/i.test(haystack)) return 'golf-hole'
+  if (/\b(?:darts|pdc)\b/i.test(haystack)) return 'dartboard'
+  if (/\b(?:cycling|tour de france|giro|velodrome)\b/i.test(haystack)) return 'velodrome'
+  return 'sports-field'
+}
+
+function linePath(points = []) {
+  return points.map((point, index) => `${index === 0 ? 'M' : 'L'} ${point[0]} ${point[1]}`).join(' ')
+}
+
+function renderSportSurfaceOutline({ sport = '', competition = '', title = '', detail = '', x, y, width, height, highlight = '#ffffff', accent = '#94a3b8', text = '#f8fafc', opacity = 0.55 } = {}) {
+  const kind = resolveSurfaceKind({ sport, competition, title, detail })
+  const sw = Math.max(3, Math.round(Math.min(width, height) * 0.012))
+  const thin = Math.max(2, Math.round(sw * 0.58))
+  const line = `rgba(255,255,255,${opacity})`
+  const dim = `rgba(255,255,255,${Math.max(0.12, opacity * 0.34)})`
+  const glow = `rgba(255,255,255,${Math.max(0.08, opacity * 0.18)})`
+  const cx = x + width / 2
+  const cy = y + height / 2
+  const rx = width * 0.42
+  const ry = height * 0.34
+
+  if (kind === 'football-pitch' || kind === 'rugby-pitch') {
+    const boxW = width * 0.36
+    const boxH = height * 0.16
+    const goalW = width * 0.2
+    return `<g data-role="sport-surface" data-surface="${kind}" opacity="0.95">
+      <rect x="${x + width * 0.08}" y="${y + height * 0.08}" width="${width * 0.84}" height="${height * 0.84}" rx="${Math.round(width * 0.035)}" fill="none" stroke="${line}" stroke-width="${sw}"/>
+      <line x1="${cx}" y1="${y + height * 0.08}" x2="${cx}" y2="${y + height * 0.92}" stroke="${dim}" stroke-width="${thin}"/>
+      <circle cx="${cx}" cy="${cy}" r="${Math.min(width, height) * 0.15}" fill="none" stroke="${line}" stroke-width="${thin}"/>
+      <rect x="${cx - boxW / 2}" y="${y + height * 0.08}" width="${boxW}" height="${boxH}" fill="none" stroke="${dim}" stroke-width="${thin}"/>
+      <rect x="${cx - boxW / 2}" y="${y + height * 0.92 - boxH}" width="${boxW}" height="${boxH}" fill="none" stroke="${dim}" stroke-width="${thin}"/>
+      <rect x="${cx - goalW / 2}" y="${y + height * 0.08}" width="${goalW}" height="${boxH * 0.42}" fill="none" stroke="${glow}" stroke-width="${thin}"/>
+      <rect x="${cx - goalW / 2}" y="${y + height * 0.92 - boxH * 0.42}" width="${goalW}" height="${boxH * 0.42}" fill="none" stroke="${glow}" stroke-width="${thin}"/>
+    </g>`
+  }
+
+  if (kind === 'gridiron') {
+    const lines = []
+    for (let i = 1; i < 10; i += 1) {
+      const lx = x + (width * i / 10)
+      lines.push(`<line x1="${lx}" y1="${y + height * 0.1}" x2="${lx}" y2="${y + height * 0.9}" stroke="${i === 5 ? line : dim}" stroke-width="${i === 5 ? sw : thin}"/>`)
+    }
+    const postTop = y + height * 0.13
+    const postBottom = y + height * 0.28
+    return `<g data-role="sport-surface" data-surface="gridiron">
+      <rect x="${x + width * 0.06}" y="${y + height * 0.1}" width="${width * 0.88}" height="${height * 0.8}" rx="${Math.round(width * 0.025)}" fill="none" stroke="${line}" stroke-width="${sw}"/>
+      ${lines.join('\n      ')}
+      <path d="M ${cx - width * 0.08} ${postTop} V ${postBottom} H ${cx + width * 0.08} V ${postTop}" fill="none" stroke="${highlight}" stroke-width="${sw}" stroke-linecap="round"/>
+      <path d="M ${cx - width * 0.08} ${y + height - (postTop - y)} V ${y + height - (postBottom - y)} H ${cx + width * 0.08} V ${y + height - (postTop - y)}" fill="none" stroke="${highlight}" stroke-width="${sw}" stroke-linecap="round"/>
+    </g>`
+  }
+
+  if (kind === 'hockey-rink') {
+    return `<g data-role="sport-surface" data-surface="hockey-rink">
+      <rect x="${x + width * 0.06}" y="${y + height * 0.16}" width="${width * 0.88}" height="${height * 0.68}" rx="${Math.min(width, height) * 0.18}" fill="none" stroke="${line}" stroke-width="${sw}"/>
+      <line x1="${cx}" y1="${y + height * 0.16}" x2="${cx}" y2="${y + height * 0.84}" stroke="rgba(239,68,68,0.55)" stroke-width="${thin}"/>
+      <line x1="${x + width * 0.31}" y1="${y + height * 0.16}" x2="${x + width * 0.31}" y2="${y + height * 0.84}" stroke="rgba(96,165,250,0.6)" stroke-width="${thin}"/>
+      <line x1="${x + width * 0.69}" y1="${y + height * 0.16}" x2="${x + width * 0.69}" y2="${y + height * 0.84}" stroke="rgba(96,165,250,0.6)" stroke-width="${thin}"/>
+      <circle cx="${cx}" cy="${cy}" r="${Math.min(width, height) * 0.09}" fill="none" stroke="${line}" stroke-width="${thin}"/>
+      <circle cx="${x + width * 0.22}" cy="${y + height * 0.34}" r="${Math.min(width, height) * 0.065}" fill="none" stroke="${dim}" stroke-width="${thin}"/>
+      <circle cx="${x + width * 0.78}" cy="${y + height * 0.66}" r="${Math.min(width, height) * 0.065}" fill="none" stroke="${dim}" stroke-width="${thin}"/>
+    </g>`
+  }
+
+  if (kind === 'basketball-court') {
+    return `<g data-role="sport-surface" data-surface="basketball-court">
+      <rect x="${x + width * 0.07}" y="${y + height * 0.12}" width="${width * 0.86}" height="${height * 0.76}" rx="${Math.round(width * 0.025)}" fill="none" stroke="${line}" stroke-width="${sw}"/>
+      <line x1="${cx}" y1="${y + height * 0.12}" x2="${cx}" y2="${y + height * 0.88}" stroke="${dim}" stroke-width="${thin}"/>
+      <circle cx="${cx}" cy="${cy}" r="${Math.min(width, height) * 0.13}" fill="none" stroke="${line}" stroke-width="${thin}"/>
+      <path d="M ${x + width * 0.07} ${y + height * 0.34} Q ${x + width * 0.28} ${cy} ${x + width * 0.07} ${y + height * 0.66}" fill="none" stroke="${line}" stroke-width="${thin}"/>
+      <path d="M ${x + width * 0.93} ${y + height * 0.34} Q ${x + width * 0.72} ${cy} ${x + width * 0.93} ${y + height * 0.66}" fill="none" stroke="${line}" stroke-width="${thin}"/>
+      <rect x="${x + width * 0.07}" y="${cy - height * 0.13}" width="${width * 0.18}" height="${height * 0.26}" fill="none" stroke="${dim}" stroke-width="${thin}"/>
+      <rect x="${x + width * 0.75}" y="${cy - height * 0.13}" width="${width * 0.18}" height="${height * 0.26}" fill="none" stroke="${dim}" stroke-width="${thin}"/>
+    </g>`
+  }
+
+  if (kind === 'tennis-court') {
+    return `<g data-role="sport-surface" data-surface="tennis-court">
+      <rect x="${x + width * 0.08}" y="${y + height * 0.12}" width="${width * 0.84}" height="${height * 0.76}" rx="${Math.round(width * 0.018)}" fill="none" stroke="${line}" stroke-width="${sw}"/>
+      <line x1="${cx}" y1="${y + height * 0.12}" x2="${cx}" y2="${y + height * 0.88}" stroke="${highlight}" stroke-width="${sw}" stroke-dasharray="${sw * 1.8} ${sw * 1.4}"/>
+      <line x1="${x + width * 0.08}" y1="${cy}" x2="${x + width * 0.92}" y2="${cy}" stroke="${dim}" stroke-width="${thin}"/>
+      <line x1="${x + width * 0.28}" y1="${y + height * 0.12}" x2="${x + width * 0.28}" y2="${y + height * 0.88}" stroke="${dim}" stroke-width="${thin}"/>
+      <line x1="${x + width * 0.72}" y1="${y + height * 0.12}" x2="${x + width * 0.72}" y2="${y + height * 0.88}" stroke="${dim}" stroke-width="${thin}"/>
+    </g>`
+  }
+
+  if (kind === 'snooker-table') {
+    const pocket = Math.max(10, Math.min(width, height) * 0.035)
+    return `<g data-role="sport-surface" data-surface="snooker-table">
+      <rect x="${x + width * 0.08}" y="${y + height * 0.14}" width="${width * 0.84}" height="${height * 0.72}" rx="${Math.round(width * 0.04)}" fill="rgba(22,101,52,0.22)" stroke="${line}" stroke-width="${sw}"/>
+      <circle cx="${x + width * 0.1}" cy="${y + height * 0.16}" r="${pocket}" fill="rgba(0,0,0,0.52)"/>
+      <circle cx="${cx}" cy="${y + height * 0.15}" r="${pocket}" fill="rgba(0,0,0,0.52)"/>
+      <circle cx="${x + width * 0.9}" cy="${y + height * 0.16}" r="${pocket}" fill="rgba(0,0,0,0.52)"/>
+      <circle cx="${x + width * 0.1}" cy="${y + height * 0.84}" r="${pocket}" fill="rgba(0,0,0,0.52)"/>
+      <circle cx="${cx}" cy="${y + height * 0.85}" r="${pocket}" fill="rgba(0,0,0,0.52)"/>
+      <circle cx="${x + width * 0.9}" cy="${y + height * 0.84}" r="${pocket}" fill="rgba(0,0,0,0.52)"/>
+      <line x1="${x + width * 0.28}" y1="${y + height * 0.16}" x2="${x + width * 0.28}" y2="${y + height * 0.84}" stroke="${dim}" stroke-width="${thin}"/>
+      <path d="M ${x + width * 0.28} ${cy - height * 0.18} A ${height * 0.18} ${height * 0.18} 0 0 1 ${x + width * 0.28} ${cy + height * 0.18}" fill="none" stroke="${dim}" stroke-width="${thin}"/>
+    </g>`
+  }
+
+  if (kind === 'octagon') {
+    const points = []
+    const radius = Math.min(rx, ry) * 1.08
+    for (let i = 0; i < 8; i += 1) {
+      const theta = (Math.PI / 8) + (i * Math.PI / 4)
+      points.push(`${(cx + Math.cos(theta) * radius).toFixed(1)},${(cy + Math.sin(theta) * radius).toFixed(1)}`)
+    }
+    return `<g data-role="sport-surface" data-surface="octagon">
+      <polygon points="${points.join(' ')}" fill="none" stroke="${line}" stroke-width="${sw}"/>
+      <polygon points="${points.join(' ')}" fill="rgba(0,0,0,0.12)" stroke="${dim}" stroke-width="${thin}" transform="translate(0 0) scale(0.72)" transform-origin="${cx} ${cy}"/>
+    </g>`
+  }
+
+  if (kind === 'boxing-ring' || kind === 'wrestling-ring') {
+    const ropeGap = height * 0.14
+    return `<g data-role="sport-surface" data-surface="${kind}">
+      <rect x="${x + width * 0.13}" y="${y + height * 0.18}" width="${width * 0.74}" height="${height * 0.64}" fill="rgba(15,23,42,0.2)" stroke="${line}" stroke-width="${sw}"/>
+      <line x1="${x + width * 0.13}" y1="${cy - ropeGap}" x2="${x + width * 0.87}" y2="${cy - ropeGap}" stroke="${highlight}" stroke-width="${thin}"/>
+      <line x1="${x + width * 0.13}" y1="${cy}" x2="${x + width * 0.87}" y2="${cy}" stroke="${line}" stroke-width="${thin}"/>
+      <line x1="${x + width * 0.13}" y1="${cy + ropeGap}" x2="${x + width * 0.87}" y2="${cy + ropeGap}" stroke="${dim}" stroke-width="${thin}"/>
+      <circle cx="${x + width * 0.13}" cy="${y + height * 0.18}" r="${sw * 1.6}" fill="${accent}"/>
+      <circle cx="${x + width * 0.87}" cy="${y + height * 0.18}" r="${sw * 1.6}" fill="${accent}"/>
+      <circle cx="${x + width * 0.13}" cy="${y + height * 0.82}" r="${sw * 1.6}" fill="${accent}"/>
+      <circle cx="${x + width * 0.87}" cy="${y + height * 0.82}" r="${sw * 1.6}" fill="${accent}"/>
+    </g>`
+  }
+
+  if (kind === 'baseball-diamond') {
+    const d = Math.min(width, height) * 0.32
+    const home = [cx, y + height * 0.72]
+    const first = [cx + d, cy]
+    const second = [cx, y + height * 0.28]
+    const third = [cx - d, cy]
+    return `<g data-role="sport-surface" data-surface="baseball-diamond">
+      <path d="${linePath([home, first, second, third, home])}" fill="rgba(234,179,8,0.12)" stroke="${line}" stroke-width="${sw}"/>
+      <path d="M ${home[0]} ${home[1]} L ${x + width * 0.14} ${y + height * 0.9} M ${home[0]} ${home[1]} L ${x + width * 0.86} ${y + height * 0.9}" stroke="${dim}" stroke-width="${thin}"/>
+      <circle cx="${cx}" cy="${cy}" r="${Math.min(width, height) * 0.07}" fill="none" stroke="${dim}" stroke-width="${thin}"/>
+      <rect x="${second[0] - sw}" y="${second[1] - sw}" width="${sw * 2}" height="${sw * 2}" fill="${text}"/>
+      <rect x="${first[0] - sw}" y="${first[1] - sw}" width="${sw * 2}" height="${sw * 2}" fill="${text}"/>
+      <rect x="${third[0] - sw}" y="${third[1] - sw}" width="${sw * 2}" height="${sw * 2}" fill="${text}"/>
+    </g>`
+  }
+
+  if (kind === 'cricket-ground') {
+    return `<g data-role="sport-surface" data-surface="cricket-ground">
+      <ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="rgba(22,101,52,0.18)" stroke="${line}" stroke-width="${sw}"/>
+      <rect x="${cx - width * 0.07}" y="${cy - height * 0.24}" width="${width * 0.14}" height="${height * 0.48}" rx="${sw}" fill="rgba(234,179,8,0.16)" stroke="${dim}" stroke-width="${thin}"/>
+      <line x1="${cx - width * 0.09}" y1="${cy - height * 0.17}" x2="${cx + width * 0.09}" y2="${cy - height * 0.17}" stroke="${line}" stroke-width="${thin}"/>
+      <line x1="${cx - width * 0.09}" y1="${cy + height * 0.17}" x2="${cx + width * 0.09}" y2="${cy + height * 0.17}" stroke="${line}" stroke-width="${thin}"/>
+    </g>`
+  }
+
+  if (kind === 'golf-hole') {
+    return `<g data-role="sport-surface" data-surface="golf-hole">
+      <path d="M ${x + width * 0.08} ${y + height * 0.78} C ${x + width * 0.32} ${y + height * 0.5}, ${x + width * 0.56} ${y + height * 0.92}, ${x + width * 0.9} ${y + height * 0.56}" fill="none" stroke="${line}" stroke-width="${sw * 2}" stroke-linecap="round"/>
+      <ellipse cx="${x + width * 0.72}" cy="${y + height * 0.38}" rx="${width * 0.18}" ry="${height * 0.1}" fill="rgba(34,197,94,0.22)" stroke="${dim}" stroke-width="${thin}"/>
+      <line x1="${x + width * 0.72}" y1="${y + height * 0.38}" x2="${x + width * 0.72}" y2="${y + height * 0.18}" stroke="${line}" stroke-width="${thin}"/>
+      <path d="M ${x + width * 0.72} ${y + height * 0.18} L ${x + width * 0.84} ${y + height * 0.23} L ${x + width * 0.72} ${y + height * 0.28} Z" fill="${highlight}" opacity="0.8"/>
+    </g>`
+  }
+
+  if (kind === 'dartboard') {
+    const rings = [0.34, 0.28, 0.22, 0.16, 0.08]
+    return `<g data-role="sport-surface" data-surface="dartboard">
+      ${rings.map((scale, index) => `<circle cx="${cx}" cy="${cy}" r="${Math.min(width, height) * scale}" fill="none" stroke="${index % 2 ? highlight : line}" stroke-width="${index === rings.length - 1 ? sw : thin}"/>`).join('\n      ')}
+      ${Array.from({ length: 10 }).map((_, index) => {
+        const a = (Math.PI * 2 * index) / 10
+        return `<line x1="${cx}" y1="${cy}" x2="${cx + Math.cos(a) * Math.min(width, height) * 0.34}" y2="${cy + Math.sin(a) * Math.min(width, height) * 0.34}" stroke="${dim}" stroke-width="${thin}"/>`
+      }).join('\n      ')}
+    </g>`
+  }
+
+  if (kind === 'velodrome') {
+    return `<g data-role="sport-surface" data-surface="velodrome">
+      <rect x="${x + width * 0.08}" y="${y + height * 0.22}" width="${width * 0.84}" height="${height * 0.56}" rx="${height * 0.28}" fill="none" stroke="${line}" stroke-width="${sw * 1.6}"/>
+      <rect x="${x + width * 0.18}" y="${y + height * 0.32}" width="${width * 0.64}" height="${height * 0.36}" rx="${height * 0.18}" fill="none" stroke="${dim}" stroke-width="${thin}"/>
+      <path d="M ${x + width * 0.22} ${cy} H ${x + width * 0.78}" stroke="${highlight}" stroke-width="${thin}" stroke-linecap="round"/>
+    </g>`
+  }
+
+  if (kind === 'circuit') {
+    const path = [
+      [x + width * 0.14, y + height * 0.64],
+      [x + width * 0.26, y + height * 0.28],
+      [x + width * 0.52, y + height * 0.24],
+      [x + width * 0.7, y + height * 0.42],
+      [x + width * 0.86, y + height * 0.31],
+      [x + width * 0.78, y + height * 0.76],
+      [x + width * 0.42, y + height * 0.7],
+      [x + width * 0.3, y + height * 0.86],
+      [x + width * 0.14, y + height * 0.64]
+    ]
+    return `<g data-role="sport-surface" data-surface="circuit">
+      <path d="${linePath(path)}" fill="none" stroke="rgba(0,0,0,0.52)" stroke-width="${sw * 4}" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="${linePath(path)}" fill="none" stroke="${line}" stroke-width="${sw * 2}" stroke-linejoin="round" stroke-linecap="round"/>
+      <path d="${linePath(path.slice(0, 5))}" fill="none" stroke="${highlight}" stroke-width="${thin}" stroke-linejoin="round" stroke-linecap="round"/>
+      <rect x="${x + width * 0.57}" y="${y + height * 0.2}" width="${width * 0.16}" height="${sw * 3}" fill="${text}" opacity="0.7" transform="rotate(42 ${x + width * 0.65} ${y + height * 0.22})"/>
+    </g>`
+  }
+
+  return `<g data-role="sport-surface" data-surface="sports-field">
+    <rect x="${x + width * 0.1}" y="${y + height * 0.16}" width="${width * 0.8}" height="${height * 0.68}" rx="${Math.round(width * 0.04)}" fill="none" stroke="${line}" stroke-width="${sw}"/>
+    <circle cx="${cx}" cy="${cy}" r="${Math.min(width, height) * 0.18}" fill="none" stroke="${dim}" stroke-width="${thin}"/>
+  </g>`
+}
+
 function renderPosterMarkLines({ mark, cx, y, width, isPoster, fill = '#ffffff' }) {
   const lines = wrapText(mark, width, isPoster ? 62 : 92, isPoster ? 2 : 1)
   const fontSize = Math.round(isPoster ? (lines.length > 1 ? 58 : 74) : 86)
@@ -366,8 +589,37 @@ function renderSportsCardSvg(input = {}, variant = 'poster') {
     return renderTextLine({ ...line, fill }, line.role === 'eventTitle' ? titlePanel.width - 44 : width - (layout.safe * 2))
   }).join('\n  ')
   const visualMarkup = matchup
-    ? renderMatchupVisual({ matchup, x: visual.x, y: visual.y, width: visual.width, height: visual.height, base, accent, highlight, isPoster })
+    ? renderMatchupVisual({
+      matchup,
+      sport: layout.normalized.sport,
+      competition: layout.normalized.competition,
+      title: layout.normalized.eventTitle,
+      detail: layout.normalized.eventDetail,
+      x: visual.x,
+      y: visual.y,
+      width: visual.width,
+      height: visual.height,
+      base,
+      accent,
+      highlight,
+      text,
+      isPoster
+    })
     : renderSportMotif({ sport: layout.normalized.sport, competition: layout.normalized.competition, title: layout.normalized.eventTitle, detail: layout.normalized.eventDetail, x: visual.x, y: visual.y, width: visual.width, height: visual.height, base, accent, highlight, text, isPoster })
+  const backgroundSurface = renderSportSurfaceOutline({
+    sport: layout.normalized.sport,
+    competition: layout.normalized.competition,
+    title: layout.normalized.eventTitle,
+    detail: layout.normalized.eventDetail,
+    x: Math.round(width * 0.08),
+    y: Math.round(height * 0.1),
+    width: Math.round(width * 0.84),
+    height: Math.round(height * 0.78),
+    highlight,
+    accent,
+    text,
+    opacity: 0.2
+  })
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(layout.normalized.eventTitle)}">
   <defs>
@@ -386,7 +638,8 @@ function renderSportsCardSvg(input = {}, variant = 'poster') {
     </pattern>
   </defs>
   <rect x="0" y="0" width="${width}" height="${height}" rx="0" fill="url(#bg)"/>
-  <rect x="0" y="0" width="${width}" height="${height}" fill="url(#diagonal)" opacity="0.8"/>
+  ${backgroundSurface}
+  <rect x="0" y="0" width="${width}" height="${height}" fill="url(#diagonal)" opacity="0.18"/>
   <rect x="${visual.x}" y="${visual.y}" width="${visual.width}" height="${visual.height}" rx="18" fill="rgba(255,255,255,0.07)" stroke="rgba(255,255,255,0.16)" stroke-width="${Math.max(2, Math.round(width * 0.004))}"/>
   ${visualMarkup}
   <rect x="${titlePanel.x}" y="${titlePanel.y}" width="${titlePanel.width}" height="${titlePanel.height}" rx="14" fill="url(#panel)" stroke="rgba(255,255,255,0.14)" stroke-width="${Math.max(2, Math.round(width * 0.004))}"/>
@@ -395,18 +648,17 @@ function renderSportsCardSvg(input = {}, variant = 'poster') {
 </svg>`
 }
 
-function renderMatchupVisual({ matchup, x, y, width, height, base, accent, highlight, isPoster }) {
+function renderMatchupVisual({ matchup, sport = '', competition = '', title = '', detail = '', x, y, width, height, base, accent, highlight, text = '#f8fafc', isPoster }) {
   const leftColor = colorFromText(matchup.left, base)
   const rightColor = colorFromText(matchup.right, accent)
-  const circleRadius = Math.round(Math.min(width, height) * (isPoster ? 0.19 : 0.21))
   const cy = Math.round(y + height * 0.48)
   const lx = Math.round(x + width * 0.27)
   const rx = Math.round(x + width * 0.73)
-  const labelY = Math.round(y + height * 0.86)
-  const fontSize = Math.round(circleRadius * 0.54)
-  const teamFont = Math.round(isPoster ? 23 : 30)
-  const leftLines = wrapText(matchup.left, width * 0.38, teamFont, 2)
-  const rightLines = wrapText(matchup.right, width * 0.38, teamFont, 2)
+  const labelY = Math.round(y + height * 0.56)
+  const versusSize = Math.round(Math.min(width, height) * (isPoster ? 0.2 : 0.23))
+  const teamFont = Math.round(isPoster ? 31 : 42)
+  const leftLines = wrapText(matchup.left, width * 0.4, teamFont, 3)
+  const rightLines = wrapText(matchup.right, width * 0.4, teamFont, 3)
   const renderTeamLines = (lines, tx) => lines.map((line, index) =>
     renderTextLine({
       role: 'visual-team',
@@ -418,19 +670,33 @@ function renderMatchupVisual({ matchup, x, y, width, height, base, accent, highl
       anchor: 'middle',
       fill: '#f8fafc',
       stroke: 'rgba(0,0,0,0.52)',
-      strokeWidth: 4
+      strokeWidth: 5
     }, width * 0.36)
   ).join('\n  ')
+
+  const surface = renderSportSurfaceOutline({
+    sport,
+    competition,
+    title,
+    detail,
+    x: x + Math.round(width * 0.04),
+    y: y + Math.round(height * 0.08),
+    width: Math.round(width * 0.92),
+    height: Math.round(height * 0.58),
+    highlight,
+    accent,
+    text,
+    opacity: 0.56
+  })
 
   return `<g data-role="matchup-visual">
     <rect x="${x}" y="${y}" width="${width / 2}" height="${height}" rx="18" fill="${leftColor}" opacity="0.72"/>
     <rect x="${x + width / 2}" y="${y}" width="${width / 2}" height="${height}" rx="18" fill="${rightColor}" opacity="0.72"/>
+    ${surface}
     <rect x="${x + width / 2 - 4}" y="${y + 18}" width="8" height="${height - 36}" fill="rgba(0,0,0,0.42)"/>
-    <circle cx="${lx}" cy="${cy}" r="${circleRadius}" fill="rgba(15,23,42,0.78)" stroke="rgba(255,255,255,0.82)" stroke-width="8"/>
-    <circle cx="${rx}" cy="${cy}" r="${circleRadius}" fill="rgba(15,23,42,0.78)" stroke="rgba(255,255,255,0.82)" stroke-width="8"/>
-    ${renderTextLine({ role: 'visual-initials', text: initialsFor(matchup.left), x: lx, y: cy + Math.round(fontSize * 0.34), fontSize, weight: 900, anchor: 'middle', fill: '#ffffff' }, circleRadius * 1.45)}
-    ${renderTextLine({ role: 'visual-versus', text: 'V', x: x + width / 2, y: cy + Math.round(circleRadius * 0.18), fontSize: Math.round(circleRadius * 0.92), weight: 900, anchor: 'middle', fill: '#ffffff', stroke: '#020617', strokeWidth: 10 }, circleRadius * 0.95)}
-    ${renderTextLine({ role: 'visual-initials', text: initialsFor(matchup.right), x: rx, y: cy + Math.round(fontSize * 0.34), fontSize, weight: 900, anchor: 'middle', fill: '#ffffff' }, circleRadius * 1.45)}
+    <rect x="${x + 22}" y="${Math.round(y + height * 0.5)}" width="${Math.round(width * 0.42)}" height="${Math.round(height * 0.24)}" rx="14" fill="rgba(15,23,42,0.54)" stroke="rgba(255,255,255,0.18)" stroke-width="3"/>
+    <rect x="${Math.round(x + width * 0.56)}" y="${Math.round(y + height * 0.5)}" width="${Math.round(width * 0.42)}" height="${Math.round(height * 0.24)}" rx="14" fill="rgba(15,23,42,0.54)" stroke="rgba(255,255,255,0.18)" stroke-width="3"/>
+    ${renderTextLine({ role: 'visual-versus', text: 'V', x: x + width / 2, y: cy + Math.round(versusSize * 0.32), fontSize: versusSize, weight: 900, anchor: 'middle', fill: '#ffffff', stroke: '#020617', strokeWidth: 10 }, versusSize * 1.05)}
     ${renderTeamLines(leftLines, lx)}
     ${renderTeamLines(rightLines, rx)}
     <rect x="${x + 18}" y="${y + 18}" width="${width - 36}" height="6" fill="${highlight}" opacity="0.8"/>
@@ -490,13 +756,25 @@ function renderMotorsportBrandVisual({ kind, mark, title, detail, competition, x
     }, width - 120)
     : ''
   const markFill = kind === 'motogp' ? '#f8fafc' : '#ffffff'
-  const stripeColor = kind === 'motogp' ? '#f8fafc' : '#ef4444'
+  const circuit = renderSportSurfaceOutline({
+    sport: 'motorsport',
+    competition,
+    title,
+    detail,
+    x: x + Math.round(width * 0.08),
+    y: y + Math.round(height * 0.08),
+    width: Math.round(width * 0.84),
+    height: Math.round(height * 0.42),
+    highlight,
+    accent,
+    text,
+    opacity: 0.68
+  })
 
   return `<g data-role="${brand}-poster-visual">
     <rect x="${x}" y="${y}" width="${width}" height="${height}" rx="18" fill="${base}" opacity="0.38"/>
     <rect x="${x + 18}" y="${y + 18}" width="${width - 36}" height="${height - 36}" rx="16" fill="rgba(15,23,42,0.32)" stroke="rgba(255,255,255,0.12)" stroke-width="3"/>
-    <path d="M ${x + width * 0.1} ${y + height * 0.25} L ${x + width * 0.92} ${y + height * 0.12}" stroke="${stripeColor}" stroke-width="${isPoster ? 18 : 28}" stroke-linecap="round" opacity="0.9"/>
-    <path d="M ${x + width * 0.08} ${y + height * 0.43} L ${x + width * 0.76} ${y + height * 0.31}" stroke="rgba(255,255,255,0.22)" stroke-width="${isPoster ? 12 : 20}" stroke-linecap="round"/>
+    ${circuit}
     ${renderTextLine({
       role: `${brand}-mark`,
       text: mark,
@@ -589,8 +867,20 @@ function renderMotorsportBrandCardSvg({ layout, kind, variant, base, accent, tex
       fill: '#ffffff'
     }, width - (isPoster ? 72 : 128))
     : ''
-  const stripeColor = kind === 'motogp' ? '#e5e7eb' : '#ef4444'
-  const accentLine = kind === 'motogp' ? '#f8fafc' : highlight
+  const circuit = renderSportSurfaceOutline({
+    sport: 'motorsport',
+    competition,
+    title,
+    detail: session,
+    x: Math.round(width * 0.12),
+    y: Math.round(height * (isPoster ? 0.08 : 0.12)),
+    width: Math.round(width * 0.76),
+    height: Math.round(height * (isPoster ? 0.36 : 0.42)),
+    highlight,
+    accent,
+    text,
+    opacity: 0.7
+  })
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(title)}">
   <defs>
@@ -605,11 +895,9 @@ function renderMotorsportBrandCardSvg({ layout, kind, variant, base, accent, tex
     </pattern>
   </defs>
   <rect x="0" y="0" width="${width}" height="${height}" rx="0" fill="url(#brandBg)"/>
-  <rect x="0" y="0" width="${width}" height="${height}" fill="url(#brandDiagonal)" opacity="0.72"/>
+  <rect x="0" y="0" width="${width}" height="${height}" fill="url(#brandDiagonal)" opacity="0.18"/>
   <g data-role="${brand}-poster-visual">
-    <path d="M ${width * 0.1} ${height * 0.23} L ${width * 0.9} ${height * 0.12}" stroke="${stripeColor}" stroke-width="${isPoster ? 22 : 38}" stroke-linecap="round" opacity="0.92"/>
-    <path d="M ${width * 0.12} ${height * 0.4} L ${width * 0.78} ${height * 0.31}" stroke="rgba(255,255,255,0.22)" stroke-width="${isPoster ? 13 : 26}" stroke-linecap="round"/>
-    <path d="M ${width * 0.18} ${height * 0.46} L ${width * 0.68} ${height * 0.39}" stroke="${accentLine}" stroke-width="${isPoster ? 5 : 9}" stroke-linecap="round" opacity="0.8"/>
+    ${circuit}
     ${renderTextLine({
       role: `${brand}-mark`,
       text: mark,
@@ -679,38 +967,25 @@ function renderSportMotif({ sport, competition, title, detail, x, y, width, heig
     strokeWidth: 5
   }, width - 96)).join('\n  ')
 
-  let icon = ''
-  if (/baseball/.test(sportKey)) {
-    const iconY = Math.round(y + height * 0.28)
-    const iconR = Math.round(r * 0.48)
-    icon = `<circle cx="${cx}" cy="${iconY}" r="${iconR}" fill="#f8fafc" opacity="0.95"/>
-      <path d="M ${cx - iconR * 0.38} ${iconY - iconR * 0.78} C ${cx - iconR * 0.1} ${iconY - iconR * 0.28}, ${cx - iconR * 0.1} ${iconY + iconR * 0.28}, ${cx - iconR * 0.38} ${iconY + iconR * 0.78}" fill="none" stroke="#dc2626" stroke-width="6" stroke-dasharray="9 11"/>
-      <path d="M ${cx + iconR * 0.38} ${iconY - iconR * 0.78} C ${cx + iconR * 0.1} ${iconY - iconR * 0.28}, ${cx + iconR * 0.1} ${iconY + iconR * 0.28}, ${cx + iconR * 0.38} ${iconY + iconR * 0.78}" fill="none" stroke="#dc2626" stroke-width="6" stroke-dasharray="9 11"/>`
-  } else if (/basketball/.test(sportKey)) {
-    const iconY = Math.round(y + height * 0.28)
-    const iconR = Math.round(r * 0.48)
-    icon = `<circle cx="${cx}" cy="${iconY}" r="${iconR}" fill="#f97316" stroke="#111827" stroke-width="6" opacity="0.92"/>
-      <path d="M ${cx - iconR} ${iconY} H ${cx + iconR} M ${cx} ${iconY - iconR} V ${iconY + iconR}" stroke="#111827" stroke-width="5"/>
-      <path d="M ${cx - iconR * 0.62} ${iconY - iconR * 0.78} C ${cx - iconR * 0.2} ${iconY - iconR * 0.22}, ${cx - iconR * 0.2} ${iconY + iconR * 0.22}, ${cx - iconR * 0.62} ${iconY + iconR * 0.78} M ${cx + iconR * 0.62} ${iconY - iconR * 0.78} C ${cx + iconR * 0.2} ${iconY - iconR * 0.22}, ${cx + iconR * 0.2} ${iconY + iconR * 0.22}, ${cx + iconR * 0.62} ${iconY + iconR * 0.78}" fill="none" stroke="#111827" stroke-width="5"/>`
-  } else if (/football|rugby|american/.test(sportKey)) {
-    icon = `<rect x="${x + 26}" y="${y + 32}" width="${width - 52}" height="${Math.round(height * 0.3)}" rx="14" fill="rgba(22,101,52,0.48)" stroke="rgba(255,255,255,0.24)" stroke-width="4"/>
-      <line x1="${cx}" y1="${y + 32}" x2="${cx}" y2="${y + 32 + Math.round(height * 0.3)}" stroke="rgba(255,255,255,0.32)" stroke-width="4"/>
-      <circle cx="${cx}" cy="${y + 32 + Math.round(height * 0.15)}" r="${Math.round(height * 0.07)}" fill="none" stroke="rgba(255,255,255,0.42)" stroke-width="4"/>`
-  } else if (/motor/.test(sportKey)) {
-    icon = `<path d="M ${x + width * 0.14} ${y + height * 0.26} C ${x + width * 0.34} ${y + 58}, ${x + width * 0.64} ${y + height * 0.42}, ${x + width * 0.86} ${y + height * 0.2}" fill="none" stroke="${highlight}" stroke-width="16" stroke-linecap="round"/>
-      <path d="M ${x + width * 0.14} ${y + height * 0.26} C ${x + width * 0.34} ${y + 58}, ${x + width * 0.64} ${y + height * 0.42}, ${x + width * 0.86} ${y + height * 0.2}" fill="none" stroke="#111827" stroke-width="7" stroke-linecap="round"/>`
-  } else if (/tennis|snooker|golf|darts|hockey/.test(sportKey)) {
-    icon = `<circle cx="${cx}" cy="${Math.round(y + height * 0.28)}" r="${Math.round(r * 0.48)}" fill="rgba(15,23,42,0.62)" stroke="${highlight}" stroke-width="7"/>
-      <path d="M ${cx - r * 0.46} ${y + height * 0.28 + r * 0.32} H ${cx + r * 0.46}" stroke="${accent}" stroke-width="9" stroke-linecap="round"/>`
-  } else {
-    icon = `<circle cx="${cx}" cy="${Math.round(y + height * 0.28)}" r="${Math.round(r * 0.48)}" fill="rgba(15,23,42,0.62)" stroke="${highlight}" stroke-width="7"/>`
-  }
+  const surface = renderSportSurfaceOutline({
+    sport,
+    competition,
+    title,
+    detail,
+    x: x + Math.round(width * 0.07),
+    y: y + Math.round(height * 0.08),
+    width: Math.round(width * 0.86),
+    height: Math.round(height * 0.5),
+    highlight,
+    accent,
+    text,
+    opacity: 0.68
+  })
 
   return `<g data-role="competition-poster-visual">
     <rect x="${x}" y="${y}" width="${width}" height="${height}" rx="18" fill="${base}" opacity="0.35"/>
     <rect x="${x + 18}" y="${y + 18}" width="${width - 36}" height="${height - 36}" rx="16" fill="rgba(15,23,42,0.28)" stroke="rgba(255,255,255,0.12)" stroke-width="3"/>
-    <path d="M ${x + 18} ${y + height * 0.78} L ${x + width - 18} ${y + height * 0.22}" stroke="rgba(255,255,255,0.16)" stroke-width="${isPoster ? 18 : 26}" stroke-linecap="round"/>
-    ${icon}
+    ${surface}
     ${posterMark}
     ${titleText}
     ${lowerLabel}
@@ -721,7 +996,7 @@ function renderSportsArtworkSvg(input = {}, variant = 'poster') {
   return renderSportsCardSvg(input, variant)
 }
 
-function buildArtworkInputFromRequest({ canonicalId = '', sport = '', league = '', title = '', date = '', seeders = '', size = '', rawTitle = '', source = 'fallback' } = {}) {
+function buildArtworkInputFromRequest({ canonicalId = '', sport = '', league = '', title = '', date = '', homeTeam = '', awayTeam = '', seeders = '', size = '', rawTitle = '', source = 'fallback' } = {}) {
   const parsed = parseSportsMetaCanonicalId(canonicalId)
   return normalizeSportsEventMetadata({
     canonicalId,
@@ -730,6 +1005,8 @@ function buildArtworkInputFromRequest({ canonicalId = '', sport = '', league = '
     competition: league || parsed?.competition || '',
     eventTitle: title || parsed?.eventTitle || '',
     date: date || parsed?.date || '',
+    homeTeam,
+    awayTeam,
     seeders: Number(seeders || 0) || undefined,
     size,
     rawTitle: rawTitle || title || canonicalId,
@@ -741,6 +1018,7 @@ module.exports = {
   DIMENSIONS,
   buildArtworkInputFromRequest,
   layoutSportsCard,
+  renderSportSurfaceOutline,
   renderSportsArtworkSvg,
   wrapText
 }

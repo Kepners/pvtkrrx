@@ -4,11 +4,13 @@ const {
   buildSportsMetaAssetUrl,
   buildSportsMetaDefaultAssetUrl,
   buildSportsMetaMemberAssetUrl,
+  SportsMetaClient,
   getPublicSportsMetaBaseUrl,
   resolveSportSlug
 } = require('../clients/sportsmeta')
 const {
   buildArtworkInputFromRequest,
+  renderSportSurfaceOutline,
   renderSportsArtworkSvg
 } = require('../utils/sportsCardArtwork')
 const {
@@ -24,7 +26,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260428-visual-v5'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260428-surface-v8'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -57,7 +59,7 @@ function normalizeVariant(value) {
   return ALLOWED_VARIANTS.has(v) ? v : ''
 }
 
-function buildUpstreamUrl({ kind, variant, canonicalId, sport, league, title, date, sportsmetaBaseUrl, memberToken }) {
+function buildUpstreamUrl({ kind, variant, canonicalId, sport, league, title, date, homeTeam, awayTeam, sportsmetaBaseUrl, memberToken }) {
   if (kind === 'id') {
     if (memberToken) {
       const memberUrl = buildSportsMetaMemberAssetUrl(sportsmetaBaseUrl || '', memberToken, variant, canonicalId)
@@ -67,7 +69,9 @@ function buildUpstreamUrl({ kind, variant, canonicalId, sport, league, title, da
   }
   return buildSportsMetaDefaultAssetUrl(sportsmetaBaseUrl || '', variant, sport, league || '', {
     title,
-    date
+    date,
+    homeTeam,
+    awayTeam
   })
 }
 
@@ -218,6 +222,22 @@ function renderTeamSplitBaseSvg(event = {}, variant = 'poster') {
   const awayLines = splitLines(away || league || sport, portrait ? 14 : 24, 2)
   const titleLines = splitLines(title, portrait ? 28 : 58, 2)
   const meta = [league, date].filter(Boolean).join(' | ')
+  const fieldPadX = Math.round(width * (portrait ? 0.055 : 0.05))
+  const fieldY = Math.round(topBand + (height * (portrait ? 0.035 : 0.045)))
+  const fieldHeight = Math.max(120, Math.round(height - topBand - bottomBand - (height * (portrait ? 0.08 : 0.1))))
+  const surface = renderSportSurfaceOutline({
+    sport,
+    competition: league,
+    title,
+    x: fieldPadX,
+    y: fieldY,
+    width: width - (fieldPadX * 2),
+    height: fieldHeight,
+    highlight: '#f8fafc',
+    accent: '#eab308',
+    text: '#f8fafc',
+    opacity: 0.32
+  })
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
   <defs>
@@ -230,6 +250,7 @@ function renderTeamSplitBaseSvg(event = {}, variant = 'poster') {
   <rect x="0" y="0" width="${width / 2}" height="${height}" fill="${leftColor}"/>
   <rect x="${width / 2}" y="0" width="${width / 2}" height="${height}" fill="${rightColor}"/>
   <rect x="0" y="0" width="${width}" height="${height}" fill="url(#shade)"/>
+  ${surface}
   <rect x="${(width / 2) - 5}" y="0" width="10" height="${height}" fill="rgba(0,0,0,0.58)"/>
   <rect x="0" y="0" width="${width}" height="${topBand}" fill="rgba(0,0,0,0.58)"/>
   <rect x="0" y="${height - bottomBand}" width="${width}" height="${bottomBand}" fill="rgba(0,0,0,0.62)"/>
@@ -572,7 +593,7 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
   }
 }
 
-function buildDefaultArtworkCacheKey({ variant, sportSlug, league, title, date, detail, seeders, size, rawTitle, sportsmetaBaseUrl }) {
+function buildDefaultArtworkCacheKey({ variant, sportSlug, league, title, date, homeTeam, awayTeam, detail, seeders, size, rawTitle, sportsmetaBaseUrl }) {
   return [
     LOCAL_ARTWORK_RENDER_VERSION,
     'default',
@@ -581,6 +602,8 @@ function buildDefaultArtworkCacheKey({ variant, sportSlug, league, title, date, 
     (league || '').trim().toLowerCase(),
     (title || '').trim().toLowerCase(),
     (date || '').trim().toLowerCase(),
+    (homeTeam || '').trim().toLowerCase(),
+    (awayTeam || '').trim().toLowerCase(),
     (detail || '').trim().toLowerCase(),
     (seeders || '').trim().toLowerCase(),
     (size || '').trim().toLowerCase(),
@@ -591,6 +614,38 @@ function buildDefaultArtworkCacheKey({ variant, sportSlug, league, title, date, 
 
 function buildCanonicalArtworkCacheKey({ variant, canonicalId, sportsmetaBaseUrl, memberToken }) {
   return `${LOCAL_ARTWORK_RENDER_VERSION}|id|${variant}|${canonicalId}|${(sportsmetaBaseUrl || '').trim().toLowerCase()}|${tokenFingerprint(memberToken)}`
+}
+
+async function resolveDefaultArtworkCanonical({
+  sportsmetaBaseUrl = '',
+  sportSlug = '',
+  league = '',
+  title = '',
+  date = '',
+  homeTeam = '',
+  awayTeam = '',
+  fallbackInput = {}
+} = {}) {
+  const hasStructuredQuery = Boolean(date && ((homeTeam && awayTeam) || title))
+  if (!hasStructuredQuery) return null
+  try {
+    const client = new SportsMetaClient({ baseUrl: sportsmetaBaseUrl })
+    const payload = await client.resolveEvent({
+      recordType: 'event',
+      sport: sportSlug || fallbackInput.sport,
+      league,
+      date,
+      home: homeTeam || fallbackInput.homeTeam,
+      away: awayTeam || fallbackInput.awayTeam,
+      event: title || fallbackInput.eventTitle,
+      title: title || fallbackInput.eventTitle
+    })
+    if (!payload?.canonicalId) return null
+    return payload
+  } catch (error) {
+    console.warn(`[sports-artwork] default canonical lookup failed sport=${sportSlug} league="${league}" title="${title}" date="${date}": ${error.message}`)
+    return null
+  }
 }
 
 async function handleDefaultSportsArtwork(req, res, config = {}) {
@@ -605,11 +660,14 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
   const title = String(req.query?.title || '').trim()
   const date = String(req.query?.date || '').trim()
   const detail = String(req.query?.detail || '').trim()
+  const homeTeam = String(req.query?.home || req.query?.homeTeam || '').trim()
+  const awayTeam = String(req.query?.away || req.query?.awayTeam || '').trim()
   const seeders = String(req.query?.seeders || '').trim()
   const size = String(req.query?.size || '').trim()
   const rawTitle = String(req.query?.rawTitle || '').trim()
   const source = String(req.query?.source || 'fallback').trim()
   const sportsmetaBaseUrl = resolveSportsmetaBaseUrlFromConfig(config)
+  const memberToken = resolveSportsPosterMemberToken(config, req)
   const upstreamUrl = buildUpstreamUrl({
     kind: 'default',
     variant,
@@ -617,6 +675,8 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
     league,
     title,
     date,
+    homeTeam,
+    awayTeam,
     sportsmetaBaseUrl
   })
   const fallbackInput = buildArtworkInputFromRequest({
@@ -624,6 +684,8 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
     league,
     title,
     date,
+    homeTeam,
+    awayTeam,
     detail,
     seeders,
     size,
@@ -631,7 +693,60 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
     source
   })
   if (detail) fallbackInput.eventDetail = detail
-  const cacheKey = buildDefaultArtworkCacheKey({ variant, sportSlug, league, title, date, detail, seeders, size, rawTitle, sportsmetaBaseUrl })
+  const canonical = memberToken
+    ? await resolveDefaultArtworkCanonical({
+      sportsmetaBaseUrl,
+      sportSlug,
+      league,
+      title,
+      date,
+      homeTeam,
+      awayTeam,
+      fallbackInput
+    })
+    : null
+  if (canonical?.canonicalId) {
+    const canonicalUpstreamUrl = buildUpstreamUrl({
+      kind: 'id',
+      variant,
+      canonicalId: canonical.canonicalId,
+      sportsmetaBaseUrl,
+      memberToken
+    })
+    const canonicalFallbackInput = buildArtworkInputFromRequest({
+      canonicalId: canonical.canonicalId,
+      sport: canonical.event?.sport || sportSlug,
+      league: canonical.event?.league || league,
+      title: canonical.event?.title || canonical.event?.name || title,
+      date: canonical.event?.date || date,
+      homeTeam: canonical.event?.homeTeam || homeTeam,
+      awayTeam: canonical.event?.awayTeam || awayTeam,
+      seeders,
+      size,
+      rawTitle,
+      source: 'sportsmeta'
+    })
+    if (detail) canonicalFallbackInput.eventDetail = detail
+    const canonicalCacheKey = buildCanonicalArtworkCacheKey({
+      variant,
+      canonicalId: canonical.canonicalId,
+      sportsmetaBaseUrl,
+      memberToken
+    })
+    await sendArtwork(res, {
+      cacheKey: canonicalCacheKey,
+      upstreamUrl: canonicalUpstreamUrl,
+      variant,
+      fallbackInput: canonicalFallbackInput,
+      teamPosterContext: {
+        canonicalId: canonical.canonicalId,
+        sportsmetaBaseUrl,
+        memberToken
+      }
+    })
+    return
+  }
+  const cacheKey = buildDefaultArtworkCacheKey({ variant, sportSlug, league, title, date, homeTeam, awayTeam, detail, seeders, size, rawTitle, sportsmetaBaseUrl })
   await sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput })
 }
 
