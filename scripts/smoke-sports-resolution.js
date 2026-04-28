@@ -480,9 +480,10 @@ async function run() {
     })
     assert.equal(
       envTokenPoster.poster,
-      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_env_poster_token')}&v=20260428-surface-v8`,
-      'PVTKRRX should prefer SportsMeta member artwork when a runtime env token is configured'
+      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?v=20260428-surface-v8`,
+      'PVTKRRX should keep runtime env member tokens server-side instead of exposing them in artwork URLs'
     )
+    assert.equal(envTokenPoster.selectedArtworkSource, 'sportsmeta-member-raster')
   } finally {
     if (previousEnvMemberToken === undefined) delete process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN
     else process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN = previousEnvMemberToken

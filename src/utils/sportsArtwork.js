@@ -99,6 +99,16 @@ function resolveSportsPosterMemberToken(input = {}) {
   )
 }
 
+function resolveUrlScopedSportsPosterMemberToken(input = {}) {
+  return normalizeSpace(
+    input?.sportsPosterMemberToken ||
+    input?.sportsmetaMemberToken ||
+    input?.memberToken ||
+    input?.config?.sportsPosterMemberToken ||
+    ''
+  )
+}
+
 // SportsMeta returns image/svg+xml for every asset URL — default and canonical
 // — and Stremio mobile/tablet clients do not render SVG posters. To keep the
 // tablet route rendering real artwork, emit a PVTKRRX-hosted raster proxy URL
@@ -110,7 +120,7 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
   const canonicalId = resolveCanonicalId(input)
   if (canonicalId) {
     const url = new URL(`${addonBase}/sports-artwork/id/${encodeURIComponent(variant)}/${encodeURIComponent(canonicalId)}.png`)
-    const memberToken = resolveSportsPosterMemberToken(input)
+    const memberToken = resolveUrlScopedSportsPosterMemberToken(input)
     if (memberToken) url.searchParams.set('token', memberToken)
     url.searchParams.set('v', SPORTS_ARTWORK_PROXY_VERSION)
     return url.toString()
