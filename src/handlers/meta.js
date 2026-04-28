@@ -71,6 +71,9 @@ function buildSportsDescriptionLines(input = {}) {
   const title = String(input.eventTitle || input.title || '').trim()
   const detail = String(input.eventDetail || '').trim()
   const date = String(input.date || '').trim()
+  const round = String(input.round || '').trim()
+  const venue = String(input.venue || '').trim()
+  const time = String(input.time || input.timestamp || '').trim()
   const homeTeam = String(input.homeTeam || '').trim()
   const awayTeam = String(input.awayTeam || '').trim()
   const canonicalDescription = String(input.canonicalDescription || '').trim()
@@ -86,6 +89,9 @@ function buildSportsDescriptionLines(input = {}) {
   if (title) pushUniqueLine(lines, `Event: ${title}`)
   if (detail) pushUniqueLine(lines, `Session: ${detail}`)
   if (date) pushUniqueLine(lines, `Date: ${date}`)
+  if (round) pushUniqueLine(lines, `Round: ${round}`)
+  if (venue) pushUniqueLine(lines, `Venue: ${venue}`)
+  if (time) pushUniqueLine(lines, `Time: ${time}`)
   if (homeTeam && awayTeam) pushUniqueLine(lines, `Teams: ${homeTeam} vs ${awayTeam}`)
 
   const availability = []
@@ -167,6 +173,9 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, 
     eventTitle: normalizedSportsEvent.eventTitle || displayTitle,
     eventDetail: normalizedSportsEvent.eventDetail || '',
     date: normalizedSportsEvent.date || eventDate,
+    round: canonicalEvent?.round,
+    venue: canonicalEvent?.venue,
+    time: canonicalEvent?.time || canonicalEvent?.timestamp,
     homeTeam: canonicalEvent?.homeTeam,
     awayTeam: canonicalEvent?.awayTeam,
     source: 'sportsmeta'
@@ -351,6 +360,9 @@ async function handleCustomMeta(config, id, context = {}) {
       eventTitle: normalizedSportsEvent?.eventTitle || eventName || displayTitle,
       eventDetail: normalizedSportsEvent?.eventDetail || carriedEventDetail,
       date: normalizedSportsEvent?.date || eventDate,
+      round: canonicalEvent?.round || sportsArtwork?.round,
+      venue: canonicalEvent?.venue || sportsArtwork?.venue,
+      time: canonicalEvent?.time || canonicalEvent?.timestamp || sportsArtwork?.time || sportsArtwork?.timestamp,
       homeTeam,
       awayTeam,
       seeders: Number(info.d || 0) || 0,

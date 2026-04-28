@@ -16,7 +16,7 @@ const OUT_DIR = path.join(process.cwd(), '.runtime', 'sports-artwork-debug')
 const ASSET_DIR = path.join(OUT_DIR, 'assets')
 const PORT = Math.max(1024, Number(process.env.PVTKRRX_ARTWORK_DEBUG_PORT || 7099) || 7099)
 const HOST = '127.0.0.1'
-const PROXY_VERSION = '20260428-surface-v8'
+const PROXY_VERSION = '20260428-club-logo-v2'
 const DEBUG_CONFIG = {
   sportsmetaBaseUrl: process.env.PVTKRRX_SPORTSMETA_BASE_URL || process.env.SPORTSMETA_BASE_URL || 'https://sportsmeta.pvtkrrx.cc',
   sportsPosterMemberToken: process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN || process.env.SPORTSMETA_MEMBER_TOKEN || ''
@@ -52,7 +52,7 @@ const CASES = [
     date: '2026-04-26',
     seeders: 26,
     size: '11.2 GB',
-    note: 'Default route with teams. The request carries home/away into the proxy so it can resolve to canonical SportsMeta and use real badges when available; otherwise it must show a football-pitch fallback.'
+    note: 'Default route with teams. The request carries home/away into the proxy so it can resolve to canonical SportsMeta and use real SportsDB/SportsMeta badge images when available; otherwise it must show a football-pitch fallback.'
   },
   {
     slug: 'football-man-utd-brentford-canonical',
@@ -173,8 +173,8 @@ function renderCard(sample) {
     normalized: sample.normalized
   }
   const badgePath = sample.routeKind === 'canonical-id'
-    ? 'canonical -> SportsMeta /event -> homeBadge/awayBadge -> pvtkrrx-team-badge-* if badges exist'
-    : 'default -> SportsMeta resolve attempt when member token exists -> canonical member badges if resolved -> sport-specific generated surface if not'
+    ? 'canonical -> SportsMeta /event -> member homeBadge/awayBadge/leagueLogo -> pvtkrrx-team-badge-* only when real raster badge bytes exist'
+    : 'default -> SportsMeta resolve attempt -> canonical member badges if resolved -> sport-specific generated surface if not'
 
   return `<article class="case" data-label="${escapeHtml(sample.label)}">
     <div class="case-head">

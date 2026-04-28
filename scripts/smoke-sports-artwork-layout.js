@@ -556,12 +556,24 @@ function makeMockResponse() {
   }
 }
 
-function teamBadgeSvg(label, fill) {
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
-    <rect width="256" height="256" rx="40" fill="${fill}"/>
-    <circle cx="128" cy="128" r="92" fill="rgba(255,255,255,0.16)" stroke="#fff" stroke-width="8"/>
-    <text x="128" y="146" text-anchor="middle" font-family="Arial Black, Arial" font-size="58" font-weight="900" fill="#fff">${label}</text>
+async function teamBadgePng(fill, accent) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+    <rect width="256" height="256" rx="46" fill="${fill}"/>
+    <path d="M128 28 L210 72 V142 C210 188 174 222 128 238 C82 222 46 188 46 142 V72 Z" fill="${accent}" stroke="#fff" stroke-width="9"/>
+    <circle cx="128" cy="128" r="46" fill="rgba(255,255,255,0.38)" stroke="rgba(0,0,0,0.26)" stroke-width="7"/>
+    <path d="M128 78 L142 112 H178 L149 133 L160 168 L128 147 L96 168 L107 133 L78 112 H114 Z" fill="#fff"/>
   </svg>`
+  return sharp(Buffer.from(svg)).png().toBuffer()
+}
+
+function sportsMetaRasterHeaders() {
+  return {
+    'content-type': 'image/png',
+    'x-sportsmeta-delivery-format': 'raster',
+    'x-sportsmeta-source': 'cached-asset',
+    'x-sportsmeta-asset-class': 'member-homebadge-raster',
+    'x-sportsmeta-generated-asset': 'false'
+  }
 }
 
 async function assertTeamBadgeArtworkProxy() {
@@ -680,33 +692,48 @@ async function assertTeamBadgeArtworkProxy() {
         })
       }
       if (url.pathname === `/member/default-token/asset/homeBadge/${encodeURIComponent(canonicalId)}`) {
-        return new Response(teamBadgeSvg('UTA', '#155e75'), {
+        return new Response(await teamBadgePng('#155e75', '#0e7490'), {
           status: 200,
-          headers: { 'content-type': 'image/svg+xml' }
+          headers: sportsMetaRasterHeaders()
         })
       }
       if (url.pathname === `/member/default-token/asset/awayBadge/${encodeURIComponent(canonicalId)}`) {
-        return new Response(teamBadgeSvg('VGK', '#92400e'), {
+        return new Response(await teamBadgePng('#92400e', '#fbbf24'), {
           status: 200,
-          headers: { 'content-type': 'image/svg+xml' }
+          headers: sportsMetaRasterHeaders()
+        })
+      }
+      if (url.pathname === `/member/default-token/asset/leagueLogo/${encodeURIComponent(canonicalId)}`) {
+        return new Response(await teamBadgePng('#111827', '#38bdf8'), {
+          status: 200,
+          headers: sportsMetaRasterHeaders()
         })
       }
       if (
         url.pathname === `/member/test-token/asset/homeBadge/${encodeURIComponent(canonicalId)}` ||
         url.pathname === `/member/test-token/asset/homeBadge/${encodeURIComponent(invalidLandscapeCanonicalId)}`
       ) {
-        return new Response(teamBadgeSvg('UTA', '#155e75'), {
+        return new Response(await teamBadgePng('#155e75', '#0e7490'), {
           status: 200,
-          headers: { 'content-type': 'image/svg+xml' }
+          headers: sportsMetaRasterHeaders()
         })
       }
       if (
         url.pathname === `/member/test-token/asset/awayBadge/${encodeURIComponent(canonicalId)}` ||
         url.pathname === `/member/test-token/asset/awayBadge/${encodeURIComponent(invalidLandscapeCanonicalId)}`
       ) {
-        return new Response(teamBadgeSvg('VGK', '#92400e'), {
+        return new Response(await teamBadgePng('#92400e', '#fbbf24'), {
           status: 200,
-          headers: { 'content-type': 'image/svg+xml' }
+          headers: sportsMetaRasterHeaders()
+        })
+      }
+      if (
+        url.pathname === `/member/test-token/asset/leagueLogo/${encodeURIComponent(canonicalId)}` ||
+        url.pathname === `/member/test-token/asset/leagueLogo/${encodeURIComponent(invalidLandscapeCanonicalId)}`
+      ) {
+        return new Response(await teamBadgePng('#111827', '#38bdf8'), {
+          status: 200,
+          headers: sportsMetaRasterHeaders()
         })
       }
       throw new Error(`Unexpected sports artwork proxy fetch: ${url.toString()}`)
@@ -734,6 +761,7 @@ async function assertTeamBadgeArtworkProxy() {
       assert.match(response.headers['x-pvtkrrx-artwork-fallback'] || '', /team_badges/, `team badge ${variant} proxy should report fallback reason`)
       assert.ok(Buffer.isBuffer(response.body), `team badge ${variant} proxy should return bytes`)
       assert.deepEqual(pngDimensions(response.body), dimensions[variant], `team badge ${variant} dimensions`)
+      fs.writeFileSync(path.join(PREVIEW_DIR, `team-badge-${variant}.png`), response.body)
     }
 
     const invalidLandscapeResponse = makeMockResponse()
@@ -756,7 +784,7 @@ async function assertTeamBadgeArtworkProxy() {
     assert.equal(invalidLandscapeResponse.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-team-badge-landscape', 'invalid member landscape should be replaced with a team-badge landscape')
     assert.match(
       invalidLandscapeResponse.headers['x-pvtkrrx-artwork-fallback'] || '',
-      /sportsmeta_landscape_raster_layout_replaced_with_team_badges/,
+      /sportsmeta_landscape_raster_(?:layout_replaced|composed)_with_team_badges/,
       'invalid member landscape should report the layout fallback reason'
     )
     assert.deepEqual(pngDimensions(invalidLandscapeResponse.body), dimensions.landscape, 'invalid member landscape fallback dimensions')
@@ -787,6 +815,7 @@ async function assertTeamBadgeArtworkProxy() {
     assert.equal(defaultResolvedResponse.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-team-badge-poster', 'default artwork resolver should use canonical team badge composition when resolvable')
     assert.match(defaultResolvedResponse.headers['x-pvtkrrx-artwork-upstream'] || '', /\/member\/\[redacted\]\/asset\/poster\/sportsmeta/, 'default artwork resolver should switch to the member canonical poster route')
     assert.deepEqual(pngDimensions(defaultResolvedResponse.body), dimensions.poster, 'default artwork resolver poster dimensions')
+    fs.writeFileSync(path.join(PREVIEW_DIR, 'default-resolved-team-badge-poster.png'), defaultResolvedResponse.body)
   } finally {
     global.fetch = originalFetch
   }

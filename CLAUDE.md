@@ -56,6 +56,7 @@
 - PVTKRRX remains the separate stream addon and should only attach streams to those same `sportsmeta:` IDs.
 - Do not describe SportsMeta as a live integrated `/sportsmeta/*` path inside `https://www.pvtkrrx.cc`; the real production boundary is a separate hostname plus `sportsmeta.service`.
 - For stream proof, use a configured `https://www.pvtkrrx.cc/:config/stream/...` route, not the bootstrap `/stream/...` compatibility path.
+- For sports poster artwork, real SportsDB/SportsMeta logos win. PVTKRRX may compose client-safe PNG posters from SportsMeta member `homeBadge`, `awayBadge`, and `leagueLogo` routes server-side, but it must not show text initials when cached/source badge assets exist. Generated sport-specific SVG/PNG fallback is only for unresolved or truly missing-logo rows.
 
 ### Sports Poster Cache — REMOVED 2026-04-22
 - PVTKRRX no longer owns a sports image cache. SportsMeta is the only source of sports artwork.

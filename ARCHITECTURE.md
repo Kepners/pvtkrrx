@@ -49,7 +49,7 @@ SportsMeta and PVTKRRX are two coordinated services in the same PVTKRRX product 
 - PVTKRRX is the Stremio-facing stream addon. It owns install surfaces, route selection, `/file`, `/playback`, qBittorrent/Prowlarr integration, and the sports/movie/TV/library catalog emitted to Stremio.
 - SportsMeta is the sports identity and artwork service. It owns the public `sportsmeta:` id space, `manifest` / `catalog` / `meta` / `event` / `resolve` endpoints, the SportsMeta SQLite DB, the asset cache, the member-token routes, and Stripe billing.
 - PVTKRRX depends on SportsMeta for sports identity resolution and upstream artwork bytes. It does not make independent sports artwork decisions or hold its own paid sports image catalogue.
-- PVTKRRX consumes the public, unauthenticated SportsMeta asset routes upstream — `https://sportsmeta.pvtkrrx.cc/asset/{variant}/{id}` when a canonical id is known and `https://sportsmeta.pvtkrrx.cc/asset/default/{variant}/{sport}?league=...` when it is not — but addon responses now emit PVTKRRX-hosted `/sports-artwork/...png` proxy URLs on the active addon origin. Those proxy routes fetch the public SportsMeta SVG surface and rasterize it to PNG so Stremio tablet/mobile clients receive client-safe artwork without any PVTKRRX-side entitlement branch.
+- PVTKRRX consumes SportsMeta asset routes upstream. Public routes remain compatible/free, while configured Sports Posters member tokens are used only server-side so PVTKRRX can fetch real SportsMeta raster badges/logos and return client-safe `/sports-artwork/...png` URLs without exposing member URLs or tokens to Stremio.
 - SportsMeta now exposes `/proof` and `/member/:token/proof` so the real asset class and entitlement path can be proven on the SportsMeta side. Those proof surfaces do not mean PVTKRRX itself has a premium artwork branch.
 - The paid side of the stack is a separate SportsMeta member install. The public PVTKRRX-facing offer now lives at `https://www.pvtkrrx.cc/sports` as the `Sports Posters` page, but checkout is proxied to SportsMeta and SportsMeta still owns member tokens, Stripe billing, and premium poster/background/logo enforcement. That member install is a different Stremio addon; it is not a tier inside PVTKRRX stream playback.
 - The old integrated `/sportsmeta/*` draft inside this repo is removed from the live product boundary; legacy `pvtkrrx` sports artwork endpoints now return `HTTP 410 Gone`.
@@ -65,7 +65,7 @@ Shared Contabo hosting and same-box network access are infrastructure couplings.
 | `src/clients/*` | Prowlarr, qBittorrent, Cinemeta, and SportsMeta integrations (TheSportsDB is owned by SportsMeta, not this repo) |
 | `src/utils/analytics.js` | Optional Umami monitoring for hosted traffic and product events, with host gating and dedupe state |
 | `src/utils/sportsArtwork.js` | Shared resolver that emits PVTKRRX `/sports-artwork/...png` URLs when a public addon base is known, and falls back to direct SportsMeta asset URLs only for internal/tooling paths |
-| `src/handlers/sportsArtworkProxy.js` | Raster proxy for `/sports-artwork/default/...png` and `/sports-artwork/id/...png`; fetches public SportsMeta assets and returns client-safe PNG bytes |
+| `src/handlers/sportsArtworkProxy.js` | Raster/composition proxy for `/sports-artwork/default/...png` and `/sports-artwork/id/...png`; fetches SportsMeta-owned assets, uses member raster badge routes server-side when configured, and returns client-safe PNG bytes |
 | `src/utils/opaqueState.js` | Opaque state tokens for `/file` and `/playback` |
 | `src/utils/pairStore.js` | LAN pair persistence |
 | `src/utils/accountStore.js` | Stremio-linked account and billing/trial data store |
@@ -141,8 +141,9 @@ The desktop popup, configure UI, and public guide should use `LAN Bridge` for th
 4. PVTKRRX's live sports catalog/meta surface now stays on SportsMeta-owned upstream art, but emits it through PVTKRRX PNG proxy routes so Stremio clients do not have to render SVG directly.
 5. The manifest now exposes a dedicated top-level `sports` surface with an `All Sports` catalog plus sport-family catalogs such as `Football`, `Motorsport`, and `MMA`.
 6. Each sport-family catalog uses the third-column `genre` dropdown for narrower league/team filters.
-7. Sports artwork — canonical posters, backgrounds, logos, and the default-sport fallbacks — still comes from SportsMeta upstream, but the addon now serves client-safe PNG bytes through `/sports-artwork/...png` on the active PVTKRRX origin. The paid TheSportsDB key still lives exclusively in SportsMeta, and PVTKRRX still emits only the free public SportsMeta surface rather than member-token artwork routes.
-8. Library items expose completed qBittorrent content through the same addon surface.
+7. Sports artwork — canonical posters, backgrounds, logos, and the default-sport fallbacks — still comes from SportsMeta upstream, but the addon now serves client-safe PNG bytes through `/sports-artwork/...png` on the active PVTKRRX origin. When `PVTKRRX_SPORTSMETA_MEMBER_TOKEN` or an equivalent saved Sports Posters token is configured, PVTKRRX fetches SportsMeta member badge/logo routes server-side and composes real-logo posters/backgrounds without exposing the token to Stremio.
+8. PVTKRRX must not invent team logos. If SportsMeta cannot resolve a canonical event or cannot supply real raster home/away badges, PVTKRRX may render a sport-specific generated fallback, but text initials are a last-resort fallback and must not replace available SportsDB/SportsMeta logos.
+9. Library items expose completed qBittorrent content through the same addon surface.
 
 ## Storage Model
 
