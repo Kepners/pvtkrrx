@@ -15,7 +15,7 @@ const TEAM_TAIL_NOISE_RE = /^(?:game|games|round|matchday|main|card|pre|post|epi
 const EVENT_SOURCE_NOISE_RE = /^(?:apple|tv|atvp?|fubo|skynz|kayo|z3r0|nva|espn(?:p|plus|\+)?|f1tv|fs1|nesn|msg|usan?|nbc(?:sn|sba|sca)?|sny|snla|snp|sky|sports|fox|bbc|itv|cbs|abc|tnt|peacock|eurosport|nordic)$/i
 
 // Known league/series tokens that start non-vs event titles
-const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|PFL|Bellator|ONE|WWE|AEW|TNA|ROH|NJPW|MotoGP|Moto\s*GP|NASCAR|IndyCar|WRC|Supercars|Supercars\s*Championship|V8SC|Bathurst|WSBK|WEC|FormulaE|Rally|Dakar|PGA|PGA\s*Tour|LPGA|LPGA\s*Tour|Masters|IPL|IPLM\d+|Indian\s*Premier\s*League|MLS|Major\s*League\s*Soccer|MLB|Major\s*League\s*Baseball|NCAA\s*Baseball|World\s*Baseball\s*Classic|NBA|NBA\s*Playoffs|EuroLeague|EasyCredit\s*BBL|Basketball\s*Champions\s*League(?:\s*of\s*Americas)?|Super\s*Rugby|MLR|Major\s*League\s*Rugby|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
+const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|PFL|Bellator|ONE|WWE|AEW|TNA|ROH|NJPW|MotoGP|Moto\s*GP|NASCAR|IndyCar|WRC|Supercars|Supercars\s*Championship|V8SC|Bathurst|WSBK|WEC|FormulaE|Rally|Dakar|PGA|PGA\s*Tour|LPGA|LPGA\s*Tour|Masters|ATP|ATP\s*World\s*Tour|WTA|WTA\s*Tour|Wimbledon|Australian\s*Open|Roland\s*Garros|French\s*Open|US\s*Open|U\.S\.\s*Open|Davis\s*Cup|Laver\s*Cup|IPL|IPLM\d+|Indian\s*Premier\s*League|MLS|Major\s*League\s*Soccer|MLB|Major\s*League\s*Baseball|NCAA\s*Baseball|World\s*Baseball\s*Classic|NBA|NBA\s*Playoffs|EuroLeague|EasyCredit\s*BBL|Basketball\s*Champions\s*League(?:\s*of\s*Americas)?|Super\s*Rugby|MLR|Major\s*League\s*Rugby|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
 
 function normalizeSegment(value) {
   return String(value || '')
@@ -220,6 +220,13 @@ function findLeadingLeagueSpan(tokens = []) {
   if (best) return best
 
   if (parts.length > 1 && GENERIC_SPORT_PREFIX_RE.test(parts[0])) {
+    const afterPrefix = findLeadingLeagueSpan(parts.slice(1))
+    if (afterPrefix && afterPrefix.nextIndex + 1 < parts.length) {
+      return {
+        league: afterPrefix.league,
+        nextIndex: afterPrefix.nextIndex + 1
+      }
+    }
     return {
       league: resolveLeagueToken(parts.slice(0, Math.min(parts.length, 3))),
       nextIndex: 1
@@ -517,11 +524,20 @@ function parseFlexibleMatchupTitle(title, fallbackDate = '') {
   const preTeamTokens = leadingLeague?.league
     ? beforeSeparator.slice(leadingLeague.nextIndex)
     : beforeSeparator
+  const leadingLeagueSport = getMappedLeagueEntry(leadingLeague?.league || '')?.sportKey || ''
+  const tennisYearIndex = leadingLeagueSport === 'tennis'
+    ? preTeamTokens.findIndex(token => /^(19|20)\d{2}$/.test(String(token || '').trim()))
+    : -1
+  const tennisPreTeamTokens = tennisYearIndex >= 0 && tennisYearIndex < preTeamTokens.length - 1
+    ? preTeamTokens.slice(tennisYearIndex + 1)
+    : preTeamTokens
   const leadingDate = parseLeadingDateTokens(preTeamTokens, fallbackDate)
   const useLeadingDate = Boolean(leadingDate && leadingDate.nextIndex > 0)
   const seasonInfo = useLeadingDate
     ? { tokens: preTeamTokens, yearHint: leadingDate.date.slice(0, 4) }
-    : stripLeadingSeasonTokens(preTeamTokens)
+    : (tennisYearIndex >= 0
+      ? { tokens: tennisPreTeamTokens, yearHint: preTeamTokens[tennisYearIndex] }
+      : stripLeadingSeasonTokens(preTeamTokens))
   const preSeparatorDate = useLeadingDate
     ? null
     : findTrailingDateSpan(seasonInfo.tokens, seasonInfo.yearHint, '')
@@ -618,6 +634,15 @@ function normalizeEventNameTokens(tokens = [], fallbackDate = '') {
       continue
     }
     if (lower === 'warm' && /^up$/i.test(next)) {
+      index += 1
+      continue
+    }
+    if (lower === 'free' && /^practice$/i.test(next)) {
+      if (/^(?:[1-3]|one|two|three)$/i.test(String(stripped[index + 2] || ''))) index += 2
+      else index += 1
+      continue
+    }
+    if (lower === 'practice' && /^(?:[1-3]|one|two|three)$/i.test(next)) {
       index += 1
       continue
     }

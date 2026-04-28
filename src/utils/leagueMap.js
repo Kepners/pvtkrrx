@@ -398,6 +398,40 @@ const LEAGUE_MAP = Object.freeze({
     sportsDbSport: 'Tennis',
     aliases: ['WTA', 'Womens Tennis Association']
   },
+  wimbledon: {
+    name: 'Wimbledon',
+    idLeague: '4463',
+    sportKey: 'tennis',
+    sportsDbSport: 'Tennis',
+    aliases: ['The Championships Wimbledon']
+  },
+  australianopen: {
+    name: 'Australian Open',
+    sportKey: 'tennis',
+    sportsDbSport: 'Tennis'
+  },
+  rolandgarros: {
+    name: 'Roland Garros',
+    sportKey: 'tennis',
+    sportsDbSport: 'Tennis',
+    aliases: ['French Open']
+  },
+  usopen: {
+    name: 'US Open',
+    sportKey: 'tennis',
+    sportsDbSport: 'Tennis',
+    aliases: ['U.S. Open']
+  },
+  daviscup: {
+    name: 'Davis Cup',
+    sportKey: 'tennis',
+    sportsDbSport: 'Tennis'
+  },
+  lavercup: {
+    name: 'Laver Cup',
+    sportKey: 'tennis',
+    sportsDbSport: 'Tennis'
+  },
   bbl: {
     name: 'Big Bash League',
     idLeague: '4461',

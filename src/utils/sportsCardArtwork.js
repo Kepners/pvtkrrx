@@ -214,6 +214,26 @@ function resolveCompetitionMark({ sport = '', competition = '', title = '', deta
   return initialsFor(clean)
 }
 
+function isFormulaOneMark(mark = '', competition = '', title = '') {
+  return /^f1$/i.test(normalizeSpace(mark)) ||
+    /\b(?:formula\s*1|formula\s*one|f1)\b/i.test(`${competition} ${title}`)
+}
+
+function isMotoGpMark(mark = '', competition = '', title = '') {
+  return /^motogp$/i.test(normalizeSpace(mark)) ||
+    /\bmoto\s*gp\b|\bmotogp\b/i.test(`${competition} ${title}`)
+}
+
+function resolveMotorsportBrandKind(normalized = {}) {
+  const sport = normalizeSpace(normalized.sport)
+  const competition = normalizeSpace(normalized.competition)
+  const title = normalizeSpace(normalized.eventTitle)
+  const mark = resolveCompetitionMark({ sport, competition, title, detail: normalized.eventDetail })
+  if (isFormulaOneMark(mark, competition, title)) return 'f1'
+  if (isMotoGpMark(mark, competition, title)) return 'motogp'
+  return ''
+}
+
 function renderPosterMarkLines({ mark, cx, y, width, isPoster, fill = '#ffffff' }) {
   const lines = wrapText(mark, width, isPoster ? 62 : 92, isPoster ? 2 : 1)
   const fontSize = Math.round(isPoster ? (lines.length > 1 ? 58 : 74) : 86)
@@ -330,6 +350,10 @@ function renderSportsCardSvg(input = {}, variant = 'poster') {
   const [base, accent, text, highlight] = paletteForSport(layout.normalized.sport)
   const markerSize = Math.max(8, Math.round(width * 0.016))
   const matchup = splitMatchup(layout.normalized.eventTitle)
+  const motorsportBrandKind = !matchup ? resolveMotorsportBrandKind(layout.normalized) : ''
+  if (motorsportBrandKind && variant !== 'logo') {
+    return renderMotorsportBrandCardSvg({ layout, kind: motorsportBrandKind, variant, base, accent, text, highlight })
+  }
   const isPoster = variant === 'poster'
   const visual = isPoster
     ? { x: 36, y: 118, width: width - 72, height: 492 }
@@ -343,7 +367,7 @@ function renderSportsCardSvg(input = {}, variant = 'poster') {
   }).join('\n  ')
   const visualMarkup = matchup
     ? renderMatchupVisual({ matchup, x: visual.x, y: visual.y, width: visual.width, height: visual.height, base, accent, highlight, isPoster })
-    : renderSportMotif({ sport: layout.normalized.sport, competition: layout.normalized.competition, title: layout.normalized.eventTitle, x: visual.x, y: visual.y, width: visual.width, height: visual.height, base, accent, highlight, text, isPoster })
+    : renderSportMotif({ sport: layout.normalized.sport, competition: layout.normalized.competition, title: layout.normalized.eventTitle, detail: layout.normalized.eventDetail, x: visual.x, y: visual.y, width: visual.width, height: visual.height, base, accent, highlight, text, isPoster })
 
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(layout.normalized.eventTitle)}">
   <defs>
@@ -414,11 +438,209 @@ function renderMatchupVisual({ matchup, x, y, width, height, base, accent, highl
   </g>`
 }
 
-function renderSportMotif({ sport, competition, title, x, y, width, height, base, accent, highlight, text, isPoster }) {
+function renderMotorsportBrandVisual({ kind, mark, title, detail, competition, x, y, width, height, base, accent, highlight, text, isPoster }) {
+  const cx = Math.round(x + width / 2)
+  const brand = kind === 'motogp' ? 'motogp' : 'formula-one'
+  const markFontSize = kind === 'motogp'
+    ? Math.round(isPoster ? 76 : 118)
+    : Math.round(isPoster ? 104 : 152)
+  const markY = Math.round(y + height * (isPoster ? 0.34 : 0.38))
+  const titleLines = wrapText(title || competition || mark, width - 88, isPoster ? 31 : 46, isPoster ? 2 : 2)
+  const detailText = wrapText(detail || '', width - 92, isPoster ? 23 : 34, 1)[0] || ''
+  const competitionText = wrapText(competition || mark, width - 92, isPoster ? 22 : 32, 1)[0] || ''
+  const titleStartY = Math.round(y + height * (isPoster ? 0.62 : 0.64))
+  const titleMarkup = titleLines.map((line, index) => renderTextLine({
+    role: `${brand}-event-title`,
+    text: line,
+    x: cx,
+    y: titleStartY + (index * Math.round((isPoster ? 31 : 46) * 1.12)),
+    fontSize: isPoster ? 31 : 46,
+    weight: 900,
+    anchor: 'middle',
+    fill: '#f8fafc',
+    stroke: '#020617',
+    strokeWidth: isPoster ? 6 : 8
+  }, width - 98)).join('\n  ')
+  const detailMarkup = detailText
+    ? renderTextLine({
+      role: `${brand}-session`,
+      text: detailText,
+      x: cx,
+      y: Math.round(y + height * (isPoster ? 0.82 : 0.84)),
+      fontSize: isPoster ? 23 : 34,
+      weight: 850,
+      anchor: 'middle',
+      fill: highlight,
+      stroke: '#020617',
+      strokeWidth: isPoster ? 4 : 6
+    }, width - 110)
+    : ''
+  const competitionMarkup = competitionText
+    ? renderTextLine({
+      role: `${brand}-competition`,
+      text: competitionText,
+      x: cx,
+      y: Math.round(y + height * (isPoster ? 0.91 : 0.92)),
+      fontSize: isPoster ? 20 : 30,
+      weight: 750,
+      anchor: 'middle',
+      fill: text,
+      stroke: 'rgba(0,0,0,0.42)',
+      strokeWidth: 4
+    }, width - 120)
+    : ''
+  const markFill = kind === 'motogp' ? '#f8fafc' : '#ffffff'
+  const stripeColor = kind === 'motogp' ? '#f8fafc' : '#ef4444'
+
+  return `<g data-role="${brand}-poster-visual">
+    <rect x="${x}" y="${y}" width="${width}" height="${height}" rx="18" fill="${base}" opacity="0.38"/>
+    <rect x="${x + 18}" y="${y + 18}" width="${width - 36}" height="${height - 36}" rx="16" fill="rgba(15,23,42,0.32)" stroke="rgba(255,255,255,0.12)" stroke-width="3"/>
+    <path d="M ${x + width * 0.1} ${y + height * 0.25} L ${x + width * 0.92} ${y + height * 0.12}" stroke="${stripeColor}" stroke-width="${isPoster ? 18 : 28}" stroke-linecap="round" opacity="0.9"/>
+    <path d="M ${x + width * 0.08} ${y + height * 0.43} L ${x + width * 0.76} ${y + height * 0.31}" stroke="rgba(255,255,255,0.22)" stroke-width="${isPoster ? 12 : 20}" stroke-linecap="round"/>
+    ${renderTextLine({
+      role: `${brand}-mark`,
+      text: mark,
+      x: cx,
+      y: markY,
+      fontSize: markFontSize,
+      weight: 950,
+      anchor: 'middle',
+      fill: markFill,
+      stroke: '#020617',
+      strokeWidth: isPoster ? 10 : 14
+    }, width - 88)}
+    ${titleMarkup}
+    ${detailMarkup}
+    ${competitionMarkup}
+  </g>`
+}
+
+function renderMotorsportBrandCardSvg({ layout, kind, variant, base, accent, text, highlight }) {
+  const { width, height } = layout.dimensions
+  const normalized = layout.normalized
+  const brand = kind === 'motogp' ? 'motogp' : 'formula-one'
+  const mark = kind === 'motogp' ? 'MotoGP' : 'F1'
+  const isPoster = variant === 'poster'
+  const isBackground = variant === 'background'
+  const cx = Math.round(width / 2)
+  const title = normalizeSpace(normalized.eventTitle || normalized.competition || mark)
+  const session = normalizeSpace(normalized.eventDetail || '')
+  const competition = normalizeSpace(normalized.competition || (kind === 'motogp' ? 'MotoGP' : 'Formula 1'))
+  const footer = buildFooter(normalized)
+  const titleLines = wrapText(title, width * (isPoster ? 0.82 : 0.58), isPoster ? 42 : isBackground ? 82 : 58, isPoster ? 2 : 1)
+  const markFontSize = kind === 'motogp'
+    ? Math.round(isPoster ? 100 : isBackground ? 190 : 148)
+    : Math.round(isPoster ? 148 : isBackground ? 245 : 190)
+  const titleFontSize = Math.round(isPoster ? 42 : isBackground ? 82 : 58)
+  const sessionFontSize = Math.round(isPoster ? 28 : isBackground ? 46 : 34)
+  const competitionFontSize = Math.round(isPoster ? 22 : isBackground ? 36 : 28)
+  const footerFontSize = Math.round(isPoster ? 18 : isBackground ? 26 : 20)
+  const markY = Math.round(height * (isPoster ? 0.34 : 0.42))
+  const titleStartY = Math.round(height * (isPoster ? 0.56 : 0.62))
+  const sessionY = Math.round(height * (isPoster ? 0.72 : 0.74))
+  const competitionY = Math.round(height * (isPoster ? 0.83 : 0.84))
+  const footerY = Math.round(height - (isPoster ? 42 : 54))
+  const titleMarkup = titleLines.map((line, index) => renderTextLine({
+    role: `${brand}-event-title`,
+    text: line,
+    x: cx,
+    y: titleStartY + (index * Math.round(titleFontSize * 1.12)),
+    fontSize: titleFontSize,
+    weight: 900,
+    anchor: 'middle',
+    fill: '#f8fafc',
+    stroke: '#020617',
+    strokeWidth: isPoster ? 8 : 12
+  }, width * (isPoster ? 0.82 : 0.62))).join('\n  ')
+  const sessionMarkup = session
+    ? renderTextLine({
+      role: `${brand}-session`,
+      text: session,
+      x: cx,
+      y: sessionY,
+      fontSize: sessionFontSize,
+      weight: 850,
+      anchor: 'middle',
+      fill: highlight,
+      stroke: '#020617',
+      strokeWidth: isPoster ? 5 : 8
+    }, width * (isPoster ? 0.76 : 0.5))
+    : ''
+  const competitionMarkup = renderTextLine({
+    role: `${brand}-competition`,
+    text: competition,
+    x: cx,
+    y: competitionY,
+    fontSize: competitionFontSize,
+    weight: 800,
+    anchor: 'middle',
+    fill: text,
+    stroke: 'rgba(0,0,0,0.48)',
+    strokeWidth: isPoster ? 4 : 6
+  }, width * (isPoster ? 0.76 : 0.48))
+  const footerMarkup = footer
+    ? renderTextLine({
+      role: 'footer',
+      text: footer,
+      x: isPoster ? 36 : 64,
+      y: footerY,
+      fontSize: footerFontSize,
+      weight: 700,
+      fill: '#ffffff'
+    }, width - (isPoster ? 72 : 128))
+    : ''
+  const stripeColor = kind === 'motogp' ? '#e5e7eb' : '#ef4444'
+  const accentLine = kind === 'motogp' ? '#f8fafc' : highlight
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img" aria-label="${escapeXml(title)}">
+  <defs>
+    <linearGradient id="brandBg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="${base}"/>
+      <stop offset="0.58" stop-color="#111827"/>
+      <stop offset="1" stop-color="${colorFromText(title, accent)}"/>
+    </linearGradient>
+    <pattern id="brandDiagonal" width="56" height="56" patternUnits="userSpaceOnUse" patternTransform="rotate(32)">
+      <rect width="56" height="56" fill="transparent"/>
+      <rect width="12" height="56" fill="rgba(255,255,255,0.05)"/>
+    </pattern>
+  </defs>
+  <rect x="0" y="0" width="${width}" height="${height}" rx="0" fill="url(#brandBg)"/>
+  <rect x="0" y="0" width="${width}" height="${height}" fill="url(#brandDiagonal)" opacity="0.72"/>
+  <g data-role="${brand}-poster-visual">
+    <path d="M ${width * 0.1} ${height * 0.23} L ${width * 0.9} ${height * 0.12}" stroke="${stripeColor}" stroke-width="${isPoster ? 22 : 38}" stroke-linecap="round" opacity="0.92"/>
+    <path d="M ${width * 0.12} ${height * 0.4} L ${width * 0.78} ${height * 0.31}" stroke="rgba(255,255,255,0.22)" stroke-width="${isPoster ? 13 : 26}" stroke-linecap="round"/>
+    <path d="M ${width * 0.18} ${height * 0.46} L ${width * 0.68} ${height * 0.39}" stroke="${accentLine}" stroke-width="${isPoster ? 5 : 9}" stroke-linecap="round" opacity="0.8"/>
+    ${renderTextLine({
+      role: `${brand}-mark`,
+      text: mark,
+      x: cx,
+      y: markY,
+      fontSize: markFontSize,
+      weight: 950,
+      anchor: 'middle',
+      fill: '#ffffff',
+      stroke: '#020617',
+      strokeWidth: isPoster ? 12 : 18
+    }, width * (isPoster ? 0.76 : 0.5))}
+    ${titleMarkup}
+    ${sessionMarkup}
+    ${competitionMarkup}
+  </g>
+  ${footerMarkup}
+</svg>`
+}
+
+function renderSportMotif({ sport, competition, title, detail, x, y, width, height, base, accent, highlight, text, isPoster }) {
   const cx = Math.round(x + width / 2)
   const cy = Math.round(y + height * 0.45)
   const r = Math.round(Math.min(width, height) * (isPoster ? 0.25 : 0.28))
-  const mark = resolveCompetitionMark({ sport, competition, title })
+  const mark = resolveCompetitionMark({ sport, competition, title, detail })
+  if (isFormulaOneMark(mark, competition, title)) {
+    return renderMotorsportBrandVisual({ kind: 'f1', mark: 'F1', title, detail, competition, x, y, width, height, base, accent, highlight, text, isPoster })
+  }
+  if (isMotoGpMark(mark, competition, title)) {
+    return renderMotorsportBrandVisual({ kind: 'motogp', mark: 'MotoGP', title, detail, competition, x, y, width, height, base, accent, highlight, text, isPoster })
+  }
   const titleLines = wrapText(title, width - 82, isPoster ? 28 : 38, isPoster ? 2 : 2)
   const lowerLabel = wrapText(competition || sport, width - 64, isPoster ? 25 : 34, 2)
     .map((line, index) => renderTextLine({

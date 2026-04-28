@@ -85,6 +85,26 @@ const CASES = [
     }
   },
   {
+    slug: 'motorsport-formula-one-azerbaijan',
+    input: {
+      rawTitle: 'Formula 1 Azerbaijan GP Race 1080p WEB-DL',
+      sportHint: 'motorsport',
+      competition: 'Formula 1',
+      eventTitle: 'Azerbaijan GP',
+      eventDetail: 'Race',
+      date: '2026-04-26',
+      seeders: 17,
+      size: '8.9 GB',
+      source: 'prowlarr'
+    },
+    expected: {
+      sport: 'Motorsport',
+      competition: 'Formula 1',
+      eventTitle: 'Azerbaijan GP',
+      eventDetail: 'Race'
+    }
+  },
+  {
     slug: 'football-nottingham-sunderland',
     input: {
       rawTitle: 'Nottingham Forest vs Sunderland',
@@ -744,13 +764,13 @@ async function main() {
 
     assert.ok(
       nodes.some((node) => node.role === 'visual-versus' || node.role === 'sport-motif') ||
-        /data-role="(?:matchup-visual|sport-visual|competition-poster-visual)"/.test(svg),
+        /data-role="(?:matchup-visual|sport-visual|competition-poster-visual|formula-one-poster-visual|motogp-poster-visual)"/.test(svg),
       `${testCase.slug} poster should include a visible event/sport motif`
     )
 
     if (!nodes.some((node) => node.role === 'visual-versus')) {
       assert.ok(
-        nodes.some((node) => node.role === 'competition-mark'),
+        nodes.some((node) => ['competition-mark', 'formula-one-mark', 'motogp-mark'].includes(node.role)),
         `${testCase.slug} fallback poster should include a competition mark`
       )
     }
@@ -758,8 +778,28 @@ async function main() {
     if (testCase.slug.includes('motogp') || testCase.slug.includes('motorsport')) {
       assert.ok(
         nodes.some((node) => node.role === 'competition-mark' && /motogp|f1|formula/i.test(node.text)) ||
-          /MotoGP|F1|FORMULA/i.test(svg),
+          /MotoGP|F1|FORMULA|formula-one-poster-visual|motogp-poster-visual/i.test(svg),
         `${testCase.slug} motorsport fallback should expose the competition, not a generic race card`
+      )
+    }
+
+    if (testCase.slug.includes('formula-one')) {
+      assert.match(svg, /data-role="formula-one-poster-visual"/, `${testCase.slug} should use the Formula 1 poster visual`)
+      assert.ok(
+        nodes.some((node) => node.role === 'formula-one-mark' && node.text === 'F1'),
+        `${testCase.slug} should expose a large F1 mark`
+      )
+      assert.ok(
+        nodes.some((node) => node.role === 'formula-one-event-title' && /Azerbaijan/i.test(node.text)),
+        `${testCase.slug} should show the GP name on the visual`
+      )
+    }
+
+    if (testCase.slug.includes('motogp')) {
+      assert.match(svg, /data-role="motogp-poster-visual"/, `${testCase.slug} should use the MotoGP poster visual`)
+      assert.ok(
+        nodes.some((node) => node.role === 'motogp-mark' && /MotoGP/i.test(node.text)),
+        `${testCase.slug} should expose a large MotoGP mark`
       )
     }
 

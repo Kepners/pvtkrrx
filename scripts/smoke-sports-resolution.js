@@ -466,7 +466,7 @@ async function run() {
   )
   assert.equal(
     paidSportsMetaResponse.meta?.poster,
-    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}&v=20260427-visual-v3`,
+    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}&v=20260428-visual-v5`,
     'paid sports configs must emit PVTKRRX raster-proxy poster URLs for canonical sports art'
   )
 
@@ -480,7 +480,7 @@ async function run() {
     })
     assert.equal(
       envTokenPoster.poster,
-      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_env_poster_token')}&v=20260427-visual-v3`,
+      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_env_poster_token')}&v=20260428-visual-v5`,
       'PVTKRRX should prefer SportsMeta member artwork when a runtime env token is configured'
     )
   } finally {
@@ -772,6 +772,77 @@ async function run() {
   assert.equal(pgaPrefixedProfile.league, 'PGA Tour', 'Golf-prefixed PGA Tour rows should keep PGA Tour as the league')
   assert.equal(pgaPrefixedProfile.event, 'Valero Texas Open Day', 'Golf-prefixed PGA Tour rows should preserve the event label')
   assert.equal(pgaPrefixedProfile.broadcast, 'Sky Sports', 'Golf-prefixed PGA Tour rows should keep Sky as broadcast metadata')
+
+  const faCupPrefixedProfile = parseSportsTorrentProfile({
+    title: 'Football FA Cup Chelsea vs Leeds United 2026 04 26 1080p WEB-DL',
+    pubDate: '2026-04-26T12:00:00.000Z',
+    sportHint: 'football',
+    seeders: 26
+  })
+  assert.equal(faCupPrefixedProfile.sport, 'football', 'Football-prefixed FA Cup rows should classify as football')
+  assert.equal(faCupPrefixedProfile.league, 'FA Cup', 'Football-prefixed FA Cup rows should keep FA Cup as league')
+  assert.equal(faCupPrefixedProfile.home_team, 'Chelsea', 'Football-prefixed FA Cup rows should not leak the league into the home team')
+  assert.equal(faCupPrefixedProfile.away_team, 'Leeds United', 'Football-prefixed FA Cup rows should preserve the away team')
+  assert.equal(faCupPrefixedProfile.date, '2026-04-26', 'Football-prefixed FA Cup rows should extract the event date')
+
+  const eplProfile = parseSportsTorrentProfile({
+    title: 'EPL Liverpool vs Crystal Palace 25 04 2026 Sky Sports 1080p 50fps',
+    pubDate: '2026-04-25T12:00:00.000Z',
+    sportHint: 'football',
+    seeders: 10
+  })
+  assert.equal(eplProfile.sport, 'football', 'EPL rows should classify as football')
+  assert.equal(eplProfile.league, 'English Premier League', 'EPL shorthand should map to English Premier League')
+  assert.equal(eplProfile.home_team, 'Liverpool', 'EPL rows should preserve the home team')
+  assert.equal(eplProfile.away_team, 'Crystal Palace', 'EPL rows should preserve the away team')
+  assert.equal(eplProfile.date, '2026-04-25', 'EPL rows should extract the fixture date')
+
+  const ufcProfile = parseSportsTorrentProfile({
+    title: 'UFC Fight Night Burns vs Malott Main Card 1080p WEB DL H264 Fight BB',
+    pubDate: '2026-04-18T12:00:00.000Z',
+    sportHint: 'mma',
+    seeders: 8
+  })
+  assert.equal(ufcProfile.sport, 'mma', 'UFC rows should classify as MMA')
+  assert.equal(ufcProfile.league, 'UFC', 'UFC rows should keep UFC as league')
+  assert.equal(ufcProfile.home_team, 'Burns', 'UFC rows should preserve the first fighter')
+  assert.equal(ufcProfile.away_team, 'Malott', 'UFC rows should preserve the second fighter')
+  assert.equal(ufcProfile.session, 'Main Card', 'UFC rows should expose main card as session metadata')
+
+  const wimbledonProfile = parseSportsTorrentProfile({
+    title: 'Wimbledon 2025 07 06 Day 7 Court #2 1080p BBC',
+    pubDate: '2025-07-06T12:00:00.000Z',
+    sportHint: 'tennis',
+    seeders: 3
+  })
+  assert.equal(wimbledonProfile.sport, 'tennis', 'Wimbledon rows should classify as tennis')
+  assert.equal(wimbledonProfile.league, 'Wimbledon', 'Wimbledon rows should keep Wimbledon as league')
+  assert.equal(wimbledonProfile.event, 'Day Court #2', 'Wimbledon schedule rows should keep court/day event detail')
+  assert.equal(wimbledonProfile.date, '2025-07-06', 'Wimbledon schedule rows should extract the event date')
+
+  const atpProfile = parseSportsTorrentProfile({
+    title: 'ATP Madrid Open 2026 Sinner vs Alcaraz Final 1080p WEB DL',
+    pubDate: '2026-05-03T12:00:00.000Z',
+    sportHint: 'tennis',
+    seeders: 3
+  })
+  assert.equal(atpProfile.sport, 'tennis', 'ATP rows should classify as tennis')
+  assert.equal(atpProfile.league, 'ATP World Tour', 'ATP rows should keep ATP World Tour as league')
+  assert.equal(atpProfile.home_team, 'Sinner', 'ATP rows should not leak tournament name into first player')
+  assert.equal(atpProfile.away_team, 'Alcaraz', 'ATP rows should preserve the second player')
+  assert.equal(atpProfile.round, 'Final', 'ATP rows should expose final as round metadata')
+
+  const wtaProfile = parseSportsTorrentProfile({
+    title: 'WTA Rome 2026 Swiatek vs Gauff Semi Final 720p WEB',
+    pubDate: '2026-05-14T12:00:00.000Z',
+    sportHint: 'tennis',
+    seeders: 3
+  })
+  assert.equal(wtaProfile.sport, 'tennis', 'WTA rows should classify as tennis')
+  assert.equal(wtaProfile.league, 'WTA Tour', 'WTA rows should keep WTA Tour as league')
+  assert.equal(wtaProfile.home_team, 'Swiatek', 'WTA rows should not leak tournament name into first player')
+  assert.equal(wtaProfile.away_team, 'Gauff', 'WTA rows should preserve the second player')
+  assert.equal(wtaProfile.round, 'Semi Final', 'WTA rows should expose semi final as round metadata')
 
   const oldArchiveRank = rankSportsTorrent({
     title: 'Formula1 2017 Round 8 Azerbaijan GP Race 1080p WEB DL H264',

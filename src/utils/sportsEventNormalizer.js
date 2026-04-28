@@ -84,7 +84,7 @@ function titleCase(value) {
     .filter(Boolean)
     .map((part) => {
       const upper = part.toUpperCase()
-      if (['EPL', 'FA', 'F1', 'IPL', 'MLB', 'MLS', 'MMA', 'MOTOGP', 'NBA', 'NFL', 'NHL', 'PGA', 'UFC', 'WRC', 'WWE'].includes(upper)) {
+      if (['EPL', 'FA', 'F1', 'GP', 'IPL', 'MLB', 'MLS', 'MMA', 'MOTOGP', 'NBA', 'NFL', 'NHL', 'PGA', 'UFC', 'WRC', 'WWE'].includes(upper)) {
         return upper === 'MOTOGP' ? 'MotoGP' : upper
       }
       return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
@@ -201,16 +201,30 @@ function normalizeMotorsportEvent({ league = '', eventName = '', rawTitle = '' }
   }
 
   let detail = ''
-  const last = tokens[tokens.length - 1]
-  if (SESSION_WORDS.has(String(last || '').toLowerCase())) {
-    detail = titleCase(tokens.pop())
-  } else {
-    detail = extractMotorsportSessionDetail(rawTitle)
+  const tokenSession = extractMotorsportSessionFromTokens(tokens)
+  if (tokenSession) {
+    detail = tokenSession.detail
+    tokens = tokens.slice(0, tokenSession.index)
+  }
+  if (!detail) {
+    const last = tokens[tokens.length - 1]
+    if (SESSION_WORDS.has(String(last || '').toLowerCase())) {
+      detail = titleCase(tokens.pop())
+    } else {
+      detail = extractMotorsportSessionDetail(rawTitle)
+    }
   }
 
   let competition = leagueLabel
   let eventTitle = titleCase(tokens.join(' '))
-  if (/^(motogp|formula 1|f1|nascar|indycar|wrc|wec|formula e)$/i.test(leagueLabel) && tokens.length >= 2) {
+  if (/^(formula 1|f1)$/i.test(leagueLabel) && tokens.length >= 2) {
+    const country = normalizeCountryToken(tokens[0])
+    const suffix = titleCase(tokens.slice(1).join(' '))
+    competition = 'Formula 1'
+    eventTitle = /^(gp|grand prix)$/i.test(suffix)
+      ? `${country} ${/^gp$/i.test(suffix) ? 'GP' : 'Grand Prix'}`
+      : `${country} ${suffix}`.trim()
+  } else if (/^(motogp|nascar|indycar|wrc|wec|formula e)$/i.test(leagueLabel) && tokens.length >= 2) {
     const country = normalizeCountryToken(tokens[0])
     competition = `${leagueLabel} ${country}`.trim()
     eventTitle = titleCase(tokens.slice(1).join(' '))
@@ -230,12 +244,62 @@ function extractMotorsportSessionDetail(rawTitle = '') {
   if (fpPractice) return `${fpPractice[1].toUpperCase()} ${titleCase(fpPractice[2])}`
   const freePractice = text.match(/\bfree\s+practice\s+([1-3]|one|two|three)\b/i)
   if (freePractice) return `Free Practice ${titleCase(freePractice[1])}`
+  const numberedPractice = text.match(/\bpractice\s+([1-3]|one|two|three)\b/i)
+  if (numberedPractice) return `Practice ${titleCase(numberedPractice[1])}`
   const rawSession = text.match(/\b(warm\s+up|warmup|qualifying|qualifier|practice|sprint|race|fp[1-3])\b/i)
   if (!rawSession) return ''
   const value = rawSession[1].replace(/\s+/g, ' ')
   if (/^fp[1-3]$/i.test(value)) return value.toUpperCase()
   if (/^warmup$/i.test(value)) return 'Warm Up'
   return titleCase(value)
+}
+
+function normalizeSessionNumber(value = '') {
+  const clean = String(value || '').trim().toLowerCase()
+  const map = {
+    1: 'One',
+    2: 'Two',
+    3: 'Three',
+    one: 'One',
+    two: 'Two',
+    three: 'Three'
+  }
+  return map[clean] || ''
+}
+
+function extractMotorsportSessionFromTokens(tokens = []) {
+  for (let index = 0; index < tokens.length; index += 1) {
+    const current = String(tokens[index] || '').toLowerCase()
+    const next = String(tokens[index + 1] || '').toLowerCase()
+    const afterNext = String(tokens[index + 2] || '').toLowerCase()
+    if (/^fp[1-3]$/i.test(current)) {
+      return {
+        index,
+        detail: next === 'practice' ? `${current.toUpperCase()} Practice` : current.toUpperCase()
+      }
+    }
+    if (current === 'free' && next === 'practice') {
+      const number = normalizeSessionNumber(afterNext)
+      return {
+        index,
+        detail: number ? `Free Practice ${number}` : 'Free Practice'
+      }
+    }
+    if (current === 'practice') {
+      const number = normalizeSessionNumber(next)
+      return {
+        index,
+        detail: number ? `Practice ${number}` : 'Practice'
+      }
+    }
+    if (current === 'warm' && next === 'up') {
+      return { index, detail: 'Warm Up' }
+    }
+    if (['race', 'sprint', 'qualifying', 'qualifier'].includes(current)) {
+      return { index, detail: current === 'qualifier' ? 'Qualifying' : titleCase(current) }
+    }
+  }
+  return null
 }
 
 function parseSportsMetaCanonicalId(id = '') {
