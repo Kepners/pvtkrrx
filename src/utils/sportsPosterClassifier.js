@@ -69,6 +69,11 @@ function hasActualPair(input = {}) {
   return left.toLowerCase() !== right.toLowerCase()
 }
 
+function extractBracketedCategory(rawTitle = '') {
+  const match = String(rawTitle || '').match(/^\s*\[([^\]]{2,40})\]\s*/)
+  return match ? match[1].trim() : ''
+}
+
 // SportsCult category truths beat title parsing for hard cases. Title parsing
 // only refines when the category map says allowTitleRefinement.
 function resolveSportsCultContext(input = {}) {
@@ -80,6 +85,10 @@ function resolveSportsCultContext(input = {}) {
   if (Array.isArray(input.sportsCultCategoryNames)) names.push(...input.sportsCultCategoryNames)
   if (Array.isArray(input.categoryNames)) names.push(...input.categoryNames)
   if (input.indexerCategoryName) names.push(input.indexerCategoryName)
+  // SportsCult RSS embeds the category in [Brackets] at the start of the
+  // title; treat that as a category-name hint when no explicit one was given.
+  const bracketed = extractBracketedCategory(input.rawTitle || input.title || '')
+  if (bracketed) names.push(bracketed)
   return inferSportsCultPosterContextFromCategoryNames(names)
 }
 
