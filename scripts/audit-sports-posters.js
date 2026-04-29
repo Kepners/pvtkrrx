@@ -5,7 +5,7 @@ const path = require('node:path')
 const sharp = require('sharp')
 
 const OUT_DIR = path.join(process.cwd(), '.runtime', 'sports-poster-audit')
-const EXPECTED_VERSION = '20260429-paid-template-classifier-v1'
+const EXPECTED_VERSION = '20260429-sportcult-category-poster-v1'
 const DEFAULT_MANIFEST = process.env.PVTKRRX_SPORTS_POSTER_AUDIT_MANIFEST ||
   'https://pvt.kepners.co.uk/selfhost/manifest.json?mode=hosted'
 const ALLOWED_SOURCES = new Set([
@@ -15,7 +15,7 @@ const ALLOWED_SOURCES = new Set([
   'pvtkrrx-emergency-legacy-fallback'
 ])
 const BAD_TEXT_RE = /\b(?:SPOR\/SPOR|BASK\/BASK|undefined|null|unknown|x264|x265|h264|h265|2160p|1080p|720p|WEB-DL|HDTV|REPACK|COMPLETE)\b/i
-const STALE_VERSION_RE = /paid-python-template|python-template-port|generated-card|sports-card|legacy|2026042[78]-/i
+const STALE_VERSION_RE = /paid-python-template|python-template-port|generated-card|sports-card|legacy|2026042[78]-|paid-template-classifier-v1/i
 
 function parseArgs(argv = process.argv.slice(2)) {
   const args = {

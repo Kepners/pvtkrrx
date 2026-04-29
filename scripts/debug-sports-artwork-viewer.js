@@ -16,7 +16,7 @@ const OUT_DIR = path.join(process.cwd(), '.runtime', 'sports-artwork-debug')
 const ASSET_DIR = path.join(OUT_DIR, 'assets')
 const PORT = Math.max(1024, Number(process.env.PVTKRRX_ARTWORK_DEBUG_PORT || 7099) || 7099)
 const HOST = '127.0.0.1'
-const PROXY_VERSION = '20260429-paid-template-classifier-v1'
+const PROXY_VERSION = '20260429-sportcult-category-poster-v1'
 const DEBUG_CONFIG = {
   sportsmetaBaseUrl: process.env.PVTKRRX_SPORTSMETA_BASE_URL || process.env.SPORTSMETA_BASE_URL || 'https://sportsmeta.pvtkrrx.cc',
   sportsPosterMemberToken: process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN || process.env.SPORTSMETA_MEMBER_TOKEN || ''

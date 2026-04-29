@@ -239,7 +239,9 @@ function parseSportsTorrentProfile(itemOrTitle = '', options = {}) {
     eventDetail: profile.session || profile.round,
     homeTeam: profile.home_team,
     awayTeam: profile.away_team,
-    rawTitle
+    rawTitle,
+    categoryNames: Array.isArray(itemOrTitle?.categoryNames) ? itemOrTitle.categoryNames : (Array.isArray(options.categoryNames) ? options.categoryNames : []),
+    indexerCategoryName: options.indexerCategoryName || (typeof itemOrTitle === 'object' ? itemOrTitle?.indexer || '' : '')
   })
   profile.clean_name = buildCleanName(profile)
   profile.confidence = confidenceScore(profile)

@@ -7,7 +7,7 @@ const {
 const { resolveSportsPosterTemplate } = require('./sportsPosterTemplates')
 const { resolveSportBackdrop } = require('./sportBackdrops')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260429-paid-template-classifier-v1'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260429-sportcult-category-poster-v1'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()

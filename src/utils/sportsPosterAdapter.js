@@ -49,6 +49,8 @@ const LEAGUE_CODES = Object.freeze({
 
 const SPORT_LABELS = Object.freeze({
   'american-football': 'American Football',
+  athletics: 'Athletics',
+  aquatics: 'Aquatics',
   baseball: 'Baseball',
   basketball: 'Basketball',
   boxing: 'Boxing',
@@ -58,15 +60,20 @@ const SPORT_LABELS = Object.freeze({
   fighting: 'Fighting',
   football: 'Football',
   golf: 'Golf',
+  gymnastics: 'Gymnastics',
   hockey: 'Hockey',
   'ice-hockey': 'Hockey',
+  kickboxing: 'Kickboxing',
   mma: 'MMA',
   motorsport: 'Motorsport',
+  olympics: 'Olympics',
   rugby: 'Rugby',
   snooker: 'Snooker',
+  'table-tennis': 'Table Tennis',
   tennis: 'Tennis',
-  wrestling: 'Wrestling',
-  athletics: 'Athletics'
+  volleyball: 'Volleyball',
+  winter: 'Winter Sport',
+  wrestling: 'Wrestling'
 })
 
 function normalizeSpace(value) {
@@ -182,11 +189,14 @@ function sportIconFor(input = {}) {
   if (/golf|pga|lpga|masters|ryder cup|liv golf|open championship/.test(text)) return 'golf'
   if (/darts|pdc|world matchplay|premier league darts/.test(text)) return 'darts'
   if (/cycling|tour de france|giro|vuelta|stage|time trial|road race|paris roubaix|tour of flanders/.test(text)) return 'cycling'
+  if (/swimming|aquatics|fina|water polo|diving/.test(text)) return 'athletics'
+  if (/gymnastics|rhythmic gymnastics|trampoline/.test(text)) return 'athletics'
+  if (/winter olympics|alpine skiing|biathlon|snowboard|ice skating|figure skating|luge|skeleton/.test(text)) return 'athletics'
   if (/athletics|diamond league|continental tour|track and field|marathon|simbine|kip keino/.test(text)) return 'athletics'
   if (/cricket|ipl|odi|t20|ashes|test match/.test(text)) return 'cricket'
   if (/rugby|nrl|six nations|super rugby|major league rugby/.test(text)) return 'rugby'
   if (/wrestling|wwe|aew|smackdown|raw|nxt|wrestlemania|royal rumble/.test(text)) return 'wrestling'
-  if (/snooker|crucible|world snooker/.test(text)) return 'snooker'
+  if (/snooker|crucible|world snooker|table tennis|billiards/.test(text)) return 'snooker'
   if (/american.*football|nfl|super bowl/.test(text)) return 'football'
   if (/football|soccer|premier|fa cup|mls|champions league|europa|nations league|world cup/.test(text)) return 'soccer'
   if (/hockey|nhl/.test(text)) return 'hockey'
@@ -194,13 +204,21 @@ function sportIconFor(input = {}) {
   if (/baseball|mlb|world series/.test(text)) return 'baseball'
   if (/tennis|wimbledon|atp|wta/.test(text)) return 'tennis'
   if (/mma|ufc|boxing|fight/.test(text)) return 'mma'
+  if (/olympic/.test(text)) return 'athletics'
   return 'soccer'
 }
 
 function eventFormatFor(classification, input = {}) {
   if (classification === 'team_vs_team') return 'matchup'
   if (classification === 'tennis_or_snooker_match') return 'single'
-  if ((classification === 'combat_event' || classification === 'darts_event') && hasActualPair(input)) return 'single'
+  if (
+    (classification === 'combat_event' ||
+     classification === 'darts_event' ||
+     classification === 'racket_event') &&
+    hasActualPair(input)
+  ) {
+    return 'single'
+  }
   return 'solo'
 }
 
@@ -252,6 +270,17 @@ function eventShortFor(input = {}, classification = '') {
   if (classification === 'darts_event' && !hasActualPair(input)) {
     return truncate(pickFirst(input.league, input.competition, input.eventTitle, input.title, 'Darts Event'), 38)
   }
+  if (classification === 'racket_event' && !hasActualPair(input)) {
+    return truncate(pickFirst(input.league, input.competition, input.eventTitle, input.title, 'Tournament'), 38)
+  }
+  if (
+    classification === 'olympic_event' ||
+    classification === 'winter_sport_event' ||
+    classification === 'aquatics_event' ||
+    classification === 'gymnastics_event'
+  ) {
+    return truncate(pickFirst(input.eventTitle, input.title, input.eventName, input.eventShort, input.event_short, input.league, input.competition, 'Sports Event'), 38)
+  }
   const raw = pickFirst(
     input.eventShort,
     input.event_short,
@@ -276,7 +305,7 @@ function sessionFor(input = {}, classification = '', eventShort = '') {
     input.detail,
     input.roundShort,
     input.round,
-    (classification === 'team_vs_team' || classification === 'combat_event' || classification === 'tennis_or_snooker_match' || classification === 'darts_event') && hasActualPair(input)
+    (classification === 'team_vs_team' || classification === 'combat_event' || classification === 'tennis_or_snooker_match' || classification === 'darts_event' || classification === 'racket_event') && hasActualPair(input)
       ? `${sideName(input, 'home')} v ${sideName(input, 'away')}`
       : '',
     classification === 'wrestling_event' ? input.date : '',
