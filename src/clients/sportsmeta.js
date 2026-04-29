@@ -314,12 +314,23 @@ function getPublicSportsMetaBaseUrl(overrideBaseUrl) {
   )
 }
 
-function buildSportsMetaAssetUrl(baseUrl, variant, canonicalId) {
+function addAssetQueryParams(urlString, options = {}) {
+  if (!urlString) return ''
+  const template = String(options?.template || options?.templateId || '').trim()
+  const logoMode = String(options?.logoMode || '').trim()
+  if (!template && !logoMode) return urlString
+  const url = new URL(urlString)
+  if (template) url.searchParams.set('template', template)
+  if (logoMode) url.searchParams.set('logoMode', logoMode)
+  return url.toString()
+}
+
+function buildSportsMetaAssetUrl(baseUrl, variant, canonicalId, options = {}) {
   const base = getPublicSportsMetaBaseUrl(baseUrl)
   const v = String(variant || '').trim()
   const id = String(canonicalId || '').trim()
   if (!base || !v || !id) return ''
-  return `${base}/asset/${encodeURIComponent(v)}/${encodeURIComponent(id)}`
+  return addAssetQueryParams(`${base}/asset/${encodeURIComponent(v)}/${encodeURIComponent(id)}`, options)
 }
 
 function normalizeSportsMetaMemberToken(value) {
@@ -341,13 +352,16 @@ function normalizeSportsMetaMemberToken(value) {
   return raw.replace(/^bearer\s+/i, '').trim()
 }
 
-function buildSportsMetaMemberAssetUrl(baseUrl, memberToken, variant, canonicalId) {
+function buildSportsMetaMemberAssetUrl(baseUrl, memberToken, variant, canonicalId, options = {}) {
   const base = getPublicSportsMetaBaseUrl(baseUrl)
   const token = normalizeSportsMetaMemberToken(memberToken)
   const v = String(variant || '').trim()
   const id = String(canonicalId || '').trim()
   if (!base || !token || !v || !id) return ''
-  return `${base}/member/${encodeURIComponent(token)}/asset/${encodeURIComponent(v)}/${encodeURIComponent(id)}`
+  return addAssetQueryParams(
+    `${base}/member/${encodeURIComponent(token)}/asset/${encodeURIComponent(v)}/${encodeURIComponent(id)}`,
+    options
+  )
 }
 
 function buildSportsMetaDefaultAssetUrl(baseUrl, variant, sport, league = '', options = {}) {
@@ -361,11 +375,15 @@ function buildSportsMetaDefaultAssetUrl(baseUrl, variant, sport, league = '', op
   const dateValue = String(options?.date || '').trim()
   const homeValue = String(options?.home || options?.homeTeam || '').trim()
   const awayValue = String(options?.away || options?.awayTeam || '').trim()
+  const templateValue = String(options?.template || options?.templateId || '').trim()
+  const logoModeValue = String(options?.logoMode || '').trim()
   if (leagueValue) url.searchParams.set('league', leagueValue)
   if (titleValue) url.searchParams.set('title', titleValue)
   if (dateValue) url.searchParams.set('date', dateValue)
   if (homeValue) url.searchParams.set('home', homeValue)
   if (awayValue) url.searchParams.set('away', awayValue)
+  if (templateValue) url.searchParams.set('template', templateValue)
+  if (logoModeValue) url.searchParams.set('logoMode', logoModeValue)
   return url.toString()
 }
 

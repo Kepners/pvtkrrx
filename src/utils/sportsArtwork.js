@@ -4,8 +4,9 @@ const {
   buildSportsMetaMemberAssetUrl,
   resolveSportSlug
 } = require('../clients/sportsmeta')
+const { resolveSportsPosterTemplate } = require('./sportsPosterTemplates')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260428-club-logo-v3'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260428-club-logo-templates-v1'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
@@ -99,6 +100,15 @@ function resolveSportsPosterMemberToken(input = {}) {
   )
 }
 
+function resolveConfiguredSportsPosterTemplate(input = {}) {
+  return resolveSportsPosterTemplate(
+    input?.sportsPosterTemplate,
+    input?.posterTemplate,
+    input?.config?.sportsPosterTemplate,
+    process.env.PVTKRRX_SPORTS_POSTER_TEMPLATE
+  )
+}
+
 function resolveUrlScopedSportsPosterMemberToken(input = {}) {
   return normalizeSpace(
     input?.sportsPosterMemberToken ||
@@ -122,6 +132,7 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
     const url = new URL(`${addonBase}/sports-artwork/id/${encodeURIComponent(variant)}/${encodeURIComponent(canonicalId)}.png`)
     const memberToken = resolveUrlScopedSportsPosterMemberToken(input)
     if (memberToken) url.searchParams.set('token', memberToken)
+    url.searchParams.set('template', resolveConfiguredSportsPosterTemplate(input))
     url.searchParams.set('v', SPORTS_ARTWORK_PROXY_VERSION)
     return url.toString()
   }
@@ -143,6 +154,7 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
   if (Number(input?.seeders) > 0) url.searchParams.set('seeders', String(Number(input.seeders)))
   if (input?.size) url.searchParams.set('size', normalizeSpace(input.size))
   if (input?.source) url.searchParams.set('source', normalizeSpace(input.source))
+  url.searchParams.set('template', resolveConfiguredSportsPosterTemplate(input))
   url.searchParams.set('v', SPORTS_ARTWORK_PROXY_VERSION)
   return url.toString()
 }
@@ -166,7 +178,10 @@ function buildSportsMetaMemberDirectUrl(variant, input = {}) {
   const canonicalId = resolveCanonicalId(input)
   const memberToken = resolveSportsPosterMemberToken(input)
   if (!canonicalId || !memberToken) return ''
-  return buildSportsMetaMemberAssetUrl(sportsmetaBaseUrl, memberToken, variant, canonicalId)
+  return buildSportsMetaMemberAssetUrl(sportsmetaBaseUrl, memberToken, variant, canonicalId, {
+    template: resolveConfiguredSportsPosterTemplate(input),
+    logoMode: 'logos'
+  })
 }
 
 function buildVariantUrl(variant, input = {}) {

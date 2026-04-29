@@ -466,8 +466,24 @@ async function run() {
   )
   assert.equal(
     paidSportsMetaResponse.meta?.poster,
-    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}&v=20260428-club-logo-v3`,
+    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}&template=ticket-stub&v=20260428-club-logo-templates-v1`,
     'paid sports configs must emit PVTKRRX raster-proxy poster URLs for canonical sports art'
+  )
+
+  const templateSportsMetaResponse = await handleMeta(
+    {
+      sportsmetaBaseUrl: 'https://sportsmeta.test',
+      sportsPosterMemberToken: 'https://sportsmeta.test/member/sm_paid_poster_token',
+      sportsPosterTemplate: 'glitch'
+    },
+    'sports',
+    barcaId,
+    { baseUrl: 'https://addon.test' }
+  )
+  assert.equal(
+    templateSportsMetaResponse.meta?.poster,
+    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}&template=glitch&v=20260428-club-logo-templates-v1`,
+    'paid sports configs must carry the selected Sports Posters template into artwork URLs'
   )
 
   const previousEnvMemberToken = process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN
@@ -480,7 +496,7 @@ async function run() {
     })
     assert.equal(
       envTokenPoster.poster,
-      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?v=20260428-club-logo-v3`,
+      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260428-club-logo-templates-v1`,
       'PVTKRRX should keep runtime env member tokens server-side instead of exposing them in artwork URLs'
     )
     assert.equal(envTokenPoster.selectedArtworkSource, 'sportsmeta-member-raster')

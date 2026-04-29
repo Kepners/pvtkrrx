@@ -1256,6 +1256,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       baseUrl: addonBaseUrl,
       sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
       sportsPosterMemberToken: config?.sportsPosterMemberToken,
+      sportsPosterTemplate: config?.sportsPosterTemplate,
       canonicalId: sportsMetaResolution?.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED
         ? canonicalCatalogIdForArtwork
         : '',

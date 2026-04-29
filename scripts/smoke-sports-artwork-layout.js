@@ -9,7 +9,11 @@ const {
   layoutSportsCard,
   renderSportsArtworkSvg
 } = require('../src/utils/sportsCardArtwork')
-const { handleCanonicalSportsArtwork, handleDefaultSportsArtwork } = require('../src/handlers/sportsArtworkProxy')
+const {
+  SPORTS_POSTER_TEMPLATES,
+  handleCanonicalSportsArtwork,
+  handleDefaultSportsArtwork
+} = require('../src/handlers/sportsArtworkProxy')
 const { SPORTS_DISCOVERY_CATALOGS } = require('../src/config/sportsCatalogs')
 const { normalizeSportsEventMetadata } = require('../src/utils/sportsEventNormalizer')
 
@@ -757,11 +761,35 @@ async function assertTeamBadgeArtworkProxy() {
       )
       assert.equal(response.statusCode, 200, `team badge ${variant} proxy should return 200`)
       assert.equal(response.headers['content-type'], 'image/png', `team badge ${variant} proxy should return PNG`)
-      assert.equal(response.headers['x-pvtkrrx-artwork-source'], `pvtkrrx-team-badge-${variant}`, `team badge ${variant} proxy should replace generated/SVG art`)
-      assert.match(response.headers['x-pvtkrrx-artwork-fallback'] || '', /team_badges/, `team badge ${variant} proxy should report fallback reason`)
+      assert.equal(response.headers['x-pvtkrrx-artwork-source'], 'sportsmeta-central-rasterized', `central ${variant} proxy should rasterize SportsMeta generated art`)
+      assert.match(response.headers['x-pvtkrrx-artwork-fallback'] || '', /sportsmeta_central_svg_rasterized/, `central ${variant} proxy should report rasterized central SVG`)
       assert.ok(Buffer.isBuffer(response.body), `team badge ${variant} proxy should return bytes`)
       assert.deepEqual(pngDimensions(response.body), dimensions[variant], `team badge ${variant} dimensions`)
       fs.writeFileSync(path.join(PREVIEW_DIR, `team-badge-${variant}.png`), response.body)
+    }
+
+    for (const template of SPORTS_POSTER_TEMPLATES) {
+      const response = makeMockResponse()
+      await handleCanonicalSportsArtwork(
+        {
+          params: {
+            variant: 'poster',
+            canonicalId: `${encodeURIComponent(canonicalId)}.png`
+          },
+          query: { template }
+        },
+        response,
+        {
+          sportsmetaBaseUrl: 'https://sportsmeta.test',
+          sportsPosterMemberToken: 'test-token'
+        }
+      )
+      assert.equal(response.statusCode, 200, `${template} template should return 200`)
+      assert.equal(response.headers['content-type'], 'image/png', `${template} template should return PNG`)
+      assert.equal(response.headers['x-pvtkrrx-artwork-source'], 'sportsmeta-central-rasterized', `${template} template should use SportsMeta central artwork`)
+      assert.equal(response.headers['x-pvtkrrx-artwork-template'], template, `${template} template should be reported in response headers`)
+      assert.deepEqual(pngDimensions(response.body), dimensions.poster, `${template} template poster dimensions`)
+      fs.writeFileSync(path.join(PREVIEW_DIR, `template-${template}-poster.png`), response.body)
     }
 
     const invalidLandscapeResponse = makeMockResponse()
@@ -812,7 +840,7 @@ async function assertTeamBadgeArtworkProxy() {
     )
     assert.equal(defaultResolvedResponse.statusCode, 200, 'default artwork resolver should return 200')
     assert.equal(defaultResolvedResponse.headers['content-type'], 'image/png', 'default artwork resolver should return PNG')
-    assert.equal(defaultResolvedResponse.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-team-badge-poster', 'default artwork resolver should use canonical team badge composition when resolvable')
+    assert.equal(defaultResolvedResponse.headers['x-pvtkrrx-artwork-source'], 'sportsmeta-central-rasterized', 'default artwork resolver should use SportsMeta central artwork when resolvable')
     assert.match(defaultResolvedResponse.headers['x-pvtkrrx-artwork-upstream'] || '', /\/member\/\[redacted\]\/asset\/poster\/sportsmeta/, 'default artwork resolver should switch to the member canonical poster route')
     assert.deepEqual(pngDimensions(defaultResolvedResponse.body), dimensions.poster, 'default artwork resolver poster dimensions')
     fs.writeFileSync(path.join(PREVIEW_DIR, 'default-resolved-team-badge-poster.png'), defaultResolvedResponse.body)

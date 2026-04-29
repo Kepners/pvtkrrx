@@ -2793,6 +2793,17 @@
         <label for="sportsPosterMemberToken">Sports Posters Token (optional)</label>
         <input type="text" id="sportsPosterMemberToken" placeholder="Paste your SportsMeta member URL or token">
         <p class="hint">Use this only after subscribing to Sports Posters. It applies to PC Local, LAN Bridge, and Remote Seedbox installs, and only affects sports artwork.</p>
+        <label for="sportsPosterTemplate">Sports Posters Template</label>
+        <select id="sportsPosterTemplate">
+          <option value="ticket-stub">Ticket Stub</option>
+          <option value="editorial">Editorial</option>
+          <option value="broadcast">Broadcast</option>
+          <option value="sportsbook">Sportsbook</option>
+          <option value="trading-card">Trading Card</option>
+          <option value="brutalist">Brutalist</option>
+          <option value="glitch">Glitch</option>
+        </select>
+        <p class="hint">Choose the paid poster layout used when SportsMeta can resolve real team or league logos. Unresolved tracker rows still use safe generated sports artwork.</p>
         <div id="localHostnameBlock">
           <label for="localHostname">Local Hostname (.local alias)</label>
           <input type="text" id="localHostname" value="pvtkrrx.local" placeholder="pvtkrrx.local">
@@ -6312,6 +6323,7 @@
         fileServerUrl: fileServerUrlInput ? fileServerUrlInput.replace(/\/+$/, '') : '',
         fileServerAuth: document.getElementById('fileServerAuth').value.trim(),
         sportsPosterMemberToken: document.getElementById('sportsPosterMemberToken').value.trim(),
+        sportsPosterTemplate: document.getElementById('sportsPosterTemplate').value || 'ticket-stub',
         pathMapping: {
           from: document.getElementById('pathFrom').value,
           to: document.getElementById('pathTo').value
@@ -6370,6 +6382,13 @@
       }
       if (typeof config.watchedDeleteGraceSeconds === 'number' && Number.isFinite(config.watchedDeleteGraceSeconds)) {
         document.getElementById('watchedDeleteGraceSeconds').value = String(config.watchedDeleteGraceSeconds);
+      }
+      if (config.sportsPosterTemplate) {
+        const templateSelect = document.getElementById('sportsPosterTemplate');
+        const templateValue = String(config.sportsPosterTemplate || '').trim().toLowerCase();
+        if (Array.from(templateSelect.options).some(option => option.value === templateValue)) {
+          templateSelect.value = templateValue;
+        }
       }
       if (config.localHostname) {
         const normalizedDefault = normalizeLocalHostname(defaultLocalHostname);
