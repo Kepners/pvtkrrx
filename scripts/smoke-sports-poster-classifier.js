@@ -18,6 +18,11 @@ const REQUIRED_CLASSES = [
   'wrestling_event',
   'cycling_event',
   'athletics_event',
+  'olympic_event',
+  'winter_sport_event',
+  'aquatics_event',
+  'gymnastics_event',
+  'racket_event',
   'darts_event',
   'tennis_or_snooker_match',
   'tournament_event',
@@ -144,7 +149,7 @@ const CASES = [
   },
   {
     slug: 'wimbledon-day-one',
-    expected: 'tournament_event',
+    expected: 'racket_event',
     input: {
       rawTitle: 'Wimbledon Day 1 Centre Court 1080p BBC',
       sportHint: 'tennis',
@@ -161,6 +166,115 @@ const CASES = [
       sportHint: '',
       competition: '',
       eventTitle: 'Sports Highlights Pack'
+    }
+  },
+  {
+    slug: 'olympic-games-default',
+    expected: 'olympic_event',
+    input: {
+      rawTitle: 'Olympic Games Paris 2024 Opening Ceremony 1080p',
+      sportsCultCategory: 'OlympicGamesParis24',
+      eventTitle: 'Opening Ceremony'
+    }
+  },
+  {
+    slug: 'olympic-games-athletics-refinement',
+    expected: 'athletics_event',
+    input: {
+      rawTitle: 'Olympic Games Track and Field 100m Final 1080p',
+      sportsCultCategory: 'Olympic games',
+      eventTitle: 'Track and Field 100m Final'
+    }
+  },
+  {
+    slug: 'winter-sport',
+    expected: 'winter_sport_event',
+    input: {
+      rawTitle: 'Alpine Skiing World Cup Soelden 1080p',
+      sportsCultCategory: 'WinterSport',
+      eventTitle: 'Alpine Skiing World Cup'
+    }
+  },
+  {
+    slug: 'aquatics-swimming',
+    expected: 'aquatics_event',
+    input: {
+      rawTitle: 'World Aquatics Championships 100m Freestyle Final',
+      sportsCultCategory: 'Swimming/Aquatics',
+      eventTitle: 'World Aquatics Championships'
+    }
+  },
+  {
+    slug: 'gymnastics-rhythmic',
+    expected: 'gymnastics_event',
+    input: {
+      rawTitle: 'Rhythmic Gymnastics World Cup 2026 1080p',
+      sportsCultCategory: 'RhythmicGymnastics',
+      eventTitle: 'Rhythmic Gymnastics World Cup'
+    }
+  },
+  {
+    slug: 'table-tennis-tournament',
+    expected: 'racket_event',
+    input: {
+      rawTitle: 'World Table Tennis Singapore Smash 2026 1080p',
+      sportsCultCategory: 'TableTennis',
+      eventTitle: 'Singapore Smash'
+    }
+  },
+  {
+    slug: 'wwe-categorised-as-grappling',
+    expected: 'wrestling_event',
+    input: {
+      rawTitle: 'WWE Monday Night Raw 2026 04 29 1080p',
+      sportsCultCategory: 'Wrestling/Grapling',
+      eventTitle: 'Monday Night Raw'
+    }
+  },
+  {
+    slug: 'pure-grappling-not-wrestling-show',
+    expected: 'combat_event',
+    input: {
+      rawTitle: 'ADCC World Championship 2026 Submission Only 1080p',
+      sportsCultCategory: 'Wrestling/Grapling',
+      eventTitle: 'ADCC World Championship'
+    }
+  },
+  {
+    slug: 'fight-sports-pfl-refinement',
+    expected: 'combat_event',
+    input: {
+      rawTitle: 'PFL 2026 Lightweight Tournament Main Card 1080p',
+      sportsCultCategory: 'Fight Sports',
+      eventTitle: 'PFL 2026'
+    }
+  },
+  {
+    slug: 'european-soccer-international-pair',
+    expected: 'team_vs_team',
+    input: {
+      rawTitle: 'UEFA Nations League England vs France 2026 06 10 1080p',
+      sportsCultCategory: 'International Soccer',
+      homeTeam: 'England',
+      awayTeam: 'France'
+    }
+  },
+  {
+    slug: 'uncategorised-stays-generic',
+    expected: 'generic_event',
+    input: {
+      rawTitle: 'Some Sports Special 2026 1080p',
+      sportsCultCategory: 'Uncategorised',
+      eventTitle: 'Sports Special'
+    }
+  },
+  {
+    slug: 'cricket-the-hundred-tournament',
+    expected: 'tournament_event',
+    input: {
+      rawTitle: 'The Hundred 2026 Highlights 1080p',
+      sportsCultCategory: 'Cricket',
+      eventTitle: 'The Hundred Highlights'
     }
   }
 ]

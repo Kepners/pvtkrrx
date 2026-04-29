@@ -578,7 +578,9 @@ function normalizeSportsCatalogItems(items = []) {
       eventDetail: sportsProfile?.session || sportsProfile?.round,
       homeTeam: sportsProfile?.home_team || parsedSportsEvent?.homeTeam,
       awayTeam: sportsProfile?.away_team || parsedSportsEvent?.awayTeam,
-      rawTitle: item?.title || ''
+      rawTitle: item?.title || '',
+      categoryNames: Array.isArray(item?.categoryNames) ? item.categoryNames : [],
+      indexerCategoryName: item?.indexer || ''
     })
     return {
       ...item,
@@ -682,7 +684,8 @@ function normalizeSportsEventTitle(title, parsedSportsEvent = null, parsedEvent 
 
   return cleanTitle(title)
     .replace(/\butd\b/gi, 'united')
-    .replace(/\b\d{3,4}p\d*\b/gi, ' ')
+    .replace(/\b\d{3,4}p(?:[a-z]{1,6})?(?:\d{2,3}fps)?/gi, ' ')
+    .replace(/\b\d{2,3}fps\b/gi, ' ')
     .replace(/\b(?:mini|full|extended|highlights?|replay|pre[\s.\-_]*match|post[\s.\-_]*match|match)\b/gi, ' ')
     .replace(/\b(?:web[\s.\-_]*dl|webrip|hdtv|h264|h265|x264|x265|hevc|aac|ac3|ddp|multi|english|en|skynz|fubo)\b/gi, ' ')
     .replace(/\s+/g, ' ')
