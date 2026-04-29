@@ -161,7 +161,6 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
   if (input?.eventDetail) url.searchParams.set('detail', normalizeSpace(input.eventDetail))
   const eventClass = resolveEventClass(input)
   if (eventClass) url.searchParams.set('eventClass', eventClass)
-  if (input?.rawTitle) url.searchParams.set('rawTitle', normalizeSpace(input.rawTitle))
   if (Number(input?.seeders) > 0) url.searchParams.set('seeders', String(Number(input.seeders)))
   if (input?.size) url.searchParams.set('size', normalizeSpace(input.size))
   if (input?.source) url.searchParams.set('source', normalizeSpace(input.source))
