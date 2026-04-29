@@ -1,6 +1,6 @@
 # SportsMeta Boundary
 
-Updated: 2026-04-24
+Updated: 2026-04-29
 
 ## Live Truth
 
@@ -17,6 +17,7 @@ The shared Contabo VM does not make them the same product.
 - `sportsmeta.service`
 - `manifest`, `catalog`, `meta`, `event`, `resolve`, and artwork routes for canonical `sportsmeta:` ids
 - the SportsMeta SQLite database and asset cache under `/opt/sportsmeta/data`
+- the SportsCult/TheSportsDB coverage policy that decides which categories get scheduled API enrichment versus deterministic generated/default artwork
 - premium member routes under `/member/:token/...`
 - Stripe checkout, portal, webhook handling, entitlements, and member-token enforcement
 
@@ -69,6 +70,7 @@ The shared Contabo VM does not make them the same product.
 - PVTKRRX may retry missed identity enrichment in a short-lived, in-process background backfill cache after the catalog response has already been returned. That cache stores SportsMeta resolution outcomes only; it does not make PVTKRRX an artwork database owner and it does not create sports rows without Prowlarr availability.
 - Any configured Prowlarr indexer can create catalog and stream availability when the returned title passes PVTKRRX's sports filters.
   Category `5060` searches remain the first pass; sparse exact stream searches can also use a broad Prowlarr fallback so sports releases filed under general TV categories are not hidden.
+- SportsMeta may audit SportsCult category/demand signals for enrichment planning, but that audit must stay read-only from PVTKRRX's point of view. It cannot create PVTKRRX catalog rows without live Prowlarr availability.
 
 ## Failure Rules
 
@@ -106,6 +108,7 @@ These are infrastructure couplings, not proof of one product.
 ## Coupling To Reduce Next
 
 - SportsMeta bootstrap imports still start from PVTKRRX cache roots instead of a fully self-owned ingest pipeline
+- SportsMeta now owns a policy-driven scheduled ingest, but live SportsCult demand audit is still operator-triggered rather than a closed-loop automatic promotion/purge system
 - PVTKRRX still owns fallback row ids, tracker-availability anchors, and final addon-facing PNG normalization/composition for unresolved or generated-artwork sports rows, even though identity and source artwork still come from SportsMeta
 - same-box internal networking still exists between the hosted PVTKRRX relay and the SportsMeta service
 - import quality cleanup is still needed for some SportsMeta alias mappings
