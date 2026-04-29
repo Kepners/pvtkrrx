@@ -751,6 +751,23 @@ async function run() {
   assert.equal(wweProfile.league, 'WWE', 'Prowlarr WWE rows should classify as WWE')
   assert.equal(wweProfile.event, 'SmackDown', 'Prowlarr WWE rows should keep the show name as the event')
 
+  const wweRepackNormalized = normalizeSportsEventMetadata({
+    rawTitle: 'WWE Monday Night Raw REPACK',
+    sportHint: 'wrestling',
+    competition: 'WWE',
+    date: '2026-03-09'
+  })
+  assert.equal(wweRepackNormalized.eventTitle, 'Monday Night Raw', 'WWE rows should strip REPACK from poster titles')
+  assert.doesNotMatch(wweRepackNormalized.eventTitle, /\bREPACK\b/i, 'WWE normalized poster title should not contain release tags')
+  const wweRepackProfile = parseSportsTorrentProfile({
+    title: 'WWE Monday Night Raw REPACK',
+    pubDate: '2026-03-09T12:00:00.000Z',
+    sportHint: 'wrestling',
+    seeders: 2
+  })
+  assert.equal(wweRepackProfile.event, 'Monday Night RAW', 'Prowlarr WWE REPACK rows should keep only the show name')
+  assert.equal(wweRepackProfile.release_group, null, 'REPACK should not be treated as a real release group')
+
   const superRugbyProfile = parseSportsTorrentProfile({
     title: 'Super Rugby 2026 Hurricanes vs Brumbies 25 04 1080p50fps',
     pubDate: '2026-04-26T12:00:00.000Z',

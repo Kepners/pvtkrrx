@@ -134,7 +134,7 @@ function cleanTrackerText(value) {
       .replace(/[._]+/g, ' ')
       .replace(/\b(?:2160p|1080p|1080i|720p|576p|540p|480p)(?:\d{2,3}(?:fps)?)?\b/gi, ' ')
       .replace(/\b\d{2,3}fps\b/gi, ' ')
-      .replace(/\b(?:x264|x265|h264|h265|hevc|avc|av1|web(?:rip|dl)?|hdtv|aac|ac3|ddp)\b/gi, ' ')
+      .replace(/\b(?:x264|x265|h264|h265|hevc|avc|av1|web(?:rip|dl)?|hdtv|repack|proper|complete|aac|ac3|ddp)\b/gi, ' ')
       .replace(/\b(?:en|english|fubo|skynz|usan?|yes\s*network|yes|nesn|msg|espn(?:p|plus|\+)?|tnt|sky|nbc|fox|sn|sportsnet|eurosport)\b/gi, ' ')
   )
 }

@@ -127,7 +127,7 @@ function extractReleaseGroup(rawTitle = '') {
   const tokens = clean.split(/[.\s]+/).filter(Boolean)
   const last = tokens[tokens.length - 1] || ''
   if (BROADCAST_RULES.some(([, pattern]) => pattern.test(last))) return null
-  if (/^(?:EN|ENG|English|BBC|TNT|ESPN|FOX|NBC|CBS|ABC|FS1|FSP|SNY|SNLA|SNP|CARD|ARID|Peacock|Kayo)$/i.test(last)) return null
+  if (/^(?:EN|ENG|English|BBC|TNT|ESPN|FOX|NBC|CBS|ABC|FS1|FSP|SNY|SNLA|SNP|CARD|ARID|Peacock|Kayo|REPACK|PROPER|COMPLETE)$/i.test(last)) return null
   if (/^[A-Z0-9]{3,24}$/.test(last) && !/^(WEB|HDTV|AAC|H264|H265|HEVC|AV1)$/i.test(last)) return last
   return null
 }
