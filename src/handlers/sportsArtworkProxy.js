@@ -1,5 +1,6 @@
 const sharp = require('sharp')
 const crypto = require('crypto')
+const fs = require('fs')
 const {
   buildSportsMetaAssetUrl,
   buildSportsMetaDefaultAssetUrl,
@@ -25,6 +26,10 @@ const {
   readSportsArtworkDiskCache,
   writeSportsArtworkDiskCache
 } = require('../utils/sportsArtworkDiskCache')
+const {
+  resolveSportBackdrop,
+  resolveSportBackdropBucket
+} = require('../utils/sportBackdrops')
 
 const VARIANT_DIMENSIONS = {
   poster: { width: 600, height: 900 },
@@ -179,6 +184,40 @@ function sourceTitleForAudit(fallbackInput = {}) {
     fallbackInput.canonicalId ||
     'sports artwork request'
   )
+}
+
+function isBackdropVariant(variant) {
+  return variant === 'background' || variant === 'landscape'
+}
+
+async function readLocalSportBackdropFallback(variant, fallbackInput = {}, reason = 'sportsmeta_backdrop_missing', status = 0, contentType = '') {
+  if (!isBackdropVariant(variant)) return null
+  const backdrop = resolveSportBackdrop({
+    sport: fallbackInput.sport,
+    sportHint: fallbackInput.sport,
+    league: fallbackInput.competition || fallbackInput.league,
+    title: fallbackInput.eventTitle || fallbackInput.title,
+    rawTitle: fallbackInput.rawTitle,
+    category: fallbackInput.category,
+    source: fallbackInput.source
+  })
+  if (!backdrop.path) return null
+  try {
+    const buffer = await fs.promises.readFile(backdrop.path)
+    return {
+      buffer,
+      contentType: 'image/jpeg',
+      selectedArtworkSource: 'pvtkrrx-sport-4k-backdrop',
+      selectedTemplate: 'sport-4k',
+      eventClass: fallbackInput.eventClass || classifySportsEvent(fallbackInput),
+      fallbackReason: reason,
+      sportBackdropBucket: backdrop.bucket || resolveSportBackdropBucket(fallbackInput),
+      httpStatus: status,
+      upstreamContentType: contentType
+    }
+  } catch (_) {
+    return null
+  }
 }
 
 async function renderEmergencyTemplatePng(variant, fallbackInput = {}, template = 'ticket-stub', error = null) {
@@ -853,6 +892,9 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
     }
   }
 
+  const localBackdrop = await readLocalSportBackdropFallback(variant, fallbackInput, reason, status, contentType)
+  if (localBackdrop) return localBackdrop
+
   const rendered = await renderTemplateFallbackArtwork(variant, fallbackInput, template)
   return {
     buffer: rendered.buffer,
@@ -949,6 +991,14 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
       }
     } catch (error) {
       if (!shouldRenderLocalFallbackForSvg(variant) && variant !== 'logo') throw error
+      const localBackdrop = await readLocalSportBackdropFallback(
+        variant,
+        fallbackInput,
+        `upstream_${error?.status || 'error'}_sport_4k_backdrop`,
+        error?.status || 0,
+        ''
+      )
+      if (localBackdrop) return localBackdrop
       const rendered = await renderTemplateFallbackArtwork(variant, fallbackInput, template)
       return {
         buffer: rendered.buffer,
@@ -1044,6 +1094,7 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
     res.setHeader('X-PVTKRRX-Artwork-Source', result.selectedArtworkSource || 'unknown')
     res.setHeader('X-PVTKRRX-Artwork-Cache', result.cacheLayer || 'rendered')
     res.setHeader('X-PVTKRRX-Artwork-Template', selectedTemplate)
+    if (result.sportBackdropBucket) res.setHeader('X-PVTKRRX-Sport-Backdrop', result.sportBackdropBucket)
     if (result.eventClass) res.setHeader('X-PVTKRRX-Sports-Event-Class', result.eventClass)
     if (result.renderFailure) res.setHeader('X-PVTKRRX-Artwork-Render-Failure', result.renderFailure)
     if (result.fallbackReason) res.setHeader('X-PVTKRRX-Artwork-Fallback', result.fallbackReason)
@@ -1255,8 +1306,19 @@ async function handleCanonicalSportsArtwork(req, res, config = {}) {
   })
   const fallbackInput = buildArtworkInputFromRequest({
     canonicalId,
-    source: 'sportsmeta'
+    sport: String(req.query?.sport || '').trim(),
+    league: String(req.query?.league || '').trim(),
+    title: String(req.query?.title || '').trim(),
+    date: String(req.query?.date || '').trim(),
+    homeTeam: String(req.query?.home || req.query?.homeTeam || '').trim(),
+    awayTeam: String(req.query?.away || req.query?.awayTeam || '').trim(),
+    detail: String(req.query?.detail || '').trim(),
+    rawTitle: String(req.query?.rawTitle || '').trim(),
+    source: String(req.query?.source || 'sportsmeta').trim()
   })
+  const eventClass = String(req.query?.eventClass || req.query?.class || '').trim()
+  if (req.query?.detail) fallbackInput.eventDetail = String(req.query.detail).trim()
+  if (eventClass) fallbackInput.eventClass = eventClass
   const cacheKey = buildCanonicalArtworkCacheKey({ variant, template, canonicalId, sportsmetaBaseUrl, memberToken })
   await sendArtwork(res, {
     cacheKey,

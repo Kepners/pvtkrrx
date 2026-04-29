@@ -5,6 +5,7 @@ const {
   resolveSportSlug
 } = require('../clients/sportsmeta')
 const { resolveSportsPosterTemplate } = require('./sportsPosterTemplates')
+const { resolveSportBackdrop } = require('./sportBackdrops')
 
 const SPORTS_ARTWORK_PROXY_VERSION = '20260429-paid-template-classifier-v1'
 
@@ -137,21 +138,35 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
   const addonBase = resolveAddonBaseUrl(input)
   if (!addonBase) return ''
   const canonicalId = resolveCanonicalId(input)
+  const league = resolveLeague(input)
+  const title = resolveTitle(input)
+  const date = resolveDate(input)
+  const homeTeam = resolveHomeTeam(input)
+  const awayTeam = resolveAwayTeam(input)
   if (canonicalId) {
     const url = new URL(`${addonBase}/sports-artwork/id/${encodeURIComponent(variant)}/${encodeURIComponent(canonicalId)}.png`)
     const memberToken = resolveUrlScopedSportsPosterMemberToken(input)
     if (memberToken) url.searchParams.set('token', memberToken)
+    if (variant === 'background' || variant === 'landscape') {
+      const sport = resolveSport(input)
+      if (sport) url.searchParams.set('sport', sport)
+      if (league) url.searchParams.set('league', league)
+      if (title) url.searchParams.set('title', title)
+      if (date) url.searchParams.set('date', date)
+      if (homeTeam) url.searchParams.set('home', homeTeam)
+      if (awayTeam) url.searchParams.set('away', awayTeam)
+      if (input?.eventDetail) url.searchParams.set('detail', normalizeSpace(input.eventDetail))
+      const eventClass = resolveEventClass(input)
+      if (eventClass) url.searchParams.set('eventClass', eventClass)
+      if (input?.rawTitle) url.searchParams.set('rawTitle', normalizeSpace(input.rawTitle))
+      if (input?.source) url.searchParams.set('source', normalizeSpace(input.source))
+    }
     url.searchParams.set('template', resolveConfiguredSportsPosterTemplate(input))
     url.searchParams.set('v', SPORTS_ARTWORK_PROXY_VERSION)
     return url.toString()
   }
   const sportSlug = resolveSportSlug(resolveSport(input))
   if (!sportSlug) return ''
-  const league = resolveLeague(input)
-  const title = resolveTitle(input)
-  const date = resolveDate(input)
-  const homeTeam = resolveHomeTeam(input)
-  const awayTeam = resolveAwayTeam(input)
   const url = new URL(`${addonBase}/sports-artwork/default/${encodeURIComponent(variant)}/${encodeURIComponent(sportSlug)}.png`)
   if (league) url.searchParams.set('league', league)
   if (title) url.searchParams.set('title', title)
@@ -223,11 +238,25 @@ function resolveSportsPosterAsset(input = {}) {
 }
 
 function resolveSportsBackgroundAsset(input = {}) {
-  return buildVariantUrl('background', input)
+  if (resolveCanonicalId(input)) return buildVariantUrl('background', input)
+  return resolveSportBackdrop({
+    ...input,
+    sport: resolveSport(input),
+    league: resolveLeague(input),
+    title: resolveTitle(input),
+    baseUrl: resolveAddonBaseUrl(input)
+  }).url || buildVariantUrl('background', input)
 }
 
 function resolveSportsLandscapeAsset(input = {}) {
-  return buildVariantUrl('landscape', input)
+  if (resolveCanonicalId(input)) return buildVariantUrl('landscape', input)
+  return resolveSportBackdrop({
+    ...input,
+    sport: resolveSport(input),
+    league: resolveLeague(input),
+    title: resolveTitle(input),
+    baseUrl: resolveAddonBaseUrl(input)
+  }).url || buildVariantUrl('landscape', input)
 }
 
 function resolveSportsLogoAsset(input = {}) {
@@ -238,5 +267,6 @@ module.exports = {
   resolveSportsPosterAsset,
   resolveSportsBackgroundAsset,
   resolveSportsLandscapeAsset,
-  resolveSportsLogoAsset
+  resolveSportsLogoAsset,
+  resolveSportBackdrop
 }

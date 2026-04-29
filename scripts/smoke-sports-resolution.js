@@ -541,7 +541,7 @@ async function run() {
   )
   assert.equal(unresolvedSportsMeta.meta?.posterShape, 'poster', 'unresolved sports detail should keep poster-shaped artwork')
   assert.match(String(unresolvedSportsMeta.meta?.poster || ''), /\/sports-artwork\/default\/poster\/basketball\.png/, 'unresolved sports detail poster should use the poster variant')
-  assert.match(String(unresolvedSportsMeta.meta?.background || ''), /\/sports-artwork\/default\/landscape\/basketball\.png/, 'unresolved sports detail background should use a 16:9 landscape variant, not the poster')
+  assert.match(String(unresolvedSportsMeta.meta?.background || ''), /\/sports-backdrops\/nba-4k\.jpg\?v=20260429-sport-level-4k-v1$/, 'unresolved sports detail background should use the reusable NBA 4K sport backdrop')
   assert.doesNotMatch(String(unresolvedSportsMeta.meta?.background || ''), /\/poster\//, 'sports detail background must not be a blown-up poster')
   assert.match(String(unresolvedSportsMeta.meta?.description || ''), /Sport: Basketball/, 'sports detail description should include sport')
   assert.match(String(unresolvedSportsMeta.meta?.description || ''), /League: NBA Playoffs/, 'sports detail description should include league')
