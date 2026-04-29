@@ -20,6 +20,7 @@ const {
   renderLogoGlyphSvg,
   renderSportsPosterTemplateSvg
 } = require('../utils/sportsPosterTemplates')
+const { classifySportsEvent } = require('../utils/sportsEventClassifier')
 const {
   readSportsArtworkDiskCache,
   writeSportsArtworkDiskCache
@@ -33,7 +34,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260429-python-template-port-v2'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260429-paid-template-classifier-v1'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -143,7 +144,7 @@ function shouldRenderLocalFallbackForSvg(variant) {
 }
 
 function buildTemplateFallbackEvent(fallbackInput = {}) {
-  return {
+  const event = {
     sport: normalizeSpace(fallbackInput.sport),
     league: normalizeSpace(fallbackInput.competition || fallbackInput.league),
     title: normalizeSpace(fallbackInput.eventTitle || fallbackInput.title),
@@ -157,16 +158,34 @@ function buildTemplateFallbackEvent(fallbackInput = {}) {
     rawTitle: normalizeSpace(fallbackInput.rawTitle),
     source: normalizeSpace(fallbackInput.source || 'fallback')
   }
+  if (fallbackInput.eventClass) event.eventClass = normalizeSpace(fallbackInput.eventClass)
+  return event
 }
 
-async function renderTemplateFallbackPng(variant, fallbackInput = {}, template = 'ticket-stub') {
-  if (!['poster', 'landscape', 'background'].includes(variant)) {
-    const svg = renderSportsArtworkSvg(fallbackInput, variant)
-    return rasterizeToPng(Buffer.from(svg), variant)
-  }
+function failureReason(value = '') {
+  return String(value || 'error')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 80) || 'error'
+}
 
+function sourceTitleForAudit(fallbackInput = {}) {
+  return normalizeSpace(
+    fallbackInput.rawTitle ||
+    fallbackInput.eventTitle ||
+    fallbackInput.title ||
+    fallbackInput.name ||
+    fallbackInput.canonicalId ||
+    'sports artwork request'
+  )
+}
+
+async function renderEmergencyTemplatePng(variant, fallbackInput = {}, template = 'ticket-stub', error = null) {
   const normalizedTemplate = normalizeSportsPosterTemplate(template)
   const event = buildTemplateFallbackEvent(fallbackInput)
+  const eventClass = fallbackInput.eventClass || classifySportsEvent(event)
+  event.eventClass = eventClass
   const homeColor = colorForLabel(event.homeTeam || event.title || event.league || event.sport, '#0f766e')
   const awayColor = colorForLabel(event.awayTeam || event.league || event.sport, '#123c69')
   const theme = {
@@ -174,13 +193,11 @@ async function renderTemplateFallbackPng(variant, fallbackInput = {}, template =
     awayColor,
     accentColor: paperAccentFromHex(readableAccentFromHex(homeColor))
   }
-  const hasMatchup = Boolean(event.homeTeam && event.awayTeam)
   const artwork = renderSportsPosterTemplateSvg({
     event,
     variant,
     template: normalizedTemplate,
-    theme,
-    mode: hasMatchup ? 'matchup' : 'single'
+    theme
   })
   const composites = []
   for (const slot of artwork.slots || []) {
@@ -199,11 +216,83 @@ async function renderTemplateFallbackPng(variant, fallbackInput = {}, template =
   if (artwork.overlay) {
     composites.push({ input: Buffer.from(artwork.overlay), left: 0, top: 0 })
   }
-
-  return sharp(Buffer.from(artwork.svg))
+  const title = sourceTitleForAudit(fallbackInput)
+  const cause = failureReason(error?.message || error || 'unknown')
+  console.warn(`[sports-poster] EMERGENCY_LEGACY_FALLBACK variant=${variant} cause=${cause} title=${title}`)
+  const buffer = await sharp(Buffer.from(artwork.svg))
     .composite(composites)
     .png({ compressionLevel: 9, adaptiveFiltering: true })
     .toBuffer()
+  return {
+    buffer,
+    selectedArtworkSource: 'pvtkrrx-emergency-legacy-fallback',
+    selectedTemplate: normalizedTemplate,
+    eventClass,
+    renderFailure: error?.message || String(error || '')
+  }
+}
+
+async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, template = 'ticket-stub') {
+  if (!['poster', 'landscape', 'background'].includes(variant)) {
+    const svg = renderSportsArtworkSvg(fallbackInput, variant)
+    const title = sourceTitleForAudit(fallbackInput)
+    console.warn(`[sports-poster] EMERGENCY_LEGACY_FALLBACK variant=${variant} cause=unsupported_variant title=${title}`)
+    return {
+      buffer: await rasterizeToPng(Buffer.from(svg), variant),
+      selectedArtworkSource: 'pvtkrrx-emergency-legacy-fallback',
+      selectedTemplate: normalizeSportsPosterTemplate(template),
+      eventClass: fallbackInput.eventClass || classifySportsEvent(fallbackInput)
+    }
+  }
+
+  const normalizedTemplate = normalizeSportsPosterTemplate(template)
+  const event = buildTemplateFallbackEvent(fallbackInput)
+  const homeColor = colorForLabel(event.homeTeam || event.title || event.league || event.sport, '#0f766e')
+  const awayColor = colorForLabel(event.awayTeam || event.league || event.sport, '#123c69')
+  const theme = {
+    homeColor,
+    awayColor,
+    accentColor: paperAccentFromHex(readableAccentFromHex(homeColor))
+  }
+  const eventClass = fallbackInput.eventClass || classifySportsEvent(event)
+  event.eventClass = eventClass
+  try {
+    const artwork = renderSportsPosterTemplateSvg({
+      event,
+      variant,
+      template: normalizedTemplate,
+      theme
+    })
+    const composites = []
+    for (const slot of artwork.slots || []) {
+      const glyphSvg = renderLogoGlyphSvg({
+        role: slot.role,
+        event,
+        theme,
+        size: slot.size
+      })
+      composites.push({
+        input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size),
+        left: slot.left,
+        top: slot.top
+      })
+    }
+    if (artwork.overlay) {
+      composites.push({ input: Buffer.from(artwork.overlay), left: 0, top: 0 })
+    }
+    const buffer = await sharp(Buffer.from(artwork.svg))
+      .composite(composites)
+      .png({ compressionLevel: 9, adaptiveFiltering: true })
+      .toBuffer()
+    return {
+      buffer,
+      selectedArtworkSource: 'pvtkrrx-paid-template',
+      selectedTemplate: normalizedTemplate,
+      eventClass
+    }
+  } catch (error) {
+    return renderEmergencyTemplatePng(variant, fallbackInput, normalizedTemplate, error)
+  }
 }
 
 function escapeXml(value) {
@@ -612,13 +701,31 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     awayColor: awayBadge?.color || colorForLabel(event.awayTeam || event.league || event.sport, '#123c69'),
     accentColor: paperAccentFromHex(leagueLogo?.color || homeBadge?.color || readableAccentFromHex(homeBadge?.color))
   }
-  const artwork = renderSportsPosterTemplateSvg({
-    event,
-    variant: normalizedVariant,
-    template: normalizedTemplate,
-    theme,
-    mode: hasMatchup ? 'matchup' : 'single'
-  })
+  let artwork
+  const eventClass = classifySportsEvent(event)
+  event.eventClass = eventClass
+  try {
+    artwork = renderSportsPosterTemplateSvg({
+      event,
+      variant: normalizedVariant,
+      template: normalizedTemplate,
+      theme
+    })
+  } catch (error) {
+    const emergency = await renderEmergencyTemplatePng(normalizedVariant, {
+      canonicalId,
+      sport: event.sport,
+      league: event.league,
+      title: event.title || event.name,
+      eventTitle: event.title || event.name,
+      date: event.date,
+      homeTeam: event.homeTeam,
+      awayTeam: event.awayTeam,
+      rawTitle: event.title || event.name || canonicalId,
+      source: 'sportsmeta'
+    }, normalizedTemplate, error)
+    return emergency
+  }
   const imageByRole = {
     home: homeBadge,
     away: awayBadge,
@@ -638,10 +745,16 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     composites.push({ input: Buffer.from(artwork.overlay), left: 0, top: 0 })
   }
 
-  return sharp(Buffer.from(artwork.svg))
+  const buffer = await sharp(Buffer.from(artwork.svg))
     .composite(composites)
     .png({ compressionLevel: 9, adaptiveFiltering: true })
     .toBuffer()
+  return {
+    buffer,
+    selectedArtworkSource: 'pvtkrrx-paid-template',
+    selectedTemplate: normalizedTemplate,
+    eventClass
+  }
 }
 
 async function renderTeamBadgeArtworkPngLegacy({ canonicalId = '', sportsmetaBaseUrl = '', memberToken = '', variant = 'poster' } = {}) {
@@ -727,22 +840,28 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
     })
     if (teamPoster) {
       return {
-        buffer: teamPoster,
+        buffer: teamPoster.buffer || teamPoster,
         contentType: 'image/png',
-        selectedArtworkSource: `pvtkrrx-team-badge-${variant}`,
+        selectedArtworkSource: teamPoster.selectedArtworkSource || 'pvtkrrx-paid-template',
         fallbackReason: `${reason}_with_team_badges`,
+        selectedTemplate: teamPoster.selectedTemplate || template,
+        renderFailure: teamPoster.renderFailure || '',
+        eventClass: teamPoster.eventClass || '',
         httpStatus: status,
         upstreamContentType: contentType
       }
     }
   }
 
-  const png = await renderTemplateFallbackPng(variant, fallbackInput, template)
+  const rendered = await renderTemplateFallbackArtwork(variant, fallbackInput, template)
   return {
-    buffer: png,
+    buffer: rendered.buffer,
     contentType: 'image/png',
-    selectedArtworkSource: 'pvtkrrx-generated-card',
-    fallbackReason: reason,
+    selectedArtworkSource: rendered.selectedArtworkSource || 'pvtkrrx-paid-template',
+    fallbackReason: rendered.renderFailure ? `${reason}_paid_template_failed_${failureReason(rendered.renderFailure)}` : reason,
+    selectedTemplate: rendered.selectedTemplate || template,
+    renderFailure: rendered.renderFailure || '',
+    eventClass: rendered.eventClass || '',
     httpStatus: status,
     upstreamContentType: contentType
   }
@@ -765,6 +884,7 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
   }
 
   const pending = (async () => {
+    const fallbackEventClass = fallbackInput.eventClass || classifySportsEvent(fallbackInput)
     try {
       const { status, contentType, buffer, headers } = await fetchUpstream(upstreamUrl)
       const generatedAsset = /^true$/i.test(String(headers?.['x-sportsmeta-generated-asset'] || ''))
@@ -785,6 +905,8 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
           buffer,
           contentType,
           selectedArtworkSource: 'sportsmeta-raster',
+          selectedTemplate: normalizeSportsPosterTemplate(template),
+          eventClass: fallbackEventClass,
           fallbackReason: '',
           httpStatus: status,
           upstreamContentType: contentType
@@ -806,7 +928,9 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
         return {
           buffer: png,
           contentType: 'image/png',
-          selectedArtworkSource: 'sportsmeta-svg-rasterized',
+          selectedArtworkSource: 'sportsmeta-raster',
+          selectedTemplate: normalizeSportsPosterTemplate(template),
+          eventClass: fallbackEventClass,
           fallbackReason: 'sportsmeta_svg_rasterized',
           httpStatus: status,
           upstreamContentType: contentType
@@ -816,19 +940,26 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
       return {
         buffer: png,
         contentType: 'image/png',
-        selectedArtworkSource: 'sportsmeta-rasterized',
+        selectedArtworkSource: 'sportsmeta-raster',
+        selectedTemplate: normalizeSportsPosterTemplate(template),
+        eventClass: fallbackEventClass,
         fallbackReason: /^image\/svg\+xml/i.test(contentType) ? 'sportsmeta_svg_rasterized' : 'sportsmeta_non_raster_rasterized',
         httpStatus: status,
         upstreamContentType: contentType
       }
     } catch (error) {
       if (!shouldRenderLocalFallbackForSvg(variant) && variant !== 'logo') throw error
-      const png = await renderTemplateFallbackPng(variant, fallbackInput, template)
+      const rendered = await renderTemplateFallbackArtwork(variant, fallbackInput, template)
       return {
-        buffer: png,
+        buffer: rendered.buffer,
         contentType: 'image/png',
-        selectedArtworkSource: 'pvtkrrx-generated-card',
-        fallbackReason: `upstream_${error?.status || 'error'}`,
+        selectedArtworkSource: rendered.selectedArtworkSource || 'pvtkrrx-paid-template',
+        fallbackReason: rendered.renderFailure
+          ? `upstream_${error?.status || 'error'}_paid_template_failed_${failureReason(rendered.renderFailure)}`
+          : `upstream_${error?.status || 'error'}`,
+        selectedTemplate: rendered.selectedTemplate || template,
+        renderFailure: rendered.renderFailure || '',
+        eventClass: rendered.eventClass || '',
         httpStatus: error?.status || 0,
         upstreamContentType: ''
       }
@@ -905,16 +1036,19 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
     const normalizedTemplate = normalizeSportsPosterTemplate(template)
     const result = await loadRaster(cacheKey, upstreamUrl, variant, fallbackInput, teamPosterContext, normalizedTemplate)
     const { buffer, contentType } = result
+    const selectedTemplate = normalizeSportsPosterTemplate(result.selectedTemplate || normalizedTemplate)
     res.setHeader('Content-Type', contentType || 'image/png')
     res.setHeader('Content-Length', String(buffer.length))
     res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000, stale-if-error=2592000')
     res.setHeader('X-PVTKRRX-Artwork-Upstream', redactUrl(upstreamUrl))
     res.setHeader('X-PVTKRRX-Artwork-Source', result.selectedArtworkSource || 'unknown')
     res.setHeader('X-PVTKRRX-Artwork-Cache', result.cacheLayer || 'rendered')
-    res.setHeader('X-PVTKRRX-Artwork-Template', normalizedTemplate)
+    res.setHeader('X-PVTKRRX-Artwork-Template', selectedTemplate)
+    if (result.eventClass) res.setHeader('X-PVTKRRX-Sports-Event-Class', result.eventClass)
+    if (result.renderFailure) res.setHeader('X-PVTKRRX-Artwork-Render-Failure', result.renderFailure)
     if (result.fallbackReason) res.setHeader('X-PVTKRRX-Artwork-Fallback', result.fallbackReason)
     console.log(
-      `[sports-artwork] selectedArtworkSource=${result.selectedArtworkSource || 'unknown'} variant=${variant} template=${normalizedTemplate} cache=${result.cacheLayer || 'rendered'} artworkUrl=${redactUrl(upstreamUrl)} fallbackReason=${result.fallbackReason || ''} httpStatus=${result.httpStatus || ''} contentType=${result.upstreamContentType || contentType || ''}`
+      `[sports-artwork] selectedArtworkSource=${result.selectedArtworkSource || 'unknown'} variant=${variant} template=${selectedTemplate} eventClass=${result.eventClass || ''} cache=${result.cacheLayer || 'rendered'} artworkUrl=${redactUrl(upstreamUrl)} fallbackReason=${result.fallbackReason || ''} renderFailure="${result.renderFailure || ''}" httpStatus=${result.httpStatus || ''} contentType=${result.upstreamContentType || contentType || ''}`
     )
     res.status(200).end(buffer)
   } catch (err) {
@@ -925,7 +1059,7 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
   }
 }
 
-function buildDefaultArtworkCacheKey({ variant, template, sportSlug, league, title, date, homeTeam, awayTeam, detail, seeders, size, rawTitle, sportsmetaBaseUrl }) {
+function buildDefaultArtworkCacheKey({ variant, template, sportSlug, league, title, date, homeTeam, awayTeam, detail, eventClass, seeders, size, rawTitle, sportsmetaBaseUrl }) {
   return [
     LOCAL_ARTWORK_RENDER_VERSION,
     'default',
@@ -938,6 +1072,7 @@ function buildDefaultArtworkCacheKey({ variant, template, sportSlug, league, tit
     (homeTeam || '').trim().toLowerCase(),
     (awayTeam || '').trim().toLowerCase(),
     (detail || '').trim().toLowerCase(),
+    (eventClass || '').trim().toLowerCase(),
     (seeders || '').trim().toLowerCase(),
     (size || '').trim().toLowerCase(),
     (rawTitle || '').trim().toLowerCase(),
@@ -999,6 +1134,7 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
   const size = String(req.query?.size || '').trim()
   const rawTitle = String(req.query?.rawTitle || '').trim()
   const source = String(req.query?.source || 'fallback').trim()
+  const eventClass = String(req.query?.eventClass || req.query?.class || '').trim()
   const sportsmetaBaseUrl = resolveSportsmetaBaseUrlFromConfig(config)
   const memberToken = resolveSportsPosterMemberToken(config, req)
   const template = resolveSportsPosterTemplateFromConfig(config, req)
@@ -1028,16 +1164,27 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
     source
   })
   if (detail) fallbackInput.eventDetail = detail
-  const canonical = await resolveDefaultArtworkCanonical({
-    sportsmetaBaseUrl,
-    sportSlug,
-    league,
-    title,
-    date,
-    homeTeam,
-    awayTeam,
-    fallbackInput
-  })
+  const defaultEventClass = eventClass || classifySportsEvent(fallbackInput)
+  if (defaultEventClass && defaultEventClass !== 'team_vs_team' && title) {
+    fallbackInput.eventTitle = title
+    fallbackInput.eventName = title
+  }
+  if (!fallbackInput.eventDetail && defaultEventClass && defaultEventClass !== 'team_vs_team' && homeTeam && awayTeam) {
+    fallbackInput.eventDetail = `${homeTeam} v ${awayTeam}`
+  }
+  if (defaultEventClass) fallbackInput.eventClass = defaultEventClass
+  const canonical = defaultEventClass === 'team_vs_team'
+    ? await resolveDefaultArtworkCanonical({
+        sportsmetaBaseUrl,
+        sportSlug,
+        league,
+        title,
+        date,
+        homeTeam,
+        awayTeam,
+        fallbackInput
+      })
+    : null
   if (canonical?.canonicalId) {
     const canonicalUpstreamUrl = buildUpstreamUrl({
       kind: 'id',
@@ -1061,6 +1208,7 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
       source: 'sportsmeta'
     })
     if (detail) canonicalFallbackInput.eventDetail = detail
+    if (defaultEventClass) canonicalFallbackInput.eventClass = defaultEventClass
     const canonicalCacheKey = buildCanonicalArtworkCacheKey({
       variant,
       template,
@@ -1082,7 +1230,7 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
     })
     return
   }
-  const cacheKey = buildDefaultArtworkCacheKey({ variant, template, sportSlug, league, title, date, homeTeam, awayTeam, detail, seeders, size, rawTitle, sportsmetaBaseUrl })
+  const cacheKey = buildDefaultArtworkCacheKey({ variant, template, sportSlug, league, title, date, homeTeam, awayTeam, detail, eventClass: defaultEventClass, seeders, size, rawTitle, sportsmetaBaseUrl })
   await sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput, template })
 }
 

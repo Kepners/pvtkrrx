@@ -17,6 +17,71 @@ const EVENT_SOURCE_NOISE_RE = /^(?:apple|tv|atvp?|fubo|skynz|kayo|z3r0|nva|espn(
 // Known league/series tokens that start non-vs event titles
 const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|PFL|Bellator|ONE|WWE|AEW|TNA|ROH|NJPW|MotoGP|Moto\s*GP|NASCAR|IndyCar|WRC|Supercars|Supercars\s*Championship|V8SC|Bathurst|WSBK|WEC|FormulaE|Rally|Dakar|PGA|PGA\s*Tour|LPGA|LPGA\s*Tour|Masters|ATP|ATP\s*World\s*Tour|WTA|WTA\s*Tour|Wimbledon|Australian\s*Open|Roland\s*Garros|French\s*Open|US\s*Open|U\.S\.\s*Open|Davis\s*Cup|Laver\s*Cup|IPL|IPLM\d+|Indian\s*Premier\s*League|MLS|Major\s*League\s*Soccer|MLB|Major\s*League\s*Baseball|NCAA\s*Baseball|World\s*Baseball\s*Classic|NBA|NBA\s*Playoffs|EuroLeague|EasyCredit\s*BBL|Basketball\s*Champions\s*League(?:\s*of\s*Americas)?|Super\s*Rugby|MLR|Major\s*League\s*Rugby|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
 
+const SESSION_PATTERNS = [
+  ['Pre-Season Testing', /\bpre[\s-]*season\s+testing\b/i],
+  ['Test Session', /\btest\s+session\b/i],
+  ['Sprint Shootout', /\bsprint\s+shootout\b/i],
+  ['Sprint Qualifying', /\bsprint\s+qualifying\b/i],
+  ['Early Prelims', /\bearly\s+prelims?\b/i],
+  ['Main Card', /\bmain\s+card\b/i],
+  ['Main Event', /\bmain\s+event\b/i],
+  ['FP1 Practice', /\bfp1\s+practice\b/i],
+  ['FP2 Practice', /\bfp2\s+practice\b/i],
+  ['FP3 Practice', /\bfp3\s+practice\b/i],
+  ['Free Practice 1', /\bfree\s+practice\s+(?:1|one)\b/i],
+  ['Free Practice 2', /\bfree\s+practice\s+(?:2|two)\b/i],
+  ['Free Practice 3', /\bfree\s+practice\s+(?:3|three)\b/i],
+  ['Practice 1', /\bpractice\s+(?:1|one)\b/i],
+  ['Practice 2', /\bpractice\s+(?:2|two)\b/i],
+  ['Practice 3', /\bpractice\s+(?:3|three)\b/i],
+  ['FP1', /\bfp1\b/i],
+  ['FP2', /\bfp2\b/i],
+  ['FP3', /\bfp3\b/i],
+  ['Qualifying', /\bqualifying\b/i],
+  ['Sprint', /\bsprint\b/i],
+  ['Warm Up', /\bwarm\s*up\b/i],
+  ['Race', /\brace\b/i],
+  ['Prelims', /\bprelims?\b/i],
+  ['PPV', /\bppv\b/i],
+  ['Final Round', /\bfinal\s+round\b/i],
+  ['Round 1', /\bround\s+(?:1|one)\b/i],
+  ['Round 2', /\bround\s+(?:2|two)\b/i],
+  ['Round 3', /\bround\s+(?:3|three)\b/i],
+  ['Round 4', /\bround\s+(?:4|four)\b/i],
+  ['Foursomes', /\bfoursomes\b/i],
+  ['Singles', /\bsingles\b/i],
+  ['Time Trial', /\btime\s+trial\b/i],
+  ['Road Race', /\broad\s+race\b/i]
+]
+
+const ROUND_PATTERNS = [
+  ['Quarter Final', /\b(?:quarter[\s-]*final|qf)\b/i],
+  ['Semi Final', /\b(?:semi[\s-]*final|sf)\b/i],
+  ['Final', /\bfinal\b/i],
+  ['Round', /\bround\s+(\d{1,2})\b/i],
+  ['R', /\br(\d{1,2})\b/i],
+  ['Stage', /\bstage\s+(\d{1,2})\b/i],
+  ['Day', /\bday\s+(\d{1,2})\b/i],
+  ['Night', /\bnight\s+(\d{1,2})\b/i],
+  ['Game', /\bgame\s+(\d{1,2})\b/i],
+  ['Week', /\bweek\s+(\d{1,2})\b/i]
+]
+
+const LEADING_LEAGUE_ALIASES = [
+  [/^uefa nations league$/i, 'UEFA Nations League'],
+  [/^fifa world cup qualifiers?$/i, 'FIFA World Cup Qualifier'],
+  [/^world cup qualifiers?$/i, 'World Cup Qualifier'],
+  [/^euro qualifiers?$/i, 'Euro Qualifier'],
+  [/^european championship$/i, 'European Championship'],
+  [/^copa america$/i, 'Copa America'],
+  [/^afcon$/i, 'AFCON'],
+  [/^asian cup$/i, 'Asian Cup'],
+  [/^conmebol qualifiers?$/i, 'CONMEBOL Qualifier'],
+  [/^concacaf qualifiers?$/i, 'CONCACAF Qualifier'],
+  [/^international friendlies?$/i, 'International Friendly'],
+  [/^premier league darts$/i, 'Premier League Darts']
+]
+
 function normalizeSegment(value) {
   return String(value || '')
     .normalize('NFKD')
@@ -24,6 +89,21 @@ function normalizeSegment(value) {
     .replace(/[._]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function titleCase(value = '') {
+  return normalizeSegment(value)
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => {
+      const upper = part.toUpperCase()
+      if (['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'F1', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'NBA', 'NFL', 'NHL', 'NXT', 'PDC', 'PFL', 'PGA', 'PPV', 'UFC', 'UEFA', 'WEC', 'WRC', 'WTA', 'WWE'].includes(upper)) return upper
+      if (upper === 'MOTOGP') return 'MotoGP'
+      if (upper === 'SMACKDOWN') return 'SmackDown'
+      if (upper === 'WRESTLEMANIA') return 'WrestleMania'
+      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+    })
+    .join(' ')
 }
 
 function isValidDate(year, month, day) {
@@ -208,6 +288,13 @@ function findLeadingLeagueSpan(tokens = []) {
   const maxParts = Math.min(parts.length, 6)
   for (let count = 1; count <= maxParts; count += 1) {
     const candidate = normalizeSegment(parts.slice(0, count).join(' '))
+    const alias = LEADING_LEAGUE_ALIASES.find(([pattern]) => pattern.test(candidate))
+    if (alias) {
+      best = {
+        league: alias[1],
+        nextIndex: count
+      }
+    }
     const mapped = getMappedLeagueEntry(candidate)
     if (mapped) {
       best = {
@@ -564,13 +651,20 @@ function parseFlexibleMatchupTitle(title, fallbackDate = '') {
 
   const homeTeam = normalizeTeamTokens(homeTeamTokens)
   const awayTeam = normalizeTeamTokens(awayTeamTokens)
-  if (!homeTeam || !awayTeam || !date) return null
+  if (!homeTeam || !awayTeam) return null
+  const eventShort = leadingLeague?.league && /^\d{1,4}$/.test(String(preTeamTokens[0] || '').trim())
+    ? `${leadingLeague.league} ${preTeamTokens[0]}`
+    : (leadingLeague?.league || `${homeTeam} vs ${awayTeam}`)
 
   return {
     league: leadingLeague?.league || '',
-    date,
+    ...(date ? { date } : {}),
     homeTeam,
     awayTeam,
+    principalA: homeTeam,
+    principalB: awayTeam,
+    eventName: `${homeTeam} vs ${awayTeam}`,
+    eventShort,
     raw
   }
 }
@@ -659,6 +753,51 @@ function normalizeEventNameTokens(tokens = [], fallbackDate = '') {
   return cleaned
 }
 
+function extractPosterSessionAndRound(tokens = [], rawTitle = '') {
+  const text = normalizeSegment(
+    (Array.isArray(tokens) ? tokens.join(' ') : String(tokens || '')) || rawTitle
+  )
+  const result = {
+    session: '',
+    round: '',
+    roundShort: ''
+  }
+
+  for (const [label, pattern] of SESSION_PATTERNS) {
+    if (pattern.test(text)) {
+      result.session = label
+      break
+    }
+  }
+
+  for (const [label, pattern] of ROUND_PATTERNS) {
+    const match = text.match(pattern)
+    if (!match) continue
+    result.round = match[1] ? `${label} ${match[1]}` : label
+    result.roundShort = match[1] ? `${label.charAt(0).toUpperCase()}${match[1]}` : result.round
+    break
+  }
+
+  if (!result.round && result.session && /^round\s+\d+/i.test(result.session)) {
+    result.round = result.session
+    result.roundShort = result.session.replace(/^round\s+/i, 'R')
+  }
+
+  return result
+}
+
+function shortenEventName(value = '') {
+  const clean = titleCase(value)
+  if (!clean) return ''
+  return clean
+    .replace(/\bGrand Prix\b/g, 'GP')
+    .replace(/\bChampionship\b/g, 'Champs')
+    .replace(/\bWorld Cup Qualifier\b/g, 'WCQ')
+    .replace(/\bWorld Cup Qualifiers\b/g, 'WCQ')
+    .replace(/\bFriday Night SmackDown\b/g, 'SmackDown')
+    .replace(/\bMonday Night Raw\b/g, 'Raw')
+}
+
 function parseSportsTitle(title, fallbackDate = '') {
   const raw = String(title || '').trim()
   if (!raw) return null
@@ -698,6 +837,10 @@ function parseSportsTitle(title, fallbackDate = '') {
     date: dateMatch.date,
     homeTeam,
     awayTeam,
+    principalA: homeTeam,
+    principalB: awayTeam,
+    eventName: `${homeTeam} vs ${awayTeam}`,
+    eventShort: league,
     ...(quality ? { quality } : {}),
     raw
   }
@@ -738,6 +881,7 @@ function parseSportsEventTitle(title, fallbackDate = '') {
     // Just a year token - skip it, don't treat it as part of event name
     eventStartIndex += 1
   }
+  dateStr = dateStr || extractFallbackDate(raw || fallbackDate)
 
   // Collect event name tokens until we hit metadata
   const eventTokens = []
@@ -754,10 +898,15 @@ function parseSportsEventTitle(title, fallbackDate = '') {
     eventTokens.push(token)
   }
 
-  const normalizedEventTokens = normalizeEventNameTokens(eventTokens, dateStr || fallbackDate)
+  const posterDetail = extractPosterSessionAndRound(eventTokens, raw)
+  const league = normalizeSegment(leagueStart.leagueToken)
+  const numericCard = /^(?:ufc|pfl|bellator|one|wwe|aew)$/i.test(league) &&
+    /^\d{1,4}$/.test(String(eventTokens[0] || '').trim())
+  const normalizedEventTokens = numericCard
+    ? [league, eventTokens[0]]
+    : normalizeEventNameTokens(eventTokens, dateStr || fallbackDate)
   if (normalizedEventTokens.length === 0) return null
 
-  const league = normalizeSegment(leagueStart.leagueToken)
   const eventName = normalizeSegment(normalizedEventTokens.join(' '))
   if (!league || !eventName) return null
 
@@ -765,6 +914,10 @@ function parseSportsEventTitle(title, fallbackDate = '') {
     league,
     ...(dateStr ? { date: dateStr } : {}),
     eventName,
+    eventShort: shortenEventName(eventName),
+    ...(posterDetail.session ? { session: posterDetail.session } : {}),
+    ...(posterDetail.round ? { round: posterDetail.round } : {}),
+    ...(posterDetail.roundShort ? { roundShort: posterDetail.roundShort } : {}),
     ...(quality ? { quality } : {}),
     raw
   }

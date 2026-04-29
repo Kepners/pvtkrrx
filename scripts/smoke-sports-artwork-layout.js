@@ -4,6 +4,10 @@ const assert = require('assert/strict')
 const fs = require('fs')
 const path = require('path')
 const sharp = require('sharp')
+
+process.env.PVTKRRX_SPORTS_ARTWORK_DISK_CACHE = 'false'
+process.env.PVTKRRX_SPORTS_POSTER_TEMPLATE = 'ticket-stub'
+
 const {
   DIMENSIONS,
   layoutSportsCard,
@@ -660,6 +664,12 @@ async function assertTeamBadgeArtworkProxy() {
         })
       }
       if (url.pathname === '/resolve') {
+        if (url.searchParams.get('sport') !== 'hockey' || url.searchParams.get('league') !== 'NHL') {
+          return new Response(JSON.stringify({ ok: false, error: 'not_found' }), {
+            status: 404,
+            headers: { 'content-type': 'application/json' }
+          })
+        }
         assert.equal(url.searchParams.get('recordType'), 'event', 'default artwork lookup should request an event')
         assert.equal(url.searchParams.get('sport'), 'hockey', 'default artwork lookup should pass sport')
         assert.equal(url.searchParams.get('league'), 'NHL', 'default artwork lookup should pass league')
@@ -684,6 +694,12 @@ async function assertTeamBadgeArtworkProxy() {
         }), {
           status: 200,
           headers: { 'content-type': 'application/json' }
+        })
+      }
+      if (/^\/asset\/default\//.test(url.pathname)) {
+        return new Response('not found', {
+          status: 404,
+          headers: { 'content-type': 'text/plain' }
         })
       }
       if (url.pathname === `/member/default-token/asset/poster/${encodeURIComponent(canonicalId)}`) {
@@ -761,7 +777,8 @@ async function assertTeamBadgeArtworkProxy() {
       )
       assert.equal(response.statusCode, 200, `team badge ${variant} proxy should return 200`)
       assert.equal(response.headers['content-type'], 'image/png', `team badge ${variant} proxy should return PNG`)
-      assert.equal(response.headers['x-pvtkrrx-artwork-source'], `pvtkrrx-team-badge-${variant}`, `central ${variant} proxy should replace SportsMeta SVG layout with template team-badge art`)
+      assert.equal(response.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-paid-template', `central ${variant} proxy should replace SportsMeta SVG layout with paid template art`)
+      assert.equal(response.headers['x-pvtkrrx-sports-event-class'], 'team_vs_team', `central ${variant} proxy should classify team-vs-team events`)
       assert.match(response.headers['x-pvtkrrx-artwork-fallback'] || '', /sportsmeta_central_svg_layout_replaced_with_team_badges/, `central ${variant} proxy should report the local template replacement`)
       assert.ok(Buffer.isBuffer(response.body), `team badge ${variant} proxy should return bytes`)
       assert.deepEqual(pngDimensions(response.body), dimensions[variant], `team badge ${variant} dimensions`)
@@ -786,8 +803,9 @@ async function assertTeamBadgeArtworkProxy() {
       )
       assert.equal(response.statusCode, 200, `${template} template should return 200`)
       assert.equal(response.headers['content-type'], 'image/png', `${template} template should return PNG`)
-      assert.equal(response.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-team-badge-poster', `${template} template should use PVTKRRX team-badge template artwork`)
+      assert.equal(response.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-paid-template', `${template} template should use paid template artwork`)
       assert.equal(response.headers['x-pvtkrrx-artwork-template'], template, `${template} template should be reported in response headers`)
+      assert.equal(response.headers['x-pvtkrrx-sports-event-class'], 'team_vs_team', `${template} template should preserve team-vs-team classification`)
       assert.deepEqual(pngDimensions(response.body), dimensions.poster, `${template} template poster dimensions`)
       fs.writeFileSync(path.join(PREVIEW_DIR, `template-${template}-poster.png`), response.body)
     }
@@ -809,7 +827,8 @@ async function assertTeamBadgeArtworkProxy() {
     )
     assert.equal(invalidLandscapeResponse.statusCode, 200, 'invalid member landscape proxy should return 200')
     assert.equal(invalidLandscapeResponse.headers['content-type'], 'image/png', 'invalid member landscape proxy should return PNG')
-    assert.equal(invalidLandscapeResponse.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-team-badge-landscape', 'invalid member landscape should be replaced with a team-badge landscape')
+    assert.equal(invalidLandscapeResponse.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-paid-template', 'invalid member landscape should be replaced with paid template art')
+    assert.equal(invalidLandscapeResponse.headers['x-pvtkrrx-sports-event-class'], 'team_vs_team', 'invalid member landscape should preserve team-vs-team classification')
     assert.match(
       invalidLandscapeResponse.headers['x-pvtkrrx-artwork-fallback'] || '',
       /sportsmeta_landscape_raster_(?:layout_replaced|composed)_with_team_badges/,
@@ -840,10 +859,96 @@ async function assertTeamBadgeArtworkProxy() {
     )
     assert.equal(defaultResolvedResponse.statusCode, 200, 'default artwork resolver should return 200')
     assert.equal(defaultResolvedResponse.headers['content-type'], 'image/png', 'default artwork resolver should return PNG')
-    assert.equal(defaultResolvedResponse.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-team-badge-poster', 'default artwork resolver should use PVTKRRX team-badge template artwork when resolvable')
+    assert.equal(defaultResolvedResponse.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-paid-template', 'default artwork resolver should use paid template artwork when resolvable')
+    assert.equal(defaultResolvedResponse.headers['x-pvtkrrx-sports-event-class'], 'team_vs_team', 'default artwork resolver should classify resolved team events')
     assert.match(defaultResolvedResponse.headers['x-pvtkrrx-artwork-upstream'] || '', /\/member\/\[redacted\]\/asset\/poster\/sportsmeta/, 'default artwork resolver should switch to the member canonical poster route')
     assert.deepEqual(pngDimensions(defaultResolvedResponse.body), dimensions.poster, 'default artwork resolver poster dimensions')
     fs.writeFileSync(path.join(PREVIEW_DIR, 'default-resolved-team-badge-poster.png'), defaultResolvedResponse.body)
+
+    const noLogoCases = [
+      {
+        slug: 'paid-template-football-no-logo',
+        sport: 'football.png',
+        query: {
+          league: 'English Premier League',
+          title: 'Arsenal vs Chelsea',
+          date: '2026-04-29',
+          home: 'Arsenal',
+          away: 'Chelsea',
+          eventClass: 'team_vs_team'
+        },
+        expectedClass: 'team_vs_team',
+        expectedTemplate: 'ticket-stub'
+      },
+      {
+        slug: 'paid-template-f1-no-logo',
+        sport: 'motorsport.png',
+        query: {
+          league: 'Formula 1',
+          title: 'British Grand Prix',
+          detail: 'Qualifying',
+          date: '2026-07-04',
+          eventClass: 'motorsport_event'
+        },
+        expectedClass: 'motorsport_event',
+        expectedTemplate: 'ticket-stub'
+      },
+      {
+        slug: 'paid-template-ufc-no-logo',
+        sport: 'mma.png',
+        query: {
+          league: 'UFC',
+          title: 'UFC 312',
+          detail: 'Main Event',
+          date: '2026-06-14',
+          home: 'Du Plessis',
+          away: 'Strickland',
+          eventClass: 'combat_event'
+        },
+        expectedClass: 'combat_event',
+        expectedTemplate: 'ticket-stub'
+      },
+      {
+        slug: 'paid-template-tennis-no-logo',
+        sport: 'tennis.png',
+        query: {
+          league: 'Wimbledon',
+          title: 'Wimbledon',
+          detail: 'Sinner v Alcaraz',
+          date: '2026-07-12',
+          home: 'Sinner',
+          away: 'Alcaraz',
+          eventClass: 'tennis_or_snooker_match'
+        },
+        expectedClass: 'tennis_or_snooker_match',
+        expectedTemplate: 'ticket-stub'
+      }
+    ]
+
+    for (const testCase of noLogoCases) {
+      const response = makeMockResponse()
+      await handleDefaultSportsArtwork(
+        {
+          params: {
+            variant: 'poster',
+            sport: testCase.sport
+          },
+          query: testCase.query
+        },
+        response,
+        {
+          sportsmetaBaseUrl: 'https://sportsmeta.test'
+        }
+      )
+      assert.equal(response.statusCode, 200, `${testCase.slug} should return 200`)
+      assert.equal(response.headers['content-type'], 'image/png', `${testCase.slug} should return PNG`)
+      assert.equal(response.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-paid-template', `${testCase.slug} should use paid no-logo template art`)
+      assert.equal(response.headers['x-pvtkrrx-sports-event-class'], testCase.expectedClass, `${testCase.slug} classification`)
+      assert.equal(response.headers['x-pvtkrrx-artwork-template'], testCase.expectedTemplate, `${testCase.slug} selected template`)
+      assert.doesNotMatch(response.headers['x-pvtkrrx-artwork-source'], /generated-card|team-badge|emergency-svg|emergency-legacy/, `${testCase.slug} should not use old generated or emergency art`)
+      assert.deepEqual(pngDimensions(response.body), dimensions.poster, `${testCase.slug} poster dimensions`)
+      fs.writeFileSync(path.join(PREVIEW_DIR, `${testCase.slug}.png`), response.body)
+    }
   } finally {
     global.fetch = originalFetch
   }

@@ -16,7 +16,7 @@ const OUT_DIR = path.join(process.cwd(), '.runtime', 'sports-artwork-debug')
 const ASSET_DIR = path.join(OUT_DIR, 'assets')
 const PORT = Math.max(1024, Number(process.env.PVTKRRX_ARTWORK_DEBUG_PORT || 7099) || 7099)
 const HOST = '127.0.0.1'
-const PROXY_VERSION = '20260429-python-template-port-v2'
+const PROXY_VERSION = '20260429-paid-template-classifier-v1'
 const DEBUG_CONFIG = {
   sportsmetaBaseUrl: process.env.PVTKRRX_SPORTSMETA_BASE_URL || process.env.SPORTSMETA_BASE_URL || 'https://sportsmeta.pvtkrrx.cc',
   sportsPosterMemberToken: process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN || process.env.SPORTSMETA_MEMBER_TOKEN || ''
@@ -173,8 +173,8 @@ function renderCard(sample) {
     normalized: sample.normalized
   }
   const badgePath = sample.routeKind === 'canonical-id'
-    ? 'canonical -> SportsMeta /event -> member homeBadge/awayBadge/leagueLogo -> pvtkrrx-team-badge-* only when real raster badge bytes exist'
-    : 'default -> SportsMeta resolve attempt -> canonical member badges if resolved -> sport-specific generated surface if not'
+    ? 'canonical -> SportsMeta /event -> member homeBadge/awayBadge/leagueLogo -> pvtkrrx-paid-template only when real raster badge bytes exist'
+    : 'default -> SportsMeta resolve attempt -> canonical member badges if resolved -> paid template no-logo render if not'
 
   return `<article class="case" data-label="${escapeHtml(sample.label)}">
     <div class="case-head">

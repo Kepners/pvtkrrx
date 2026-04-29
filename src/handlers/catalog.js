@@ -35,6 +35,7 @@ const {
   resolveSportsLogoAsset
 } = require('../utils/sportsArtwork')
 const { normalizeSportsEventMetadata } = require('../utils/sportsEventNormalizer')
+const { classifySportsEvent } = require('../utils/sportsEventClassifier')
 const { buildMetaPlaceholder } = require('../utils/metaPlaceholder')
 const { applyHostedServiceOverrides } = require('../utils/hostedServiceOverrides')
 
@@ -568,6 +569,17 @@ function normalizeSportsCatalogItems(items = []) {
       sportHint: item?.sportHint,
       league: effectiveLeague
     })
+    const eventClass = sportsProfile?.event_class || classifySportsEvent({
+      sportHint: sportsProfile?.sport || item?.sportHint,
+      sport: sportsProfile?.sport,
+      competition: sportsProfile?.league || effectiveLeague,
+      league: sportsProfile?.league || effectiveLeague,
+      eventTitle: sportsProfile?.event,
+      eventDetail: sportsProfile?.session || sportsProfile?.round,
+      homeTeam: sportsProfile?.home_team || parsedSportsEvent?.homeTeam,
+      awayTeam: sportsProfile?.away_team || parsedSportsEvent?.awayTeam,
+      rawTitle: item?.title || ''
+    })
     return {
       ...item,
       trackerSource: {
@@ -578,12 +590,17 @@ function normalizeSportsCatalogItems(items = []) {
         seeders: item?.seeders || 0,
         indexer: item?.indexer || '',
         pubDate: item?.pubDate || item?.publishDate || '',
-        sportHint: item?.sportHint || ''
+        sportHint: item?.sportHint || '',
+        eventClass
       },
       trackerSourceType: isSportsCultIndexer(item?.indexer) ? 'sportscult' : 'other',
       parsedSportsEvent,
       parsedEvent,
-      sportsProfile,
+      eventClass,
+      sportsProfile: {
+        ...sportsProfile,
+        event_class: eventClass
+      },
       sportsRank: rankSportsTorrent(item, '', {
         profile: sportsProfile,
         parsedSportsEvent,
@@ -1266,6 +1283,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       homeTeam: normalizedSportsEvent.homeTeam || fallbackHomeTeam,
       awayTeam: normalizedSportsEvent.awayTeam || fallbackAwayTeam,
       eventDetail: normalizedSportsEvent.eventDetail || '',
+      eventClass: availability.eventClass || availability.sportsProfile?.event_class || '',
       date: normalizedSportsEvent.date || eventDate,
       seeders: normalizedSportsEvent.seeders,
       size: normalizedSportsEvent.size,
@@ -1317,7 +1335,8 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
             v: String(canonicalEvent?.eventId || sportsArtwork?.eventId || '').trim(),
             x: canonicalCatalogId,
             q: String(sportsMetaResolution?.status || SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY),
-            ak: availabilityAnchorKey
+            ak: availabilityAnchorKey,
+            ec: availability.eventClass || availability.sportsProfile?.event_class || ''
           }, {
             compress: true,
             compact: 'sports'

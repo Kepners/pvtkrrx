@@ -466,7 +466,7 @@ async function run() {
   )
   assert.equal(
     paidSportsMetaResponse.meta?.poster,
-    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}&template=ticket-stub&v=20260429-python-template-port-v2`,
+    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}&template=ticket-stub&v=20260429-paid-template-classifier-v1`,
     'paid sports configs must emit PVTKRRX raster-proxy poster URLs for canonical sports art'
   )
 
@@ -482,7 +482,7 @@ async function run() {
   )
   assert.equal(
     templateSportsMetaResponse.meta?.poster,
-    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}&template=glitch&v=20260429-python-template-port-v2`,
+    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}&template=glitch&v=20260429-paid-template-classifier-v1`,
     'paid sports configs must carry the selected Sports Posters template into artwork URLs'
   )
 
@@ -496,7 +496,7 @@ async function run() {
     })
     assert.equal(
       envTokenPoster.poster,
-      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260429-python-template-port-v2`,
+      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260429-paid-template-classifier-v1`,
       'PVTKRRX should keep runtime env member tokens server-side instead of exposing them in artwork URLs'
     )
     assert.equal(envTokenPoster.selectedArtworkSource, 'sportsmeta-member-raster')
@@ -709,6 +709,7 @@ async function run() {
   assert.equal(motogpTntProfile.session, 'Race', 'Prowlarr MotoGP rows should expose the session')
   assert.equal(motogpTntProfile.broadcast, 'TNT', 'Prowlarr MotoGP rows should keep broadcast separately')
   assert.equal(motogpTntProfile.release_group, 'MWR', 'Prowlarr MotoGP rows should keep the real release group')
+  assert.equal(motogpTntProfile.event_class, 'motorsport_event', 'MotoGP rows should be classified as event/session posters, not team matchups')
 
   const mlbRsProfile = parseSportsTorrentProfile({
     title: 'MLB 26 04 2026 RS Miami Marlins vs San Francisco Giants 720p60 EN NBCSBA',
@@ -789,6 +790,7 @@ async function run() {
   assert.equal(pgaPrefixedProfile.league, 'PGA Tour', 'Golf-prefixed PGA Tour rows should keep PGA Tour as the league')
   assert.equal(pgaPrefixedProfile.event, 'Valero Texas Open Day', 'Golf-prefixed PGA Tour rows should preserve the event label')
   assert.equal(pgaPrefixedProfile.broadcast, 'Sky Sports', 'Golf-prefixed PGA Tour rows should keep Sky as broadcast metadata')
+  assert.equal(pgaPrefixedProfile.event_class, 'golf_event', 'PGA Tour rows should be classified as golf-event posters')
 
   const faCupPrefixedProfile = parseSportsTorrentProfile({
     title: 'Football FA Cup Chelsea vs Leeds United 2026 04 26 1080p WEB-DL',
@@ -813,6 +815,7 @@ async function run() {
   assert.equal(eplProfile.home_team, 'Liverpool', 'EPL rows should preserve the home team')
   assert.equal(eplProfile.away_team, 'Crystal Palace', 'EPL rows should preserve the away team')
   assert.equal(eplProfile.date, '2026-04-25', 'EPL rows should extract the fixture date')
+  assert.equal(eplProfile.event_class, 'team_vs_team', 'EPL rows with two teams should be classified as team-vs-team')
 
   const ufcProfile = parseSportsTorrentProfile({
     title: 'UFC Fight Night Burns vs Malott Main Card 1080p WEB DL H264 Fight BB',
@@ -825,6 +828,7 @@ async function run() {
   assert.equal(ufcProfile.home_team, 'Burns', 'UFC rows should preserve the first fighter')
   assert.equal(ufcProfile.away_team, 'Malott', 'UFC rows should preserve the second fighter')
   assert.equal(ufcProfile.session, 'Main Card', 'UFC rows should expose main card as session metadata')
+  assert.equal(ufcProfile.event_class, 'combat_event', 'UFC rows should be classified as combat-event posters')
 
   const wimbledonProfile = parseSportsTorrentProfile({
     title: 'Wimbledon 2025 07 06 Day 7 Court #2 1080p BBC',
@@ -848,6 +852,7 @@ async function run() {
   assert.equal(atpProfile.home_team, 'Sinner', 'ATP rows should not leak tournament name into first player')
   assert.equal(atpProfile.away_team, 'Alcaraz', 'ATP rows should preserve the second player')
   assert.equal(atpProfile.round, 'Final', 'ATP rows should expose final as round metadata')
+  assert.equal(atpProfile.event_class, 'tennis_or_snooker_match', 'ATP rows should be classified as tennis/snooker posters')
 
   const wtaProfile = parseSportsTorrentProfile({
     title: 'WTA Rome 2026 Swiatek vs Gauff Semi Final 720p WEB',

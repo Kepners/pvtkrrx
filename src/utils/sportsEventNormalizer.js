@@ -31,7 +31,7 @@ const COUNTRY_WORDS = {
   austrian: 'Austria',
   belgian: 'Belgium',
   britain: 'Britain',
-  british: 'Britain',
+  british: 'British',
   canada: 'Canada',
   canadian: 'Canada',
   catalan: 'Catalunya',
@@ -70,7 +70,7 @@ const SESSION_WORDS = new Set([
   'fp3'
 ])
 
-const MATCHUP_PREFIX_NOISE_RE = /\b(?:english\s+premier\s+league|major\s+league\s+soccer|premier\s+league|champions\s+league|europa\s+league|fa\s+cup|la\s+liga|serie\s+a|bundesliga|college\s+football|world\s+series|stanley\s+cup|super\s+league\s+rugby|super\s+league|six\s+nations|premiership\s+rugby|rugby\s+championship|rugby\s+league|test\s+cricket|indian\s+premier\s+league|the\s+ashes|world\s+championship|world\s+matchplay|fight\s+night|main\s+card|main\s+event|regular\s+season|formula\s+1|formula\s+e|pga\s+tour|tour\s+de\s+france|giro\s+d['’]?italia|vuelta\s+a\s+espana|australian\s+open|roland\s+garros|us\s+open|nhl|mlb|nba|nfl|mls|epl|ipl|odi|t20|atp|wta|pdc|ufc|pfl|wwe|aew|pga|lpga|motogp|nascar|indycar|wrc|wec|bkfc|football|baseball|hockey|basketball|cricket|rugby|tennis|boxing|mma|wrestling|darts|golf|motorsport|playoffs?|postseason|finals?|prelims?|heavyweight|matchroom|queensberry|masters|wimbledon|classics|rs)\b/gi
+const MATCHUP_PREFIX_NOISE_RE = /\b(?:english\s+premier\s+league|major\s+league\s+soccer|premier\s+league|champions\s+league|europa\s+league|conference\s+league|uefa\s+nations\s+league|fifa\s+world\s+cup|world\s+cup\s+qualifiers?|euro\s+qualifiers?|european\s+championship|copa\s+america|afcon|asian\s+cup|conmebol\s+qualifiers?|concacaf\s+qualifiers?|international\s+friendlies?|fa\s+cup|la\s+liga|serie\s+a|bundesliga|college\s+football|world\s+series|stanley\s+cup|super\s+league\s+rugby|super\s+league|six\s+nations|premiership\s+rugby|rugby\s+championship|rugby\s+league|test\s+cricket|indian\s+premier\s+league|the\s+ashes|world\s+championship|world\s+matchplay|fight\s+night|main\s+card|main\s+event|regular\s+season|formula\s+1|formula\s+e|pga\s+tour|tour\s+de\s+france|giro\s+d['’]?italia|vuelta\s+a\s+espana|australian\s+open|roland\s+garros|us\s+open|nhl|mlb|nba|nfl|mls|epl|ipl|odi|t20|atp|wta|pdc|ufc|pfl|wwe|aew|pga|lpga|motogp|nascar|indycar|wrc|wec|bkfc|football|baseball|hockey|basketball|cricket|rugby|tennis|boxing|mma|wrestling|darts|golf|motorsport|playoffs?|postseason|finals?|prelims?|heavyweight|matchroom|queensberry|masters|wimbledon|classics|rs)\b/gi
 
 const RELEASE_GROUP_NOISE_RE = /\b(?:m4rtyr|thecig|mwr|billie|mgp|ntb|ctrlhd|deflate|organic|tgx|nf|int)\b.*$/i
 
@@ -146,7 +146,7 @@ function stripMatchupSideNoise(value, side = 'left') {
     .replace(MATCHUP_PREFIX_NOISE_RE, ' ')
     .replace(/\b(?:game|gm|g|r|round)\s*\d+\b/gi, ' ')
     .replace(/\b(?:19|20)\d{2}\b/g, ' ')
-    .replace(/\b\d{1,2}\b/g, ' ')
+    .replace(/\b\d{1,4}\b/g, ' ')
   text = normalizeSpace(text)
   const tokens = text.split(/\s+/).filter(Boolean)
   if (tokens.length > 5) {
@@ -371,8 +371,16 @@ function normalizeSportsEventMetadata(input = {}) {
   const awayTeam = normalizeSpace(input.awayTeam || input.away || canonicalEvent.awayTeam || canonicalParsed?.awayTeam || parsedSportsEvent?.awayTeam || looseMatchup?.awayTeam || '')
 
   let competition = normalizeCompetition(rawLeague, sportKey, rawTitle)
-  let eventTitle = normalizeSpace(input.eventTitle || input.name || canonicalEvent.name || canonicalEvent.title || '')
-  let eventDetail = normalizeSpace(input.eventDetail || '')
+  let eventTitle = normalizeSpace(input.eventTitle || input.eventName || input.name || canonicalEvent.name || canonicalEvent.title || '')
+  let eventDetail = normalizeSpace(
+    input.eventDetail ||
+    input.session ||
+    parsedEvent?.session ||
+    parsedEvent?.round ||
+    parsedSportsEvent?.session ||
+    parsedSportsEvent?.round ||
+    ''
+  )
 
   if (homeTeam && awayTeam && labelsMatch(homeTeam, competition)) {
     eventTitle = awayTeam
@@ -397,6 +405,14 @@ function normalizeSportsEventMetadata(input = {}) {
     eventDetail = eventDetail || motorsport.eventDetail
   }
 
+  if (sportKey === 'cycling' && /^(?:stage|race|time trial|road race)$/i.test(eventTitle) && competition) {
+    eventTitle = competition
+  }
+
+  if (sportKey === 'golf' && /^championship$/i.test(eventTitle) && /\bpga\b/i.test(rawLeague || rawTitle)) {
+    eventTitle = 'PGA Championship'
+  }
+
   if (!eventTitle) {
     eventTitle = cleanTrackerText(rawTitle) || rawTitle || 'Sports Event'
   }
@@ -405,9 +421,22 @@ function normalizeSportsEventMetadata(input = {}) {
     sport,
     competition: competition || sport,
     eventTitle,
+    eventName: eventTitle,
+    eventShort: normalizeSpace(
+      input.eventShort ||
+      input.event_short ||
+      (/^(?:stage|race|championship)$/i.test(parsedEvent?.eventShort || '') ? eventTitle : parsedEvent?.eventShort) ||
+      parsedSportsEvent?.eventShort ||
+      eventTitle
+    ),
     ...(homeTeam ? { homeTeam } : {}),
     ...(awayTeam ? { awayTeam } : {}),
+    ...(homeTeam ? { principalA: homeTeam } : {}),
+    ...(awayTeam ? { principalB: awayTeam } : {}),
     ...(eventDetail ? { eventDetail } : {}),
+    ...(parsedEvent?.session ? { session: parsedEvent.session } : {}),
+    ...(parsedEvent?.round ? { round: parsedEvent.round } : {}),
+    ...(parsedEvent?.roundShort ? { roundShort: parsedEvent.roundShort } : {}),
     ...(date ? { date } : {}),
     ...(Number.isFinite(Number(input.seeders)) ? { seeders: Number(input.seeders) } : {}),
     ...(input.size ? { size: String(input.size) } : {}),

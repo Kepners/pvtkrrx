@@ -103,11 +103,11 @@ async function fetchJson(url, label) {
 
 async function inspectImage(url) {
   const target = String(url || '').trim()
-  if (!target) return { ok: false, status: 0, width: 0, height: 0, contentType: '', source: '', fallback: 'missing_url', upstream: '' }
+  if (!target) return { ok: false, status: 0, width: 0, height: 0, contentType: '', source: '', template: '', eventClass: '', renderFailure: '', fallback: 'missing_url', upstream: '' }
 
   const result = await fetchTimed(target, { accept: 'image/png,image/jpeg,image/webp,image/*' })
   if (result.error) {
-    return { ok: false, status: 0, width: 0, height: 0, contentType: '', source: '', fallback: result.error.message, upstream: '' }
+    return { ok: false, status: 0, width: 0, height: 0, contentType: '', source: '', template: '', eventClass: '', renderFailure: '', fallback: result.error.message, upstream: '' }
   }
 
   const response = result.response
@@ -128,6 +128,9 @@ async function inspectImage(url) {
     width: Number(metadata.width || 0),
     height: Number(metadata.height || 0),
     source: String(response.headers.get('x-pvtkrrx-artwork-source') || ''),
+    template: String(response.headers.get('x-pvtkrrx-artwork-template') || ''),
+    eventClass: String(response.headers.get('x-pvtkrrx-sports-event-class') || ''),
+    renderFailure: String(response.headers.get('x-pvtkrrx-artwork-render-failure') || ''),
     fallback: String(response.headers.get('x-pvtkrrx-artwork-fallback') || ''),
     upstream: redactUrl(String(response.headers.get('x-pvtkrrx-artwork-upstream') || ''))
   }
@@ -241,7 +244,9 @@ async function main() {
     posterPortrait: rows.filter((row) => row.checks.posterPortrait).length,
     backgroundReachable: rows.filter((row) => row.checks.backgroundReachable).length,
     backgroundWide: rows.filter((row) => row.checks.backgroundWide).length,
-    generatedFallbacks: rows.filter((row) => row.poster.source === 'pvtkrrx-generated-card' || row.background.source === 'pvtkrrx-generated-card').length,
+    oldGeneratedFallbacks: rows.filter((row) => row.poster.source === 'pvtkrrx-generated-card' || row.background.source === 'pvtkrrx-generated-card').length,
+    emergencyFallbacks: rows.filter((row) => row.poster.source === 'pvtkrrx-emergency-legacy-fallback' || row.background.source === 'pvtkrrx-emergency-legacy-fallback').length,
+    paidTemplateRenders: rows.filter((row) => row.poster.source === 'pvtkrrx-paid-template' || row.background.source === 'pvtkrrx-paid-template').length,
     memberUpstreams: rows.filter((row) => /\/member\/\[redacted\]\/asset\//.test(row.poster.upstream) || /\/member\/\[redacted\]\/asset\//.test(row.background.upstream)).length,
     targeted
   }
@@ -252,7 +257,7 @@ async function main() {
   console.log(`sampled=${summary.sampled} resolved=${summary.resolved} fallback=${summary.fallback}`)
   console.log(`posterReachable=${summary.posterReachable}/${summary.sampled} posterPortrait=${summary.posterPortrait}/${summary.sampled}`)
   console.log(`backgroundReachable=${summary.backgroundReachable}/${summary.sampled} backgroundWide=${summary.backgroundWide}/${summary.sampled}`)
-  console.log(`generatedFallbacks=${summary.generatedFallbacks} memberUpstreams=${summary.memberUpstreams}`)
+  console.log(`paidTemplateRenders=${summary.paidTemplateRenders} oldGeneratedFallbacks=${summary.oldGeneratedFallbacks} emergencyFallbacks=${summary.emergencyFallbacks} memberUpstreams=${summary.memberUpstreams}`)
   console.log(`targetedTerms=${targeted.map((entry) => `${entry.term}:${entry.sampled}`).join(', ')}`)
   console.log(JSON.stringify({ summary, rows }, null, 2))
 

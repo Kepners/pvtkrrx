@@ -2,6 +2,7 @@ const { parse: parseMediaTitle } = require('./parser')
 const { getMappedLeagueEntry, mapLeague } = require('./leagueMap')
 const { normalizeSportKey, resolveSportHint } = require('./sportsRules')
 const { parseSportsTitle, parseSportsEventTitle } = require('./sportsTitleParser')
+const { classifySportsEvent } = require('./sportsEventClassifier')
 
 const BROADCAST_RULES = [
   ['Sky Sports', /\bsky[\s._-]*sports?\b|\bskysports\b/i],
@@ -229,6 +230,17 @@ function parseSportsTorrentProfile(itemOrTitle = '', options = {}) {
     language: normalizeLanguage(media.languages),
     release_group: extractReleaseGroup(rawTitle)
   }
+  profile.event_class = classifySportsEvent({
+    sportHint: profile.sport,
+    sport: profile.sport,
+    competition: profile.league,
+    league: profile.league,
+    eventTitle: profile.event,
+    eventDetail: profile.session || profile.round,
+    homeTeam: profile.home_team,
+    awayTeam: profile.away_team,
+    rawTitle
+  })
   profile.clean_name = buildCleanName(profile)
   profile.confidence = confidenceScore(profile)
   return profile

@@ -13,6 +13,7 @@ const {
   resolveSportsLogoAsset
 } = require('../utils/sportsArtwork')
 const { normalizeSportsEventMetadata } = require('../utils/sportsEventNormalizer')
+const { classifySportsEvent } = require('../utils/sportsEventClassifier')
 const BRAND_POSTER = BRAND_ARTWORK
 const BRAND_LOGO = BRAND_ARTWORK
 
@@ -258,6 +259,7 @@ async function handleCustomMeta(config, id, context = {}) {
   const carriedAwayTeam = String(info.w || '').trim()
   const carriedEventDetail = String(info.j || '').trim()
   const carriedSportHint = String(info.r || '').trim()
+  const carriedEventClass = String(info.ec || info.eventClass || info.event_class || '').trim()
   const canonicalId = String(info.x || '').trim()
   const resolutionStatus = String(info.q || '').trim()
   const normalizedCarriedLeague = String(carriedLeague || mapLeague(carriedLeagueCode) || carriedLeagueCode).trim()
@@ -313,6 +315,8 @@ async function handleCustomMeta(config, id, context = {}) {
         competition: league,
         eventTitle: displayTitle,
         date: eventDate,
+        homeTeam,
+        awayTeam,
         eventDetail: carriedEventDetail,
         seeders: Number(info.d || 0) || undefined,
         size: Number(info.s || 0) > 0 ? formatSize(info.s) : '',
@@ -320,6 +324,18 @@ async function handleCustomMeta(config, id, context = {}) {
         source: canonicalSportsMeta ? 'sportsmeta' : 'prowlarr'
       })
     : null
+  const eventClass = isSports
+    ? carriedEventClass || classifySportsEvent({
+        sport: resolvedSportHint || normalizedSportsEvent?.sport || '',
+        league: normalizedSportsEvent?.competition || league,
+        title: normalizedSportsEvent?.eventTitle || displayTitle,
+        eventTitle: normalizedSportsEvent?.eventTitle || displayTitle,
+        eventDetail: normalizedSportsEvent?.eventDetail || carriedEventDetail,
+        homeTeam: normalizedSportsEvent?.homeTeam || homeTeam,
+        awayTeam: normalizedSportsEvent?.awayTeam || awayTeam,
+        rawTitle: normalizedSportsEvent?.rawTitle || info.t || displayTitle
+      })
+    : ''
 
   const artworkInput = {
     baseUrl: String(baseUrl || '').replace(/\/+$/, ''),
@@ -330,7 +346,10 @@ async function handleCustomMeta(config, id, context = {}) {
     sportHint: resolvedSportHint || normalizedSportsEvent?.sport || '',
     league: normalizedSportsEvent?.competition || league,
     title: normalizedSportsEvent?.eventTitle || displayTitle,
+    homeTeam: normalizedSportsEvent?.homeTeam || homeTeam,
+    awayTeam: normalizedSportsEvent?.awayTeam || awayTeam,
     eventDetail: normalizedSportsEvent?.eventDetail || '',
+    eventClass,
     date: normalizedSportsEvent?.date || eventDate,
     seeders: normalizedSportsEvent?.seeders,
     size: normalizedSportsEvent?.size,

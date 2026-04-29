@@ -6,7 +6,7 @@ const {
 } = require('../clients/sportsmeta')
 const { resolveSportsPosterTemplate } = require('./sportsPosterTemplates')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260429-python-template-port-v2'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260429-paid-template-classifier-v1'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
@@ -88,6 +88,15 @@ function resolveAwayTeam(input = {}) {
   )
 }
 
+function resolveEventClass(input = {}) {
+  return normalizeSpace(
+    input?.eventClass ||
+    input?.sportsEventClass ||
+    input?.sportsArtwork?.eventClass ||
+    ''
+  )
+}
+
 function resolveSportsPosterMemberToken(input = {}) {
   return normalizeSpace(
     input?.sportsPosterMemberToken ||
@@ -150,6 +159,8 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
   if (homeTeam) url.searchParams.set('home', homeTeam)
   if (awayTeam) url.searchParams.set('away', awayTeam)
   if (input?.eventDetail) url.searchParams.set('detail', normalizeSpace(input.eventDetail))
+  const eventClass = resolveEventClass(input)
+  if (eventClass) url.searchParams.set('eventClass', eventClass)
   if (input?.rawTitle) url.searchParams.set('rawTitle', normalizeSpace(input.rawTitle))
   if (Number(input?.seeders) > 0) url.searchParams.set('seeders', String(Number(input.seeders)))
   if (input?.size) url.searchParams.set('size', normalizeSpace(input.size))

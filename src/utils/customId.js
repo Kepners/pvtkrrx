@@ -29,7 +29,7 @@ function compactSportsPayload(payload = {}) {
   // Full league name (g) and full torrent title (t) are excluded to stay
   // under 256 chars — the meta handler can re-derive from league code (u)
   // and display title (n).
-  const eventDate = String(payload.e || '').trim()
+  const eventDate = String(payload.e || payload.p || '').trim()
   const eventId = String(payload.v || '').trim()
   const leagueCode = String(payload.u || '').trim()
   const league = String(payload.g || '').trim()
@@ -39,7 +39,11 @@ function compactSportsPayload(payload = {}) {
   const canonicalId = String(payload.x || '').trim()
   const resolutionStatus = String(payload.q || '').trim()
   const availabilityAnchorKey = String(payload.ak || '').trim()
-  if (eventDate) compact.e = eventDate
+  const eventClass = String(payload.ec || payload.eventClass || payload.event_class || '').trim()
+  if (eventDate) {
+    compact.e = eventDate
+    compact.p = eventDate
+  }
   if (eventId) compact.v = eventId
   if (leagueCode) compact.u = leagueCode
   if (league) compact.g = league
@@ -49,6 +53,7 @@ function compactSportsPayload(payload = {}) {
   if (canonicalId) compact.x = canonicalId
   if (resolutionStatus) compact.q = resolutionStatus
   if (availabilityAnchorKey) compact.ak = availabilityAnchorKey
+  if (eventClass) compact.ec = eventClass
   return compact
 }
 
