@@ -87,7 +87,7 @@ function titleCase(value = '') {
     .filter(Boolean)
     .map((part) => {
       const upper = part.toUpperCase()
-      if (['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'F1', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'NBA', 'NFL', 'NHL', 'NXT', 'PDC', 'PFL', 'PGA', 'RAW', 'UFC', 'UEFA', 'WEC', 'WRC', 'WTA', 'WWE'].includes(upper)) return upper
+      if (['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'F1', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'NBA', 'NFL', 'NHL', 'NXT', 'PDC', 'PFL', 'PGA', 'RAW', 'TBA', 'UFC', 'UEFA', 'WEC', 'WRC', 'WTA', 'WWE'].includes(upper)) return upper
       if (upper === 'MOTOGP') return 'MotoGP'
       if (upper === 'SMACKDOWN') return 'SmackDown'
       if (upper === 'WRESTLEMANIA') return 'WrestleMania'
@@ -179,13 +179,21 @@ function sportIconFor(input = {}) {
     input.rawTitle
   ].filter(Boolean).join(' ')).toLowerCase()
   if (/formula|f1|motogp|moto\s*gp|motor|wrc|rally|grand prix|nascar|indycar|wec|formula e/.test(text)) return 'f1'
+  if (/golf|pga|lpga|masters|ryder cup|liv golf|open championship/.test(text)) return 'golf'
+  if (/darts|pdc|world matchplay|premier league darts/.test(text)) return 'darts'
+  if (/cycling|tour de france|giro|vuelta|stage|time trial|road race|paris roubaix|tour of flanders/.test(text)) return 'cycling'
+  if (/athletics|diamond league|continental tour|track and field|marathon|simbine|kip keino/.test(text)) return 'athletics'
+  if (/cricket|ipl|odi|t20|ashes|test match/.test(text)) return 'cricket'
+  if (/rugby|nrl|six nations|super rugby|major league rugby/.test(text)) return 'rugby'
+  if (/wrestling|wwe|aew|smackdown|raw|nxt|wrestlemania|royal rumble/.test(text)) return 'wrestling'
+  if (/snooker|crucible|world snooker/.test(text)) return 'snooker'
   if (/american.*football|nfl|super bowl/.test(text)) return 'football'
   if (/football|soccer|premier|fa cup|mls|champions league|europa|nations league|world cup/.test(text)) return 'soccer'
   if (/hockey|nhl/.test(text)) return 'hockey'
   if (/basketball|nba|wnba|euroleague/.test(text)) return 'basketball'
   if (/baseball|mlb|world series/.test(text)) return 'baseball'
-  if (/tennis|wimbledon|atp|wta|snooker/.test(text)) return 'tennis'
-  if (/mma|ufc|boxing|fight|wrestling|wwe|aew/.test(text)) return 'mma'
+  if (/tennis|wimbledon|atp|wta/.test(text)) return 'tennis'
+  if (/mma|ufc|boxing|fight/.test(text)) return 'mma'
   return 'soccer'
 }
 

@@ -241,12 +241,13 @@ function leagueCodeFor(event = {}, league = '') {
 }
 
 function sportIconFor(event = {}, facts = {}) {
-  const text = `${event.sportIcon || ''} ${facts.sport || ''} ${facts.league || ''} ${facts.detail || ''} ${facts.title || ''}`.toLowerCase()
+  const text = `${event.sport_icon || ''} ${event.sportIcon || ''} ${facts.sport || ''} ${facts.league || ''} ${facts.detail || ''} ${facts.title || ''}`.toLowerCase()
   if (/formula|f1/.test(text)) return 'f1'
   if (/moto\s*gp|motogp|motor|wrc|rally|grand prix/.test(text)) return 'f1'
   if (/golf|pga|lpga|masters|ryder|liv/.test(text)) return 'golf'
   if (/darts|pdc|world matchplay/.test(text)) return 'darts'
   if (/cycling|tour de france|giro|vuelta|stage|time trial|road race/.test(text)) return 'cycling'
+  if (/athletics|diamond league|continental tour|track and field|marathon/.test(text)) return 'athletics'
   if (/cricket|ipl|odi|t20|ashes/.test(text)) return 'cricket'
   if (/rugby|nrl|six nations|super rugby/.test(text)) return 'rugby'
   if (/wrestling|wwe|aew|smackdown|raw|nxt/.test(text)) return 'wrestling'
@@ -255,6 +256,7 @@ function sportIconFor(event = {}, facts = {}) {
   if (/hockey|nhl/.test(text)) return 'hockey'
   if (/basketball|nba/.test(text)) return 'basketball'
   if (/baseball|mlb/.test(text)) return 'baseball'
+  if (/snooker|crucible|world snooker/.test(text)) return 'snooker'
   if (/tennis|wimbledon|atp|wta/.test(text)) return 'tennis'
   if (/mma|ufc|boxing|fight/.test(text)) return 'mma'
   return 'soccer'
@@ -362,8 +364,10 @@ function sportGlyph(icon = 'soccer', x = 50, y = 50, size = 100, color = '#fff',
     golf: `<circle cx="38" cy="68" r="14" fill="currentColor" stroke="none"/><path d="M48,68 C66,62 76,52 82,38"/><line x1="62" y1="18" x2="62" y2="76"/><path d="M62,18 L84,26 L62,34 Z" fill="currentColor" stroke="none"/>`,
     darts: `<circle cx="50" cy="50" r="38"/><circle cx="50" cy="50" r="25"/><circle cx="50" cy="50" r="10" fill="currentColor" stroke="none"/><line x1="50" y1="12" x2="50" y2="88"/><line x1="12" y1="50" x2="88" y2="50"/>`,
     cycling: `<circle cx="28" cy="68" r="16"/><circle cx="74" cy="68" r="16"/><path d="M28,68 L46,40 L58,68 L42,68 L56,42 L72,68"/><path d="M42,32 L54,32"/><circle cx="58" cy="24" r="7" fill="currentColor" stroke="none"/>`,
+    athletics: `<path d="M30,78 C42,62 54,48 70,24"/><path d="M30,78 L50,78"/><path d="M46,56 L68,62"/><path d="M54,46 L42,30"/><circle cx="72" cy="20" r="8" fill="currentColor" stroke="none"/>`,
     cricket: `<path d="M26,76 L72,30"/><path d="M66,24 L80,38 L74,44 L60,30 Z" fill="currentColor" stroke="none"/><circle cx="28" cy="34" r="9"/>`,
     rugby: `<ellipse cx="50" cy="50" rx="36" ry="24" transform="rotate(-28 50 50)"/><path d="M28,50 Q50,40 72,50"/><path d="M28,50 Q50,60 72,50"/>`,
+    snooker: `<circle cx="36" cy="62" r="13" fill="currentColor" stroke="none"/><circle cx="58" cy="62" r="13"/><circle cx="48" cy="40" r="13"/><path d="M22,82 L82,22"/>`,
     wrestling: `<rect x="20" y="34" width="60" height="42"/><line x1="20" y1="44" x2="80" y2="44"/><line x1="20" y1="56" x2="80" y2="56"/><line x1="20" y1="68" x2="80" y2="68"/><circle cx="30" cy="34" r="4" fill="currentColor" stroke="none"/><circle cx="70" cy="34" r="4" fill="currentColor" stroke="none"/><circle cx="30" cy="76" r="4" fill="currentColor" stroke="none"/><circle cx="70" cy="76" r="4" fill="currentColor" stroke="none"/>`
   }
   const inner = shapes[icon] || shapes.soccer
