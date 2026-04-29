@@ -733,6 +733,90 @@
       line-height: 1.5;
     }
 
+    .poster-gallery {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 14px;
+    }
+
+    .poster-example {
+      margin: 0;
+      border: 1px solid rgba(0, 246, 255, 0.18);
+      border-radius: 11px;
+      padding: 10px;
+      background:
+        radial-gradient(260px 160px at 18% 0%, rgba(0, 246, 255, 0.08), transparent 70%),
+        rgba(4, 8, 18, 0.68);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.025);
+    }
+
+    .poster-example img {
+      display: block;
+      width: 100%;
+      aspect-ratio: 2 / 3;
+      object-fit: contain;
+      border-radius: 8px;
+      background: #040812;
+    }
+
+    .poster-example figcaption {
+      margin-top: 9px;
+      color: #c8dafa;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .poster-example strong {
+      display: block;
+      color: #f4f8ff;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .audit-grid {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .audit-card {
+      border: 1px solid rgba(0, 246, 255, 0.18);
+      border-radius: 11px;
+      padding: 16px 14px;
+      background: rgba(4, 8, 18, 0.68);
+      min-height: 130px;
+    }
+
+    .audit-value {
+      font-family: "Orbitron", sans-serif;
+      font-size: clamp(24px, 3.8vw, 38px);
+      color: #f4f8ff;
+      margin-bottom: 8px;
+      overflow-wrap: anywhere;
+    }
+
+    .audit-label {
+      color: #c8dafa;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .audit-note {
+      margin-top: 14px;
+      border: 1px solid rgba(255, 178, 26, 0.28);
+      border-radius: 11px;
+      padding: 13px 14px;
+      color: #f8e4b7;
+      background: rgba(72, 44, 6, 0.22);
+      font-size: 14px;
+      line-height: 1.55;
+    }
+
     .step-grid {
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -952,6 +1036,8 @@
     @media (max-width: 1000px) {
       .signal-row,
       .feature-grid,
+      .poster-gallery,
+      .audit-grid,
       .plan-grid,
       .step-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1040,6 +1126,8 @@
 
       .signal-row,
       .feature-grid,
+      .poster-gallery,
+      .audit-grid,
       .plan-grid,
       .step-grid {
         grid-template-columns: 1fr;
@@ -1223,6 +1311,85 @@
           </ul>
         </article>
       </div>
+    </section>
+
+    <section class="section-block" id="poster-examples">
+      <div class="section-head">
+        <div class="section-kicker">Sports Posters Samples</div>
+        <h2 class="section-title">What the artwork upgrade is meant to look like</h2>
+        <p class="section-copy">
+          These are full-size poster layout samples, not a tiny contact sheet. On member routes, SportsMeta uses cached league, event, and team artwork where it has safe matches. Missing team or league images fall back to sport-specific glyph artwork and are logged for later DB enrichment.
+        </p>
+      </div>
+      <div class="poster-gallery" aria-label="Sports Posters template examples">
+        <figure class="poster-example">
+          <img src="/sports-posters/sample-ticket-stub-football.svg" width="600" height="900" alt="Ticket Stub football poster sample with team badges and venue data">
+          <figcaption><strong>Ticket Stub</strong>Default free layout. Member routes replace placeholder marks with cached DB logos when available.</figcaption>
+        </figure>
+        <figure class="poster-example">
+          <img src="/sports-posters/sample-neon-f1.svg" width="600" height="900" alt="Neon Formula 1 poster sample with grand prix and session data">
+          <figcaption><strong>Neon Motorsport</strong>F1 and race sessions can use race-specific text, circuit styling, and session metadata.</figcaption>
+        </figure>
+        <figure class="poster-example">
+          <img src="/sports-posters/sample-broadcast-basketball.svg" width="600" height="900" alt="Broadcast basketball poster sample with court lines and team matchup">
+          <figcaption><strong>Broadcast</strong>Team-vs-team sports use sport-specific field or court linework plus cached badges where resolved.</figcaption>
+        </figure>
+        <figure class="poster-example">
+          <img src="/sports-posters/sample-rink-hockey.svg" width="600" height="900" alt="Hockey rink poster sample with team badges and venue details">
+          <figcaption><strong>Rink</strong>Ice hockey and hockey rows get rink geometry, matchup facts, venue, and time where known.</figcaption>
+        </figure>
+        <figure class="poster-example">
+          <img src="/sports-posters/sample-sportsbook-baseball.svg" width="600" height="900" alt="Baseball poster sample with diamond artwork and two team badges">
+          <figcaption><strong>Baseball Card</strong>MLB rows use diamond artwork, team split, venue, and start-time fields when the DB has them.</figcaption>
+        </figure>
+        <figure class="poster-example">
+          <img src="/sports-posters/sample-fight-night-ufc.svg" width="600" height="900" alt="Fight card poster sample with octagon artwork and event metadata">
+          <figcaption><strong>Fight Card</strong>UFC, boxing, and MMA fallback layouts use ring or octagon geometry instead of generic stripes.</figcaption>
+        </figure>
+        <figure class="poster-example">
+          <img src="/sports-posters/sample-motogp-circuit.svg" width="600" height="900" alt="MotoGP poster sample with circuit linework and session title">
+          <figcaption><strong>Circuit</strong>MotoGP rows can stay logo/session-first when team badges do not apply.</figcaption>
+        </figure>
+        <figure class="poster-example">
+          <img src="/sports-posters/sample-cricket-split.svg" width="600" height="900" alt="Cricket poster sample with team split and IPL metadata">
+          <figcaption><strong>Team Split</strong>Cricket, rugby, and football can share a clear split layout when both sides are known.</figcaption>
+        </figure>
+        <figure class="poster-example">
+          <img src="/sports-posters/sample-snooker-table.svg" width="600" height="900" alt="Snooker poster sample with table linework and tournament metadata">
+          <figcaption><strong>Table Sport</strong>Snooker and similar events use sport-specific surface geometry instead of generic card backgrounds.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section-block" id="cache-audit">
+      <div class="section-head">
+        <div class="section-kicker">SportsDB Cache Audit</div>
+        <h2 class="section-title">What has actually been audited and cleaned</h2>
+        <p class="section-copy">
+          Latest live Contabo snapshot, checked 2026-04-29. The DB has been mapped and evidence-linked, but the cache has not been blindly deleted or compacted. Cleanup must stay guarded because many cached images are still linked to generated member artwork.
+        </p>
+      </div>
+      <div class="audit-grid" aria-label="Live SportsMeta cache audit figures">
+        <article class="audit-card">
+          <div class="audit-value">37 GB</div>
+          <p class="audit-label">Current <span class="inline-code">/opt/sportsmeta/data</span> footprint. The old 12 GB working figure is no longer accurate after central poster generation.</p>
+        </article>
+        <article class="audit-card">
+          <div class="audit-value">117,476</div>
+          <p class="audit-label">Cached asset rows. Live disk also reports 117,476 JSON cache files and 117,476 media cache files.</p>
+        </article>
+        <article class="audit-card">
+          <div class="audit-value">20,749</div>
+          <p class="audit-label">SportsMeta records currently mapped, including 20,628 event records and league/sport/entity records.</p>
+        </article>
+        <article class="audit-card">
+          <div class="audit-value">269,652</div>
+          <p class="audit-label">Resolved image-evidence rows, including posters, logos, league logos, badges, backgrounds, and landscapes.</p>
+        </article>
+      </div>
+      <p class="audit-note">
+        Cleanup status: audited and classified, not fully purged. The safe next step is an orphan and duplicate report that proves which files have no DB reference before deletion. Missing logo fallbacks should stay logged so the DB can be improved by the sports people actually use.
+      </p>
     </section>
 
     <section class="section-block">

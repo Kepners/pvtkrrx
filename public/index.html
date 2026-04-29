@@ -760,6 +760,52 @@
       transform: translateY(-1px);
     }
 
+    .sports-showcase {
+      margin-top: 18px;
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      align-items: start;
+    }
+
+    .sports-sample-card {
+      margin: 0;
+      border: 1px solid rgba(0, 246, 255, 0.2);
+      border-radius: 11px;
+      padding: 12px;
+      background:
+        radial-gradient(380px 210px at 18% 8%, rgba(0, 246, 255, 0.1), transparent 70%),
+        rgba(4, 8, 18, 0.66);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.03);
+    }
+
+    .sports-sample-card img {
+      display: block;
+      width: 100%;
+      max-height: 560px;
+      aspect-ratio: 2 / 3;
+      object-fit: contain;
+      border-radius: 8px;
+      background: #040812;
+    }
+
+    .sports-sample-card figcaption {
+      margin-top: 10px;
+      color: #c8dafa;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .sports-sample-card strong {
+      display: block;
+      color: #f4f8ff;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 11px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
     /* ── FAQ ── */
     .faq-section {
       margin-top: 32px;
@@ -1049,6 +1095,10 @@
         grid-template-columns: 1fr;
       }
 
+      .sports-showcase {
+        grid-template-columns: 1fr;
+      }
+
       .hero {
         min-height: 66vh;
       }
@@ -1331,8 +1381,24 @@
         <div class="section-kicker">Sports Support</div>
         <h2 class="section-title">Private tracker sports in Stremio</h2>
         <p class="section-copy">
-          Sports is a first-class catalog alongside movies, TV, and your library. Genre filtering, artwork enrichment, and metadata — all from the trackers you already control.
+          Sports is a first-class catalog alongside movies, TV, and your library. Sports Posters adds cached member artwork when SportsMeta can safely resolve the league, event, and team image data.
         </p>
+      </div>
+      <div class="sports-showcase" aria-label="Sports Posters member artwork samples">
+        <figure class="sports-sample-card">
+          <img src="/sports-posters/sample-ticket-stub-football.svg" width="600" height="900" alt="Ticket Stub sports poster sample with league mark, team badges, match title, venue, date, and time">
+          <figcaption>
+            <strong>Ticket Stub</strong>
+            The free default layout, upgraded on member routes with cached team and league images where SportsMeta has them.
+          </figcaption>
+        </figure>
+        <figure class="sports-sample-card">
+          <img src="/sports-posters/sample-neon-f1.svg" width="600" height="900" alt="Neon motorsport poster sample with Formula 1 race session title and circuit information">
+          <figcaption>
+            <strong>Member Template</strong>
+            Paid Sports Posters can switch template style without changing the PVTKRRX stream source.
+          </figcaption>
+        </figure>
       </div>
       <div class="sports-cta">
         <a href="/sports" class="sports-cta-link" data-umami-event="cta_view_sports" data-umami-event-page="home" data-umami-event-section="sports">See sports features</a>

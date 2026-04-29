@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Sports Posters MotoGP circuit sample</title>
+  <desc id="desc">A MotoGP poster sample using circuit-style line art, race session text, grand prix title, and timing information.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#111827"/>
+      <stop offset=".52" stop-color="#1f2937"/>
+      <stop offset="1" stop-color="#b91c1c"/>
+    </linearGradient>
+    <pattern id="diagonal" width="26" height="26" patternUnits="userSpaceOnUse" patternTransform="rotate(28)">
+      <rect width="8" height="26" fill="#fff" opacity=".05"/>
+    </pattern>
+  </defs>
+  <rect width="600" height="900" rx="18" fill="url(#bg)"/>
+  <rect width="600" height="900" rx="18" fill="url(#diagonal)"/>
+  <text x="38" y="54" font-family="Arial Black, Arial, sans-serif" font-size="22" fill="#fff">MOTORSPORT</text>
+  <text x="38" y="84" font-family="Arial Black, Arial, sans-serif" font-size="24" fill="#f97316">MotoGP Brazil</text>
+  <circle cx="548" cy="56" r="9" fill="#ef4444"/>
+  <path d="M110 245c60-82 142 24 218-36 54-43 30-118 96-132 70-15 121 56 86 119-30 55-104 30-137 91-35 66 48 113 11 171-47 74-196 63-255-12-58-72-75-125-19-201z" fill="none" stroke="#e5e7eb" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M110 245c60-82 142 24 218-36 54-43 30-118 96-132 70-15 121 56 86 119-30 55-104 30-137 91-35 66 48 113 11 171-47 74-196 63-255-12-58-72-75-125-19-201z" fill="none" stroke="#111827" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  <rect x="184" y="310" width="232" height="82" rx="16" fill="#f8fafc"/>
+  <text x="300" y="363" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="38" fill="#111827">MotoGP</text>
+  <text x="300" y="504" text-anchor="middle" font-family="Arial Black, Arial, sans-serif" font-size="46" fill="#fff">Brazil GP</text>
+  <text x="300" y="552" text-anchor="middle" font-family="Arial, sans-serif" font-size="25" letter-spacing="5" fill="#f97316">SPRINT</text>
+  <rect x="54" y="612" width="492" height="132" rx="10" fill="#08111f" stroke="#f97316" stroke-opacity=".45"/>
+  <text x="78" y="662" font-family="Arial Black, Arial, sans-serif" font-size="29" fill="#fff">Brazil Warm Up / Qualifying</text>
+  <text x="78" y="704" font-family="Arial, sans-serif" font-size="22" fill="#cbd5e1">Session-aware parser output</text>
+  <line x1="54" y1="800" x2="546" y2="800" stroke="#f97316" stroke-width="3"/>
+  <text x="54" y="842" font-family="Arial Black, Arial, sans-serif" font-size="22" letter-spacing="6" fill="#fff">MOTOGP</text>
+  <text x="546" y="842" text-anchor="end" font-family="Arial, sans-serif" font-size="20" fill="#e5e7eb">2026-04-29</text>
+</svg>
