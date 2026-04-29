@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600">
+  <defs>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@1,700&display=swap');
+.bebas { font-family: 'Bebas Neue', Impact, sans-serif; }
+.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+.serif { font-family: 'Playfair Display', Georgia, serif; }</style>
+    <linearGradient id="foil" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f8e08e"/>
+      <stop offset="18%" stop-color="#d4af37"/>
+      <stop offset="36%" stop-color="#faf0a8"/>
+      <stop offset="54%" stop-color="#b8941f"/>
+      <stop offset="72%" stop-color="#f8e08e"/>
+      <stop offset="90%" stop-color="#8c6e1c"/>
+      <stop offset="100%" stop-color="#d4af37"/>
+    </linearGradient>
+    <radialGradient id="face" cx="50%" cy="0%" r="100%">
+      <stop offset="0%" stop-color="#1E3A8A"/>
+      <stop offset="35%" stop-color="#E10600"/>
+      <stop offset="100%" stop-color="#0c0c12"/>
+    </radialGradient>
+    <linearGradient id="awayWash" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="60%" stop-color="#0090D0cc"/>
+      <stop offset="100%" stop-color="#FF8000"/>
+    </linearGradient>
+    <linearGradient id="prism" x1="0%" y1="0%" x2="100%" y2="50%">
+      <stop offset="30%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="38%" stop-color="rgba(255,180,255,0.10)"/>
+      <stop offset="46%" stop-color="rgba(180,255,255,0.10)"/>
+      <stop offset="54%" stop-color="rgba(255,255,180,0.10)"/>
+      <stop offset="62%" stop-color="rgba(255,180,180,0.10)"/>
+      <stop offset="70%" stop-color="rgba(0,0,0,0)"/>
+    </linearGradient>
+    <linearGradient id="namePlate" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#fff5d0"/>
+      <stop offset="40%" stop-color="#e6cc7a"/>
+      <stop offset="100%" stop-color="#c89a3c"/>
+    </linearGradient>
+    <linearGradient id="diamond" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fff5d0"/>
+      <stop offset="60%" stop-color="#d4af37"/>
+      <stop offset="100%" stop-color="#8c6e1c"/>
+    </linearGradient>
+  </defs>
+
+  <!-- backing -->
+  <rect width="400" height="600" fill="#1a1108"/>
+  <!-- foil frame -->
+  <rect x="4" y="4" width="392" height="592" fill="url(#foil)"/>
+  <rect x="10" y="10" width="380" height="580" fill="none" stroke="rgba(0,0,0,0.4)"/>
+  <!-- face (clipped) -->
+  <rect x="12" y="12" width="376" height="576" fill="url(#face)"/>
+  <!-- prism sheen -->
+  <rect x="12" y="12" width="376" height="576" fill="url(#prism)" style="mix-blend-mode:screen"/>
+  <!-- guilloché -->
+  <g opacity="0.18"><circle cx="200" cy="280" r="20" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="38" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="56" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="74" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="92" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="110" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="128" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="146" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="164" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="182" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="200" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="218" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="236" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="254" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="272" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="290" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="308" fill="none" stroke="#f8e08e" stroke-width="0.5"/><circle cx="200" cy="280" r="326" fill="none" stroke="#f8e08e" stroke-width="0.5"/><line x1="200" y1="280" x2="520.0" y2="280.0" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="515.1" y2="335.6" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="500.7" y2="389.4" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="477.1" y2="440.0" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="445.1" y2="485.7" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="405.7" y2="525.1" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="360.0" y2="557.1" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="309.4" y2="580.7" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="255.6" y2="595.1" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="200.0" y2="600.0" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="144.4" y2="595.1" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="90.6" y2="580.7" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="40.0" y2="557.1" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="-5.7" y2="525.1" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="-45.1" y2="485.7" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="-77.1" y2="440.0" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="-100.7" y2="389.4" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="-115.1" y2="335.6" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="-120.0" y2="280.0" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="-115.1" y2="224.4" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="-100.7" y2="170.6" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="-77.1" y2="120.0" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="-45.1" y2="74.3" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="-5.7" y2="34.9" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="40.0" y2="2.9" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="90.6" y2="-20.7" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="144.4" y2="-35.1" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="200.0" y2="-40.0" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="255.6" y2="-35.1" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="309.4" y2="-20.7" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="360.0" y2="2.9" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="405.7" y2="34.9" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="445.1" y2="74.3" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="477.1" y2="120.0" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="500.7" y2="170.6" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/><line x1="200" y1="280" x2="515.1" y2="224.4" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/></g>
+  <!-- away wash -->
+  <rect x="12" y="318.0" width="376" height="270.0" fill="url(#awayWash)"/>
+
+  <g transform="translate(20 20) scale(1 1)">
+            <path d="M2 2 L20 2 M2 2 L2 20 M2 2 L14 14 M8 2 L2 8" stroke="#f8e08e" stroke-width="1" fill="none"/>
+            <circle cx="14" cy="14" r="2" fill="#f8e08e"/>
+        </g><g transform="translate(380 20) scale(-1 1)">
+            <path d="M2 2 L20 2 M2 2 L2 20 M2 2 L14 14 M8 2 L2 8" stroke="#f8e08e" stroke-width="1" fill="none"/>
+            <circle cx="14" cy="14" r="2" fill="#f8e08e"/>
+        </g><g transform="translate(20 580) scale(1 -1)">
+            <path d="M2 2 L20 2 M2 2 L2 20 M2 2 L14 14 M8 2 L2 8" stroke="#f8e08e" stroke-width="1" fill="none"/>
+            <circle cx="14" cy="14" r="2" fill="#f8e08e"/>
+        </g><g transform="translate(380 580) scale(-1 -1)">
+            <path d="M2 2 L20 2 M2 2 L2 20 M2 2 L14 14 M8 2 L2 8" stroke="#f8e08e" stroke-width="1" fill="none"/>
+            <circle cx="14" cy="14" r="2" fill="#f8e08e"/>
+        </g>
+
+  <!-- top -->
+  <g transform="translate(160.0 30)">
+    <rect x="0" y="0" width="32" height="22" fill="none" stroke="#f8e08e" stroke-width="1.2"/>
+    <text class="bebas" x="16" y="16" text-anchor="middle" font-size="14" fill="#f8e08e">F1</text>
+    <text class="bebas" x="38" y="11" font-size="11" fill="#f8e08e" letter-spacing="0.1em">FORMULA 1</text>
+    <text class="mono" x="38" y="22" font-size="6.5" fill="#f8e08e" opacity="0.8" letter-spacing="2">FORMULA 1</text>
+  </g>
+  <text class="mono" x="200.0" y="80" text-anchor="middle" font-size="8" fill="rgba(255,245,208,0.75)" letter-spacing="2">— ROUND 12 —</text>
+
+  <!-- center burst + badges + diamond VS -->
+  <g opacity="0.3"><line x1="200" y1="115" x2="460.0" y2="115.0" stroke="#f8e08e" stroke-width="1.2"/><line x1="200" y1="115" x2="451.1" y2="182.3" stroke="#f8e08e" stroke-width="0.6"/><line x1="200" y1="115" x2="425.2" y2="245.0" stroke="#f8e08e" stroke-width="1.2"/><line x1="200" y1="115" x2="383.8" y2="298.8" stroke="#f8e08e" stroke-width="0.6"/><line x1="200" y1="115" x2="330.0" y2="340.2" stroke="#f8e08e" stroke-width="1.2"/><line x1="200" y1="115" x2="267.3" y2="366.1" stroke="#f8e08e" stroke-width="0.6"/><line x1="200" y1="115" x2="200.0" y2="375.0" stroke="#f8e08e" stroke-width="1.2"/><line x1="200" y1="115" x2="132.7" y2="366.1" stroke="#f8e08e" stroke-width="0.6"/><line x1="200" y1="115" x2="70.0" y2="340.2" stroke="#f8e08e" stroke-width="1.2"/><line x1="200" y1="115" x2="16.2" y2="298.8" stroke="#f8e08e" stroke-width="0.6"/><line x1="200" y1="115" x2="-25.2" y2="245.0" stroke="#f8e08e" stroke-width="1.2"/><line x1="200" y1="115" x2="-51.1" y2="182.3" stroke="#f8e08e" stroke-width="0.6"/><line x1="200" y1="115" x2="-60.0" y2="115.0" stroke="#f8e08e" stroke-width="1.2"/><line x1="200" y1="115" x2="-51.1" y2="47.7" stroke="#f8e08e" stroke-width="0.6"/><line x1="200" y1="115" x2="-25.2" y2="-15.0" stroke="#f8e08e" stroke-width="1.2"/><line x1="200" y1="115" x2="16.2" y2="-68.8" stroke="#f8e08e" stroke-width="0.6"/><line x1="200" y1="115" x2="70.0" y2="-110.2" stroke="#f8e08e" stroke-width="1.2"/><line x1="200" y1="115" x2="132.7" y2="-136.1" stroke="#f8e08e" stroke-width="0.6"/><line x1="200" y1="115" x2="200.0" y2="-145.0" stroke="#f8e08e" stroke-width="1.2"/><line x1="200" y1="115" x2="267.3" y2="-136.1" stroke="#f8e08e" stroke-width="0.6"/><line x1="200" y1="115" x2="330.0" y2="-110.2" stroke="#f8e08e" stroke-width="1.2"/><line x1="200" y1="115" x2="383.8" y2="-68.8" stroke="#f8e08e" stroke-width="0.6"/><line x1="200" y1="115" x2="425.2" y2="-15.0" stroke="#f8e08e" stroke-width="1.2"/><line x1="200" y1="115" x2="451.1" y2="47.7" stroke="#f8e08e" stroke-width="0.6"/></g>
+  <!-- home badge -->
+  <g transform="translate(110 170) rotate(-7)">
+    <circle cx="0" cy="0" r="62" fill="url(#face)" stroke="#FFFFFF" stroke-width="2" filter="url(#shadow1)"/>
+    <text class="bebas" x="0" y="14" text-anchor="middle" font-size="44" fill="#FFFFFF">MV</text>
+  </g>
+  <!-- away badge -->
+  <g transform="translate(290 280) rotate(7)">
+    <circle cx="0" cy="0" r="62" fill="#FF8000" stroke="#000000" stroke-width="2" filter="url(#shadow1)"/>
+    <text class="bebas" x="0" y="14" text-anchor="middle" font-size="44" fill="#000000">LN</text>
+  </g>
+  <!-- diamond VS -->
+  <g transform="translate(200.0 225) rotate(45)">
+    <rect x="-38" y="-38" width="76" height="76" fill="url(#diamond)" stroke="#2a1a08" stroke-width="2"/>
+  </g>
+  <text class="bebas" x="200.0" y="232" text-anchor="middle" font-size="26" fill="#2a1a08" letter-spacing="1">VS</text>
+
+  <!-- nameplate -->
+  <rect x="18" y="380" width="364" height="80" fill="url(#namePlate)" stroke="#2a1a08" stroke-width="1.5"/>
+  <text class="serif" x="200.0" y="406" text-anchor="middle" font-size="16" font-style="italic" font-weight="700" fill="#2a1a08">Max Verstappen</text>
+  <text class="mono" x="200.0" y="422" text-anchor="middle" font-size="8" fill="#5a4a1f" letter-spacing="3">— VERSUS —</text>
+  <text class="serif" x="200.0" y="448" text-anchor="middle" font-size="16" font-style="italic" font-weight="700" fill="#2a1a08">Lando Norris</text>
+
+  <!-- footer -->
+  <text class="mono" x="22" y="578" font-size="8" fill="rgba(255,245,208,0.85)" letter-spacing="1.5">SILVERSTONE CIRCUIT</text>
+  <text class="mono" x="378" y="578" text-anchor="end" font-size="8" fill="rgba(255,245,208,0.85)" letter-spacing="1.5">№ FO-260704-VERNOR</text>
+
+  <defs>
+    <filter id="shadow1"><feGaussianBlur in="SourceAlpha" stdDeviation="6"/><feOffset dy="10"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+</svg>

@@ -29,6 +29,12 @@
 - Apply global defaults first, then project-specific constraints from `./CLAUDE.md`.
 - Keep project details in `./CLAUDE.md`; keep this file as the stable routing contract.
 
+## Sports Posters Template Guardrail
+- Before changing Sports Posters layouts, inspect `C:\Users\kepne\projects\L - PVTKRRX\PCnestspeaker\python-templates`.
+- Treat those Python template generators as the current source of truth for `editorial`, `broadcast`, `sportsbook`, `trading-card`, `brutalist`, `ticket-stub`, and `glitch`.
+- `ticket-stub` is the free/default layout. The paid/member Sports Posters surface can use all seven layouts.
+- Real SportsMeta/SportsDB logo images must replace placeholder text in league/team slots when present; glyph fallback is only for missing images.
+
 ## Audit-And-Proof Standard
 
 Do not optimize for a nice-sounding answer. Optimize for a truthful one. Work in a strict audit-and-proof style.

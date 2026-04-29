@@ -58,6 +58,13 @@
 - For stream proof, use a configured `https://www.pvtkrrx.cc/:config/stream/...` route, not the bootstrap `/stream/...` compatibility path.
 - For sports poster artwork, real SportsDB/SportsMeta logos win. PVTKRRX may compose client-safe PNG posters from SportsMeta member `homeBadge`, `awayBadge`, and `leagueLogo` routes server-side, but it must not show text initials when cached/source badge assets exist. Generated sport-specific SVG/PNG fallback is only for unresolved or truly missing-logo rows.
 
+### Sports Posters Template Source
+- The visual source of truth for Sports Posters templates is `C:\Users\kepne\projects\L - PVTKRRX\PCnestspeaker\python-templates`.
+- Do not redesign these templates from scratch in PVTKRRX. Port/copy the Python template structure and proportions unless the user explicitly provides a newer design source.
+- Template family: `01-editorial`, `02-broadcast`, `03-sportsbook`, `04-trading-card`, `05-brutalist`, `06-ticket-stub`, and `07-glitch`.
+- `06-ticket-stub` is the free/default poster style. Member Sports Posters can use all seven styles.
+- Logo slots must be populated from SportsMeta/SportsDB-derived league, home-team, and away-team images when available. If a real image is missing, use a sport-specific glyph fallback and log the missing image for later DB enrichment.
+
 ### Sports Poster Cache — REMOVED 2026-04-22
 - PVTKRRX no longer owns a sports image cache. SportsMeta is the only source of sports artwork.
 - Deleted modules: `src/clients/sportsdb.js`, `src/utils/sportsImageCache.js`, `src/utils/sportsCacheSeeder.js`, `src/utils/sportsCacheAutofill.js`, `src/utils/sportsThumb.js`, `src/utils/sportsmetaCatalogue.js`, `src/handlers/sportsmeta.js`.

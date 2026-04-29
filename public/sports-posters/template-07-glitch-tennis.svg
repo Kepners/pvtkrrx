@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600">
+  <defs>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=JetBrains+Mono:wght@400;700&display=swap');
+.hero { font-family: 'Bebas Neue', Impact, sans-serif; }
+.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }</style>
+    <radialGradient id="bgRad" cx="50%" cy="35%" r="80%">
+      <stop offset="0%" stop-color="#4F2D7F" stop-opacity="0.25"/>
+      <stop offset="45%" stop-color="#111114"/>
+      <stop offset="100%" stop-color="#050507"/>
+    </radialGradient>
+    <radialGradient id="bgRad2" cx="50%" cy="35%" r="60%">
+      <stop offset="0%" stop-color="#2a2a30" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="75%">
+      <stop offset="50%" stop-color="#000" stop-opacity="0"/>
+      <stop offset="100%" stop-color="#000" stop-opacity="0.85"/>
+    </radialGradient>
+    <pattern id="scanFine" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="1" fill="rgba(255,255,255,0.04)"/>
+    </pattern>
+    <pattern id="scanCoarse" width="3" height="3" patternUnits="userSpaceOnUse">
+      <rect width="3" height="1" fill="rgba(255,255,255,0.06)"/>
+    </pattern>
+    <filter id="blurA" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="0.5"/></filter>
+    <filter id="blurB" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="0.4"/></filter>
+  </defs>
+
+  <rect width="400" height="600" fill="#0A0A0C"/>
+  <rect width="400" height="600" fill="url(#bgRad)"/>
+  <rect width="400" height="600" fill="url(#bgRad2)"/>
+  
+    <rect x="-20" y="110" width="440" height="380" fill="url(#scanFine)" opacity="0.6"/>
+    <rect x="0" y="0" width="400" height="600" fill="url(#scanCoarse)" style="mix-blend-mode:overlay"/>
+    <rect x="0" y="200" width="400" height="18" fill="rgba(255,255,255,0.07)" transform="translate(8 0) skewX(-2)" style="mix-blend-mode:screen"/>
+    <rect x="0" y="280" width="400" height="6" fill="rgba(255,255,255,0.12)" transform="translate(-12 0)" style="mix-blend-mode:screen"/>
+    <rect x="0" y="340" width="400" height="10" fill="#ff0044" opacity="0.3" transform="translate(6 0)" style="mix-blend-mode:screen"/>
+    <rect x="0" y="358" width="400" height="10" fill="#00d9ff" opacity="0.25" transform="translate(-6 0)" style="mix-blend-mode:screen"/>
+  
+    <g transform="translate(24 22)">
+      <rect x="0" y="0" width="34" height="22" fill="none" stroke="#fff" stroke-width="1.5"/>
+      <text class="hero" x="17" y="17" text-anchor="middle" font-size="14" fill="#fff" letter-spacing="0.04em">ATP</text>
+      <text class="mono" x="44" y="10" font-size="9" fill="#fff" letter-spacing="3">GRAND SLAM</text>
+      <text class="mono" x="44" y="20" font-size="7" fill="#fff" opacity="0.6" letter-spacing="3">TENNIS</text>
+    </g>
+    <text class="mono" x="376" y="36" text-anchor="end" font-size="9.5" fill="#ff0044" letter-spacing="3">● REC</text>
+  
+    <text class="mono" x="24" y="86" font-size="9" fill="#00d9ff" letter-spacing="2.5">› GENTLEMEN&apos;S FINAL</text>
+    <text class="mono" x="376" y="86" text-anchor="end" font-size="9" fill="#fff" opacity="0.65" letter-spacing="2.5">2026-07-13</text>
+  
+        
+    <g transform="translate(200.0 240) skewX(-3)">
+      <text class="hero" x="-5" y="2" text-anchor="middle" font-size="88" fill="#00d9ff" opacity="0.7" filter="url(#blurA)" style="mix-blend-mode:screen" letter-spacing="0.02em">WIMBLEDON</text>
+      <text class="hero" x="5" y="-1" text-anchor="middle" font-size="88" fill="#ff0044" opacity="0.75" filter="url(#blurB)" style="mix-blend-mode:screen" letter-spacing="0.02em">WIMBLEDON</text>
+      <text class="hero" x="0" y="0" text-anchor="middle" font-size="88" fill="#fff" letter-spacing="0.02em">WIMBLEDON</text>
+    </g>
+        <text class="mono" x="200.0" y="290" text-anchor="middle" font-size="11" fill="#fff" letter-spacing="3">FINAL — SUNDAY</text>
+        <g transform="translate(200.0 360)">
+          <text class="hero" x="-1" y="0" text-anchor="middle" font-size="22" fill="#ff0044" letter-spacing="8">MAIN</text>
+          <text class="hero" x="1" y="0" text-anchor="middle" font-size="22" fill="#00d9ff" letter-spacing="8">MAIN</text>
+          <text class="hero" x="0" y="0" text-anchor="middle" font-size="22" fill="#fff" letter-spacing="8">MAIN</text>
+        </g>
+  
+    <g transform="translate(0 504)">
+      <rect x="18" y="0" width="364" height="40" fill="rgba(0,0,0,0.55)" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>
+      
+    <g>
+      <text class="hero" x="29" y="26" text-anchor="start" font-size="16" fill="#ff0044" opacity="0.85" letter-spacing="0.06em">WIMBLEDON</text>
+      <text class="hero" x="31" y="26" text-anchor="start" font-size="16" fill="#00d9ff" opacity="0.85" letter-spacing="0.06em">WIMBLEDON</text>
+      <text class="hero" x="30" y="26" text-anchor="start" font-size="16" fill="#fff" letter-spacing="0.06em">WIMBLEDON</text>
+    </g>
+    </g>
+  
+    <text class="mono" x="24" y="578" font-size="9" fill="#ff0044" letter-spacing="2.5">CENTRE COURT · ALL ENGLAND CLUB</text>
+    <text class="mono" x="200.0" y="578" text-anchor="middle" font-size="9" fill="#fff" opacity="0.6" letter-spacing="2.5">· · ·</text>
+    <text class="mono" x="376" y="578" text-anchor="end" font-size="9" fill="#00d9ff" letter-spacing="2.5">14:00 BST</text>
+  <rect width="400" height="600" fill="url(#vignette)" pointer-events="none"/>
+  
+    <g transform="translate(14 14) rotate(0)">
+      <path d="M-12 -6 L-12 -12 L-6 -12" stroke="#ff0044" stroke-width="1.2" fill="none"/>
+      <path d="M-11 -5 L-11 -11 L-5 -11" stroke="#00d9ff" stroke-width="1" fill="none" opacity="0.7"/>
+    </g>
+    <g transform="translate(386 14) rotate(90)">
+      <path d="M-12 -6 L-12 -12 L-6 -12" stroke="#ff0044" stroke-width="1.2" fill="none"/>
+      <path d="M-11 -5 L-11 -11 L-5 -11" stroke="#00d9ff" stroke-width="1" fill="none" opacity="0.7"/>
+    </g>
+    <g transform="translate(14 586) rotate(270)">
+      <path d="M-12 -6 L-12 -12 L-6 -12" stroke="#ff0044" stroke-width="1.2" fill="none"/>
+      <path d="M-11 -5 L-11 -11 L-5 -11" stroke="#00d9ff" stroke-width="1" fill="none" opacity="0.7"/>
+    </g>
+    <g transform="translate(386 586) rotate(180)">
+      <path d="M-12 -6 L-12 -12 L-6 -12" stroke="#ff0044" stroke-width="1.2" fill="none"/>
+      <path d="M-11 -5 L-11 -11 L-5 -11" stroke="#00d9ff" stroke-width="1" fill="none" opacity="0.7"/>
+    </g>
+</svg>

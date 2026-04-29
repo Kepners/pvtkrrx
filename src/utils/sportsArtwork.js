@@ -6,7 +6,7 @@ const {
 } = require('../clients/sportsmeta')
 const { resolveSportsPosterTemplate } = require('./sportsPosterTemplates')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260428-club-logo-templates-v1'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260429-python-template-port-v2'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()

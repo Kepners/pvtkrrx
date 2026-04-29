@@ -33,7 +33,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260429-template-glyph-fallback-v2'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260429-python-template-port-v2'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -791,12 +791,23 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
         }
       }
       if (/^image\/svg\+xml/i.test(contentType) && shouldRenderLocalFallbackForSvg(variant)) {
+        return renderLayoutFallback({
+          variant,
+          fallbackInput,
+          teamPosterContext,
+          template,
+          status,
+          contentType,
+          reason: generatedAsset ? 'sportsmeta_central_svg_layout_replaced' : 'sportsmeta_svg_layout_replaced'
+        })
+      }
+      if (/^image\/svg\+xml/i.test(contentType)) {
         const png = await rasterizeToPng(buffer, variant)
         return {
           buffer: png,
           contentType: 'image/png',
-          selectedArtworkSource: generatedAsset ? 'sportsmeta-central-rasterized' : 'sportsmeta-svg-rasterized',
-          fallbackReason: generatedAsset ? 'sportsmeta_central_svg_rasterized' : 'sportsmeta_svg_rasterized',
+          selectedArtworkSource: 'sportsmeta-svg-rasterized',
+          fallbackReason: 'sportsmeta_svg_rasterized',
           httpStatus: status,
           upstreamContentType: contentType
         }

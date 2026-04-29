@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600">
+  <defs>
+    <style>@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:ital,wght@1,400;1,700&display=swap');
+.bebas { font-family: 'Bebas Neue', Impact, sans-serif; }
+.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
+.serif { font-family: 'Playfair Display', Georgia, serif; }
+.sans { font-family: 'Inter', system-ui, sans-serif; }</style>
+    <linearGradient id="mastheadOverlay" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="rgba(40,25,10,0.4)"/>
+      <stop offset="50%" stop-color="rgba(40,25,10,0)"/>
+      <stop offset="100%" stop-color="rgba(40,25,10,0.4)"/>
+    </linearGradient>
+    <pattern id="paper" x="0" y="0" width="3" height="3" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.5" fill="rgba(80,50,20,0.06)"/>
+    </pattern>
+    <radialGradient id="edgeWear" cx="50%" cy="50%" r="80%">
+      <stop offset="60%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="100%" stop-color="rgba(80,50,20,0.25)"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="400" height="600" fill="#E6DEC9"/>
+  <rect width="400" height="600" fill="url(#paper)"/>
+  
+    <rect x="0" y="0" width="200.0" height="100" fill="#6CABDD"/>
+    <rect x="200.0" y="0" width="200.0" height="100" fill="#EF0107"/>
+    <rect x="0" y="0" width="400" height="100" fill="url(#mastheadOverlay)" style="mix-blend-mode:multiply"/>
+    <line x1="200.0" y1="12" x2="200.0" y2="88" stroke="rgba(0,0,0,0.45)" stroke-width="2"/>
+    <text class="bebas" x="200.0" y="22" text-anchor="middle" font-size="9" fill="rgba(255,235,180,0.9)" letter-spacing="3">OFFICIAL · ADMITTANCE</text>
+    <g transform="translate(140.0 30)">
+      <circle cx="11" cy="12" r="11" fill="none" stroke="#fff5d0" stroke-width="1.4"/>
+      <text class="bebas" x="11" y="16" text-anchor="middle" font-size="10" fill="#fff5d0">EPL</text>
+      <text class="bebas" x="28" y="11" font-size="11" fill="#fff5d0" letter-spacing="2">PREMIER LEAGUE</text>
+      <text class="mono" x="28" y="22" font-size="6" fill="#fff5d0" opacity="0.8" letter-spacing="2">FOOTBALL</text>
+    </g>
+    <text class="bebas" x="200.0" y="78" text-anchor="middle" font-size="10" fill="rgba(255,245,220,0.85)" letter-spacing="2.5">— MATCHWEEK 34 —</text>
+
+  <!-- top perforation -->
+  <line x1="0" y1="100" x2="400" y2="100" stroke="rgba(60,40,15,0.45)" stroke-dasharray="3 3"/>
+  <circle cx="8" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="24" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="40" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="56" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="72" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="88" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="104" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="120" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="136" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="152" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="168" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="184" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="200" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="216" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="232" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="248" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="264" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="280" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="296" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="312" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="328" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="344" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="360" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="376" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="392" cy="108" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/>
+  <line x1="0" y1="116" x2="400" y2="116" stroke="rgba(60,40,15,0.45)" stroke-dasharray="3 3"/>
+
+  
+    <g transform="translate(80 200)">
+      <circle cx="0" cy="0" r="38" fill="#6CABDD" stroke="#FFFFFF" stroke-width="2"/>
+      <text class="bebas" x="0" y="12" text-anchor="middle" font-size="28" fill="#FFFFFF">MC</text>
+      <rect x="-26" y="46" width="52" height="20" fill="#6CABDD"/>
+      <text class="bebas" x="0" y="60" text-anchor="middle" font-size="12" fill="#FFFFFF" letter-spacing="2">HOME</text>
+    </g>
+    <text class="serif" x="200.0" y="206" text-anchor="middle" font-style="italic" font-size="38" fill="#5a3a1f">×</text>
+    <g transform="translate(320 200)">
+      <circle cx="0" cy="0" r="38" fill="#EF0107" stroke="#9C824A" stroke-width="2"/>
+      <text class="bebas" x="0" y="12" text-anchor="middle" font-size="28" fill="#9C824A">AR</text>
+      <rect x="-26" y="46" width="52" height="20" fill="#EF0107"/>
+      <text class="bebas" x="0" y="60" text-anchor="middle" font-size="12" fill="#9C824A" letter-spacing="2">AWAY</text>
+    </g>
+  
+    <line x1="20" y1="305" x2="160" y2="305" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
+    <line x1="240" y1="305" x2="380" y2="305" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
+    <text class="bebas" x="200.0" y="310" text-anchor="middle" font-size="13" fill="#5a3a1f" letter-spacing="3">FEATURE</text>
+  
+    <text class="bebas" x="200.0" y="346" text-anchor="middle" font-size="24" fill="#1a1410" letter-spacing="1">Manchester City</text>
+    <text class="serif" x="200.0" y="368" text-anchor="middle" font-style="italic" font-size="14" fill="#9b6f2f">versus</text>
+    <text class="bebas" x="200.0" y="394" text-anchor="middle" font-size="24" fill="#1a1410" letter-spacing="1">Arsenal</text>
+    <text class="mono" x="200.0" y="424" text-anchor="middle" font-size="9.5" fill="#5a3a1f" letter-spacing="1.6">ETIHAD STADIUM</text>
+
+  <!-- bottom perforation -->
+  <line x1="0" y1="483" x2="400" y2="483" stroke="rgba(60,40,15,0.45)" stroke-dasharray="3 3"/>
+  <circle cx="8" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="24" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="40" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="56" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="72" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="88" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="104" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="120" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="136" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="152" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="168" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="184" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="200" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="216" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="232" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="248" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="264" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="280" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="296" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="312" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="328" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="344" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="360" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="376" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/><circle cx="392" cy="492" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/>
+  <line x1="0" y1="500" x2="400" y2="500" stroke="rgba(60,40,15,0.45)" stroke-dasharray="3 3"/>
+
+  
+    <g class="mono">
+      <text x="22" y="522" font-size="8" fill="#5a3a1f" letter-spacing="2" font-weight="700">DATE</text>
+      <text x="22" y="538" font-size="14" fill="#1a1410">2026-04-28</text>
+      <text x="22" y="558" font-size="8" fill="#5a3a1f" letter-spacing="2" font-weight="700">KICKOFF</text>
+      <text x="22" y="574" font-size="14" fill="#1a1410">20:00 BST</text>
+    </g>
+    <g>
+      <text class="sans" x="200.0" y="522" text-anchor="middle" font-size="8" fill="#5a3a1f" letter-spacing="2" font-weight="700">SECTION</text>
+      <text class="bebas" x="200.0" y="544" text-anchor="middle" font-size="22" fill="#1a1410" letter-spacing="1">A · 12 · 4</text>
+      <text class="mono" x="200.0" y="562" text-anchor="middle" font-size="9" fill="#5a3a1f" letter-spacing="1">#MCI-ARS-260428</text>
+    </g>
+    <g transform="translate(342 544) rotate(-7)">
+      <rect x="-32" y="-20" width="64" height="40" fill="none" stroke="#8c1f0f" stroke-width="2.5"/>
+      <text class="bebas" x="0" y="-2" text-anchor="middle" font-size="14" fill="#8c1f0f" letter-spacing="2">ADMIT</text>
+      <text class="bebas" x="0" y="14" text-anchor="middle" font-size="14" fill="#8c1f0f" letter-spacing="2">ONE</text>
+    </g>
+  <rect width="400" height="600" fill="url(#edgeWear)" pointer-events="none"/>
+</svg>
