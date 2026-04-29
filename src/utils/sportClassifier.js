@@ -10,11 +10,11 @@ const SPORTS = [
   { key: 'rugby', keywords: ['rugby'] },
   { key: 'cricket', keywords: ['cricket', 'indian premier league', 'ipl', 't20'] },
   { key: 'motorsport', keywords: ['f1', 'formula 1', 'formula1', 'motogp', 'motorsport', 'grand prix', 'indycar', 'wrc', 'nascar', 'supercars', 'v8 supercars', 'bathurst', 'wsbk', 'wec', 'formula e', 'rally', 'dakar', 'sprint cup'] },
-  { key: 'cycling', keywords: ['cycling', 'tour de france', 'giro', 'vuelta'] },
-  { key: 'wrestling', keywords: ['wwe', 'aew', 'wrestling', 'smackdown', 'raw'] },
-  { key: 'darts', keywords: ['darts', 'pdc darts', 'bdo darts', 'premier league darts'] },
-  { key: 'snooker', keywords: ['snooker'] },
-  { key: 'golf', keywords: ['golf', 'pga tour', 'pga', 'lpga', 'masters'] },
+  { key: 'cycling', keywords: ['cycling', 'tour de france', 'giro', 'vuelta', 'paris roubaix', 'milan san remo', 'tour of flanders', 'liege bastogne liege', 'tour de suisse'] },
+  { key: 'wrestling', keywords: ['wwe', 'aew', 'wrestling', 'smackdown', 'raw', 'nxt', 'wrestlemania', 'royal rumble', 'summerslam', 'survivor series', 'money in the bank', 'crown jewel'] },
+  { key: 'darts', keywords: ['darts', 'pdc darts', 'bdo darts', 'premier league darts', 'world matchplay', 'world championship darts'] },
+  { key: 'snooker', keywords: ['snooker', 'snooker masters', 'world snooker championship', 'crucible'] },
+  { key: 'golf', keywords: ['golf', 'pga tour', 'pga', 'lpga', 'masters', 'ryder cup', 'liv golf', 'open championship'] },
   { key: 'athletics', keywords: ['world athletics', 'diamond league', 'continental tour', 'track and field', 'olympic athletics', 'london marathon', 'boston marathon'] },
   { key: 'olympics', keywords: ['olympics', 'olympic games'] }
 ]
