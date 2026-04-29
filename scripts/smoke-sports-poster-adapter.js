@@ -37,6 +37,22 @@ const CASES = [
     }
   },
   {
+    slug: 'f1-fp-session-casing',
+    expectedClass: 'motorsport_event',
+    expectedFormat: 'solo',
+    expectedEventShort: 'Monaco GP',
+    expectedSession: 'FP2',
+    input: {
+      sportHint: 'motorsport',
+      competition: 'Formula 1',
+      rawTitle: 'F1 Monaco Grand Prix FP2 1080p',
+      eventTitle: 'Monaco Grand Prix',
+      eventShort: 'Monaco GP',
+      eventDetail: 'FP2',
+      date: '2026-05-22'
+    }
+  },
+  {
     slug: 'combat-head-to-head',
     expectedClass: 'combat_event',
     expectedFormat: 'single',
@@ -73,6 +89,36 @@ const CASES = [
       eventTitle: 'Premier League Darts',
       homeTeam: 'Luke Littler',
       awayTeam: 'Michael van Gerwen'
+    }
+  },
+  {
+    slug: 'darts-tournament-solo',
+    expectedClass: 'darts_event',
+    expectedFormat: 'solo',
+    expectedEventShort: 'Premier League Darts',
+    expectedSession: 'Night 1',
+    input: {
+      sportHint: 'darts',
+      competition: 'Premier League Darts',
+      rawTitle: 'Premier League Darts Night 1 1080p',
+      eventTitle: 'Premier League Darts',
+      eventDetail: 'Night 1'
+    }
+  },
+  {
+    slug: 'tennis-player-match',
+    expectedClass: 'tennis_or_snooker_match',
+    expectedFormat: 'single',
+    expectedEventShort: 'Wimbledon',
+    expectedSession: 'Final',
+    input: {
+      sportHint: 'tennis',
+      competition: 'Wimbledon',
+      rawTitle: 'Wimbledon 2026 Final Alcaraz vs Sinner 1080p',
+      eventTitle: 'Alcaraz vs Sinner',
+      eventDetail: 'Final',
+      homeTeam: 'Alcaraz',
+      awayTeam: 'Sinner'
     }
   },
   {
@@ -119,6 +165,8 @@ for (const testCase of CASES) {
 
   assert.equal(eventClass, testCase.expectedClass, `${testCase.slug} class`)
   assert.equal(data.event_format, testCase.expectedFormat, `${testCase.slug} event format`)
+  if (testCase.expectedEventShort) assert.equal(data.event_short, testCase.expectedEventShort, `${testCase.slug} event_short`)
+  if (testCase.expectedSession) assert.equal(data.session, testCase.expectedSession, `${testCase.slug} session`)
   assert.ok(data.event_short && data.event_short.length <= 38, `${testCase.slug} event_short bounded`)
   assert.ok(data.session && data.session.length <= 42, `${testCase.slug} session bounded`)
   assert.ok(data.home?.name && data.away?.name, `${testCase.slug} sides populated for template compatibility`)
@@ -129,5 +177,11 @@ for (const testCase of CASES) {
 
 const cleaned = cleanDisplayText('Formula.1.British.GP.1080p.WEB-DL.x264-Group', 'Event')
 assert.equal(cleaned, 'Formula 1 British GP', 'cleanDisplayText removes release noise')
+
+const cleanedMashed = cleanDisplayText('Inside the NBA 2026 28 04 720pEN60fps', 'Event')
+assert.doesNotMatch(cleanedMashed, /720p|60fps/i, 'cleanDisplayText strips mashed quality+language+fps tokens')
+
+const cleanedFps = cleanDisplayText('Premier League Match 1080pES60fps', 'Event')
+assert.doesNotMatch(cleanedFps, /1080p|60fps/i, 'cleanDisplayText strips quality+language combinations')
 
 console.log(`Sports poster adapter smoke passed. cases=${CASES.length}`)

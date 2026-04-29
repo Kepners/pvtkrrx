@@ -15,7 +15,7 @@ const TEAM_TAIL_NOISE_RE = /^(?:game|games|round|matchday|main|card|pre|post|epi
 const EVENT_SOURCE_NOISE_RE = /^(?:apple|tv|atvp?|fubo|skynz|kayo|z3r0|nva|espn(?:p|plus|\+)?|f1tv|fs1|nesn|msg|usan?|nbc(?:sn|sba|sca)?|sny|snla|snp|sky|sports|fox|bbc|itv|cbs|abc|tnt|peacock|eurosport|nordic)$/i
 
 // Known league/series tokens that start non-vs event titles
-const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|PFL|Bellator|ONE|WWE|AEW|TNA|ROH|NJPW|MotoGP|Moto\s*GP|NASCAR|IndyCar|WRC|Supercars|Supercars\s*Championship|V8SC|Bathurst|WSBK|WEC|FormulaE|Rally|Dakar|PGA|PGA\s*Tour|LPGA|LPGA\s*Tour|Masters|ATP|ATP\s*World\s*Tour|WTA|WTA\s*Tour|Wimbledon|Australian\s*Open|Roland\s*Garros|French\s*Open|US\s*Open|U\.S\.\s*Open|Davis\s*Cup|Laver\s*Cup|IPL|IPLM\d+|Indian\s*Premier\s*League|MLS|Major\s*League\s*Soccer|MLB|Major\s*League\s*Baseball|NCAA\s*Baseball|World\s*Baseball\s*Classic|NBA|NBA\s*Playoffs|EuroLeague|EasyCredit\s*BBL|Basketball\s*Champions\s*League(?:\s*of\s*Americas)?|Super\s*Rugby|MLR|Major\s*League\s*Rugby|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
+const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|PFL|Bellator|ONE|WWE|AEW|TNA|ROH|NJPW|MotoGP|Moto\s*GP|NASCAR|IndyCar|WRC|Supercars|Supercars\s*Championship|V8SC|Bathurst|WSBK|WEC|FormulaE|Rally|Dakar|PGA|PGA\s*Tour|LPGA|LPGA\s*Tour|Masters|ATP|ATP\s*World\s*Tour|WTA|WTA\s*Tour|Wimbledon|Australian\s*Open|Roland\s*Garros|French\s*Open|US\s*Open|U\.S\.\s*Open|Davis\s*Cup|Laver\s*Cup|PDC|PDC\s*Darts|Premier\s*League\s*Darts|World\s*Championship\s*Darts|World\s*Matchplay|IPL|IPLM\d+|Indian\s*Premier\s*League|MLS|Major\s*League\s*Soccer|MLB|Major\s*League\s*Baseball|NCAA\s*Baseball|World\s*Baseball\s*Classic|NBA|NBA\s*Playoffs|EuroLeague|EasyCredit\s*BBL|Basketball\s*Champions\s*League(?:\s*of\s*Americas)?|Super\s*Rugby|MLR|Major\s*League\s*Rugby|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
 
 const SESSION_PATTERNS = [
   ['Pre-Season Testing', /\bpre[\s-]*season\s+testing\b/i],
@@ -798,6 +798,15 @@ function shortenEventName(value = '') {
     .replace(/\bMonday Night Raw\b/g, 'Raw')
 }
 
+function normalizeLeagueLabel(value = '') {
+  const label = titleCase(value)
+  if (/^F1$/i.test(label)) return 'Formula 1'
+  if (/^Pdc$/i.test(label)) return 'PDC'
+  if (/^Pdc Darts$/i.test(label)) return 'PDC Darts'
+  if (/^Premier League Darts$/i.test(label)) return 'Premier League Darts'
+  return label
+}
+
 function parseSportsTitle(title, fallbackDate = '') {
   const raw = String(title || '').trim()
   if (!raw) return null
@@ -899,7 +908,7 @@ function parseSportsEventTitle(title, fallbackDate = '') {
   }
 
   const posterDetail = extractPosterSessionAndRound(eventTokens, raw)
-  const league = normalizeSegment(leagueStart.leagueToken)
+  const league = normalizeLeagueLabel(leagueStart.leagueToken)
   const numericCard = /^(?:ufc|pfl|bellator|one|wwe|aew)$/i.test(league) &&
     /^\d{1,4}$/.test(String(eventTokens[0] || '').trim())
   const normalizedEventTokens = numericCard
@@ -907,7 +916,10 @@ function parseSportsEventTitle(title, fallbackDate = '') {
     : normalizeEventNameTokens(eventTokens, dateStr || fallbackDate)
   if (normalizedEventTokens.length === 0) return null
 
-  const eventName = normalizeSegment(normalizedEventTokens.join(' '))
+  let eventName = normalizeSegment(normalizedEventTokens.join(' '))
+  if (/darts/i.test(league) && /^(?:night|round|final|semi final|quarter final)$/i.test(eventName)) {
+    eventName = league
+  }
   if (!league || !eventName) return null
 
   return {

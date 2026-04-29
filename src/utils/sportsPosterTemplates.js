@@ -244,6 +244,12 @@ function sportIconFor(event = {}, facts = {}) {
   const text = `${event.sportIcon || ''} ${facts.sport || ''} ${facts.league || ''} ${facts.detail || ''} ${facts.title || ''}`.toLowerCase()
   if (/formula|f1/.test(text)) return 'f1'
   if (/moto\s*gp|motogp|motor|wrc|rally|grand prix/.test(text)) return 'f1'
+  if (/golf|pga|lpga|masters|ryder|liv/.test(text)) return 'golf'
+  if (/darts|pdc|world matchplay/.test(text)) return 'darts'
+  if (/cycling|tour de france|giro|vuelta|stage|time trial|road race/.test(text)) return 'cycling'
+  if (/cricket|ipl|odi|t20|ashes/.test(text)) return 'cricket'
+  if (/rugby|nrl|six nations|super rugby/.test(text)) return 'rugby'
+  if (/wrestling|wwe|aew|smackdown|raw|nxt/.test(text)) return 'wrestling'
   if (/american.*football|nfl/.test(text)) return 'football'
   if (/football|soccer|premier|fa cup|mls|champions league|europa/.test(text)) return 'soccer'
   if (/hockey|nhl/.test(text)) return 'hockey'
@@ -352,7 +358,13 @@ function sportGlyph(icon = 'soccer', x = 50, y = 50, size = 100, color = '#fff',
     baseball: `<circle cx="50" cy="50" r="34"/><path d="M22,38 Q40,46 36,72"/><path d="M78,38 Q60,46 64,72"/>`,
     f1: `<path d="M10,60 L30,60 L40,48 L60,48 L70,60 L90,60 L90,68 L70,68 L60,76 L40,76 L30,68 L10,68 Z" fill="currentColor" stroke="none"/><circle cx="30" cy="72" r="6" fill="currentColor" stroke="none"/><circle cx="70" cy="72" r="6" fill="currentColor" stroke="none"/>`,
     mma: `<path d="M28,30 L44,30 L44,22 L60,22 L60,30 L72,30 L76,42 L72,68 L60,76 L40,76 L28,68 L24,42 Z"/><line x1="40" y1="44" x2="60" y2="44"/><line x1="40" y1="56" x2="60" y2="56"/>`,
-    tennis: `<circle cx="50" cy="50" r="34"/><path d="M22,32 Q50,50 22,68"/><path d="M78,32 Q50,50 78,68"/>`
+    tennis: `<circle cx="50" cy="50" r="34"/><path d="M22,32 Q50,50 22,68"/><path d="M78,32 Q50,50 78,68"/>`,
+    golf: `<circle cx="38" cy="68" r="14" fill="currentColor" stroke="none"/><path d="M48,68 C66,62 76,52 82,38"/><line x1="62" y1="18" x2="62" y2="76"/><path d="M62,18 L84,26 L62,34 Z" fill="currentColor" stroke="none"/>`,
+    darts: `<circle cx="50" cy="50" r="38"/><circle cx="50" cy="50" r="25"/><circle cx="50" cy="50" r="10" fill="currentColor" stroke="none"/><line x1="50" y1="12" x2="50" y2="88"/><line x1="12" y1="50" x2="88" y2="50"/>`,
+    cycling: `<circle cx="28" cy="68" r="16"/><circle cx="74" cy="68" r="16"/><path d="M28,68 L46,40 L58,68 L42,68 L56,42 L72,68"/><path d="M42,32 L54,32"/><circle cx="58" cy="24" r="7" fill="currentColor" stroke="none"/>`,
+    cricket: `<path d="M26,76 L72,30"/><path d="M66,24 L80,38 L74,44 L60,30 Z" fill="currentColor" stroke="none"/><circle cx="28" cy="34" r="9"/>`,
+    rugby: `<ellipse cx="50" cy="50" rx="36" ry="24" transform="rotate(-28 50 50)"/><path d="M28,50 Q50,40 72,50"/><path d="M28,50 Q50,60 72,50"/>`,
+    wrestling: `<rect x="20" y="34" width="60" height="42"/><line x1="20" y1="44" x2="80" y2="44"/><line x1="20" y1="56" x2="80" y2="56"/><line x1="20" y1="68" x2="80" y2="68"/><circle cx="30" cy="34" r="4" fill="currentColor" stroke="none"/><circle cx="70" cy="34" r="4" fill="currentColor" stroke="none"/><circle cx="30" cy="76" r="4" fill="currentColor" stroke="none"/><circle cx="70" cy="76" r="4" fill="currentColor" stroke="none"/>`
   }
   const inner = shapes[icon] || shapes.soccer
   const scale = size / 100
@@ -365,6 +377,7 @@ function renderEditorial(event = {}, variant = 'poster', theme = {}, mode = '') 
   const issueNo = (m.date || '').replace(/-/g, '.') || 'SportsMeta'
   const homeLast = m.home.name.split(/\s+/).filter(Boolean).slice(-1)[0] || m.home.name
   const awayLast = m.away.name.split(/\s+/).filter(Boolean).slice(-1)[0] || m.away.name
+  const headlineLines = splitLines(m.event_short || m.league || m.sport, 16, 2)
   const paper = '#EFEAE0'
   const ink = '#1a1612'
   const inkSoft = '#4a3d2e'
@@ -418,11 +431,14 @@ function renderEditorial(event = {}, variant = 'poster', theme = {}, mode = '') 
   <rect x="34" y="84" width="64" height="14" fill="rgba(15,12,10,0.78)"/>
   <text class="sans" x="66" y="94" text-anchor="middle" font-size="7" fill="${paper}" letter-spacing="1.5" font-weight="700">PLATE I - LIVE</text>
   <text class="sans" x="22" y="328" font-size="9" fill="${gold}" letter-spacing="2.5" font-weight="700">- A ${e(m.league.toUpperCase())} FEATURE</text>
-  <text class="serif" x="22" y="372" font-size="42" font-style="italic" fill="${ink}" letter-spacing="-1">${e(homeLast)}</text>
+  ${m.hasMatchup
+    ? `<text class="serif" x="22" y="372" font-size="42" font-style="italic" fill="${ink}" letter-spacing="-1">${e(homeLast)}</text>
   <text class="serif" x="22" y="416" font-size="22" fill="${gold}">.</text>
-  <text class="serif" x="42" y="416" font-size="42" font-weight="700" fill="${ink}" letter-spacing="-1">${e(awayLast)}</text>
-  <text class="serif" x="22" y="456" font-size="12" font-style="italic" fill="${inkSoft}">${e(m.round)}, written from ${e(m.venue)}.</text>
-  <text class="serif" x="22" y="472" font-size="12" font-style="italic" fill="${inkSoft}">On the evening of ${e(m.date || 'matchday')}.</text>
+  <text class="serif" x="42" y="416" font-size="42" font-weight="700" fill="${ink}" letter-spacing="-1">${e(awayLast)}</text>`
+    : `<text class="serif" x="22" y="372" font-size="${headlineLines.length > 1 ? 30 : 42}" font-style="italic" font-weight="700" fill="${ink}" letter-spacing="-1">${e(headlineLines[0] || m.event_short)}</text>${headlineLines[1] ? `<text class="serif" x="22" y="${headlineLines.length > 1 ? 408 : 416}" font-size="30" font-style="italic" font-weight="700" fill="${ink}" letter-spacing="-1">${e(headlineLines[1])}</text>` : ''}
+  <text class="serif" x="22" y="${headlineLines.length > 1 ? 444 : 416}" font-size="22" fill="${gold}" font-style="italic">- ${e((m.session || m.round || m.sport).toUpperCase())}</text>`}
+  <text class="serif" x="22" y="${m.hasMatchup ? 456 : 480}" font-size="12" font-style="italic" fill="${inkSoft}">${e(m.hasMatchup ? `${m.round}, written from ${m.venue}.` : `${m.league}, ${m.round || m.session || m.sport}.`)}</text>
+  <text class="serif" x="22" y="${m.hasMatchup ? 472 : 498}" font-size="12" font-style="italic" fill="${inkSoft}">On the evening of ${e(m.date || 'matchday')}.</text>
   <rect x="22" y="540" width="${SOURCE_W - 44}" height="1" fill="url(#goldRule)"/>
   <text class="sans" x="22" y="582" font-size="8.5" fill="${ink}" letter-spacing="1.6" font-weight="600">${e(m.venue.toUpperCase())}</text>
   <text class="serif" x="${SOURCE_W - 22}" y="582" text-anchor="end" font-style="italic" font-size="12" fill="${gold}">${e(m.time || m.date)}</text>`
@@ -442,14 +458,17 @@ function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') 
         { role: 'league', left: 18, top: 18, size: 32 },
         { role: 'league', left: 120, top: 150, size: 160 }
       ]
+  const heroLines = m.hasMatchup ? [] : splitLines(m.event_short || m.league || m.sport, 14, 2)
+  const heroFontSize = heroLines.length > 1 ? 44 : (heroLines[0] && heroLines[0].length > 10 ? 52 : 64)
   const heroVisual = m.hasMatchup
     ? `<text class="bebas" x="-8" y="320" font-size="220" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1" letter-spacing="-8">${e(m.home.short)}</text>
   <text class="bebas" x="${SOURCE_W + 8}" y="540" text-anchor="end" font-size="220" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1" letter-spacing="-8">${e(m.away.short)}</text>
   <circle cx="74" cy="240" r="50" fill="url(#homeGrad)" stroke="${m.home.accent}" stroke-width="1.5"/>
   <circle cx="326" cy="240" r="50" fill="url(#awayGrad)" stroke="${m.away.accent}" stroke-width="1.5"/>
   <text class="bebas" x="${SOURCE_W / 2}" y="${SOURCE_H / 2 + 22}" text-anchor="middle" font-size="88" fill="url(#chrome)" letter-spacing="4" filter="url(#vsShadow)" transform="skewX(-12)">VS</text>`
-    : `<text class="bebas" x="${SOURCE_W / 2}" y="244" text-anchor="middle" font-size="64" fill="white" letter-spacing="2" filter="url(#vsShadow)">${e(m.event_short.toUpperCase())}</text>
-  <text class="mono" x="${SOURCE_W / 2}" y="286" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.85)" letter-spacing="2.5">${e((m.session || m.round).toUpperCase())}</text>
+    : `<text class="bebas" x="${SOURCE_W / 2}" y="${heroLines.length > 1 ? 224 : 244}" text-anchor="middle" font-size="${heroFontSize}" fill="white" letter-spacing="2" filter="url(#vsShadow)" textLength="${SOURCE_W - 56}" lengthAdjust="spacingAndGlyphs">${e((heroLines[0] || m.event_short).toUpperCase())}</text>
+  ${heroLines[1] ? `<text class="bebas" x="${SOURCE_W / 2}" y="266" text-anchor="middle" font-size="${heroFontSize}" fill="white" letter-spacing="2" filter="url(#vsShadow)" textLength="${SOURCE_W - 56}" lengthAdjust="spacingAndGlyphs">${e(heroLines[1].toUpperCase())}</text>` : ''}
+  <text class="mono" x="${SOURCE_W / 2}" y="${heroLines.length > 1 ? 296 : 286}" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.85)" letter-spacing="2.5">${e((m.session || m.round).toUpperCase())}</text>
   <circle cx="${SOURCE_W / 2}" cy="352" r="48" fill="url(#homeGrad)" stroke="${m.home.accent}" stroke-width="1.5"/>
   ${sportGlyph(m.sport_icon, SOURCE_W / 2, 352, 72, 'white', 0.85)}`
   const lowerThird = m.hasMatchup
@@ -458,7 +477,7 @@ function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') 
   <text class="sans" x="${SOURCE_W - 18}" y="${SOURCE_H - 66}" text-anchor="end" font-size="9" font-weight="700" fill="${m.away.primary}" letter-spacing="1.8">${e(m.rightLabel)}</text>
   <text class="bebas" x="${SOURCE_W - 18}" y="${SOURCE_H - 48}" text-anchor="end" font-size="18" fill="white" letter-spacing="1">${e(m.away.name)}</text>`
     : `<text class="sans" x="${SOURCE_W / 2}" y="${SOURCE_H - 68}" text-anchor="middle" font-size="9" font-weight="700" fill="${m.home.primary}" letter-spacing="1.8">${e(m.league.toUpperCase())}</text>
-  <text class="bebas" x="${SOURCE_W / 2}" y="${SOURCE_H - 48}" text-anchor="middle" font-size="20" fill="white" letter-spacing="1">${e(m.event_short)}</text>`
+  <text class="bebas" x="${SOURCE_W / 2}" y="${SOURCE_H - 48}" text-anchor="middle" font-size="20" fill="white" letter-spacing="1" textLength="${SOURCE_W - 60}" lengthAdjust="spacingAndGlyphs">${e(m.event_short)}</text>`
   const inner = `<defs>
     <style>${FONTS_BEBAS_MONO_SANS}</style>
     <radialGradient id="homeGrad" cx="30%" cy="40%" r="80%"><stop offset="0%" stop-color="${m.home.primary}"/><stop offset="70%" stop-color="${m.home.secondary}"/><stop offset="100%" stop-color="#060810"/></radialGradient>

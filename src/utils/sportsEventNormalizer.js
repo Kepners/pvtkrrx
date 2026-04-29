@@ -418,18 +418,21 @@ function normalizeSportsEventMetadata(input = {}) {
     eventTitle = cleanTrackerText(rawTitle) || rawTitle || 'Sports Event'
   }
 
+  const normalizedEventShort = normalizeSpace(
+    input.eventShort ||
+    input.event_short ||
+    parsedSportsEvent?.eventShort ||
+    (sportKey === 'golf' && eventTitle ? eventTitle : '') ||
+    (/^(?:stage|race|championship)$/i.test(parsedEvent?.eventShort || '') ? eventTitle : parsedEvent?.eventShort) ||
+    eventTitle
+  )
+
   return {
     sport,
     competition: competition || sport,
     eventTitle,
     eventName: eventTitle,
-    eventShort: normalizeSpace(
-      input.eventShort ||
-      input.event_short ||
-      (/^(?:stage|race|championship)$/i.test(parsedEvent?.eventShort || '') ? eventTitle : parsedEvent?.eventShort) ||
-      parsedSportsEvent?.eventShort ||
-      eventTitle
-    ),
+    eventShort: normalizedEventShort,
     ...(homeTeam ? { homeTeam } : {}),
     ...(awayTeam ? { awayTeam } : {}),
     ...(homeTeam ? { principalA: homeTeam } : {}),

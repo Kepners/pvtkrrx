@@ -13,7 +13,7 @@ const DEFAULT_OUT = path.join(process.cwd(), 'dist', 'poster-samples')
 
 const EVENTS = [
   {
-    className: 'team_vs_team',
+    className: 'football-club-matchup',
     event: {
       sport: 'Football',
       sportHint: 'football',
@@ -27,7 +27,37 @@ const EVENTS = [
     }
   },
   {
-    className: 'motorsport_event',
+    className: 'football-international-matchup',
+    event: {
+      sport: 'Football',
+      sportHint: 'football',
+      league: 'UEFA Nations League',
+      title: 'England vs France',
+      eventTitle: 'England vs France',
+      homeTeam: 'England',
+      awayTeam: 'France',
+      date: '2026-06-10',
+      eventClass: 'team_vs_team'
+    }
+  },
+  {
+    className: 'f1-practice-1',
+    event: {
+      sport: 'Motorsport',
+      sportHint: 'motorsport',
+      league: 'Formula 1',
+      title: 'British Grand Prix',
+      eventTitle: 'British Grand Prix',
+      eventName: 'British Grand Prix',
+      eventShort: 'British GP',
+      eventDetail: 'Practice 1',
+      session: 'Practice 1',
+      date: '2026-07-03',
+      eventClass: 'motorsport_event'
+    }
+  },
+  {
+    className: 'f1-qualifying',
     event: {
       sport: 'Motorsport',
       sportHint: 'motorsport',
@@ -43,7 +73,22 @@ const EVENTS = [
     }
   },
   {
-    className: 'combat_event',
+    className: 'ufc-card-solo',
+    event: {
+      sport: 'MMA',
+      sportHint: 'mma',
+      league: 'UFC',
+      title: 'UFC 312',
+      eventTitle: 'UFC 312',
+      eventName: 'UFC 312',
+      eventDetail: 'Main Card',
+      session: 'Main Card',
+      date: '2026-06-14',
+      eventClass: 'combat_event'
+    }
+  },
+  {
+    className: 'ufc-fighter-match',
     event: {
       sport: 'MMA',
       sportHint: 'mma',
@@ -60,7 +105,7 @@ const EVENTS = [
     }
   },
   {
-    className: 'golf_event',
+    className: 'golf-tournament-round',
     event: {
       sport: 'Golf',
       sportHint: 'golf',
@@ -74,7 +119,7 @@ const EVENTS = [
     }
   },
   {
-    className: 'wrestling_event',
+    className: 'wwe-show',
     event: {
       sport: 'Wrestling',
       sportHint: 'wrestling',
@@ -88,7 +133,7 @@ const EVENTS = [
     }
   },
   {
-    className: 'cycling_event',
+    className: 'cycling-stage',
     event: {
       sport: 'Cycling',
       sportHint: 'cycling',
@@ -102,7 +147,7 @@ const EVENTS = [
     }
   },
   {
-    className: 'athletics_event',
+    className: 'athletics-event',
     event: {
       sport: 'Athletics',
       sportHint: 'athletics',
@@ -116,28 +161,14 @@ const EVENTS = [
     }
   },
   {
-    className: 'darts_event',
-    event: {
-      sport: 'Darts',
-      sportHint: 'darts',
-      league: 'Premier League Darts',
-      title: 'Premier League Darts',
-      eventTitle: 'Premier League Darts',
-      homeTeam: 'Luke Littler',
-      awayTeam: 'Michael van Gerwen',
-      date: '2026-04-30',
-      eventClass: 'darts_event'
-    }
-  },
-  {
-    className: 'tennis_or_snooker_match',
+    className: 'tennis-player-match',
     event: {
       sport: 'Tennis',
       sportHint: 'tennis',
       league: 'Wimbledon',
       title: 'Wimbledon',
       eventTitle: 'Wimbledon',
-      eventDetail: 'Final',
+      eventDetail: 'Sinner v Alcaraz',
       session: 'Final',
       homeTeam: 'Sinner',
       awayTeam: 'Alcaraz',
@@ -146,7 +177,35 @@ const EVENTS = [
     }
   },
   {
-    className: 'tournament_event',
+    className: 'snooker-tournament',
+    event: {
+      sport: 'Snooker',
+      sportHint: 'snooker',
+      league: 'World Championship',
+      title: 'World Snooker Championship',
+      eventTitle: 'World Snooker Championship',
+      eventDetail: 'Final',
+      session: 'Final',
+      date: '2026-05-04',
+      eventClass: 'tournament_event'
+    }
+  },
+  {
+    className: 'darts-tournament',
+    event: {
+      sport: 'Darts',
+      sportHint: 'darts',
+      league: 'Premier League Darts',
+      title: 'Premier League Darts',
+      eventTitle: 'Premier League Darts',
+      eventDetail: 'Night 1',
+      session: 'Night 1',
+      date: '2026-04-30',
+      eventClass: 'darts_event'
+    }
+  },
+  {
+    className: 'tennis-tournament',
     event: {
       sport: 'Tennis',
       sportHint: 'tennis',
@@ -160,7 +219,7 @@ const EVENTS = [
     }
   },
   {
-    className: 'generic_event',
+    className: 'generic-event',
     event: {
       sport: 'Sports',
       league: 'Sports',

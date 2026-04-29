@@ -1,5 +1,5 @@
 const SPORTS = [
-  { key: 'football', keywords: ['football', 'soccer', 'epl', 'premier league', 'mls', 'major league soccer', 'american major league soccer', 'la liga', 'serie a', 'bundesliga', 'uefa', 'champions league', 'europa league', 'conference league', 'efl', 'english football league', 'league one', 'league two', 'fa cup', 'carabao cup', 'community shield'] },
+  { key: 'football', keywords: ['football', 'soccer', 'epl', 'premier league', 'mls', 'major league soccer', 'american major league soccer', 'la liga', 'serie a', 'bundesliga', 'uefa', 'champions league', 'europa league', 'conference league', 'efl', 'english football league', 'league one', 'league two', 'fa cup', 'carabao cup', 'community shield', 'fifa world cup', 'world cup qualifier', 'world cup qualifiers', 'uefa nations league', 'european championship', 'euro qualifier', 'euro qualifiers', 'copa america', 'afcon', 'asian cup', 'conmebol qualifier', 'concacaf qualifier', 'international friendly', 'international friendlies'] },
   { key: 'basketball', keywords: ['basketball', 'nba playoffs', 'nba postseason', 'nba', 'wnba', 'euroleague'] },
   { key: 'baseball', keywords: ['baseball', 'major league baseball', 'mlb'] },
   { key: 'hockey', keywords: ['hockey', 'nhl', 'ice hockey'] },

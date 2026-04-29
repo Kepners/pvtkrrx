@@ -101,6 +101,15 @@ const CASES = [
     }
   },
   {
+    slug: 'fifa-world-cup-qualifier-matchup',
+    expected: 'team_vs_team',
+    input: {
+      rawTitle: 'FIFA World Cup Qualifier Brazil vs Argentina 1080p',
+      sportHint: '',
+      competition: 'FIFA World Cup Qualifier'
+    }
+  },
+  {
     slug: 'world-athletics-continental-tour-classic',
     expected: 'athletics_event',
     input: {

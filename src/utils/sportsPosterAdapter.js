@@ -1,7 +1,7 @@
 const { classifySportsPosterEvent, hasActualPair } = require('./sportsPosterClassifier')
 
 const FORBIDDEN_VALUE_RE = /^(?:undefined|null|unknown|n\/a|na|sport|sports)$/i
-const RELEASE_NOISE_RE = /\b(?:2160p|1080p|1080i|720p|576p|540p|480p|x264|x265|h264|h265|hevc|avc|av1|web[-._\s]?dl|web[-._\s]?rip|web|hdtv|repack|proper|complete|aac|ddp?\d?(?:\.\d)?|multi|english)\b/gi
+const RELEASE_NOISE_RE = /(?:\b(?:2160p|1080p|1080i|720p|576p|540p|480p)(?:[a-z]{1,6})?(?:\d{2,3}fps)?|\b\d{2,3}fps\b|\b(?:x264|x265|h264|h265|hevc|avc|av1|web[-._\s]?dl|web[-._\s]?rip|web|hdtv|repack|proper|complete|aac|ddp?\d?(?:\.\d)?|multi|english)\b)/gi
 
 const LEAGUE_CODES = Object.freeze({
   'english premier league': 'EPL',
@@ -87,7 +87,7 @@ function titleCase(value = '') {
     .filter(Boolean)
     .map((part) => {
       const upper = part.toUpperCase()
-      if (['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'F1', 'FIFA', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'NBA', 'NFL', 'NHL', 'NXT', 'PDC', 'PFL', 'PGA', 'RAW', 'UFC', 'UEFA', 'WEC', 'WRC', 'WTA', 'WWE'].includes(upper)) return upper
+      if (['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'F1', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'NBA', 'NFL', 'NHL', 'NXT', 'PDC', 'PFL', 'PGA', 'RAW', 'UFC', 'UEFA', 'WEC', 'WRC', 'WTA', 'WWE'].includes(upper)) return upper
       if (upper === 'MOTOGP') return 'MotoGP'
       if (upper === 'SMACKDOWN') return 'SmackDown'
       if (upper === 'WRESTLEMANIA') return 'WrestleMania'
@@ -232,6 +232,18 @@ function ensureDistinctSides(home, away) {
 }
 
 function eventShortFor(input = {}, classification = '') {
+  if (classification === 'team_vs_team') {
+    return truncate(pickFirst(input.eventShort, input.event_short, input.league, input.competition, 'Matchup'), 38)
+  }
+  if (classification === 'tennis_or_snooker_match') {
+    return truncate(pickFirst(input.league, input.competition, input.eventShort, input.event_short, input.eventTitle, input.title, 'Tournament'), 38)
+  }
+  if (classification === 'golf_event') {
+    return truncate(pickFirst(input.eventTitle, input.title, input.eventName, input.eventShort, input.event_short, input.league, input.competition, 'Golf Event'), 38)
+  }
+  if (classification === 'darts_event' && !hasActualPair(input)) {
+    return truncate(pickFirst(input.league, input.competition, input.eventTitle, input.title, 'Darts Event'), 38)
+  }
   const raw = pickFirst(
     input.eventShort,
     input.event_short,
@@ -259,6 +271,7 @@ function sessionFor(input = {}, classification = '', eventShort = '') {
     (classification === 'team_vs_team' || classification === 'combat_event' || classification === 'tennis_or_snooker_match' || classification === 'darts_event') && hasActualPair(input)
       ? `${sideName(input, 'home')} v ${sideName(input, 'away')}`
       : '',
+    classification === 'wrestling_event' ? input.date : '',
     classification === 'generic_event' ? input.sport || input.sportHint : '',
     'Event'
   )
@@ -266,13 +279,24 @@ function sessionFor(input = {}, classification = '', eventShort = '') {
   return clean.toLowerCase() === eventShort.toLowerCase() ? 'Event' : clean
 }
 
+function distinctLeagueLabel(league = '', sport = '', eventShort = '') {
+  const a = normalizeSpace(league).toLowerCase()
+  const b = normalizeSpace(sport).toLowerCase()
+  if (!a || a !== b) return league
+  const candidate = normalizeSpace(eventShort)
+  if (candidate && candidate.toLowerCase() !== a) return truncate(candidate, 30)
+  if (/^(?:general|sports?|event|live)$/i.test(a)) return 'Live Sport'
+  return league
+}
+
 function buildPaidTemplateMatchup(normalizedEvent = {}, classification = '') {
   const eventClass = POSTER_CLASS_SET.has(classification)
     ? classification
     : classifySportsPosterEvent(normalizedEvent)
   const sport = sportLabel(normalizedEvent)
-  const league = truncate(pickFirst(normalizedEvent.league, normalizedEvent.competition, sport), 30)
+  let league = truncate(pickFirst(normalizedEvent.league, normalizedEvent.competition, sport), 30)
   const eventShort = eventShortFor(normalizedEvent, eventClass)
+  league = distinctLeagueLabel(league, sport, eventShort)
   const session = sessionFor(normalizedEvent, eventClass, eventShort)
   const eventFormat = eventFormatFor(eventClass, normalizedEvent)
   const primaryColor = pickFirst(normalizedEvent.primaryColor, normalizedEvent.primary_color) || colorForLabel(eventShort, '#123c69')
