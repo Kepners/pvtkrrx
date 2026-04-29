@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="400" height="600" viewBox="0 0 400 600">
   <defs>
-    <style>@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&display=swap');
+    <style>@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&amp;family=Inter:wght@400;600;700&amp;family=JetBrains+Mono:wght@400;600&amp;family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,700&amp;display=swap');
 .serif { font-family: 'Playfair Display', Georgia, serif; }
 .bebas { font-family: 'Bebas Neue', Impact, sans-serif; }
 .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
