@@ -501,6 +501,12 @@ The production system now runs the intended paid-upgrade boundary:
 
 ## Remaining Backlog
 
+- [x] Add a policy-driven SportsCult/SportsDB scheduled ingest strategy so major sports stay covered without broad default API/storage growth
+- [x] Add operator tooling for the SportsCult coverage plan and read-only demand audit
+- [x] Reduce live SportsMeta scheduled ingest cadence from every 2 hours to every 6 hours after the policy deployment
+- [ ] Observe the first full production run of the new `major` policy and record the API/request/storage result
+- [ ] Run the SportsCult demand audit with explicit Prowlarr env if SportsMeta is allowed read-only Prowlarr access
+- [ ] Decide DB/cache purge or compaction only after policy-run proof shows default-generated categories are safe to keep lightweight
 - [ ] Watch the first real paid customers through Stripe webhooks and the portal path instead of only smoke tokens
 - [ ] Decide whether SportsMeta should later add lifetime/manual offers on top of the current yearly-first model
 - [ ] Improve import quality and alias contamination without weakening canonical-id stability

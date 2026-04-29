@@ -1010,7 +1010,7 @@ These items should still be treated as open until captured on real clients:
 
 1. Browser-check the live homepage on desktop and mobile and fix any regressions now that the refactor is public.
 2. Decide whether Contabo should keep the extra `/opt/pvtkrrx` `systemd` runtime, repoint Caddy to it, or remove it so deploy expectations stop drifting.
-3. Monitor SportsMeta scheduled ingest completeness and decide whether to add a broader revalidate/prune path; the new timer is live, but the first scheduled history pass still logged `status = partial` and one football window needed a one-off import after cleanup.
+3. Monitor the SportsMeta `major` coverage-policy scheduled ingest that replaced the broad 14-day crawl on 2026-04-29; the next proof point is the first full 6-hour policy run, then a decision on SportsCult demand-audit promotion, revalidate/prune work, and any DB/cache purge or compaction.
 4. Add repeatable operator tooling for new JPG drops and future re-imports so `/opt/pvtkrrx/runtime` is not the only bootstrap path.
 5. Monitor the live SportsMeta Stripe/member-token boundary and add later commercial options there if needed; keep PVTKRRX free and keep entitlement logic off the public stream addon surface.
 6. Decide whether SportsMeta should stay as the current systemd + Caddy service boundary or move under Coolify later; the separate runtime itself is now working.
