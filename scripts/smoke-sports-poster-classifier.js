@@ -101,6 +101,15 @@ const CASES = [
     }
   },
   {
+    slug: 'world-athletics-continental-tour-classic',
+    expected: 'athletics_event',
+    input: {
+      rawTitle: 'World Athletics Continental Tour Gold 2026 04 24 Kip Keino Classic',
+      competition: 'World Athletics Continental Tour Gold',
+      eventTitle: 'Kip Keino Classic'
+    }
+  },
+  {
     slug: 'premier-league-darts',
     expected: 'darts_event',
     input: {

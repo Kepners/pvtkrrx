@@ -115,18 +115,19 @@ function classifySportsPosterEvent(input = {}) {
     return 'wrestling_event'
   }
 
-  if (
-    sport === 'cycling' ||
-    /\b(?:tour de france|giro d[''`]?italia|giro ditalia|vuelta a espana|vuelta|paris roubaix|milan san remo|tour of flanders|liege bastogne liege|criterium du dauphine|tour de suisse|uci|road race|time trial|stage\s*\d+|classics?)\b/.test(text)
-  ) {
-    return 'cycling_event'
-  }
-
+  // Athletics has "Tour" and "Classic" event names, so it must win before cycling classics.
   if (
     sport === 'athletics' ||
     /\b(?:world athletics|diamond league|continental tour|track and field|olympic athletics|athletics championships|london marathon|boston marathon|marathon)\b/.test(text)
   ) {
     return 'athletics_event'
+  }
+
+  if (
+    sport === 'cycling' ||
+    /\b(?:tour de france|giro d[''`]?italia|giro ditalia|vuelta a espana|vuelta|paris roubaix|milan san remo|tour of flanders|liege bastogne liege|criterium du dauphine|tour de suisse|uci|road race|time trial|stage\s*\d+|classics?)\b/.test(text)
+  ) {
+    return 'cycling_event'
   }
 
   if (sport === 'tennis' || sport === 'snooker' || /\b(?:tennis|wimbledon|atp|wta|australian open|roland garros|french open|us open tennis|snooker|crucible|uk championship)\b/.test(text)) {

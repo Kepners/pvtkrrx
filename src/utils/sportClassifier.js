@@ -15,6 +15,7 @@ const SPORTS = [
   { key: 'darts', keywords: ['darts', 'pdc darts', 'bdo darts', 'premier league darts'] },
   { key: 'snooker', keywords: ['snooker'] },
   { key: 'golf', keywords: ['golf', 'pga tour', 'pga', 'lpga', 'masters'] },
+  { key: 'athletics', keywords: ['world athletics', 'diamond league', 'continental tour', 'track and field', 'olympic athletics', 'london marathon', 'boston marathon'] },
   { key: 'olympics', keywords: ['olympics', 'olympic games'] }
 ]
 

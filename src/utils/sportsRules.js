@@ -74,6 +74,7 @@ function detectStrongSportHintFromTitle(title) {
     ['mma', /\b(?:ufc|bellator|pfl|fight[\s._-]*night|one[\s._-]*championship)\b/i],
     ['boxing', /\b(?:boxing|matchroom|queensberry|top[\s._-]*rank)\b/i],
     ['golf', /\b(?:pga(?:[\s._-]*tour)?|lpga|masters|ryder[\s._-]*cup|open[\s._-]*championship)\b/i],
+    ['athletics', /\b(?:world[\s._-]*athletics|diamond[\s._-]*league|continental[\s._-]*tour|track[\s._-]*(?:and|&)[\s._-]*field|olympic[\s._-]*athletics|athletics[\s._-]*championships?|london[\s._-]*marathon|boston[\s._-]*marathon)\b/i],
     ['cycling', /\b(?:cycling|tour[\s._-]*de[\s._-]*france|giro[\s._-]*d[\s._-]*italia|vuelta)\b/i],
     ['wrestling', /\b(?:wwe|aew|wrestling)\b/i],
     ['snooker', /\bsnooker\b/i]
@@ -138,6 +139,7 @@ function scoreSportsEventSignals(title, sportHint = '') {
     if (sport === 'darts' && /\b(?:pdc|bdo|darts|premier[\s.\-_]*league[\s.\-_]*darts)\b/i.test(value)) score += 2
     if (sport === 'cricket' && /\b(?:ipl|indian[\s.\-_]*premier[\s.\-_]*league|t20|odi|ashes)\b/i.test(value)) score += 2
     if (sport === 'golf' && /\b(?:pga(?:[\s.\-_]*tour)?|lpga|masters|open[\s.\-_]*championship|ryder[\s.\-_]*cup)\b/i.test(value)) score += 2
+    if (sport === 'athletics' && /\b(?:world[\s.\-_]*athletics|diamond[\s.\-_]*league|continental[\s.\-_]*tour|track[\s.\-_]*(?:and|&)[\s.\-_]*field|olympic[\s.\-_]*athletics|marathon)\b/i.test(value)) score += 2
   }
 
   return score

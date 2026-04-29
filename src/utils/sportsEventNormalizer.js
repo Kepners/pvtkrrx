@@ -8,6 +8,7 @@ const SPORT_LABELS = {
   basketball: 'Basketball',
   boxing: 'Boxing',
   cricket: 'Cricket',
+  athletics: 'Athletics',
   cycling: 'Cycling',
   darts: 'Darts',
   fighting: 'Fighting',
