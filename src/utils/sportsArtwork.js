@@ -208,7 +208,7 @@ function resolveSportsPosterAsset(input = {}) {
       : resolveCanonicalId(input) ? 'pvtkrrx-proxy-canonical' : 'pvtkrrx-proxy-default',
     selectedArtworkSource: hasMemberUrl
       ? 'sportsmeta-member-raster'
-      : resolveCanonicalId(input) ? 'pvtkrrx-canonical-proxy' : 'pvtkrrx-generated-fallback'
+      : resolveCanonicalId(input) ? 'pvtkrrx-canonical-proxy' : 'sportsmeta-default-proxy'
   }
 }
 
