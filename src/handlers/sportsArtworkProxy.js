@@ -17,6 +17,7 @@ const {
   SPORTS_POSTER_TEMPLATES,
   normalizeSportsPosterTemplate,
   resolveSportsPosterTemplate,
+  renderLogoGlyphSvg,
   renderSportsPosterTemplateSvg
 } = require('../utils/sportsPosterTemplates')
 const {
@@ -32,7 +33,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260428-club-logo-templates-v1'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260429-template-glyph-fallback-v2'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -141,9 +142,68 @@ function shouldRenderLocalFallbackForSvg(variant) {
   return variant === 'poster' || variant === 'background' || variant === 'landscape'
 }
 
-async function renderLocalFallbackPng(variant, fallbackInput = {}) {
-  const svg = renderSportsArtworkSvg(fallbackInput, variant)
-  return rasterizeToPng(Buffer.from(svg), variant)
+function buildTemplateFallbackEvent(fallbackInput = {}) {
+  return {
+    sport: normalizeSpace(fallbackInput.sport),
+    league: normalizeSpace(fallbackInput.competition || fallbackInput.league),
+    title: normalizeSpace(fallbackInput.eventTitle || fallbackInput.title),
+    eventName: normalizeSpace(fallbackInput.eventTitle || fallbackInput.title),
+    eventDetail: normalizeSpace(fallbackInput.eventDetail || fallbackInput.detail || fallbackInput.session),
+    date: normalizeSpace(fallbackInput.date),
+    homeTeam: normalizeSpace(fallbackInput.homeTeam),
+    awayTeam: normalizeSpace(fallbackInput.awayTeam),
+    seeders: normalizeSpace(fallbackInput.seeders),
+    size: normalizeSpace(fallbackInput.size),
+    rawTitle: normalizeSpace(fallbackInput.rawTitle),
+    source: normalizeSpace(fallbackInput.source || 'fallback')
+  }
+}
+
+async function renderTemplateFallbackPng(variant, fallbackInput = {}, template = 'ticket-stub') {
+  if (!['poster', 'landscape', 'background'].includes(variant)) {
+    const svg = renderSportsArtworkSvg(fallbackInput, variant)
+    return rasterizeToPng(Buffer.from(svg), variant)
+  }
+
+  const normalizedTemplate = normalizeSportsPosterTemplate(template)
+  const event = buildTemplateFallbackEvent(fallbackInput)
+  const homeColor = colorForLabel(event.homeTeam || event.title || event.league || event.sport, '#0f766e')
+  const awayColor = colorForLabel(event.awayTeam || event.league || event.sport, '#123c69')
+  const theme = {
+    homeColor,
+    awayColor,
+    accentColor: paperAccentFromHex(readableAccentFromHex(homeColor))
+  }
+  const hasMatchup = Boolean(event.homeTeam && event.awayTeam)
+  const artwork = renderSportsPosterTemplateSvg({
+    event,
+    variant,
+    template: normalizedTemplate,
+    theme,
+    mode: hasMatchup ? 'matchup' : 'single'
+  })
+  const composites = []
+  for (const slot of artwork.slots || []) {
+    const glyphSvg = renderLogoGlyphSvg({
+      role: slot.role,
+      event,
+      theme,
+      size: slot.size
+    })
+    composites.push({
+      input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size),
+      left: slot.left,
+      top: slot.top
+    })
+  }
+  if (artwork.overlay) {
+    composites.push({ input: Buffer.from(artwork.overlay), left: 0, top: 0 })
+  }
+
+  return sharp(Buffer.from(artwork.svg))
+    .composite(composites)
+    .png({ compressionLevel: 9, adaptiveFiltering: true })
+    .toBuffer()
 }
 
 function escapeXml(value) {
@@ -677,7 +737,7 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
     }
   }
 
-  const png = await renderLocalFallbackPng(variant, fallbackInput)
+  const png = await renderTemplateFallbackPng(variant, fallbackInput, template)
   return {
     buffer: png,
     contentType: 'image/png',
@@ -752,7 +812,7 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
       }
     } catch (error) {
       if (!shouldRenderLocalFallbackForSvg(variant) && variant !== 'logo') throw error
-      const png = await renderLocalFallbackPng(variant, fallbackInput)
+      const png = await renderTemplateFallbackPng(variant, fallbackInput, template)
       return {
         buffer: png,
         contentType: 'image/png',

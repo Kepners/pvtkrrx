@@ -1299,6 +1299,22 @@
       color: #ffd4dc;
     }
 
+    .simple-flow-setting {
+      margin: 0 0 0.85rem;
+      padding: 0.85rem;
+      border: 1px solid rgba(0, 246, 255, 0.14);
+      border-radius: 10px;
+      background: rgba(0, 0, 0, 0.14);
+    }
+
+    .simple-flow-setting label {
+      margin-top: 0;
+    }
+
+    .simple-flow-setting .hint {
+      margin-bottom: 0.7rem;
+    }
+
     .simple-flow-actions {
       display: flex;
       flex-wrap: wrap;
@@ -2512,6 +2528,20 @@
           <div class="simple-flow-title" id="simpleFlowTitle">LAN Bridge</div>
           <p class="simple-flow-copy" id="simpleFlowCopy">Do the next required action for the selected route. PVTKRRX keeps the install path short here and leaves lower-priority rescue tools below.</p>
           <div class="simple-flow-status info" id="simpleFlowStatus">Checking this PC so the simple install path can stay short.</div>
+          <div class="simple-flow-setting" id="sportsPosterTemplateMain">
+            <label for="sportsPosterTemplate">Sports Posters Template</label>
+            <select id="sportsPosterTemplate">
+              <option value="ticket-stub">Ticket Stub</option>
+              <option value="editorial">Editorial</option>
+              <option value="broadcast">Broadcast</option>
+              <option value="sportsbook">Sportsbook</option>
+              <option value="trading-card">Trading Card</option>
+              <option value="brutalist">Brutalist</option>
+              <option value="glitch">Glitch</option>
+            </select>
+            <p class="hint">Changes save back to this route config. Refresh Stremio to see the new poster style; reinstall is only needed for a new device or manifest change.</p>
+            <div class="simple-flow-status info" id="sportsPosterTemplateStatus">Ticket Stub is the free/default poster style. Paid routes can use the other six templates when SportsMeta has artwork.</div>
+          </div>
           <div class="simple-flow-actions">
             <button class="btn-copy" type="button" id="simpleCheckStremioBtn" onclick="checkAndLinkStremioOnThisPc(this)">Check Stremio Login On This PC</button>
             <button class="btn-test" type="button" id="simpleAutoSetupBtn" onclick="autoSetup()">Auto Setup</button>
@@ -2793,17 +2823,6 @@
         <label for="sportsPosterMemberToken">Sports Posters Token (optional)</label>
         <input type="text" id="sportsPosterMemberToken" placeholder="Paste your SportsMeta member URL or token">
         <p class="hint">Use this only after subscribing to Sports Posters. It applies to PC Local, LAN Bridge, and Remote Seedbox installs, and only affects sports artwork.</p>
-        <label for="sportsPosterTemplate">Sports Posters Template</label>
-        <select id="sportsPosterTemplate">
-          <option value="ticket-stub">Ticket Stub</option>
-          <option value="editorial">Editorial</option>
-          <option value="broadcast">Broadcast</option>
-          <option value="sportsbook">Sportsbook</option>
-          <option value="trading-card">Trading Card</option>
-          <option value="brutalist">Brutalist</option>
-          <option value="glitch">Glitch</option>
-        </select>
-        <p class="hint">Choose the paid poster layout used when SportsMeta can resolve real team or league logos. Unresolved tracker rows still use safe generated sports artwork.</p>
         <div id="localHostnameBlock">
           <label for="localHostname">Local Hostname (.local alias)</label>
           <input type="text" id="localHostname" value="pvtkrrx.local" placeholder="pvtkrrx.local">
@@ -3018,6 +3037,7 @@
     };
     let stremioAuthKeyPollTimer = null;
     let stremioAuthKeyPollUntil = 0;
+    let sportsPosterTemplateAutoSaveTimer = null;
 
     function hasLinkedAccount() {
       return Boolean(accountLinkState.stremioUserId || accountLinkState.accountUserId);
@@ -5649,6 +5669,10 @@
     document.getElementById('sportsPosterMemberToken').addEventListener('input', function() {
       markSecretFieldDirty('sportsPosterMemberToken');
     });
+    const sportsPosterTemplateSelect = document.getElementById('sportsPosterTemplate');
+    if (sportsPosterTemplateSelect) {
+      sportsPosterTemplateSelect.addEventListener('change', scheduleSportsPosterTemplateAutoSave);
+    }
     const qbitAutoExtractToggle = document.getElementById('qbitAutoExtractEnabled');
     if (qbitAutoExtractToggle) {
       qbitAutoExtractToggle.dataset.userTouched = 'false';
@@ -6638,6 +6662,94 @@
         updateQuickSetupStatus();
       }
       updateSimpleFlowCard();
+    }
+
+    function setSportsPosterTemplateStatus(type, msg) {
+      const el = document.getElementById('sportsPosterTemplateStatus');
+      if (!el) return;
+      el.className = 'simple-flow-status ' + (type || 'info');
+      el.textContent = msg;
+    }
+
+    function scheduleSportsPosterTemplateAutoSave() {
+      if (sportsPosterTemplateAutoSaveTimer) clearTimeout(sportsPosterTemplateAutoSaveTimer);
+      setSportsPosterTemplateStatus('info', 'Saving poster template to this route config...');
+      sportsPosterTemplateAutoSaveTimer = setTimeout(() => {
+        autoSaveSportsPosterTemplate().catch((error) => {
+          setSportsPosterTemplateStatus('err', 'Template save failed: ' + error.message);
+        });
+      }, 400);
+    }
+
+    async function autoSaveSportsPosterTemplate() {
+      await maybeLoadSavedSelfHostConfig({ setLoadedStatus: false });
+      const installMode = getInstallMode();
+      const installTarget = getInstallTarget();
+      let config = getConfig();
+
+      if (!hasMainPathRequirementsFilled(installTarget)) {
+        setSportsPosterTemplateStatus('info', 'Template selected. Save the Main Path once Prowlarr and qBittorrent are filled in.');
+        return;
+      }
+
+      if (installMode !== 'local' && serverRuntime.selfHostServerMode) {
+        if (!(await ensureSelfHostAdminAccess('save the Sports Posters template'))) {
+          setSportsPosterTemplateStatus('err', 'Self-host password required to save the Sports Posters template.');
+          return;
+        }
+      }
+
+      const modeValidationError = validateReachability(config, installMode);
+      if (modeValidationError) {
+        setSportsPosterTemplateStatus('err', modeValidationError);
+        return;
+      }
+
+      if (installMode === 'local') {
+        const saveRes = await fetch('/local-config', {
+          method: 'POST',
+          headers: buildJsonHeaders(),
+          body: JSON.stringify(config)
+        });
+        const saveData = await saveRes.json().catch(() => ({}));
+        if (!saveRes.ok || saveData.error) {
+          setSportsPosterTemplateStatus('err', saveData.error || 'Failed to save local template setting.');
+          return;
+        }
+        setLanPairStateFromConfig(saveData);
+        updateSavedSecretState(saveData.savedSecrets || {});
+        if (saveData.localHostname) {
+          setActiveLocalHostname(saveData.localHostname);
+          setInstallModeHint();
+        }
+        await buildLanPairInstallLinks(getConfig());
+        setSportsPosterTemplateStatus('ok', 'Saved. Refresh Stremio to see this poster style; no reinstall needed for the same installed route.');
+        return;
+      }
+
+      const hostedPayload = routeParity.stripRemoteSeedboxLanFields(config, { keepRelayUrl: true });
+      if (serverRuntime.selfHostServerMode) {
+        const saveRes = await fetch('/server-config', {
+          method: 'POST',
+          headers: buildJsonHeaders(),
+          body: JSON.stringify(hostedPayload)
+        });
+        const saveData = await saveRes.json().catch(() => ({}));
+        if (!saveRes.ok || saveData.error) {
+          if (saveRes.status === 401) {
+            clearRejectedServerAdminToken('Self-host password rejected. Paste the current password before saving the Sports Posters template again.');
+          }
+          setSportsPosterTemplateStatus('err', saveData.error || 'Failed to save self-hosted template setting.');
+          return;
+        }
+        updateSavedSecretState(saveData.savedSecrets || {});
+        serverRuntime.serverConfigConfigured = true;
+        serverRuntime.serverConfigLoaded = true;
+        setSportsPosterTemplateStatus('ok', 'Saved. The existing self-host addon uses this poster template on its next Stremio refresh; no reinstall needed.');
+        return;
+      }
+
+      setSportsPosterTemplateStatus('info', 'Template selected. Hosted relay token installs need Save And Generate Link because the config lives inside the install token.');
     }
 
     async function testConnection() {
