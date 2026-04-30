@@ -1,4 +1,5 @@
 const assert = require('assert')
+const crypto = require('crypto')
 const fs = require('fs')
 const path = require('path')
 const sharp = require('sharp')
@@ -9,20 +10,37 @@ const {
   sportBackdropPath
 } = require('../src/utils/sportBackdrops')
 
+const SOURCE_BACKDROP_DIR = path.join(__dirname, '..', 'backdrops', 'python-backdrops')
+
+function sha256(filePath) {
+  return crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex')
+}
+
 async function assertBackdropFile(bucket) {
-  const filePath = sportBackdropPath(bucket)
-  assert.ok(fs.existsSync(filePath), `${bucket} backdrop must exist`)
-  const stat = fs.statSync(filePath)
-  const metadata = await sharp(filePath).metadata()
+  const publicPath = sportBackdropPath(bucket)
+  const sourcePath = path.join(SOURCE_BACKDROP_DIR, `${bucket}-4k.jpg`)
+  assert.ok(fs.existsSync(sourcePath), `${bucket} source backdrop must exist`)
+  assert.ok(fs.existsSync(publicPath), `${bucket} public backdrop must exist`)
+  const sourceStat = fs.statSync(sourcePath)
+  const publicStat = fs.statSync(publicPath)
+  const metadata = await sharp(publicPath).metadata()
   assert.equal(metadata.width, 3840, `${bucket} backdrop width`)
   assert.equal(metadata.height, 2160, `${bucket} backdrop height`)
+  assert.equal(metadata.format, 'jpeg', `${bucket} backdrop format`)
   assert.ok(metadata.width > metadata.height, `${bucket} backdrop must be landscape`)
+  const sourceHash = sha256(sourcePath)
+  const publicHash = sha256(publicPath)
+  assert.equal(publicHash, sourceHash, `${bucket} public mirror must match source`)
   return {
     bucket,
-    file: path.basename(filePath),
+    sourceFile: path.relative(path.join(__dirname, '..'), sourcePath),
+    publicFile: path.relative(path.join(__dirname, '..'), publicPath),
     width: metadata.width,
     height: metadata.height,
-    bytes: stat.size
+    format: metadata.format,
+    sourceBytes: sourceStat.size,
+    publicBytes: publicStat.size,
+    sha256: publicHash
   }
 }
 
@@ -36,8 +54,10 @@ async function main() {
     { name: 'EPL', expected: 'football', input: { sport: 'football', league: 'EPL', title: 'EPL Arsenal vs Chelsea' } },
     { name: 'FA Cup', expected: 'football', input: { league: 'FA Cup', title: 'FA Cup Round Five' } },
     { name: 'UCL', expected: 'football', input: { league: 'UCL', title: 'UEFA Champions League' } },
-    { name: 'PGA/Golf', expected: 'golf', input: { sport: 'golf', league: 'PGA Tour', title: 'PGA Tour Highlights' } },
+    { name: 'La Liga', expected: 'football', input: { league: 'La Liga', title: 'Real Madrid vs Barcelona' } },
     { name: 'UFC', expected: 'ufc', input: { sport: 'mma', league: 'UFC', title: 'UFC Fight Night' } },
+    { name: 'F1', expected: 'formula1', input: { sport: 'motorsport', league: 'F1', title: 'Formula 1 Grand Prix' } },
+    { name: 'PGA/Golf', expected: 'golf', input: { sport: 'golf', league: 'PGA Tour', title: 'PGA Tour Highlights' } },
     { name: 'unknown', expected: 'generic-sport', input: { title: 'Unknown Sports Release' } }
   ]
 
