@@ -13,6 +13,7 @@ const { renderSportsPosterTemplateSvg } = require('../src/utils/sportsPosterTemp
 
 const OUTPUT_DIR = path.join(__dirname, '..', '.runtime', 'sports-broadcast-smoke')
 const BASE_URL = 'https://addon.test'
+const BROADCAST_WORDMARK = 'PVTKRRX \u00b7 BROADCAST'
 
 const cases = [
   {
@@ -20,7 +21,7 @@ const cases = [
     input: 'WRC Spain Islas Canarias Saturday Highlights',
     labelPattern: /\b(?:WRC|MOTORSPORT)\b/i,
     titlePattern: /ISLAS|CANARIAS|HIGHLIGHTS/i,
-    mustNotMatch: [/FORMULA\s*1/i, /\bF1\b/i, />ICS</i, /data-role="broadcast-live"/i, />LIVE</i],
+    mustNotMatch: [/FORMULA\s*1/i, /\bF1\b/i, /\bICS\b/i, /data-role="broadcast-live"/i, />LIVE</i],
     forbidVs: true,
     forbidFormulaBackdrop: true,
     expectedSport: /motorsport/i
@@ -30,7 +31,7 @@ const cases = [
     input: 'MotoGP Brazil Gear Up',
     labelPattern: /\bMOTOGP\b/i,
     titlePattern: /GEAR|UP/i,
-    mustNotMatch: [/FORMULA\s*1/i, /\bF1\b/i, />ICS</i, /data-role="broadcast-live"/i, />LIVE</i],
+    mustNotMatch: [/FORMULA\s*1/i, /\bF1\b/i, /\bICS\b/i, /data-role="broadcast-live"/i, />LIVE</i],
     forbidVs: true,
     forbidFormulaBackdrop: true,
     expectedSport: /motorsport/i
@@ -40,7 +41,7 @@ const cases = [
     input: 'John Higgins vs Shaun Murphy WC',
     labelPattern: /\b(?:SNOOKER|WC|WORLD\s+CHAMPIONSHIP)\b/i,
     titlePattern: /JOHN\s+HIGGINS|SHAUN\s+MURPHY/i,
-    mustNotMatch: [/>ICS</i, /data-role="broadcast-live"/i, />LIVE</i],
+    mustNotMatch: [/\bICS\b/i, /data-role="broadcast-live"/i, />LIVE</i],
     forbidVs: false,
     expectedSport: /snooker/i
   },
@@ -49,7 +50,7 @@ const cases = [
     input: 'Houston Rockets vs Los Angeles Lakers',
     labelPattern: /\b(?:NBA|BASKETBALL)\b/i,
     titlePattern: /HOUSTON\s+ROCKETS|LOS\s+ANGELES\s+LAKERS/i,
-    mustNotMatch: [/>ICS</i, /data-role="broadcast-live"/i, />LIVE</i],
+    mustNotMatch: [/\bICS\b/i, /data-role="broadcast-live"/i, />LIVE</i],
     forbidVs: false,
     expectedSport: /basketball/i
   }
@@ -72,6 +73,15 @@ function compactEvent(normalized, eventClass) {
     source: normalized.source,
     eventClass
   }
+}
+
+function textForRole(svg, role) {
+  const match = svg.match(new RegExp(`data-role="${role}"[^>]*>([^<]*)`, 'i'))
+  return match ? match[1] : ''
+}
+
+function textListForRole(svg, role) {
+  return [...svg.matchAll(new RegExp(`data-role="${role}"[^>]*>([^<]*)`, 'gi'))].map((match) => match[1])
 }
 
 async function main() {
@@ -120,11 +130,28 @@ async function main() {
     assert.match(posterResolved.poster, /template=broadcast/, `${testCase.slug} poster URL template`)
     assert.match(background, /\/sports-backdrops\//, `${testCase.slug} background must use sport backdrop asset`)
     assert.doesNotMatch(background, /glitch/i, `${testCase.slug} background must not use glitch`)
+    assert.match(svg, /viewBox="0 0 600 900"/, `${testCase.slug} native 600x900 viewBox`)
     assert.match(svg, /data-layout-family="BROADCAST"/, `${testCase.slug} SVG explicit layout family marker`)
+    assert.match(svg, /data-layout-style="sportsmeta-default-poster"/, `${testCase.slug} Broadcast default-poster style marker`)
+    assert.match(svg, /data-role="inner-border"/, `${testCase.slug} inner border marker`)
+    assert.match(svg, /data-role="accent-top"/, `${testCase.slug} top accent stripe marker`)
+    assert.match(svg, /data-role="accent-bottom"/, `${testCase.slug} bottom accent stripe marker`)
+    assert.match(svg, /data-role="pill-badge"/, `${testCase.slug} pill badge marker`)
+    assert.match(svg, /data-role="broadcast-pattern"/, `${testCase.slug} sport pattern marker`)
+    assert.match(svg, /data-role="broadcast-title"[^>]*(?:class="broadcast-title"|font-family="[^"]*Inter)/i, `${testCase.slug} Inter-style Broadcast title marker`)
     assert.match(svg, testCase.labelPattern, `${testCase.slug} sport or league label`)
     assert.match(svg, testCase.titlePattern, `${testCase.slug} readable title text`)
+    assert.match(svg, new RegExp(BROADCAST_WORDMARK), `${testCase.slug} honest Broadcast wordmark`)
     assert.match(normalized.sport, testCase.expectedSport, `${testCase.slug} normalized sport`)
     assert.equal((artwork.slots || []).length, 0, `${testCase.slug} broadcast poster must not allocate fake logo slots`)
+    assert.doesNotMatch(svg, /viewBox="0 0 400 600"/, `${testCase.slug} must not wrap old 400x600 source`)
+    assert.doesNotMatch(svg, /data-role="broadcast-title"[^>]*class="bebas"/i, `${testCase.slug} Broadcast title must not use Bebas`)
+    assert.doesNotMatch(svg, /homeGrad/i, `${testCase.slug} must not use homeGrad`)
+    assert.doesNotMatch(svg, /awayGrad/i, `${testCase.slug} must not use awayGrad`)
+    assert.doesNotMatch(svg, /lowerThird/i, `${testCase.slug} must not use old lowerThird block`)
+    assert.doesNotMatch(svg, /\bTBA\b/i, `${testCase.slug} must not render TBA placeholder`)
+    assert.doesNotMatch(svg, /\.{3,}/, `${testCase.slug} must not render ellipsis truncation`)
+    assert.doesNotMatch(svg, /\bICS\b/i, `${testCase.slug} must not render fake title acronym badge`)
 
     if (testCase.forbidVs) {
       assert.doesNotMatch(svg, /data-role="broadcast-versus"|>VS</i, `${testCase.slug} must not force VS`)
@@ -136,6 +163,9 @@ async function main() {
     for (const pattern of testCase.mustNotMatch) {
       assert.doesNotMatch(svg, pattern, `${testCase.slug} forbidden SVG pattern ${pattern}`)
     }
+
+    const svgOutputPath = path.join(OUTPUT_DIR, `${testCase.slug}-broadcast.svg`)
+    await fs.promises.writeFile(svgOutputPath, svg)
 
     const outputPath = path.join(OUTPUT_DIR, `${testCase.slug}-broadcast.png`)
     const buffer = await sharp(Buffer.from(svg), { density: 192 })
@@ -154,9 +184,16 @@ async function main() {
       normalizedLeague: normalized.competition,
       eventTitle: normalized.eventTitle,
       eventClass,
+      renderedTitle: textListForRole(svg, 'broadcast-title').join(' '),
+      renderedLabel: textForRole(svg, 'broadcast-label'),
+      renderedSubtitle: textForRole(svg, 'broadcast-subtitle'),
+      hasTba: /\bTBA\b/i.test(svg),
+      hasEllipsis: /\.{3,}/.test(svg),
+      hasHomeAwayGrad: /homeGrad|awayGrad/i.test(svg),
       layoutFamily: posterResolved.layoutFamily,
       poster: posterResolved.poster,
       background,
+      svg: path.relative(path.join(__dirname, '..'), svgOutputPath),
       preview: path.relative(path.join(__dirname, '..'), outputPath)
     })
   }

@@ -30,6 +30,9 @@ const SPORTS_POSTER_LAYOUT_FAMILIES = Object.freeze({
 
 const SOURCE_W = 400
 const SOURCE_H = 600
+const BROADCAST_W = 600
+const BROADCAST_H = 900
+const BROADCAST_WORDMARK = 'PVTKRRX \u00b7 BROADCAST'
 
 const { buildPaidTemplateMatchup } = require('./sportsPosterAdapter')
 const { classifySportsPosterEvent } = require('./sportsPosterClassifier')
@@ -396,6 +399,314 @@ const FONTS_EDITORIAL = `.serif { font-family: 'Playfair Display', Georgia, seri
 .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
 .sans { font-family: 'Inter', system-ui, sans-serif; }`
 
+const BROADCAST_PLACEHOLDER_RE = /^(?:tba|tbd|n\/?a|na|unknown|undefined|null|event|session|sports event|sport event|matchup|tournament|golf event|darts event)$/i
+const BROADCAST_ALLOWED_LABELS = new Set(['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'FE', 'FIFA', 'F1', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'MotoGP', 'NBA', 'NFL', 'NHL', 'PDC', 'PFL', 'PGA', 'UCL', 'UEL', 'UFC', 'UEFA', 'WEC', 'WRC', 'WTA', 'WWE'])
+
+function cleanBroadcastText(value = '') {
+  const clean = normalizeSpace(value)
+    .replace(/\.{3,}|\u2026/g, '')
+    .replace(/\bTBA\b\s*(?:[-/|]|\u2022)?\s*/gi, '')
+    .replace(/\s*(?:[-/|]|\u2022)\s*\bTBA\b/gi, '')
+    .replace(/\s*(?:[-/|]|\u2022)\s*$/g, '')
+    .replace(/^\s*(?:[-/|]|\u2022)\s*/g, '')
+  const normalized = normalizeSpace(clean)
+  return normalized && !BROADCAST_PLACEHOLDER_RE.test(normalized) ? normalized : ''
+}
+
+function firstBroadcastText(...values) {
+  for (const value of values) {
+    const clean = cleanBroadcastText(value)
+    if (clean) return clean
+  }
+  return ''
+}
+
+function broadcastTextKey(value = '') {
+  return cleanBroadcastText(value).toLowerCase().replace(/[^a-z0-9]+/g, '')
+}
+
+function broadcastLabelCase(value = '') {
+  const clean = cleanBroadcastText(value)
+  if (!clean) return ''
+  const upper = clean.toUpperCase()
+  if (upper === 'MOTOGP') return 'MotoGP'
+  return upper
+}
+
+function broadcastLabelForRender(event = {}, m = {}) {
+  const text = normalizeSpace([
+    event.broadcastLabel,
+    event.layoutLabel,
+    event.leagueCode,
+    event.league_code,
+    event.league,
+    event.competition,
+    event.title,
+    event.eventTitle,
+    event.eventShort,
+    event.event_short,
+    event.rawTitle,
+    m.broadcastLabel,
+    m.league_code,
+    m.league,
+    m.event_short,
+    m.event,
+    m.sport
+  ].filter(Boolean).join(' '))
+
+  if (/\b(?:moto\s*gp|motogp)\b/i.test(text)) return 'MotoGP'
+  if (/\bwrc\b|\brally\b/i.test(text)) return 'WRC'
+  if (isFormulaOneText(text)) return 'F1'
+  if (/\bsnooker\b|\bworld\s+championship\b|\bcrucible\b/i.test(text)) return 'SNOOKER'
+  if (/\bnba\b/i.test(text)) return 'NBA'
+  if (/\bbasketball\b/i.test(text)) return 'BASKETBALL'
+  if (/\b(?:football|soccer|premier|fa cup|mls|champions league|europa|world cup)\b/i.test(text)) return 'FOOTBALL'
+  if (/\bmotorsport\b|\bmotor\b/i.test(text)) return 'MOTORSPORT'
+
+  const raw = broadcastLabelCase(firstBroadcastText(event.broadcastLabel, event.layoutLabel, event.leagueCode, event.league_code, m.broadcastLabel, m.league_code))
+  if (BROADCAST_ALLOWED_LABELS.has(raw)) return raw
+  const sport = broadcastLabelCase(firstBroadcastText(event.sport, m.sport, event.sportHint))
+  return sport || 'SPORTS'
+}
+
+function broadcastPaletteFor(event = {}, m = {}, label = '') {
+  const text = normalizeSpace([
+    label,
+    event.sport,
+    event.sportHint,
+    event.league,
+    event.competition,
+    event.title,
+    event.eventTitle,
+    event.eventShort,
+    event.rawTitle,
+    m.sport,
+    m.league,
+    m.sport_icon
+  ].filter(Boolean).join(' ')).toLowerCase()
+
+  if (/moto\s*gp|motogp|wrc|rally|motor|motorsport|f1|formula/.test(text)) {
+    return {
+      key: 'motorsport',
+      bg0: '#140506',
+      bg1: '#2a0708',
+      bg2: '#08090d',
+      glow: 'rgba(239, 68, 68, 0.32)',
+      glowSoft: 'rgba(239, 68, 68, 0.04)',
+      accent: '#b91c1c',
+      accent2: '#ef4444',
+      pill: 'rgba(185, 28, 28, 0.35)',
+      pattern: 'motorsport'
+    }
+  }
+  if (/snooker|billiards|crucible/.test(text)) {
+    return {
+      key: 'snooker',
+      bg0: '#03130d',
+      bg1: '#06281a',
+      bg2: '#020705',
+      glow: 'rgba(34, 197, 94, 0.28)',
+      glowSoft: 'rgba(34, 197, 94, 0.04)',
+      accent: '#16a34a',
+      accent2: '#86efac',
+      pill: 'rgba(22, 163, 74, 0.32)',
+      pattern: 'snooker'
+    }
+  }
+  if (/basketball|nba|wnba/.test(text)) {
+    return {
+      key: 'basketball',
+      bg0: '#180b05',
+      bg1: '#3b1607',
+      bg2: '#090604',
+      glow: 'rgba(249, 115, 22, 0.30)',
+      glowSoft: 'rgba(249, 115, 22, 0.04)',
+      accent: '#c2410c',
+      accent2: '#fb923c',
+      pill: 'rgba(194, 65, 12, 0.34)',
+      pattern: 'basketball'
+    }
+  }
+  if (/football|soccer|premier|fa cup|mls|champions league|europa|world cup/.test(text)) {
+    return {
+      key: 'football',
+      bg0: '#03140d',
+      bg1: '#064e3b',
+      bg2: '#020807',
+      glow: 'rgba(16, 185, 129, 0.27)',
+      glowSoft: 'rgba(16, 185, 129, 0.04)',
+      accent: '#dc2626',
+      accent2: '#f97316',
+      pill: 'rgba(22, 101, 52, 0.38)',
+      pattern: 'football'
+    }
+  }
+  return {
+    key: 'generic',
+    bg0: '#070b16',
+    bg1: '#111827',
+    bg2: '#020617',
+    glow: 'rgba(59, 130, 246, 0.28)',
+    glowSoft: 'rgba(59, 130, 246, 0.04)',
+    accent: '#b91c1c',
+    accent2: '#38bdf8',
+    pill: 'rgba(30, 64, 175, 0.34)',
+    pattern: 'generic'
+  }
+}
+
+function broadcastPatternSvg(pattern = 'generic') {
+  if (pattern === 'motorsport') {
+    const chevrons = Array.from({ length: 6 }, (_, index) => {
+      const y = 54 + index * 130
+      return `<path d="M -70 ${y} L 238 ${y} L 302 ${y + 72} L 238 ${y + 144} L -70 ${y + 144} Z" fill="rgba(255,255,255,0.075)"/>`
+    }).join('')
+    const checks = []
+    for (let row = 0; row < 4; row += 1) {
+      for (let col = 0; col < 4; col += 1) {
+        const light = (row + col) % 2 === 0
+        checks.push(`<rect x="${432 + col * 22}" y="${132 + row * 22}" width="22" height="22" fill="${light ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.34)'}"/>`)
+      }
+    }
+    return `${chevrons}<g data-role="motorsport-checker">${checks.join('')}</g><path d="M 70 704 C 190 646 278 728 392 658 C 474 608 520 632 602 582" fill="none" stroke="rgba(255,255,255,0.13)" stroke-width="6" stroke-linecap="round"/>`
+  }
+  if (pattern === 'football') {
+    return `<rect x="84" y="150" width="432" height="600" rx="18" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+<line x1="84" y1="450" x2="516" y2="450" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+<circle cx="300" cy="450" r="76" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+<rect x="84" y="286" width="92" height="328" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+<rect x="424" y="286" width="92" height="328" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+<g opacity="0.18">${Array.from({ length: 10 }, (_, index) => `<line x1="${56 + index * 54}" y1="96" x2="${-40 + index * 54}" y2="828" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>`).join('')}</g>`
+  }
+  if (pattern === 'snooker') {
+    return `<rect x="92" y="130" width="416" height="640" rx="34" fill="rgba(0,0,0,0.14)" stroke="rgba(255,255,255,0.09)" stroke-width="4"/>
+<circle cx="118" cy="156" r="16" fill="rgba(0,0,0,0.30)" stroke="rgba(255,255,255,0.08)"/>
+<circle cx="482" cy="156" r="16" fill="rgba(0,0,0,0.30)" stroke="rgba(255,255,255,0.08)"/>
+<circle cx="118" cy="744" r="16" fill="rgba(0,0,0,0.30)" stroke="rgba(255,255,255,0.08)"/>
+<circle cx="482" cy="744" r="16" fill="rgba(0,0,0,0.30)" stroke="rgba(255,255,255,0.08)"/>
+<circle cx="300" cy="450" r="120" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="2"/>
+<path d="M 162 706 L 464 252" stroke="rgba(255,255,255,0.13)" stroke-width="4" stroke-linecap="round"/>
+<circle cx="236" cy="586" r="15" fill="rgba(255,255,255,0.16)"/><circle cx="322" cy="496" r="12" fill="rgba(255,255,255,0.11)"/><circle cx="390" cy="398" r="10" fill="rgba(255,255,255,0.09)"/>`
+  }
+  if (pattern === 'basketball') {
+    return `<rect x="82" y="126" width="436" height="648" rx="24" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+<line x1="82" y1="450" x2="518" y2="450" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+<circle cx="300" cy="450" r="74" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+<path d="M 216 126 A 84 84 0 0 0 384 126" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+<path d="M 216 774 A 84 84 0 0 1 384 774" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+<rect x="238" y="126" width="124" height="142" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+<rect x="238" y="632" width="124" height="142" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+<g opacity="0.16">${Array.from({ length: 9 }, (_, index) => `<line x1="${-80 + index * 92}" y1="128" x2="${120 + index * 92}" y2="772" stroke="rgba(255,255,255,0.16)" stroke-width="1.2"/>`).join('')}</g>`
+  }
+  return `<g opacity="0.25">${Array.from({ length: 12 }, (_, index) => `<rect x="${-120 + index * 72}" y="126" width="20" height="650" transform="rotate(28 ${-120 + index * 72} 126)" fill="rgba(255,255,255,0.12)"/>`).join('')}</g>
+<circle cx="452" cy="230" r="92" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="2"/>
+<circle cx="452" cy="230" r="52" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+<path d="M 64 664 L 224 612 L 318 690 L 536 598" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="4" stroke-linecap="round"/>`
+}
+
+function wrapBroadcastTitle(value = '') {
+  const words = cleanBroadcastText(value).split(/\s+/).filter(Boolean)
+  if (!words.length) return ['Sports']
+  const lines = []
+  let current = ''
+  const maxChars = words.join(' ').length > 42 ? 18 : 22
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word
+    if (candidate.length <= maxChars || !current) {
+      current = candidate
+      continue
+    }
+    lines.push(current)
+    current = word
+  }
+  if (current) lines.push(current)
+  while (lines.length > 3) {
+    const last = lines.pop()
+    const target = lines.length - 1
+    lines[target] = `${lines[target]} ${last}`
+  }
+  return lines
+}
+
+function broadcastTitleLayout(lines = []) {
+  const longest = lines.reduce((max, line) => Math.max(max, line.length), 0)
+  let fontSize = 54
+  if (longest > 24) fontSize = 50
+  if (longest > 30) fontSize = 46
+  if (longest > 38) fontSize = 42
+  if (longest > 48) fontSize = 38
+  if (lines.length >= 3) fontSize = Math.min(fontSize, 46)
+  const gap = Math.round(fontSize * 1.08)
+  const startY = lines.length >= 3 ? 382 : lines.length === 2 ? 398 : 424
+  return { fontSize, gap, startY }
+}
+
+function broadcastTitleFromEvent(event = {}, m = {}) {
+  const home = firstBroadcastText(event.homeTeam, event.home?.name, m.home?.name)
+  const away = firstBroadcastText(event.awayTeam, event.away?.name, m.away?.name)
+  if (home && away && home.toLowerCase() !== away.toLowerCase()) return `${home} vs ${away}`
+  return firstBroadcastText(
+    event.eventShort,
+    event.event_short,
+    event.eventTitle,
+    event.title,
+    event.eventName,
+    event.name,
+    m.event_short,
+    m.event,
+    m.league,
+    m.sport,
+    'Sports'
+  )
+}
+
+function compactBroadcastDetail(detail = '', league = '', label = '') {
+  let clean = cleanBroadcastText(detail)
+  if (!clean) return ''
+  for (const prefix of [league, label]) {
+    const words = cleanBroadcastText(prefix).split(/\s+/).filter(Boolean)
+    for (const word of words) {
+      clean = clean.replace(new RegExp(`^${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+`, 'i'), '')
+    }
+  }
+  return cleanBroadcastText(clean) || cleanBroadcastText(detail)
+}
+
+function broadcastSubtitleFromEvent(event = {}, m = {}, label = '', title = '') {
+  const league = firstBroadcastText(event.league, event.competition, m.leagueFull, m.league, label, event.sport, m.sport)
+  const detailCandidates = [
+    event.date,
+    event.localDate,
+    event.eventDetail,
+    event.detail,
+    event.session,
+    event.round,
+    m.date,
+    m.session,
+    m.round,
+    event.eventShort,
+    event.event_short,
+    event.eventTitle,
+    m.event_short,
+    m.event
+  ]
+  const titleKey = broadcastTextKey(title)
+  let detail = ''
+  for (const candidate of detailCandidates) {
+    const clean = compactBroadcastDetail(candidate, league, label)
+    if (!clean) continue
+    if (broadcastTextKey(clean) === broadcastTextKey(league)) continue
+    detail = clean
+    if (broadcastTextKey(clean) !== titleKey) break
+  }
+  const parts = [league, detail].map(cleanBroadcastText).filter(Boolean)
+  const unique = []
+  for (const part of parts) {
+    if (!unique.some((existing) => broadcastTextKey(existing) === broadcastTextKey(part))) unique.push(part)
+  }
+  return unique.join(' \u2022 ')
+}
+
 function sportGlyph(icon = 'soccer', x = 50, y = 50, size = 100, color = '#fff', opacity = 1, strokeWidth = 2) {
   const shapes = {
     soccer: `<circle cx="50" cy="50" r="38"/><polygon points="50,32 62,40 58,54 42,54 38,40" fill="currentColor" stroke="none"/><line x1="50" y1="32" x2="50" y2="20"/><line x1="62" y1="40" x2="72" y2="34"/><line x1="58" y1="54" x2="68" y2="64"/><line x1="42" y1="54" x2="32" y2="64"/><line x1="38" y1="40" x2="28" y2="34"/>`,
@@ -499,75 +810,66 @@ function renderEditorial(event = {}, variant = 'poster', theme = {}, mode = '') 
 function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') {
   const m = templateData(event, theme, mode)
   const e = escapeXml
-  const slots = []
-  const label = normalizeSpace(m.broadcastLabel || m.league || m.sport || 'Sports')
-  const mainTitle = m.hasMatchup
-    ? `${m.home.name} vs ${m.away.name}`
-    : normalizeSpace(m.event_short || m.event || m.league || m.sport || 'Sports Event')
-  const titleLines = splitLines(mainTitle, m.hasMatchup ? 18 : 16, 3)
-  const titleFont = titleLines.length >= 3 ? 38 : titleLines.length === 2 ? 48 : 60
-  const titleStart = titleLines.length >= 3 ? 202 : titleLines.length === 2 ? 222 : 246
-  const titleGap = titleLines.length >= 3 ? 46 : 54
+  const label = broadcastLabelForRender(event, m)
+  const palette = broadcastPaletteFor(event, m, label)
+  const title = broadcastTitleFromEvent(event, m)
+  const titleLines = wrapBroadcastTitle(title)
+  const titleLayout = broadcastTitleLayout(titleLines)
   const titleBlock = titleLines.map((line, index) => (
-    `<text data-role="broadcast-title" class="bebas" x="${SOURCE_W / 2}" y="${titleStart + index * titleGap}" text-anchor="middle" font-size="${titleFont}" fill="white" letter-spacing="1" filter="url(#titleShadow)">${e(line.toUpperCase())}</text>`
-  )).join('\n  ')
-  const subtitle = normalizeSpace(
-    (m.session && m.session !== 'Event' ? m.session : '') ||
-    (m.round && m.round !== 'Event' ? m.round : '') ||
-    m.date ||
-    m.leagueFull ||
-    m.sport
-  )
-  const subtitleY = titleStart + titleLines.length * titleGap + 10
-  const matchupMarker = m.hasMatchup
-    ? `<text data-role="broadcast-versus" class="bebas" x="${SOURCE_W / 2}" y="${subtitleY + 42}" text-anchor="middle" font-size="40" fill="url(#chrome)" letter-spacing="2" filter="url(#titleShadow)" transform="skewX(-10)">VS</text>`
+    `<text data-role="broadcast-title" class="broadcast-title" x="50" y="${titleLayout.startY + index * titleLayout.gap}" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="${titleLayout.fontSize}" font-weight="800" fill="#ffffff" letter-spacing="0">${e(line)}</text>`
+  )).join('\n')
+  const subtitle = broadcastSubtitleFromEvent(event, m, label, title)
+  const subtitleFont = subtitle.length > 52 ? 14 : subtitle.length > 44 ? 16 : subtitle.length > 34 ? 18 : 20
+  const pillWidth = Math.max(88, Math.min(250, Math.round(label.length * 10.6 + 28)))
+  const pattern = broadcastPatternSvg(palette.pattern)
+  const maybeLive = m.isLive
+    ? `<g data-role="broadcast-live" transform="translate(498 54)"><circle cx="0" cy="0" r="5" fill="${palette.accent2}"/><text x="14" y="5" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="12" font-weight="800" fill="#ffffff" letter-spacing="2">LIVE</text></g>`
     : ''
-  const liveBadge = m.isLive
-    ? `<circle cx="${SOURCE_W - 70}" cy="30" r="3.5" fill="#ef4444" filter="url(#redGlow)"/>
-  <text data-role="broadcast-live" class="sans" x="${SOURCE_W - 60}" y="34" font-size="9.5" font-weight="800" fill="white" letter-spacing="2">LIVE</text>`
-    : ''
-  const lowerThird = m.hasMatchup
-    ? `<text data-role="broadcast-competitor" class="sans" x="24" y="${SOURCE_H - 72}" font-size="10" font-weight="800" fill="${m.home.accent}" letter-spacing="1.4">${e(m.leftLabel)}</text>
-  <text data-role="broadcast-competitor-name" class="bebas" x="24" y="${SOURCE_H - 50}" font-size="22" fill="white" letter-spacing="1">${e(m.home.name)}</text>
-  <text data-role="broadcast-competitor" class="sans" x="${SOURCE_W - 24}" y="${SOURCE_H - 72}" text-anchor="end" font-size="10" font-weight="800" fill="${m.away.accent}" letter-spacing="1.4">${e(m.rightLabel)}</text>
-  <text data-role="broadcast-competitor-name" class="bebas" x="${SOURCE_W - 24}" y="${SOURCE_H - 50}" text-anchor="end" font-size="22" fill="white" letter-spacing="1">${e(m.away.name)}</text>`
-    : `<text data-role="broadcast-footer-label" class="sans" x="${SOURCE_W / 2}" y="${SOURCE_H - 68}" text-anchor="middle" font-size="10" font-weight="800" fill="${m.home.accent}" letter-spacing="1.8">${e(label.toUpperCase())}</text>
-  <text data-role="broadcast-footer-title" class="bebas" x="${SOURCE_W / 2}" y="${SOURCE_H - 46}" text-anchor="middle" font-size="22" fill="white" letter-spacing="1">${e(mainTitle)}</text>`
-  const inner = `<defs>
-    <style>${FONTS_BEBAS_MONO_SANS}</style>
-    <radialGradient id="homeGrad" cx="30%" cy="40%" r="80%"><stop offset="0%" stop-color="${m.home.primary}"/><stop offset="70%" stop-color="${m.home.secondary}"/><stop offset="100%" stop-color="#060810"/></radialGradient>
-    <radialGradient id="awayGrad" cx="70%" cy="60%" r="80%"><stop offset="0%" stop-color="${m.away.primary}"/><stop offset="70%" stop-color="${m.away.secondary}"/><stop offset="100%" stop-color="#060810"/></radialGradient>
-    <linearGradient id="chrome" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#ffffff"/><stop offset="45%" stop-color="#d8d8d8"/><stop offset="55%" stop-color="#8a8a8a"/><stop offset="100%" stop-color="#ffffff"/></linearGradient>
-    <linearGradient id="lowerThird" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="rgba(0,0,0,0)"/><stop offset="35%" stop-color="rgba(0,0,0,0.85)"/><stop offset="100%" stop-color="rgba(0,0,0,0.95)"/></linearGradient>
-    <radialGradient id="vignette" cx="50%" cy="50%" r="75%"><stop offset="35%" stop-color="rgba(0,0,0,0)"/><stop offset="100%" stop-color="rgba(0,0,0,0.85)"/></radialGradient>
-    <pattern id="scanlines" x="0" y="0" width="3" height="3" patternUnits="userSpaceOnUse"><rect width="3" height="1" fill="rgba(255,255,255,0.04)"/></pattern>
-    <filter id="seamBlur"><feGaussianBlur stdDeviation="2"/></filter>
-    <filter id="redGlow"><feGaussianBlur stdDeviation="1.5"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="titleShadow"><feGaussianBlur in="SourceAlpha" stdDeviation="3"/><feOffset dy="4"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${BROADCAST_W}" height="${BROADCAST_H}" viewBox="0 0 ${BROADCAST_W} ${BROADCAST_H}" role="img" aria-label="${e(title)}">
+  <defs>
+    <linearGradient id="broadcastBgGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="${palette.bg0}"/>
+      <stop offset="52%" stop-color="${palette.bg1}"/>
+      <stop offset="100%" stop-color="${palette.bg2}"/>
+    </linearGradient>
+    <radialGradient id="broadcastBgGlow" cx="25%" cy="18%" r="70%">
+      <stop offset="0%" stop-color="${palette.glow}"/>
+      <stop offset="60%" stop-color="${palette.glowSoft}"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <linearGradient id="broadcastAccentStripe" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="${palette.accent}"/>
+      <stop offset="58%" stop-color="${palette.accent2}"/>
+      <stop offset="100%" stop-color="${palette.accent}"/>
+    </linearGradient>
+    <pattern id="broadcastFineLines" x="0" y="0" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(28)">
+      <rect x="0" y="0" width="3" height="18" fill="rgba(255,255,255,0.035)"/>
+    </pattern>
   </defs>
-  <g data-role="broadcast-layout" data-layout-family="BROADCAST">
-  <rect width="${SOURCE_W}" height="${SOURCE_H}" fill="#000"/>
-  <polygon points="0,0 ${SOURCE_W * 0.62},0 ${SOURCE_W * 0.38},${SOURCE_H} 0,${SOURCE_H}" fill="url(#homeGrad)"/>
-  <polygon points="${SOURCE_W * 0.62},0 ${SOURCE_W},0 ${SOURCE_W},${SOURCE_H} ${SOURCE_W * 0.38},${SOURCE_H}" fill="url(#awayGrad)"/>
-  <line x1="${SOURCE_W / 2 - 32}" y1="0" x2="${SOURCE_W / 2 + 32}" y2="${SOURCE_H}" stroke="rgba(255,255,255,0.72)" stroke-width="3" filter="url(#seamBlur)" opacity="0.62"/>
-  <rect width="${SOURCE_W}" height="${SOURCE_H}" fill="url(#scanlines)" style="mix-blend-mode:overlay"/>
-  <rect width="${SOURCE_W}" height="${SOURCE_H}" fill="url(#vignette)"/>
-  ${sportGlyph(m.sport_icon, SOURCE_W / 2, SOURCE_H / 2 + 18, 390, 'white', 0.045)}
-  <text data-role="broadcast-label" class="bebas" x="22" y="34" font-size="18" fill="white" letter-spacing="1.4">${e(label.toUpperCase())}</text>
-  <text data-role="broadcast-sport" class="mono" x="22" y="48" font-size="8" fill="white" opacity="0.72" letter-spacing="2">${e(m.sport.toUpperCase())}</text>
-  ${liveBadge}
-  <rect x="22" y="92" width="${SOURCE_W - 44}" height="1" fill="rgba(255,255,255,0.55)"/>
-  <text data-role="broadcast-kicker" class="mono" x="${SOURCE_W / 2}" y="128" text-anchor="middle" font-size="10" fill="rgba(255,255,255,0.82)" letter-spacing="2.2">${e(label.toUpperCase())}</text>
-  ${titleBlock}
-  ${subtitle ? `<text data-role="broadcast-subtitle" class="sans" x="${SOURCE_W / 2}" y="${subtitleY}" text-anchor="middle" font-size="14" font-weight="800" fill="rgba(255,255,255,0.88)" letter-spacing="1.2">${e(subtitle.toUpperCase())}</text>` : ''}
-  ${matchupMarker}
-  <rect x="0" y="${SOURCE_H - 130}" width="${SOURCE_W}" height="130" fill="url(#lowerThird)"/>
-  ${lowerThird}
-  <line x1="18" y1="${SOURCE_H - 38}" x2="${SOURCE_W - 18}" y2="${SOURCE_H - 38}" stroke="rgba(255,255,255,0.4)" stroke-width="0.6"/>
-  <text data-role="broadcast-footer" class="mono" x="18" y="${SOURCE_H - 22}" font-size="9" fill="rgba(255,255,255,0.72)" letter-spacing="1.6">${e((m.venue || m.league || m.sport).toUpperCase())}</text>
-  <text data-role="broadcast-date" class="mono" x="${SOURCE_W - 18}" y="${SOURCE_H - 22}" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.72)" letter-spacing="1.6">${e([m.date, m.time].filter(Boolean).join(' - ').toUpperCase())}</text>
-  </g>`
-  return wrapTemplateSvg(inner, slots, variant)
+  <g data-role="broadcast-layout" data-layout-family="BROADCAST" data-layout-style="sportsmeta-default-poster" data-palette="${e(palette.key)}">
+    <rect width="${BROADCAST_W}" height="${BROADCAST_H}" fill="url(#broadcastBgGradient)"/>
+    <rect width="${BROADCAST_W}" height="${BROADCAST_H}" fill="url(#broadcastBgGlow)"/>
+    <rect width="${BROADCAST_W}" height="${BROADCAST_H}" fill="url(#broadcastFineLines)" opacity="0.44"/>
+    <g data-role="broadcast-pattern" opacity="0.9">${pattern}</g>
+    <rect data-role="inner-border" x="30" y="30" width="540" height="840" rx="28" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+    <rect data-role="accent-top" x="30" y="30" width="540" height="4" rx="2" fill="${palette.accent}"/>
+    <rect data-role="accent-bottom" x="30" y="866" width="540" height="4" rx="2" fill="url(#broadcastAccentStripe)"/>
+    <g data-role="pill-badge">
+      <rect x="42" y="42" width="${pillWidth}" height="34" rx="17" fill="${palette.pill}" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+      <text data-role="broadcast-label" x="56" y="64" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="14" font-weight="700" fill="#ffffff" letter-spacing="2">${e(label)}</text>
+    </g>
+    ${maybeLive}
+    ${titleBlock}
+    ${subtitle ? `<text data-role="broadcast-subtitle" x="50" y="812" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="${subtitleFont}" font-weight="600" fill="rgba(255,255,255,0.85)" letter-spacing="1">${e(subtitle.toUpperCase())}</text>` : ''}
+    <text data-role="broadcast-wordmark" x="50" y="844" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="12" font-weight="700" fill="rgba(255,255,255,0.55)" letter-spacing="4">${e(BROADCAST_WORDMARK)}</text>
+  </g>
+</svg>`
+  return {
+    svg,
+    slots: [],
+    overlay: ''
+  }
 }
 
 function renderSportsbook(event = {}, variant = 'poster', theme = {}, mode = '') {
