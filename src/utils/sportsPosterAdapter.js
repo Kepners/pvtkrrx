@@ -47,17 +47,6 @@ const LEAGUE_CODES = Object.freeze({
   wta: 'WTA'
 })
 
-const TEAM_CODE_OVERRIDES = Object.freeze({
-  arsenal: 'ARS',
-  'manchester city': 'MCI',
-  'houston rockets': 'HOU',
-  'los angeles lakers': 'LAL',
-  'cleveland cavaliers': 'CLE',
-  'toronto raptors': 'TOR',
-  'philadelphia flyers': 'PHI',
-  'pittsburgh penguins': 'PIT'
-})
-
 const SPORT_LABELS = Object.freeze({
   'american-football': 'American Football',
   athletics: 'Athletics',
@@ -169,28 +158,27 @@ function readableAccent(primary = '#123c69') {
   return ((0.299 * r) + (0.587 * g) + (0.114 * b)) > 150 ? '#111827' : '#ffffff'
 }
 
-function teamCodeOverride(value = '') {
-  const key = cleanDisplayText(value, '')
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, ' ')
-    .trim()
-  return TEAM_CODE_OVERRIDES[key] || ''
+function sanitizeIdentityCode(value = '', maxLen = 6) {
+  const clean = String(value || '')
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9]+/g, '')
+    .toUpperCase()
+  if (!clean) return ''
+  if (FORBIDDEN_VALUE_RE.test(clean)) return ''
+  return clean.slice(0, maxLen)
 }
 
 function shortCode(value = '', fallback = 'EVT') {
-  const override = teamCodeOverride(value)
-  if (override) return override
   const clean = cleanDisplayText(value, fallback)
   const words = clean.replace(/[^a-z0-9 ]+/gi, ' ').split(/\s+/).filter(Boolean)
   const code = words.length >= 2
     ? words.map((word) => word[0]).join('')
-    : (words[0] || fallback).slice(0, 4)
+    : (words[0] || fallback).slice(0, 3)
   return (code || fallback).slice(0, 6).toUpperCase()
 }
 
 function initials(value = '', fallback = 'EV') {
-  const override = teamCodeOverride(value)
-  if (override) return override
   const clean = cleanDisplayText(value, fallback)
   const words = clean.replace(/[^a-z0-9 ]+/gi, ' ').split(/\s+/).filter(Boolean)
   if (words.length >= 2) return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase()
@@ -274,14 +262,16 @@ function sideName(input = {}, side = 'home', eventShort = 'Event', session = 'Se
   return pickFirst(input.principalB, input.awayTeam, input.away?.name, input.fighterB, input.playerB, input.teamB, session, input.league, 'Session')
 }
 
-function buildSide(name, role, theme = {}) {
+function buildSide(name, role, theme = {}, identity = {}) {
   const displayName = cleanEssentialName(name, role === 'away' ? 'Away' : 'Home')
   const primary = pickFirst(role === 'away' ? theme.awayColor : theme.homeColor, role === 'away' ? theme.secondaryColor : theme.primaryColor) || colorForLabel(displayName)
   const secondary = pickFirst(role === 'away' ? theme.awaySecondary : theme.homeSecondary) || colorForLabel(`${displayName} secondary`, '#1C2C5B')
+  const explicitShort = sanitizeIdentityCode(pickFirst(identity.short, identity.code, identity.tla, identity.abbreviation, identity.abbr), 6)
+  const explicitInitials = sanitizeIdentityCode(pickFirst(identity.initials), 5)
   return {
     name: displayName,
-    short: shortCode(displayName, role === 'away' ? 'AWY' : 'HME'),
-    initials: initials(displayName, role === 'away' ? 'AW' : 'HM'),
+    short: explicitShort || shortCode(displayName, role === 'away' ? 'AWY' : 'HME'),
+    initials: explicitInitials || initials(displayName, role === 'away' ? 'AW' : 'HM'),
     primary,
     secondary,
     accent: readableAccent(primary)
@@ -377,16 +367,32 @@ function buildPaidTemplateMatchup(normalizedEvent = {}, classification = '') {
   const secondaryColor = pickFirst(normalizedEvent.secondaryColor, normalizedEvent.secondary_color) || colorForLabel(`${eventShort} secondary`, '#15151E')
   const accentColor = pickFirst(normalizedEvent.accentColor, normalizedEvent.accent_color) || readableAccent(primaryColor)
 
-  const home = buildSide(sideName(normalizedEvent, 'home', eventShort, session), 'home', {
-    primaryColor,
-    secondaryColor,
-    homeColor: normalizedEvent.home?.primary || normalizedEvent.homeColor
-  })
-  const away = buildSide(sideName(normalizedEvent, 'away', eventShort, session), 'away', {
-    primaryColor,
-    secondaryColor,
-    awayColor: normalizedEvent.away?.primary || normalizedEvent.awayColor
-  })
+  const home = buildSide(
+    sideName(normalizedEvent, 'home', eventShort, session),
+    'home',
+    {
+      primaryColor,
+      secondaryColor,
+      homeColor: normalizedEvent.home?.primary || normalizedEvent.homeColor
+    },
+    {
+      short: pickFirst(normalizedEvent.homeShort, normalizedEvent.homeCode, normalizedEvent.home?.short, normalizedEvent.home?.code, normalizedEvent.home?.tla, normalizedEvent.home?.abbreviation),
+      initials: pickFirst(normalizedEvent.homeInitials, normalizedEvent.home?.initials)
+    }
+  )
+  const away = buildSide(
+    sideName(normalizedEvent, 'away', eventShort, session),
+    'away',
+    {
+      primaryColor,
+      secondaryColor,
+      awayColor: normalizedEvent.away?.primary || normalizedEvent.awayColor
+    },
+    {
+      short: pickFirst(normalizedEvent.awayShort, normalizedEvent.awayCode, normalizedEvent.away?.short, normalizedEvent.away?.code, normalizedEvent.away?.tla, normalizedEvent.away?.abbreviation),
+      initials: pickFirst(normalizedEvent.awayInitials, normalizedEvent.away?.initials)
+    }
+  )
   ensureDistinctSides(home, away)
 
   return {
