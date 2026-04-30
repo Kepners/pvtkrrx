@@ -311,7 +311,11 @@ async function run() {
     assert.match(configureHtml, /Change the actual qBittorrent save path/i, 'configure page should explain where to change the live qBittorrent save path')
     assert.match(configureHtml, /href="\/runbooks"/, 'configure page should link to runbooks')
     assert.match(configureHtml, /route-parity\.js/, 'configure page should load shared parity helper')
-    assert.match(configureHtml, /SportsMeta service/i, 'configure page should explain that SportsMeta owns sports metadata and artwork')
+    assert.match(
+      configureHtml,
+      /SportsMeta service owns sports metadata and public glyph artwork[\s\S]*PVTKRRX consumes that output as Stremio presentation enrichment/i,
+      'configure page should explain the SportsMeta-owned sports metadata/artwork boundary'
+    )
     assert.doesNotMatch(configureHtml, /Prowlarr Base URL\s*-\s*<code>http:\/\/localhost:9696<\/code>/i, 'configure page should not present localhost as the default Remote Seedbox truth')
     assert.match(configureHtml, /Same-host setups use <code>http:\/\/127\.0\.0\.1:9696<\/code>\. Put the reachable URL here if Prowlarr runs on a different seedbox or VPS/i, 'configure page should explain when loopback is valid for Prowlarr')
     assert.match(configureHtml, /Same-host setups use <code>http:\/\/127\.0\.0\.1:8080<\/code>\. Put the reachable URL here if qBittorrent runs on a different seedbox or VPS/i, 'configure page should explain when loopback is valid for qBittorrent')
