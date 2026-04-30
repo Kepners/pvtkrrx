@@ -138,9 +138,11 @@ function layoutFamilyForSportsPosterRender(value, event = {}) {
   const explicit = normalizeSpace(event.layoutFamily || event.sportsArtwork?.layoutFamily).toUpperCase()
   if (explicit === 'TEAM_VS_TEAM') return 'TEAM_VS_TEAM'
   if (explicit === 'COMPETITOR_VS_COMPETITOR') return 'COMPETITOR_VS_COMPETITOR'
+  if (explicit === 'SINGLE_EVENT_MOTORSPORT') return 'SINGLE_EVENT_MOTORSPORT'
   const eventClass = normalizeSpace(event.eventClass || event.posterClass) || classifySportsPosterEvent(event)
   if (eventClass === 'team_vs_team') return 'TEAM_VS_TEAM'
   if (isCompetitorVsCompetitorEvent({ ...event, eventClass })) return 'COMPETITOR_VS_COMPETITOR'
+  if (eventClass === 'motorsport_event') return 'SINGLE_EVENT_MOTORSPORT'
   return layoutFamilyForSportsPosterTemplate(template)
 }
 
@@ -1172,6 +1174,288 @@ function renderCompetitorVsCompetitor(event = {}, variant = 'poster', theme = {}
   })
 }
 
+// SINGLE_EVENT_MOTORSPORT
+//
+// One central motorsport identity, no VS, sport-specific glyph. Mirrors the
+// Python proof generator at backdrops/python-backdrops/10-single-event-motorsport/
+// so smoke assertions can rely on identical data-role markers from both paths.
+
+const MOTORSPORT_LEAGUE_RULES = [
+  { pattern: /\b(?:moto\s*gp|motogp)\b/i, label: 'MOTOGP', sport: 'MotoGP', icon: 'motogp-bike' },
+  { pattern: /\b(?:wrc|world\s+rally(?:\s+championship)?|rally)\b/i, label: 'WRC', sport: 'WRC', icon: 'wrc-rally' },
+  { pattern: /\b(?:formula\s*1|formula\s*one|formula1|f1)\b/i, label: 'FORMULA 1', sport: 'Formula 1', icon: 'f1' },
+  { pattern: /\bnascar\b/i, label: 'NASCAR', sport: 'NASCAR', icon: 'nascar-oval' },
+  { pattern: /\b(?:indycar|indy\s*car|indy\s*500)\b/i, label: 'INDYCAR', sport: 'IndyCar', icon: 'indycar-oval' },
+  { pattern: /\b(?:wec|world\s+endurance|formula\s*e|supercars?|v8sc)\b/i, label: 'MOTORSPORT', sport: 'Motorsport', icon: 'motorsport-helmet' },
+  { pattern: /\b(?:motorsport|motor\s+racing|grand\s+prix|race\s+series)\b/i, label: 'MOTORSPORT', sport: 'Motorsport', icon: 'motorsport-helmet' }
+]
+
+const MOTORSPORT_PALETTES = {
+  MOTOGP: { primary: '#c81d2a', secondary: '#1a0606', accent: '#ffd166', paper: '#fff4e0' },
+  WRC: { primary: '#2563eb', secondary: '#0a1024', accent: '#fbbf24', paper: '#f5f7ff' },
+  'FORMULA 1': { primary: '#e10600', secondary: '#15151e', accent: '#f4f4f4', paper: '#ffffff' },
+  NASCAR: { primary: '#ffd200', secondary: '#111111', accent: '#0033a0', paper: '#fff8d6' },
+  INDYCAR: { primary: '#1f3a8a', secondary: '#0b1228', accent: '#f97316', paper: '#eef2ff' },
+  MOTORSPORT: { primary: '#1f2937', secondary: '#0a0d12', accent: '#ef4444', paper: '#f3f4f6' }
+}
+
+function classifyMotorsportLeague(event = {}, m = {}) {
+  const text = normalizeSpace([
+    event.broadcastLabel,
+    event.layoutLabel,
+    event.leagueCode,
+    event.league_code,
+    event.league,
+    event.competition,
+    event.title,
+    event.eventTitle,
+    event.eventShort,
+    event.event_short,
+    event.rawTitle,
+    event.sport,
+    m.broadcastLabel,
+    m.league_code,
+    m.league,
+    m.event,
+    m.event_short
+  ].filter(Boolean).join(' '))
+  for (const rule of MOTORSPORT_LEAGUE_RULES) {
+    if (rule.pattern.test(text)) return { label: rule.label, sport: rule.sport, icon: rule.icon }
+  }
+  return { label: 'MOTORSPORT', sport: 'Motorsport', icon: 'motorsport-helmet' }
+}
+
+function isMotorsportPlaceholder(value = '') {
+  const clean = normalizeSpace(value).toLowerCase()
+  if (!clean) return true
+  return /^(?:tba|tbd|n\/?a|na|unknown|undefined|null|event|session|sports?\s*event|sport\s*event|motorsport\s*event|matchup|tournament)$/i.test(clean)
+}
+
+function fitMotorsportTitle(text = '', maxWidth = 350, baseSize = 50, minSize = 26) {
+  const clean = normalizeSpace(text)
+  if (!clean) return { text: '', lines: [], fontSize: baseSize, maxWidth, status: 'empty' }
+  let fontSize = baseSize
+  let lines = [clean]
+  while (fontSize > minSize && estimatedTextWidth(clean, fontSize) > maxWidth) fontSize -= 2
+  if (estimatedTextWidth(clean, fontSize) > maxWidth) {
+    const computeWrap = (size) => {
+      const maxChars = Math.max(8, Math.floor(maxWidth / Math.max(size * 0.58, 1)))
+      return splitLines(clean, maxChars, 3)
+    }
+    lines = computeWrap(fontSize)
+    while (fontSize > minSize && lines.some((line) => estimatedTextWidth(line, fontSize) > maxWidth)) {
+      fontSize -= 2
+      lines = computeWrap(fontSize)
+    }
+  }
+  const fitted = lines.length > 0 && lines.every((line) => estimatedTextWidth(line, fontSize) <= maxWidth)
+  return { text: clean, lines, fontSize, maxWidth, status: fitted ? 'fit' : 'fit-with-textLength' }
+}
+
+function motorsportGlyphMarkup(iconKind, cx, cy, size, paper, accent) {
+  const half = size / 2
+  const ringRadius = size * 0.46
+  const strokeColor = paper
+  const innerScale = (size / 200).toFixed(3)
+  const ringStroke = Math.max(2, Math.round(size * 0.018))
+  const ring = `<circle cx="${cx}" cy="${cy}" r="${ringRadius}" fill="rgba(0,0,0,0.32)" stroke="${strokeColor}" stroke-width="${ringStroke}"/>`
+  const inner = (() => {
+    if (iconKind === 'motogp-bike') {
+      return `<g transform="translate(${cx} ${cy}) scale(${innerScale})" stroke="${strokeColor}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="-46" cy="34" r="30"/>
+        <circle cx="50" cy="34" r="30"/>
+        <path d="M -46 34 L -8 -10 L 36 -10 L 50 34"/>
+        <path d="M -10 -8 L 6 -36 L 28 -28 L 22 -8"/>
+        <circle cx="14" cy="-46" r="14" fill="${accent}" stroke="none"/>
+        <path d="M -28 -2 L -56 16"/>
+      </g>`
+    }
+    if (iconKind === 'wrc-rally') {
+      return `<g transform="translate(${cx} ${cy}) scale(${innerScale})" stroke="${strokeColor}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M -68 26 L -54 -4 L -18 -22 L 30 -22 L 54 -4 L 68 26 Z"/>
+        <path d="M -34 -4 L -10 -16 L 22 -16 L 38 -4"/>
+        <circle cx="-40" cy="34" r="16"/>
+        <circle cx="42" cy="34" r="16"/>
+        <path d="M -84 50 L -54 50" stroke="${accent}"/>
+        <path d="M -90 62 L -40 62" stroke="${accent}"/>
+        <path d="M -78 -14 L -52 -14" stroke="${accent}"/>
+      </g>`
+    }
+    if (iconKind === 'f1') {
+      return `<g transform="translate(${cx} ${cy}) scale(${innerScale})" stroke="${strokeColor}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M -78 18 L -52 18 L -38 0 L 30 0 L 50 18 L 78 18 L 78 30 L 50 30 L 38 42 L -22 42 L -38 30 L -78 30 Z"/>
+        <circle cx="-50" cy="36" r="14" fill="${accent}" stroke="none"/>
+        <circle cx="56" cy="36" r="14" fill="${accent}" stroke="none"/>
+        <path d="M -82 12 L -90 6 L -70 6"/>
+        <path d="M 70 6 L 90 6 L 82 12"/>
+      </g>`
+    }
+    if (iconKind === 'nascar-oval' || iconKind === 'indycar-oval') {
+      return `<g transform="translate(${cx} ${cy}) scale(${innerScale})" stroke="${strokeColor}" stroke-width="5" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <ellipse cx="0" cy="6" rx="78" ry="40"/>
+        <ellipse cx="0" cy="6" rx="58" ry="22"/>
+        <path d="M -34 6 L 34 6" stroke="${accent}" stroke-dasharray="6 6"/>
+        <rect x="-6" y="-46" width="44" height="22" fill="none"/>
+        <rect x="-6" y="-46" width="11" height="11" fill="${strokeColor}" stroke="none"/>
+        <rect x="16" y="-46" width="11" height="11" fill="${strokeColor}" stroke="none"/>
+        <rect x="5" y="-35" width="11" height="11" fill="${strokeColor}" stroke="none"/>
+        <rect x="27" y="-35" width="11" height="11" fill="${strokeColor}" stroke="none"/>
+        <line x1="-6" y1="-46" x2="-6" y2="-2" stroke-width="4"/>
+      </g>`
+    }
+    return `<g transform="translate(${cx} ${cy}) scale(${innerScale})" stroke="${strokeColor}" stroke-width="6" fill="none" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M -52 16 C -52 -34 52 -34 52 16 L 52 26 L -52 26 Z"/>
+        <path d="M -42 -2 L 42 -2 L 38 14 L -38 14 Z" fill="${accent}" stroke="none"/>
+        <circle cx="0" cy="58" r="22"/>
+        <circle cx="0" cy="58" r="8" fill="${strokeColor}" stroke="none"/>
+      </g>`
+  })()
+  return `<g data-role="motorsport-identity" data-icon-kind="${iconKind}">${ring}${inner}</g>`
+}
+
+const MOTORSPORT_LEAGUE_PREFIX_RE = /^\s*(?:formula\s*1|formula\s*one|formula1|f1|motogp|moto\s*gp|wrc|world\s+rally(?:\s+championship)?|nascar|indycar|indy\s*car|wec|formula\s*e|supercars?|v8sc|motorsport)\b[\s\-:.]*/i
+const RELEASE_NOISE_TAIL_RE = /\b(?:1080p|2160p|720p|web[\-._\s]?dl|web[\-._\s]?rip|web|hdtv|x264|x265|h264|h265|hevc|av1|repack|proper|aac|ddp\d?(?:\.\d)?|multi|english|fps\d+|mkv|mp4)\b/gi
+
+function stripMotorsportLeaguePrefix(value = '') {
+  return normalizeSpace(String(value || '').replace(/[._]+/g, ' ').replace(MOTORSPORT_LEAGUE_PREFIX_RE, '').replace(RELEASE_NOISE_TAIL_RE, ' '))
+}
+
+function pickMotorsportEventTitle(event = {}, m = {}, label = '') {
+  const labelEscaped = String(label || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const labelPrefix = labelEscaped ? new RegExp(`^${labelEscaped}\\s+`, 'i') : null
+  const fromCandidates = (values) => {
+    for (const value of values) {
+      const clean = normalizeSpace(value)
+      if (!clean || isMotorsportPlaceholder(clean)) continue
+      const stripped = labelPrefix ? clean.replace(labelPrefix, '').trim() : clean
+      if (stripped && !isMotorsportPlaceholder(stripped)) return stripped
+      if (clean && !isMotorsportPlaceholder(clean)) return clean
+    }
+    return ''
+  }
+  // Prefer a clean rawTitle stripped of motorsport league prefix when the
+  // normalized eventTitle came back single-token or shorter — the upstream
+  // motorsport normalizer drops digits like "Daytona 500" -> "Daytona" and
+  // mangles "Long Beach Grand Prix" -> "Beach Grand Prix".
+  const fromRaw = stripMotorsportLeaguePrefix(event.rawTitle || '')
+  const fromNormalized = fromCandidates([
+    event.eventTitle,
+    event.event_title,
+    event.title,
+    m.event,
+    m.event_short,
+    event.eventShort,
+    event.event_short
+  ])
+  if (fromRaw) {
+    const rawWords = fromRaw.split(/\s+/).filter(Boolean)
+    const normWords = fromNormalized.split(/\s+/).filter(Boolean)
+    if (!fromNormalized) return fromRaw
+    if (rawWords.length > normWords.length) return fromRaw
+    if (rawWords.length === normWords.length && fromRaw.length > fromNormalized.length) return fromRaw
+  }
+  if (fromNormalized) return fromNormalized
+  return fromCandidates([event.competition, event.league, m.league])
+}
+
+function renderSingleEventMotorsport(event = {}, variant = 'poster', theme = {}, mode = '') {
+  const m = templateData(event, theme, mode)
+  const e = escapeXml
+  const { label, sport, icon } = classifyMotorsportLeague(event, m)
+  const palette = MOTORSPORT_PALETTES[label] || MOTORSPORT_PALETTES.MOTORSPORT
+  const { primary, secondary, accent, paper } = palette
+  const eventTitleRaw = pickMotorsportEventTitle(event, m, label)
+  const eventTitle = eventTitleRaw || (label === 'MOTORSPORT' ? 'Motorsport Event' : `${sport} Event`)
+  const subtitleCandidate = normalizeSpace(
+    m.session ||
+    m.round ||
+    event.session ||
+    event.round ||
+    (event.competition && event.competition !== eventTitle ? event.competition : '') ||
+    (event.league && event.league !== eventTitle && event.league !== sport ? event.league : '')
+  )
+  const subtitle = !subtitleCandidate || isMotorsportPlaceholder(subtitleCandidate) ? '' : subtitleCandidate
+  const isLive = m.isLive === true
+  const date = normalizeSpace(m.date || event.date || '')
+
+  const labelBox = { x: 24, y: 24, width: 156, height: 44 }
+  const identityBox = { x: 90, y: 130, width: 220, height: 220 }
+  const titleBox = { x: 24, y: 380, width: 352, height: 140 }
+
+  const titleFit = fitMotorsportTitle(eventTitle, titleBox.width - 8, 44, 22)
+  const lineStep = Math.round(titleFit.fontSize * 1.05)
+  const titleStartY = titleBox.y + 44
+
+  const titleMarkup = titleFit.lines.map((line, index) => {
+    const overFlow = estimatedTextWidth(line, titleFit.fontSize) > titleFit.maxWidth
+    const length = overFlow ? ` textLength="${titleFit.maxWidth}" lengthAdjust="spacingAndGlyphs"` : ''
+    return `<text data-role="event-title" data-fit-status="${titleFit.status}" x="${titleBox.x}" y="${titleStartY + index * lineStep}" font-size="${titleFit.fontSize}" font-family="Bebas Neue, Impact, Arial, sans-serif" font-weight="800" letter-spacing="0" fill="${paper}"${length}>${e(line)}</text>`
+  }).join('\n  ')
+
+  const subtitleMarkup = subtitle
+    ? `<text data-role="event-subtitle" x="${titleBox.x}" y="${titleStartY + titleFit.lines.length * lineStep + 20}" font-family="Inter, Arial, sans-serif" font-size="13" font-weight="700" fill="rgba(255,255,255,0.78)" letter-spacing="2">${e(subtitle.toUpperCase())}</text>`
+    : ''
+
+  const liveMarkup = isLive
+    ? `<g data-role="live-status" data-live="true" transform="translate(${SOURCE_W - 24} 32)"><circle cx="0" cy="0" r="5" fill="#ff2d2d"/><text x="-10" y="5" text-anchor="end" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="900" fill="${paper}" letter-spacing="2">LIVE</text></g>`
+    : ''
+
+  const dateMarkup = date && !isMotorsportPlaceholder(date)
+    ? `<text data-role="footer-date" x="${SOURCE_W - 24}" y="${SOURCE_H - 24}" text-anchor="end" font-family="Inter, Arial, sans-serif" font-size="11" font-weight="800" fill="rgba(255,255,255,0.72)" letter-spacing="2">${e(date)}</text>`
+    : ''
+
+  const slots = [{ role: 'league', left: identityBox.x, top: identityBox.y, size: identityBox.width }]
+
+  const inner = `<defs>
+    <linearGradient id="motorsportBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="${primary}"/>
+      <stop offset="55%" stop-color="${secondary}"/>
+      <stop offset="100%" stop-color="#04050a"/>
+    </linearGradient>
+    <radialGradient id="motorsportSpot" cx="22%" cy="20%" r="80%">
+      <stop offset="0%" stop-color="${accent}" stop-opacity="0.18"/>
+      <stop offset="100%" stop-color="${accent}" stop-opacity="0"/>
+    </radialGradient>
+    <pattern id="motorsportGrid" width="22" height="22" patternUnits="userSpaceOnUse">
+      <path d="M 22 0 L 0 0 0 22" fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+    </pattern>
+    <filter id="motorsportShadow"><feDropShadow dx="0" dy="10" stdDeviation="9" flood-color="#000" flood-opacity="0.34"/></filter>
+  </defs>
+  <rect width="${SOURCE_W}" height="${SOURCE_H}" fill="url(#motorsportBg)"/>
+  <rect width="${SOURCE_W}" height="${SOURCE_H}" fill="url(#motorsportSpot)"/>
+  <rect width="${SOURCE_W}" height="${SOURCE_H}" fill="url(#motorsportGrid)"/>
+  <path d="M0 76 H${SOURCE_W}" stroke="rgba(255,255,255,0.20)" stroke-width="1.4"/>
+  <path d="M0 374 H${SOURCE_W}" stroke="rgba(255,255,255,0.12)" stroke-width="1.4"/>
+
+  <g data-role="sport-label" data-league-label="${e(label)}" data-sport-label="${e(sport)}"
+     data-box-x="${labelBox.x}" data-box-y="${labelBox.y}" data-box-width="${labelBox.width}" data-box-height="${labelBox.height}"
+     transform="translate(${labelBox.x} ${labelBox.y})">
+    <rect x="0" y="0" width="${labelBox.width}" height="${labelBox.height}" rx="5" fill="rgba(0,0,0,0.55)" stroke="rgba(255,255,255,0.35)"/>
+    <text x="12" y="22" font-family="Inter, Arial, sans-serif" font-size="15" font-weight="900" fill="${paper}" letter-spacing="2">${e(label)}</text>
+    <text x="12" y="36" font-family="Inter, Arial, sans-serif" font-size="8" font-weight="800" fill="rgba(255,255,255,0.7)" letter-spacing="3">${e(sport.toUpperCase())}</text>
+  </g>
+  ${liveMarkup}
+
+  <g filter="url(#motorsportShadow)" data-role="motorsport-identity-box"
+     data-box-x="${identityBox.x}" data-box-y="${identityBox.y}" data-box-width="${identityBox.width}" data-box-height="${identityBox.height}">
+    ${motorsportGlyphMarkup(icon, identityBox.x + identityBox.width / 2, identityBox.y + identityBox.height / 2, identityBox.width, paper, accent)}
+  </g>
+
+  <g data-role="event-title-box" data-box-x="${titleBox.x}" data-box-y="${titleBox.y}" data-box-width="${titleBox.width}" data-box-height="${titleBox.height}">
+    ${titleMarkup}
+  </g>
+  ${subtitleMarkup}
+  ${dateMarkup}`
+
+  return wrapTemplateSvg(inner, slots, variant, {
+    layoutFamily: 'SINGLE_EVENT_MOTORSPORT',
+    leagueLabel: label,
+    sportLabel: sport,
+    iconKind: icon,
+    eventTitle: titleFit.text
+  })
+}
+
 function renderSportsbook(event = {}, variant = 'poster', theme = {}, mode = '') {
   const m = templateData(event, theme, mode)
   const e = escapeXml
@@ -1535,6 +1819,7 @@ function renderSportsPosterTemplateSvg({ event = {}, variant = 'poster', templat
   let artwork
   if (normalizedTemplate === 'broadcast') artwork = renderBroadcast(event, variant, theme, mode)
   else if (layoutFamily === 'COMPETITOR_VS_COMPETITOR') artwork = renderCompetitorVsCompetitor(event, variant, theme, mode)
+  else if (layoutFamily === 'SINGLE_EVENT_MOTORSPORT') artwork = renderSingleEventMotorsport(event, variant, theme, mode)
   else if (normalizedTemplate === 'sportsbook') artwork = renderSportsbook(event, variant, theme, mode)
   else if (normalizedTemplate === 'trading-card') artwork = renderTradingCard(event, variant, theme, mode)
   else if (normalizedTemplate === 'brutalist') artwork = renderBrutalist(event, variant, theme, mode)

@@ -17,6 +17,7 @@
     "smoke:sports-broadcast": "node scripts/smoke-sports-broadcast-artwork.js",
     "smoke:sports-competitor-vs-competitor": "node scripts/smoke-sports-competitor-vs-competitor.js",
     "smoke:sports-team-vs-team": "node scripts/smoke-sports-team-vs-team.js",
+    "smoke:sports-single-event-motorsport": "node scripts/smoke-sports-single-event-motorsport.js",
     "smoke:sports-artwork": "node scripts/smoke-sports-artwork-layout.js",
     "smoke:sports-poster-classifier": "node scripts/smoke-sports-poster-classifier.js",
     "smoke:sports-poster-adapter": "node scripts/smoke-sports-poster-adapter.js",
