@@ -1,3 +1,7 @@
+// Guards source/public mirror parity for the approved 4K JPG sport backdrops
+// in backdrops/python-backdrops/<sport>-4k.jpg vs public/sports-backdrops/.
+// This is NOT a check on the Python SVG generators that share the folder name —
+// those are a separate, unused experimental family. See backdrops/python-backdrops/README.md.
 const assert = require('assert')
 const crypto = require('crypto')
 const fs = require('fs')
