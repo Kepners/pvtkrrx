@@ -111,6 +111,7 @@ class ProwlarrClient {
       category: categoryIds[0] || '',
       categoryIds,
       categoryNames,
+      indexerCategoryName: categoryNames[0] || '',
       sportHint,
       pubDate: r.publishDate || ''
     }

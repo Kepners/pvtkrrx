@@ -1,7 +1,7 @@
 {
-  "generatedAt": "2026-04-29T22:52:13.889Z",
+  "generatedAt": "2026-04-30T16:01:04.665Z",
   "source": "sportscult.org RSS feed (passkey/pid redacted, download URLs stripped)",
-  "note": "SportsCult RSS embeds category in [Brackets] at start of title; categoryNames XML element absent on this feed.",
+  "note": "Regenerated from the existing redacted titles with the current PVTKRRX normalizer/classifier. SportsCult RSS embeds category in [Brackets] at start of title; categoryNames XML element was absent on the captured feed, so bracket categories are replayed as categoryNames/indexerCategoryName for audit reasoning. parsedHome/parsedAway are current normalized fields only; poster classification does not invent missing pairs from tracker/indexer names.",
   "itemCount": 20,
   "samples": [
     {
@@ -10,11 +10,16 @@
       "categoryNames": [
         "Tennis"
       ],
+      "indexerCategoryName": "Tennis",
       "sourceCategory": "Tennis",
       "appSportHint": "tennis",
       "canonicalSport": "tennis",
       "detectedPosterClass": "racket_event",
       "proposedPosterMode": "solo",
+      "parsedSport": "Tennis",
+      "parsedCompetition": "Tennis",
+      "parsedTitle": "Madrid, Spain Women Singles Quarterfinals Kostyuk, Marta - Noskova, Linda",
+      "parsedDetail": "Singles",
       "parsedHome": "",
       "parsedAway": "",
       "parsedEvent": ""
@@ -25,12 +30,17 @@
       "categoryNames": [
         "Champions League"
       ],
+      "indexerCategoryName": "Champions League",
       "sourceCategory": "Champions League",
       "appSportHint": "football",
       "canonicalSport": "football",
-      "detectedPosterClass": "team_vs_team",
-      "proposedPosterMode": "matchup",
-      "parsedHome": "Champions League",
+      "detectedPosterClass": "tournament_event",
+      "proposedPosterMode": "solo",
+      "parsedSport": "Football",
+      "parsedCompetition": "UEFA Champions League",
+      "parsedTitle": "Arsenal",
+      "parsedDetail": "",
+      "parsedHome": "",
       "parsedAway": "Arsenal",
       "parsedEvent": ""
     },
@@ -40,12 +50,17 @@
       "categoryNames": [
         "Champions League"
       ],
+      "indexerCategoryName": "Champions League",
       "sourceCategory": "Champions League",
       "appSportHint": "football",
       "canonicalSport": "football",
       "detectedPosterClass": "team_vs_team",
       "proposedPosterMode": "matchup",
-      "parsedHome": "UCL",
+      "parsedSport": "Football",
+      "parsedCompetition": "UEFA Champions League",
+      "parsedTitle": "Atletico Madrid vs Arsenal",
+      "parsedDetail": "",
+      "parsedHome": "Atletico Madrid",
       "parsedAway": "Arsenal",
       "parsedEvent": ""
     },
@@ -55,12 +70,17 @@
       "categoryNames": [
         "Champions League"
       ],
+      "indexerCategoryName": "Champions League",
       "sourceCategory": "Champions League",
       "appSportHint": "football",
       "canonicalSport": "football",
       "detectedPosterClass": "team_vs_team",
       "proposedPosterMode": "matchup",
-      "parsedHome": "Champions League",
+      "parsedSport": "Football",
+      "parsedCompetition": "UEFA Champions League",
+      "parsedTitle": "Atletico Madrid vs Arsenal",
+      "parsedDetail": "",
+      "parsedHome": "Atletico Madrid",
       "parsedAway": "Arsenal",
       "parsedEvent": ""
     },
@@ -70,12 +90,17 @@
       "categoryNames": [
         "Champions League"
       ],
+      "indexerCategoryName": "Champions League",
       "sourceCategory": "Champions League",
       "appSportHint": "football",
       "canonicalSport": "football",
       "detectedPosterClass": "team_vs_team",
       "proposedPosterMode": "matchup",
-      "parsedHome": "Champions League 2025 2026 |",
+      "parsedSport": "Football",
+      "parsedCompetition": "UEFA Champions League",
+      "parsedTitle": "| vs Arsenal",
+      "parsedDetail": "",
+      "parsedHome": "|",
       "parsedAway": "Arsenal",
       "parsedEvent": ""
     },
@@ -85,12 +110,17 @@
       "categoryNames": [
         "Champions League"
       ],
+      "indexerCategoryName": "Champions League",
       "sourceCategory": "Champions League",
       "appSportHint": "football",
       "canonicalSport": "football",
       "detectedPosterClass": "team_vs_team",
       "proposedPosterMode": "matchup",
-      "parsedHome": "Champions League",
+      "parsedSport": "Football",
+      "parsedCompetition": "UEFA Champions League",
+      "parsedTitle": "Atletico Madrid vs Arsenal",
+      "parsedDetail": "",
+      "parsedHome": "Atletico Madrid",
       "parsedAway": "Arsenal",
       "parsedEvent": ""
     },
@@ -100,12 +130,17 @@
       "categoryNames": [
         "Champions League"
       ],
+      "indexerCategoryName": "Champions League",
       "sourceCategory": "Champions League",
       "appSportHint": "football",
       "canonicalSport": "football",
-      "detectedPosterClass": "team_vs_team",
-      "proposedPosterMode": "matchup",
-      "parsedHome": "Champions League",
+      "detectedPosterClass": "tournament_event",
+      "proposedPosterMode": "solo",
+      "parsedSport": "Football",
+      "parsedCompetition": "UEFA Champions League",
+      "parsedTitle": "Arsenal",
+      "parsedDetail": "",
+      "parsedHome": "",
       "parsedAway": "Arsenal",
       "parsedEvent": ""
     },
@@ -115,13 +150,18 @@
       "categoryNames": [
         "Snooker/Pool"
       ],
+      "indexerCategoryName": "Snooker/Pool",
       "sourceCategory": "Snooker/Pool",
       "appSportHint": "snooker",
       "canonicalSport": "snooker",
       "detectedPosterClass": "racket_event",
       "proposedPosterMode": "single",
+      "parsedSport": "Snooker",
+      "parsedCompetition": "Snooker",
+      "parsedTitle": "Wu Yize vs Hossein Vafaei Wc",
+      "parsedDetail": "",
       "parsedHome": "Wu Yize",
-      "parsedAway": "Hossein Vafaei WC",
+      "parsedAway": "Hossein Vafaei Wc",
       "parsedEvent": ""
     },
     {
@@ -130,12 +170,17 @@
       "categoryNames": [
         "Champions League"
       ],
+      "indexerCategoryName": "Champions League",
       "sourceCategory": "Champions League",
       "appSportHint": "football",
       "canonicalSport": "football",
-      "detectedPosterClass": "team_vs_team",
-      "proposedPosterMode": "matchup",
-      "parsedHome": "Champions League",
+      "detectedPosterClass": "tournament_event",
+      "proposedPosterMode": "solo",
+      "parsedSport": "Football",
+      "parsedCompetition": "UEFA Champions League",
+      "parsedTitle": "Arsenal",
+      "parsedDetail": "",
+      "parsedHome": "",
       "parsedAway": "Arsenal",
       "parsedEvent": ""
     },
@@ -145,12 +190,17 @@
       "categoryNames": [
         "NBA"
       ],
+      "indexerCategoryName": "NBA",
       "sourceCategory": "NBA",
       "appSportHint": "basketball",
       "canonicalSport": "basketball",
       "detectedPosterClass": "team_vs_team",
       "proposedPosterMode": "matchup",
-      "parsedHome": "NBA Western Conference Semifinals Spurs",
+      "parsedSport": "Basketball",
+      "parsedCompetition": "NBA",
+      "parsedTitle": "Western Conference Semifinals Spurs vs Suns",
+      "parsedDetail": "",
+      "parsedHome": "Western Conference Semifinals Spurs",
       "parsedAway": "Suns",
       "parsedEvent": ""
     },
@@ -160,13 +210,18 @@
       "categoryNames": [
         "Snooker/Pool"
       ],
+      "indexerCategoryName": "Snooker/Pool",
       "sourceCategory": "Snooker/Pool",
       "appSportHint": "snooker",
       "canonicalSport": "snooker",
       "detectedPosterClass": "racket_event",
       "proposedPosterMode": "single",
+      "parsedSport": "Snooker",
+      "parsedCompetition": "Snooker",
+      "parsedTitle": "Wu Yize vs Hossein Vafaei Wc",
+      "parsedDetail": "",
       "parsedHome": "Wu Yize",
-      "parsedAway": "Hossein Vafaei WC",
+      "parsedAway": "Hossein Vafaei Wc",
       "parsedEvent": ""
     },
     {
@@ -175,13 +230,18 @@
       "categoryNames": [
         "Snooker/Pool"
       ],
+      "indexerCategoryName": "Snooker/Pool",
       "sourceCategory": "Snooker/Pool",
       "appSportHint": "snooker",
       "canonicalSport": "snooker",
       "detectedPosterClass": "racket_event",
       "proposedPosterMode": "single",
+      "parsedSport": "Snooker",
+      "parsedCompetition": "Snooker",
+      "parsedTitle": "Zhao Xintong vs Shaun Murphy Wc",
+      "parsedDetail": "",
       "parsedHome": "Zhao Xintong",
-      "parsedAway": "Shaun Murphy WC",
+      "parsedAway": "Shaun Murphy Wc",
       "parsedEvent": ""
     },
     {
@@ -190,11 +250,16 @@
       "categoryNames": [
         "NBA"
       ],
+      "indexerCategoryName": "NBA",
       "sourceCategory": "NBA",
       "appSportHint": "basketball",
       "canonicalSport": "basketball",
       "detectedPosterClass": "tournament_event",
-      "proposedPosterMode": "matchup",
+      "proposedPosterMode": "solo",
+      "parsedSport": "Basketball",
+      "parsedCompetition": "NBA Playoffs",
+      "parsedTitle": "All Games",
+      "parsedDetail": "",
       "parsedHome": "",
       "parsedAway": "",
       "parsedEvent": ""
@@ -205,11 +270,16 @@
       "categoryNames": [
         "Tennis"
       ],
+      "indexerCategoryName": "Tennis",
       "sourceCategory": "Tennis",
       "appSportHint": "tennis",
       "canonicalSport": "tennis",
       "detectedPosterClass": "racket_event",
       "proposedPosterMode": "solo",
+      "parsedSport": "Tennis",
+      "parsedCompetition": "Tennis",
+      "parsedTitle": "Madrid, Spain Women Singles Quarterfinals Pliskova, Karolina - Potapova, Anastasia",
+      "parsedDetail": "Singles",
       "parsedHome": "",
       "parsedAway": "",
       "parsedEvent": ""
@@ -220,11 +290,16 @@
       "categoryNames": [
         "NBA"
       ],
+      "indexerCategoryName": "NBA",
       "sourceCategory": "NBA",
       "appSportHint": "basketball",
       "canonicalSport": "basketball",
       "detectedPosterClass": "tournament_event",
-      "proposedPosterMode": "matchup",
+      "proposedPosterMode": "solo",
+      "parsedSport": "Basketball",
+      "parsedCompetition": "NBA Playoffs",
+      "parsedTitle": "All Games",
+      "parsedDetail": "",
       "parsedHome": "",
       "parsedAway": "",
       "parsedEvent": ""
@@ -235,12 +310,17 @@
       "categoryNames": [
         "Champions League"
       ],
+      "indexerCategoryName": "Champions League",
       "sourceCategory": "Champions League",
       "appSportHint": "football",
       "canonicalSport": "football",
       "detectedPosterClass": "team_vs_team",
       "proposedPosterMode": "matchup",
-      "parsedHome": "UCL",
+      "parsedSport": "Football",
+      "parsedCompetition": "UEFA Champions League",
+      "parsedTitle": "Psg vs Bayern Munich",
+      "parsedDetail": "",
+      "parsedHome": "Psg",
       "parsedAway": "Bayern Munich",
       "parsedEvent": ""
     },
@@ -250,13 +330,18 @@
       "categoryNames": [
         "Snooker/Pool"
       ],
+      "indexerCategoryName": "Snooker/Pool",
       "sourceCategory": "Snooker/Pool",
       "appSportHint": "snooker",
       "canonicalSport": "snooker",
       "detectedPosterClass": "racket_event",
       "proposedPosterMode": "single",
+      "parsedSport": "Snooker",
+      "parsedCompetition": "Snooker",
+      "parsedTitle": "John Higgins vs Neil Robertson Wc",
+      "parsedDetail": "",
       "parsedHome": "John Higgins",
-      "parsedAway": "Neil Robertson WC",
+      "parsedAway": "Neil Robertson Wc",
       "parsedEvent": ""
     },
     {
@@ -265,11 +350,16 @@
       "categoryNames": [
         "NBA"
       ],
+      "indexerCategoryName": "NBA",
       "sourceCategory": "NBA",
       "appSportHint": "basketball",
       "canonicalSport": "basketball",
       "detectedPosterClass": "team_vs_team",
       "proposedPosterMode": "matchup",
+      "parsedSport": "Basketball",
+      "parsedCompetition": "NBA Playoffs",
+      "parsedTitle": "Portland Trail Blazers vs San Antonio Spurs",
+      "parsedDetail": "",
       "parsedHome": "Portland Trail Blazers",
       "parsedAway": "San Antonio Spurs",
       "parsedEvent": ""
@@ -280,13 +370,18 @@
       "categoryNames": [
         "NHL"
       ],
+      "indexerCategoryName": "NHL",
       "sourceCategory": "NHL",
       "appSportHint": "hockey",
       "canonicalSport": "hockey",
       "detectedPosterClass": "team_vs_team",
       "proposedPosterMode": "matchup",
+      "parsedSport": "Hockey",
+      "parsedCompetition": "NHL",
+      "parsedTitle": "Boston Bruins vs Buffalo Sabres 4k",
+      "parsedDetail": "",
       "parsedHome": "Boston Bruins",
-      "parsedAway": "Buffalo Sabres Hockey 4k",
+      "parsedAway": "Buffalo Sabres 4k",
       "parsedEvent": ""
     },
     {
@@ -295,11 +390,16 @@
       "categoryNames": [
         "Athletics"
       ],
+      "indexerCategoryName": "Athletics",
       "sourceCategory": "Athletics",
       "appSportHint": "athletics",
       "canonicalSport": "athletics",
       "detectedPosterClass": "athletics_event",
       "proposedPosterMode": "solo",
+      "parsedSport": "Athletics",
+      "parsedCompetition": "Athletics",
+      "parsedTitle": "[Athletics] World Athletics Continental Tour Silver 04 28 Simbine Classic WA+ [SEEDERS (4)/LEECHERS (1)]",
+      "parsedDetail": "",
       "parsedHome": "",
       "parsedAway": "",
       "parsedEvent": ""

@@ -9,6 +9,7 @@ const {
 } = require('../src/utils/sportsPosterClassifier')
 const { classifySportsEvent } = require('../src/utils/sportsEventClassifier')
 const { normalizeSportsEventMetadata } = require('../src/utils/sportsEventNormalizer')
+const { ProwlarrClient } = require('../src/clients/prowlarr')
 
 const REQUIRED_CLASSES = [
   'team_vs_team',
@@ -344,6 +345,65 @@ for (const testCase of [
   assert.equal(event.homeTeam, testCase.expectedHome, `${testCase.slug} home team`)
   assert.equal(event.awayTeam, testCase.expectedAway, `${testCase.slug} away team`)
   assert.equal(classifySportsPosterEvent(event), 'team_vs_team', `${testCase.slug} class`)
+}
+
+const categoryLookup = new Map([
+  ['7', new Map([
+    ['100011', 'EuroLeague Basketbal']
+  ])]
+])
+const mappedProwlarrItem = new ProwlarrClient('http://prowlarr.test', 'test-api-key')._mapResult({
+  title: 'EuroLeague Round 30 Highlights 1080p',
+  indexerId: 7,
+  indexer: 'SportsCult',
+  categories: [{ id: 100011 }],
+  size: 123,
+  seeders: 3,
+  publishDate: '2026-04-29T12:00:00.000Z'
+}, categoryLookup)
+assert.deepEqual(mappedProwlarrItem.categoryNames, ['EuroLeague Basketbal'], 'Prowlarr category lookup should expose categoryNames')
+assert.equal(mappedProwlarrItem.indexerCategoryName, 'EuroLeague Basketbal', 'Prowlarr category lookup should expose first mapped category as indexerCategoryName')
+
+for (const testCase of [
+  {
+    slug: 'categoryNames-only-context',
+    expected: 'darts_event',
+    input: {
+      rawTitle: 'Premier League Darts Night 1 1080p',
+      categoryNames: ['Darts'],
+      eventTitle: 'Premier League Darts'
+    }
+  },
+  {
+    slug: 'indexerCategoryName-only-context',
+    expected: 'motorsport_event',
+    input: {
+      rawTitle: 'Formula1 British Grand Prix Qualifying 1080p',
+      indexerCategoryName: 'Formula1',
+      eventTitle: 'British Grand Prix'
+    }
+  },
+  {
+    slug: 'indexer-name-is-not-category-context',
+    expected: 'generic_event',
+    input: {
+      rawTitle: 'Some Sports Special 2026 1080p',
+      indexer: 'Darts',
+      eventTitle: 'Sports Special'
+    }
+  },
+  {
+    slug: 'bracket-category-context',
+    expected: 'darts_event',
+    input: {
+      rawTitle: '[Darts] Premier League Darts Night 1 1080p',
+      eventTitle: 'Premier League Darts'
+    }
+  }
+]) {
+  const event = eventFor(testCase.input)
+  assert.equal(classifySportsPosterEvent(event), testCase.expected, `${testCase.slug} poster class`)
+  assert.equal(classifySportsEvent(event), testCase.expected, `${testCase.slug} compatibility class`)
 }
 
 console.log(`Sports poster classifier smoke passed. classes=${[...seen].join(',')}`)

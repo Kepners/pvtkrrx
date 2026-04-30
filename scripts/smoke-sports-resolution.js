@@ -7,7 +7,9 @@ const persistentBackfillRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-sp
 process.env.PVTKRRX_SPORTS_IDENTITY_BACKFILL_FILE = path.join(persistentBackfillRoot, 'sports-identity-backfill-cache.json')
 
 const { SportsMetaClient } = require('../src/clients/sportsmeta')
+const { ProwlarrClient } = require('../src/clients/prowlarr')
 const { handleMeta } = require('../src/handlers/meta')
+const { handleCatalog } = require('../src/handlers/catalog')
 const {
   SPORTS_META_RESOLUTION_STATUS,
   resolveSportsMetaIdentity
@@ -27,6 +29,8 @@ const { parseSportsEventTitle, parseSportsTitle } = require('../src/utils/sports
 const { parseSportsTorrentProfile, rankSportsTorrent } = require('../src/utils/sportsTorrentProfile')
 
 const ORIGINAL_FETCH = global.fetch
+const ORIGINAL_PROWLARR_SEARCH = ProwlarrClient.prototype.search
+const ORIGINAL_PROWLARR_CAPS = ProwlarrClient.prototype.caps
 
 function canonicalPayload({ id, name, league, date, sport, homeTeam = '', awayTeam = '' }) {
   return {
@@ -66,6 +70,37 @@ function availability(title, options = {}) {
 }
 
 async function run() {
+  const sportsSearchCalls = []
+  ProwlarrClient.prototype.search = async function search(query, cats, type = 'search', options = {}) {
+    sportsSearchCalls.push({
+      query,
+      cats: String(cats || ''),
+      type,
+      useCategories: Boolean(options?.useCategories)
+    })
+    return []
+  }
+  ProwlarrClient.prototype.caps = async function caps() {
+    return [{ id: 1, name: 'SportsCult' }]
+  }
+  try {
+    await handleCatalog(
+      { jackettUrl: 'http://prowlarr.test', jackettApiKey: 'test-api-key' },
+      'sports',
+      'pvtkrrx-sports',
+      '',
+      {}
+    )
+  } finally {
+    ProwlarrClient.prototype.search = ORIGINAL_PROWLARR_SEARCH
+    ProwlarrClient.prototype.caps = ORIGINAL_PROWLARR_CAPS
+  }
+  assert.ok(sportsSearchCalls.length > 0, 'sports catalog smoke should exercise Prowlarr sports searches')
+  assert.ok(
+    sportsSearchCalls.every((call) => call.cats === '5060' && call.useCategories === true),
+    'sports catalog/prewarm search path should keep every Prowlarr call constrained to Torznab category 5060'
+  )
+
   const burnsId = 'sportsmeta:event:mma|2026-04-18|ufc|ufc-fight-night-273-burns|malott'
   const barcaId = 'sportsmeta:event:football|2026-04-22|spanish-la-liga|barcelona|celta-vigo'
   const barcaOtherId = 'sportsmeta:event:football|2026-04-25|spanish-la-liga|getafe|barcelona'

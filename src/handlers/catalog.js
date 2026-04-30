@@ -352,7 +352,9 @@ async function searchSportsCatalogItems(config, torznab, query, limit) {
     config,
     torznab,
     query,
-    SPORT_CATS
+    SPORT_CATS,
+    'search',
+    { useCategories: true }
   )
   return mergeUniqueProwlarrItems(strictItems, broadItems)
 }
@@ -580,7 +582,7 @@ function normalizeSportsCatalogItems(items = []) {
       awayTeam: sportsProfile?.away_team || parsedSportsEvent?.awayTeam,
       rawTitle: item?.title || '',
       categoryNames: Array.isArray(item?.categoryNames) ? item.categoryNames : [],
-      indexerCategoryName: item?.indexer || ''
+      indexerCategoryName: item?.indexerCategoryName || ''
     })
     return {
       ...item,
@@ -593,6 +595,8 @@ function normalizeSportsCatalogItems(items = []) {
         indexer: item?.indexer || '',
         pubDate: item?.pubDate || item?.publishDate || '',
         sportHint: item?.sportHint || '',
+        categoryNames: Array.isArray(item?.categoryNames) ? item.categoryNames : [],
+        indexerCategoryName: item?.indexerCategoryName || '',
         eventClass
       },
       trackerSourceType: isSportsCultIndexer(item?.indexer) ? 'sportscult' : 'other',

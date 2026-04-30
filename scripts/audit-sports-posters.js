@@ -8,15 +8,18 @@ const OUT_DIR = path.join(process.cwd(), '.runtime', 'sports-poster-audit')
 const EXPECTED_VERSION = '20260430-public-sportsmeta-v1'
 const DEFAULT_MANIFEST = process.env.PVTKRRX_SPORTS_POSTER_AUDIT_MANIFEST ||
   'https://pvt.kepners.co.uk/selfhost/manifest.json?mode=hosted'
-const ALLOWED_SOURCES = new Set([
+const POSTER_ALLOWED_SOURCES = new Set([
   'sportsmeta-raster',
-  'pvtkrrx-team-badge-poster',
   'pvtkrrx-public-template',
   'pvtkrrx-template-glyph',
   'pvtkrrx-emergency-legacy-fallback'
 ])
+const BACKDROP_ALLOWED_SOURCES = new Set([
+  ...POSTER_ALLOWED_SOURCES,
+  'pvtkrrx-sport-4k-backdrop'
+])
 const BAD_TEXT_RE = /\b(?:SPOR\/SPOR|BASK\/BASK|undefined|null|unknown|x264|x265|h264|h265|2160p|1080p|720p|WEB-DL|HDTV|REPACK|COMPLETE)\b/i
-const STALE_VERSION_RE = /paid-python-template|python-template-port|generated-card|sports-card|legacy|2026042[78]-|paid-template-classifier-v1/i
+const STALE_VERSION_RE = /paid-python-template|python-template-port|generated-card|sports-card|legacy|2026042[78]-|20260429-(?:sportcult-category-poster|paid-template-classifier)-v1|paid-template-classifier-v1/i
 
 function parseArgs(argv = process.argv.slice(2)) {
   const args = {
@@ -90,6 +93,18 @@ function imageTypeAllowed(contentType = '') {
   return /^image\/(?:png|jpeg|jpg|webp|svg\+xml)/i.test(contentType)
 }
 
+function artworkVariantFromUrl(value = '') {
+  const url = String(value || '')
+  const match = url.match(/\/sports-artwork\/(?:default|id)\/([^/?#]+)/i)
+  return match ? decodeURIComponent(match[1]).toLowerCase() : ''
+}
+
+function allowedSourcesForVariant(variant = '') {
+  return variant === 'background' || variant === 'landscape'
+    ? BACKDROP_ALLOWED_SOURCES
+    : POSTER_ALLOWED_SOURCES
+}
+
 async function inspectPoster({ manifestUrl, catalog, meta, index }) {
   const name = normalizeSpace(meta?.name || meta?.title || '')
   const posterUrl = absoluteUrl(meta?.poster || meta?.posterShape || '', manifestUrl)
@@ -104,6 +119,7 @@ async function inspectPoster({ manifestUrl, catalog, meta, index }) {
     status: 0,
     contentType: '',
     source: '',
+    variant: artworkVariantFromUrl(posterUrl),
     template: '',
     cacheControl: '',
     cors: '',
@@ -135,7 +151,8 @@ async function inspectPoster({ manifestUrl, catalog, meta, index }) {
     const buffer = Buffer.from(await response.arrayBuffer())
     if (response.status !== 200) row.failures.push(`poster_http_${response.status}`)
     if (!imageTypeAllowed(row.contentType)) row.failures.push(`bad_content_type_${row.contentType || 'missing'}`)
-    if (row.source && !ALLOWED_SOURCES.has(row.source)) row.failures.push(`legacy_or_unknown_source_${row.source}`)
+    const allowedSources = allowedSourcesForVariant(row.variant)
+    if (row.source && !allowedSources.has(row.source)) row.failures.push(`source_not_allowed_for_${row.variant || 'unknown'}_${row.source}`)
     if (!row.source) row.failures.push('missing_source_header')
     if (/generated-card|sports-card|legacy-default/i.test(row.source)) row.failures.push('legacy_source_header')
     if (BAD_TEXT_RE.test(buffer.slice(0, Math.min(buffer.length, 32768)).toString('utf8'))) row.failures.push('bad_text_in_image_payload')

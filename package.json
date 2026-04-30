@@ -24,6 +24,7 @@
     "smoke:sports-catalog-latency": "node scripts/smoke-sports-catalog-latency.js",
     "audit:sports-artwork": "node scripts/audit-sports-artwork.js",
     "audit:sports-posters": "node scripts/audit-sports-posters.js",
+    "prewarm:sports-posters": "node scripts/prewarm-sports-posters.js",
     "debug:sports-artwork": "node scripts/debug-sports-artwork-viewer.js --serve --open",
     "smoke:config": "node scripts/smoke-config-flow.js",
     "smoke:guards": "node scripts/smoke-runtime-guards.js",
