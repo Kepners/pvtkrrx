@@ -16,10 +16,9 @@ const OUT_DIR = path.join(process.cwd(), '.runtime', 'sports-artwork-debug')
 const ASSET_DIR = path.join(OUT_DIR, 'assets')
 const PORT = Math.max(1024, Number(process.env.PVTKRRX_ARTWORK_DEBUG_PORT || 7099) || 7099)
 const HOST = '127.0.0.1'
-const PROXY_VERSION = '20260429-sportcult-category-poster-v1'
+const PROXY_VERSION = '20260430-public-sportsmeta-v1'
 const DEBUG_CONFIG = {
-  sportsmetaBaseUrl: process.env.PVTKRRX_SPORTSMETA_BASE_URL || process.env.SPORTSMETA_BASE_URL || 'https://sportsmeta.pvtkrrx.cc',
-  sportsPosterMemberToken: process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN || process.env.SPORTSMETA_MEMBER_TOKEN || ''
+  sportsmetaBaseUrl: process.env.PVTKRRX_SPORTSMETA_BASE_URL || process.env.SPORTSMETA_BASE_URL || 'https://sportsmeta.pvtkrrx.cc'
 }
 
 const CASES = [
@@ -31,7 +30,7 @@ const CASES = [
     competition: 'Formula 1',
     seeders: 17,
     size: '8.9 GB',
-    note: 'Default route. If SportsMeta can resolve this and a member token is configured, the proxy uses member artwork. Otherwise it must show a Formula 1 circuit fallback, not a generic stripe card.'
+    note: 'Default route. If SportsMeta can resolve this publicly, the proxy uses public SportsMeta artwork. Otherwise it must show a Formula 1 circuit fallback, not a generic stripe card.'
   },
   {
     slug: 'motogp-brazil',
@@ -173,8 +172,8 @@ function renderCard(sample) {
     normalized: sample.normalized
   }
   const badgePath = sample.routeKind === 'canonical-id'
-    ? 'canonical -> SportsMeta /event -> member homeBadge/awayBadge/leagueLogo -> pvtkrrx-paid-template only when real raster badge bytes exist'
-    : 'default -> SportsMeta resolve attempt -> canonical member badges if resolved -> paid template no-logo render if not'
+    ? 'canonical -> SportsMeta /event -> public homeBadge/awayBadge/leagueLogo -> pvtkrrx-public-template only when real public raster badge bytes exist'
+    : 'default -> SportsMeta resolve attempt -> public canonical badges if resolved -> public glyph/template fallback if not'
 
   return `<article class="case" data-label="${escapeHtml(sample.label)}">
     <div class="case-head">
@@ -214,7 +213,7 @@ function renderCard(sample) {
         <p><strong>Raw:</strong> ${escapeHtml(sample.rawTitle)}</p>
         <p><strong>Badge path:</strong> ${escapeHtml(badgePath)}</p>
         ${sample.canonicalId ? `<p><strong>Canonical ID:</strong> ${escapeHtml(sample.canonicalId)}</p>` : ''}
-        <p><strong>Member token configured:</strong> ${DEBUG_CONFIG.sportsPosterMemberToken ? 'yes' : 'no'}</p>
+        <p><strong>PVTKRRX member routing:</strong> disabled; paid poster bytes are served only by the SportsMeta member addon.</p>
         <pre>${renderJson(parser)}</pre>
       </section>
     </div>
@@ -371,7 +370,7 @@ function renderHtml(samples = []) {
   <header>
     <div>
       <h1>PVTKRRX Sports Artwork Debug</h1>
-      <p>This shows the exact difference between direct canonical cards and default sports rows. Default rows now attempt a conservative SportsMeta canonical resolve first when a member token is configured; only unresolved rows use the sport-specific generated fallback.</p>
+      <p>This shows the exact difference between direct canonical cards and default sports rows. Default rows attempt a conservative public SportsMeta canonical resolve first; unresolved rows use the sport-specific generated fallback.</p>
     </div>
     <div class="toolbar">Proxy version ${escapeHtml(PROXY_VERSION)} | ${escapeHtml(new Date().toISOString())}</div>
   </header>

@@ -316,4 +316,34 @@ for (const className of REQUIRED_CLASSES) {
   assert.ok(seen.has(className), `classifier smoke covers ${className}`)
 }
 
+for (const testCase of [
+  {
+    slug: 'sportcult-euroleague-bracket-stripped',
+    rawTitle: '[EuroLeague Basketbal] Real Madrid vs Barcelona 1080p',
+    expectedCompetition: 'EuroLeague Basketball',
+    expectedHome: 'Real Madrid',
+    expectedAway: 'Barcelona'
+  },
+  {
+    slug: 'sportcult-elc-bracket-stripped',
+    rawTitle: '[ELC] West Brom vs Leeds 1080p',
+    expectedCompetition: 'EFL Championship',
+    expectedHome: 'West Brom',
+    expectedAway: 'Leeds'
+  },
+  {
+    slug: 'sportcult-ucl-round-noise-stripped',
+    rawTitle: '[Champions League] UCL 2025/26 Semi Final 1st Leg Atletico Madrid vs Arsenal 2160p 4K HDR',
+    expectedCompetition: 'UEFA Champions League',
+    expectedHome: 'Atletico Madrid',
+    expectedAway: 'Arsenal'
+  }
+]) {
+  const event = eventFor({ rawTitle: testCase.rawTitle })
+  assert.equal(event.competition, testCase.expectedCompetition, `${testCase.slug} competition`)
+  assert.equal(event.homeTeam, testCase.expectedHome, `${testCase.slug} home team`)
+  assert.equal(event.awayTeam, testCase.expectedAway, `${testCase.slug} away team`)
+  assert.equal(classifySportsPosterEvent(event), 'team_vs_team', `${testCase.slug} class`)
+}
+
 console.log(`Sports poster classifier smoke passed. classes=${[...seen].join(',')}`)

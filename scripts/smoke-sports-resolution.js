@@ -466,8 +466,8 @@ async function run() {
   )
   assert.equal(
     paidSportsMetaResponse.meta?.poster,
-    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}&template=ticket-stub&v=20260429-sportcult-category-poster-v1`,
-    'paid sports configs must emit PVTKRRX raster-proxy poster URLs for canonical sports art'
+    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260430-public-sportsmeta-v1`,
+    'PVTKRRX must not expose or forward SportsMeta member tokens in stream-addon artwork URLs'
   )
 
   const templateSportsMetaResponse = await handleMeta(
@@ -482,8 +482,8 @@ async function run() {
   )
   assert.equal(
     templateSportsMetaResponse.meta?.poster,
-    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}&template=glitch&v=20260429-sportcult-category-poster-v1`,
-    'paid sports configs must carry the selected Sports Posters template into artwork URLs'
+    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260430-public-sportsmeta-v1`,
+    'PVTKRRX must keep SportsMeta member template selection out of stream-addon artwork URLs'
   )
 
   const previousEnvMemberToken = process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN
@@ -496,10 +496,10 @@ async function run() {
     })
     assert.equal(
       envTokenPoster.poster,
-      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260429-sportcult-category-poster-v1`,
-      'PVTKRRX should keep runtime env member tokens server-side instead of exposing them in artwork URLs'
+      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260430-public-sportsmeta-v1`,
+      'PVTKRRX should ignore runtime env member tokens on stream-addon artwork URLs'
     )
-    assert.equal(envTokenPoster.selectedArtworkSource, 'sportsmeta-member-raster')
+    assert.equal(envTokenPoster.selectedArtworkSource, 'pvtkrrx-canonical-public-proxy')
   } finally {
     if (previousEnvMemberToken === undefined) delete process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN
     else process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN = previousEnvMemberToken

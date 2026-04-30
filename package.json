@@ -19,7 +19,6 @@
     "smoke:sports-poster-adapter": "node scripts/smoke-sports-poster-adapter.js",
     "smoke:sports-poster-render": "node scripts/smoke-sports-poster-render.js",
     "smoke:sportcult-category-map": "node scripts/smoke-sportcult-category-map.js",
-    "prewarm:sports-posters": "node scripts/prewarm-sports-posters.js",
     "smoke:sports-catalog-seeds": "node scripts/smoke-sports-catalog-seeds.js",
     "smoke:sports-latency": "node scripts/smoke-sports-catalog-latency.js",
     "smoke:sports-catalog-latency": "node scripts/smoke-sports-catalog-latency.js",

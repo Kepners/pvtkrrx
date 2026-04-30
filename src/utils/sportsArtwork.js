@@ -1,13 +1,12 @@
 const {
   buildSportsMetaAssetUrl,
   buildSportsMetaDefaultAssetUrl,
-  buildSportsMetaMemberAssetUrl,
   resolveSportSlug
 } = require('../clients/sportsmeta')
 const { resolveSportsPosterTemplate } = require('./sportsPosterTemplates')
 const { resolveSportBackdrop } = require('./sportBackdrops')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260429-sportcult-category-poster-v1'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260430-public-sportsmeta-v1'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
@@ -98,40 +97,13 @@ function resolveEventClass(input = {}) {
   )
 }
 
-function resolveSportsPosterMemberToken(input = {}) {
-  return normalizeSpace(
-    input?.sportsPosterMemberToken ||
-    input?.sportsmetaMemberToken ||
-    input?.memberToken ||
-    input?.config?.sportsPosterMemberToken ||
-    process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN ||
-    process.env.SPORTSMETA_MEMBER_TOKEN ||
-    ''
-  )
-}
-
 function resolveConfiguredSportsPosterTemplate(input = {}) {
-  return resolveSportsPosterTemplate(
-    input?.sportsPosterTemplate,
-    input?.posterTemplate,
-    input?.config?.sportsPosterTemplate,
-    process.env.PVTKRRX_SPORTS_POSTER_TEMPLATE
-  )
-}
-
-function resolveUrlScopedSportsPosterMemberToken(input = {}) {
-  return normalizeSpace(
-    input?.sportsPosterMemberToken ||
-    input?.sportsmetaMemberToken ||
-    input?.memberToken ||
-    input?.config?.sportsPosterMemberToken ||
-    ''
-  )
+  return resolveSportsPosterTemplate('ticket-stub')
 }
 
 // SportsMeta returns image/svg+xml for every asset URL — default and canonical
 // — and Stremio mobile/tablet clients do not render SVG posters. To keep the
-// tablet route rendering real artwork, emit a PVTKRRX-hosted raster proxy URL
+// tablet route rendering public glyph artwork, emit a PVTKRRX-hosted raster proxy URL
 // whenever the catalog/meta handler has a public addon baseUrl. The proxy
 // fetches the SportsMeta SVG and returns a PNG rasterized with sharp.
 function buildPvtkrrxRasterUrl(variant, input = {}) {
@@ -145,8 +117,6 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
   const awayTeam = resolveAwayTeam(input)
   if (canonicalId) {
     const url = new URL(`${addonBase}/sports-artwork/id/${encodeURIComponent(variant)}/${encodeURIComponent(canonicalId)}.png`)
-    const memberToken = resolveUrlScopedSportsPosterMemberToken(input)
-    if (memberToken) url.searchParams.set('token', memberToken)
     if (variant === 'background' || variant === 'landscape') {
       const sport = resolveSport(input)
       if (sport) url.searchParams.set('sport', sport)
@@ -198,17 +168,6 @@ function buildSportsMetaDirectUrl(variant, input = {}) {
   })
 }
 
-function buildSportsMetaMemberDirectUrl(variant, input = {}) {
-  const sportsmetaBaseUrl = resolveSportsMetaBaseUrl(input)
-  const canonicalId = resolveCanonicalId(input)
-  const memberToken = resolveSportsPosterMemberToken(input)
-  if (!canonicalId || !memberToken) return ''
-  return buildSportsMetaMemberAssetUrl(sportsmetaBaseUrl, memberToken, variant, canonicalId, {
-    template: resolveConfiguredSportsPosterTemplate(input),
-    logoMode: 'logos'
-  })
-}
-
 function buildVariantUrl(variant, input = {}) {
   // Prefer PVTKRRX-hosted raster when we have a public addon base URL — that
   // is the client-safe form for every route (catalog + meta responses go to
@@ -217,23 +176,16 @@ function buildVariantUrl(variant, input = {}) {
   // tooling that bypasses the HTTP handlers).
   const rasterUrl = buildPvtkrrxRasterUrl(variant, input)
   if (rasterUrl) return rasterUrl
-  const memberUrl = buildSportsMetaMemberDirectUrl(variant, input)
-  if (memberUrl) return memberUrl
   return buildSportsMetaDirectUrl(variant, input)
 }
 
 function resolveSportsPosterAsset(input = {}) {
-  const hasMemberUrl = Boolean(buildSportsMetaMemberDirectUrl('poster', input))
   const poster = buildVariantUrl('poster', input)
   return {
     poster,
     posterShape: 'poster',
-    posterMode: hasMemberUrl
-      ? 'sportsmeta-member'
-      : resolveCanonicalId(input) ? 'pvtkrrx-proxy-canonical' : 'pvtkrrx-proxy-default',
-    selectedArtworkSource: hasMemberUrl
-      ? 'sportsmeta-member-raster'
-      : resolveCanonicalId(input) ? 'pvtkrrx-canonical-proxy' : 'sportsmeta-default-proxy'
+    posterMode: resolveCanonicalId(input) ? 'pvtkrrx-proxy-canonical-public' : 'pvtkrrx-proxy-default-public',
+    selectedArtworkSource: resolveCanonicalId(input) ? 'pvtkrrx-canonical-public-proxy' : 'sportsmeta-default-public-proxy'
   }
 }
 

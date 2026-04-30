@@ -15,7 +15,6 @@ const { handleStream } = require('../handlers/stream')
 const { handleMeta } = require('../handlers/meta')
 const { ProwlarrClient } = require('../clients/prowlarr')
 const { QBitClient } = require('../clients/qbittorrent')
-const { normalizeSportsMetaMemberToken } = require('../clients/sportsmeta')
 const { normalizeSportsPosterTemplate } = require('../utils/sportsPosterTemplates')
 const { autoProvisionWindows, ensureWindowsLanAccess, discoverProwlarrConfig } = require('../utils/provision')
 const { getLanIpv4Addresses, normalizeLocalHostname, startLanAlias } = require('../utils/lanAlias')
@@ -967,8 +966,10 @@ function normalizeAddonConfig(config = {}, options = {}) {
     ...stripLegacySportsMetadataConfigFields(config),
     additionalStorageRoots: normalizeLocalStorageRoots(config.additionalStorageRoots)
   }
-  normalized.sportsPosterMemberToken = normalizeSportsMetaMemberToken(normalized.sportsPosterMemberToken)
-  normalized.sportsPosterTemplate = normalizeSportsPosterTemplate(normalized.sportsPosterTemplate)
+  // PVTKRRX is not the Sports Posters entitlement surface. Drop legacy token
+  // fields on normalization and keep the stream-addon artwork template public.
+  normalized.sportsPosterMemberToken = ''
+  normalized.sportsPosterTemplate = normalizeSportsPosterTemplate('ticket-stub')
   const explicitProfile = normalizeRouteProfile(normalized.routeProfile)
   const localProfile = explicitProfile === 'local'
   const callerControlsLanPairDefaults =
@@ -1214,7 +1215,7 @@ function buildConfigReadback(config = {}) {
     qbitUsername: Boolean(String(safe.qbitUsername || '').trim()),
     qbitPassword: Boolean(String(safe.qbitPassword || '').trim()),
     fileServerAuth: Boolean(String(safe.fileServerAuth || '').trim()),
-    sportsPosterMemberToken: Boolean(String(safe.sportsPosterMemberToken || '').trim()),
+    sportsPosterMemberToken: false,
     lanPairKey: Boolean(String(safe.lanPairKey || '').trim())
   }
 

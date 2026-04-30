@@ -5,13 +5,14 @@ const path = require('node:path')
 const sharp = require('sharp')
 
 const OUT_DIR = path.join(process.cwd(), '.runtime', 'sports-poster-audit')
-const EXPECTED_VERSION = '20260429-sportcult-category-poster-v1'
+const EXPECTED_VERSION = '20260430-public-sportsmeta-v1'
 const DEFAULT_MANIFEST = process.env.PVTKRRX_SPORTS_POSTER_AUDIT_MANIFEST ||
   'https://pvt.kepners.co.uk/selfhost/manifest.json?mode=hosted'
 const ALLOWED_SOURCES = new Set([
   'sportsmeta-raster',
   'pvtkrrx-team-badge-poster',
-  'pvtkrrx-paid-template',
+  'pvtkrrx-public-template',
+  'pvtkrrx-template-glyph',
   'pvtkrrx-emergency-legacy-fallback'
 ])
 const BAD_TEXT_RE = /\b(?:SPOR\/SPOR|BASK\/BASK|undefined|null|unknown|x264|x265|h264|h265|2160p|1080p|720p|WEB-DL|HDTV|REPACK|COMPLETE)\b/i

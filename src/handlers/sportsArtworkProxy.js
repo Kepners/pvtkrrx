@@ -1,10 +1,8 @@
 const sharp = require('sharp')
-const crypto = require('crypto')
 const fs = require('fs')
 const {
   buildSportsMetaAssetUrl,
   buildSportsMetaDefaultAssetUrl,
-  buildSportsMetaMemberAssetUrl,
   SportsMetaClient,
   getPublicSportsMetaBaseUrl,
   resolveSportSlug
@@ -39,7 +37,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260429-sportcult-category-poster-v1'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260430-public-sportsmeta-v1'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -72,15 +70,10 @@ function normalizeVariant(value) {
   return ALLOWED_VARIANTS.has(v) ? v : ''
 }
 
-function buildUpstreamUrl({ kind, variant, canonicalId, sport, league, title, date, homeTeam, awayTeam, sportsmetaBaseUrl, memberToken, template }) {
+function buildUpstreamUrl({ kind, variant, canonicalId, sport, league, title, date, homeTeam, awayTeam, sportsmetaBaseUrl, template }) {
   if (kind === 'id') {
     const centralOptions = {
-      template: normalizeSportsPosterTemplate(template),
-      logoMode: memberToken ? 'logos' : ''
-    }
-    if (memberToken) {
-      const memberUrl = buildSportsMetaMemberAssetUrl(sportsmetaBaseUrl || '', memberToken, variant, canonicalId, centralOptions)
-      if (memberUrl) return memberUrl
+      template: normalizeSportsPosterTemplate(template)
     }
     return buildSportsMetaAssetUrl(sportsmetaBaseUrl || '', variant, canonicalId, centralOptions)
   }
@@ -89,8 +82,7 @@ function buildUpstreamUrl({ kind, variant, canonicalId, sport, league, title, da
     date,
     homeTeam,
     awayTeam,
-    template: normalizeSportsPosterTemplate(template),
-    logoMode: memberToken ? 'logos' : ''
+    template: normalizeSportsPosterTemplate(template)
   })
 }
 
@@ -325,7 +317,7 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
       .toBuffer()
     return {
       buffer,
-      selectedArtworkSource: 'pvtkrrx-paid-template',
+      selectedArtworkSource: 'pvtkrrx-template-glyph',
       selectedTemplate: normalizedTemplate,
       eventClass
     }
@@ -645,12 +637,11 @@ async function loadCanonicalEvent(canonicalId = '', sportsmetaBaseUrl = '') {
   return pending
 }
 
-function buildCanonicalBadgeUrl({ sportsmetaBaseUrl = '', memberToken = '', canonicalId = '', variant = '', fallbackUrl = '' } = {}) {
-  if (memberToken) {
-    const memberUrl = buildSportsMetaMemberAssetUrl(sportsmetaBaseUrl, memberToken, variant, canonicalId)
-    if (memberUrl) return memberUrl
-  }
-  return normalizeSpace(fallbackUrl) || buildSportsMetaAssetUrl(sportsmetaBaseUrl, variant, canonicalId)
+function buildCanonicalBadgeUrl({ sportsmetaBaseUrl = '', canonicalId = '', variant = '', fallbackUrl = '' } = {}) {
+  const publicFallback = normalizeSpace(fallbackUrl)
+  return publicFallback && !/\/member\//i.test(publicFallback)
+    ? publicFallback
+    : buildSportsMetaAssetUrl(sportsmetaBaseUrl, variant, canonicalId)
 }
 
 async function fetchCompositionImage(url = '', size = 210, options = {}) {
@@ -691,28 +682,25 @@ async function resizeCompositionBuffer(buffer, size = 210) {
     .toBuffer()
 }
 
-async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl = '', memberToken = '', variant = 'poster', template = 'editorial' } = {}) {
+async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl = '', variant = 'poster', template = 'editorial' } = {}) {
   const canonical = await loadCanonicalEvent(canonicalId, sportsmetaBaseUrl)
   const event = canonical?.event || {}
   const hasMatchup = Boolean(event.homeTeam && event.awayTeam)
 
   const homeBadgeUrl = buildCanonicalBadgeUrl({
     sportsmetaBaseUrl,
-    memberToken,
     canonicalId,
     variant: 'homeBadge',
     fallbackUrl: canonical?.assets?.homeBadge
   })
   const awayBadgeUrl = buildCanonicalBadgeUrl({
     sportsmetaBaseUrl,
-    memberToken,
     canonicalId,
     variant: 'awayBadge',
     fallbackUrl: canonical?.assets?.awayBadge
   })
   const leagueLogoUrl = buildCanonicalBadgeUrl({
     sportsmetaBaseUrl,
-    memberToken,
     canonicalId,
     variant: 'leagueLogo',
     fallbackUrl: canonical?.assets?.leagueLogo || canonical?.assets?.logo
@@ -790,34 +778,31 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     .toBuffer()
   return {
     buffer,
-    selectedArtworkSource: 'pvtkrrx-paid-template',
+    selectedArtworkSource: 'pvtkrrx-public-template',
     selectedTemplate: normalizedTemplate,
     eventClass
   }
 }
 
-async function renderTeamBadgeArtworkPngLegacy({ canonicalId = '', sportsmetaBaseUrl = '', memberToken = '', variant = 'poster' } = {}) {
+async function renderTeamBadgeArtworkPngLegacy({ canonicalId = '', sportsmetaBaseUrl = '', variant = 'poster' } = {}) {
   const canonical = await loadCanonicalEvent(canonicalId, sportsmetaBaseUrl)
   const event = canonical?.event || {}
   if (!event.homeTeam || !event.awayTeam) return null
 
   const homeBadgeUrl = buildCanonicalBadgeUrl({
     sportsmetaBaseUrl,
-    memberToken,
     canonicalId,
     variant: 'homeBadge',
     fallbackUrl: canonical?.assets?.homeBadge
   })
   const awayBadgeUrl = buildCanonicalBadgeUrl({
     sportsmetaBaseUrl,
-    memberToken,
     canonicalId,
     variant: 'awayBadge',
     fallbackUrl: canonical?.assets?.awayBadge
   })
   const leagueLogoUrl = buildCanonicalBadgeUrl({
     sportsmetaBaseUrl,
-    memberToken,
     canonicalId,
     variant: 'leagueLogo',
     fallbackUrl: canonical?.assets?.leagueLogo || canonical?.assets?.logo
@@ -873,7 +858,6 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
     const teamPoster = await renderTeamBadgeArtworkPng({
       canonicalId: teamPosterContext.canonicalId,
       sportsmetaBaseUrl: teamPosterContext.sportsmetaBaseUrl,
-      memberToken: teamPosterContext.memberToken,
       variant,
       template
     })
@@ -881,7 +865,7 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
       return {
         buffer: teamPoster.buffer || teamPoster,
         contentType: 'image/png',
-        selectedArtworkSource: teamPoster.selectedArtworkSource || 'pvtkrrx-paid-template',
+        selectedArtworkSource: teamPoster.selectedArtworkSource || 'pvtkrrx-public-template',
         fallbackReason: `${reason}_with_team_badges`,
         selectedTemplate: teamPoster.selectedTemplate || template,
         renderFailure: teamPoster.renderFailure || '',
@@ -899,8 +883,8 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
   return {
     buffer: rendered.buffer,
     contentType: 'image/png',
-    selectedArtworkSource: rendered.selectedArtworkSource || 'pvtkrrx-paid-template',
-    fallbackReason: rendered.renderFailure ? `${reason}_paid_template_failed_${failureReason(rendered.renderFailure)}` : reason,
+    selectedArtworkSource: rendered.selectedArtworkSource || 'pvtkrrx-template-glyph',
+    fallbackReason: rendered.renderFailure ? `${reason}_public_template_failed_${failureReason(rendered.renderFailure)}` : reason,
     selectedTemplate: rendered.selectedTemplate || template,
     renderFailure: rendered.renderFailure || '',
     eventClass: rendered.eventClass || '',
@@ -1003,9 +987,9 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
       return {
         buffer: rendered.buffer,
         contentType: 'image/png',
-        selectedArtworkSource: rendered.selectedArtworkSource || 'pvtkrrx-paid-template',
+        selectedArtworkSource: rendered.selectedArtworkSource || 'pvtkrrx-template-glyph',
         fallbackReason: rendered.renderFailure
-          ? `upstream_${error?.status || 'error'}_paid_template_failed_${failureReason(rendered.renderFailure)}`
+          ? `upstream_${error?.status || 'error'}_public_template_failed_${failureReason(rendered.renderFailure)}`
           : `upstream_${error?.status || 'error'}`,
         selectedTemplate: rendered.selectedTemplate || template,
         renderFailure: rendered.renderFailure || '',
@@ -1047,34 +1031,14 @@ function resolveSportsmetaBaseUrlFromConfig(config = {}) {
   return String(config?.sportsmetaBaseUrl || '').trim()
 }
 
-function resolveSportsPosterMemberToken(config = {}, req = null) {
-  return String(
-    req?.query?.token ||
-    config?.sportsPosterMemberToken ||
-    process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN ||
-    process.env.SPORTSMETA_MEMBER_TOKEN ||
-    ''
-  ).trim()
-}
-
 function resolveSportsPosterTemplateFromConfig(config = {}, req = null) {
-  return resolveSportsPosterTemplate(
-    req?.query?.template,
-    config?.sportsPosterTemplate,
-    process.env.PVTKRRX_SPORTS_POSTER_TEMPLATE
-  )
+  return resolveSportsPosterTemplate('ticket-stub')
 }
 
 function redactUrl(value) {
   return String(value || '')
     .replace(/\/member\/([^/?#]+)\/asset\//i, '/member/[redacted]/asset/')
     .replace(/([?&](?:token|key|password|secret)=)[^&#]+/ig, '$1[redacted]')
-}
-
-function tokenFingerprint(value = '') {
-  const raw = String(value || '').trim()
-  if (!raw) return ''
-  return crypto.createHash('sha256').update(raw).digest('hex').slice(0, 16)
 }
 
 async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput, teamPosterContext, template = 'editorial' }) {
@@ -1131,8 +1095,8 @@ function buildDefaultArtworkCacheKey({ variant, template, sportSlug, league, tit
   ].join('|')
 }
 
-function buildCanonicalArtworkCacheKey({ variant, template, canonicalId, sportsmetaBaseUrl, memberToken }) {
-  return `${LOCAL_ARTWORK_RENDER_VERSION}|id|${variant}|${normalizeSportsPosterTemplate(template)}|${canonicalId}|${(sportsmetaBaseUrl || '').trim().toLowerCase()}|${tokenFingerprint(memberToken)}`
+function buildCanonicalArtworkCacheKey({ variant, template, canonicalId, sportsmetaBaseUrl }) {
+  return `${LOCAL_ARTWORK_RENDER_VERSION}|id|${variant}|${normalizeSportsPosterTemplate(template)}|${canonicalId}|${(sportsmetaBaseUrl || '').trim().toLowerCase()}`
 }
 
 async function resolveDefaultArtworkCanonical({
@@ -1187,7 +1151,6 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
   const source = String(req.query?.source || 'fallback').trim()
   const eventClass = String(req.query?.eventClass || req.query?.class || '').trim()
   const sportsmetaBaseUrl = resolveSportsmetaBaseUrlFromConfig(config)
-  const memberToken = resolveSportsPosterMemberToken(config, req)
   const template = resolveSportsPosterTemplateFromConfig(config, req)
   const upstreamUrl = buildUpstreamUrl({
     kind: 'default',
@@ -1242,7 +1205,6 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
       variant,
       canonicalId: canonical.canonicalId,
       sportsmetaBaseUrl,
-      memberToken,
       template
     })
     const canonicalFallbackInput = buildArtworkInputFromRequest({
@@ -1264,8 +1226,7 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
       variant,
       template,
       canonicalId: canonical.canonicalId,
-      sportsmetaBaseUrl,
-      memberToken
+      sportsmetaBaseUrl
     })
     await sendArtwork(res, {
       cacheKey: canonicalCacheKey,
@@ -1275,8 +1236,7 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
       template,
       teamPosterContext: {
         canonicalId: canonical.canonicalId,
-        sportsmetaBaseUrl,
-        memberToken
+        sportsmetaBaseUrl
       }
     })
     return
@@ -1294,14 +1254,12 @@ async function handleCanonicalSportsArtwork(req, res, config = {}) {
     return
   }
   const sportsmetaBaseUrl = resolveSportsmetaBaseUrlFromConfig(config)
-  const memberToken = resolveSportsPosterMemberToken(config, req)
   const template = resolveSportsPosterTemplateFromConfig(config, req)
   const upstreamUrl = buildUpstreamUrl({
     kind: 'id',
     variant,
     canonicalId,
     sportsmetaBaseUrl,
-    memberToken,
     template
   })
   const fallbackInput = buildArtworkInputFromRequest({
@@ -1319,7 +1277,7 @@ async function handleCanonicalSportsArtwork(req, res, config = {}) {
   const eventClass = String(req.query?.eventClass || req.query?.class || '').trim()
   if (req.query?.detail) fallbackInput.eventDetail = String(req.query.detail).trim()
   if (eventClass) fallbackInput.eventClass = eventClass
-  const cacheKey = buildCanonicalArtworkCacheKey({ variant, template, canonicalId, sportsmetaBaseUrl, memberToken })
+  const cacheKey = buildCanonicalArtworkCacheKey({ variant, template, canonicalId, sportsmetaBaseUrl })
   await sendArtwork(res, {
     cacheKey,
     upstreamUrl,
@@ -1328,8 +1286,7 @@ async function handleCanonicalSportsArtwork(req, res, config = {}) {
     template,
     teamPosterContext: {
       canonicalId,
-      sportsmetaBaseUrl,
-      memberToken
+      sportsmetaBaseUrl
     }
   })
 }
