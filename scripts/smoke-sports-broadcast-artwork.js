@@ -164,6 +164,21 @@ async function main() {
       assert.doesNotMatch(svg, pattern, `${testCase.slug} forbidden SVG pattern ${pattern}`)
     }
 
+    const titleSafeRightX = 560
+    const titleLeftX = 50
+    const titleSafeWidth = titleSafeRightX - titleLeftX
+    const titleMatches = [...svg.matchAll(/<text\s+data-role="broadcast-title"[^>]*font-size="(\d+)"[^>]*>([^<]+)<\/text>/g)]
+    assert.ok(titleMatches.length > 0, `${testCase.slug} must emit broadcast-title text`)
+    for (const match of titleMatches) {
+      const fontSize = Number(match[1])
+      const text = match[2]
+      const estWidth = text.length * fontSize * 0.58
+      assert.ok(
+        estWidth <= titleSafeWidth,
+        `${testCase.slug} title line "${text}" at ${fontSize}px ~${Math.round(estWidth)}px > ${titleSafeWidth}px safe width`
+      )
+    }
+
     const svgOutputPath = path.join(OUTPUT_DIR, `${testCase.slug}-broadcast.svg`)
     await fs.promises.writeFile(svgOutputPath, svg)
 

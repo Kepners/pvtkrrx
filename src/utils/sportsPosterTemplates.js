@@ -607,9 +607,10 @@ function broadcastPatternSvg(pattern = 'generic') {
 function wrapBroadcastTitle(value = '') {
   const words = cleanBroadcastText(value).split(/\s+/).filter(Boolean)
   if (!words.length) return ['Sports']
+  const total = words.join(' ').length
+  const maxChars = total > 36 ? 14 : total > 24 ? 16 : 18
   const lines = []
   let current = ''
-  const maxChars = words.join(' ').length > 42 ? 18 : 22
   for (const word of words) {
     const candidate = current ? `${current} ${word}` : word
     if (candidate.length <= maxChars || !current) {
@@ -630,21 +631,27 @@ function wrapBroadcastTitle(value = '') {
 
 function broadcastTitleLayout(lines = []) {
   const longest = lines.reduce((max, line) => Math.max(max, line.length), 0)
-  let fontSize = 54
-  if (longest > 24) fontSize = 50
-  if (longest > 30) fontSize = 46
-  if (longest > 38) fontSize = 42
-  if (longest > 48) fontSize = 38
-  if (lines.length >= 3) fontSize = Math.min(fontSize, 46)
+  const safeWidth = 800
+  let fontSize = longest > 0 ? Math.min(54, Math.max(28, Math.floor(safeWidth / longest))) : 54
+  if (lines.length >= 3) fontSize = Math.min(fontSize, 42)
   const gap = Math.round(fontSize * 1.08)
   const startY = lines.length >= 3 ? 382 : lines.length === 2 ? 398 : 424
   return { fontSize, gap, startY }
 }
 
+function broadcastMatchupFromEvent(event = {}, m = {}) {
+  const home = firstBroadcastText(event.homeTeam, event.home?.name, event.principalA, event.fighterA, event.playerA, event.teamA)
+  const away = firstBroadcastText(event.awayTeam, event.away?.name, event.principalB, event.fighterB, event.playerB, event.teamB)
+  if (!home || !away) return null
+  if (home.toLowerCase() === away.toLowerCase()) return null
+  const eventFormat = String(m?.event_format || '').toLowerCase()
+  if (eventFormat === 'solo') return null
+  return { home, away }
+}
+
 function broadcastTitleFromEvent(event = {}, m = {}) {
-  const home = firstBroadcastText(event.homeTeam, event.home?.name, m.home?.name)
-  const away = firstBroadcastText(event.awayTeam, event.away?.name, m.away?.name)
-  if (home && away && home.toLowerCase() !== away.toLowerCase()) return `${home} vs ${away}`
+  const matchup = broadcastMatchupFromEvent(event, m)
+  if (matchup) return `${matchup.home} vs ${matchup.away}`
   return firstBroadcastText(
     event.eventShort,
     event.event_short,
@@ -672,16 +679,26 @@ function compactBroadcastDetail(detail = '', league = '', label = '') {
   return cleanBroadcastText(clean) || cleanBroadcastText(detail)
 }
 
-function broadcastSubtitleFromEvent(event = {}, m = {}, label = '', title = '') {
+function broadcastMatchupKey(home = '', away = '') {
+  return broadcastTextKey(`${home} ${away}`)
+}
+
+function stripVersusToken(value = '') {
+  return String(value || '').replace(/\b(?:vs|v|versus|x)\b/gi, ' ')
+}
+
+function broadcastSubtitleFromEvent(event = {}, m = {}, label = '', title = '', matchup = null) {
   const league = firstBroadcastText(event.league, event.competition, m.leagueFull, m.league, label, event.sport, m.sport)
-  const detailCandidates = [
+  const realDetailCandidates = [
     event.date,
     event.localDate,
     event.eventDetail,
     event.detail,
     event.session,
     event.round,
-    m.date,
+    m.date
+  ]
+  const fallbackDetailCandidates = [
     m.session,
     m.round,
     event.eventShort,
@@ -690,14 +707,21 @@ function broadcastSubtitleFromEvent(event = {}, m = {}, label = '', title = '') 
     m.event_short,
     m.event
   ]
+  const detailCandidates = matchup
+    ? realDetailCandidates
+    : realDetailCandidates.concat(fallbackDetailCandidates)
   const titleKey = broadcastTextKey(title)
+  const matchupKey = matchup ? broadcastMatchupKey(matchup.home, matchup.away) : ''
   let detail = ''
   for (const candidate of detailCandidates) {
     const clean = compactBroadcastDetail(candidate, league, label)
     if (!clean) continue
-    if (broadcastTextKey(clean) === broadcastTextKey(league)) continue
+    const cleanKey = broadcastTextKey(clean)
+    const cleanKeyNoVersus = broadcastTextKey(stripVersusToken(clean))
+    if (cleanKey === broadcastTextKey(league)) continue
+    if (matchupKey && (cleanKey === matchupKey || cleanKeyNoVersus === matchupKey)) continue
     detail = clean
-    if (broadcastTextKey(clean) !== titleKey) break
+    if (cleanKey !== titleKey && cleanKeyNoVersus !== titleKey) break
   }
   const parts = [league, detail].map(cleanBroadcastText).filter(Boolean)
   const unique = []
@@ -807,18 +831,48 @@ function renderEditorial(event = {}, variant = 'poster', theme = {}, mode = '') 
   return wrapTemplateSvg(inner, slots, variant)
 }
 
+const BROADCAST_TITLE_FONT = "'Inter','Helvetica Neue','Arial',sans-serif"
+
+function broadcastSideFontSize(name = '') {
+  const length = String(name || '').length
+  if (length <= 10) return 56
+  if (length <= 14) return 48
+  if (length <= 18) return 42
+  return 36
+}
+
+function renderBroadcastMatchupTitle(matchup, e) {
+  const homeName = matchup.home.toUpperCase()
+  const awayName = matchup.away.toUpperCase()
+  const sharedSize = Math.min(broadcastSideFontSize(homeName), broadcastSideFontSize(awayName))
+  const versusSize = Math.max(28, Math.round(sharedSize * 0.6))
+  const homeY = 376
+  const versusY = homeY + Math.round(sharedSize * 0.92)
+  const awayY = versusY + Math.round(sharedSize * 1.04)
+  return `<text data-role="broadcast-title" class="broadcast-title" x="50" y="${homeY}" font-family="${BROADCAST_TITLE_FONT}" font-size="${sharedSize}" font-weight="800" fill="#ffffff" letter-spacing="-1">${e(homeName)}</text>
+    <text data-role="broadcast-versus" x="50" y="${versusY}" font-family="${BROADCAST_TITLE_FONT}" font-size="${versusSize}" font-weight="600" fill="rgba(255,255,255,0.7)" letter-spacing="6">VS</text>
+    <text data-role="broadcast-title" class="broadcast-title" x="50" y="${awayY}" font-family="${BROADCAST_TITLE_FONT}" font-size="${sharedSize}" font-weight="800" fill="#ffffff" letter-spacing="-1">${e(awayName)}</text>`
+}
+
+function renderBroadcastSoloTitle(title, e) {
+  const lines = wrapBroadcastTitle(title)
+  const layout = broadcastTitleLayout(lines)
+  return lines.map((line, index) => (
+    `<text data-role="broadcast-title" class="broadcast-title" x="50" y="${layout.startY + index * layout.gap}" font-family="${BROADCAST_TITLE_FONT}" font-size="${layout.fontSize}" font-weight="800" fill="#ffffff" letter-spacing="-1">${e(line.toUpperCase())}</text>`
+  )).join('\n    ')
+}
+
 function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') {
   const m = templateData(event, theme, mode)
   const e = escapeXml
   const label = broadcastLabelForRender(event, m)
   const palette = broadcastPaletteFor(event, m, label)
+  const matchup = broadcastMatchupFromEvent(event, m)
   const title = broadcastTitleFromEvent(event, m)
-  const titleLines = wrapBroadcastTitle(title)
-  const titleLayout = broadcastTitleLayout(titleLines)
-  const titleBlock = titleLines.map((line, index) => (
-    `<text data-role="broadcast-title" class="broadcast-title" x="50" y="${titleLayout.startY + index * titleLayout.gap}" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="${titleLayout.fontSize}" font-weight="800" fill="#ffffff" letter-spacing="0">${e(line)}</text>`
-  )).join('\n')
-  const subtitle = broadcastSubtitleFromEvent(event, m, label, title)
+  const titleBlock = matchup
+    ? renderBroadcastMatchupTitle(matchup, e)
+    : renderBroadcastSoloTitle(title, e)
+  const subtitle = broadcastSubtitleFromEvent(event, m, label, title, matchup)
   const subtitleFont = subtitle.length > 52 ? 14 : subtitle.length > 44 ? 16 : subtitle.length > 34 ? 18 : 20
   const pillWidth = Math.max(88, Math.min(250, Math.round(label.length * 10.6 + 28)))
   const pattern = broadcastPatternSvg(palette.pattern)
