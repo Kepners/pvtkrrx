@@ -1,6 +1,6 @@
 const { classifySportsPosterEvent, hasActualPair } = require('./sportsPosterClassifier')
 
-const FORBIDDEN_VALUE_RE = /^(?:undefined|null|unknown|n\/a|na|sport|sports)$/i
+const FORBIDDEN_VALUE_RE = /^(?:undefined|null|unknown|n\/a|na|sport|sports|tba|tbd)$/i
 const RELEASE_NOISE_RE = /(?:\b(?:2160p|1080p|1080i|720p|576p|540p|480p)(?:[a-z]{1,6})?(?:\d{2,3}fps)?|\b\d{2,3}fps\b|\b(?:x264|x265|h264|h265|hevc|avc|av1|web[-._\s]?dl|web[-._\s]?rip|web|hdtv|repack|proper|complete|aac|ddp?\d?(?:\.\d)?|multi|english)\b)/gi
 
 const LEAGUE_CODES = Object.freeze({
@@ -45,6 +45,17 @@ const LEAGUE_CODES = Object.freeze({
   wimbledon: 'WIM',
   atp: 'ATP',
   wta: 'WTA'
+})
+
+const TEAM_CODE_OVERRIDES = Object.freeze({
+  arsenal: 'ARS',
+  'manchester city': 'MCI',
+  'houston rockets': 'HOU',
+  'los angeles lakers': 'LAL',
+  'cleveland cavaliers': 'CLE',
+  'toronto raptors': 'TOR',
+  'philadelphia flyers': 'PHI',
+  'pittsburgh penguins': 'PIT'
 })
 
 const SPORT_LABELS = Object.freeze({
@@ -116,10 +127,22 @@ function cleanDisplayText(value = '', fallback = 'Event') {
   return titleCase(result)
 }
 
-function truncate(value = '', max = 46) {
-  const clean = cleanDisplayText(value, 'Event')
+function truncate(value = '', max = 46, fallback = 'Event') {
+  const clean = cleanDisplayText(value, fallback)
   if (clean.length <= max) return clean
   return `${clean.slice(0, Math.max(1, max - 3)).trimEnd()}...`
+}
+
+function cleanEssentialName(value = '', fallback = 'Event') {
+  return cleanDisplayText(value, fallback)
+    .replace(/\.{3,}|\u2026/g, '')
+    .trim()
+}
+
+function cleanOptionalDisplayText(value = '') {
+  return cleanDisplayText(value, '')
+    .replace(/\.{3,}|\u2026/g, '')
+    .trim()
 }
 
 function hashString(value = '') {
@@ -146,7 +169,17 @@ function readableAccent(primary = '#123c69') {
   return ((0.299 * r) + (0.587 * g) + (0.114 * b)) > 150 ? '#111827' : '#ffffff'
 }
 
+function teamCodeOverride(value = '') {
+  const key = cleanDisplayText(value, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+  return TEAM_CODE_OVERRIDES[key] || ''
+}
+
 function shortCode(value = '', fallback = 'EVT') {
+  const override = teamCodeOverride(value)
+  if (override) return override
   const clean = cleanDisplayText(value, fallback)
   const words = clean.replace(/[^a-z0-9 ]+/gi, ' ').split(/\s+/).filter(Boolean)
   const code = words.length >= 2
@@ -156,6 +189,8 @@ function shortCode(value = '', fallback = 'EVT') {
 }
 
 function initials(value = '', fallback = 'EV') {
+  const override = teamCodeOverride(value)
+  if (override) return override
   const clean = cleanDisplayText(value, fallback)
   const words = clean.replace(/[^a-z0-9 ]+/gi, ' ').split(/\s+/).filter(Boolean)
   if (words.length >= 2) return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase()
@@ -240,7 +275,7 @@ function sideName(input = {}, side = 'home', eventShort = 'Event', session = 'Se
 }
 
 function buildSide(name, role, theme = {}) {
-  const displayName = truncate(name, 34)
+  const displayName = cleanEssentialName(name, role === 'away' ? 'Away' : 'Home')
   const primary = pickFirst(role === 'away' ? theme.awayColor : theme.homeColor, role === 'away' ? theme.secondaryColor : theme.primaryColor) || colorForLabel(displayName)
   const secondary = pickFirst(role === 'away' ? theme.awaySecondary : theme.homeSecondary) || colorForLabel(`${displayName} secondary`, '#1C2C5B')
   return {
@@ -361,8 +396,8 @@ function buildPaidTemplateMatchup(normalizedEvent = {}, classification = '') {
     league_full: truncate(pickFirst(normalizedEvent.leagueFull, normalizedEvent.league_full, league), 46),
     round: truncate(pickFirst(normalizedEvent.round, normalizedEvent.roundShort, session), 42),
     venue: truncate(pickFirst(normalizedEvent.venue, league, sport), 42),
-    date: truncate(pickFirst(normalizedEvent.date, normalizedEvent.localDate, 'TBA'), 16),
-    time: truncate(pickFirst(normalizedEvent.time, normalizedEvent.timestamp, 'TBA'), 16),
+    date: cleanOptionalDisplayText(pickFirst(normalizedEvent.date, normalizedEvent.localDate)),
+    time: cleanOptionalDisplayText(pickFirst(normalizedEvent.time, normalizedEvent.timestamp)),
     home,
     away,
     sport_icon: sportIconFor(normalizedEvent),
