@@ -14,7 +14,7 @@ const {
 } = require('../utils/sportsCardArtwork')
 const {
   SPORTS_POSTER_TEMPLATES,
-  layoutFamilyForSportsPosterTemplate,
+  layoutFamilyForSportsPosterRender,
   normalizeSportsPosterTemplate,
   resolveSportsPosterTemplate,
   renderLogoGlyphSvg,
@@ -38,7 +38,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260430-public-sportsmeta-v1'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260430-team-vs-team-v1'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -186,7 +186,7 @@ function isBackdropVariant(variant) {
 async function readLocalSportBackdropFallback(variant, fallbackInput = {}, reason = 'sportsmeta_backdrop_missing', status = 0, contentType = '', template = '') {
   if (!isBackdropVariant(variant)) return null
   const normalizedTemplate = normalizeSportsPosterTemplate(template || fallbackInput.template || 'ticket-stub')
-  const layoutFamily = layoutFamilyForSportsPosterTemplate(normalizedTemplate)
+  const layoutFamily = layoutFamilyForSportsPosterRender(normalizedTemplate, fallbackInput)
   const backdrop = resolveSportBackdrop({
     sport: fallbackInput.sport,
     sportHint: fallbackInput.sport,
@@ -264,7 +264,7 @@ async function renderEmergencyTemplatePng(variant, fallbackInput = {}, template 
     buffer,
     selectedArtworkSource: 'pvtkrrx-emergency-legacy-fallback',
     selectedTemplate: normalizedTemplate,
-    layoutFamily: layoutFamilyForSportsPosterTemplate(normalizedTemplate),
+    layoutFamily: layoutFamilyForSportsPosterRender(normalizedTemplate, event),
     eventClass,
     renderFailure: error?.message || String(error || '')
   }
@@ -279,7 +279,7 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
       buffer: await rasterizeToPng(Buffer.from(svg), variant),
       selectedArtworkSource: 'pvtkrrx-emergency-legacy-fallback',
       selectedTemplate: normalizeSportsPosterTemplate(template),
-      layoutFamily: layoutFamilyForSportsPosterTemplate(template),
+      layoutFamily: layoutFamilyForSportsPosterRender(template, fallbackInput),
       eventClass: fallbackInput.eventClass || classifySportsEvent(fallbackInput)
     }
   }
@@ -327,7 +327,7 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
       buffer,
       selectedArtworkSource: 'pvtkrrx-template-glyph',
       selectedTemplate: normalizedTemplate,
-      layoutFamily: artwork.layoutFamily || layoutFamilyForSportsPosterTemplate(normalizedTemplate),
+      layoutFamily: artwork.layoutFamily || layoutFamilyForSportsPosterRender(normalizedTemplate, event),
       eventClass
     }
   } catch (error) {
@@ -789,7 +789,7 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     buffer,
     selectedArtworkSource: 'pvtkrrx-public-template',
     selectedTemplate: normalizedTemplate,
-    layoutFamily: artwork.layoutFamily || layoutFamilyForSportsPosterTemplate(normalizedTemplate),
+    layoutFamily: artwork.layoutFamily || layoutFamilyForSportsPosterRender(normalizedTemplate, event),
     eventClass
   }
 }
@@ -878,7 +878,7 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
         selectedArtworkSource: teamPoster.selectedArtworkSource || 'pvtkrrx-public-template',
         fallbackReason: `${reason}_with_team_badges`,
         selectedTemplate: teamPoster.selectedTemplate || template,
-        layoutFamily: teamPoster.layoutFamily || layoutFamilyForSportsPosterTemplate(teamPoster.selectedTemplate || template),
+        layoutFamily: teamPoster.layoutFamily || layoutFamilyForSportsPosterRender(teamPoster.selectedTemplate || template, fallbackInput),
         renderFailure: teamPoster.renderFailure || '',
         eventClass: teamPoster.eventClass || '',
         httpStatus: status,
@@ -897,7 +897,7 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
     selectedArtworkSource: rendered.selectedArtworkSource || 'pvtkrrx-template-glyph',
     fallbackReason: rendered.renderFailure ? `${reason}_public_template_failed_${failureReason(rendered.renderFailure)}` : reason,
     selectedTemplate: rendered.selectedTemplate || template,
-    layoutFamily: rendered.layoutFamily || layoutFamilyForSportsPosterTemplate(rendered.selectedTemplate || template),
+    layoutFamily: rendered.layoutFamily || layoutFamilyForSportsPosterRender(rendered.selectedTemplate || template, fallbackInput),
     renderFailure: rendered.renderFailure || '',
     eventClass: rendered.eventClass || '',
     httpStatus: status,
@@ -944,7 +944,7 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
           contentType,
           selectedArtworkSource: 'sportsmeta-raster',
           selectedTemplate: normalizeSportsPosterTemplate(template),
-          layoutFamily: layoutFamilyForSportsPosterTemplate(template),
+          layoutFamily: layoutFamilyForSportsPosterRender(template, fallbackInput),
           eventClass: fallbackEventClass,
           fallbackReason: '',
           httpStatus: status,
@@ -969,7 +969,7 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
           contentType: 'image/png',
           selectedArtworkSource: 'sportsmeta-raster',
           selectedTemplate: normalizeSportsPosterTemplate(template),
-          layoutFamily: layoutFamilyForSportsPosterTemplate(template),
+          layoutFamily: layoutFamilyForSportsPosterRender(template, fallbackInput),
           eventClass: fallbackEventClass,
           fallbackReason: 'sportsmeta_svg_rasterized',
           httpStatus: status,
@@ -982,7 +982,7 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
         contentType: 'image/png',
         selectedArtworkSource: 'sportsmeta-raster',
         selectedTemplate: normalizeSportsPosterTemplate(template),
-        layoutFamily: layoutFamilyForSportsPosterTemplate(template),
+        layoutFamily: layoutFamilyForSportsPosterRender(template, fallbackInput),
         eventClass: fallbackEventClass,
         fallbackReason: /^image\/svg\+xml/i.test(contentType) ? 'sportsmeta_svg_rasterized' : 'sportsmeta_non_raster_rasterized',
         httpStatus: status,
@@ -1008,7 +1008,7 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
           ? `upstream_${error?.status || 'error'}_public_template_failed_${failureReason(rendered.renderFailure)}`
           : `upstream_${error?.status || 'error'}`,
         selectedTemplate: rendered.selectedTemplate || template,
-        layoutFamily: rendered.layoutFamily || layoutFamilyForSportsPosterTemplate(rendered.selectedTemplate || template),
+        layoutFamily: rendered.layoutFamily || layoutFamilyForSportsPosterRender(rendered.selectedTemplate || template, fallbackInput),
         renderFailure: rendered.renderFailure || '',
         eventClass: rendered.eventClass || '',
         httpStatus: error?.status || 0,
@@ -1072,7 +1072,7 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
     const result = await loadRaster(cacheKey, upstreamUrl, variant, fallbackInput, teamPosterContext, normalizedTemplate)
     const { buffer, contentType } = result
     const selectedTemplate = normalizeSportsPosterTemplate(result.selectedTemplate || normalizedTemplate)
-    const layoutFamily = result.layoutFamily || layoutFamilyForSportsPosterTemplate(selectedTemplate)
+    const layoutFamily = result.layoutFamily || layoutFamilyForSportsPosterRender(selectedTemplate, fallbackInput)
     res.setHeader('Content-Type', contentType || 'image/png')
     res.setHeader('Content-Length', String(buffer.length))
     res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000, stale-if-error=2592000')

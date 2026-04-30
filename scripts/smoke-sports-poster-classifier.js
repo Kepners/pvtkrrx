@@ -55,6 +55,26 @@ const CASES = [
     }
   },
   {
+    slug: 'motogp-brazil-gear-up',
+    expected: 'motorsport_event',
+    input: {
+      rawTitle: 'MotoGP Brazil Gear Up',
+      sportHint: 'motorsport',
+      competition: 'MotoGP',
+      eventTitle: 'Brazil Gear Up'
+    }
+  },
+  {
+    slug: 'wrc-spain-islas-canarias-highlights',
+    expected: 'motorsport_event',
+    input: {
+      rawTitle: 'WRC Spain Islas Canarias Saturday Highlights',
+      sportHint: 'motorsport',
+      competition: 'WRC',
+      eventTitle: 'Spain Islas Canarias Saturday Highlights'
+    }
+  },
+  {
     slug: 'ufc-numbered-card',
     expected: 'combat_event',
     input: {

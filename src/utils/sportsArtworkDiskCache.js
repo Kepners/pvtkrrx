@@ -60,6 +60,7 @@ async function readSportsArtworkDiskCache(cacheKey = {}) {
       contentType: String(meta.contentType || 'image/png'),
       selectedArtworkSource: String(meta.selectedArtworkSource || 'unknown'),
       selectedTemplate: String(meta.selectedTemplate || ''),
+      layoutFamily: String(meta.layoutFamily || ''),
       eventClass: String(meta.eventClass || ''),
       renderFailure: String(meta.renderFailure || ''),
       fallbackReason: String(meta.fallbackReason || ''),
@@ -98,6 +99,7 @@ async function getPostgresPool() {
         content_type text NOT NULL,
         selected_artwork_source text NOT NULL,
         selected_template text NOT NULL DEFAULT '',
+        layout_family text NOT NULL DEFAULT '',
         event_class text NOT NULL DEFAULT '',
         render_failure text NOT NULL DEFAULT '',
         fallback_reason text NOT NULL DEFAULT '',
@@ -115,6 +117,7 @@ async function getPostgresPool() {
     await pool.query(`
       ALTER TABLE pvtkrrx_sports_artwork_cache
       ADD COLUMN IF NOT EXISTS selected_template text NOT NULL DEFAULT '',
+      ADD COLUMN IF NOT EXISTS layout_family text NOT NULL DEFAULT '',
       ADD COLUMN IF NOT EXISTS event_class text NOT NULL DEFAULT '',
       ADD COLUMN IF NOT EXISTS render_failure text NOT NULL DEFAULT ''
     `)
@@ -131,7 +134,7 @@ async function readSportsArtworkPostgresCache(cacheKey = '') {
     const pool = await getPostgresPool()
     if (!pool) return null
     const result = await pool.query(
-      `SELECT content_type, selected_artwork_source, selected_template, event_class, render_failure, fallback_reason, http_status, upstream_content_type, body
+      `SELECT content_type, selected_artwork_source, selected_template, layout_family, event_class, render_failure, fallback_reason, http_status, upstream_content_type, body
        FROM pvtkrrx_sports_artwork_cache
        WHERE cache_key = $1 AND expires_at > now()
        LIMIT 1`,
@@ -144,6 +147,7 @@ async function readSportsArtworkPostgresCache(cacheKey = '') {
       contentType: String(row.content_type || 'image/png'),
       selectedArtworkSource: String(row.selected_artwork_source || 'unknown'),
       selectedTemplate: String(row.selected_template || ''),
+      layoutFamily: String(row.layout_family || ''),
       eventClass: String(row.event_class || ''),
       renderFailure: String(row.render_failure || ''),
       fallbackReason: String(row.fallback_reason || ''),
@@ -165,12 +169,13 @@ async function writeSportsArtworkPostgresCache(cacheKey = '', value = {}, ttlMs 
     const expiresAt = new Date(Date.now() + Math.max(60000, Number(ttlMs || 0) || 6 * 60 * 60 * 1000))
     await pool.query(
       `INSERT INTO pvtkrrx_sports_artwork_cache
-        (cache_key, content_type, selected_artwork_source, selected_template, event_class, render_failure, fallback_reason, http_status, upstream_content_type, body, created_at, expires_at)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now(), $11)
+        (cache_key, content_type, selected_artwork_source, selected_template, layout_family, event_class, render_failure, fallback_reason, http_status, upstream_content_type, body, created_at, expires_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now(), $12)
        ON CONFLICT (cache_key) DO UPDATE SET
         content_type = EXCLUDED.content_type,
         selected_artwork_source = EXCLUDED.selected_artwork_source,
         selected_template = EXCLUDED.selected_template,
+        layout_family = EXCLUDED.layout_family,
         event_class = EXCLUDED.event_class,
         render_failure = EXCLUDED.render_failure,
         fallback_reason = EXCLUDED.fallback_reason,
@@ -184,6 +189,7 @@ async function writeSportsArtworkPostgresCache(cacheKey = '', value = {}, ttlMs 
         String(value.contentType || 'image/png'),
         String(value.selectedArtworkSource || 'unknown'),
         String(value.selectedTemplate || ''),
+        String(value.layoutFamily || ''),
         String(value.eventClass || ''),
         String(value.renderFailure || ''),
         String(value.fallbackReason || ''),
@@ -253,6 +259,7 @@ async function writeSportsArtworkDiskCache(cacheKey = '', value = {}, options = 
     contentType: String(value.contentType || 'image/png'),
     selectedArtworkSource: String(value.selectedArtworkSource || 'unknown'),
     selectedTemplate: String(value.selectedTemplate || ''),
+    layoutFamily: String(value.layoutFamily || ''),
     eventClass: String(value.eventClass || ''),
     renderFailure: String(value.renderFailure || ''),
     fallbackReason: String(value.fallbackReason || ''),

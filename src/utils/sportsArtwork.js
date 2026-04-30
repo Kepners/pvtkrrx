@@ -5,12 +5,12 @@ const {
 } = require('../clients/sportsmeta')
 const {
   isBroadcastLayoutFamily,
-  layoutFamilyForSportsPosterTemplate,
+  layoutFamilyForSportsPosterRender,
   resolveSportsPosterTemplate
 } = require('./sportsPosterTemplates')
 const { resolveSportBackdrop } = require('./sportBackdrops')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260430-public-sportsmeta-v1'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260430-team-vs-team-v1'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
@@ -110,7 +110,7 @@ function resolveConfiguredSportsPosterTemplate(input = {}) {
 }
 
 function resolveSportsArtworkLayoutFamily(input = {}) {
-  return layoutFamilyForSportsPosterTemplate(resolveConfiguredSportsPosterTemplate(input))
+  return layoutFamilyForSportsPosterRender(resolveConfiguredSportsPosterTemplate(input), input)
 }
 
 // SportsMeta returns image/svg+xml for every asset URL — default and canonical
@@ -193,7 +193,7 @@ function buildVariantUrl(variant, input = {}) {
 
 function resolveSportsPosterAsset(input = {}) {
   const selectedTemplate = resolveConfiguredSportsPosterTemplate(input)
-  const layoutFamily = layoutFamilyForSportsPosterTemplate(selectedTemplate)
+  const layoutFamily = layoutFamilyForSportsPosterRender(selectedTemplate, input)
   const poster = buildVariantUrl('poster', input)
   return {
     poster,

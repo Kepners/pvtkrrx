@@ -64,6 +64,17 @@ const LEAGUE_CODE_ALIASES = Object.freeze({
   wimbledon: 'ATP'
 })
 
+const TEAM_CODE_OVERRIDES = Object.freeze({
+  arsenal: 'ARS',
+  'manchester city': 'MCI',
+  'houston rockets': 'HOU',
+  'los angeles lakers': 'LAL',
+  'cleveland cavaliers': 'CLE',
+  'toronto raptors': 'TOR',
+  'philadelphia flyers': 'PHI',
+  'pittsburgh penguins': 'PIT'
+})
+
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
 }
@@ -123,6 +134,15 @@ function layoutFamilyForSportsPosterTemplate(value) {
   return SPORTS_POSTER_LAYOUT_FAMILIES[template] || 'TICKET_STUB'
 }
 
+function layoutFamilyForSportsPosterRender(value, event = {}) {
+  const template = normalizeSportsPosterTemplate(value)
+  if (template === 'broadcast') return 'BROADCAST'
+  const explicit = normalizeSpace(event.layoutFamily || event.sportsArtwork?.layoutFamily).toUpperCase()
+  if (explicit === 'TEAM_VS_TEAM') return 'TEAM_VS_TEAM'
+  const eventClass = normalizeSpace(event.eventClass || event.posterClass) || classifySportsPosterEvent(event)
+  return eventClass === 'team_vs_team' ? 'TEAM_VS_TEAM' : layoutFamilyForSportsPosterTemplate(template)
+}
+
 function isBroadcastLayoutFamily(value) {
   return String(value || '').trim().toUpperCase() === 'BROADCAST'
 }
@@ -173,12 +193,23 @@ function scaleSlot(slot, variant = 'poster') {
   }
 }
 
-function wrapTemplateSvg(inner, slots = [], variant = 'poster') {
+function svgDataAttrs(values = {}) {
+  return Object.entries(values)
+    .filter(([, value]) => value !== undefined && value !== null && normalizeSpace(value) !== '')
+    .map(([key, value]) => {
+      const attr = key.replace(/[A-Z]/g, (char) => `-${char.toLowerCase()}`)
+      return `data-${attr}="${escapeXml(value)}"`
+    })
+    .join(' ')
+}
+
+function wrapTemplateSvg(inner, slots = [], variant = 'poster', metadata = {}) {
   const layout = layoutScale(variant)
   const background = variant === 'poster' ? '' : `<rect width="${layout.width}" height="${layout.height}" fill="#05070d"/>`
+  const dataAttrs = svgDataAttrs(metadata)
   return {
     svg: `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}" height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}" role="img">
+<svg xmlns="http://www.w3.org/2000/svg" width="${layout.width}" height="${layout.height}" viewBox="0 0 ${layout.width} ${layout.height}" role="img"${dataAttrs ? ` ${dataAttrs}` : ''}>
   ${background}
   <svg x="${layout.offsetX}" y="${layout.offsetY}" width="${Math.round(SOURCE_W * layout.scale)}" height="${Math.round(SOURCE_H * layout.scale)}" viewBox="0 0 ${SOURCE_W} ${SOURCE_H}" preserveAspectRatio="${layout.preserveAspectRatio}">
 ${inner}
@@ -215,7 +246,25 @@ function splitLines(value = '', maxChars = 20, maxLines = 2) {
   return lines
 }
 
+function estimatedTextWidth(value = '', fontSize = 16) {
+  return normalizeSpace(value).length * fontSize * 0.58
+}
+
+function fitTextAttributes(value = '', maxWidth = 120, baseSize = 16, minSize = 10) {
+  const clean = normalizeSpace(value)
+  const rawSize = clean ? Math.floor((maxWidth / Math.max(clean.length * 0.58, 1))) : baseSize
+  const fontSize = Math.max(minSize, Math.min(baseSize, rawSize))
+  const attrs = [`font-size="${fontSize}"`]
+  if (estimatedTextWidth(clean, fontSize) > maxWidth) {
+    attrs.push(`textLength="${Math.round(maxWidth)}"`)
+    attrs.push('lengthAdjust="spacingAndGlyphs"')
+  }
+  return attrs.join(' ')
+}
+
 function initialsFor(value = '', fallback = 'SP') {
+  const override = teamInitialsFor(value, '')
+  if (override) return override
   const clean = normalizeSpace(value).replace(/[^A-Za-z0-9 ]+/g, ' ')
   const words = clean.split(/\s+/).filter(Boolean)
   if (words.length >= 2) return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase()
@@ -223,7 +272,14 @@ function initialsFor(value = '', fallback = 'SP') {
   return fallback
 }
 
+function teamInitialsFor(value = '', fallback = 'SP') {
+  const key = normalizeSpace(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  return TEAM_CODE_OVERRIDES[key] || fallback
+}
+
 function shortFor(value = '', fallback = 'SP') {
+  const override = teamInitialsFor(value, '')
+  if (override) return override
   const clean = normalizeSpace(value).replace(/[^A-Za-z0-9 ]+/g, ' ')
   const words = clean.split(/\s+/).filter(Boolean)
   if (words.length >= 2) return words.map((word) => word[0]).join('').slice(0, 4).toUpperCase()
@@ -1101,11 +1157,33 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
   const m = templateData(event, theme, mode)
   const e = escapeXml
   const perfRow = (y) => Array.from({ length: 25 }, (_, i) => 8 + i * 16).filter((x) => x < SOURCE_W).map((x) => `<circle cx="${x}" cy="${y}" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/>`).join('')
+  const homeVisual = { x: 108, y: 205, size: 88 }
+  const awayVisual = { x: 292, y: 355, size: 88 }
+  const homeInitialSize = m.home.initials.length > 2 ? 25 : 30
+  const awayInitialSize = m.away.initials.length > 2 ? 25 : 30
+  const homeNameAttrs = fitTextAttributes(m.home.name, 156, 18, 10)
+  const awayNameAttrs = fitTextAttributes(m.away.name, 156, 18, 10)
+  const leagueLabel = normalizeSpace(m.league_code || m.league || m.sport).toUpperCase()
+  const leagueLabelAttrs = fitTextAttributes(leagueLabel, 82, 18, 10)
+  const sportLabelAttrs = fitTextAttributes(m.sport.toUpperCase(), 112, 6, 5)
+  const vsBox = { x: SOURCE_W / 2 - 35, y: SOURCE_H / 2 - 35, size: 70 }
+  const layoutRole = m.isTeamMatchup ? 'team-vs-team-layout' : 'head-to-head-layout'
+  const homeVisualRole = m.isTeamMatchup ? 'home-team-visual' : 'left-competitor-visual'
+  const awayVisualRole = m.isTeamMatchup ? 'away-team-visual' : 'right-competitor-visual'
+  const initialsRole = m.isTeamMatchup ? 'fallback-team-initials' : 'fallback-competitor-initials'
+  const homeNameRole = m.isTeamMatchup ? 'home-team-name' : 'left-competitor-name'
+  const awayNameRole = m.isTeamMatchup ? 'away-team-name' : 'right-competitor-name'
+  const homeVisualIdentity = m.isTeamMatchup
+    ? `data-team-side="home" data-team-name="${e(m.home.name)}"`
+    : `data-competitor-side="left" data-competitor-name="${e(m.home.name)}"`
+  const awayVisualIdentity = m.isTeamMatchup
+    ? `data-team-side="away" data-team-name="${e(m.away.name)}"`
+    : `data-competitor-side="right" data-competitor-name="${e(m.away.name)}"`
   const slots = m.hasMatchup
     ? [
         { role: 'league', left: 140, top: 30, size: 44 },
-        { role: 'home', left: 42, top: 162, size: 76 },
-        { role: 'away', left: 282, top: 162, size: 76 }
+        { role: 'home', left: homeVisual.x - homeVisual.size / 2, top: homeVisual.y - homeVisual.size / 2, size: homeVisual.size },
+        { role: 'away', left: awayVisual.x - awayVisual.size / 2, top: awayVisual.y - awayVisual.size / 2, size: awayVisual.size }
       ]
     : [
         { role: 'league', left: 140, top: 30, size: 44 },
@@ -1113,15 +1191,29 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
       ]
   const stubY = SOURCE_H - 100
   const feature = m.hasMatchup
-    ? `<g transform="translate(80 200)"><circle cx="0" cy="0" r="38" fill="${m.home.primary}" stroke="${m.home.accent}" stroke-width="2"/><rect x="-30" y="46" width="60" height="20" fill="${m.home.primary}"/><text class="bebas" x="0" y="60" text-anchor="middle" font-size="12" fill="${m.home.accent}" letter-spacing="2">${e(m.leftLabel)}</text></g>
-  <text class="serif" x="${SOURCE_W / 2}" y="206" text-anchor="middle" font-style="italic" font-size="38" fill="#5a3a1f">x</text>
-  <g transform="translate(${SOURCE_W - 80} 200)"><circle cx="0" cy="0" r="38" fill="${m.away.primary}" stroke="${m.away.accent}" stroke-width="2"/><rect x="-30" y="46" width="60" height="20" fill="${m.away.primary}"/><text class="bebas" x="0" y="60" text-anchor="middle" font-size="12" fill="${m.away.accent}" letter-spacing="2">${e(m.rightLabel)}</text></g>
-  <line x1="20" y1="305" x2="160" y2="305" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
-  <line x1="${SOURCE_W - 160}" y1="305" x2="${SOURCE_W - 20}" y2="305" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
-  <text class="bebas" x="${SOURCE_W / 2}" y="310" text-anchor="middle" font-size="13" fill="#5a3a1f" letter-spacing="3">FEATURE</text>
-  <text class="bebas" x="${SOURCE_W / 2}" y="346" text-anchor="middle" font-size="24" fill="#1a1410" letter-spacing="1">${e(m.home.name)}</text>
-  <text class="serif" x="${SOURCE_W / 2}" y="368" text-anchor="middle" font-style="italic" font-size="14" fill="#9b6f2f">versus</text>
-  <text class="bebas" x="${SOURCE_W / 2}" y="394" text-anchor="middle" font-size="24" fill="#1a1410" letter-spacing="1">${e(m.away.name)}</text>`
+    ? `<g data-role="${layoutRole}"${m.isTeamMatchup ? ' data-layout-family="TEAM_VS_TEAM" data-event-class="team_vs_team"' : ''} data-league-label="${e(leagueLabel)}">
+    <g data-role="${homeVisualRole}" ${homeVisualIdentity} data-box-x="${homeVisual.x - homeVisual.size / 2}" data-box-y="${homeVisual.y - homeVisual.size / 2}" data-box-width="${homeVisual.size}" data-box-height="${homeVisual.size}" transform="translate(${homeVisual.x} ${homeVisual.y})">
+      <circle cx="0" cy="0" r="${homeVisual.size / 2}" fill="${m.home.primary}" stroke="${m.home.accent}" stroke-width="2.4"/>
+      <circle cx="0" cy="0" r="${homeVisual.size / 2 - 7}" fill="rgba(230,222,201,0.12)" stroke="rgba(255,255,255,0.34)" stroke-width="1"/>
+      <text data-role="${initialsRole}" ${m.isTeamMatchup ? 'data-team-side="home"' : 'data-competitor-side="left"'} class="bebas" x="0" y="${Math.round(homeInitialSize * 0.34)}" text-anchor="middle" font-size="${homeInitialSize}" fill="${m.home.accent}" letter-spacing="0">${e(m.home.initials)}</text>
+    </g>
+    <g data-role="versus" data-box-x="${vsBox.x}" data-box-y="${vsBox.y}" data-box-width="${vsBox.size}" data-box-height="${vsBox.size}" transform="translate(${SOURCE_W / 2} ${SOURCE_H / 2})">
+      <circle cx="0" cy="0" r="35" fill="#1a1410" stroke="#9b6f2f" stroke-width="2.6"/>
+      <circle cx="0" cy="0" r="27" fill="none" stroke="rgba(230,222,201,0.45)" stroke-width="1"/>
+      <text data-role="matchup-vs" class="bebas" x="0" y="13" text-anchor="middle" font-size="34" fill="#fff5d0" letter-spacing="0">VS</text>
+    </g>
+    <g data-role="${awayVisualRole}" ${awayVisualIdentity} data-box-x="${awayVisual.x - awayVisual.size / 2}" data-box-y="${awayVisual.y - awayVisual.size / 2}" data-box-width="${awayVisual.size}" data-box-height="${awayVisual.size}" transform="translate(${awayVisual.x} ${awayVisual.y})">
+      <circle cx="0" cy="0" r="${awayVisual.size / 2}" fill="${m.away.primary}" stroke="${m.away.accent}" stroke-width="2.4"/>
+      <circle cx="0" cy="0" r="${awayVisual.size / 2 - 7}" fill="rgba(230,222,201,0.12)" stroke="rgba(255,255,255,0.34)" stroke-width="1"/>
+      <text data-role="${initialsRole}" ${m.isTeamMatchup ? 'data-team-side="away"' : 'data-competitor-side="right"'} class="bebas" x="0" y="${Math.round(awayInitialSize * 0.34)}" text-anchor="middle" font-size="${awayInitialSize}" fill="${m.away.accent}" letter-spacing="0">${e(m.away.initials)}</text>
+    </g>
+    <line x1="24" y1="270" x2="156" y2="270" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
+    <line x1="${SOURCE_W - 156}" y1="430" x2="${SOURCE_W - 24}" y2="430" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
+    <text class="mono" x="28" y="286" font-size="8" fill="#5a3a1f" letter-spacing="1.6">${e(m.leftLabel)}</text>
+    <text data-role="${homeNameRole}"${m.isTeamMatchup ? ` data-team-side="home" data-team-name="${e(m.home.name)}"` : ''} class="bebas" x="28" y="308" ${homeNameAttrs} fill="#1a1410" letter-spacing="0">${e(m.home.name)}</text>
+    <text class="mono" x="${SOURCE_W - 28}" y="446" text-anchor="end" font-size="8" fill="#5a3a1f" letter-spacing="1.6">${e(m.rightLabel)}</text>
+    <text data-role="${awayNameRole}"${m.isTeamMatchup ? ` data-team-side="away" data-team-name="${e(m.away.name)}"` : ''} class="bebas" x="${SOURCE_W - 28}" y="468" text-anchor="end" ${awayNameAttrs} fill="#1a1410" letter-spacing="0">${e(m.away.name)}</text>
+  </g>`
     : `<g transform="translate(${SOURCE_W / 2} 204)"><circle cx="0" cy="0" r="52" fill="${m.home.primary}" stroke="${m.home.accent}" stroke-width="2"/>${sportGlyph(m.sport_icon, 0, 0, 76, m.home.accent, 0.95)}</g>
   <line x1="20" y1="305" x2="160" y2="305" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
   <line x1="${SOURCE_W - 160}" y1="305" x2="${SOURCE_W - 20}" y2="305" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
@@ -1141,7 +1233,7 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
   <rect x="0" y="0" width="${SOURCE_W}" height="100" fill="url(#mastheadOverlay)" style="mix-blend-mode:multiply"/>
   <line x1="${SOURCE_W / 2}" y1="12" x2="${SOURCE_W / 2}" y2="88" stroke="rgba(0,0,0,0.45)" stroke-width="2"/>
   <text class="bebas" x="${SOURCE_W / 2}" y="22" text-anchor="middle" font-size="9" fill="rgba(255,235,180,0.9)" letter-spacing="3">OFFICIAL - ADMITTANCE</text>
-  <g transform="translate(${SOURCE_W / 2 - 60} 30)"><text class="bebas" x="28" y="11" font-size="11" fill="#fff5d0" letter-spacing="2">${e(m.league.toUpperCase())}</text><text class="mono" x="28" y="22" font-size="6" fill="#fff5d0" opacity="0.8" letter-spacing="2">${e(m.sport.toUpperCase())}</text></g>
+  <g data-role="league-label-block" data-league-label="${e(leagueLabel)}" transform="translate(22 30)"><text data-role="league-label" data-league-label="${e(leagueLabel)}" class="bebas" x="0" y="16" ${leagueLabelAttrs} fill="#fff5d0" letter-spacing="0">${e(leagueLabel)}</text><text data-role="sport-label" class="mono" x="0" y="28" ${sportLabelAttrs} fill="#fff5d0" opacity="0.8" letter-spacing="0">${e(m.sport.toUpperCase())}</text></g>
   <text class="bebas" x="${SOURCE_W / 2}" y="78" text-anchor="middle" font-size="10" fill="rgba(255,245,220,0.85)" letter-spacing="2.5">- ${e(m.round.toUpperCase())} -</text>
   <line x1="0" y1="100" x2="${SOURCE_W}" y2="100" stroke="rgba(60,40,15,0.45)" stroke-dasharray="3 3"/>
   ${perfRow(108)}
@@ -1160,7 +1252,14 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
   <text class="mono" x="${SOURCE_W / 2}" y="${stubY + 62}" text-anchor="middle" font-size="9" fill="#5a3a1f" letter-spacing="1">#${e(m.home.short)}-${e(m.away.short)}-${e((m.date || '').replace(/-/g, '').slice(2))}</text>
   <g transform="translate(${SOURCE_W - 58} ${stubY + 44}) rotate(-7)"><rect x="-32" y="-20" width="64" height="40" fill="none" stroke="#8c1f0f" stroke-width="2.5"/><text class="bebas" x="0" y="-2" text-anchor="middle" font-size="14" fill="#8c1f0f" letter-spacing="2">ADMIT</text><text class="bebas" x="0" y="14" text-anchor="middle" font-size="14" fill="#8c1f0f" letter-spacing="2">ONE</text></g>
   <rect width="${SOURCE_W}" height="${SOURCE_H}" fill="url(#edgeWear)" pointer-events="none"/>`
-  return wrapTemplateSvg(inner, slots, variant)
+  return wrapTemplateSvg(inner, slots, variant, m.isTeamMatchup
+    ? {
+        layoutFamily: 'TEAM_VS_TEAM',
+        leagueLabel,
+        homeTeam: m.home.name,
+        awayTeam: m.away.name
+      }
+    : {})
 }
 
 function glitchText(text, x, y, size, skew = -3, anchor = 'middle') {
@@ -1241,7 +1340,7 @@ function renderSportsPosterTemplateSvg({ event = {}, variant = 'poster', templat
   return {
     ...artwork,
     template: normalizedTemplate,
-    layoutFamily: layoutFamilyForSportsPosterTemplate(normalizedTemplate)
+    layoutFamily: layoutFamilyForSportsPosterRender(normalizedTemplate, event)
   }
 }
 
@@ -1255,6 +1354,24 @@ function renderLogoGlyphSvg({ role = 'league', event = {}, theme = {}, size = 25
   const icon = sportIconFor(event, facts)
   const primary = role === 'away' ? (theme.awayColor || '#123c69') : (theme.homeColor || '#0f766e')
   const secondary = role === 'league' ? (theme.accentColor || '#b58b2a') : (theme.accentColor || '#f5d76e')
+  if (role === 'home' || role === 'away') {
+    const eventClass = normalizeSpace(event.eventClass || event.posterClass) || classifySportsPosterEvent(event)
+    const isTeam = eventClass === 'team_vs_team'
+    const name = role === 'away' ? facts.away : facts.home
+    const label = role === 'away'
+      ? (facts.awayInitials || initialsFor(name, 'AW'))
+      : (facts.homeInitials || initialsFor(name, 'HM'))
+    const fontSize = label.length > 2 ? Math.round(size * 0.26) : Math.round(size * 0.32)
+    const accent = readableAccent(primary)
+    const roleAttr = isTeam
+      ? `data-role="fallback-team-initials" data-team-side="${escapeXml(role)}" data-team-name="${escapeXml(name)}"`
+      : `data-role="fallback-competitor-initials" data-competitor-side="${role === 'away' ? 'right' : 'left'}" data-competitor-name="${escapeXml(name)}"`
+    return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
+  <defs><radialGradient id="g" cx="35%" cy="30%" r="78%"><stop offset="0" stop-color="${secondary}"/><stop offset="1" stop-color="${primary}"/></radialGradient></defs>
+  <circle cx="${size / 2}" cy="${size / 2}" r="${size * 0.43}" fill="url(#g)" stroke="rgba(255,255,255,0.78)" stroke-width="${Math.max(3, Math.round(size * 0.03))}"/>
+  <text ${roleAttr} x="${size / 2}" y="${Math.round(size * 0.5 + fontSize * 0.35)}" text-anchor="middle" font-family="'Bebas Neue', Impact, Arial, sans-serif" font-size="${fontSize}" font-weight="800" fill="${accent}" letter-spacing="0">${escapeXml(label)}</text>
+</svg>`
+  }
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
   <defs><radialGradient id="g" cx="35%" cy="30%" r="78%"><stop offset="0" stop-color="${secondary}"/><stop offset="1" stop-color="${primary}"/></radialGradient></defs>
   <rect width="${size}" height="${size}" rx="${Math.round(size * 0.18)}" fill="rgba(2,6,23,0)"/>
@@ -1269,6 +1386,7 @@ module.exports = {
   TEMPLATE_LABELS,
   isBroadcastLayoutFamily,
   layoutFamilyForSportsPosterTemplate,
+  layoutFamilyForSportsPosterRender,
   normalizeSportsPosterTemplate,
   resolveSportsPosterTemplate,
   renderLogoGlyphSvg,
