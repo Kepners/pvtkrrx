@@ -12,7 +12,9 @@ function classifySportsEvent(input = {}) {
 
 function selectTemplateForSportsClass(eventClass = '', requestedTemplate = 'ticket-stub') {
   const normalized = normalizeSportsPosterTemplate(requestedTemplate || 'ticket-stub')
-  return eventClass === 'team_vs_team' ? normalized : 'glitch'
+  if (normalized === 'glitch') return 'glitch'
+  if (eventClass === 'team_vs_team') return normalized
+  return normalized === 'ticket-stub' ? 'broadcast' : normalized
 }
 
 module.exports = {

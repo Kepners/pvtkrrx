@@ -1304,7 +1304,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     const catalogPosterUrl = posterUrl
     const catalogPosterShape = posterShape || 'poster'
     console.log(
-      `[sports-artwork-select] id="${sportsMetaResolution?.canonicalId || 'fallback'}" selectedArtworkSource=${posterResolved.selectedArtworkSource || ''} posterUrl="${redactArtworkUrl(posterUrl)}" backdropUrl="${redactArtworkUrl(landscapeUrl || backgroundUrl)}" fallbackReason="${sportsMetaResolution?.reason || ''}"`
+      `[sports-artwork-select] id="${sportsMetaResolution?.canonicalId || 'fallback'}" selectedArtworkSource=${posterResolved.selectedArtworkSource || ''} layoutFamily=${posterResolved.layoutFamily || ''} posterUrl="${redactArtworkUrl(posterUrl)}" backdropUrl="${redactArtworkUrl(landscapeUrl || backgroundUrl)}" fallbackReason="${sportsMetaResolution?.reason || ''}"`
     )
     const availabilityAnchorKey = setSportsAvailabilityAnchor(availability.trackerSource || availability)
     const canonicalCatalogId = String(sportsMetaResolution?.canonicalId || '').trim()
@@ -1354,7 +1354,16 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       background: landscapeUrl || backgroundUrl || undefined,
       logo: logoUrl || undefined,
       releaseInfo: eventDate || undefined,
-      posterShape: catalogPosterShape
+      posterShape: catalogPosterShape,
+      ...(posterResolved.layoutFamily ? { layoutFamily: posterResolved.layoutFamily } : {}),
+      ...(posterResolved.layoutFamily ? {
+        sportsArtwork: {
+          layoutFamily: posterResolved.layoutFamily,
+          posterTemplate: posterResolved.selectedTemplate || config?.sportsPosterTemplate || '',
+          eventClass: artworkInput.eventClass || '',
+          resolutionStatus: String(sportsMetaResolution?.status || SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY)
+        }
+      } : {})
     }
   })
 

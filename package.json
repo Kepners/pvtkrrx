@@ -14,6 +14,7 @@
     "smoke:sports-resolution": "node scripts/smoke-sports-resolution.js",
     "smoke:sports": "node scripts/smoke-sports-resolution.js && node scripts/smoke-sport-backdrops.js",
     "smoke:sport-backdrops": "node scripts/smoke-sport-backdrops.js",
+    "smoke:sports-broadcast": "node scripts/smoke-sports-broadcast-artwork.js",
     "smoke:sports-artwork": "node scripts/smoke-sports-artwork-layout.js",
     "smoke:sports-poster-classifier": "node scripts/smoke-sports-poster-classifier.js",
     "smoke:sports-poster-adapter": "node scripts/smoke-sports-poster-adapter.js",

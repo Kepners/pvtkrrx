@@ -14,6 +14,7 @@ const {
 } = require('../utils/sportsCardArtwork')
 const {
   SPORTS_POSTER_TEMPLATES,
+  layoutFamilyForSportsPosterTemplate,
   normalizeSportsPosterTemplate,
   resolveSportsPosterTemplate,
   renderLogoGlyphSvg,
@@ -182,8 +183,10 @@ function isBackdropVariant(variant) {
   return variant === 'background' || variant === 'landscape'
 }
 
-async function readLocalSportBackdropFallback(variant, fallbackInput = {}, reason = 'sportsmeta_backdrop_missing', status = 0, contentType = '') {
+async function readLocalSportBackdropFallback(variant, fallbackInput = {}, reason = 'sportsmeta_backdrop_missing', status = 0, contentType = '', template = '') {
   if (!isBackdropVariant(variant)) return null
+  const normalizedTemplate = normalizeSportsPosterTemplate(template || fallbackInput.template || 'ticket-stub')
+  const layoutFamily = layoutFamilyForSportsPosterTemplate(normalizedTemplate)
   const backdrop = resolveSportBackdrop({
     sport: fallbackInput.sport,
     sportHint: fallbackInput.sport,
@@ -191,7 +194,8 @@ async function readLocalSportBackdropFallback(variant, fallbackInput = {}, reaso
     title: fallbackInput.eventTitle || fallbackInput.title,
     rawTitle: fallbackInput.rawTitle,
     category: fallbackInput.category,
-    source: fallbackInput.source
+    source: fallbackInput.source,
+    layoutFamily
   })
   if (!backdrop.path) return null
   try {
@@ -200,10 +204,12 @@ async function readLocalSportBackdropFallback(variant, fallbackInput = {}, reaso
       buffer,
       contentType: 'image/jpeg',
       selectedArtworkSource: 'pvtkrrx-sport-4k-backdrop',
-      selectedTemplate: 'sport-4k',
+      selectedTemplate: normalizedTemplate,
+      layoutFamily,
       eventClass: fallbackInput.eventClass || classifySportsEvent(fallbackInput),
       fallbackReason: reason,
       sportBackdropBucket: backdrop.bucket || resolveSportBackdropBucket(fallbackInput),
+      sportBackdropFallbackReason: backdrop.fallbackReason || '',
       httpStatus: status,
       upstreamContentType: contentType
     }
@@ -258,6 +264,7 @@ async function renderEmergencyTemplatePng(variant, fallbackInput = {}, template 
     buffer,
     selectedArtworkSource: 'pvtkrrx-emergency-legacy-fallback',
     selectedTemplate: normalizedTemplate,
+    layoutFamily: layoutFamilyForSportsPosterTemplate(normalizedTemplate),
     eventClass,
     renderFailure: error?.message || String(error || '')
   }
@@ -272,6 +279,7 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
       buffer: await rasterizeToPng(Buffer.from(svg), variant),
       selectedArtworkSource: 'pvtkrrx-emergency-legacy-fallback',
       selectedTemplate: normalizeSportsPosterTemplate(template),
+      layoutFamily: layoutFamilyForSportsPosterTemplate(template),
       eventClass: fallbackInput.eventClass || classifySportsEvent(fallbackInput)
     }
   }
@@ -319,6 +327,7 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
       buffer,
       selectedArtworkSource: 'pvtkrrx-template-glyph',
       selectedTemplate: normalizedTemplate,
+      layoutFamily: artwork.layoutFamily || layoutFamilyForSportsPosterTemplate(normalizedTemplate),
       eventClass
     }
   } catch (error) {
@@ -780,6 +789,7 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     buffer,
     selectedArtworkSource: 'pvtkrrx-public-template',
     selectedTemplate: normalizedTemplate,
+    layoutFamily: artwork.layoutFamily || layoutFamilyForSportsPosterTemplate(normalizedTemplate),
     eventClass
   }
 }
@@ -868,6 +878,7 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
         selectedArtworkSource: teamPoster.selectedArtworkSource || 'pvtkrrx-public-template',
         fallbackReason: `${reason}_with_team_badges`,
         selectedTemplate: teamPoster.selectedTemplate || template,
+        layoutFamily: teamPoster.layoutFamily || layoutFamilyForSportsPosterTemplate(teamPoster.selectedTemplate || template),
         renderFailure: teamPoster.renderFailure || '',
         eventClass: teamPoster.eventClass || '',
         httpStatus: status,
@@ -876,7 +887,7 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
     }
   }
 
-  const localBackdrop = await readLocalSportBackdropFallback(variant, fallbackInput, reason, status, contentType)
+  const localBackdrop = await readLocalSportBackdropFallback(variant, fallbackInput, reason, status, contentType, template)
   if (localBackdrop) return localBackdrop
 
   const rendered = await renderTemplateFallbackArtwork(variant, fallbackInput, template)
@@ -886,6 +897,7 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
     selectedArtworkSource: rendered.selectedArtworkSource || 'pvtkrrx-template-glyph',
     fallbackReason: rendered.renderFailure ? `${reason}_public_template_failed_${failureReason(rendered.renderFailure)}` : reason,
     selectedTemplate: rendered.selectedTemplate || template,
+    layoutFamily: rendered.layoutFamily || layoutFamilyForSportsPosterTemplate(rendered.selectedTemplate || template),
     renderFailure: rendered.renderFailure || '',
     eventClass: rendered.eventClass || '',
     httpStatus: status,
@@ -932,6 +944,7 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
           contentType,
           selectedArtworkSource: 'sportsmeta-raster',
           selectedTemplate: normalizeSportsPosterTemplate(template),
+          layoutFamily: layoutFamilyForSportsPosterTemplate(template),
           eventClass: fallbackEventClass,
           fallbackReason: '',
           httpStatus: status,
@@ -956,6 +969,7 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
           contentType: 'image/png',
           selectedArtworkSource: 'sportsmeta-raster',
           selectedTemplate: normalizeSportsPosterTemplate(template),
+          layoutFamily: layoutFamilyForSportsPosterTemplate(template),
           eventClass: fallbackEventClass,
           fallbackReason: 'sportsmeta_svg_rasterized',
           httpStatus: status,
@@ -968,6 +982,7 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
         contentType: 'image/png',
         selectedArtworkSource: 'sportsmeta-raster',
         selectedTemplate: normalizeSportsPosterTemplate(template),
+        layoutFamily: layoutFamilyForSportsPosterTemplate(template),
         eventClass: fallbackEventClass,
         fallbackReason: /^image\/svg\+xml/i.test(contentType) ? 'sportsmeta_svg_rasterized' : 'sportsmeta_non_raster_rasterized',
         httpStatus: status,
@@ -980,7 +995,8 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
         fallbackInput,
         `upstream_${error?.status || 'error'}_sport_4k_backdrop`,
         error?.status || 0,
-        ''
+        '',
+        template
       )
       if (localBackdrop) return localBackdrop
       const rendered = await renderTemplateFallbackArtwork(variant, fallbackInput, template)
@@ -992,6 +1008,7 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
           ? `upstream_${error?.status || 'error'}_public_template_failed_${failureReason(rendered.renderFailure)}`
           : `upstream_${error?.status || 'error'}`,
         selectedTemplate: rendered.selectedTemplate || template,
+        layoutFamily: rendered.layoutFamily || layoutFamilyForSportsPosterTemplate(rendered.selectedTemplate || template),
         renderFailure: rendered.renderFailure || '',
         eventClass: rendered.eventClass || '',
         httpStatus: error?.status || 0,
@@ -1055,6 +1072,7 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
     const result = await loadRaster(cacheKey, upstreamUrl, variant, fallbackInput, teamPosterContext, normalizedTemplate)
     const { buffer, contentType } = result
     const selectedTemplate = normalizeSportsPosterTemplate(result.selectedTemplate || normalizedTemplate)
+    const layoutFamily = result.layoutFamily || layoutFamilyForSportsPosterTemplate(selectedTemplate)
     res.setHeader('Content-Type', contentType || 'image/png')
     res.setHeader('Content-Length', String(buffer.length))
     res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000, stale-if-error=2592000')
@@ -1062,12 +1080,14 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
     res.setHeader('X-PVTKRRX-Artwork-Source', result.selectedArtworkSource || 'unknown')
     res.setHeader('X-PVTKRRX-Artwork-Cache', result.cacheLayer || 'rendered')
     res.setHeader('X-PVTKRRX-Artwork-Template', selectedTemplate)
+    res.setHeader('X-PVTKRRX-Artwork-Layout-Family', layoutFamily)
     if (result.sportBackdropBucket) res.setHeader('X-PVTKRRX-Sport-Backdrop', result.sportBackdropBucket)
+    if (result.sportBackdropFallbackReason) res.setHeader('X-PVTKRRX-Sport-Backdrop-Fallback', result.sportBackdropFallbackReason)
     if (result.eventClass) res.setHeader('X-PVTKRRX-Sports-Event-Class', result.eventClass)
     if (result.renderFailure) res.setHeader('X-PVTKRRX-Artwork-Render-Failure', result.renderFailure)
     if (result.fallbackReason) res.setHeader('X-PVTKRRX-Artwork-Fallback', result.fallbackReason)
     console.log(
-      `[sports-artwork] selectedArtworkSource=${result.selectedArtworkSource || 'unknown'} variant=${variant} template=${selectedTemplate} eventClass=${result.eventClass || ''} cache=${result.cacheLayer || 'rendered'} artworkUrl=${redactUrl(upstreamUrl)} fallbackReason=${result.fallbackReason || ''} renderFailure="${result.renderFailure || ''}" httpStatus=${result.httpStatus || ''} contentType=${result.upstreamContentType || contentType || ''}`
+      `[sports-artwork] selectedArtworkSource=${result.selectedArtworkSource || 'unknown'} variant=${variant} template=${selectedTemplate} layoutFamily=${layoutFamily} eventClass=${result.eventClass || ''} cache=${result.cacheLayer || 'rendered'} artworkUrl=${redactUrl(upstreamUrl)} backdropFallbackReason="${result.sportBackdropFallbackReason || ''}" fallbackReason=${result.fallbackReason || ''} renderFailure="${result.renderFailure || ''}" httpStatus=${result.httpStatus || ''} contentType=${result.upstreamContentType || contentType || ''}`
     )
     res.status(200).end(buffer)
   } catch (err) {

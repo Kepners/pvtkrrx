@@ -185,7 +185,9 @@ function sportIconFor(input = {}) {
     input.title,
     input.rawTitle
   ].filter(Boolean).join(' ')).toLowerCase()
-  if (/formula|f1|motogp|moto\s*gp|motor|wrc|rally|grand prix|nascar|indycar|wec|formula e/.test(text)) return 'f1'
+  if (/\b(?:formula\s*1|formula\s*one|formula1|f1)\b/.test(text)) return 'f1'
+  if (/\b(?:motogp|moto\s*gp)\b/.test(text)) return 'motogp'
+  if (/\b(?:motor|wrc|rally|grand prix|nascar|indycar|wec|formula e|supercars|v8sc)\b/.test(text)) return 'motorsport'
   if (/golf|pga|lpga|masters|ryder cup|liv golf|open championship/.test(text)) return 'golf'
   if (/darts|pdc|world matchplay|premier league darts/.test(text)) return 'darts'
   if (/cycling|tour de france|giro|vuelta|stage|time trial|road race|paris roubaix|tour of flanders/.test(text)) return 'cycling'

@@ -72,9 +72,10 @@ const SESSION_WORDS = new Set([
   'fp3'
 ])
 
-const MATCHUP_PREFIX_NOISE_RE = /\b(?:english\s+premier\s+league|major\s+league\s+soccer|premier\s+league|champions\s+league|europa\s+league|conference\s+league|uefa\s+nations\s+league|fifa\s+world\s+cup|world\s+cup\s+qualifiers?|euro\s+qualifiers?|european\s+championship|copa\s+america|afcon|asian\s+cup|conmebol\s+qualifiers?|concacaf\s+qualifiers?|international\s+friendlies?|fa\s+cup|la\s+liga|serie\s+a|bundesliga|college\s+football|world\s+series|stanley\s+cup|super\s+league\s+rugby|super\s+league|six\s+nations|premiership\s+rugby|rugby\s+championship|rugby\s+league|test\s+cricket|indian\s+premier\s+league|the\s+ashes|world\s+championship|world\s+matchplay|fight\s+night|main\s+card|main\s+event|regular\s+season|formula\s+1|formula\s+e|pga\s+tour|tour\s+de\s+france|giro\s+d['’]?italia|vuelta\s+a\s+espana|australian\s+open|roland\s+garros|us\s+open|nhl|mlb|nba|nfl|mls|epl|ipl|odi|t20|atp|wta|pdc|ufc|pfl|wwe|aew|pga|lpga|motogp|nascar|indycar|wrc|wec|bkfc|football|baseball|hockey|basketball|cricket|rugby|tennis|boxing|mma|wrestling|darts|golf|motorsport|playoffs?|postseason|finals?|prelims?|heavyweight|matchroom|queensberry|masters|wimbledon|classics|rs)\b/gi
+const MATCHUP_PREFIX_NOISE_RE = /\b(?:english\s+premier\s+league|major\s+league\s+soccer|premier\s+league|champions\s+league|europa\s+league|conference\s+league|uefa\s+nations\s+league|fifa\s+world\s+cup|world\s+cup\s+qualifiers?|euro\s+qualifiers?|european\s+championship|copa\s+america|afcon|asian\s+cup|conmebol\s+qualifiers?|concacaf\s+qualifiers?|international\s+friendlies?|fa\s+cup|la\s+liga|serie\s+a|bundesliga|college\s+football|world\s+series|stanley\s+cup|super\s+league\s+rugby|super\s+league|six\s+nations|premiership\s+rugby|rugby\s+championship|rugby\s+league|test\s+cricket|indian\s+premier\s+league|the\s+ashes|world\s+championship|world\s+matchplay|fight\s+night|main\s+card|main\s+event|regular\s+season|formula\s+1|formula\s+e|pga\s+tour|tour\s+de\s+france|giro\s+d['’]?italia|vuelta\s+a\s+espana|australian\s+open|roland\s+garros|us\s+open|nhl|mlb|nba|nfl|mls|epl|ipl|odi|t20|atp|wta|pdc|ufc|pfl|wwe|aew|pga|lpga|motogp|nascar|indycar|wrc|wec|bkfc|wc|football|baseball|hockey|basketball|cricket|rugby|tennis|boxing|mma|wrestling|darts|golf|motorsport|playoffs?|postseason|finals?|prelims?|heavyweight|matchroom|queensberry|masters|wimbledon|classics|rs)\b/gi
 
 const RELEASE_GROUP_NOISE_RE = /\b(?:m4rtyr|thecig|mwr|billie|mgp|ntb|ctrlhd|deflate|organic|tgx|nf|int)\b.*$/i
+const NBA_TEAM_PATTERN = /\b(?:houston\s+rockets|los\s+angeles\s+lakers|lakers|rockets|boston\s+celtics|golden\s+state\s+warriors|chicago\s+bulls|new\s+york\s+knicks|miami\s+heat|dallas\s+mavericks|denver\s+nuggets|phoenix\s+suns|milwaukee\s+bucks|philadelphia\s+76ers)\b/i
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
@@ -116,6 +117,8 @@ function normalizeCompetition(value, sportKey = '', rawTitle = '') {
   if (!competition) {
     if (sport === 'baseball') competition = 'MLB'
     else if (sport === 'hockey') competition = 'NHL'
+    else if (sport === 'basketball' && NBA_TEAM_PATTERN.test(raw)) competition = 'NBA'
+    else if (sport === 'snooker' && /\b(?:wc|world\s+championship)\b/i.test(raw)) competition = 'World Championship'
   }
 
   if (/^nhl$/i.test(competition) && /\bplayoffs?\b/i.test(raw)) {
@@ -231,6 +234,14 @@ function normalizeMotorsportEvent({ league = '', eventName = '', rawTitle = '' }
     tokens.slice(0, leagueTokens.length).join(' ').toLowerCase() === leagueTokens.join(' ')
   ) {
     tokens = tokens.slice(leagueTokens.length)
+  }
+  const leagueSuffixTokens = leagueTokens.length > 1 ? leagueTokens.slice(1) : []
+  if (
+    leagueSuffixTokens.length > 0 &&
+    tokens.length >= leagueSuffixTokens.length &&
+    tokens.slice(0, leagueSuffixTokens.length).join(' ').toLowerCase() === leagueSuffixTokens.join(' ')
+  ) {
+    tokens = tokens.slice(leagueSuffixTokens.length)
   }
   if (tokens.length === 0) {
     return { competition: leagueLabel, eventTitle: '', eventDetail: '' }

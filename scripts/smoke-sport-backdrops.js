@@ -61,6 +61,9 @@ async function main() {
     { name: 'La Liga', expected: 'football', input: { league: 'La Liga', title: 'Real Madrid vs Barcelona' } },
     { name: 'UFC', expected: 'ufc', input: { sport: 'mma', league: 'UFC', title: 'UFC Fight Night' } },
     { name: 'F1', expected: 'formula1', input: { sport: 'motorsport', league: 'F1', title: 'Formula 1 Grand Prix' } },
+    { name: 'MotoGP', expected: 'motogp', input: { sport: 'motorsport', league: 'MotoGP', title: 'MotoGP Brazil Gear Up', layoutFamily: 'BROADCAST' } },
+    { name: 'WRC neutral motorsport', expected: 'generic-sport', input: { sport: 'motorsport', league: 'WRC Spain', title: 'Islas Canarias Saturday Highlights', layoutFamily: 'BROADCAST' }, fallbackReason: 'neutral_motorsport_broadcast_backdrop_no_specific_asset' },
+    { name: 'generic motorsport neutral', expected: 'generic-sport', input: { sport: 'motorsport', league: 'Motorsport', title: 'Rally Highlights', layoutFamily: 'BROADCAST' }, fallbackReason: 'neutral_motorsport_broadcast_backdrop_no_specific_asset' },
     { name: 'PGA/Golf', expected: 'golf', input: { sport: 'golf', league: 'PGA Tour', title: 'PGA Tour Highlights' } },
     { name: 'unknown', expected: 'generic-sport', input: { title: 'Unknown Sports Release' } }
   ]
@@ -73,6 +76,9 @@ async function main() {
       resolved.url.endsWith(`/sports-backdrops/${testCase.expected}-4k.jpg?v=20260429-sport-level-4k-v1`),
       `${testCase.name} URL should use ${testCase.expected}-4k`
     )
+    if (testCase.fallbackReason) {
+      assert.equal(resolved.fallbackReason, testCase.fallbackReason, `${testCase.name} fallback reason`)
+    }
   }
 
   console.log(JSON.stringify({ ok: true, assets, cases }, null, 2))

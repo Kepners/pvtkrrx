@@ -3,7 +3,11 @@ const {
   buildSportsMetaDefaultAssetUrl,
   resolveSportSlug
 } = require('../clients/sportsmeta')
-const { resolveSportsPosterTemplate } = require('./sportsPosterTemplates')
+const {
+  isBroadcastLayoutFamily,
+  layoutFamilyForSportsPosterTemplate,
+  resolveSportsPosterTemplate
+} = require('./sportsPosterTemplates')
 const { resolveSportBackdrop } = require('./sportBackdrops')
 
 const SPORTS_ARTWORK_PROXY_VERSION = '20260430-public-sportsmeta-v1'
@@ -105,6 +109,10 @@ function resolveConfiguredSportsPosterTemplate(input = {}) {
   )
 }
 
+function resolveSportsArtworkLayoutFamily(input = {}) {
+  return layoutFamilyForSportsPosterTemplate(resolveConfiguredSportsPosterTemplate(input))
+}
+
 // SportsMeta returns image/svg+xml for every asset URL — default and canonical
 // — and Stremio mobile/tablet clients do not render SVG posters. To keep the
 // tablet route rendering public glyph artwork, emit a PVTKRRX-hosted raster proxy URL
@@ -184,35 +192,60 @@ function buildVariantUrl(variant, input = {}) {
 }
 
 function resolveSportsPosterAsset(input = {}) {
+  const selectedTemplate = resolveConfiguredSportsPosterTemplate(input)
+  const layoutFamily = layoutFamilyForSportsPosterTemplate(selectedTemplate)
   const poster = buildVariantUrl('poster', input)
   return {
     poster,
     posterShape: 'poster',
     posterMode: resolveCanonicalId(input) ? 'pvtkrrx-proxy-canonical-public' : 'pvtkrrx-proxy-default-public',
-    selectedArtworkSource: resolveCanonicalId(input) ? 'pvtkrrx-canonical-public-proxy' : 'sportsmeta-default-public-proxy'
+    selectedArtworkSource: resolveCanonicalId(input) ? 'pvtkrrx-canonical-public-proxy' : 'sportsmeta-default-public-proxy',
+    selectedTemplate,
+    layoutFamily
   }
 }
 
-function resolveSportsBackgroundAsset(input = {}) {
-  if (resolveCanonicalId(input)) return buildVariantUrl('background', input)
+function resolveSportsBroadcastBackdrop(input = {}) {
+  const layoutFamily = input.layoutFamily || resolveSportsArtworkLayoutFamily(input)
+  if (!isBroadcastLayoutFamily(layoutFamily)) return null
+  const backdrop = resolveSportBackdrop({
+    ...input,
+    layoutFamily,
+    sport: resolveSport(input),
+    league: resolveLeague(input),
+    title: resolveTitle(input),
+    baseUrl: resolveAddonBaseUrl(input)
+  })
+  if (backdrop?.url) {
+    console.log(
+      `[sports-backdrop-select] layoutFamily=${layoutFamily} bucket=${backdrop.bucket || ''} requested=${backdrop.requestedBucket || ''} fallbackReason="${backdrop.fallbackReason || ''}" backdropUrl="${backdrop.url}"`
+    )
+  }
+  return backdrop
+}
+
+function resolveSportsBackdropForDefault(input = {}) {
   return resolveSportBackdrop({
     ...input,
     sport: resolveSport(input),
     league: resolveLeague(input),
     title: resolveTitle(input),
     baseUrl: resolveAddonBaseUrl(input)
-  }).url || buildVariantUrl('background', input)
+  })
+}
+
+function resolveSportsBackgroundAsset(input = {}) {
+  const broadcastBackdrop = resolveSportsBroadcastBackdrop(input)
+  if (broadcastBackdrop?.url) return broadcastBackdrop.url
+  if (resolveCanonicalId(input)) return buildVariantUrl('background', input)
+  return resolveSportsBackdropForDefault(input).url || buildVariantUrl('background', input)
 }
 
 function resolveSportsLandscapeAsset(input = {}) {
+  const broadcastBackdrop = resolveSportsBroadcastBackdrop(input)
+  if (broadcastBackdrop?.url) return broadcastBackdrop.url
   if (resolveCanonicalId(input)) return buildVariantUrl('landscape', input)
-  return resolveSportBackdrop({
-    ...input,
-    sport: resolveSport(input),
-    league: resolveLeague(input),
-    title: resolveTitle(input),
-    baseUrl: resolveAddonBaseUrl(input)
-  }).url || buildVariantUrl('landscape', input)
+  return resolveSportsBackdropForDefault(input).url || buildVariantUrl('landscape', input)
 }
 
 function resolveSportsLogoAsset(input = {}) {
@@ -224,5 +257,7 @@ module.exports = {
   resolveSportsBackgroundAsset,
   resolveSportsLandscapeAsset,
   resolveSportsLogoAsset,
-  resolveSportBackdrop
+  resolveSportBackdrop,
+  resolveSportsArtworkLayoutFamily,
+  resolveSportsBroadcastBackdrop
 }
