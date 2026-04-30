@@ -259,8 +259,13 @@ function initialsFor(value = '', fallback = 'SP') {
   const clean = normalizeSpace(value).replace(/[^A-Za-z0-9 ]+/g, ' ')
   const words = clean.split(/\s+/).filter(Boolean)
   const lettered = letterStartingWords(words)
-  if (lettered.length >= 2) {
-    return `${lettered[0][0]}${lettered[lettered.length - 1][0]}`.toUpperCase()
+  // 3+ letter-starting words: take first letter of each (e.g. Boston Red Sox -> BRS,
+  // New York Yankees -> NYY, Tampa Bay Lightning -> TBL), capped at 3 chars.
+  if (lettered.length >= 3) {
+    return lettered.map((word) => word[0]).join('').slice(0, 3).toUpperCase()
+  }
+  if (lettered.length === 2) {
+    return `${lettered[0][0]}${lettered[1][0]}`.toUpperCase()
   }
   const single = lettered[0] || words[0]
   if (single) return single.slice(0, 3).toUpperCase()

@@ -68,11 +68,16 @@ const FIXTURES = [
     expectedHome: 'San Francisco 49ers',
     expectedAway: 'Kansas City Chiefs',
     expectedLabel: /^(?:NFL|FOOTBALL)$/,
-    expectedSerial: /#SF-KC[A-Z]?-/
+    expectedSerial: /#SF-KC[A-Z]?-/,
+    // SF has 2 letter-starting words ("San", "Francisco") -> first+last initial = "SF".
+    // KC has 3 letter-starting words ("Kansas", "City", "Chiefs") -> 3-letter acronym = "KCC".
+    expectedHomeInitials: 'SF',
+    expectedAwayInitials: 'KCC'
   },
   {
     // Edge case: 3-word teams where the generic fallback must produce a multi-letter
     // acronym from each letter-starting word. No SportsMeta identity supplied.
+    // "Boston Red Sox" must be "BRS", not "BS" (first+last would be embarrassing).
     slug: 'mlb-yankees-redsox-generic-fallback',
     rawTitle: 'New York Yankees vs Boston Red Sox',
     sportHint: 'baseball',
@@ -80,7 +85,9 @@ const FIXTURES = [
     expectedHome: 'New York Yankees',
     expectedAway: 'Boston Red Sox',
     expectedLabel: /^(?:MLB|BASEBALL)$/,
-    expectedSerial: /#NYY-BRS-/
+    expectedSerial: /#NYY-BRS-/,
+    expectedHomeInitials: 'NYY',
+    expectedAwayInitials: 'BRS'
   }
 ]
 
@@ -253,6 +260,14 @@ function assertRuntimeTeamPoster(fixture) {
   assertNoEmptyDateTime(`${fixture.slug} runtime`, artwork.svg)
   if (fixture.expectedSerial) {
     assert.match(artwork.svg, fixture.expectedSerial, `${fixture.slug} stub serial matches expected pattern`)
+  }
+  if (fixture.expectedHomeInitials) {
+    const homeInitialsMatch = artwork.svg.match(/data-role="fallback-team-initials" data-team-side="home"[^>]*>([^<]+)</)
+    assert.equal(homeInitialsMatch && homeInitialsMatch[1], fixture.expectedHomeInitials, `${fixture.slug} home circle initials`)
+  }
+  if (fixture.expectedAwayInitials) {
+    const awayInitialsMatch = artwork.svg.match(/data-role="fallback-team-initials" data-team-side="away"[^>]*>([^<]+)</)
+    assert.equal(awayInitialsMatch && awayInitialsMatch[1], fixture.expectedAwayInitials, `${fixture.slug} away circle initials`)
   }
   // Slot coordinates are what the badge-composite path consumes when SportsMeta
   // returns real team logos. Lock the staggered home-higher-left / away-lower-right
