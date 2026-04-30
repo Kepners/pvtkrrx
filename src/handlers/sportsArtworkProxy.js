@@ -38,7 +38,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260430-team-vs-team-v1'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260501-competitor-vs-competitor-v1'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -236,8 +236,10 @@ async function renderEmergencyTemplatePng(variant, fallbackInput = {}, template 
     template: normalizedTemplate,
     theme
   })
+  const skipGeneratedSlots = (artwork.layoutFamily || layoutFamilyForSportsPosterRender(normalizedTemplate, event)) === 'COMPETITOR_VS_COMPETITOR'
   const composites = []
   for (const slot of artwork.slots || []) {
+    if (skipGeneratedSlots) continue
     const glyphSvg = renderLogoGlyphSvg({
       role: slot.role,
       event,
@@ -302,8 +304,10 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
       template: normalizedTemplate,
       theme
     })
+    const skipGeneratedSlots = (artwork.layoutFamily || layoutFamilyForSportsPosterRender(normalizedTemplate, event)) === 'COMPETITOR_VS_COMPETITOR'
     const composites = []
     for (const slot of artwork.slots || []) {
+      if (skipGeneratedSlots) continue
       const glyphSvg = renderLogoGlyphSvg({
         role: slot.role,
         event,
@@ -695,6 +699,8 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
   const canonical = await loadCanonicalEvent(canonicalId, sportsmetaBaseUrl)
   const event = canonical?.event || {}
   const hasMatchup = Boolean(event.homeTeam && event.awayTeam)
+  const eventClass = classifySportsEvent(event)
+  event.eventClass = eventClass
 
   const homeBadgeUrl = buildCanonicalBadgeUrl({
     sportsmetaBaseUrl,
@@ -717,20 +723,23 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
 
   const normalizedVariant = ['poster', 'landscape', 'background'].includes(variant) ? variant : 'poster'
   const normalizedTemplate = normalizeSportsPosterTemplate(template)
+  const layoutFamily = layoutFamilyForSportsPosterRender(normalizedTemplate, event)
+  const isCompetitorPoster = layoutFamily === 'COMPETITOR_VS_COMPETITOR'
+  const needsTeamBadges = hasMatchup && !isCompetitorPoster
   const dims = VARIANT_DIMENSIONS[normalizedVariant] || VARIANT_DIMENSIONS.poster
   const portrait = dims.height > dims.width
   const logoSize = Math.round(Math.min(dims.width * (portrait ? 0.42 : 0.22), dims.height * (portrait ? 0.36 : 0.4), portrait ? 260 : 390))
   const leagueLogoSize = Math.round(Math.min(dims.width * (portrait ? 0.42 : 0.22), dims.height * (portrait ? 0.34 : 0.36), portrait ? 260 : 390))
   const [homeBadge, awayBadge, leagueLogo] = await Promise.all([
-    hasMatchup ? fetchCompositionImage(homeBadgeUrl, logoSize, { requireRealRaster: true, fallbackColor: colorForLabel(event.homeTeam, '#0f766e') }) : null,
-    hasMatchup ? fetchCompositionImage(awayBadgeUrl, logoSize, { requireRealRaster: true, fallbackColor: colorForLabel(event.awayTeam, '#123c69') }) : null,
+    needsTeamBadges ? fetchCompositionImage(homeBadgeUrl, logoSize, { requireRealRaster: true, fallbackColor: colorForLabel(event.homeTeam, '#0f766e') }) : null,
+    needsTeamBadges ? fetchCompositionImage(awayBadgeUrl, logoSize, { requireRealRaster: true, fallbackColor: colorForLabel(event.awayTeam, '#123c69') }) : null,
     fetchCompositionImage(leagueLogoUrl, leagueLogoSize, {
       requireRealRaster: true,
       fallbackColor: '#b58b2a'
     })
   ])
-  if (hasMatchup && (!homeBadge?.buffer || !awayBadge?.buffer)) return null
-  if (!hasMatchup && !leagueLogo?.buffer) return null
+  if (needsTeamBadges && (!homeBadge?.buffer || !awayBadge?.buffer)) return null
+  if ((isCompetitorPoster || !hasMatchup) && !leagueLogo?.buffer) return null
 
   const theme = {
     homeColor: homeBadge?.color || leagueLogo?.color || colorForLabel(event.homeTeam || event.sport, '#0f766e'),
@@ -738,8 +747,6 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     accentColor: paperAccentFromHex(leagueLogo?.color || homeBadge?.color || readableAccentFromHex(homeBadge?.color))
   }
   let artwork
-  const eventClass = classifySportsEvent(event)
-  event.eventClass = eventClass
   try {
     artwork = renderSportsPosterTemplateSvg({
       event,
@@ -789,7 +796,7 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     buffer,
     selectedArtworkSource: 'pvtkrrx-public-template',
     selectedTemplate: normalizedTemplate,
-    layoutFamily: artwork.layoutFamily || layoutFamilyForSportsPosterRender(normalizedTemplate, event),
+    layoutFamily: artwork.layoutFamily || layoutFamily,
     eventClass
   }
 }

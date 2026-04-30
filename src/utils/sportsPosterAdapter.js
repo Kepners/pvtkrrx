@@ -41,6 +41,12 @@ const LEAGUE_CODES = Object.freeze({
   wrc: 'WRC',
   wec: 'WEC',
   'formula e': 'FE',
+  snooker: 'SNOOKER',
+  'world championship': 'WC',
+  darts: 'DARTS',
+  boxing: 'BOXING',
+  tennis: 'TENNIS',
+  'table tennis': 'TABLE',
   pdc: 'PDC',
   wimbledon: 'WIM',
   atp: 'ATP',
@@ -92,12 +98,13 @@ function titleCase(value = '') {
   return normalizeSpace(value)
     .split(/\s+/)
     .filter(Boolean)
-    .map((part) => {
+    .map((part, index) => {
       const upper = part.toUpperCase()
-      if (['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'F1', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'NBA', 'NFL', 'NHL', 'NXT', 'PDC', 'PFL', 'PGA', 'RAW', 'TBA', 'UFC', 'UEFA', 'WEC', 'WRC', 'WTA', 'WWE'].includes(upper)) return upper
+      if (['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'F1', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'NBA', 'NFL', 'NHL', 'NXT', 'PDC', 'PFL', 'PGA', 'RAW', 'TBA', 'UFC', 'UEFA', 'WC', 'WEC', 'WRC', 'WTA', 'WWE'].includes(upper)) return upper
       if (upper === 'MOTOGP') return 'MotoGP'
       if (upper === 'SMACKDOWN') return 'SmackDown'
       if (upper === 'WRESTLEMANIA') return 'WrestleMania'
+      if (index > 0 && /^(?:van|von|de|del|da|dos|du)$/i.test(part)) return part.toLowerCase()
       return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
     })
     .join(' ')
@@ -119,7 +126,12 @@ function cleanDisplayText(value = '', fallback = 'Event') {
 function truncate(value = '', max = 46, fallback = 'Event') {
   const clean = cleanDisplayText(value, fallback)
   if (clean.length <= max) return clean
-  return `${clean.slice(0, Math.max(1, max - 3)).trimEnd()}...`
+  // Hard cut at the previous word boundary if possible. No ellipsis suffix:
+  // "..." gets read as missing data and confuses real-time event posters.
+  const hardCut = clean.slice(0, max).trimEnd()
+  const lastSpace = hardCut.lastIndexOf(' ')
+  if (lastSpace > Math.floor(max * 0.6)) return hardCut.slice(0, lastSpace).trimEnd()
+  return hardCut
 }
 
 function cleanEssentialName(value = '', fallback = 'Event') {
@@ -208,8 +220,13 @@ function sportLabel(input = {}) {
 function leagueCodeFor(league = '', sport = '') {
   const normalized = normalizeSpace(league).toLowerCase()
   if (LEAGUE_CODES[normalized]) return LEAGUE_CODES[normalized]
-  if (/^formula\s*1$/i.test(league)) return 'F1'
-  if (/^moto\s*gp$/i.test(league)) return 'MotoGP'
+  if (/^formula\s*1\b/i.test(league)) return 'F1'
+  if (/^moto\s*gp\b/i.test(league)) return 'MotoGP'
+  // Composite leagues like "MotoGP Brazil" or "WRC Spain" carry the round
+  // venue as a suffix. Match the first token so we still return the recognised
+  // abbreviation (MotoGP / WRC / NBA / etc.) rather than a 2-letter acronym.
+  const firstToken = normalized.split(/\s+/)[0]
+  if (firstToken && LEAGUE_CODES[firstToken]) return LEAGUE_CODES[firstToken]
   return shortCode(league || sport, 'EVT')
 }
 
@@ -315,6 +332,30 @@ function eventShortFor(input = {}, classification = '') {
   if (classification === 'racket_event' && !hasActualPair(input)) {
     return truncate(pickFirst(input.league, input.competition, input.eventTitle, input.title, 'Tournament'), 38)
   }
+  if (classification === 'motorsport_event') {
+    // Prefer an explicitly supplied event short (e.g. "Monaco GP", "British GP")
+    // when it survives release-noise stripping with substance. Fall back to
+    // competition (e.g. "MotoGP Brazil", "WRC Spain") if the stripped eventShort
+    // is just a fragment that the competition already contains — that catches
+    // normalizer leftovers like eventShort="Brazil" with competition="MotoGP
+    // Brazil". Otherwise use the explicit eventShort even when long.
+    const cleanedCompetition = stripReleaseTitleNoise(input.competition)
+    const explicitShort = [input.eventShort, input.event_short, input.eventName]
+      .map(stripReleaseTitleNoise)
+      .find((value) => value && value.length >= 3)
+    const competitionFullyContains = explicitShort && cleanedCompetition &&
+      cleanedCompetition.toLowerCase().includes(explicitShort.toLowerCase()) &&
+      cleanedCompetition.split(/\s+/).filter(Boolean).length > explicitShort.split(/\s+/).filter(Boolean).length
+    const preferred = competitionFullyContains ? cleanedCompetition : explicitShort
+    return truncate(pickFirst(
+      preferred,
+      cleanedCompetition,
+      stripReleaseTitleNoise(input.league),
+      stripReleaseTitleNoise(input.eventTitle),
+      stripReleaseTitleNoise(input.title),
+      'Motorsport Event'
+    ), 38)
+  }
   if (
     classification === 'olympic_event' ||
     classification === 'winter_sport_event' ||
@@ -350,12 +391,13 @@ function sessionFor(input = {}, classification = '', eventShort = '') {
     (classification === 'team_vs_team' || classification === 'combat_event' || classification === 'tennis_or_snooker_match' || classification === 'darts_event' || classification === 'racket_event') && hasActualPair(input)
       ? `${sideName(input, 'home')} v ${sideName(input, 'away')}`
       : '',
-    classification === 'wrestling_event' ? input.date : '',
-    classification === 'generic_event' ? input.sport || input.sportHint : '',
-    'Event'
+    classification === 'wrestling_event' ? input.date : ''
   )
+  if (!raw) return ''
   const clean = truncate(raw, 42)
-  return clean.toLowerCase() === eventShort.toLowerCase() ? 'Event' : clean
+  if (isPlaceholderLabel(clean)) return ''
+  if (clean.toLowerCase() === eventShort.toLowerCase()) return ''
+  return clean
 }
 
 function distinctLeagueLabel(league = '', sport = '', eventShort = '') {
@@ -366,6 +408,22 @@ function distinctLeagueLabel(league = '', sport = '', eventShort = '') {
   if (candidate && candidate.toLowerCase() !== a) return truncate(candidate, 30)
   if (/^(?:general|sports?|event|live)$/i.test(a)) return 'Live Sport'
   return league
+}
+
+const PLACEHOLDER_LABEL_RE = /^(?:event|sports?\s*event|general|sport|matchup|tournament|session)$/i
+
+function isPlaceholderLabel(value = '') {
+  return PLACEHOLDER_LABEL_RE.test(normalizeSpace(value))
+}
+
+function blankIfPlaceholder(value = '') {
+  return isPlaceholderLabel(value) ? '' : value
+}
+
+const RELEASE_TITLE_NOISE_RE = /\b(?:gear\s*up|saturday\s*highlights|sunday\s*highlights|friday\s*highlights|highlights|recap|preview|qualifying\s*recap|race\s*recap)\b/gi
+
+function stripReleaseTitleNoise(value = '') {
+  return normalizeSpace(String(value || '').replace(RELEASE_TITLE_NOISE_RE, ' '))
 }
 
 function buildPaidTemplateMatchup(normalizedEvent = {}, classification = '') {
@@ -415,8 +473,8 @@ function buildPaidTemplateMatchup(normalizedEvent = {}, classification = '') {
     league,
     league_code: leagueCodeFor(pickFirst(normalizedEvent.leagueCode, normalizedEvent.league_code, league), sport),
     league_full: truncate(pickFirst(normalizedEvent.leagueFull, normalizedEvent.league_full, league), 46),
-    round: truncate(pickFirst(normalizedEvent.round, normalizedEvent.roundShort, session), 42),
-    venue: truncate(pickFirst(normalizedEvent.venue, league, sport), 42),
+    round: blankIfPlaceholder(truncate(pickFirst(normalizedEvent.round, normalizedEvent.roundShort, session), 42)),
+    venue: blankIfPlaceholder(truncate(pickFirst(normalizedEvent.venue, league, sport), 42)),
     date: cleanOptionalDisplayText(pickFirst(normalizedEvent.date, normalizedEvent.localDate)),
     time: cleanOptionalDisplayText(pickFirst(normalizedEvent.time, normalizedEvent.timestamp)),
     home,

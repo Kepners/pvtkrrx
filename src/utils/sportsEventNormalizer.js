@@ -87,7 +87,7 @@ function titleCase(value) {
     .filter(Boolean)
     .map((part, index) => {
       const upper = part.toUpperCase()
-      if (['EPL', 'FA', 'F1', 'GP', 'IPL', 'MLB', 'MLS', 'MMA', 'MOTOGP', 'NBA', 'NFL', 'NHL', 'PGA', 'UFC', 'WRC', 'WWE'].includes(upper)) {
+      if (['EPL', 'FA', 'F1', 'GP', 'IPL', 'MLB', 'MLS', 'MMA', 'MOTOGP', 'NBA', 'NFL', 'NHL', 'PGA', 'UFC', 'WC', 'WRC', 'WWE'].includes(upper)) {
         return upper === 'MOTOGP' ? 'MotoGP' : upper
       }
       const lower = part.toLowerCase()

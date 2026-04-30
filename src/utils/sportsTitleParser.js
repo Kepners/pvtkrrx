@@ -97,7 +97,7 @@ function titleCase(value = '') {
     .filter(Boolean)
     .map((part) => {
       const upper = part.toUpperCase()
-      if (['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'F1', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'NBA', 'NFL', 'NHL', 'NXT', 'PDC', 'PFL', 'PGA', 'PPV', 'UFC', 'UEFA', 'WEC', 'WRC', 'WTA', 'WWE'].includes(upper)) return upper
+      if (['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'F1', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'NBA', 'NFL', 'NHL', 'NXT', 'PDC', 'PFL', 'PGA', 'PPV', 'UFC', 'UEFA', 'WC', 'WEC', 'WRC', 'WTA', 'WWE'].includes(upper)) return upper
       if (upper === 'MOTOGP') return 'MotoGP'
       if (upper === 'SMACKDOWN') return 'SmackDown'
       if (upper === 'WRESTLEMANIA') return 'WrestleMania'
@@ -389,7 +389,7 @@ function normalizeTeamLabel(value) {
       .replace(TEAM_BROADCAST_RE, ' ')
       .replace(TEAM_LANGUAGE_RE, ' ')
       .replace(TEAM_PRESENTATION_RE, ' ')
-      .replace(/\b(?:mlb|nba(?:\s+playoffs?)?|nfl|nhl|mls|ipl|pga(?:\s+tour)?|motogp|ufc)\b$/gi, ' ')
+      .replace(/\b(?:mlb|nba(?:\s+playoffs?)?|nfl|nhl|mls|ipl|pga(?:\s+tour)?|motogp|ufc|mma|pfl|bellator|atp|wta|pdc|darts?|wc|world\s+championship|snooker|tennis|boxing)\b$/gi, ' ')
       .replace(/\b(?:r\d+|gm\d+|g\d+|\d{2,3}fps|fps)\b/gi, ' ')
   )
 }
