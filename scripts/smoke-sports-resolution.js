@@ -517,8 +517,8 @@ async function run() {
   )
   assert.equal(
     templateSportsMetaResponse.meta?.poster,
-    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260430-public-sportsmeta-v1`,
-    'PVTKRRX must keep SportsMeta member template selection out of stream-addon artwork URLs'
+    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=glitch&v=20260430-public-sportsmeta-v1`,
+    'PVTKRRX should preserve the installer-selected Sports Posters template without exposing member tokens'
   )
 
   const previousEnvMemberToken = process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN

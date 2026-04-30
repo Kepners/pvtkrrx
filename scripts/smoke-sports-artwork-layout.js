@@ -804,7 +804,7 @@ async function assertTeamBadgeArtworkProxy() {
       assert.equal(response.statusCode, 200, `${template} template should return 200`)
       assert.equal(response.headers['content-type'], 'image/png', `${template} template should return PNG`)
       assert.match(response.headers['x-pvtkrrx-artwork-source'], /^pvtkrrx-(?:template-glyph|public-template)$/, `${template} template request should stay on public/glyph artwork`)
-      assert.equal(response.headers['x-pvtkrrx-artwork-template'], 'ticket-stub', `${template} template request should be pinned to the public Ticket Stub template`)
+      assert.equal(response.headers['x-pvtkrrx-artwork-template'], template, `${template} template request should select the requested Sports Posters template`)
       assert.equal(response.headers['x-pvtkrrx-sports-event-class'], 'team_vs_team', `${template} template should preserve team-vs-team classification`)
       assert.deepEqual(pngDimensions(response.body), dimensions.poster, `${template} template poster dimensions`)
       fs.writeFileSync(path.join(PREVIEW_DIR, `template-${template}-poster.png`), response.body)

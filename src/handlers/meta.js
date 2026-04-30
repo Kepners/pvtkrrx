@@ -151,7 +151,7 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, 
   const artworkInput = {
     baseUrl: String(baseUrl || '').replace(/\/+$/, ''),
     sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
-    sportsPosterTemplate: 'ticket-stub',
+    sportsPosterTemplate: config?.sportsPosterTemplate,
     canonicalId: String(canonicalEvent?.id || canonical?.canonicalId || requestedId || '').trim(),
     sportHint: sportHint || normalizedSportsEvent.sport,
     league: normalizedSportsEvent.competition || league,
@@ -339,7 +339,7 @@ async function handleCustomMeta(config, id, context = {}) {
   const artworkInput = {
     baseUrl: String(baseUrl || '').replace(/\/+$/, ''),
     sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
-    sportsPosterTemplate: 'ticket-stub',
+    sportsPosterTemplate: config?.sportsPosterTemplate,
     canonicalId: canonicalId && resolutionStatus === 'resolved' ? canonicalId : '',
     sportHint: resolvedSportHint || normalizedSportsEvent?.sport || '',
     league: normalizedSportsEvent?.competition || league,

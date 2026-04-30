@@ -1032,7 +1032,11 @@ function resolveSportsmetaBaseUrlFromConfig(config = {}) {
 }
 
 function resolveSportsPosterTemplateFromConfig(config = {}, req = null) {
-  return resolveSportsPosterTemplate('ticket-stub')
+  return resolveSportsPosterTemplate(
+    config?.sportsPosterTemplate,
+    req?.query?.template,
+    'ticket-stub'
+  )
 }
 
 function redactUrl(value) {

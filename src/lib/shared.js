@@ -966,10 +966,10 @@ function normalizeAddonConfig(config = {}, options = {}) {
     ...stripLegacySportsMetadataConfigFields(config),
     additionalStorageRoots: normalizeLocalStorageRoots(config.additionalStorageRoots)
   }
-  // PVTKRRX is not the Sports Posters entitlement surface. Drop legacy token
-  // fields on normalization and keep the stream-addon artwork template public.
+  // PVTKRRX is not the Sports Posters entitlement-token surface. Drop legacy
+  // token fields while preserving the installer-selected layout preference.
   normalized.sportsPosterMemberToken = ''
-  normalized.sportsPosterTemplate = normalizeSportsPosterTemplate('ticket-stub')
+  normalized.sportsPosterTemplate = normalizeSportsPosterTemplate(config.sportsPosterTemplate || 'ticket-stub')
   const explicitProfile = normalizeRouteProfile(normalized.routeProfile)
   const localProfile = explicitProfile === 'local'
   const callerControlsLanPairDefaults =

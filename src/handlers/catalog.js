@@ -1279,7 +1279,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     const artworkInput = {
       baseUrl: addonBaseUrl,
       sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
-      sportsPosterTemplate: 'ticket-stub',
+      sportsPosterTemplate: config?.sportsPosterTemplate,
       canonicalId: sportsMetaResolution?.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED
         ? canonicalCatalogIdForArtwork
         : '',

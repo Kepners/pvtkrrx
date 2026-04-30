@@ -291,8 +291,11 @@
       border: 1px solid rgba(0, 246, 255, 0.18);
       border-radius: 18px;
       background:
+        linear-gradient(180deg, rgba(4, 8, 18, 0.42), rgba(4, 8, 18, 0.9)),
+        linear-gradient(90deg, rgba(4, 8, 18, 0.94), rgba(4, 8, 18, 0.46) 50%, rgba(4, 8, 18, 0.9)),
         radial-gradient(700px 360px at 52% 42%, rgba(0, 168, 255, 0.15), transparent 66%),
-        radial-gradient(560px 240px at 45% 55%, rgba(255, 0, 212, 0.09), transparent 60%);
+        radial-gradient(560px 240px at 45% 55%, rgba(255, 0, 212, 0.09), transparent 60%),
+        url("/sports-backdrops/football-4k.jpg") center / cover no-repeat;
       z-index: 0;
       box-shadow:
         inset 0 0 0 1px rgba(255, 255, 255, 0.02),
@@ -310,6 +313,48 @@
       position: relative;
       z-index: 1;
       animation: core-flicker 5.2s infinite;
+    }
+
+    .hero-showcase {
+      width: min(100%, 920px);
+      margin-top: 26px;
+      display: grid;
+      grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.75fr);
+      gap: 14px;
+      align-items: stretch;
+    }
+
+    .hero-backdrop,
+    .hero-posters {
+      border: 1px solid rgba(0, 246, 255, 0.22);
+      border-radius: 8px;
+      background: rgba(4, 8, 18, 0.72);
+      overflow: hidden;
+      box-shadow: 0 0 24px rgba(0, 168, 255, 0.18);
+    }
+
+    .hero-backdrop img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 250px;
+      object-fit: cover;
+    }
+
+    .hero-posters {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      padding: 8px;
+    }
+
+    .hero-posters img {
+      width: 100%;
+      height: 100%;
+      aspect-ratio: 2 / 3;
+      object-fit: cover;
+      border-radius: 6px;
+      background: #040812;
     }
 
     .kicker {
@@ -755,9 +800,13 @@
       display: block;
       width: 100%;
       aspect-ratio: 2 / 3;
-      object-fit: contain;
+      object-fit: cover;
       border-radius: 8px;
       background: #040812;
+    }
+
+    .poster-example.backdrop img {
+      aspect-ratio: 16 / 9;
     }
 
     .poster-example figcaption {
@@ -1043,6 +1092,10 @@
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
 
+      .hero-showcase {
+        grid-template-columns: 1fr;
+      }
+
       .hero {
         min-height: 64vh;
       }
@@ -1089,6 +1142,19 @@
 
       .hero {
         min-height: 58vh;
+      }
+
+      .hero-showcase {
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .hero-posters {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .hero-backdrop img {
+        min-height: 180px;
       }
 
       .hero::before {
@@ -1239,6 +1305,16 @@
           <a class="btn btn-primary" href="#plans" data-umami-event="cta_sports_posters_plans" data-umami-event-page="sports" data-umami-event-section="hero">Start Sports Posters</a>
           <a class="btn btn-secondary" href="https://sportsmeta.pvtkrrx.cc/proof" data-umami-event="cta_sportsmeta_proof" data-umami-event-page="sports" data-umami-event-section="hero">Open Proof Page</a>
         </div>
+        <div class="hero-showcase" aria-label="Current PVTKRRX sports artwork samples">
+          <div class="hero-backdrop">
+            <img src="/sports-backdrops/formula1-4k.jpg" width="3840" height="2160" alt="Reusable Formula 1 4K sports backdrop sample">
+          </div>
+          <div class="hero-posters">
+            <img src="/sports-artwork/default/poster/football.png?league=UEFA+Champions+League&amp;title=Arsenal+vs+Atletico+Madrid&amp;date=2026-04-29&amp;home=Arsenal&amp;away=Atletico+Madrid&amp;eventClass=team_vs_team&amp;seeders=30&amp;size=6.2+GB&amp;source=prowlarr&amp;template=broadcast&amp;v=20260430-public-sportsmeta-v1" width="600" height="900" alt="Current Broadcast sports poster sample for a football fixture">
+            <img src="/sports-artwork/default/poster/motorsport.png?league=WRC+Spain&amp;title=Islas+Canarias+Saturday+Highlights+Stan&amp;eventClass=motorsport_event&amp;seeders=4&amp;size=1.3+GB&amp;source=prowlarr&amp;template=glitch&amp;v=20260430-public-sportsmeta-v1" width="600" height="900" alt="Current Glitch sports poster sample for motorsport">
+            <img src="/sports-artwork/default/poster/basketball.png?league=Basketball&amp;title=Inside+the+NBA+2026+29+04+ESPN&amp;eventClass=tournament_event&amp;seeders=18&amp;size=2.0+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260430-public-sportsmeta-v1" width="600" height="900" alt="Current Ticket Stub sports poster sample for basketball">
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1315,48 +1391,48 @@
 
     <section class="section-block" id="poster-examples">
       <div class="section-head">
-        <div class="section-kicker">Sports Posters Samples</div>
-        <h2 class="section-title">What the artwork upgrade is meant to look like</h2>
+        <div class="section-kicker">Latest Sports Artwork</div>
+        <h2 class="section-title">Current poster templates and 4K backdrops</h2>
         <p class="section-copy">
-          These are full-size poster layout samples, not a tiny contact sheet. On member routes, SportsMeta uses cached league, event, and team artwork where it has safe matches. Missing team or league images fall back to sport-specific glyph artwork and are logged for later DB enrichment.
+          These samples use the current PVTKRRX sports artwork route, the refreshed public SportsMeta cache version, and the reusable 4K sport backdrop set. SportsMeta remains the sports metadata and artwork backend; PVTKRRX presents that output inside the Stremio-facing installer and addon routes.
         </p>
       </div>
       <div class="poster-gallery" aria-label="Sports Posters template examples">
         <figure class="poster-example">
-          <img src="/sports-posters/template-01-editorial-football.svg" width="600" height="900" alt="Editorial football poster sample with league, teams, venue, date, and time">
-          <figcaption><strong>Editorial</strong>Magazine-style fixture poster for resolved football rows with league, date, venue, and matchup data.</figcaption>
+          <img src="/sports-artwork/default/poster/football.png?league=Premier+League&amp;title=Arsenal+vs+Chelsea&amp;date=2026-04-30&amp;home=Arsenal&amp;away=Chelsea&amp;eventClass=team_vs_team&amp;seeders=42&amp;size=8.1+GB&amp;source=prowlarr&amp;template=editorial&amp;v=20260430-public-sportsmeta-v1" width="600" height="900" loading="lazy" decoding="async" alt="Current Editorial sports poster sample with football fixture data">
+          <figcaption><strong>Editorial</strong>Magazine-style member layout using the current PVTKRRX artwork route.</figcaption>
         </figure>
         <figure class="poster-example">
-          <img src="/sports-posters/template-02-broadcast-basketball.svg" width="600" height="900" alt="Broadcast basketball poster sample with league mark, matchup, and venue data">
-          <figcaption><strong>Broadcast</strong>Live-match split template for team-vs-team rows. Member routes use cached team and league logos where resolved.</figcaption>
+          <img src="/sports-artwork/default/poster/basketball.png?league=NBA&amp;title=Detroit+Pistons+vs+Orlando+Magic&amp;date=2026-04-29&amp;home=Detroit+Pistons&amp;away=Orlando+Magic&amp;eventClass=team_vs_team&amp;seeders=18&amp;size=2.0+GB&amp;source=prowlarr&amp;template=broadcast&amp;v=20260430-public-sportsmeta-v1" width="600" height="900" loading="lazy" decoding="async" alt="Current Broadcast sports poster sample with NBA fixture data">
+          <figcaption><strong>Broadcast</strong>Split matchup template for team-vs-team sports rows.</figcaption>
         </figure>
         <figure class="poster-example">
-          <img src="/sports-posters/template-03-sportsbook-baseball.svg" width="600" height="900" alt="Sportsbook baseball poster sample with team badges and fixture audit data">
-          <figcaption><strong>Sportsbook</strong>Dark data-led card with league, matchup, venue, date, time, and status fields.</figcaption>
+          <img src="/sports-artwork/default/poster/baseball.png?league=MLB&amp;title=Boston+Red+Sox+vs+New+York+Yankees&amp;date=2026-04-30&amp;home=Boston+Red+Sox&amp;away=New+York+Yankees&amp;eventClass=team_vs_team&amp;seeders=14&amp;size=5.4+GB&amp;source=prowlarr&amp;template=sportsbook&amp;v=20260430-public-sportsmeta-v1" width="600" height="900" loading="lazy" decoding="async" alt="Current Sportsbook sports poster sample with MLB fixture data">
+          <figcaption><strong>Sportsbook</strong>Dark data-led card with matchup and availability fields.</figcaption>
         </figure>
         <figure class="poster-example">
-          <img src="/sports-posters/template-04-trading-card-football.svg" width="600" height="900" alt="Trading card football poster sample with foil border and matchup badges">
-          <figcaption><strong>Trading Card</strong>Foil-frame member template with badge slots, event nameplate, venue, and serialised match data.</figcaption>
+          <img src="/sports-artwork/default/poster/football.png?league=UEFA+Champions+League&amp;title=Arsenal+vs+Atletico+Madrid&amp;date=2026-04-29&amp;home=Arsenal&amp;away=Atletico+Madrid&amp;eventClass=team_vs_team&amp;seeders=30&amp;size=6.2+GB&amp;source=prowlarr&amp;template=trading-card&amp;v=20260430-public-sportsmeta-v1" width="600" height="900" loading="lazy" decoding="async" alt="Current Trading Card sports poster sample with football fixture data">
+          <figcaption><strong>Trading Card</strong>Foil-frame layout for resolved match rows.</figcaption>
         </figure>
         <figure class="poster-example">
-          <img src="/sports-posters/template-05-brutalist-ufc.svg" width="600" height="900" alt="Brutalist UFC poster sample with bold typography and fight metadata">
-          <figcaption><strong>Brutalist</strong>High-impact poster for fight and event-led rows where typography and sport identity carry the design.</figcaption>
+          <img src="/sports-artwork/default/poster/mma.png?league=UFC&amp;title=UFC+312&amp;detail=Main+Event&amp;date=2026-06-14&amp;home=Du+Plessis&amp;away=Strickland&amp;eventClass=combat_event&amp;seeders=21&amp;size=4.7+GB&amp;source=prowlarr&amp;template=brutalist&amp;v=20260430-public-sportsmeta-v1" width="600" height="900" loading="lazy" decoding="async" alt="Current Brutalist sports poster sample with UFC event data">
+          <figcaption><strong>Brutalist</strong>High-impact layout for fight and event-first rows.</figcaption>
         </figure>
         <figure class="poster-example">
-          <img src="/sports-posters/template-06-ticket-stub-football.svg" width="600" height="900" alt="Ticket Stub football poster sample with badge slots and fixture data">
-          <figcaption><strong>Ticket Stub</strong>Default free layout. Member routes replace glyph marks with cached DB logos when available.</figcaption>
+          <img src="/sports-artwork/default/poster/snooker.png?league=Snooker&amp;title=John+Higgins+vs+Shaun+Murphy+Wc&amp;date=2026-04-30&amp;home=John+Higgins&amp;away=Shaun+Murphy+Wc&amp;eventClass=racket_event&amp;seeders=1&amp;size=6.9+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260430-public-sportsmeta-v1" width="600" height="900" loading="lazy" decoding="async" alt="Current Ticket Stub sports poster sample with snooker fixture data">
+          <figcaption><strong>Ticket Stub</strong>Default layout for the public installer and member template set.</figcaption>
         </figure>
         <figure class="poster-example">
-          <img src="/sports-posters/template-07-glitch-f1.svg" width="600" height="900" alt="Glitch Formula 1 poster sample with race session metadata">
-          <figcaption><strong>Glitch</strong>Member template for motorsport, tennis, and event-first rows that need a logo-led poster instead of team splits.</figcaption>
+          <img src="/sports-artwork/default/poster/motorsport.png?league=Formula+1&amp;title=British+Grand+Prix&amp;detail=Qualifying&amp;date=2026-07-04&amp;eventClass=motorsport_event&amp;seeders=24&amp;size=7.6+GB&amp;source=prowlarr&amp;template=glitch&amp;v=20260430-public-sportsmeta-v1" width="600" height="900" loading="lazy" decoding="async" alt="Current Glitch sports poster sample with Formula 1 session data">
+          <figcaption><strong>Glitch</strong>Premium event-first template for motorsport and other non-team rows.</figcaption>
         </figure>
-        <figure class="poster-example">
-          <img src="/sports-posters/template-01-editorial-tennis.svg" width="600" height="900" alt="Editorial tennis poster sample with tournament and player metadata">
-          <figcaption><strong>Editorial Variant</strong>Singles and tournament rows can still use the same audited data fields without inventing teams.</figcaption>
+        <figure class="poster-example backdrop">
+          <img src="/sports-backdrops/football-4k.jpg" width="3840" height="2160" loading="lazy" decoding="async" alt="Reusable football 4K backdrop sample for Stremio backgrounds">
+          <figcaption><strong>Football 4K</strong>Reusable sport-level backdrop used across football competitions.</figcaption>
         </figure>
-        <figure class="poster-example">
-          <img src="/sports-posters/template-06-ticket-stub-hockey.svg" width="600" height="900" alt="Ticket Stub hockey poster sample with league and team badge slots">
-          <figcaption><strong>Ticket Stub Variant</strong>Hockey rows use the same default layout with league, round, venue, date, and kickoff fields.</figcaption>
+        <figure class="poster-example backdrop">
+          <img src="/sports-backdrops/generic-sport-4k.jpg" width="3840" height="2160" loading="lazy" decoding="async" alt="Reusable generic 4K sport backdrop sample for Stremio backgrounds">
+          <figcaption><strong>Generic Sport 4K</strong>Fallback backdrop for unknown or unclassified sports rows.</figcaption>
         </figure>
       </div>
     </section>

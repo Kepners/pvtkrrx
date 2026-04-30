@@ -224,6 +224,7 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
+      flex-wrap: wrap;
       gap: 12px;
       box-shadow:
         inset 0 0 0 1px rgba(255, 255, 255, 0.03),
@@ -254,6 +255,66 @@
       color: #d2e4ff;
       text-shadow: 0 0 8px rgba(0, 168, 255, 0.45);
       white-space: nowrap;
+    }
+
+    .app-version-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 32px;
+      padding: 5px 10px;
+      border: 1px solid rgba(0, 246, 255, 0.22);
+      border-radius: 999px;
+      background: rgba(0, 246, 255, 0.07);
+      color: #cfe6ff;
+      font-family: "IBM Plex Mono", monospace;
+      font-size: 10px;
+      letter-spacing: 0.8px;
+      text-transform: uppercase;
+      white-space: nowrap;
+    }
+
+    .app-version-status::before {
+      content: "";
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #8ca2c0;
+      box-shadow: 0 0 10px rgba(140, 162, 192, 0.65);
+      flex: 0 0 auto;
+    }
+
+    .app-version-status.ok {
+      border-color: rgba(0, 255, 102, 0.32);
+      background: rgba(0, 255, 102, 0.08);
+      color: #d8ffe8;
+    }
+
+    .app-version-status.ok::before {
+      background: var(--accent-2);
+      box-shadow: 0 0 12px rgba(0, 255, 102, 0.85);
+    }
+
+    .app-version-status.update {
+      border-color: rgba(255, 0, 212, 0.42);
+      background: rgba(255, 0, 212, 0.08);
+      color: #ffe5fb;
+    }
+
+    .app-version-status.update::before {
+      background: #ff00d4;
+      box-shadow: 0 0 12px rgba(255, 0, 212, 0.85);
+    }
+
+    .app-version-status.err {
+      border-color: rgba(255, 106, 123, 0.35);
+      background: rgba(255, 106, 123, 0.08);
+      color: #ffd4dc;
+    }
+
+    .app-version-status.err::before {
+      background: #ff6a7b;
+      box-shadow: 0 0 12px rgba(255, 106, 123, 0.75);
     }
 
     .nav {
@@ -1311,6 +1372,10 @@
       margin-top: 0;
     }
 
+    .simple-flow-setting select {
+      margin-bottom: 0.7rem;
+    }
+
     .simple-flow-setting .hint {
       margin-bottom: 0.7rem;
     }
@@ -2347,6 +2412,7 @@
         <span class="brand-dot"></span>
         <div class="brand-text">PVTKRRX / Private Tracker Bridge</div>
       </div>
+      <div class="app-version-status" id="appVersionStatus">Checking version</div>
       <nav class="nav">
         <a href="/">Home</a>
         <a href="/sports">Sports</a>
@@ -2530,7 +2596,7 @@
           <div class="simple-flow-status info" id="simpleFlowStatus">Checking this PC so the simple install path can stay short.</div>
           <div class="simple-flow-setting" id="sportsPosterTemplateMain">
             <label for="sportsPosterTemplate">Sports Posters Template</label>
-            <select id="sportsPosterTemplate" disabled>
+            <select id="sportsPosterTemplate">
               <option value="ticket-stub">Ticket Stub</option>
               <option value="editorial">Editorial</option>
               <option value="broadcast">Broadcast</option>
@@ -2539,8 +2605,8 @@
               <option value="brutalist">Brutalist</option>
               <option value="glitch">Glitch</option>
             </select>
-            <p class="hint">PVTKRRX uses the public Ticket Stub/glyph artwork transport. Paid template selection belongs to the SportsMeta member install.</p>
-            <div class="simple-flow-status info" id="sportsPosterTemplateStatus">Sports Posters member templates are controlled by SportsMeta, not this PVTKRRX stream-addon route.</div>
+            <p class="hint">Choose the Sports Posters layout for this install. SportsMeta stays the sports metadata/artwork backend; PVTKRRX stores the preference and sends it through the Stremio-facing artwork route.</p>
+            <div class="simple-flow-status info" id="sportsPosterTemplateStatus">Template choice is saved with this PVTKRRX install. Playback, streams, and tracker results are unchanged.</div>
           </div>
           <div class="simple-flow-actions">
             <button class="btn-copy" type="button" id="simpleCheckStremioBtn" onclick="checkAndLinkStremioOnThisPc(this)">Check Stremio Login On This PC</button>
@@ -2819,10 +2885,10 @@
         <h2>Settings</h2>
         <label for="maxResults">Max Results Per Search</label>
         <input type="number" id="maxResults" value="50" min="10" max="200">
-        <p class="hint">The SportsMeta service owns sports metadata and public glyph artwork. PVTKRRX consumes that output as Stremio presentation enrichment and does not forward Sports Posters member tokens.</p>
+        <p class="hint">The SportsMeta service owns sports metadata and artwork. PVTKRRX is the Stremio-facing frontend and consumes that output as presentation enrichment.</p>
         <label for="sportsPosterMemberToken">SportsMeta member install</label>
         <input type="text" id="sportsPosterMemberToken" placeholder="Use the SportsMeta member addon for paid posters" disabled>
-        <p class="hint">Paid posters for customers are served by SportsMeta member routes. This PVTKRRX stream-addon route keeps using public/free artwork.</p>
+        <p class="hint">PVTKRRX does not expose SportsMeta member tokens in generated Stremio artwork URLs. Template selection above controls the layout preference for this installer.</p>
         <div id="localHostnameBlock">
           <label for="localHostname">Local Hostname (.local alias)</label>
           <input type="text" id="localHostname" value="pvtkrrx.local" placeholder="pvtkrrx.local">
@@ -5619,6 +5685,38 @@
       }
     }
 
+    function normalizeVersionLabel(value) {
+      const raw = String(value || '').trim();
+      if (!raw) return 'unknown';
+      return raw.startsWith('v') ? raw : `v${raw}`;
+    }
+
+    function setAppVersionStatus(type, message) {
+      const el = document.getElementById('appVersionStatus');
+      if (!el) return;
+      el.className = `app-version-status ${type || ''}`.trim();
+      el.textContent = message;
+    }
+
+    async function refreshAppVersionStatus() {
+      const el = document.getElementById('appVersionStatus');
+      if (!el) return;
+      try {
+        const res = await fetch('/version-status.json', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const current = normalizeVersionLabel(data.currentVersion);
+        const latest = normalizeVersionLabel(data.latestVersion);
+        if (data.updateAvailable) {
+          setAppVersionStatus('update', `App ${current} - update available ${latest}`);
+        } else {
+          setAppVersionStatus('ok', `App ${current} - up to date`);
+        }
+      } catch (error) {
+        setAppVersionStatus('err', 'App version - update check unavailable');
+      }
+    }
+
     document.getElementById('provider').addEventListener('change', function() {
       applyProviderPreset(this.value, { applyMapping: true });
     });
@@ -5728,6 +5826,7 @@
     setInstallTarget(activeInstallTarget);
     applyProviderPreset(document.getElementById('provider').value, { applyMapping: false });
     spawnDebridDots();
+    refreshAppVersionStatus();
     document.getElementById('localInstall').style.display = 'none';
     document.getElementById('hostedInstall').style.display = 'none';
     window.addEventListener('beforeunload', stopStremioAuthKeyPolling);
@@ -6338,7 +6437,7 @@
         provider: document.getElementById('provider').value,
         fileServerUrl: fileServerUrlInput ? fileServerUrlInput.replace(/\/+$/, '') : '',
         fileServerAuth: document.getElementById('fileServerAuth').value.trim(),
-        sportsPosterTemplate: 'ticket-stub',
+        sportsPosterTemplate: document.getElementById('sportsPosterTemplate')?.value || 'ticket-stub',
         pathMapping: {
           from: document.getElementById('pathFrom').value,
           to: document.getElementById('pathTo').value
@@ -6400,7 +6499,8 @@
       }
       const templateSelect = document.getElementById('sportsPosterTemplate');
       if (templateSelect) {
-        templateSelect.value = 'ticket-stub';
+        templateSelect.value = config.sportsPosterTemplate || 'ticket-stub';
+        scheduleSportsPosterTemplateAutoSave();
       }
       if (config.localHostname) {
         const normalizedDefault = normalizeLocalHostname(defaultLocalHostname);
@@ -6661,8 +6761,8 @@
 
     function scheduleSportsPosterTemplateAutoSave() {
       const templateSelect = document.getElementById('sportsPosterTemplate');
-      if (templateSelect) templateSelect.value = 'ticket-stub';
-      setSportsPosterTemplateStatus('info', 'PVTKRRX uses the public Ticket Stub/glyph artwork path. Paid template selection belongs to the SportsMeta member addon.');
+      const label = templateSelect?.options?.[templateSelect.selectedIndex]?.textContent || 'Ticket Stub';
+      setSportsPosterTemplateStatus('ok', `${label} selected. This template preference is saved into the generated PVTKRRX install link.`);
     }
 
     async function testConnection() {

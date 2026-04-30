@@ -98,7 +98,11 @@ function resolveEventClass(input = {}) {
 }
 
 function resolveConfiguredSportsPosterTemplate(input = {}) {
-  return resolveSportsPosterTemplate('ticket-stub')
+  return resolveSportsPosterTemplate(
+    input?.sportsPosterTemplate,
+    input?.config?.sportsPosterTemplate,
+    'ticket-stub'
+  )
 }
 
 // SportsMeta returns image/svg+xml for every asset URL — default and canonical

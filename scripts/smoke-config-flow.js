@@ -311,9 +311,15 @@ async function run() {
     assert.match(configureHtml, /Change the actual qBittorrent save path/i, 'configure page should explain where to change the live qBittorrent save path')
     assert.match(configureHtml, /href="\/runbooks"/, 'configure page should link to runbooks')
     assert.match(configureHtml, /route-parity\.js/, 'configure page should load shared parity helper')
+    assert.match(configureHtml, /id="appVersionStatus"/, 'configure page should show app version and update status at the top')
+    assert.match(configureHtml, /fetch\('\/version-status\.json'/, 'configure page should check the runtime version endpoint')
+    for (const template of ['ticket-stub', 'editorial', 'broadcast', 'sportsbook', 'trading-card', 'brutalist', 'glitch']) {
+      assert.match(configureHtml, new RegExp(`value="${template}"`, 'i'), `configure page should expose ${template} Sports Posters template`)
+    }
+    assert.doesNotMatch(configureHtml, /<select id="sportsPosterTemplate" disabled>/i, 'configure page should not render the Sports Posters template selector as disabled')
     assert.match(
       configureHtml,
-      /SportsMeta service owns sports metadata and public glyph artwork[\s\S]*PVTKRRX consumes that output as Stremio presentation enrichment/i,
+      /SportsMeta service owns sports metadata and artwork[\s\S]*PVTKRRX is the Stremio-facing frontend and consumes that output as presentation enrichment/i,
       'configure page should explain the SportsMeta-owned sports metadata/artwork boundary'
     )
     assert.doesNotMatch(configureHtml, /Prowlarr Base URL\s*-\s*<code>http:\/\/localhost:9696<\/code>/i, 'configure page should not present localhost as the default Remote Seedbox truth')
