@@ -246,7 +246,8 @@ async function main() {
     backgroundWide: rows.filter((row) => row.checks.backgroundWide).length,
     oldGeneratedFallbacks: rows.filter((row) => row.poster.source === 'pvtkrrx-generated-card' || row.background.source === 'pvtkrrx-generated-card').length,
     emergencyFallbacks: rows.filter((row) => row.poster.source === 'pvtkrrx-emergency-legacy-fallback' || row.background.source === 'pvtkrrx-emergency-legacy-fallback').length,
-    paidTemplateRenders: rows.filter((row) => row.poster.source === 'pvtkrrx-paid-template' || row.background.source === 'pvtkrrx-paid-template').length,
+    publicTemplateRenders: rows.filter((row) => row.poster.source === 'pvtkrrx-public-template' || row.background.source === 'pvtkrrx-public-template').length,
+    glyphTemplateRenders: rows.filter((row) => row.poster.source === 'pvtkrrx-template-glyph' || row.background.source === 'pvtkrrx-template-glyph').length,
     memberUpstreams: rows.filter((row) => /\/member\/\[redacted\]\/asset\//.test(row.poster.upstream) || /\/member\/\[redacted\]\/asset\//.test(row.background.upstream)).length,
     targeted
   }
@@ -257,7 +258,7 @@ async function main() {
   console.log(`sampled=${summary.sampled} resolved=${summary.resolved} fallback=${summary.fallback}`)
   console.log(`posterReachable=${summary.posterReachable}/${summary.sampled} posterPortrait=${summary.posterPortrait}/${summary.sampled}`)
   console.log(`backgroundReachable=${summary.backgroundReachable}/${summary.sampled} backgroundWide=${summary.backgroundWide}/${summary.sampled}`)
-  console.log(`paidTemplateRenders=${summary.paidTemplateRenders} oldGeneratedFallbacks=${summary.oldGeneratedFallbacks} emergencyFallbacks=${summary.emergencyFallbacks} memberUpstreams=${summary.memberUpstreams}`)
+  console.log(`publicTemplateRenders=${summary.publicTemplateRenders} glyphTemplateRenders=${summary.glyphTemplateRenders} oldGeneratedFallbacks=${summary.oldGeneratedFallbacks} emergencyFallbacks=${summary.emergencyFallbacks} memberUpstreams=${summary.memberUpstreams}`)
   console.log(`targetedTerms=${targeted.map((entry) => `${entry.term}:${entry.sampled}`).join(', ')}`)
   console.log(JSON.stringify({ summary, rows }, null, 2))
 

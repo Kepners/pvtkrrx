@@ -7,7 +7,9 @@ const persistentBackfillRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-sp
 process.env.PVTKRRX_SPORTS_IDENTITY_BACKFILL_FILE = path.join(persistentBackfillRoot, 'sports-identity-backfill-cache.json')
 
 const { SportsMetaClient } = require('../src/clients/sportsmeta')
+const { ProwlarrClient } = require('../src/clients/prowlarr')
 const { handleMeta } = require('../src/handlers/meta')
+const { handleCatalog } = require('../src/handlers/catalog')
 const {
   SPORTS_META_RESOLUTION_STATUS,
   resolveSportsMetaIdentity
@@ -27,6 +29,8 @@ const { parseSportsEventTitle, parseSportsTitle } = require('../src/utils/sports
 const { parseSportsTorrentProfile, rankSportsTorrent } = require('../src/utils/sportsTorrentProfile')
 
 const ORIGINAL_FETCH = global.fetch
+const ORIGINAL_PROWLARR_SEARCH = ProwlarrClient.prototype.search
+const ORIGINAL_PROWLARR_CAPS = ProwlarrClient.prototype.caps
 
 function canonicalPayload({ id, name, league, date, sport, homeTeam = '', awayTeam = '' }) {
   return {
@@ -66,6 +70,37 @@ function availability(title, options = {}) {
 }
 
 async function run() {
+  const sportsSearchCalls = []
+  ProwlarrClient.prototype.search = async function search(query, cats, type = 'search', options = {}) {
+    sportsSearchCalls.push({
+      query,
+      cats: String(cats || ''),
+      type,
+      useCategories: Boolean(options?.useCategories)
+    })
+    return []
+  }
+  ProwlarrClient.prototype.caps = async function caps() {
+    return [{ id: 1, name: 'SportsCult' }]
+  }
+  try {
+    await handleCatalog(
+      { jackettUrl: 'http://prowlarr.test', jackettApiKey: 'test-api-key' },
+      'sports',
+      'pvtkrrx-sports',
+      '',
+      {}
+    )
+  } finally {
+    ProwlarrClient.prototype.search = ORIGINAL_PROWLARR_SEARCH
+    ProwlarrClient.prototype.caps = ORIGINAL_PROWLARR_CAPS
+  }
+  assert.ok(sportsSearchCalls.length > 0, 'sports catalog smoke should exercise Prowlarr sports searches')
+  assert.ok(
+    sportsSearchCalls.every((call) => call.cats === '5060' && call.useCategories === true),
+    'sports catalog/prewarm search path should keep every Prowlarr call constrained to Torznab category 5060'
+  )
+
   const burnsId = 'sportsmeta:event:mma|2026-04-18|ufc|ufc-fight-night-273-burns|malott'
   const barcaId = 'sportsmeta:event:football|2026-04-22|spanish-la-liga|barcelona|celta-vigo'
   const barcaOtherId = 'sportsmeta:event:football|2026-04-25|spanish-la-liga|getafe|barcelona'
@@ -466,8 +501,8 @@ async function run() {
   )
   assert.equal(
     paidSportsMetaResponse.meta?.poster,
-    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}&template=ticket-stub&v=20260429-sportcult-category-poster-v1`,
-    'paid sports configs must emit PVTKRRX raster-proxy poster URLs for canonical sports art'
+    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260430-public-sportsmeta-v1`,
+    'PVTKRRX must not expose or forward SportsMeta member tokens in stream-addon artwork URLs'
   )
 
   const templateSportsMetaResponse = await handleMeta(
@@ -482,8 +517,8 @@ async function run() {
   )
   assert.equal(
     templateSportsMetaResponse.meta?.poster,
-    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?token=${encodeURIComponent('https://sportsmeta.test/member/sm_paid_poster_token')}&template=glitch&v=20260429-sportcult-category-poster-v1`,
-    'paid sports configs must carry the selected Sports Posters template into artwork URLs'
+    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=glitch&v=20260430-public-sportsmeta-v1`,
+    'PVTKRRX should preserve the installer-selected Sports Posters template without exposing member tokens'
   )
 
   const previousEnvMemberToken = process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN
@@ -496,10 +531,10 @@ async function run() {
     })
     assert.equal(
       envTokenPoster.poster,
-      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260429-sportcult-category-poster-v1`,
-      'PVTKRRX should keep runtime env member tokens server-side instead of exposing them in artwork URLs'
+      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260430-public-sportsmeta-v1`,
+      'PVTKRRX should ignore runtime env member tokens on stream-addon artwork URLs'
     )
-    assert.equal(envTokenPoster.selectedArtworkSource, 'sportsmeta-member-raster')
+    assert.equal(envTokenPoster.selectedArtworkSource, 'pvtkrrx-canonical-public-proxy')
   } finally {
     if (previousEnvMemberToken === undefined) delete process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN
     else process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN = previousEnvMemberToken
@@ -541,7 +576,7 @@ async function run() {
   )
   assert.equal(unresolvedSportsMeta.meta?.posterShape, 'poster', 'unresolved sports detail should keep poster-shaped artwork')
   assert.match(String(unresolvedSportsMeta.meta?.poster || ''), /\/sports-artwork\/default\/poster\/basketball\.png/, 'unresolved sports detail poster should use the poster variant')
-  assert.match(String(unresolvedSportsMeta.meta?.background || ''), /\/sports-artwork\/default\/landscape\/basketball\.png/, 'unresolved sports detail background should use a 16:9 landscape variant, not the poster')
+  assert.match(String(unresolvedSportsMeta.meta?.background || ''), /\/sports-backdrops\/nba-4k\.jpg\?v=20260429-sport-level-4k-v1$/, 'unresolved sports detail background should use the reusable NBA 4K sport backdrop')
   assert.doesNotMatch(String(unresolvedSportsMeta.meta?.background || ''), /\/poster\//, 'sports detail background must not be a blown-up poster')
   assert.match(String(unresolvedSportsMeta.meta?.description || ''), /Sport: Basketball/, 'sports detail description should include sport')
   assert.match(String(unresolvedSportsMeta.meta?.description || ''), /League: NBA Playoffs/, 'sports detail description should include league')

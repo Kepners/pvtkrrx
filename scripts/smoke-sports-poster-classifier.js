@@ -9,6 +9,8 @@ const {
 } = require('../src/utils/sportsPosterClassifier')
 const { classifySportsEvent } = require('../src/utils/sportsEventClassifier')
 const { normalizeSportsEventMetadata } = require('../src/utils/sportsEventNormalizer')
+const { ProwlarrClient } = require('../src/clients/prowlarr')
+const { parseSportsTorrentProfile } = require('../src/utils/sportsTorrentProfile')
 
 const REQUIRED_CLASSES = [
   'team_vs_team',
@@ -315,5 +317,122 @@ for (const testCase of CASES) {
 for (const className of REQUIRED_CLASSES) {
   assert.ok(seen.has(className), `classifier smoke covers ${className}`)
 }
+
+for (const testCase of [
+  {
+    slug: 'sportcult-euroleague-bracket-stripped',
+    rawTitle: '[EuroLeague Basketbal] Real Madrid vs Barcelona 1080p',
+    expectedCompetition: 'EuroLeague Basketball',
+    expectedHome: 'Real Madrid',
+    expectedAway: 'Barcelona'
+  },
+  {
+    slug: 'sportcult-elc-bracket-stripped',
+    rawTitle: '[ELC] West Brom vs Leeds 1080p',
+    expectedCompetition: 'EFL Championship',
+    expectedHome: 'West Brom',
+    expectedAway: 'Leeds'
+  },
+  {
+    slug: 'sportcult-ucl-round-noise-stripped',
+    rawTitle: '[Champions League] UCL 2025/26 Semi Final 1st Leg Atletico Madrid vs Arsenal 2160p 4K HDR',
+    expectedCompetition: 'UEFA Champions League',
+    expectedHome: 'Atletico Madrid',
+    expectedAway: 'Arsenal'
+  }
+]) {
+  const event = eventFor({ rawTitle: testCase.rawTitle })
+  assert.equal(event.competition, testCase.expectedCompetition, `${testCase.slug} competition`)
+  assert.equal(event.homeTeam, testCase.expectedHome, `${testCase.slug} home team`)
+  assert.equal(event.awayTeam, testCase.expectedAway, `${testCase.slug} away team`)
+  assert.equal(classifySportsPosterEvent(event), 'team_vs_team', `${testCase.slug} class`)
+}
+
+const categoryLookup = new Map([
+  ['7', new Map([
+    ['100011', 'EuroLeague Basketbal']
+  ])]
+])
+const mappedProwlarrItem = new ProwlarrClient('http://prowlarr.test', 'test-api-key')._mapResult({
+  title: 'EuroLeague Round 30 Highlights 1080p',
+  indexerId: 7,
+  indexer: 'SportsCult',
+  categories: [{ id: 100011 }],
+  size: 123,
+  seeders: 3,
+  publishDate: '2026-04-29T12:00:00.000Z'
+}, categoryLookup)
+assert.deepEqual(mappedProwlarrItem.categoryNames, ['EuroLeague Basketbal'], 'Prowlarr category lookup should expose categoryNames')
+assert.equal(mappedProwlarrItem.indexerCategoryName, 'EuroLeague Basketbal', 'Prowlarr category lookup should expose first mapped category as indexerCategoryName')
+
+for (const testCase of [
+  {
+    slug: 'categoryNames-only-context',
+    expected: 'darts_event',
+    input: {
+      rawTitle: 'Premier League Darts Night 1 1080p',
+      categoryNames: ['Darts'],
+      eventTitle: 'Premier League Darts'
+    }
+  },
+  {
+    slug: 'indexerCategoryName-only-context',
+    expected: 'motorsport_event',
+    input: {
+      rawTitle: 'Formula1 British Grand Prix Qualifying 1080p',
+      indexerCategoryName: 'Formula1',
+      eventTitle: 'British Grand Prix'
+    }
+  },
+  {
+    slug: 'indexer-name-is-not-category-context',
+    expected: 'generic_event',
+    input: {
+      rawTitle: 'Some Sports Special 2026 1080p',
+      indexer: 'Darts',
+      eventTitle: 'Sports Special'
+    }
+  },
+  {
+    slug: 'bracket-category-context',
+    expected: 'darts_event',
+    input: {
+      rawTitle: '[Darts] Premier League Darts Night 1 1080p',
+      eventTitle: 'Premier League Darts'
+    }
+  }
+]) {
+  const event = eventFor(testCase.input)
+  assert.equal(classifySportsPosterEvent(event), testCase.expected, `${testCase.slug} poster class`)
+  assert.equal(classifySportsEvent(event), testCase.expected, `${testCase.slug} compatibility class`)
+}
+
+const categoryNamesOnlyProfile = parseSportsTorrentProfile({
+  title: 'Premier League Darts Night 1 1080p',
+  categoryNames: ['Darts'],
+  pubDate: '2026-04-29T12:00:00.000Z'
+})
+assert.equal(categoryNamesOnlyProfile.event_class, 'darts_event', 'sports torrent profile should classify from categoryNames alone')
+
+const indexerCategoryOnlyProfile = parseSportsTorrentProfile({
+  title: 'Formula1 British Grand Prix Qualifying 1080p',
+  indexerCategoryName: 'Formula1',
+  pubDate: '2026-04-29T12:00:00.000Z'
+})
+assert.equal(indexerCategoryOnlyProfile.event_class, 'motorsport_event', 'sports torrent profile should classify from indexerCategoryName alone')
+
+const indexerNameOnlyProfile = parseSportsTorrentProfile({
+  title: 'Some Sports Special 2026 1080p',
+  indexer: 'SportsCult',
+  pubDate: '2026-04-29T12:00:00.000Z'
+})
+assert.equal(indexerNameOnlyProfile.event_class, 'generic_event', 'sports torrent profile must not treat a tracker indexer name as category truth')
+
+const genuineCategoryIndexerProfile = parseSportsTorrentProfile({
+  title: 'Formula1 British Grand Prix Qualifying 1080p',
+  indexer: 'Formula1',
+  pubDate: '2026-04-29T12:00:00.000Z'
+})
+assert.equal(genuineCategoryIndexerProfile.event_class, 'motorsport_event', 'sports torrent profile may use item.indexer only when it is itself a known SportsCult category')
 
 console.log(`Sports poster classifier smoke passed. classes=${[...seen].join(',')}`)

@@ -207,6 +207,66 @@ git push origin main
 
 Never push to a different branch expecting the live site to update.
 
+---
+
+## Deployment Topology (verified 2026-04-30)
+
+**There are TWO PVTKRRX runtimes on Contabo. They are not interchangeable.**
+
+| Runtime | What it is | What it serves | How to update |
+|---|---|---|---|
+| **Coolify Docker container** `w14jewmw5ubscrxh8zzfhq7d-...` (image tag = source commit) | The PUBLIC website | `https://www.pvtkrrx.cc/` (Caddy → `pvtkrrx:3000`) | Push to GitHub `main`, Coolify auto-rebuilds (`COOLIFY_BRANCH=main`). Trigger via Coolify UI at `https://coolify.buildsales.homes` resource UUID `w14jewmw5ubscrxh8zzfhq7d` |
+| **systemd `pvtkrrx.service`** (`/opt/pvtkrrx/index.js`, port 7000) | Native self-host runtime | NOT public — hits to host port 7000 only (e.g. local LAN, `127.0.0.1:7000`) | rsync source over SSH alias `contabo`, update `/opt/pvtkrrx/REVISION`, `systemctl restart pvtkrrx.service` |
+
+**Caddy config** (in container `caddy:2-alpine`, file `/etc/caddy/apps-enabled/pvtkrrx.cc.caddy`): `pvtkrrx.cc, www.pvtkrrx.cc { reverse_proxy pvtkrrx:3000 }`. Only the Coolify container is reachable as `pvtkrrx:3000` on the docker network.
+
+**Updating the systemd service does NOT change what real users see.** The native systemd runtime is for self-host installs / LAN bridge / desktop heartbeat use only. Real-user broadcast posters etc. all come from the Coolify container.
+
+**To get a code change in front of real users:**
+1. Push the branch to GitHub
+2. Coolify needs to deploy from that branch — by default it watches `main`. If the work is on a feature branch (e.g. `integrate/sportcult-category-contract`), either:
+   - Merge into `main` (Coolify auto-rebuilds), OR
+   - Update the Coolify resource to track the feature branch (UI), then trigger redeploy
+3. Verify the new image tag in `docker inspect <container> --format '{{.Config.Image}}'` matches the target commit
+4. Bust any downstream caches (Caddy `Cache-Control: max-age` headers, sharp raster cache files)
+
+### SportsMeta is different
+
+| | PVTKRRX | SportsMeta |
+|---|---|---|
+| Public host | `www.pvtkrrx.cc` | `sportsmeta.pvtkrrx.cc` |
+| Runtime | Coolify Docker container | systemd `sportsmeta.service` |
+| Source path | container `:tag` | `/opt/sportsmeta/app` (no `.git`, source synced over SSH) |
+| REVISION file | container env `SOURCE_COMMIT` | `/opt/sportsmeta/app/REVISION` |
+| Deploy mechanism | GitHub push → Coolify rebuild | rsync source → `systemctl restart sportsmeta.service` |
+| Backups | Coolify keeps image history | Manual `tar` to `/opt/sportsmeta/backups/<ts>-<note>` |
+
+### Cache invalidation
+
+**SportsMeta** (SQLite + on-disk files):
+- DB: `/opt/sportsmeta/data/db/sportsmeta.sqlite`, table `sportsmeta_assets`, columns `cache_key,source_url,content_type,ext,size,fetched_at,last_accessed_at,file_path,imported_at`
+- Files: `/opt/sportsmeta/data/assets/cache/`
+- DatabaseSync API is `node:sqlite` (not better-sqlite3 — that module isn't installed)
+- Bust pattern (broadcast only): `DELETE FROM sportsmeta_assets WHERE source_url LIKE '%/broadcast/%'` and `fs.unlinkSync(file_path)`
+- 10,808 broadcast entries existed at the time of the 2026-04-30 redesign
+
+**PVTKRRX** (file-only):
+- Two cache dirs: `/opt/pvtkrrx/data/pvtkrrx/sports-artwork-raster-cache/` (~272MB, primary) and `/opt/pvtkrrx/runtime/sports-artwork-raster-cache/` (~1.2MB, smaller secondary)
+- Each entry is a `.bin` (raster bytes) + `.json` (metadata) pair, named by SHA-256 of the cache key
+- The JSON has `selectedTemplate` field (e.g. `"broadcast"`, `"ticket-stub"`, `"sportsbook"`); some older entries have empty `selectedTemplate` so a complete bust may need to delete by URL pattern OR nuke the directory
+- After busting, restart `pvtkrrx.service` to also clear in-memory `rasterCache`
+
+### Reverse-proxy probe
+
+Quick way to confirm which container is serving public traffic:
+```bash
+ssh contabo 'docker ps --format "{{.Names}}\t{{.Image}}" | grep -i pvtkrrx'
+ssh contabo 'docker inspect <container> --format "{{range .Config.Env}}{{println .}}{{end}}" | grep -E "SOURCE_COMMIT|COOLIFY_BRANCH|COOLIFY_RESOURCE_UUID"'
+ssh contabo 'docker exec caddy cat /etc/caddy/apps-enabled/pvtkrrx.cc.caddy'
+```
+
+If `SOURCE_COMMIT` doesn't match the GitHub HEAD you expected, Coolify hasn't rebuilt — pushing to GitHub alone is not enough.
+
 ## Release Rule
 
 - When the user says `release`, `publish`, `ship`, `issue a new revision`, or otherwise asks for the latest install/build, default to checking and updating both release surfaces together unless they explicitly scope the request:

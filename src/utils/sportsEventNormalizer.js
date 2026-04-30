@@ -1,6 +1,7 @@
 const { parseSportsTitle, parseSportsEventTitle } = require('./sportsTitleParser')
 const { normalizeSportKey, resolveSportHint } = require('./sportsRules')
 const { getMappedLeagueEntry, mapLeague } = require('./leagueMap')
+const { mapSportsCultCategory } = require('../config/sportsCultCategoryMap')
 
 const SPORT_LABELS = {
   'american-football': 'American Football',
@@ -71,9 +72,10 @@ const SESSION_WORDS = new Set([
   'fp3'
 ])
 
-const MATCHUP_PREFIX_NOISE_RE = /\b(?:english\s+premier\s+league|major\s+league\s+soccer|premier\s+league|champions\s+league|europa\s+league|conference\s+league|uefa\s+nations\s+league|fifa\s+world\s+cup|world\s+cup\s+qualifiers?|euro\s+qualifiers?|european\s+championship|copa\s+america|afcon|asian\s+cup|conmebol\s+qualifiers?|concacaf\s+qualifiers?|international\s+friendlies?|fa\s+cup|la\s+liga|serie\s+a|bundesliga|college\s+football|world\s+series|stanley\s+cup|super\s+league\s+rugby|super\s+league|six\s+nations|premiership\s+rugby|rugby\s+championship|rugby\s+league|test\s+cricket|indian\s+premier\s+league|the\s+ashes|world\s+championship|world\s+matchplay|fight\s+night|main\s+card|main\s+event|regular\s+season|formula\s+1|formula\s+e|pga\s+tour|tour\s+de\s+france|giro\s+d['’]?italia|vuelta\s+a\s+espana|australian\s+open|roland\s+garros|us\s+open|nhl|mlb|nba|nfl|mls|epl|ipl|odi|t20|atp|wta|pdc|ufc|pfl|wwe|aew|pga|lpga|motogp|nascar|indycar|wrc|wec|bkfc|football|baseball|hockey|basketball|cricket|rugby|tennis|boxing|mma|wrestling|darts|golf|motorsport|playoffs?|postseason|finals?|prelims?|heavyweight|matchroom|queensberry|masters|wimbledon|classics|rs)\b/gi
+const MATCHUP_PREFIX_NOISE_RE = /\b(?:english\s+premier\s+league|major\s+league\s+soccer|premier\s+league|champions\s+league|europa\s+league|conference\s+league|uefa\s+nations\s+league|fifa\s+world\s+cup|world\s+cup\s+qualifiers?|euro\s+qualifiers?|european\s+championship|copa\s+america|afcon|asian\s+cup|conmebol\s+qualifiers?|concacaf\s+qualifiers?|international\s+friendlies?|fa\s+cup|la\s+liga|serie\s+a|bundesliga|college\s+football|world\s+series|stanley\s+cup|super\s+league\s+rugby|super\s+league|six\s+nations|premiership\s+rugby|rugby\s+championship|rugby\s+league|test\s+cricket|indian\s+premier\s+league|the\s+ashes|world\s+championship|world\s+matchplay|fight\s+night|main\s+card|main\s+event|regular\s+season|formula\s+1|formula\s+e|pga\s+tour|tour\s+de\s+france|giro\s+d['’]?italia|vuelta\s+a\s+espana|australian\s+open|roland\s+garros|us\s+open|nhl|mlb|nba|nfl|mls|epl|ipl|odi|t20|atp|wta|pdc|ufc|pfl|wwe|aew|pga|lpga|motogp|nascar|indycar|wrc|wec|bkfc|wc|football|baseball|hockey|basketball|cricket|rugby|tennis|boxing|mma|wrestling|darts|golf|motorsport|playoffs?|postseason|finals?|prelims?|heavyweight|matchroom|queensberry|masters|wimbledon|classics|rs)\b/gi
 
 const RELEASE_GROUP_NOISE_RE = /\b(?:m4rtyr|thecig|mwr|billie|mgp|ntb|ctrlhd|deflate|organic|tgx|nf|int)\b.*$/i
+const NBA_TEAM_PATTERN = /\b(?:houston\s+rockets|los\s+angeles\s+lakers|lakers|rockets|boston\s+celtics|golden\s+state\s+warriors|chicago\s+bulls|new\s+york\s+knicks|miami\s+heat|dallas\s+mavericks|denver\s+nuggets|phoenix\s+suns|milwaukee\s+bucks|philadelphia\s+76ers)\b/i
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
@@ -83,10 +85,17 @@ function titleCase(value) {
   return normalizeSpace(value)
     .split(/[\s-]+/)
     .filter(Boolean)
-    .map((part) => {
+    .map((part, index) => {
       const upper = part.toUpperCase()
       if (['EPL', 'FA', 'F1', 'GP', 'IPL', 'MLB', 'MLS', 'MMA', 'MOTOGP', 'NBA', 'NFL', 'NHL', 'PGA', 'UFC', 'WRC', 'WWE'].includes(upper)) {
         return upper === 'MOTOGP' ? 'MotoGP' : upper
+      }
+      const lower = part.toLowerCase()
+      if (index > 0 && ['van', 'von', 'de', 'del', 'der', 'den', 'da', 'di', 'du', 'la', 'le'].includes(lower)) {
+        return lower
+      }
+      if (/^O[A-Z][a-z]+/.test(part) || /^[A-Z][a-z]+[A-Z][a-z]+/.test(part)) {
+        return part
       }
       return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
     })
@@ -108,6 +117,8 @@ function normalizeCompetition(value, sportKey = '', rawTitle = '') {
   if (!competition) {
     if (sport === 'baseball') competition = 'MLB'
     else if (sport === 'hockey') competition = 'NHL'
+    else if (sport === 'basketball' && NBA_TEAM_PATTERN.test(raw)) competition = 'NBA'
+    else if (sport === 'snooker' && /\b(?:wc|world\s+championship)\b/i.test(raw)) competition = 'World Championship'
   }
 
   if (/^nhl$/i.test(competition) && /\bplayoffs?\b/i.test(raw)) {
@@ -140,11 +151,27 @@ function cleanTrackerText(value) {
   )
 }
 
+function stripLeadingSportsCultCategory(value = '') {
+  const text = String(value || '')
+  const match = text.match(/^\s*\[([^\]]{2,80})\]\s*/)
+  if (!match) return text
+  return mapSportsCultCategory(match[1]) ? text.slice(match[0].length) : text
+}
+
+function extractLeadingSportsCultCategory(value = '') {
+  const match = String(value || '').match(/^\s*\[([^\]]{2,80})\]\s*/)
+  const category = match ? normalizeSpace(match[1]) : ''
+  const entry = category ? mapSportsCultCategory(category) : null
+  return entry ? { category, entry } : { category: '', entry: null }
+}
+
 function stripMatchupSideNoise(value, side = 'left') {
   let text = cleanTrackerText(value)
     .replace(/[{}\[\]()]/g, ' ')
     .replace(RELEASE_GROUP_NOISE_RE, ' ')
     .replace(MATCHUP_PREFIX_NOISE_RE, ' ')
+    .replace(/\b(?:ucl|quarter\s+final|semi\s+final|first\s+leg|second\s+leg|leg)\b/gi, ' ')
+    .replace(/\b\d{1,2}(?:st|nd|rd|th)\b/gi, ' ')
     .replace(/\b(?:game|gm|g|r|round)\s*\d+\b/gi, ' ')
     .replace(/\b(?:19|20)\d{2}\b/g, ' ')
     .replace(/\b\d{1,4}\b/g, ' ')
@@ -158,8 +185,19 @@ function stripMatchupSideNoise(value, side = 'left') {
   return text
 }
 
+function cleanMatchupSide(value, side = 'left') {
+  const raw = normalizeSpace(value)
+  if (!raw) return ''
+  const prefixNoise = new RegExp(MATCHUP_PREFIX_NOISE_RE.source, 'i')
+  const hasNoise = prefixNoise.test(raw) ||
+    /\b(?:ucl|elc|quarter\s+final|semi\s+final|first\s+leg|second\s+leg|leg)\b/i.test(raw) ||
+    /\b\d{1,2}(?:st|nd|rd|th)\b/i.test(raw) ||
+    /\b(?:19|20)\d{2}\b/.test(raw)
+  return hasNoise ? titleCase(stripMatchupSideNoise(raw, side)) : titleCase(raw)
+}
+
 function parseLooseMatchup(rawTitle = '') {
-  const cleaned = String(rawTitle || '').replace(/[._]+/g, ' ')
+  const cleaned = stripLeadingSportsCultCategory(rawTitle).replace(/[._]+/g, ' ')
   const closedBracketedMatchup = [...cleaned.matchAll(/[\[{(]([^{}[\]()]{3,160})[\]})]/g)]
     .map((match) => match[1])
     .find((value) => /\s+(?:vs\.?|v\.?|@)\s+/i.test(value))
@@ -173,8 +211,8 @@ function parseLooseMatchup(rawTitle = '') {
   const awayTeam = stripMatchupSideNoise(match[2], 'right')
   if (!homeTeam || !awayTeam) return null
   return {
-    homeTeam: titleCase(homeTeam),
-    awayTeam: titleCase(awayTeam)
+    homeTeam: cleanMatchupSide(homeTeam, 'left'),
+    awayTeam: cleanMatchupSide(awayTeam, 'right')
   }
 }
 
@@ -196,6 +234,14 @@ function normalizeMotorsportEvent({ league = '', eventName = '', rawTitle = '' }
     tokens.slice(0, leagueTokens.length).join(' ').toLowerCase() === leagueTokens.join(' ')
   ) {
     tokens = tokens.slice(leagueTokens.length)
+  }
+  const leagueSuffixTokens = leagueTokens.length > 1 ? leagueTokens.slice(1) : []
+  if (
+    leagueSuffixTokens.length > 0 &&
+    tokens.length >= leagueSuffixTokens.length &&
+    tokens.slice(0, leagueSuffixTokens.length).join(' ').toLowerCase() === leagueSuffixTokens.join(' ')
+  ) {
+    tokens = tokens.slice(leagueSuffixTokens.length)
   }
   if (tokens.length === 0) {
     return { competition: leagueLabel, eventTitle: '', eventDetail: '' }
@@ -348,8 +394,10 @@ function normalizeSportsEventMetadata(input = {}) {
     ''
   )
   const canonicalParsed = parseSportsMetaCanonicalId(input.canonicalId || canonicalEvent.id || '')
-  const parsedSportsEvent = input.parsedSportsEvent || parseSportsTitle(rawTitle, input.date || input.pubDate || '') || null
-  const parsedEvent = input.parsedEvent || (!parsedSportsEvent ? parseSportsEventTitle(rawTitle, input.date || input.pubDate || '') : null)
+  const parserTitle = stripLeadingSportsCultCategory(rawTitle)
+  const leadingCategory = extractLeadingSportsCultCategory(rawTitle)
+  const parsedSportsEvent = input.parsedSportsEvent || parseSportsTitle(parserTitle, input.date || input.pubDate || '') || null
+  const parsedEvent = input.parsedEvent || (!parsedSportsEvent ? parseSportsEventTitle(parserTitle, input.date || input.pubDate || '') : null)
   const looseMatchup = parseLooseMatchup(rawTitle)
   const rawLeague = normalizeSpace(
     input.competition ||
@@ -358,18 +406,20 @@ function normalizeSportsEventMetadata(input = {}) {
     canonicalParsed?.competition ||
     parsedSportsEvent?.league ||
     parsedEvent?.league ||
+    leadingCategory.entry?.topLevelLabel ||
+    leadingCategory.category ||
     ''
   )
   const mappedEntry = getMappedLeagueEntry(rawLeague)
   const sportKey = normalizeSportKey(resolveSportHint({
     explicitHint: input.sportHint || input.sport || canonicalEvent.sport || canonicalParsed?.sportKey || mappedEntry?.sportKey || '',
-    categoryHint: input.categoryHint || '',
+    categoryHint: input.categoryHint || leadingCategory.entry?.appSportHint || '',
     title: rawTitle
   }))
   const sport = formatSportLabel(sportKey || input.sport || canonicalParsed?.sportKey) || 'Sports'
   const date = normalizeSpace(input.date || canonicalEvent.date || canonicalParsed?.date || parsedSportsEvent?.date || parsedEvent?.date || '')
-  const homeTeam = normalizeSpace(input.homeTeam || input.home || canonicalEvent.homeTeam || canonicalParsed?.homeTeam || parsedSportsEvent?.homeTeam || looseMatchup?.homeTeam || '')
-  const awayTeam = normalizeSpace(input.awayTeam || input.away || canonicalEvent.awayTeam || canonicalParsed?.awayTeam || parsedSportsEvent?.awayTeam || looseMatchup?.awayTeam || '')
+  const homeTeam = cleanMatchupSide(input.homeTeam || input.home || canonicalEvent.homeTeam || canonicalParsed?.homeTeam || parsedSportsEvent?.homeTeam || looseMatchup?.homeTeam || '', 'left')
+  const awayTeam = cleanMatchupSide(input.awayTeam || input.away || canonicalEvent.awayTeam || canonicalParsed?.awayTeam || parsedSportsEvent?.awayTeam || looseMatchup?.awayTeam || '', 'right')
 
   let competition = normalizeCompetition(rawLeague, sportKey, rawTitle)
   let eventTitle = normalizeSpace(input.eventTitle || input.eventName || input.name || canonicalEvent.name || canonicalEvent.title || '')
@@ -389,6 +439,8 @@ function normalizeSportsEventMetadata(input = {}) {
     eventTitle = homeTeam
   } else if (homeTeam && awayTeam) {
     eventTitle = `${homeTeam} vs ${awayTeam}`
+  } else if (homeTeam || awayTeam) {
+    eventTitle = homeTeam || awayTeam
   } else if (parsedEvent?.eventName) {
     eventTitle = normalizeSpace(input.eventTitle || parsedEvent.eventName)
   } else if (canonicalParsed?.eventTitle) {

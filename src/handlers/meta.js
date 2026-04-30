@@ -112,6 +112,19 @@ function buildSportsDescriptionLines(input = {}) {
   return lines
 }
 
+function buildSportsArtworkDebug(input = {}) {
+  const layoutFamily = String(input.posterResolved?.layoutFamily || '').trim()
+  const selectedTemplate = String(input.posterResolved?.selectedTemplate || input.sportsPosterTemplate || '').trim()
+  const eventClass = String(input.eventClass || '').trim()
+  const resolutionStatus = String(input.resolutionStatus || '').trim()
+  return {
+    ...(layoutFamily ? { layoutFamily } : {}),
+    ...(selectedTemplate ? { posterTemplate: selectedTemplate } : {}),
+    ...(eventClass ? { eventClass } : {}),
+    ...(resolutionStatus ? { resolutionStatus } : {})
+  }
+}
+
 async function loadCanonicalSportsMeta(config = {}, canonicalId = '') {
   const normalizedId = String(canonicalId || '').trim()
   if (!normalizedId) return null
@@ -151,7 +164,6 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, 
   const artworkInput = {
     baseUrl: String(baseUrl || '').replace(/\/+$/, ''),
     sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
-    sportsPosterMemberToken: config?.sportsPosterMemberToken,
     sportsPosterTemplate: config?.sportsPosterTemplate,
     canonicalId: String(canonicalEvent?.id || canonical?.canonicalId || requestedId || '').trim(),
     sportHint: sportHint || normalizedSportsEvent.sport,
@@ -192,6 +204,23 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, 
     logo
   }
   if (posterResolved?.posterShape) meta.posterShape = posterResolved.posterShape
+  if (posterResolved?.layoutFamily) {
+    meta.layoutFamily = posterResolved.layoutFamily
+    meta.sportsArtwork = buildSportsArtworkDebug({
+      posterResolved,
+      sportsPosterTemplate: config?.sportsPosterTemplate,
+      eventClass: classifySportsEvent({
+        sport: sportHint || normalizedSportsEvent.sport,
+        league: normalizedSportsEvent.competition || league,
+        title: normalizedSportsEvent.eventTitle || displayTitle,
+        eventTitle: normalizedSportsEvent.eventTitle || displayTitle,
+        homeTeam: canonicalEvent?.homeTeam,
+        awayTeam: canonicalEvent?.awayTeam,
+        rawTitle: normalizedSportsEvent.rawTitle
+      }),
+      resolutionStatus: 'resolved'
+    })
+  }
   const genres = buildSportsGenres(sportHint, league)
   if (genres.length > 0) meta.genres = genres
   if (eventDate) meta.releaseInfo = eventDate
@@ -340,7 +369,6 @@ async function handleCustomMeta(config, id, context = {}) {
   const artworkInput = {
     baseUrl: String(baseUrl || '').replace(/\/+$/, ''),
     sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
-    sportsPosterMemberToken: config?.sportsPosterMemberToken,
     sportsPosterTemplate: config?.sportsPosterTemplate,
     canonicalId: canonicalId && resolutionStatus === 'resolved' ? canonicalId : '',
     sportHint: resolvedSportHint || normalizedSportsEvent?.sport || '',
@@ -413,6 +441,15 @@ async function handleCustomMeta(config, id, context = {}) {
     logo
   }
   if (posterShape) meta.posterShape = posterShape
+  if (isSports && posterResolved?.layoutFamily) {
+    meta.layoutFamily = posterResolved.layoutFamily
+    meta.sportsArtwork = buildSportsArtworkDebug({
+      posterResolved,
+      sportsPosterTemplate: config?.sportsPosterTemplate,
+      eventClass,
+      resolutionStatus
+    })
+  }
   if (sportsGenres.length > 0) meta.genres = sportsGenres
   if (eventDate) meta.releaseInfo = eventDate
   if (isSports && resolvedSportHint) {

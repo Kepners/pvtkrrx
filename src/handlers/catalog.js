@@ -352,7 +352,9 @@ async function searchSportsCatalogItems(config, torznab, query, limit) {
     config,
     torznab,
     query,
-    SPORT_CATS
+    SPORT_CATS,
+    'search',
+    { useCategories: true }
   )
   return mergeUniqueProwlarrItems(strictItems, broadItems)
 }
@@ -580,7 +582,7 @@ function normalizeSportsCatalogItems(items = []) {
       awayTeam: sportsProfile?.away_team || parsedSportsEvent?.awayTeam,
       rawTitle: item?.title || '',
       categoryNames: Array.isArray(item?.categoryNames) ? item.categoryNames : [],
-      indexerCategoryName: item?.indexer || ''
+      indexerCategoryName: item?.indexerCategoryName || ''
     })
     return {
       ...item,
@@ -593,6 +595,8 @@ function normalizeSportsCatalogItems(items = []) {
         indexer: item?.indexer || '',
         pubDate: item?.pubDate || item?.publishDate || '',
         sportHint: item?.sportHint || '',
+        categoryNames: Array.isArray(item?.categoryNames) ? item.categoryNames : [],
+        indexerCategoryName: item?.indexerCategoryName || '',
         eventClass
       },
       trackerSourceType: isSportsCultIndexer(item?.indexer) ? 'sportscult' : 'other',
@@ -1275,7 +1279,6 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     const artworkInput = {
       baseUrl: addonBaseUrl,
       sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
-      sportsPosterMemberToken: config?.sportsPosterMemberToken,
       sportsPosterTemplate: config?.sportsPosterTemplate,
       canonicalId: sportsMetaResolution?.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED
         ? canonicalCatalogIdForArtwork
@@ -1301,7 +1304,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     const catalogPosterUrl = posterUrl
     const catalogPosterShape = posterShape || 'poster'
     console.log(
-      `[sports-artwork-select] id="${sportsMetaResolution?.canonicalId || 'fallback'}" selectedArtworkSource=${posterResolved.selectedArtworkSource || ''} posterUrl="${redactArtworkUrl(posterUrl)}" backdropUrl="${redactArtworkUrl(landscapeUrl || backgroundUrl)}" fallbackReason="${sportsMetaResolution?.reason || ''}"`
+      `[sports-artwork-select] id="${sportsMetaResolution?.canonicalId || 'fallback'}" selectedArtworkSource=${posterResolved.selectedArtworkSource || ''} layoutFamily=${posterResolved.layoutFamily || ''} posterUrl="${redactArtworkUrl(posterUrl)}" backdropUrl="${redactArtworkUrl(landscapeUrl || backgroundUrl)}" fallbackReason="${sportsMetaResolution?.reason || ''}"`
     )
     const availabilityAnchorKey = setSportsAvailabilityAnchor(availability.trackerSource || availability)
     const canonicalCatalogId = String(sportsMetaResolution?.canonicalId || '').trim()
@@ -1351,7 +1354,16 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       background: landscapeUrl || backgroundUrl || undefined,
       logo: logoUrl || undefined,
       releaseInfo: eventDate || undefined,
-      posterShape: catalogPosterShape
+      posterShape: catalogPosterShape,
+      ...(posterResolved.layoutFamily ? { layoutFamily: posterResolved.layoutFamily } : {}),
+      ...(posterResolved.layoutFamily ? {
+        sportsArtwork: {
+          layoutFamily: posterResolved.layoutFamily,
+          posterTemplate: posterResolved.selectedTemplate || config?.sportsPosterTemplate || '',
+          eventClass: artworkInput.eventClass || '',
+          resolutionStatus: String(sportsMetaResolution?.status || SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY)
+        }
+      } : {})
     }
   })
 

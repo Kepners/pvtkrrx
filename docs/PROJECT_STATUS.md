@@ -1,10 +1,19 @@
 # PVTKRRX Project Status
 
-Updated: 2026-04-27
+Updated: 2026-04-30
 
 ## Current Stage
 
-PVTKRRX is on the synchronized `1.1.57` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+PVTKRRX is on the synchronized `1.1.63` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+
+## 2026-04-30: v1.1.63 sport-level 4K backdrops and SportsCult category contract
+
+- Sports backdrop fallback now uses reusable sport-level 4K landscape assets instead of event-, match-, league-, or competition-specific generated backdrops.
+- Football competitions such as EPL, FA Cup, UCL, Champions League, Europa League, La Liga, Serie A, Bundesliga, Ligue 1, and international football all map to the same `football-4k.jpg` fallback.
+- Trusted SportsMeta event/team artwork still wins when available; unresolved Prowlarr/SportsCult rows fall back to `/sports-backdrops/<sport>-4k.jpg`, and unknown sport detection falls back to `generic-sport-4k.jpg`.
+- Added the SportsCult bracketed-category contract so tracker RSS category hints are preserved for title classification.
+- Clarified and enforced the SportsMeta boundary: RSS/SportsCult poster generation and paid Sports Posters member artwork belong to the SportsMeta website/member addon only. PVTKRRX now consumes public/root SportsMeta artwork routes, rasterizes public SVG/glyph artwork for Stremio compatibility, drops legacy member-token config fields on normalization, and pins its public template to Ticket Stub.
+- Release proof passed locally for the real Stremio sports catalog/meta routes, football mapping fixtures, contact-sheet style artifact, Windows build, self-host smoke, and installer syntax guard.
 
 ## 2026-04-28: sports poster artwork repair in progress
 
@@ -63,7 +72,7 @@ PVTKRRX is on the synchronized `1.1.57` release line. Release numbering remains 
 ## 2026-04-26: v1.1.50 proactive sports artwork pairing
 
 - SportsMeta resolver changes are paired with PVTKRRX changes for availability-driven sports rows: Prowlarr/qBittorrent still decide whether a row exists, while SportsMeta now resolves identity and artwork more proactively without guessing below threshold.
-- PVTKRRX sports artwork proxy now prefers SportsMeta member raster routes whenever `sportsPosterMemberToken`, `PVTKRRX_SPORTSMETA_MEMBER_TOKEN`, or `SPORTSMETA_MEMBER_TOKEN` is configured, while preserving the public SVG/generated fallback path when no member token exists.
+- Superseded by the 2026-04-30 boundary correction: PVTKRRX no longer consumes SportsMeta member raster routes. Paid Sports Posters routes and entitlement tokens stay on SportsMeta; PVTKRRX keeps only the public SVG/glyph fallback path.
 - PVTKRRX sports identity backfill now persists to the runtime directory by default, so startup/prewarm work can survive process restarts instead of only helping the first in-memory response window.
 - Added `npm run audit:sports-artwork` to sample live-style sports catalog rows and report poster/background URLs, asset source headers, dimensions, fallback status, and mismatch reasons.
 - Local proof passed before release prep:

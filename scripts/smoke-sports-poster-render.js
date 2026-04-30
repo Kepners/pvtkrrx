@@ -12,6 +12,7 @@ const {
 
 const OUT_DIR = path.join(process.cwd(), '.runtime', 'sports-poster-render-smoke')
 const BAD_TEXT_RE = /\b(?:SPOR|BASK|undefined|null|unknown|n\/a)\b/i
+const BROADCAST_WORDMARK_RE = /PVTKRRX \u00b7 BROADCAST/
 
 const SOLO_EVENT = {
   sport: 'Motorsport',
@@ -84,6 +85,21 @@ async function assertRendered({ template, event, variant = 'poster', slug, expec
       `${slug} should render a real head-to-head marker`
     )
   }
+  if (expectations.requireBroadcastMarkers) {
+    assert.match(artwork.svg, /viewBox="0 0 600 900"/, `${slug} native Broadcast viewBox`)
+    assert.match(artwork.svg, /data-layout-family="BROADCAST"/, `${slug} Broadcast family marker`)
+    assert.match(artwork.svg, /data-layout-style="sportsmeta-default-poster"/, `${slug} Broadcast style marker`)
+    assert.match(artwork.svg, /data-role="inner-border"/, `${slug} Broadcast inner border`)
+    assert.match(artwork.svg, /data-role="accent-top"/, `${slug} Broadcast top accent`)
+    assert.match(artwork.svg, /data-role="accent-bottom"/, `${slug} Broadcast bottom accent`)
+    assert.match(artwork.svg, /data-role="pill-badge"/, `${slug} Broadcast pill badge`)
+    assert.match(artwork.svg, /data-role="broadcast-title"[^>]*(?:class="broadcast-title"|font-family="[^"]*Inter)/i, `${slug} Broadcast Inter title`)
+    assert.match(artwork.svg, BROADCAST_WORDMARK_RE, `${slug} Broadcast wordmark`)
+    assert.doesNotMatch(artwork.svg, /viewBox="0 0 400 600"/, `${slug} no wrapped 400x600 SVG`)
+    assert.doesNotMatch(artwork.svg, /homeGrad|awayGrad|lowerThird/i, `${slug} no old Broadcast split artifacts`)
+    assert.doesNotMatch(artwork.svg, /data-role="broadcast-title"[^>]*class="bebas"/i, `${slug} no Bebas Broadcast title`)
+    assert.doesNotMatch(artwork.svg, /\bTBA\b|\.{3,}|\bICS\b/i, `${slug} no Broadcast placeholder leakage`)
+  }
 
   const png = await sharp(Buffer.from(artwork.svg)).png().toBuffer()
   const metadata = await sharp(png).metadata()
@@ -100,29 +116,38 @@ async function main() {
   fs.mkdirSync(OUT_DIR, { recursive: true })
 
   for (const template of SPORTS_POSTER_TEMPLATES) {
+    const expectations = template === 'broadcast'
+      ? { requireBroadcastMarkers: true }
+      : { requireHeadToHead: true }
     await assertRendered({
       template,
       event: TEAM_EVENT,
       slug: `team-${template}`,
-      expectations: { requireHeadToHead: true }
+      expectations
     })
   }
 
   for (const template of SPORTS_POSTER_TEMPLATES) {
+    const expectations = template === 'broadcast'
+      ? { noFakeVersus: true, noHomeAwayLabels: true, requireBroadcastMarkers: true }
+      : { noFakeVersus: true, noHomeAwayLabels: true }
     await assertRendered({
       template,
       event: SOLO_EVENT,
       slug: `solo-${template}`,
-      expectations: { noFakeVersus: true, noHomeAwayLabels: true }
+      expectations
     })
   }
 
   for (const template of SPORTS_POSTER_TEMPLATES) {
+    const expectations = template === 'broadcast'
+      ? { noHomeAwayLabels: true, requireBroadcastMarkers: true }
+      : { noHomeAwayLabels: true, requireHeadToHead: true }
     await assertRendered({
       template,
       event: SINGLE_EVENT,
       slug: `single-${template}`,
-      expectations: { noHomeAwayLabels: true, requireHeadToHead: true }
+      expectations
     })
   }
 

@@ -18,8 +18,21 @@ const TEMPLATE_LABELS = Object.freeze({
   glitch: 'Glitch'
 })
 
+const SPORTS_POSTER_LAYOUT_FAMILIES = Object.freeze({
+  editorial: 'EDITORIAL',
+  broadcast: 'BROADCAST',
+  sportsbook: 'SPORTSBOOK',
+  'trading-card': 'TRADING_CARD',
+  brutalist: 'BRUTALIST',
+  'ticket-stub': 'TICKET_STUB',
+  glitch: 'GLITCH'
+})
+
 const SOURCE_W = 400
 const SOURCE_H = 600
+const BROADCAST_W = 600
+const BROADCAST_H = 900
+const BROADCAST_WORDMARK = 'PVTKRRX \u00b7 BROADCAST'
 
 const { buildPaidTemplateMatchup } = require('./sportsPosterAdapter')
 const { classifySportsPosterEvent } = require('./sportsPosterClassifier')
@@ -47,6 +60,7 @@ const LEAGUE_CODE_ALIASES = Object.freeze({
   'formula 1': 'F1',
   'formula one': 'F1',
   f1: 'F1',
+  wrc: 'WRC',
   wimbledon: 'ATP'
 })
 
@@ -102,6 +116,15 @@ function normalizeSportsPosterTemplate(value) {
   }
   const candidate = aliases[raw] || raw
   return SPORTS_POSTER_TEMPLATES.includes(candidate) ? candidate : 'ticket-stub'
+}
+
+function layoutFamilyForSportsPosterTemplate(value) {
+  const template = normalizeSportsPosterTemplate(value)
+  return SPORTS_POSTER_LAYOUT_FAMILIES[template] || 'TICKET_STUB'
+}
+
+function isBroadcastLayoutFamily(value) {
+  return String(value || '').trim().toUpperCase() === 'BROADCAST'
 }
 
 function resolveSportsPosterTemplate(...values) {
@@ -240,10 +263,15 @@ function leagueCodeFor(event = {}, league = '') {
   return shortFor(normalized || event.sport, 'SP')
 }
 
+function isFormulaOneText(text = '') {
+  return /\b(?:formula\s*1|formula\s*one|formula1|f1)\b/i.test(text)
+}
+
 function sportIconFor(event = {}, facts = {}) {
   const text = `${event.sport_icon || ''} ${event.sportIcon || ''} ${facts.sport || ''} ${facts.league || ''} ${facts.detail || ''} ${facts.title || ''}`.toLowerCase()
-  if (/formula|f1/.test(text)) return 'f1'
-  if (/moto\s*gp|motogp|motor|wrc|rally|grand prix/.test(text)) return 'f1'
+  if (isFormulaOneText(text)) return 'f1'
+  if (/moto\s*gp|motogp/.test(text)) return 'motogp'
+  if (/motor|wrc|rally|nascar|indycar|wec|formula\s*e|supercars|v8sc|grand prix/.test(text)) return 'motorsport'
   if (/golf|pga|lpga|masters|ryder|liv/.test(text)) return 'golf'
   if (/darts|pdc|world matchplay/.test(text)) return 'darts'
   if (/cycling|tour de france|giro|vuelta|stage|time trial|road race/.test(text)) return 'cycling'
@@ -260,6 +288,24 @@ function sportIconFor(event = {}, facts = {}) {
   if (/tennis|wimbledon|atp|wta/.test(text)) return 'tennis'
   if (/mma|ufc|boxing|fight/.test(text)) return 'mma'
   return 'soccer'
+}
+
+function isLiveEvent(event = {}) {
+  if (event.isLive === true || event.live === true) return true
+  const status = normalizeSpace(event.liveStatus || event.status || event.eventStatus).toLowerCase()
+  return ['live', 'in-progress', 'in_progress', 'ongoing'].includes(status)
+}
+
+function broadcastLabelFor(event = {}, facts = {}) {
+  const raw = normalizeSpace(event.broadcastLabel || event.layoutLabel || event.leagueCode || event.league_code)
+  if (raw) return raw
+  const text = normalizeSpace(`${facts.league || ''} ${facts.sport || ''} ${facts.title || ''}`)
+  if (/\b(?:moto\s*gp|motogp)\b/i.test(text)) return 'MotoGP'
+  if (/\bwrc\b|\brally\b/i.test(text)) return 'WRC'
+  if (isFormulaOneText(text)) return 'Formula 1'
+  const code = leagueCodeFor(event, facts.league)
+  if (code && code !== 'SP') return code
+  return facts.league || facts.sport || 'Sports'
 }
 
 function eventTitle(event = {}) {
@@ -338,7 +384,9 @@ function templateData(event = {}, theme = {}, mode = '') {
     isTeamMatchup,
     isSolo: eventFormat === 'solo',
     leftLabel,
-    rightLabel
+    rightLabel,
+    isLive: isLiveEvent(event),
+    broadcastLabel: broadcastLabelFor(event, data)
   }
 }
 
@@ -351,6 +399,338 @@ const FONTS_EDITORIAL = `.serif { font-family: 'Playfair Display', Georgia, seri
 .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }
 .sans { font-family: 'Inter', system-ui, sans-serif; }`
 
+const BROADCAST_PLACEHOLDER_RE = /^(?:tba|tbd|n\/?a|na|unknown|undefined|null|event|session|sports event|sport event|matchup|tournament|golf event|darts event)$/i
+const BROADCAST_ALLOWED_LABELS = new Set(['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'FE', 'FIFA', 'F1', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'MotoGP', 'NBA', 'NFL', 'NHL', 'PDC', 'PFL', 'PGA', 'UCL', 'UEL', 'UFC', 'UEFA', 'WEC', 'WRC', 'WTA', 'WWE'])
+
+function cleanBroadcastText(value = '') {
+  const clean = normalizeSpace(value)
+    .replace(/\.{3,}|\u2026/g, '')
+    .replace(/\bTBA\b\s*(?:[-/|]|\u2022)?\s*/gi, '')
+    .replace(/\s*(?:[-/|]|\u2022)\s*\bTBA\b/gi, '')
+    .replace(/\s*(?:[-/|]|\u2022)\s*$/g, '')
+    .replace(/^\s*(?:[-/|]|\u2022)\s*/g, '')
+  const normalized = normalizeSpace(clean)
+  return normalized && !BROADCAST_PLACEHOLDER_RE.test(normalized) ? normalized : ''
+}
+
+function firstBroadcastText(...values) {
+  for (const value of values) {
+    const clean = cleanBroadcastText(value)
+    if (clean) return clean
+  }
+  return ''
+}
+
+function broadcastTextKey(value = '') {
+  return cleanBroadcastText(value).toLowerCase().replace(/[^a-z0-9]+/g, '')
+}
+
+function broadcastLabelCase(value = '') {
+  const clean = cleanBroadcastText(value)
+  if (!clean) return ''
+  const upper = clean.toUpperCase()
+  if (upper === 'MOTOGP') return 'MotoGP'
+  return upper
+}
+
+function broadcastLabelForRender(event = {}, m = {}) {
+  const text = normalizeSpace([
+    event.broadcastLabel,
+    event.layoutLabel,
+    event.leagueCode,
+    event.league_code,
+    event.league,
+    event.competition,
+    event.title,
+    event.eventTitle,
+    event.eventShort,
+    event.event_short,
+    event.rawTitle,
+    m.broadcastLabel,
+    m.league_code,
+    m.league,
+    m.event_short,
+    m.event,
+    m.sport
+  ].filter(Boolean).join(' '))
+
+  if (/\b(?:moto\s*gp|motogp)\b/i.test(text)) return 'MotoGP'
+  if (/\bwrc\b|\brally\b/i.test(text)) return 'WRC'
+  if (isFormulaOneText(text)) return 'F1'
+  if (/\bsnooker\b|\bworld\s+championship\b|\bcrucible\b/i.test(text)) return 'SNOOKER'
+  if (/\bnba\b/i.test(text)) return 'NBA'
+  if (/\bbasketball\b/i.test(text)) return 'BASKETBALL'
+  if (/\b(?:football|soccer|premier|fa cup|mls|champions league|europa|world cup)\b/i.test(text)) return 'FOOTBALL'
+  if (/\bmotorsport\b|\bmotor\b/i.test(text)) return 'MOTORSPORT'
+
+  const raw = broadcastLabelCase(firstBroadcastText(event.broadcastLabel, event.layoutLabel, event.leagueCode, event.league_code, m.broadcastLabel, m.league_code))
+  if (BROADCAST_ALLOWED_LABELS.has(raw)) return raw
+  const sport = broadcastLabelCase(firstBroadcastText(event.sport, m.sport, event.sportHint))
+  return sport || 'SPORTS'
+}
+
+function broadcastPaletteFor(event = {}, m = {}, label = '') {
+  const text = normalizeSpace([
+    label,
+    event.sport,
+    event.sportHint,
+    event.league,
+    event.competition,
+    event.title,
+    event.eventTitle,
+    event.eventShort,
+    event.rawTitle,
+    m.sport,
+    m.league,
+    m.sport_icon
+  ].filter(Boolean).join(' ')).toLowerCase()
+
+  if (/moto\s*gp|motogp|wrc|rally|motor|motorsport|f1|formula/.test(text)) {
+    return {
+      key: 'motorsport',
+      bg0: '#140506',
+      bg1: '#2a0708',
+      bg2: '#08090d',
+      glow: 'rgba(239, 68, 68, 0.32)',
+      glowSoft: 'rgba(239, 68, 68, 0.04)',
+      accent: '#b91c1c',
+      accent2: '#ef4444',
+      pill: 'rgba(185, 28, 28, 0.35)',
+      pattern: 'motorsport'
+    }
+  }
+  if (/snooker|billiards|crucible/.test(text)) {
+    return {
+      key: 'snooker',
+      bg0: '#03130d',
+      bg1: '#06281a',
+      bg2: '#020705',
+      glow: 'rgba(34, 197, 94, 0.28)',
+      glowSoft: 'rgba(34, 197, 94, 0.04)',
+      accent: '#16a34a',
+      accent2: '#86efac',
+      pill: 'rgba(22, 163, 74, 0.32)',
+      pattern: 'snooker'
+    }
+  }
+  if (/basketball|nba|wnba/.test(text)) {
+    return {
+      key: 'basketball',
+      bg0: '#180b05',
+      bg1: '#3b1607',
+      bg2: '#090604',
+      glow: 'rgba(249, 115, 22, 0.30)',
+      glowSoft: 'rgba(249, 115, 22, 0.04)',
+      accent: '#c2410c',
+      accent2: '#fb923c',
+      pill: 'rgba(194, 65, 12, 0.34)',
+      pattern: 'basketball'
+    }
+  }
+  if (/football|soccer|premier|fa cup|mls|champions league|europa|world cup/.test(text)) {
+    return {
+      key: 'football',
+      bg0: '#03140d',
+      bg1: '#064e3b',
+      bg2: '#020807',
+      glow: 'rgba(16, 185, 129, 0.27)',
+      glowSoft: 'rgba(16, 185, 129, 0.04)',
+      accent: '#dc2626',
+      accent2: '#f97316',
+      pill: 'rgba(22, 101, 52, 0.38)',
+      pattern: 'football'
+    }
+  }
+  return {
+    key: 'generic',
+    bg0: '#070b16',
+    bg1: '#111827',
+    bg2: '#020617',
+    glow: 'rgba(59, 130, 246, 0.28)',
+    glowSoft: 'rgba(59, 130, 246, 0.04)',
+    accent: '#b91c1c',
+    accent2: '#38bdf8',
+    pill: 'rgba(30, 64, 175, 0.34)',
+    pattern: 'generic'
+  }
+}
+
+function broadcastPatternSvg(pattern = 'generic') {
+  if (pattern === 'motorsport') {
+    const chevrons = Array.from({ length: 6 }, (_, index) => {
+      const y = 54 + index * 130
+      return `<path d="M -70 ${y} L 238 ${y} L 302 ${y + 72} L 238 ${y + 144} L -70 ${y + 144} Z" fill="rgba(255,255,255,0.075)"/>`
+    }).join('')
+    const checks = []
+    for (let row = 0; row < 4; row += 1) {
+      for (let col = 0; col < 4; col += 1) {
+        const light = (row + col) % 2 === 0
+        checks.push(`<rect x="${432 + col * 22}" y="${132 + row * 22}" width="22" height="22" fill="${light ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.34)'}"/>`)
+      }
+    }
+    return `${chevrons}<g data-role="motorsport-checker">${checks.join('')}</g><path d="M 70 704 C 190 646 278 728 392 658 C 474 608 520 632 602 582" fill="none" stroke="rgba(255,255,255,0.13)" stroke-width="6" stroke-linecap="round"/>`
+  }
+  if (pattern === 'football') {
+    return `<rect x="84" y="150" width="432" height="600" rx="18" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+<line x1="84" y1="450" x2="516" y2="450" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+<circle cx="300" cy="450" r="76" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+<rect x="84" y="286" width="92" height="328" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+<rect x="424" y="286" width="92" height="328" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+<g opacity="0.18">${Array.from({ length: 10 }, (_, index) => `<line x1="${56 + index * 54}" y1="96" x2="${-40 + index * 54}" y2="828" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>`).join('')}</g>`
+  }
+  if (pattern === 'snooker') {
+    return `<rect x="92" y="130" width="416" height="640" rx="34" fill="rgba(0,0,0,0.14)" stroke="rgba(255,255,255,0.09)" stroke-width="4"/>
+<circle cx="118" cy="156" r="16" fill="rgba(0,0,0,0.30)" stroke="rgba(255,255,255,0.08)"/>
+<circle cx="482" cy="156" r="16" fill="rgba(0,0,0,0.30)" stroke="rgba(255,255,255,0.08)"/>
+<circle cx="118" cy="744" r="16" fill="rgba(0,0,0,0.30)" stroke="rgba(255,255,255,0.08)"/>
+<circle cx="482" cy="744" r="16" fill="rgba(0,0,0,0.30)" stroke="rgba(255,255,255,0.08)"/>
+<circle cx="300" cy="450" r="120" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="2"/>
+<path d="M 162 706 L 464 252" stroke="rgba(255,255,255,0.13)" stroke-width="4" stroke-linecap="round"/>
+<circle cx="236" cy="586" r="15" fill="rgba(255,255,255,0.16)"/><circle cx="322" cy="496" r="12" fill="rgba(255,255,255,0.11)"/><circle cx="390" cy="398" r="10" fill="rgba(255,255,255,0.09)"/>`
+  }
+  if (pattern === 'basketball') {
+    return `<rect x="82" y="126" width="436" height="648" rx="24" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+<line x1="82" y1="450" x2="518" y2="450" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+<circle cx="300" cy="450" r="74" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+<path d="M 216 126 A 84 84 0 0 0 384 126" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+<path d="M 216 774 A 84 84 0 0 1 384 774" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="3"/>
+<rect x="238" y="126" width="124" height="142" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+<rect x="238" y="632" width="124" height="142" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="3"/>
+<g opacity="0.16">${Array.from({ length: 9 }, (_, index) => `<line x1="${-80 + index * 92}" y1="128" x2="${120 + index * 92}" y2="772" stroke="rgba(255,255,255,0.16)" stroke-width="1.2"/>`).join('')}</g>`
+  }
+  return `<g opacity="0.25">${Array.from({ length: 12 }, (_, index) => `<rect x="${-120 + index * 72}" y="126" width="20" height="650" transform="rotate(28 ${-120 + index * 72} 126)" fill="rgba(255,255,255,0.12)"/>`).join('')}</g>
+<circle cx="452" cy="230" r="92" fill="none" stroke="rgba(255,255,255,0.10)" stroke-width="2"/>
+<circle cx="452" cy="230" r="52" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="2"/>
+<path d="M 64 664 L 224 612 L 318 690 L 536 598" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="4" stroke-linecap="round"/>`
+}
+
+function wrapBroadcastTitle(value = '') {
+  const words = cleanBroadcastText(value).split(/\s+/).filter(Boolean)
+  if (!words.length) return ['Sports']
+  const total = words.join(' ').length
+  const maxChars = total > 36 ? 14 : total > 24 ? 16 : 18
+  const lines = []
+  let current = ''
+  for (const word of words) {
+    const candidate = current ? `${current} ${word}` : word
+    if (candidate.length <= maxChars || !current) {
+      current = candidate
+      continue
+    }
+    lines.push(current)
+    current = word
+  }
+  if (current) lines.push(current)
+  while (lines.length > 3) {
+    const last = lines.pop()
+    const target = lines.length - 1
+    lines[target] = `${lines[target]} ${last}`
+  }
+  return lines
+}
+
+function broadcastTitleLayout(lines = []) {
+  const longest = lines.reduce((max, line) => Math.max(max, line.length), 0)
+  const safeWidth = 800
+  let fontSize = longest > 0 ? Math.min(54, Math.max(28, Math.floor(safeWidth / longest))) : 54
+  if (lines.length >= 3) fontSize = Math.min(fontSize, 42)
+  const gap = Math.round(fontSize * 1.08)
+  const startY = lines.length >= 3 ? 382 : lines.length === 2 ? 398 : 424
+  return { fontSize, gap, startY }
+}
+
+function broadcastMatchupFromEvent(event = {}, m = {}) {
+  const home = firstBroadcastText(event.homeTeam, event.home?.name, event.principalA, event.fighterA, event.playerA, event.teamA)
+  const away = firstBroadcastText(event.awayTeam, event.away?.name, event.principalB, event.fighterB, event.playerB, event.teamB)
+  if (!home || !away) return null
+  if (home.toLowerCase() === away.toLowerCase()) return null
+  const eventFormat = String(m?.event_format || '').toLowerCase()
+  if (eventFormat === 'solo') return null
+  return { home, away }
+}
+
+function broadcastTitleFromEvent(event = {}, m = {}) {
+  const matchup = broadcastMatchupFromEvent(event, m)
+  if (matchup) return `${matchup.home} vs ${matchup.away}`
+  return firstBroadcastText(
+    event.eventShort,
+    event.event_short,
+    event.eventTitle,
+    event.title,
+    event.eventName,
+    event.name,
+    m.event_short,
+    m.event,
+    m.league,
+    m.sport,
+    'Sports'
+  )
+}
+
+function compactBroadcastDetail(detail = '', league = '', label = '') {
+  let clean = cleanBroadcastText(detail)
+  if (!clean) return ''
+  for (const prefix of [league, label]) {
+    const words = cleanBroadcastText(prefix).split(/\s+/).filter(Boolean)
+    for (const word of words) {
+      clean = clean.replace(new RegExp(`^${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s+`, 'i'), '')
+    }
+  }
+  return cleanBroadcastText(clean) || cleanBroadcastText(detail)
+}
+
+function broadcastMatchupKey(home = '', away = '') {
+  return broadcastTextKey(`${home} ${away}`)
+}
+
+function stripVersusToken(value = '') {
+  return String(value || '').replace(/\b(?:vs|v|versus|x)\b/gi, ' ')
+}
+
+function broadcastSubtitleFromEvent(event = {}, m = {}, label = '', title = '', matchup = null) {
+  const league = firstBroadcastText(event.league, event.competition, m.leagueFull, m.league, label, event.sport, m.sport)
+  const realDetailCandidates = [
+    event.date,
+    event.localDate,
+    event.eventDetail,
+    event.detail,
+    event.session,
+    event.round,
+    m.date
+  ]
+  const fallbackDetailCandidates = [
+    m.session,
+    m.round,
+    event.eventShort,
+    event.event_short,
+    event.eventTitle,
+    m.event_short,
+    m.event
+  ]
+  const detailCandidates = matchup
+    ? realDetailCandidates
+    : realDetailCandidates.concat(fallbackDetailCandidates)
+  const titleKey = broadcastTextKey(title)
+  const matchupKey = matchup ? broadcastMatchupKey(matchup.home, matchup.away) : ''
+  let detail = ''
+  for (const candidate of detailCandidates) {
+    const clean = compactBroadcastDetail(candidate, league, label)
+    if (!clean) continue
+    const cleanKey = broadcastTextKey(clean)
+    const cleanKeyNoVersus = broadcastTextKey(stripVersusToken(clean))
+    if (cleanKey === broadcastTextKey(league)) continue
+    if (matchupKey && (cleanKey === matchupKey || cleanKeyNoVersus === matchupKey)) continue
+    detail = clean
+    if (cleanKey !== titleKey && cleanKeyNoVersus !== titleKey) break
+  }
+  const parts = [league, detail].map(cleanBroadcastText).filter(Boolean)
+  const unique = []
+  for (const part of parts) {
+    if (!unique.some((existing) => broadcastTextKey(existing) === broadcastTextKey(part))) unique.push(part)
+  }
+  return unique.join(' \u2022 ')
+}
+
 function sportGlyph(icon = 'soccer', x = 50, y = 50, size = 100, color = '#fff', opacity = 1, strokeWidth = 2) {
   const shapes = {
     soccer: `<circle cx="50" cy="50" r="38"/><polygon points="50,32 62,40 58,54 42,54 38,40" fill="currentColor" stroke="none"/><line x1="50" y1="32" x2="50" y2="20"/><line x1="62" y1="40" x2="72" y2="34"/><line x1="58" y1="54" x2="68" y2="64"/><line x1="42" y1="54" x2="32" y2="64"/><line x1="38" y1="40" x2="28" y2="34"/>`,
@@ -359,6 +739,8 @@ function sportGlyph(icon = 'soccer', x = 50, y = 50, size = 100, color = '#fff',
     football: `<ellipse cx="50" cy="50" rx="38" ry="22" transform="rotate(-20 50 50)"/><line x1="38" y1="50" x2="62" y2="50"/><line x1="42" y1="46" x2="42" y2="54"/><line x1="50" y1="44" x2="50" y2="56"/><line x1="58" y1="46" x2="58" y2="54"/>`,
     baseball: `<circle cx="50" cy="50" r="34"/><path d="M22,38 Q40,46 36,72"/><path d="M78,38 Q60,46 64,72"/>`,
     f1: `<path d="M10,60 L30,60 L40,48 L60,48 L70,60 L90,60 L90,68 L70,68 L60,76 L40,76 L30,68 L10,68 Z" fill="currentColor" stroke="none"/><circle cx="30" cy="72" r="6" fill="currentColor" stroke="none"/><circle cx="70" cy="72" r="6" fill="currentColor" stroke="none"/>`,
+    motogp: `<path d="M18,66 L34,66 L46,52 L62,52 L74,66 L86,66"/><circle cx="30" cy="70" r="10"/><circle cx="74" cy="70" r="10"/><path d="M44,50 L54,34 L66,40 L62,52"/><circle cx="58" cy="26" r="6" fill="currentColor" stroke="none"/><path d="M52,36 L38,44"/>`,
+    motorsport: `<path d="M20,74 C38,34 66,34 84,58"/><path d="M22,74 L88,74"/><path d="M34,62 L42,50 L58,50 L68,62"/><path d="M72,22 L72,58"/><path d="M72,22 L88,28 L72,34"/><circle cx="34" cy="74" r="7" fill="currentColor" stroke="none"/><circle cx="72" cy="74" r="7" fill="currentColor" stroke="none"/>`,
     mma: `<path d="M28,30 L44,30 L44,22 L60,22 L60,30 L72,30 L76,42 L72,68 L60,76 L40,76 L28,68 L24,42 Z"/><line x1="40" y1="44" x2="60" y2="44"/><line x1="40" y1="56" x2="60" y2="56"/>`,
     tennis: `<circle cx="50" cy="50" r="34"/><path d="M22,32 Q50,50 22,68"/><path d="M78,32 Q50,50 78,68"/>`,
     golf: `<circle cx="38" cy="68" r="14" fill="currentColor" stroke="none"/><path d="M48,68 C66,62 76,52 82,38"/><line x1="62" y1="18" x2="62" y2="76"/><path d="M62,18 L84,26 L62,34 Z" fill="currentColor" stroke="none"/>`,
@@ -449,70 +831,99 @@ function renderEditorial(event = {}, variant = 'poster', theme = {}, mode = '') 
   return wrapTemplateSvg(inner, slots, variant)
 }
 
+const BROADCAST_TITLE_FONT = "'Inter','Helvetica Neue','Arial',sans-serif"
+
+function broadcastSideFontSize(name = '') {
+  const length = String(name || '').length
+  if (length <= 10) return 56
+  if (length <= 14) return 48
+  if (length <= 18) return 42
+  return 36
+}
+
+function renderBroadcastMatchupTitle(matchup, e) {
+  const homeName = matchup.home.toUpperCase()
+  const awayName = matchup.away.toUpperCase()
+  const sharedSize = Math.min(broadcastSideFontSize(homeName), broadcastSideFontSize(awayName))
+  const versusSize = Math.max(28, Math.round(sharedSize * 0.6))
+  const homeY = 376
+  const versusY = homeY + Math.round(sharedSize * 0.92)
+  const awayY = versusY + Math.round(sharedSize * 1.04)
+  return `<text data-role="broadcast-title" class="broadcast-title" x="50" y="${homeY}" font-family="${BROADCAST_TITLE_FONT}" font-size="${sharedSize}" font-weight="800" fill="#ffffff" letter-spacing="-1">${e(homeName)}</text>
+    <text data-role="broadcast-versus" x="50" y="${versusY}" font-family="${BROADCAST_TITLE_FONT}" font-size="${versusSize}" font-weight="600" fill="rgba(255,255,255,0.7)" letter-spacing="6">VS</text>
+    <text data-role="broadcast-title" class="broadcast-title" x="50" y="${awayY}" font-family="${BROADCAST_TITLE_FONT}" font-size="${sharedSize}" font-weight="800" fill="#ffffff" letter-spacing="-1">${e(awayName)}</text>`
+}
+
+function renderBroadcastSoloTitle(title, e) {
+  const lines = wrapBroadcastTitle(title)
+  const layout = broadcastTitleLayout(lines)
+  return lines.map((line, index) => (
+    `<text data-role="broadcast-title" class="broadcast-title" x="50" y="${layout.startY + index * layout.gap}" font-family="${BROADCAST_TITLE_FONT}" font-size="${layout.fontSize}" font-weight="800" fill="#ffffff" letter-spacing="-1">${e(line.toUpperCase())}</text>`
+  )).join('\n    ')
+}
+
 function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') {
   const m = templateData(event, theme, mode)
   const e = escapeXml
-  const slots = m.hasMatchup
-    ? [
-        { role: 'league', left: 18, top: 18, size: 32 },
-        { role: 'home', left: 24, top: 190, size: 100 },
-        { role: 'away', left: 276, top: 190, size: 100 }
-      ]
-    : [
-        { role: 'league', left: 18, top: 18, size: 32 },
-        { role: 'league', left: 120, top: 150, size: 160 }
-      ]
-  const heroLines = m.hasMatchup ? [] : splitLines(m.event_short || m.league || m.sport, 14, 2)
-  const heroFontSize = heroLines.length > 1 ? 44 : (heroLines[0] && heroLines[0].length > 10 ? 52 : 64)
-  const heroVisual = m.hasMatchup
-    ? `<text class="bebas" x="-8" y="320" font-size="220" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1" letter-spacing="-8">${e(m.home.short)}</text>
-  <text class="bebas" x="${SOURCE_W + 8}" y="540" text-anchor="end" font-size="220" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1" letter-spacing="-8">${e(m.away.short)}</text>
-  <circle cx="74" cy="240" r="50" fill="url(#homeGrad)" stroke="${m.home.accent}" stroke-width="1.5"/>
-  <circle cx="326" cy="240" r="50" fill="url(#awayGrad)" stroke="${m.away.accent}" stroke-width="1.5"/>
-  <text class="bebas" x="${SOURCE_W / 2}" y="${SOURCE_H / 2 + 22}" text-anchor="middle" font-size="88" fill="url(#chrome)" letter-spacing="4" filter="url(#vsShadow)" transform="skewX(-12)">VS</text>`
-    : `<text class="bebas" x="${SOURCE_W / 2}" y="${heroLines.length > 1 ? 224 : 244}" text-anchor="middle" font-size="${heroFontSize}" fill="white" letter-spacing="2" filter="url(#vsShadow)" textLength="${SOURCE_W - 56}" lengthAdjust="spacingAndGlyphs">${e((heroLines[0] || m.event_short).toUpperCase())}</text>
-  ${heroLines[1] ? `<text class="bebas" x="${SOURCE_W / 2}" y="266" text-anchor="middle" font-size="${heroFontSize}" fill="white" letter-spacing="2" filter="url(#vsShadow)" textLength="${SOURCE_W - 56}" lengthAdjust="spacingAndGlyphs">${e(heroLines[1].toUpperCase())}</text>` : ''}
-  <text class="mono" x="${SOURCE_W / 2}" y="${heroLines.length > 1 ? 296 : 286}" text-anchor="middle" font-size="11" fill="rgba(255,255,255,0.85)" letter-spacing="2.5">${e((m.session || m.round).toUpperCase())}</text>
-  <circle cx="${SOURCE_W / 2}" cy="352" r="48" fill="url(#homeGrad)" stroke="${m.home.accent}" stroke-width="1.5"/>
-  ${sportGlyph(m.sport_icon, SOURCE_W / 2, 352, 72, 'white', 0.85)}`
-  const lowerThird = m.hasMatchup
-    ? `<text class="sans" x="18" y="${SOURCE_H - 66}" font-size="9" font-weight="700" fill="${m.home.primary}" letter-spacing="1.8">${e(m.leftLabel)}</text>
-  <text class="bebas" x="18" y="${SOURCE_H - 48}" font-size="18" fill="white" letter-spacing="1">${e(m.home.name)}</text>
-  <text class="sans" x="${SOURCE_W - 18}" y="${SOURCE_H - 66}" text-anchor="end" font-size="9" font-weight="700" fill="${m.away.primary}" letter-spacing="1.8">${e(m.rightLabel)}</text>
-  <text class="bebas" x="${SOURCE_W - 18}" y="${SOURCE_H - 48}" text-anchor="end" font-size="18" fill="white" letter-spacing="1">${e(m.away.name)}</text>`
-    : `<text class="sans" x="${SOURCE_W / 2}" y="${SOURCE_H - 68}" text-anchor="middle" font-size="9" font-weight="700" fill="${m.home.primary}" letter-spacing="1.8">${e(m.league.toUpperCase())}</text>
-  <text class="bebas" x="${SOURCE_W / 2}" y="${SOURCE_H - 48}" text-anchor="middle" font-size="20" fill="white" letter-spacing="1" textLength="${SOURCE_W - 60}" lengthAdjust="spacingAndGlyphs">${e(m.event_short)}</text>`
-  const inner = `<defs>
-    <style>${FONTS_BEBAS_MONO_SANS}</style>
-    <radialGradient id="homeGrad" cx="30%" cy="40%" r="80%"><stop offset="0%" stop-color="${m.home.primary}"/><stop offset="70%" stop-color="${m.home.secondary}"/><stop offset="100%" stop-color="#060810"/></radialGradient>
-    <radialGradient id="awayGrad" cx="70%" cy="60%" r="80%"><stop offset="0%" stop-color="${m.away.primary}"/><stop offset="70%" stop-color="${m.away.secondary}"/><stop offset="100%" stop-color="#060810"/></radialGradient>
-    <linearGradient id="chrome" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="#ffffff"/><stop offset="45%" stop-color="#d8d8d8"/><stop offset="55%" stop-color="#8a8a8a"/><stop offset="100%" stop-color="#ffffff"/></linearGradient>
-    <linearGradient id="lowerThird" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="rgba(0,0,0,0)"/><stop offset="35%" stop-color="rgba(0,0,0,0.85)"/><stop offset="100%" stop-color="rgba(0,0,0,0.95)"/></linearGradient>
-    <radialGradient id="vignette" cx="50%" cy="50%" r="75%"><stop offset="35%" stop-color="rgba(0,0,0,0)"/><stop offset="100%" stop-color="rgba(0,0,0,0.85)"/></radialGradient>
-    <pattern id="scanlines" x="0" y="0" width="3" height="3" patternUnits="userSpaceOnUse"><rect width="3" height="1" fill="rgba(255,255,255,0.04)"/></pattern>
-    <filter id="seamBlur"><feGaussianBlur stdDeviation="2"/></filter>
-    <filter id="redGlow"><feGaussianBlur stdDeviation="1.5"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-    <filter id="vsShadow"><feGaussianBlur in="SourceAlpha" stdDeviation="3"/><feOffset dy="4"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  const label = broadcastLabelForRender(event, m)
+  const palette = broadcastPaletteFor(event, m, label)
+  const matchup = broadcastMatchupFromEvent(event, m)
+  const title = broadcastTitleFromEvent(event, m)
+  const titleBlock = matchup
+    ? renderBroadcastMatchupTitle(matchup, e)
+    : renderBroadcastSoloTitle(title, e)
+  const subtitle = broadcastSubtitleFromEvent(event, m, label, title, matchup)
+  const subtitleFont = subtitle.length > 52 ? 14 : subtitle.length > 44 ? 16 : subtitle.length > 34 ? 18 : 20
+  const pillWidth = Math.max(88, Math.min(250, Math.round(label.length * 10.6 + 28)))
+  const pattern = broadcastPatternSvg(palette.pattern)
+  const maybeLive = m.isLive
+    ? `<g data-role="broadcast-live" transform="translate(498 54)"><circle cx="0" cy="0" r="5" fill="${palette.accent2}"/><text x="14" y="5" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="12" font-weight="800" fill="#ffffff" letter-spacing="2">LIVE</text></g>`
+    : ''
+  const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${BROADCAST_W}" height="${BROADCAST_H}" viewBox="0 0 ${BROADCAST_W} ${BROADCAST_H}" role="img" aria-label="${e(title)}">
+  <defs>
+    <linearGradient id="broadcastBgGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="${palette.bg0}"/>
+      <stop offset="52%" stop-color="${palette.bg1}"/>
+      <stop offset="100%" stop-color="${palette.bg2}"/>
+    </linearGradient>
+    <radialGradient id="broadcastBgGlow" cx="25%" cy="18%" r="70%">
+      <stop offset="0%" stop-color="${palette.glow}"/>
+      <stop offset="60%" stop-color="${palette.glowSoft}"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    </radialGradient>
+    <linearGradient id="broadcastAccentStripe" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="${palette.accent}"/>
+      <stop offset="58%" stop-color="${palette.accent2}"/>
+      <stop offset="100%" stop-color="${palette.accent}"/>
+    </linearGradient>
+    <pattern id="broadcastFineLines" x="0" y="0" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(28)">
+      <rect x="0" y="0" width="3" height="18" fill="rgba(255,255,255,0.035)"/>
+    </pattern>
   </defs>
-  <rect width="${SOURCE_W}" height="${SOURCE_H}" fill="#000"/>
-  <polygon points="0,0 ${SOURCE_W * 0.6},0 ${SOURCE_W * 0.4},${SOURCE_H} 0,${SOURCE_H}" fill="url(#homeGrad)"/>
-  <polygon points="${SOURCE_W * 0.6},0 ${SOURCE_W},0 ${SOURCE_W},${SOURCE_H} ${SOURCE_W * 0.4},${SOURCE_H}" fill="url(#awayGrad)"/>
-  <line x1="${SOURCE_W / 2 - 30}" y1="0" x2="${SOURCE_W / 2 + 30}" y2="${SOURCE_H}" stroke="rgba(255,255,255,0.85)" stroke-width="3" filter="url(#seamBlur)" opacity="0.7"/>
-  <rect width="${SOURCE_W}" height="${SOURCE_H}" fill="url(#scanlines)" style="mix-blend-mode:overlay"/>
-  <rect width="${SOURCE_W}" height="${SOURCE_H}" fill="url(#vignette)"/>
-  ${sportGlyph(m.sport_icon, SOURCE_W / 2, SOURCE_H / 2, 420, 'white', 0.06)}
-  <text class="bebas" x="58" y="28" font-size="12" fill="white" letter-spacing="0.1em">${e(m.league.toUpperCase())}</text>
-  <text class="mono" x="58" y="40" font-size="7" fill="white" opacity="0.65" letter-spacing="2.5">${e(m.sport.toUpperCase())}</text>
-  <circle cx="${SOURCE_W - 44}" cy="28" r="3.5" fill="#ef4444" filter="url(#redGlow)"/>
-  <text class="sans" x="${SOURCE_W - 34}" y="32" font-size="9.5" font-weight="700" fill="white" letter-spacing="2">LIVE</text>
-  ${heroVisual}
-  <text class="mono" x="${SOURCE_W / 2}" y="${SOURCE_H / 2 + 98}" text-anchor="middle" font-size="9" fill="rgba(255,255,255,0.85)" letter-spacing="2.5">- ${e(m.round.toUpperCase())} -</text>
-  <rect x="0" y="${SOURCE_H - 130}" width="${SOURCE_W}" height="130" fill="url(#lowerThird)"/>
-  ${lowerThird}
-  <line x1="18" y1="${SOURCE_H - 38}" x2="${SOURCE_W - 18}" y2="${SOURCE_H - 38}" stroke="rgba(255,255,255,0.4)" stroke-width="0.6"/>
-  <text class="mono" x="18" y="${SOURCE_H - 22}" font-size="9" fill="rgba(255,255,255,0.7)" letter-spacing="1.6">${e(m.venue.toUpperCase())}</text>
-  <text class="mono" x="${SOURCE_W - 18}" y="${SOURCE_H - 22}" text-anchor="end" font-size="9" fill="rgba(255,255,255,0.7)" letter-spacing="1.6">${e([m.date, m.time.toUpperCase()].filter(Boolean).join(' - '))}</text>`
-  return wrapTemplateSvg(inner, slots, variant)
+  <g data-role="broadcast-layout" data-layout-family="BROADCAST" data-layout-style="sportsmeta-default-poster" data-palette="${e(palette.key)}">
+    <rect width="${BROADCAST_W}" height="${BROADCAST_H}" fill="url(#broadcastBgGradient)"/>
+    <rect width="${BROADCAST_W}" height="${BROADCAST_H}" fill="url(#broadcastBgGlow)"/>
+    <rect width="${BROADCAST_W}" height="${BROADCAST_H}" fill="url(#broadcastFineLines)" opacity="0.44"/>
+    <g data-role="broadcast-pattern" opacity="0.9">${pattern}</g>
+    <rect data-role="inner-border" x="30" y="30" width="540" height="840" rx="28" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+    <rect data-role="accent-top" x="30" y="30" width="540" height="4" rx="2" fill="${palette.accent}"/>
+    <rect data-role="accent-bottom" x="30" y="866" width="540" height="4" rx="2" fill="url(#broadcastAccentStripe)"/>
+    <g data-role="pill-badge">
+      <rect x="42" y="42" width="${pillWidth}" height="34" rx="17" fill="${palette.pill}" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
+      <text data-role="broadcast-label" x="56" y="64" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="14" font-weight="700" fill="#ffffff" letter-spacing="2">${e(label)}</text>
+    </g>
+    ${maybeLive}
+    ${titleBlock}
+    ${subtitle ? `<text data-role="broadcast-subtitle" x="50" y="812" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="${subtitleFont}" font-weight="600" fill="rgba(255,255,255,0.85)" letter-spacing="1">${e(subtitle.toUpperCase())}</text>` : ''}
+    <text data-role="broadcast-wordmark" x="50" y="844" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="12" font-weight="700" fill="rgba(255,255,255,0.55)" letter-spacing="4">${e(BROADCAST_WORDMARK)}</text>
+  </g>
+</svg>`
+  return {
+    svg,
+    slots: [],
+    overlay: ''
+  }
 }
 
 function renderSportsbook(event = {}, variant = 'poster', theme = {}, mode = '') {
@@ -819,13 +1230,19 @@ function renderGlitch(event = {}, variant = 'poster', theme = {}, mode = '') {
 
 function renderSportsPosterTemplateSvg({ event = {}, variant = 'poster', template = 'editorial', theme = {}, mode = '' } = {}) {
   const normalizedTemplate = normalizeSportsPosterTemplate(template)
-  if (normalizedTemplate === 'broadcast') return renderBroadcast(event, variant, theme, mode)
-  if (normalizedTemplate === 'sportsbook') return renderSportsbook(event, variant, theme, mode)
-  if (normalizedTemplate === 'trading-card') return renderTradingCard(event, variant, theme, mode)
-  if (normalizedTemplate === 'brutalist') return renderBrutalist(event, variant, theme, mode)
-  if (normalizedTemplate === 'ticket-stub') return renderTicketStub(event, variant, theme, mode)
-  if (normalizedTemplate === 'glitch') return renderGlitch(event, variant, theme, mode)
-  return renderEditorial(event, variant, theme, mode)
+  let artwork
+  if (normalizedTemplate === 'broadcast') artwork = renderBroadcast(event, variant, theme, mode)
+  else if (normalizedTemplate === 'sportsbook') artwork = renderSportsbook(event, variant, theme, mode)
+  else if (normalizedTemplate === 'trading-card') artwork = renderTradingCard(event, variant, theme, mode)
+  else if (normalizedTemplate === 'brutalist') artwork = renderBrutalist(event, variant, theme, mode)
+  else if (normalizedTemplate === 'ticket-stub') artwork = renderTicketStub(event, variant, theme, mode)
+  else if (normalizedTemplate === 'glitch') artwork = renderGlitch(event, variant, theme, mode)
+  else artwork = renderEditorial(event, variant, theme, mode)
+  return {
+    ...artwork,
+    template: normalizedTemplate,
+    layoutFamily: layoutFamilyForSportsPosterTemplate(normalizedTemplate)
+  }
 }
 
 function sportGlyphMarkup(icon = 'sports', size = 256) {
@@ -848,7 +1265,10 @@ function renderLogoGlyphSvg({ role = 'league', event = {}, theme = {}, size = 25
 
 module.exports = {
   SPORTS_POSTER_TEMPLATES,
+  SPORTS_POSTER_LAYOUT_FAMILIES,
   TEMPLATE_LABELS,
+  isBroadcastLayoutFamily,
+  layoutFamilyForSportsPosterTemplate,
   normalizeSportsPosterTemplate,
   resolveSportsPosterTemplate,
   renderLogoGlyphSvg,

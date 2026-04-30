@@ -27,8 +27,8 @@ The shared Contabo VM does not make them the same product.
 - `/:config/stream/...`, local `/file`, `/playback`, and route-specific install/config flows
 - internal `pvtkrrx:` ids for its own sports/library rows
 - tracker availability anchoring plus `pvtkrrx:` fallback ids for unresolved sports rows
-- rendering SportsMeta-owned public canonical or default artwork through PVTKRRX `/sports-artwork/...png` proxy URLs, including client-safe fallback poster, landscape, and background composition from SportsMeta event/badge routes when the upstream canonical artwork is only generated/SVG artwork
-- storing an optional Sports Posters member token in encrypted config and emitting SportsMeta member artwork URLs for sports poster/background/logo assets only
+- rendering SportsMeta-owned public canonical or default artwork through PVTKRRX `/sports-artwork/...png` proxy URLs, including client-safe free/glyph fallback poster, landscape, and background composition when the upstream canonical artwork is only generated/SVG artwork
+- consuming only SportsMeta public/root artwork routes; Sports Posters member tokens and premium poster bytes stay on SportsMeta member routes
 - no SportsMeta member token issuance, Stripe billing ownership, or local entitlement validation
 - qBittorrent/Prowlarr integration and actual stream attachment
 
@@ -90,9 +90,9 @@ The shared Contabo VM does not make them the same product.
 
 - PVTKRRX remains free.
 - Sports Posters is a SportsMeta entitlement for sports artwork only.
-- Paid PVTKRRX configs may store `sportsPosterMemberToken`, normalized from either a raw token or a `/member/:token` SportsMeta URL.
-- For canonical `sportsmeta:` sports rows, PVTKRRX emits PVTKRRX `/sports-artwork/...png` raster-proxy URLs. When a `sportsPosterMemberToken` is present, the proxy fetches the matching SportsMeta member asset upstream and normalizes it to the declared poster, landscape, background, or logo dimensions before Stremio sees it.
-- Free/fallback sports artwork stays on the same PVTKRRX `/sports-artwork/...png` raster proxy. The proxy calls SportsMeta public/default assets, carries the event title/date when known, and can compose home-vs-away badge artwork for canonical events when SportsMeta does not have real raster artwork.
+- PVTKRRX configs must not become a Sports Posters entitlement transport. The paid install/artwork path is the SportsMeta member URL under `https://sportsmeta.pvtkrrx.cc/member/:token/...`.
+- For canonical `sportsmeta:` sports rows, PVTKRRX emits PVTKRRX `/sports-artwork/...png` raster-proxy URLs backed by SportsMeta public/root routes only. This is a client-compatibility transport for free/public SVG or glyph-style artwork, not a premium route.
+- Free/fallback sports artwork stays on the same PVTKRRX `/sports-artwork/...png` raster proxy. The proxy calls SportsMeta public/default assets, carries the event title/date when known, and must not call member-scoped SportsMeta routes.
 - Stripe is never called by PVTKRRX while catalog/meta/artwork routes are being served.
 - SportsMeta validates the member token locally, reads its SQLite catalogue locally, and streams cached raster assets from `/opt/sportsmeta/data/assets/cache`.
 

@@ -56,6 +56,9 @@ function normalizeSportKey(value) {
   return raw
 }
 
+const NBA_TEAM_PATTERN = /\b(?:houston\s+rockets|los\s+angeles\s+lakers|lakers|rockets|boston\s+celtics|golden\s+state\s+warriors|chicago\s+bulls|new\s+york\s+knicks|miami\s+heat|dallas\s+mavericks|denver\s+nuggets|phoenix\s+suns|milwaukee\s+bucks|philadelphia\s+76ers)\b/i
+const SNOOKER_PLAYER_PATTERN = /\b(?:john\s+higgins|shaun\s+murphy|ronnie\s+o['\s._-]*sullivan|judd\s+trump|mark\s+selby|mark\s+allen|neil\s+robertson|kyren\s+wilson|ding\s+junhui|mark\s+williams|stephen\s+maguire|jack\s+lisowski)\b/i
+
 function detectStrongSportHintFromTitle(title) {
   const value = String(title || '')
   if (!value.trim()) return ''
@@ -83,6 +86,8 @@ function detectStrongSportHintFromTitle(title) {
   for (const [sport, pattern] of rules) {
     if (pattern.test(value)) return sport
   }
+  if (NBA_TEAM_PATTERN.test(value)) return 'basketball'
+  if (SNOOKER_PLAYER_PATTERN.test(value)) return 'snooker'
   return ''
 }
 

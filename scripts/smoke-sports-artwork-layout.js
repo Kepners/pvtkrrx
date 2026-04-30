@@ -579,7 +579,7 @@ function sportsMetaRasterHeaders() {
     'content-type': 'image/png',
     'x-sportsmeta-delivery-format': 'raster',
     'x-sportsmeta-source': 'cached-asset',
-    'x-sportsmeta-asset-class': 'member-homebadge-raster',
+    'x-sportsmeta-asset-class': 'public-homebadge-raster',
     'x-sportsmeta-generated-asset': 'false'
   }
 }
@@ -604,8 +604,8 @@ async function assertTeamBadgeArtworkProxy() {
     global.fetch = async (input) => {
       const url = new URL(String(input))
       if (
-        url.pathname === `/member/test-token/asset/poster/${encodeURIComponent(canonicalId)}` ||
-        url.pathname === `/member/test-token/asset/landscape/${encodeURIComponent(canonicalId)}`
+        url.pathname === `/asset/poster/${encodeURIComponent(canonicalId)}` ||
+        url.pathname === `/asset/landscape/${encodeURIComponent(canonicalId)}`
       ) {
         return new Response('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900"></svg>', {
           status: 200,
@@ -615,7 +615,7 @@ async function assertTeamBadgeArtworkProxy() {
           }
         })
       }
-      if (url.pathname === `/member/test-token/asset/landscape/${encodeURIComponent(invalidLandscapeCanonicalId)}`) {
+      if (url.pathname === `/asset/landscape/${encodeURIComponent(invalidLandscapeCanonicalId)}`) {
         return new Response(invalidLandscapeRaster, {
           status: 200,
           headers: { 'content-type': 'image/jpeg' }
@@ -634,8 +634,8 @@ async function assertTeamBadgeArtworkProxy() {
             awayTeam: 'Vegas Golden Knights'
           },
           assets: {
-            homeBadge: `https://sportsmeta.test/member/test-token/asset/homeBadge/${encodeURIComponent(canonicalId)}`,
-            awayBadge: `https://sportsmeta.test/member/test-token/asset/awayBadge/${encodeURIComponent(canonicalId)}`
+            homeBadge: `https://sportsmeta.test/asset/homeBadge/${encodeURIComponent(canonicalId)}`,
+            awayBadge: `https://sportsmeta.test/asset/awayBadge/${encodeURIComponent(canonicalId)}`
           }
         }), {
           status: 200,
@@ -655,8 +655,8 @@ async function assertTeamBadgeArtworkProxy() {
             awayTeam: 'California Legion'
           },
           assets: {
-            homeBadge: `https://sportsmeta.test/member/test-token/asset/homeBadge/${encodeURIComponent(invalidLandscapeCanonicalId)}`,
-            awayBadge: `https://sportsmeta.test/member/test-token/asset/awayBadge/${encodeURIComponent(invalidLandscapeCanonicalId)}`
+            homeBadge: `https://sportsmeta.test/asset/homeBadge/${encodeURIComponent(invalidLandscapeCanonicalId)}`,
+            awayBadge: `https://sportsmeta.test/asset/awayBadge/${encodeURIComponent(invalidLandscapeCanonicalId)}`
           }
         }), {
           status: 200,
@@ -687,9 +687,9 @@ async function assertTeamBadgeArtworkProxy() {
             awayTeam: 'Vegas Golden Knights'
           },
           assets: {
-            poster: `https://sportsmeta.test/member/default-token/asset/poster/${encodeURIComponent(canonicalId)}`,
-            homeBadge: `https://sportsmeta.test/member/default-token/asset/homeBadge/${encodeURIComponent(canonicalId)}`,
-            awayBadge: `https://sportsmeta.test/member/default-token/asset/awayBadge/${encodeURIComponent(canonicalId)}`
+            poster: `https://sportsmeta.test/asset/poster/${encodeURIComponent(canonicalId)}`,
+            homeBadge: `https://sportsmeta.test/asset/homeBadge/${encodeURIComponent(canonicalId)}`,
+            awayBadge: `https://sportsmeta.test/asset/awayBadge/${encodeURIComponent(canonicalId)}`
           }
         }), {
           status: 200,
@@ -702,7 +702,7 @@ async function assertTeamBadgeArtworkProxy() {
           headers: { 'content-type': 'text/plain' }
         })
       }
-      if (url.pathname === `/member/default-token/asset/poster/${encodeURIComponent(canonicalId)}`) {
+      if (url.pathname === `/asset/poster/${encodeURIComponent(canonicalId)}`) {
         return new Response('<svg xmlns="http://www.w3.org/2000/svg" width="600" height="900"></svg>', {
           status: 200,
           headers: {
@@ -711,27 +711,27 @@ async function assertTeamBadgeArtworkProxy() {
           }
         })
       }
-      if (url.pathname === `/member/default-token/asset/homeBadge/${encodeURIComponent(canonicalId)}`) {
+      if (url.pathname === `/asset/homeBadge/${encodeURIComponent(canonicalId)}`) {
         return new Response(await teamBadgePng('#155e75', '#0e7490'), {
           status: 200,
           headers: sportsMetaRasterHeaders()
         })
       }
-      if (url.pathname === `/member/default-token/asset/awayBadge/${encodeURIComponent(canonicalId)}`) {
+      if (url.pathname === `/asset/awayBadge/${encodeURIComponent(canonicalId)}`) {
         return new Response(await teamBadgePng('#92400e', '#fbbf24'), {
           status: 200,
           headers: sportsMetaRasterHeaders()
         })
       }
-      if (url.pathname === `/member/default-token/asset/leagueLogo/${encodeURIComponent(canonicalId)}`) {
+      if (url.pathname === `/asset/leagueLogo/${encodeURIComponent(canonicalId)}`) {
         return new Response(await teamBadgePng('#111827', '#38bdf8'), {
           status: 200,
           headers: sportsMetaRasterHeaders()
         })
       }
       if (
-        url.pathname === `/member/test-token/asset/homeBadge/${encodeURIComponent(canonicalId)}` ||
-        url.pathname === `/member/test-token/asset/homeBadge/${encodeURIComponent(invalidLandscapeCanonicalId)}`
+        url.pathname === `/asset/homeBadge/${encodeURIComponent(canonicalId)}` ||
+        url.pathname === `/asset/homeBadge/${encodeURIComponent(invalidLandscapeCanonicalId)}`
       ) {
         return new Response(await teamBadgePng('#155e75', '#0e7490'), {
           status: 200,
@@ -739,8 +739,8 @@ async function assertTeamBadgeArtworkProxy() {
         })
       }
       if (
-        url.pathname === `/member/test-token/asset/awayBadge/${encodeURIComponent(canonicalId)}` ||
-        url.pathname === `/member/test-token/asset/awayBadge/${encodeURIComponent(invalidLandscapeCanonicalId)}`
+        url.pathname === `/asset/awayBadge/${encodeURIComponent(canonicalId)}` ||
+        url.pathname === `/asset/awayBadge/${encodeURIComponent(invalidLandscapeCanonicalId)}`
       ) {
         return new Response(await teamBadgePng('#92400e', '#fbbf24'), {
           status: 200,
@@ -748,8 +748,8 @@ async function assertTeamBadgeArtworkProxy() {
         })
       }
       if (
-        url.pathname === `/member/test-token/asset/leagueLogo/${encodeURIComponent(canonicalId)}` ||
-        url.pathname === `/member/test-token/asset/leagueLogo/${encodeURIComponent(invalidLandscapeCanonicalId)}`
+        url.pathname === `/asset/leagueLogo/${encodeURIComponent(canonicalId)}` ||
+        url.pathname === `/asset/leagueLogo/${encodeURIComponent(invalidLandscapeCanonicalId)}`
       ) {
         return new Response(await teamBadgePng('#111827', '#38bdf8'), {
           status: 200,
@@ -777,7 +777,7 @@ async function assertTeamBadgeArtworkProxy() {
       )
       assert.equal(response.statusCode, 200, `team badge ${variant} proxy should return 200`)
       assert.equal(response.headers['content-type'], 'image/png', `team badge ${variant} proxy should return PNG`)
-      assert.equal(response.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-paid-template', `central ${variant} proxy should replace SportsMeta SVG layout with paid template art`)
+      assert.match(response.headers['x-pvtkrrx-artwork-source'], /^pvtkrrx-(?:template-glyph|public-template)$/, `central ${variant} proxy should stay on public/glyph artwork`)
       assert.equal(response.headers['x-pvtkrrx-sports-event-class'], 'team_vs_team', `central ${variant} proxy should classify team-vs-team events`)
       assert.match(response.headers['x-pvtkrrx-artwork-fallback'] || '', /sportsmeta_central_svg_layout_replaced_with_team_badges/, `central ${variant} proxy should report the local template replacement`)
       assert.ok(Buffer.isBuffer(response.body), `team badge ${variant} proxy should return bytes`)
@@ -803,8 +803,8 @@ async function assertTeamBadgeArtworkProxy() {
       )
       assert.equal(response.statusCode, 200, `${template} template should return 200`)
       assert.equal(response.headers['content-type'], 'image/png', `${template} template should return PNG`)
-      assert.equal(response.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-paid-template', `${template} template should use paid template artwork`)
-      assert.equal(response.headers['x-pvtkrrx-artwork-template'], template, `${template} template should be reported in response headers`)
+      assert.match(response.headers['x-pvtkrrx-artwork-source'], /^pvtkrrx-(?:template-glyph|public-template)$/, `${template} template request should stay on public/glyph artwork`)
+      assert.equal(response.headers['x-pvtkrrx-artwork-template'], template, `${template} template request should select the requested Sports Posters template`)
       assert.equal(response.headers['x-pvtkrrx-sports-event-class'], 'team_vs_team', `${template} template should preserve team-vs-team classification`)
       assert.deepEqual(pngDimensions(response.body), dimensions.poster, `${template} template poster dimensions`)
       fs.writeFileSync(path.join(PREVIEW_DIR, `template-${template}-poster.png`), response.body)
@@ -827,7 +827,7 @@ async function assertTeamBadgeArtworkProxy() {
     )
     assert.equal(invalidLandscapeResponse.statusCode, 200, 'invalid member landscape proxy should return 200')
     assert.equal(invalidLandscapeResponse.headers['content-type'], 'image/png', 'invalid member landscape proxy should return PNG')
-    assert.equal(invalidLandscapeResponse.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-paid-template', 'invalid member landscape should be replaced with paid template art')
+    assert.match(invalidLandscapeResponse.headers['x-pvtkrrx-artwork-source'], /^pvtkrrx-(?:template-glyph|public-template)$/, 'invalid landscape should stay on public/glyph artwork')
     assert.equal(invalidLandscapeResponse.headers['x-pvtkrrx-sports-event-class'], 'team_vs_team', 'invalid member landscape should preserve team-vs-team classification')
     assert.match(
       invalidLandscapeResponse.headers['x-pvtkrrx-artwork-fallback'] || '',
@@ -859,15 +859,15 @@ async function assertTeamBadgeArtworkProxy() {
     )
     assert.equal(defaultResolvedResponse.statusCode, 200, 'default artwork resolver should return 200')
     assert.equal(defaultResolvedResponse.headers['content-type'], 'image/png', 'default artwork resolver should return PNG')
-    assert.equal(defaultResolvedResponse.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-paid-template', 'default artwork resolver should use paid template artwork when resolvable')
+    assert.match(defaultResolvedResponse.headers['x-pvtkrrx-artwork-source'], /^pvtkrrx-(?:template-glyph|public-template)$/, 'default artwork resolver should stay on public/glyph artwork')
     assert.equal(defaultResolvedResponse.headers['x-pvtkrrx-sports-event-class'], 'team_vs_team', 'default artwork resolver should classify resolved team events')
-    assert.match(defaultResolvedResponse.headers['x-pvtkrrx-artwork-upstream'] || '', /\/member\/\[redacted\]\/asset\/poster\/sportsmeta/, 'default artwork resolver should switch to the member canonical poster route')
+    assert.doesNotMatch(defaultResolvedResponse.headers['x-pvtkrrx-artwork-upstream'] || '', /\/member\//, 'default artwork resolver must not switch to a member canonical poster route')
     assert.deepEqual(pngDimensions(defaultResolvedResponse.body), dimensions.poster, 'default artwork resolver poster dimensions')
     fs.writeFileSync(path.join(PREVIEW_DIR, 'default-resolved-team-badge-poster.png'), defaultResolvedResponse.body)
 
     const noLogoCases = [
       {
-        slug: 'paid-template-football-no-logo',
+        slug: 'public-template-football-no-logo',
         sport: 'football.png',
         query: {
           league: 'English Premier League',
@@ -881,7 +881,7 @@ async function assertTeamBadgeArtworkProxy() {
         expectedTemplate: 'ticket-stub'
       },
       {
-        slug: 'paid-template-f1-no-logo',
+        slug: 'public-template-f1-no-logo',
         sport: 'motorsport.png',
         query: {
           league: 'Formula 1',
@@ -894,7 +894,7 @@ async function assertTeamBadgeArtworkProxy() {
         expectedTemplate: 'ticket-stub'
       },
       {
-        slug: 'paid-template-ufc-no-logo',
+        slug: 'public-template-ufc-no-logo',
         sport: 'mma.png',
         query: {
           league: 'UFC',
@@ -909,7 +909,7 @@ async function assertTeamBadgeArtworkProxy() {
         expectedTemplate: 'ticket-stub'
       },
       {
-        slug: 'paid-template-tennis-no-logo',
+        slug: 'public-template-tennis-no-logo',
         sport: 'tennis.png',
         query: {
           league: 'Wimbledon',
@@ -942,7 +942,7 @@ async function assertTeamBadgeArtworkProxy() {
       )
       assert.equal(response.statusCode, 200, `${testCase.slug} should return 200`)
       assert.equal(response.headers['content-type'], 'image/png', `${testCase.slug} should return PNG`)
-      assert.equal(response.headers['x-pvtkrrx-artwork-source'], 'pvtkrrx-paid-template', `${testCase.slug} should use paid no-logo template art`)
+      assert.match(response.headers['x-pvtkrrx-artwork-source'], /^pvtkrrx-(?:template-glyph|public-template)$/, `${testCase.slug} should use public/glyph template art`)
       assert.equal(response.headers['x-pvtkrrx-sports-event-class'], testCase.expectedClass, `${testCase.slug} classification`)
       assert.equal(response.headers['x-pvtkrrx-artwork-template'], testCase.expectedTemplate, `${testCase.slug} selected template`)
       assert.doesNotMatch(response.headers['x-pvtkrrx-artwork-source'], /generated-card|team-badge|emergency-svg|emergency-legacy/, `${testCase.slug} should not use old generated or emergency art`)
