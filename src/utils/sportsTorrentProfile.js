@@ -3,6 +3,7 @@ const { getMappedLeagueEntry, mapLeague } = require('./leagueMap')
 const { normalizeSportKey, resolveSportHint } = require('./sportsRules')
 const { parseSportsTitle, parseSportsEventTitle } = require('./sportsTitleParser')
 const { classifySportsEvent } = require('./sportsEventClassifier')
+const { mapSportsCultCategory } = require('../config/sportsCultCategoryMap')
 
 const BROADCAST_RULES = [
   ['Sky Sports', /\bsky[\s._-]*sports?\b|\bskysports\b/i],
@@ -58,6 +59,18 @@ const ROUND_RULES = [
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
+}
+
+function resolveIndexerCategoryName(itemOrTitle = '', options = {}) {
+  const explicit = normalizeSpace(options.indexerCategoryName || '')
+  if (explicit) return explicit
+  if (!itemOrTitle || typeof itemOrTitle !== 'object') return ''
+
+  const direct = normalizeSpace(itemOrTitle.indexerCategoryName || '')
+  if (direct) return direct
+
+  const indexer = normalizeSpace(itemOrTitle.indexer || '')
+  return mapSportsCultCategory(indexer) ? indexer : ''
 }
 
 function titleCase(value) {
@@ -241,7 +254,7 @@ function parseSportsTorrentProfile(itemOrTitle = '', options = {}) {
     awayTeam: profile.away_team,
     rawTitle,
     categoryNames: Array.isArray(itemOrTitle?.categoryNames) ? itemOrTitle.categoryNames : (Array.isArray(options.categoryNames) ? options.categoryNames : []),
-    indexerCategoryName: options.indexerCategoryName || (typeof itemOrTitle === 'object' ? (itemOrTitle?.indexerCategoryName || itemOrTitle?.indexer || '') : '')
+    indexerCategoryName: resolveIndexerCategoryName(itemOrTitle, options)
   })
   profile.clean_name = buildCleanName(profile)
   profile.confidence = confidenceScore(profile)

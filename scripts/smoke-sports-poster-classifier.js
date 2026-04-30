@@ -10,6 +10,7 @@ const {
 const { classifySportsEvent } = require('../src/utils/sportsEventClassifier')
 const { normalizeSportsEventMetadata } = require('../src/utils/sportsEventNormalizer')
 const { ProwlarrClient } = require('../src/clients/prowlarr')
+const { parseSportsTorrentProfile } = require('../src/utils/sportsTorrentProfile')
 
 const REQUIRED_CLASSES = [
   'team_vs_team',
@@ -405,5 +406,33 @@ for (const testCase of [
   assert.equal(classifySportsPosterEvent(event), testCase.expected, `${testCase.slug} poster class`)
   assert.equal(classifySportsEvent(event), testCase.expected, `${testCase.slug} compatibility class`)
 }
+
+const categoryNamesOnlyProfile = parseSportsTorrentProfile({
+  title: 'Premier League Darts Night 1 1080p',
+  categoryNames: ['Darts'],
+  pubDate: '2026-04-29T12:00:00.000Z'
+})
+assert.equal(categoryNamesOnlyProfile.event_class, 'darts_event', 'sports torrent profile should classify from categoryNames alone')
+
+const indexerCategoryOnlyProfile = parseSportsTorrentProfile({
+  title: 'Formula1 British Grand Prix Qualifying 1080p',
+  indexerCategoryName: 'Formula1',
+  pubDate: '2026-04-29T12:00:00.000Z'
+})
+assert.equal(indexerCategoryOnlyProfile.event_class, 'motorsport_event', 'sports torrent profile should classify from indexerCategoryName alone')
+
+const indexerNameOnlyProfile = parseSportsTorrentProfile({
+  title: 'Some Sports Special 2026 1080p',
+  indexer: 'SportsCult',
+  pubDate: '2026-04-29T12:00:00.000Z'
+})
+assert.equal(indexerNameOnlyProfile.event_class, 'generic_event', 'sports torrent profile must not treat a tracker indexer name as category truth')
+
+const genuineCategoryIndexerProfile = parseSportsTorrentProfile({
+  title: 'Formula1 British Grand Prix Qualifying 1080p',
+  indexer: 'Formula1',
+  pubDate: '2026-04-29T12:00:00.000Z'
+})
+assert.equal(genuineCategoryIndexerProfile.event_class, 'motorsport_event', 'sports torrent profile may use item.indexer only when it is itself a known SportsCult category')
 
 console.log(`Sports poster classifier smoke passed. classes=${[...seen].join(',')}`)

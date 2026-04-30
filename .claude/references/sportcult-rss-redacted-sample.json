@@ -1,6 +1,6 @@
 {
   "generatedAt": "2026-04-30T16:01:04.665Z",
-  "source": "sportscult.org RSS feed (passkey/pid redacted, download URLs stripped)",
+  "source": "sportscult.org RSS feed (credentials redacted, download URLs stripped)",
   "note": "Regenerated from the existing redacted titles with the current PVTKRRX normalizer/classifier. SportsCult RSS embeds category in [Brackets] at start of title; categoryNames XML element was absent on the captured feed, so bracket categories are replayed as categoryNames/indexerCategoryName for audit reasoning. parsedHome/parsedAway are current normalized fields only; poster classification does not invent missing pairs from tracker/indexer names.",
   "itemCount": 20,
   "samples": [
