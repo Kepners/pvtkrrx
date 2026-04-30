@@ -251,19 +251,29 @@ function fitTextAttributes(value = '', maxWidth = 120, baseSize = 16, minSize = 
   return attrs.join(' ')
 }
 
+function letterStartingWords(words = []) {
+  return words.filter((word) => /^[A-Za-z]/.test(word))
+}
+
 function initialsFor(value = '', fallback = 'SP') {
   const clean = normalizeSpace(value).replace(/[^A-Za-z0-9 ]+/g, ' ')
   const words = clean.split(/\s+/).filter(Boolean)
-  if (words.length >= 2) return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase()
-  if (words.length === 1) return words[0].slice(0, 3).toUpperCase()
+  const lettered = letterStartingWords(words)
+  if (lettered.length >= 2) {
+    return `${lettered[0][0]}${lettered[lettered.length - 1][0]}`.toUpperCase()
+  }
+  const single = lettered[0] || words[0]
+  if (single) return single.slice(0, 3).toUpperCase()
   return fallback
 }
 
 function shortFor(value = '', fallback = 'SP') {
   const clean = normalizeSpace(value).replace(/[^A-Za-z0-9 ]+/g, ' ')
   const words = clean.split(/\s+/).filter(Boolean)
-  if (words.length >= 2) return words.map((word) => word[0]).join('').slice(0, 4).toUpperCase()
-  if (words.length === 1) return words[0].slice(0, 3).toUpperCase()
+  const lettered = letterStartingWords(words)
+  if (lettered.length >= 2) return lettered.map((word) => word[0]).join('').slice(0, 4).toUpperCase()
+  const single = lettered[0] || words[0]
+  if (single) return single.slice(0, 3).toUpperCase()
   return fallback
 }
 

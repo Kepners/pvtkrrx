@@ -51,6 +51,32 @@ const FIXTURES = [
     expectedHome: 'Philadelphia Flyers',
     expectedAway: 'Pittsburgh Penguins',
     expectedLabel: /^(?:NHL|HOCKEY)$/
+  },
+  {
+    // Edge case: 3-word team where the third word starts with a digit ("49ers").
+    // The generic fallback must skip digit-prefixed words when assembling the
+    // serial code so we get "SF" instead of "S4". No SportsMeta identity supplied
+    // so this proves the generic algorithm.
+    slug: 'nfl-49ers-chiefs-generic-fallback',
+    rawTitle: 'San Francisco 49ers vs Kansas City Chiefs',
+    sportHint: 'american-football',
+    competition: 'NFL',
+    expectedHome: 'San Francisco 49ers',
+    expectedAway: 'Kansas City Chiefs',
+    expectedLabel: /^(?:NFL|FOOTBALL)$/,
+    expectedSerial: /^#SF-KC[A-Z]?-/
+  },
+  {
+    // Edge case: 3-word teams where the generic fallback must produce a multi-letter
+    // acronym from each letter-starting word. No SportsMeta identity supplied.
+    slug: 'mlb-yankees-redsox-generic-fallback',
+    rawTitle: 'New York Yankees vs Boston Red Sox',
+    sportHint: 'baseball',
+    competition: 'MLB',
+    expectedHome: 'New York Yankees',
+    expectedAway: 'Boston Red Sox',
+    expectedLabel: /^(?:MLB|BASEBALL)$/,
+    expectedSerial: /^#NYY-BRS-/
   }
 ]
 
@@ -197,12 +223,29 @@ function assertRuntimeTeamPoster(fixture) {
   assertTeamLayoutGeometry(`${fixture.slug} runtime`, homeBox, awayBox, versusBox, SOURCE_BOX)
   assertNoBadTeamText(`${fixture.slug} runtime`, artwork.svg, fixture.expectedHome, fixture.expectedAway)
   assertNoEmptyDateTime(`${fixture.slug} runtime`, artwork.svg)
+  if (fixture.expectedSerial) {
+    assert.match(artwork.svg, fixture.expectedSerial, `${fixture.slug} stub serial matches expected pattern`)
+  }
+  // Slot coordinates are what the badge-composite path consumes when SportsMeta
+  // returns real team logos. Lock the staggered home-higher-left / away-lower-right
+  // positions so future template tweaks can't silently shift the composite slots.
+  assert.deepEqual(
+    artwork.slots.find((slot) => slot.role === 'home'),
+    { role: 'home', size: 132, left: 96, top: 242 },
+    `${fixture.slug} home composite slot coordinates`
+  )
+  assert.deepEqual(
+    artwork.slots.find((slot) => slot.role === 'away'),
+    { role: 'away', size: 132, left: 372, top: 467 },
+    `${fixture.slug} away composite slot coordinates`
+  )
   return {
     layoutFamily: artwork.layoutFamily,
     homeVisualBox: homeBox,
     awayVisualBox: awayBox,
     versusBox,
-    selectedTemplate: asset.selectedTemplate
+    selectedTemplate: asset.selectedTemplate,
+    slots: artwork.slots
   }
 }
 

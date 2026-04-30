@@ -169,20 +169,30 @@ function sanitizeIdentityCode(value = '', maxLen = 6) {
   return clean.slice(0, maxLen)
 }
 
+function letterStartingWords(words = []) {
+  return words.filter((word) => /^[A-Za-z]/.test(word))
+}
+
 function shortCode(value = '', fallback = 'EVT') {
   const clean = cleanDisplayText(value, fallback)
   const words = clean.replace(/[^a-z0-9 ]+/gi, ' ').split(/\s+/).filter(Boolean)
-  const code = words.length >= 2
-    ? words.map((word) => word[0]).join('')
-    : (words[0] || fallback).slice(0, 3)
+  const lettered = letterStartingWords(words)
+  // For multi-word names, build an acronym from words that start with a letter
+  // so digit-prefixed segments like "49ers" don't pollute the code with "4".
+  const code = lettered.length >= 2
+    ? lettered.map((word) => word[0]).join('')
+    : (lettered[0] || words[0] || fallback).slice(0, 3)
   return (code || fallback).slice(0, 6).toUpperCase()
 }
 
 function initials(value = '', fallback = 'EV') {
   const clean = cleanDisplayText(value, fallback)
   const words = clean.replace(/[^a-z0-9 ]+/gi, ' ').split(/\s+/).filter(Boolean)
-  if (words.length >= 2) return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase()
-  return (words[0] || fallback).slice(0, 3).toUpperCase()
+  const lettered = letterStartingWords(words)
+  if (lettered.length >= 2) {
+    return `${lettered[0][0]}${lettered[lettered.length - 1][0]}`.toUpperCase()
+  }
+  return (lettered[0] || words[0] || fallback).slice(0, 3).toUpperCase()
 }
 
 function sportLabel(input = {}) {
