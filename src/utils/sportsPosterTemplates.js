@@ -64,17 +64,6 @@ const LEAGUE_CODE_ALIASES = Object.freeze({
   wimbledon: 'ATP'
 })
 
-const TEAM_CODE_OVERRIDES = Object.freeze({
-  arsenal: 'ARS',
-  'manchester city': 'MCI',
-  'houston rockets': 'HOU',
-  'los angeles lakers': 'LAL',
-  'cleveland cavaliers': 'CLE',
-  'toronto raptors': 'TOR',
-  'philadelphia flyers': 'PHI',
-  'pittsburgh penguins': 'PIT'
-})
-
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
 }
@@ -262,28 +251,29 @@ function fitTextAttributes(value = '', maxWidth = 120, baseSize = 16, minSize = 
   return attrs.join(' ')
 }
 
+function letterStartingWords(words = []) {
+  return words.filter((word) => /^[A-Za-z]/.test(word))
+}
+
 function initialsFor(value = '', fallback = 'SP') {
-  const override = teamInitialsFor(value, '')
-  if (override) return override
   const clean = normalizeSpace(value).replace(/[^A-Za-z0-9 ]+/g, ' ')
   const words = clean.split(/\s+/).filter(Boolean)
-  if (words.length >= 2) return `${words[0][0]}${words[words.length - 1][0]}`.toUpperCase()
-  if (words.length === 1) return words[0].slice(0, 3).toUpperCase()
+  const lettered = letterStartingWords(words)
+  if (lettered.length >= 2) {
+    return `${lettered[0][0]}${lettered[lettered.length - 1][0]}`.toUpperCase()
+  }
+  const single = lettered[0] || words[0]
+  if (single) return single.slice(0, 3).toUpperCase()
   return fallback
 }
 
-function teamInitialsFor(value = '', fallback = 'SP') {
-  const key = normalizeSpace(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
-  return TEAM_CODE_OVERRIDES[key] || fallback
-}
-
 function shortFor(value = '', fallback = 'SP') {
-  const override = teamInitialsFor(value, '')
-  if (override) return override
   const clean = normalizeSpace(value).replace(/[^A-Za-z0-9 ]+/g, ' ')
   const words = clean.split(/\s+/).filter(Boolean)
-  if (words.length >= 2) return words.map((word) => word[0]).join('').slice(0, 4).toUpperCase()
-  if (words.length === 1) return words[0].slice(0, 4).toUpperCase()
+  const lettered = letterStartingWords(words)
+  if (lettered.length >= 2) return lettered.map((word) => word[0]).join('').slice(0, 4).toUpperCase()
+  const single = lettered[0] || words[0]
+  if (single) return single.slice(0, 3).toUpperCase()
   return fallback
 }
 
@@ -1243,10 +1233,10 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
   <line x1="0" y1="${SOURCE_H - 117}" x2="${SOURCE_W}" y2="${SOURCE_H - 117}" stroke="rgba(60,40,15,0.45)" stroke-dasharray="3 3"/>
   ${perfRow(SOURCE_H - 108)}
   <line x1="0" y1="${SOURCE_H - 100}" x2="${SOURCE_W}" y2="${SOURCE_H - 100}" stroke="rgba(60,40,15,0.45)" stroke-dasharray="3 3"/>
-  <text class="mono" x="22" y="${stubY + 22}" font-size="8" fill="#5a3a1f" letter-spacing="2" font-weight="700">DATE</text>
-  <text class="mono" x="22" y="${stubY + 38}" font-size="14" fill="#1a1410">${e(m.date)}</text>
-  <text class="mono" x="22" y="${stubY + 58}" font-size="8" fill="#5a3a1f" letter-spacing="2" font-weight="700">KICKOFF</text>
-  <text class="mono" x="22" y="${stubY + 74}" font-size="14" fill="#1a1410">${e(m.time)}</text>
+  ${m.date ? `<text class="mono" x="22" y="${stubY + 22}" font-size="8" fill="#5a3a1f" letter-spacing="2" font-weight="700">DATE</text>
+  <text class="mono" x="22" y="${stubY + 38}" font-size="14" fill="#1a1410">${e(m.date)}</text>` : ''}
+  ${m.time ? `<text class="mono" x="22" y="${stubY + 58}" font-size="8" fill="#5a3a1f" letter-spacing="2" font-weight="700">KICKOFF</text>
+  <text class="mono" x="22" y="${stubY + 74}" font-size="14" fill="#1a1410">${e(m.time)}</text>` : ''}
   <text class="sans" x="${SOURCE_W / 2}" y="${stubY + 22}" text-anchor="middle" font-size="8" fill="#5a3a1f" letter-spacing="2" font-weight="700">SECTION</text>
   <text class="bebas" x="${SOURCE_W / 2}" y="${stubY + 44}" text-anchor="middle" font-size="22" fill="#1a1410" letter-spacing="1">A - 12 - 4</text>
   <text class="mono" x="${SOURCE_W / 2}" y="${stubY + 62}" text-anchor="middle" font-size="9" fill="#5a3a1f" letter-spacing="1">#${e(m.home.short)}-${e(m.away.short)}-${e((m.date || '').replace(/-/g, '').slice(2))}</text>

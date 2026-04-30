@@ -17,7 +17,37 @@ To deploy code to real users:
 3. Wait for the new container (`docker ps --format '{{.Names}}\t{{.Image}}'` should show the new SHA in the image tag).
 4. Bust any downstream caches (PVTKRRX raster cache + Caddy `Cache-Control: max-age` window).
 
-**Programmatic Coolify deploy dispatch** (used in this session):
+### GitHub webhook → Coolify auto-deploy (set up 2026-04-30)
+
+GitHub repository webhook is now wired to Coolify so pushes to `main` auto-deploy. No manual `php artisan tinker` dispatch needed for normal pushes.
+
+| Field | Value |
+|---|---|
+| GitHub repo settings | `Kepners/pvtkrrx` → Settings → Webhooks |
+| Payload URL | `https://coolify.buildsales.homes/webhooks/source/github/events/manual` |
+| Content type | `application/json` |
+| Secret | stored in Coolify DB only — `applications.manual_webhook_secret_github` for app id 9 (uuid `w14jewmw5ubscrxh8zzfhq7d`). Do not commit the value. |
+| SSL verification | enabled |
+| Events | Just the `push` event |
+| Active | true |
+
+How it works:
+1. `git push origin main` → GitHub fires a `push` webhook to the Payload URL.
+2. Coolify (`POST /webhooks/source/github/events/manual`) verifies the signature against the per-app `manual_webhook_secret_github`, finds app id 9 by repository URL, queues an `ApplicationDeploymentQueue` row, dispatches `App\Jobs\ApplicationDeploymentJob`.
+3. Container rebuild proceeds the same way as a manual deploy.
+
+To verify after a push:
+```bash
+ssh contabo 'docker logs coolify --since 2m 2>&1 | grep -iE "webhook|deploy|pvtkrrx" | tail'
+ssh contabo 'docker exec coolify-db psql -U coolify -c "SELECT id, application_id, status, is_webhook, commit, created_at FROM application_deployment_queues WHERE application_id = 9 ORDER BY id DESC LIMIT 3;"'
+```
+
+If a push fails to trigger:
+1. GitHub repo → Settings → Webhooks → the webhook → Recent Deliveries — look for red X, click for response body.
+2. Check signature mismatch (most common cause): if Coolify returns 401/403 it usually means the secret in GitHub doesn't match `manual_webhook_secret_github` in the Coolify DB.
+3. The `coolify-buildsales` GitHub App (installation id `116123960`) is also installed at the account level. If both the App and the manual webhook are firing for `Kepners/pvtkrrx`, Coolify deduplicates by deployment id but you may see two queue entries; that's harmless.
+
+**Programmatic Coolify deploy dispatch** (manual fallback, used before the webhook was wired):
 ```bash
 ssh contabo 'docker exec coolify php artisan tinker --execute="
 \$app = \App\Models\Application::where(\"uuid\", \"w14jewmw5ubscrxh8zzfhq7d\")->first();
