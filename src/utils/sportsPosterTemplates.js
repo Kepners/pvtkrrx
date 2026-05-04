@@ -1170,12 +1170,30 @@ function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') 
       ${liveDot}
     </g>`
 
-  // Pair branch — diagonal halves + chrome VS + corner initials + lower third
+  // Pair branch — diagonal halves + circular team badges + chrome VS centre + lower third
+  // Badges sit on the diagonal: HOME upper-left of VS (on home half), AWAY lower-right of VS (on away half).
+  // Filled with each side's primary colour, white ring, white code text — readable at thumbnail size.
+  const homePrimary = home.primary || '#1f2a44'
+  const awayPrimary = away.primary || '#3a1c1c'
+  const badgeR = 52
+  const homeBadgeX = 170
+  const homeBadgeY = 320
+  const awayBadgeX = 430
+  const awayBadgeY = 580
+  const codeFontSize = (code) => code.length <= 2 ? 44 : code.length <= 3 ? 38 : 30
   const pairBlock = m.hasMatchup ? `
-    <text class="bebas" data-role="broadcast-initial-home" x="-12" y="480" font-size="330" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.4" letter-spacing="-12">${e(homeShort)}</text>
-    <text class="bebas" data-role="broadcast-initial-away" x="${W + 12}" y="810" text-anchor="end" font-size="330" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.4" letter-spacing="-12">${e(awayShort)}</text>
+    <g data-role="broadcast-home-badge">
+      <circle cx="${homeBadgeX}" cy="${homeBadgeY + 5}" r="${badgeR}" fill="rgba(0,0,0,0.5)" filter="url(#broadcastSeamBlur)"/>
+      <circle cx="${homeBadgeX}" cy="${homeBadgeY}" r="${badgeR}" fill="${homePrimary}" stroke="rgba(255,255,255,0.92)" stroke-width="3"/>
+      <text class="bebas" data-role="broadcast-home-code" x="${homeBadgeX}" y="${homeBadgeY + 14}" text-anchor="middle" font-size="${codeFontSize(homeShort)}" fill="#ffffff" letter-spacing="2">${e(homeShort)}</text>
+    </g>
     <g data-role="broadcast-versus-mark" transform="translate(${W / 2} ${H / 2})">
       <text class="bebas" x="0" y="33" text-anchor="middle" font-size="132" fill="url(#broadcastChrome)" letter-spacing="6" filter="url(#broadcastVsShadow)" transform="skewX(-12)">VS</text>
+    </g>
+    <g data-role="broadcast-away-badge">
+      <circle cx="${awayBadgeX}" cy="${awayBadgeY + 5}" r="${badgeR}" fill="rgba(0,0,0,0.5)" filter="url(#broadcastSeamBlur)"/>
+      <circle cx="${awayBadgeX}" cy="${awayBadgeY}" r="${badgeR}" fill="${awayPrimary}" stroke="rgba(255,255,255,0.92)" stroke-width="3"/>
+      <text class="bebas" data-role="broadcast-away-code" x="${awayBadgeX}" y="${awayBadgeY + 14}" text-anchor="middle" font-size="${codeFontSize(awayShort)}" fill="#ffffff" letter-spacing="2">${e(awayShort)}</text>
     </g>
     ${round ? `<text class="mono" x="${W / 2}" y="${H / 2 + 147}" text-anchor="middle" font-size="14" fill="rgba(255,255,255,0.85)" letter-spacing="2.5">— ${e(round.toUpperCase())} —</text>` : ''}
     <rect x="0" y="${H - 195}" width="${W}" height="195" fill="url(#broadcastBottomBar)"/>
@@ -1210,9 +1228,16 @@ function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') 
   const soloLines = wrapBroadcastSoloTitle(soloTitle, 510)
   const soloFontSize = soloLines.length > 1 ? 44 : (soloTitle.length > 16 ? 46 : 58)
   const soloBaseY = H / 2 + 195 - (soloLines.length - 1) * Math.round(soloFontSize * 0.5)
+  // Solo: dominant league wordmark (F1, UFC, ATP, etc.) replaces the sport glyph
+  // so single-event posters echo the broadcast pair treatment.
+  const leagueMarkRaw = (m.league_code || label || m.sport || '').toString().toUpperCase().slice(0, 6) || 'EVENT'
+  const leagueMarkSize = leagueMarkRaw.length <= 2 ? 220
+    : leagueMarkRaw.length <= 3 ? 180
+    : leagueMarkRaw.length <= 4 ? 140
+    : 100
   const soloBlock = !m.hasMatchup ? `
     <g data-role="broadcast-solo">
-      ${sportGlyph(sportIcon, W / 2, H / 2 - 60, 240, '#ffffff', 0.94, 4)}
+      <text class="bebas" data-role="broadcast-league-mark" x="${W / 2}" y="${H / 2 + 30}" text-anchor="middle" font-size="${leagueMarkSize}" font-weight="900" fill="#ffffff" letter-spacing="-2" filter="url(#broadcastVsShadow)">${e(leagueMarkRaw)}</text>
       ${soloLines.map((line, idx) => `<text data-role="broadcast-title" class="broadcast-title" x="${W / 2}" y="${soloBaseY + idx * Math.round(soloFontSize * 1.05)}" text-anchor="middle" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="${soloFontSize}" font-weight="800" fill="white" letter-spacing="2">${e(line)}</text>`).join('\n      ')}
       ${round ? `<text class="mono" x="${W / 2}" y="${soloBaseY + soloLines.length * Math.round(soloFontSize * 1.05) + 14}" text-anchor="middle" font-size="14" fill="rgba(255,255,255,0.85)" letter-spacing="2.5">— ${e(round.toUpperCase())} —</text>` : ''}
     </g>
