@@ -59,11 +59,13 @@
 - For sports poster artwork, real SportsDB/SportsMeta logos win. PVTKRRX may compose client-safe PNG posters from SportsMeta member `homeBadge`, `awayBadge`, and `leagueLogo` routes server-side, but it must not show text initials when cached/source badge assets exist. Generated sport-specific SVG/PNG fallback is only for unresolved or truly missing-logo rows.
 
 ### Sports Posters Template Source
-- The visual source of truth for Sports Posters templates is `C:\Users\kepne\projects\L - PVTKRRX\PCnestspeaker\python-templates`.
-- Do not redesign these templates from scratch in PVTKRRX. Port/copy the Python template structure and proportions unless the user explicitly provides a newer design source.
-- Template family: `01-editorial`, `02-broadcast`, `03-sportsbook`, `04-trading-card`, `05-brutalist`, `06-ticket-stub`, and `07-glitch`.
-- `06-ticket-stub` is the free/default poster style. Member Sports Posters can use all seven styles.
-- Logo slots must be populated from SportsMeta/SportsDB-derived league, home-team, and away-team images when available. If a real image is missing, use a sport-specific glyph fallback and log the missing image for later DB enrichment.
+- **Live generator (canonical, edit here):** `backdrops/python-backdrops/` inside this repo. Each family lives in its own numbered folder with a `generate.py` and shared helpers under `_shared/`.
+- **External reference designs (read-only, do NOT edit):** `C:\Users\kepne\projects\L - PVTKRRX\PCnestspeaker\python-templates` and `C:\Users\kepne\projects\L - PVTKRRX\backdrops\python-backdrops`. These are design studies for visual proportions only — they do not contain the live `08-team-vs-team` source and are not regenerated when the in-repo generator runs.
+- Do not redesign templates from scratch. Match the visual proportions of the external reference designs unless the user explicitly provides a newer design source.
+- Template family in-repo: `01-editorial`, `02-broadcast`, `03-sportsbook`, `04-trading-card`, `05-brutalist`, `06-ticket-stub`, `07-glitch`, `08-team-vs-team`.
+- `06-ticket-stub` is the free/default poster style. Member Sports Posters can use all eight styles.
+- `08-team-vs-team` is the family for team fixtures (football, NBA, NHL, MLB, NFL, EPL, UCL, etc.) — home higher-left, away lower-right, VS centred. Selection rules and acceptance criteria are governed by [.claude/briefs/team-vs-team-fix.md](.claude/briefs/team-vs-team-fix.md).
+- Logo slots must be populated from SportsMeta endpoints (`/asset/team/{league}/{slug}`, `/asset/league/{league}`, `/asset/default/{variant}/{sport}`). SportsDB is no longer a source — that integration was deleted on 2026-04-22 (see "Sports Poster Cache — REMOVED" below). If a real logo is unavailable, fall back to deterministic clean initials, never to a fabricated logo URL or a both-sides-same-league-logo poster.
 
 ### Sports Poster Cache — REMOVED 2026-04-22
 - PVTKRRX no longer owns a sports image cache. SportsMeta is the only source of sports artwork.
