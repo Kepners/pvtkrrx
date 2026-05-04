@@ -29,3 +29,9 @@ website/
 # Electron build output
 dist/
 Dist/
+
+# Audit harness proof artefacts — regenerable via:
+#   node scripts/audit-contract-compliance.js
+#   node scripts/audit-template-vs-original.js
+# Trackers + briefs ARE committed; only the bulky proof artefacts are ignored.
+.claude/proofs/
