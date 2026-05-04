@@ -6,6 +6,7 @@ const { buildSportsPrewarmJobs } = require('../src/utils/sportsCatalogPrewarm')
 const { resolveSportHint } = require('../src/utils/sportsRules')
 
 const ORIGINAL_SEARCH = ProwlarrClient.prototype.search
+const ORIGINAL_CAPS = ProwlarrClient.prototype.caps
 const ORIGINAL_FETCH = global.fetch
 
 function trackerItem(title, options = {}) {
@@ -114,6 +115,129 @@ async function run() {
     'common tracker typo league codes should not leak football rows into motorsport'
   )
 
+  global.fetch = async (input) => {
+    const url = String(input || '')
+    if (url.startsWith('https://sportsmeta.test/resolve')) {
+      return new Response(JSON.stringify({ error: 'not_found' }), {
+        status: 404,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+    if (url.startsWith('https://sportsmeta.test/catalog/')) {
+      return new Response(JSON.stringify({ metas: [] }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+    throw new Error(`Unexpected fetch in smoke-sports-catalog-seeds: ${url}`)
+  }
+  ProwlarrClient.prototype.caps = async function caps() {
+    return [{ name: 'SportsCult' }]
+  }
+
+  const nonSportsCultCatalogCalls = []
+  ProwlarrClient.prototype.search = async function search(query, cats, type, options = {}) {
+    nonSportsCultCatalogCalls.push({
+      query: String(query || ''),
+      cats: String(cats || ''),
+      useCategories: options.useCategories === true
+    })
+    return [
+      trackerItem('NBA 2026 Atlanta Hawks vs New York Knicks 1080p', {
+        indexer: 'GenericSportsTracker',
+        sportHint: 'basketball',
+        pubDate: '2026-04-23T12:00:00.000Z'
+      })
+    ]
+  }
+  const nonSportsCultConfig = makeConfig()
+  nonSportsCultConfig.jackettUrl = 'https://prowlarr-non-sportscult.example'
+  const nonSportsCultCatalogResult = await handleCatalog(
+    nonSportsCultConfig,
+    'sports',
+    'pvtkrrx-sports',
+    '',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  )
+  assert.deepEqual(
+    nonSportsCultCatalogResult.metas || [],
+    [],
+    'sports catalogs must not emit non-SportsCult Prowlarr rows as catalog-owned events'
+  )
+  assert.ok(
+    nonSportsCultCatalogCalls.length > 0 && nonSportsCultCatalogCalls.every((call) => call.cats === '5060' && call.useCategories),
+    'non-SportsCult catalog rejection should still prove the Prowlarr sports-category contract'
+  )
+
+  const sportsMetaScheduleOnlyCalls = []
+  let sportsMetaScheduleFetches = 0
+  ProwlarrClient.prototype.search = async function search(query, cats, type, options = {}) {
+    sportsMetaScheduleOnlyCalls.push({
+      query: String(query || ''),
+      cats: String(cats || ''),
+      useCategories: options.useCategories === true
+    })
+    return []
+  }
+  global.fetch = async (input) => {
+    const url = String(input || '')
+    if (url.startsWith('https://sportsmeta.test/catalog/')) {
+      sportsMetaScheduleFetches += 1
+      return new Response(JSON.stringify({
+        metas: [
+          {
+            id: 'sportsmeta:event:basketball|2026-04-23|nba|atlanta-hawks|new-york-knicks',
+            name: 'Atlanta Hawks vs New York Knicks',
+            type: 'sports'
+          }
+        ]
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+    if (url.startsWith('https://sportsmeta.test/resolve')) {
+      sportsMetaScheduleFetches += 1
+      return new Response(JSON.stringify({
+        event: {
+          id: 'sportsmeta:event:basketball|2026-04-23|nba|atlanta-hawks|new-york-knicks',
+          name: 'Atlanta Hawks vs New York Knicks',
+          sport: 'Basketball',
+          league: 'NBA',
+          date: '2026-04-23',
+          homeTeam: 'Atlanta Hawks',
+          awayTeam: 'New York Knicks'
+        }
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+    throw new Error(`Unexpected SportsMeta schedule-only fetch in smoke-sports-catalog-seeds: ${url}`)
+  }
+  const sportsMetaScheduleOnlyConfig = makeConfig()
+  sportsMetaScheduleOnlyConfig.jackettUrl = 'https://prowlarr-sportsmeta-schedule-only.example'
+  const sportsMetaScheduleOnlyResult = await handleCatalog(
+    sportsMetaScheduleOnlyConfig,
+    'sports',
+    'pvtkrrx-sports',
+    '',
+    { baseUrl: 'http://127.0.0.1:7000' }
+  )
+  assert.deepEqual(
+    sportsMetaScheduleOnlyResult.metas || [],
+    [],
+    'SportsMeta schedule/catalog rows must not create sports catalog items without SportsCult availability'
+  )
+  assert.ok(
+    sportsMetaScheduleOnlyCalls.length > 0 && sportsMetaScheduleOnlyCalls.every((call) => call.cats === '5060' && call.useCategories),
+    'SportsMeta schedule-only rejection should still start from Prowlarr sports-category searches'
+  )
+  assert.equal(
+    sportsMetaScheduleFetches,
+    0,
+    'SportsMeta must not be queried for schedule/catalog enrichment when SportsCult availability is empty'
+  )
   global.fetch = async (input) => {
     const url = String(input || '')
     if (url.startsWith('https://sportsmeta.test/resolve')) {
@@ -325,5 +449,6 @@ run()
   })
   .finally(() => {
     ProwlarrClient.prototype.search = ORIGINAL_SEARCH
+    ProwlarrClient.prototype.caps = ORIGINAL_CAPS
     global.fetch = ORIGINAL_FETCH
   })

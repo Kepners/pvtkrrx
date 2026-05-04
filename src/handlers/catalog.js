@@ -626,6 +626,7 @@ function normalizeSportsCatalogItems(items = []) {
 
 function filterSportsCatalogItems(normalizedItems = [], catalogSportHint = '', requestedDetail = '', limit = 50) {
   const strictFiltered = normalizedItems.filter(item =>
+    item.trackerSourceType === 'sportscult' &&
     itemMatchesSportsCatalog(item, catalogSportHint) &&
     itemMatchesSportsDetail(item, requestedDetail) &&
     isLikelySportsEventTitle(item.title, item.sportHint) &&
@@ -638,6 +639,7 @@ function filterSportsCatalogItems(normalizedItems = [], catalogSportHint = '', r
     // noise rejection so the catalog isn't empty on default browse or sparse
     // genre/search results.
     filtered = normalizedItems.filter(item =>
+      item.trackerSourceType === 'sportscult' &&
       itemMatchesSportsCatalog(item, catalogSportHint) &&
       itemMatchesSportsDetail(item, requestedDetail) &&
       !isSportsNoiseTitle(item.title) &&
