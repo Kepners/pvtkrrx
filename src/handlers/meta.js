@@ -2,6 +2,9 @@ const { CinemetaClient } = require('../clients/cinemeta')
 const { SportsMetaClient } = require('../clients/sportsmeta')
 const { formatSize } = require('../utils/streams')
 const { resolveSportHint } = require('../utils/sportsRules')
+const { settleWithTimeout } = require('../utils/timeout')
+
+const SPORTSMETA_META_TIMEOUT_MS = Math.max(500, parseInt(process.env.PVTKRRX_SPORTSMETA_META_TIMEOUT_MS || '1500', 10))
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { decodeCustomId } = require('../utils/customId')
 const { mapLeague } = require('../utils/leagueMap')
@@ -133,12 +136,21 @@ async function loadCanonicalSportsMeta(config = {}, canonicalId = '') {
     baseUrl: config?.sportsmetaBaseUrl
   })
 
-  try {
-    return await client.getEvent(normalizedId)
-  } catch (error) {
-    console.warn(`[meta] SportsMeta lookup failed for ${normalizedId}: ${error.message}`)
-    return null
+  // Bound the lookup so a slow SportsMeta cannot starve `meta.json`
+  // responses. Catalog-side identity resolution already has a budget; this
+  // gives the per-id meta path the same protection.
+  const outcome = await settleWithTimeout(
+    client.getEvent(normalizedId).catch((error) => {
+      console.warn(`[meta] SportsMeta lookup failed for ${normalizedId}: ${error.message}`)
+      return null
+    }),
+    SPORTSMETA_META_TIMEOUT_MS,
+    null
+  )
+  if (outcome.timedOut) {
+    console.warn(`[meta] SportsMeta lookup timed out for ${normalizedId} after ${SPORTSMETA_META_TIMEOUT_MS}ms`)
   }
+  return outcome.value || null
 }
 
 function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, config = {}, requestedType = '') {

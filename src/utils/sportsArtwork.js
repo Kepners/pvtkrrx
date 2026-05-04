@@ -253,6 +253,7 @@ function resolveSportsLogoAsset(input = {}) {
 }
 
 module.exports = {
+  SPORTS_ARTWORK_PROXY_VERSION,
   resolveSportsPosterAsset,
   resolveSportsBackgroundAsset,
   resolveSportsLandscapeAsset,

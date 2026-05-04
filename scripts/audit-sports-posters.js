@@ -4,8 +4,13 @@ const fs = require('node:fs')
 const path = require('node:path')
 const sharp = require('sharp')
 
+const { SPORTS_ARTWORK_PROXY_VERSION } = require('../src/utils/sportsArtwork')
+
 const OUT_DIR = path.join(process.cwd(), '.runtime', 'sports-poster-audit')
-const EXPECTED_VERSION = '20260430-public-sportsmeta-v1'
+// Track the live proxy version so this audit doesn't false-FAIL after a
+// routine bump in src/utils/sportsArtwork.js. Override only when proving
+// against a deployed runtime that's older than HEAD.
+const EXPECTED_VERSION = String(process.env.PVTKRRX_SPORTS_POSTER_AUDIT_VERSION || SPORTS_ARTWORK_PROXY_VERSION)
 const DEFAULT_MANIFEST = process.env.PVTKRRX_SPORTS_POSTER_AUDIT_MANIFEST ||
   'https://pvt.kepners.co.uk/selfhost/manifest.json?mode=hosted'
 const POSTER_ALLOWED_SOURCES = new Set([
