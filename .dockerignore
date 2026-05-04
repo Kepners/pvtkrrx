@@ -1,0 +1,40 @@
+# Coolify build context excludes — keep the image lean and speed up COPY layer
+# export. Anything required at runtime MUST NOT be in this list.
+
+# Git history (~hundreds of MB) — runtime never reads .git
+.git/
+.gitignore
+.gitattributes
+
+# Local development state
+node_modules/
+.env
+.env.local
+.env.*.local
+.runtime/
+.vscode/
+*.code-workspace
+
+# Audit harness artefacts (regenerable; not needed at runtime)
+.claude/
+docs/PVTKRRX_RECONCILED_SPORTS_ARTWORK_DOCS/
+docs/PVTKRRX_SPORTSMETA_ARTWORK_RECONCILED_PLAN.md
+scripts/audit-*
+scripts/audit-template-vs-original.js
+scripts/generate-team-vs-team-posters.js
+scripts/probe-sports-item.js
+
+# Electron build output
+dist/
+Dist/
+
+# Nested repos and side projects
+pvtkrrx-web/
+website/
+
+# Playwright + dev caches
+.playwright-mcp/
+
+# OS junk
+.DS_Store
+Thumbs.db
