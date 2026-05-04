@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const assert = require('node:assert/strict')
+const { spawnSync } = require('node:child_process')
 const fs = require('node:fs')
 const path = require('node:path')
 const sharp = require('sharp')
@@ -12,6 +13,9 @@ const { renderSportsPosterTemplateSvg } = require('../src/utils/sportsPosterTemp
 
 const ROOT = path.resolve(__dirname, '..')
 const OUT_DIR = path.join(ROOT, '.runtime', 'sports-team-vs-team-smoke')
+const GENERATOR = path.join(ROOT, 'backdrops', 'python-backdrops', '08-team-vs-team', 'generate.py')
+const PYTHON = process.env.PYTHON || 'python'
+const GENERATOR_ARGS = [GENERATOR, '--out', OUT_DIR]
 const SOURCE_BOX = { width: 400, height: 600 }
 const POSTER_BOX = { width: 600, height: 900 }
 
@@ -64,11 +68,16 @@ const FIXTURES = [
     expectedHome: 'San Francisco 49ers',
     expectedAway: 'Kansas City Chiefs',
     expectedLabel: /^(?:NFL|FOOTBALL)$/,
-    expectedSerial: /^#SF-KC[A-Z]?-/
+    expectedSerial: /#SF-KC[A-Z]?-/,
+    // SF has 2 letter-starting words ("San", "Francisco") -> first+last initial = "SF".
+    // KC has 3 letter-starting words ("Kansas", "City", "Chiefs") -> 3-letter acronym = "KCC".
+    expectedHomeInitials: 'SF',
+    expectedAwayInitials: 'KCC'
   },
   {
     // Edge case: 3-word teams where the generic fallback must produce a multi-letter
     // acronym from each letter-starting word. No SportsMeta identity supplied.
+    // "Boston Red Sox" must be "BRS", not "BS" (first+last would be embarrassing).
     slug: 'mlb-yankees-redsox-generic-fallback',
     rawTitle: 'New York Yankees vs Boston Red Sox',
     sportHint: 'baseball',
@@ -76,7 +85,9 @@ const FIXTURES = [
     expectedHome: 'New York Yankees',
     expectedAway: 'Boston Red Sox',
     expectedLabel: /^(?:MLB|BASEBALL)$/,
-    expectedSerial: /^#NYY-BRS-/
+    expectedSerial: /#NYY-BRS-/,
+    expectedHomeInitials: 'NYY',
+    expectedAwayInitials: 'BRS'
   }
 ]
 
@@ -104,6 +115,26 @@ const SPORTSMETA_IDENTITY_FIXTURE = {
     home: { short: 'CTY', initials: 'MC' },
     away: { short: 'ARS', initials: 'AR' }
   }
+}
+
+function commandText() {
+  return [PYTHON, ...GENERATOR_ARGS.map((part) => (/\s/.test(part) ? `"${part}"` : part))].join(' ')
+}
+
+function runGenerator() {
+  fs.rmSync(OUT_DIR, { recursive: true, force: true })
+  fs.mkdirSync(OUT_DIR, { recursive: true })
+  const result = spawnSync(PYTHON, GENERATOR_ARGS, {
+    cwd: ROOT,
+    encoding: 'utf8'
+  })
+  if (result.error) throw result.error
+  assert.equal(
+    result.status,
+    0,
+    `generator failed\ncommand=${commandText()}\nstdout=${result.stdout}\nstderr=${result.stderr}`
+  )
+  return JSON.parse(result.stdout)
 }
 
 function attr(tag, name) {
@@ -148,7 +179,7 @@ function assertTeamLayoutGeometry(slug, homeBox, awayBox, versusBox, canvas) {
 
 function assertNoBadTeamText(slug, text, home, away) {
   assert.doesNotMatch(text, /\bTBA\b|\bTBD\b/i, `${slug} no TBA/TBD`)
-  assert.doesNotMatch(text, /\.\.\.|…/, `${slug} no ellipsis`)
+  assert.doesNotMatch(text, /\.\.\.|\u2026/, `${slug} no ellipsis`)
   assert.doesNotMatch(text, new RegExp(`${home.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*${away.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), `${slug} no merged team names`)
   assert.doesNotMatch(text, /data-role="fake-acronym-badge"|data-role="pill-badge"/i, `${slug} no fake acronym badge`)
   assert.doesNotMatch(text, /data-role="live-status"|>LIVE</i, `${slug} no fake LIVE`)
@@ -159,6 +190,10 @@ function assertNoBadTeamText(slug, text, home, away) {
     assert.doesNotMatch(serial[1], /(?:ARSE|FUCK|SHIT|CUNT|CRAP)/, `${slug} home short avoids vulgar substring (got ${serial[1]})`)
     assert.doesNotMatch(serial[2], /(?:ARSE|FUCK|SHIT|CUNT|CRAP)/, `${slug} away short avoids vulgar substring (got ${serial[2]})`)
   }
+}
+
+function assertProofBoxMatchesSvg(slug, svg, role, proofBox) {
+  assert.deepEqual(boxFromMarker(svg, role), proofBox, `${slug} ${role} SVG marker matches JSON proof`)
 }
 
 function assertNoEmptyDateTime(slug, svg) {
@@ -226,6 +261,14 @@ function assertRuntimeTeamPoster(fixture) {
   if (fixture.expectedSerial) {
     assert.match(artwork.svg, fixture.expectedSerial, `${fixture.slug} stub serial matches expected pattern`)
   }
+  if (fixture.expectedHomeInitials) {
+    const homeInitialsMatch = artwork.svg.match(/data-role="fallback-team-initials" data-team-side="home"[^>]*>([^<]+)</)
+    assert.equal(homeInitialsMatch && homeInitialsMatch[1], fixture.expectedHomeInitials, `${fixture.slug} home circle initials`)
+  }
+  if (fixture.expectedAwayInitials) {
+    const awayInitialsMatch = artwork.svg.match(/data-role="fallback-team-initials" data-team-side="away"[^>]*>([^<]+)</)
+    assert.equal(awayInitialsMatch && awayInitialsMatch[1], fixture.expectedAwayInitials, `${fixture.slug} away circle initials`)
+  }
   // Slot coordinates are what the badge-composite path consumes when SportsMeta
   // returns real team logos. Lock the staggered home-higher-left / away-lower-right
   // positions so future template tweaks can't silently shift the composite slots.
@@ -249,24 +292,58 @@ function assertRuntimeTeamPoster(fixture) {
   }
 }
 
-async function rasterizeFixture(fixture) {
-  const event = eventFor(fixture)
-  const artwork = renderSportsPosterTemplateSvg({
-    template: 'ticket-stub',
-    event,
-    variant: 'poster'
-  })
+async function assertGeneratedFixture(fixture) {
+  const svgPath = path.join(OUT_DIR, `${fixture.slug}.svg`)
+  const jsonPath = path.join(OUT_DIR, `${fixture.slug}.json`)
   const pngPath = path.join(OUT_DIR, `${fixture.slug}.png`)
-  await sharp(Buffer.from(artwork.svg)).png().toFile(pngPath)
+  const svg = fs.readFileSync(svgPath, 'utf8')
+  const proof = JSON.parse(fs.readFileSync(jsonPath, 'utf8'))
+
+  assert.equal(proof.layoutFamily, 'TEAM_VS_TEAM', `${fixture.slug} proof family`)
+  assert.equal(proof.homeTeam, fixture.expectedHome, `${fixture.slug} proof home`)
+  assert.equal(proof.awayTeam, fixture.expectedAway, `${fixture.slug} proof away`)
+  assert.match(proof.leagueLabel, fixture.expectedLabel, `${fixture.slug} proof league label`)
+  assert.equal(proof.titleFitStatus.home.status, 'fit', `${fixture.slug} home title fit`)
+  assert.equal(proof.titleFitStatus.away.status, 'fit', `${fixture.slug} away title fit`)
+  assert.match(svg, /data-layout-family="TEAM_VS_TEAM"/, `${fixture.slug} SVG family marker`)
+  assert.match(svg, /data-role="home-team-visual"/, `${fixture.slug} SVG home marker`)
+  assert.match(svg, /data-role="away-team-visual"/, `${fixture.slug} SVG away marker`)
+  assert.match(svg, /data-role="versus"/, `${fixture.slug} SVG VS marker`)
+  assert.match(svg, new RegExp(`data-team-name="${fixture.expectedHome.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`), `${fixture.slug} SVG home name marker`)
+  assert.match(svg, new RegExp(`data-team-name="${fixture.expectedAway.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`), `${fixture.slug} SVG away name marker`)
+  assertNoBadTeamText(fixture.slug, svg, fixture.expectedHome, fixture.expectedAway)
+  assertNoEmptyDateTime(`${fixture.slug} generated`, svg)
+  assertProofBoxMatchesSvg(fixture.slug, svg, 'home-team-visual', proof.homeVisualBox)
+  assertProofBoxMatchesSvg(fixture.slug, svg, 'away-team-visual', proof.awayVisualBox)
+  assertProofBoxMatchesSvg(fixture.slug, svg, 'versus', proof.versusBox)
+  assertTeamLayoutGeometry(fixture.slug, proof.homeVisualBox, proof.awayVisualBox, proof.versusBox, POSTER_BOX)
+  assert.ok(['team-logo', 'local-team-logo', 'league-logo', 'initials'].includes(proof.usedLogoOrInitials.home), `${fixture.slug} home visual source is known`)
+  assert.ok(['team-logo', 'local-team-logo', 'league-logo', 'initials'].includes(proof.usedLogoOrInitials.away), `${fixture.slug} away visual source is known`)
+
+  await sharp(Buffer.from(svg)).png().toFile(pngPath)
   const metadata = await sharp(pngPath).metadata()
   assert.deepEqual({ width: metadata.width, height: metadata.height }, POSTER_BOX, `${fixture.slug} PNG dimensions`)
-  return path.relative(ROOT, pngPath)
-}
 
-async function assertFixture(fixture) {
   const runtime = assertRuntimeTeamPoster(fixture)
-  const png = await rasterizeFixture(fixture)
-  return { slug: fixture.slug, png, runtime }
+  return {
+    slug: fixture.slug,
+    svg: path.relative(ROOT, svgPath),
+    png: path.relative(ROOT, pngPath),
+    json: path.relative(ROOT, jsonPath),
+    layoutFamily: proof.layoutFamily,
+    label: proof.leagueLabel,
+    homeTeam: proof.homeTeam,
+    awayTeam: proof.awayTeam,
+    homeVisualBox: proof.homeVisualBox,
+    awayVisualBox: proof.awayVisualBox,
+    versusBox: proof.versusBox,
+    usedLogoOrInitials: proof.usedLogoOrInitials,
+    titleFitStatus: {
+      home: proof.titleFitStatus.home.status,
+      away: proof.titleFitStatus.away.status
+    },
+    runtime
+  }
 }
 
 function assertNegativeSelection(testCase) {
@@ -311,15 +388,17 @@ function assertSportsMetaIdentityHonoured(fixture) {
 }
 
 async function main() {
-  fs.mkdirSync(OUT_DIR, { recursive: true })
+  const generated = runGenerator()
   const fixtures = []
   for (const fixture of FIXTURES) {
-    fixtures.push(await assertFixture(fixture))
+    fixtures.push(await assertGeneratedFixture(fixture))
   }
   const negatives = NEGATIVES.map(assertNegativeSelection)
   const sportsmetaIdentity = assertSportsMetaIdentityHonoured(SPORTSMETA_IDENTITY_FIXTURE)
   console.log(JSON.stringify({
     ok: true,
+    command: commandText(),
+    generated,
     fixtures,
     negatives,
     sportsmetaIdentity

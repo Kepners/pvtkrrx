@@ -87,7 +87,7 @@ function titleCase(value) {
     .filter(Boolean)
     .map((part, index) => {
       const upper = part.toUpperCase()
-      if (['EPL', 'FA', 'F1', 'GP', 'IPL', 'MLB', 'MLS', 'MMA', 'MOTOGP', 'NBA', 'NFL', 'NHL', 'PGA', 'UFC', 'WRC', 'WWE'].includes(upper)) {
+      if (['EPL', 'FA', 'F1', 'GP', 'IPL', 'MLB', 'MLS', 'MMA', 'MOTOGP', 'NBA', 'NFL', 'NHL', 'PGA', 'UFC', 'WC', 'WRC', 'WWE'].includes(upper)) {
         return upper === 'MOTOGP' ? 'MotoGP' : upper
       }
       const lower = part.toLowerCase()
@@ -418,6 +418,15 @@ function normalizeSportsEventMetadata(input = {}) {
   }))
   const sport = formatSportLabel(sportKey || input.sport || canonicalParsed?.sportKey) || 'Sports'
   const date = normalizeSpace(input.date || canonicalEvent.date || canonicalParsed?.date || parsedSportsEvent?.date || parsedEvent?.date || '')
+  // Year-only fallback so motorsport/golf/tennis titles like `F1.2026.*` or
+  // `PGA.2026.The.Masters.*` can still surface a usable footer date when no
+  // YYYY-MM-DD was extracted from the title.
+  const eventYear = normalizeSpace(
+    input.eventYear ||
+    parsedEvent?.eventYear ||
+    parsedSportsEvent?.eventYear ||
+    (date ? date.slice(0, 4) : '')
+  )
   const homeTeam = cleanMatchupSide(input.homeTeam || input.home || canonicalEvent.homeTeam || canonicalParsed?.homeTeam || parsedSportsEvent?.homeTeam || looseMatchup?.homeTeam || '', 'left')
   const awayTeam = cleanMatchupSide(input.awayTeam || input.away || canonicalEvent.awayTeam || canonicalParsed?.awayTeam || parsedSportsEvent?.awayTeam || looseMatchup?.awayTeam || '', 'right')
 
@@ -494,6 +503,7 @@ function normalizeSportsEventMetadata(input = {}) {
     ...(parsedEvent?.round ? { round: parsedEvent.round } : {}),
     ...(parsedEvent?.roundShort ? { roundShort: parsedEvent.roundShort } : {}),
     ...(date ? { date } : {}),
+    ...(eventYear ? { eventYear } : {}),
     ...(Number.isFinite(Number(input.seeders)) ? { seeders: Number(input.seeders) } : {}),
     ...(input.size ? { size: String(input.size) } : {}),
     rawTitle,

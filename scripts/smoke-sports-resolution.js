@@ -501,7 +501,7 @@ async function run() {
   )
   assert.equal(
     paidSportsMetaResponse.meta?.poster,
-    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260430-public-sportsmeta-v1`,
+    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260501-competitor-vs-competitor-v1`,
     'PVTKRRX must not expose or forward SportsMeta member tokens in stream-addon artwork URLs'
   )
 
@@ -517,7 +517,7 @@ async function run() {
   )
   assert.equal(
     templateSportsMetaResponse.meta?.poster,
-    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=glitch&v=20260430-public-sportsmeta-v1`,
+    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=glitch&v=20260501-competitor-vs-competitor-v1`,
     'PVTKRRX should preserve the installer-selected Sports Posters template without exposing member tokens'
   )
 
@@ -531,7 +531,7 @@ async function run() {
     })
     assert.equal(
       envTokenPoster.poster,
-      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260430-public-sportsmeta-v1`,
+      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260501-competitor-vs-competitor-v1`,
       'PVTKRRX should ignore runtime env member tokens on stream-addon artwork URLs'
     )
     assert.equal(envTokenPoster.selectedArtworkSource, 'pvtkrrx-canonical-public-proxy')

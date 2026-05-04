@@ -58,13 +58,15 @@ const ROUND_PATTERNS = [
   ['Quarter Final', /\b(?:quarter[\s-]*final|qf)\b/i],
   ['Semi Final', /\b(?:semi[\s-]*final|sf)\b/i],
   ['Final', /\bfinal\b/i],
-  ['Round', /\bround\s+(\d{1,2})\b/i],
+  // \s* (not \s+) so dotted titles like `WRC.Catalunya.Day3.Tanak` (token=`Day3`)
+  // and conventionally-spaced `Round 3` both match.
+  ['Round', /\bround\s*(\d{1,2})\b/i],
   ['R', /\br(\d{1,2})\b/i],
-  ['Stage', /\bstage\s+(\d{1,2})\b/i],
-  ['Day', /\bday\s+(\d{1,2})\b/i],
-  ['Night', /\bnight\s+(\d{1,2})\b/i],
-  ['Game', /\bgame\s+(\d{1,2})\b/i],
-  ['Week', /\bweek\s+(\d{1,2})\b/i]
+  ['Stage', /\bstage\s*(\d{1,2})\b/i],
+  ['Day', /\bday\s*(\d{1,2})\b/i],
+  ['Night', /\bnight\s*(\d{1,2})\b/i],
+  ['Game', /\bgame\s*(\d{1,2})\b/i],
+  ['Week', /\bweek\s*(\d{1,2})\b/i]
 ]
 
 const LEADING_LEAGUE_ALIASES = [
@@ -97,7 +99,7 @@ function titleCase(value = '') {
     .filter(Boolean)
     .map((part) => {
       const upper = part.toUpperCase()
-      if (['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'F1', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'NBA', 'NFL', 'NHL', 'NXT', 'PDC', 'PFL', 'PGA', 'PPV', 'UFC', 'UEFA', 'WEC', 'WRC', 'WTA', 'WWE'].includes(upper)) return upper
+      if (['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'F1', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'NBA', 'NFL', 'NHL', 'NXT', 'PDC', 'PFL', 'PGA', 'PPV', 'UFC', 'UEFA', 'WC', 'WEC', 'WRC', 'WTA', 'WWE'].includes(upper)) return upper
       if (upper === 'MOTOGP') return 'MotoGP'
       if (upper === 'SMACKDOWN') return 'SmackDown'
       if (upper === 'WRESTLEMANIA') return 'WrestleMania'
@@ -197,6 +199,15 @@ function extractFallbackDate(value) {
   if (plain) return plain[1]
 
   return ''
+}
+
+// Year-only fallback for titles like `F1.2026.Round.04...` or `PGA.2026.The.Masters...`
+// where the season/year is present but no month/day. Returns 'YYYY' or ''.
+function extractFallbackYear(value) {
+  const source = String(value || '').trim()
+  if (!source) return ''
+  const match = source.match(/\b((?:19|20)\d{2})\b/)
+  return match ? match[1] : ''
 }
 
 function findStructuredDate(tokens, fallbackDate = '') {
@@ -389,7 +400,7 @@ function normalizeTeamLabel(value) {
       .replace(TEAM_BROADCAST_RE, ' ')
       .replace(TEAM_LANGUAGE_RE, ' ')
       .replace(TEAM_PRESENTATION_RE, ' ')
-      .replace(/\b(?:mlb|nba(?:\s+playoffs?)?|nfl|nhl|mls|ipl|pga(?:\s+tour)?|motogp|ufc)\b$/gi, ' ')
+      .replace(/\b(?:mlb|nba(?:\s+playoffs?)?|nfl|nhl|mls|ipl|pga(?:\s+tour)?|motogp|ufc|mma|pfl|bellator|atp|wta|pdc|darts?|wc|world\s+championship|snooker|tennis|boxing)\b$/gi, ' ')
       .replace(/\b(?:r\d+|gm\d+|g\d+|\d{2,3}fps|fps)\b/gi, ' ')
   )
 }
@@ -656,9 +667,12 @@ function parseFlexibleMatchupTitle(title, fallbackDate = '') {
     ? `${leadingLeague.league} ${preTeamTokens[0]}`
     : (leadingLeague?.league || `${homeTeam} vs ${awayTeam}`)
 
+  const eventYear = date ? date.slice(0, 4) : extractFallbackYear(raw || fallbackDate)
+
   return {
     league: leadingLeague?.league || '',
     ...(date ? { date } : {}),
+    ...(eventYear ? { eventYear } : {}),
     homeTeam,
     awayTeam,
     principalA: homeTeam,
@@ -718,7 +732,15 @@ function normalizeEventNameTokens(tokens = [], fallbackDate = '') {
     if (EVENT_SOURCE_NOISE_RE.test(token)) break
     if (/^(19|20)\d{2}$/.test(token) || /^\d{1,2}$/.test(token)) continue
     if (/^(?:round|session|race)?\d+$/i.test(token) || /^r\d+$/i.test(token)) continue
+    // Strip dotted round/session token forms used in WRC/F1 titles such as
+    // `Day3`, `Stage4`, `Night2`, `Game5`, `Week7` so they don't pollute the
+    // event display title — extractPosterSessionAndRound surfaces them as a
+    // separate `round` field.
+    if (/^(?:day|stage|night|game|week)\d+$/i.test(token)) continue
     if (/^m\d+$/i.test(token)) continue
+    // Note: standalone words "Day"/"Stage"/"Night"/"Game"/"Week" are part of
+    // legitimate event names (e.g. "Valero Texas Open Day 2") and must be
+    // kept. Only the compact-token forms (Day3/Stage4/...) are stripped above.
     if ((lower === 'round' || lower === 'event' || lower === 'episode') && /^\d+$/.test(next)) {
       index += 1
       continue
@@ -844,6 +866,7 @@ function parseSportsTitle(title, fallbackDate = '') {
   return {
     league,
     date: dateMatch.date,
+    eventYear: dateMatch.date ? dateMatch.date.slice(0, 4) : extractFallbackYear(raw),
     homeTeam,
     awayTeam,
     principalA: homeTeam,
@@ -922,9 +945,12 @@ function parseSportsEventTitle(title, fallbackDate = '') {
   }
   if (!league || !eventName) return null
 
+  const eventYear = dateStr ? dateStr.slice(0, 4) : extractFallbackYear(raw || fallbackDate)
+
   return {
     league,
     ...(dateStr ? { date: dateStr } : {}),
+    ...(eventYear ? { eventYear } : {}),
     eventName,
     eventShort: shortenEventName(eventName),
     ...(posterDetail.session ? { session: posterDetail.session } : {}),

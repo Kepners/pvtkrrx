@@ -17,6 +17,34 @@ const TEAM_SPORT_KEYS = new Set([
   'rugby'
 ])
 
+const COMPETITOR_SPORT_KEYS = new Set([
+  'badminton',
+  'billiards',
+  'boxing',
+  'darts',
+  'fighting',
+  'kickboxing',
+  'mma',
+  'pool',
+  'snooker',
+  'squash',
+  'table-tennis',
+  'tennis',
+  'wrestling'
+])
+
+const COMPETITOR_EVENT_CLASSES = new Set([
+  'combat_event',
+  'darts_event',
+  'racket_event',
+  'tennis_or_snooker_match',
+  'wrestling_event'
+])
+
+const MOTORSPORT_TEXT_RE = /\b(?:formula\s*1|formula\s*one|formula1|f1|motogp|moto\s*gp|nascar|indycar|wrc|supercars?|v8sc|wec|formula\s*e|grand prix|rally|daytona 500)\b/i
+const TEAM_SPORT_TEXT_RE = /\b(?:basketball|nba|wnba|euroleague|football|soccer|nfl|super bowl|mlb|world series|nhl|stanley cup|ipl|cricket|rugby|afl|volleyball|handball)\b/i
+const COMPETITOR_TEXT_RE = /\b(?:snooker|billiards|pool|tennis|wimbledon|atp|wta|darts?|pdc|ufc|mma|pfl|bellator|boxing|fight night|wrestling|wwe|aew|badminton|squash|table tennis)\b/i
+
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
 }
@@ -67,6 +95,20 @@ function hasActualPair(input = {}) {
   const right = sideName(input.principalB || input.awayTeam || input.away || input.fighterB || input.playerB)
   if (isPlaceholderSide(left) || isPlaceholderSide(right)) return false
   return left.toLowerCase() !== right.toLowerCase()
+}
+
+function isCompetitorVsCompetitorEvent(input = {}) {
+  if (!hasActualPair(input)) return false
+  const sport = normalizeKey(input.sportKey || input.sportHint || input.sport)
+  const text = normalizedSearchText(input)
+  const eventClass = normalizeSpace(input.eventClass || input.posterClass || '').toLowerCase()
+
+  if (eventClass === 'team_vs_team' || eventClass === 'motorsport_event') return false
+  if (sport === 'motorsport' || MOTORSPORT_TEXT_RE.test(text)) return false
+  if (TEAM_SPORT_KEYS.has(sport) || TEAM_SPORT_TEXT_RE.test(text)) return false
+  if (COMPETITOR_EVENT_CLASSES.has(eventClass)) return true
+  if (COMPETITOR_SPORT_KEYS.has(sport)) return true
+  return COMPETITOR_TEXT_RE.test(text)
 }
 
 function extractBracketedCategory(rawTitle = '') {
@@ -192,6 +234,16 @@ function classifyByText(text, sport, paired) {
     return 'motorsport_event'
   }
 
+  // Wrestling must beat combat: WWE/AEW PPV titles contain "PPV" which the
+  // combat regex matches, and explicit `sport === 'wrestling'` must win over
+  // generic combat keywords either way.
+  if (
+    sport === 'wrestling' ||
+    /\b(?:wwe|aew|nxt|raw|smackdown|dynamite|collision|wrestlemania|royal rumble|summerslam|survivor series|money in the bank|crown jewel|backlash|all in|double or nothing|full gear|revolution)\b/.test(text)
+  ) {
+    return 'wrestling_event'
+  }
+
   if (
     sport === 'mma' ||
     sport === 'boxing' ||
@@ -206,13 +258,6 @@ function classifyByText(text, sport, paired) {
     /\b(?:pga(?: tour| championship)?|lpga|masters|ryder cup|liv golf|dp world tour|open championship|us open golf|u\.s\. open golf)\b/.test(text)
   ) {
     return 'golf_event'
-  }
-
-  if (
-    sport === 'wrestling' ||
-    /\b(?:wwe|aew|nxt|raw|smackdown|dynamite|collision|wrestlemania|royal rumble|summerslam|survivor series|money in the bank|crown jewel|backlash|all in|double or nothing|full gear|revolution)\b/.test(text)
-  ) {
-    return 'wrestling_event'
   }
 
   // Athletics has "Tour" and "Classic" event names, so it must win before cycling classics.
@@ -305,5 +350,6 @@ function classifySportsPosterEvent(input = {}) {
 module.exports = {
   POSTER_CLASSES,
   classifySportsPosterEvent,
-  hasActualPair
+  hasActualPair,
+  isCompetitorVsCompetitorEvent
 }
