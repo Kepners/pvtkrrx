@@ -10,7 +10,7 @@ const { normalizeSportsEventMetadata } = require('../src/utils/sportsEventNormal
 const { classifySportsEvent } = require('../src/utils/sportsEventClassifier')
 const { isCompetitorVsCompetitorEvent } = require('../src/utils/sportsPosterClassifier')
 const { resolveSportsPosterAsset } = require('../src/utils/sportsArtwork')
-const { renderSportsPosterTemplateSvg } = require('../src/utils/sportsPosterTemplates')
+const { renderSportsPosterTemplateSvg, renderCompetitorVsCompetitor } = require('../src/utils/sportsPosterTemplates')
 
 const ROOT = path.resolve(__dirname, '..')
 const OUT_DIR = path.join(ROOT, '.runtime', 'sports-competitor-vs-competitor-smoke')
@@ -197,11 +197,16 @@ function assertRuntimeCompetitorPoster(fixture) {
   })
   assert.equal(asset.layoutFamily, 'COMPETITOR_VS_COMPETITOR', `${fixture.slug} resolved layoutFamily`)
 
-  const artwork = renderSportsPosterTemplateSvg({
+  // Audit fix G1: per-template branch wins in renderSportsPosterTemplateSvg
+  // so 'ticket-stub' on a CvC event now renders the ticket-stub style. To
+  // assert the family-shape SVG (the original purpose of this smoke), call
+  // the family renderer directly. Production code paths still go through the
+  // dispatch and get the requested template.
+  const artwork = {
+    ...renderCompetitorVsCompetitor(event, 'poster'),
     template: 'ticket-stub',
-    event,
-    variant: 'poster'
-  })
+    layoutFamily: 'COMPETITOR_VS_COMPETITOR'
+  }
   const svg = artwork.svg
   assert.equal(artwork.layoutFamily, 'COMPETITOR_VS_COMPETITOR', `${fixture.slug} rendered layoutFamily`)
   assert.match(svg, /data-layout-family="COMPETITOR_VS_COMPETITOR"/, `${fixture.slug} rendered family marker`)

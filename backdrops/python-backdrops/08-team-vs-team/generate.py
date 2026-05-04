@@ -173,6 +173,63 @@ def colors_for_team(value: str, fallback: tuple[str, str, str]) -> tuple[str, st
     return TEAM_COLORS.get(team_key(value), fallback)
 
 
+def hex_to_rgb(hex_str: str) -> tuple[int, int, int]:
+    clean = re.sub(r"[^0-9a-fA-F]", "", str(hex_str or ""))
+    if len(clean) != 6:
+        return (0, 0, 0)
+    return (int(clean[0:2], 16), int(clean[2:4], 16), int(clean[4:6], 16))
+
+
+def rgb_to_hsl(r: int, g: int, b: int) -> tuple[float, float, float]:
+    r_, g_, b_ = r / 255.0, g / 255.0, b / 255.0
+    cmax = max(r_, g_, b_)
+    cmin = min(r_, g_, b_)
+    delta = cmax - cmin
+    lum = (cmax + cmin) / 2.0
+    if delta == 0:
+        return (0.0, 0.0, lum)
+    sat = delta / (1.0 - abs(2.0 * lum - 1.0)) if lum not in (0.0, 1.0) else 0.0
+    if cmax == r_:
+        hue = ((g_ - b_) / delta) % 6
+    elif cmax == g_:
+        hue = (b_ - r_) / delta + 2
+    else:
+        hue = (r_ - g_) / delta + 4
+    return (hue * 60.0, sat, lum)
+
+
+def colors_too_close(hex_a: str, hex_b: str) -> bool:
+    """Return True when two team primaries share the diagonal-half visual.
+
+    Uses HSL distance: small hue gap, similar lightness, and both saturated
+    enough to register. Low-saturation greys/blacks short-circuit to False so
+    a black/orange split (e.g. NHL Penguins vs Flyers) keeps both halves.
+    """
+    h_a, s_a, l_a = rgb_to_hsl(*hex_to_rgb(hex_a))
+    h_b, s_b, l_b = rgb_to_hsl(*hex_to_rgb(hex_b))
+    if s_a < 0.2 or s_b < 0.2:
+        return False
+    hue_dist = min(abs(h_a - h_b), 360.0 - abs(h_a - h_b))
+    return hue_dist < 32.0 and abs(l_a - l_b) < 0.25
+
+
+def differentiate_team_palettes(
+    home_colors: tuple[str, str, str],
+    away_colors: tuple[str, str, str],
+) -> tuple[tuple[str, str, str], tuple[str, str, str], str]:
+    """When home and away primaries clash, swap away to its secondary so the
+    diagonal split reads as two distinct halves. Falls through unchanged when
+    the swap would not actually create contrast against the home primary.
+    Returns (home, away, collision_note).
+    """
+    if not colors_too_close(home_colors[0], away_colors[0]):
+        return home_colors, away_colors, ""
+    candidate = (away_colors[1], away_colors[0], away_colors[2])
+    if colors_too_close(home_colors[0], candidate[0]):
+        return home_colors, away_colors, "primary-collision-unresolved"
+    return home_colors, candidate, "away-swapped-to-secondary"
+
+
 def league_label_for(event: dict) -> str:
     explicit = normalize_space(event.get("league_code", ""))
     if explicit and re.fullmatch(r"[A-Z0-9]{2,8}", explicit):
@@ -403,6 +460,7 @@ def build_svg(event: dict) -> tuple[str, dict]:
     date = normalize_space(event.get("date", ""))
     home_colors = colors_for_team(home, ("#0B5C36", "#1C2C5B", "#FFFFFF"))
     away_colors = colors_for_team(away, ("#7F1D1D", "#111827", "#FFFFFF"))
+    home_colors, away_colors, palette_note = differentiate_team_palettes(home_colors, away_colors)
 
     home_box = {"x": 52, "y": 148, "width": 230, "height": 230}
     away_box = {"x": 318, "y": 516, "width": 230, "height": 230}
@@ -489,7 +547,12 @@ def build_svg(event: dict) -> tuple[str, dict]:
             "home": home_used,
             "away": away_used,
         },
-        "warnings": [],
+        "palette": {
+            "home": {"primary": home_colors[0], "secondary": home_colors[1]},
+            "away": {"primary": away_colors[0], "secondary": away_colors[1]},
+            "collision": palette_note,
+        },
+        "warnings": [palette_note] if palette_note == "primary-collision-unresolved" else [],
     }
     return svg, proof
 

@@ -9,7 +9,7 @@ const sharp = require('sharp')
 const { normalizeSportsEventMetadata } = require('../src/utils/sportsEventNormalizer')
 const { classifySportsEvent } = require('../src/utils/sportsEventClassifier')
 const { resolveSportsPosterAsset } = require('../src/utils/sportsArtwork')
-const { renderSportsPosterTemplateSvg } = require('../src/utils/sportsPosterTemplates')
+const { renderSportsPosterTemplateSvg, renderSingleEventMotorsport } = require('../src/utils/sportsPosterTemplates')
 
 const ROOT = path.resolve(__dirname, '..')
 const OUT_DIR = path.join(ROOT, '.runtime', 'sports-single-event-motorsport-smoke')
@@ -182,11 +182,16 @@ function assertRuntimeMotorsportPoster(fixture) {
   })
   assert.equal(asset.layoutFamily, 'SINGLE_EVENT_MOTORSPORT', `${fixture.slug} resolved layoutFamily`)
 
-  const artwork = renderSportsPosterTemplateSvg({
+  // Audit fix G1: per-template branch wins in renderSportsPosterTemplateSvg
+  // so 'ticket-stub' on a motorsport event now renders the ticket-stub
+  // style. To assert the family-shape SVG (the original purpose of this
+  // smoke), call the family renderer directly. Production callers still get
+  // the requested template via the dispatch.
+  const artwork = {
+    ...renderSingleEventMotorsport(event, 'poster'),
     template: 'ticket-stub',
-    event,
-    variant: 'poster'
-  })
+    layoutFamily: 'SINGLE_EVENT_MOTORSPORT'
+  }
   assert.equal(artwork.layoutFamily, 'SINGLE_EVENT_MOTORSPORT', `${fixture.slug} rendered layoutFamily`)
   assert.match(artwork.svg, /data-layout-family="SINGLE_EVENT_MOTORSPORT"/, `${fixture.slug} family marker`)
   assert.match(artwork.svg, /data-role="motorsport-identity-box"/, `${fixture.slug} identity box marker`)

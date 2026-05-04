@@ -410,6 +410,21 @@ function eventFacts(event = {}) {
   return facts
 }
 
+// Names that look like placeholder fallbacks rather than real
+// competitor/team names. Used to suppress fake-matchup rendering on
+// solo events that only have generic event labels.
+const FORBIDDEN_PAIR_NAMES = new Set(['', 'home', 'away', 'team', 'event', 'session', 'fighter', 'player', 'competitor', 'tba', 'tbd', 'unknown', 'n/a', 'na', 'sports', 'sport'])
+
+function pickRealSide(...candidates) {
+  for (const candidate of candidates) {
+    const value = normalizeSpace(candidate)
+    if (!value) continue
+    if (FORBIDDEN_PAIR_NAMES.has(value.toLowerCase())) continue
+    return value
+  }
+  return ''
+}
+
 function templateData(event = {}, theme = {}, mode = '') {
   const eventClass = event.eventClass || event.posterClass || classifySportsPosterEvent(event)
   const data = buildPaidTemplateMatchup(event, eventClass)
@@ -417,8 +432,40 @@ function templateData(event = {}, theme = {}, mode = '') {
   const eventFormat = ['matchup', 'single', 'solo'].includes(requestedMode)
     ? requestedMode
     : data.event_format
-  const hasMatchup = eventFormat === 'matchup' || eventFormat === 'single'
-  const isTeamMatchup = eventFormat === 'matchup'
+  // Audit fix G1.3/G1.4: when the source supplies a real driver/competitor
+  // pair (e.g. UFC with Makhachev vs Oliveira, tennis with Alcaraz vs Sinner),
+  // per-template renderers must show the head-to-head — not the event-only
+  // tile. The canonical Python templates do exactly this: solo events with
+  // home+away render as head-to-head sportsbook/trading-card panels. We must
+  // check the ORIGINAL event input — not data.home/away because the adapter
+  // falls back to eventShort/session/league names when no real side was
+  // supplied, which would falsely trigger a fake matchup.
+  //
+  // CONTRACT INVARIANT (Q5.3 + user direction 2026-05-01): motorsport_event
+  // is NEVER a head-to-head. F1, MotoGP, NASCAR, IndyCar, WRC, etc. are
+  // multi-car / multi-driver races, not 1v1 contests. Even if test data or
+  // upstream metadata supplies home/away as drivers, the runtime renders the
+  // event tile (Series · Event · Session · Date) — driver names appear only
+  // when the source title literally contains one, which is handled by the
+  // event title text, never by a fake "vs" layout.
+  const rawLeft = pickRealSide(event.principalA, event.homeTeam, event.home?.name, event.fighterA, event.playerA, event.teamA)
+  const rawRight = pickRealSide(event.principalB, event.awayTeam, event.away?.name, event.fighterB, event.playerB, event.teamB)
+  const hasRealPair = Boolean(rawLeft && rawRight && rawLeft.toLowerCase() !== rawRight.toLowerCase())
+  const motorsportNeverPair = eventClass === 'motorsport_event'
+  // Audit fix (contract §4 row 1 fallback + Q2.3 + G8): team_vs_team with no
+  // real pair must downgrade to tournament_event so we don't render a fake
+  // "Highlights vs Highlights" matchup. Without this guard, the adapter still
+  // returns event_format='matchup' for team_vs_team class even when no real
+  // sides parsed.
+  const teamWithoutPair = eventClass === 'team_vs_team' && !hasRealPair
+  // Wrestling per Q5.4 / contract §4 row 5: event-show shape, no fake paired
+  // headline. Suppress matchup layout even when test data supplies a fake
+  // headline pair.
+  const wrestlingNeverPair = eventClass === 'wrestling_event'
+  const hasMatchup = !motorsportNeverPair && !teamWithoutPair && !wrestlingNeverPair && (
+    eventFormat === 'matchup' || eventFormat === 'single' || (eventFormat === 'solo' && hasRealPair)
+  )
+  const isTeamMatchup = eventFormat === 'matchup' && !motorsportNeverPair && !teamWithoutPair
   const leftLabel = isTeamMatchup
     ? 'HOME'
     : eventClass === 'combat_event' ? 'FIGHTER' : eventClass === 'tennis_or_snooker_match' || eventClass === 'darts_event' ? 'PLAYER' : 'ENTRY'
@@ -451,7 +498,14 @@ function templateData(event = {}, theme = {}, mode = '') {
     leftLabel,
     rightLabel,
     isLive: isLiveEvent(event),
-    broadcastLabel: broadcastLabelFor(event, data)
+    broadcastLabel: broadcastLabelFor(event, data),
+    // Audit fix (contract bug 3): expose the original eventTitle/eventName so
+    // solo template renders prefer "Royal Rumble" / "Day 7 Highlights" /
+    // "Brazilian Grand Prix" (full source title) over the adapter's shortened
+    // event_short which may strip session/round noise.
+    eventTitle: normalizeSpace(event.eventTitle || event.eventName || event.name || event.title || data.eventTitle || data.event_short || ''),
+    eventDate: normalizeSpace(event.date || event.eventDate || data.date || ''),
+    eventDetail: normalizeSpace(event.eventDetail || event.session || event.round || data.event_detail || data.session || data.round || '')
   }
 }
 
@@ -926,7 +980,10 @@ function renderEditorial(event = {}, variant = 'poster', theme = {}, mode = '') 
   const issueNo = (m.date || '').replace(/-/g, '.') || 'SportsMeta'
   const homeLast = m.home.name.split(/\s+/).filter(Boolean).slice(-1)[0] || m.home.name
   const awayLast = m.away.name.split(/\s+/).filter(Boolean).slice(-1)[0] || m.away.name
-  const headlineLines = splitLines(m.event_short || m.league || m.sport, 16, 2)
+  // Audit fix (contract bug 3): prefer the source eventTitle ("Royal Rumble",
+  // "Day 7 Highlights", "Brazilian Grand Prix") over the adapter-shortened
+  // event_short which strips session/round noise.
+  const headlineLines = splitLines((m.eventTitle && !m.hasMatchup ? m.eventTitle : m.event_short) || m.eventTitle || m.event_short || m.league || m.sport, 18, 2)
   const paper = '#EFEAE0'
   const ink = '#1a1612'
   const inkSoft = '#4a3d2e'
@@ -942,14 +999,36 @@ function renderEditorial(event = {}, variant = 'poster', theme = {}, mode = '') 
   } else {
     slots.push({ role: 'league', left: 132, top: 118, size: 136 })
   }
-  const plateIdentity = m.hasMatchup
-    ? `<circle cx="108" cy="190" r="60" fill="rgba(15,12,10,0.35)" stroke="rgba(255,240,220,0.76)" stroke-width="1.2"/>
-  <circle cx="292" cy="190" r="60" fill="rgba(15,12,10,0.35)" stroke="rgba(255,240,220,0.76)" stroke-width="1.2"/>
-  <text class="bebas" x="${SOURCE_W / 2}" y="215" text-anchor="middle" font-size="76" fill="#fff" stroke="#111827" stroke-width="5" paint-order="stroke" letter-spacing="1">V</text>
-  <text class="sans" x="108" y="282" text-anchor="middle" font-size="8" fill="${paper}" font-weight="800">${e(m.home.name)}</text>
-  <text class="sans" x="292" y="282" text-anchor="middle" font-size="8" fill="${paper}" font-weight="800">${e(m.away.name)}</text>`
-    : `<circle cx="${SOURCE_W / 2}" cy="190" r="82" fill="rgba(15,12,10,0.35)" stroke="rgba(255,240,220,0.76)" stroke-width="1.2"/>
-  <text class="sans" x="${SOURCE_W / 2}" y="282" text-anchor="middle" font-size="8" fill="${paper}" font-weight="800" letter-spacing="1.5">${e((m.session || m.round).toUpperCase())}</text>`
+  // Audit fix G3.2: editorial hero now uses team-colour radial sun-burst
+  // (matches canonical 01-editorial direction) instead of the generic dome+V.
+  // Sun rays radiate from centre; sport glyph silhouette sits on top in
+  // ivory/paper colour. Free-tier compatible — text + glyph only, no logos.
+  const sunRays = Array.from({ length: 24 }, (_, i) => {
+    const angle = i * Math.PI / 12
+    const r1 = 24
+    const r2 = 96
+    const x1 = (SOURCE_W / 2 + Math.cos(angle) * r1).toFixed(1)
+    const y1 = (190 + Math.sin(angle) * r1).toFixed(1)
+    const x2 = (SOURCE_W / 2 + Math.cos(angle) * r2).toFixed(1)
+    const y2 = (190 + Math.sin(angle) * r2).toFixed(1)
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${paper}" stroke-width="${i % 2 ? 0.6 : 1.4}" opacity="0.32"/>`
+  }).join('')
+  const heroAccent = m.hasMatchup ? m.away.primary : m.home.primary
+  const plateIdentity = `<defs>
+    <radialGradient id="editorialSun" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="${paper}" stop-opacity="0.55"/>
+      <stop offset="40%" stop-color="${m.home.primary}" stop-opacity="0.42"/>
+      <stop offset="100%" stop-color="${heroAccent}" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <circle cx="${SOURCE_W / 2}" cy="190" r="100" fill="url(#editorialSun)"/>
+  ${sunRays}
+  ${sportGlyph(m.sport_icon, SOURCE_W / 2, 190, 132, paper, 0.78, 1.4)}
+  <circle cx="${SOURCE_W / 2}" cy="190" r="42" fill="none" stroke="${paper}" stroke-width="1" stroke-dasharray="2 3" opacity="0.55"/>
+  ${m.hasMatchup
+    ? `<text class="serif" x="${SOURCE_W / 2}" y="252" text-anchor="middle" font-size="22" fill="${paper}" font-style="italic" letter-spacing="1">v</text>
+  <text class="sans" x="${SOURCE_W / 2}" y="298" text-anchor="middle" font-size="9" fill="${paper}" font-weight="800" letter-spacing="2.4">${e(m.home.name.toUpperCase())} · ${e(m.away.name.toUpperCase())}</text>`
+    : `<text class="sans" x="${SOURCE_W / 2}" y="298" text-anchor="middle" font-size="9" fill="${paper}" font-weight="800" letter-spacing="1.5">${e((m.session || m.round || m.sport).toUpperCase())}</text>`}`
   const inner = `<defs>
     <style>${FONTS_EDITORIAL}</style>
     <linearGradient id="plateGrad" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -1004,6 +1083,25 @@ function broadcastSideFontSize(name = '') {
   return 36
 }
 
+// Wrap a broadcast solo title into <=2 lines that fit a target safe width.
+// Conservative width estimate: 0.62 * fontSize per char for Inter 800 weight.
+function wrapBroadcastSoloTitle(title, safeWidth = 510) {
+  const text = String(title || '').trim()
+  if (!text) return ['']
+  const words = text.split(/\s+/)
+  if (words.length === 1) return [text]
+  // Try splitting roughly in half by word count, then refine to balance line widths
+  let bestSplit = Math.ceil(words.length / 2)
+  let bestDiff = Infinity
+  for (let split = 1; split < words.length; split += 1) {
+    const a = words.slice(0, split).join(' ').length
+    const b = words.slice(split).join(' ').length
+    const diff = Math.abs(a - b)
+    if (diff < bestDiff) { bestDiff = diff; bestSplit = split }
+  }
+  return [words.slice(0, bestSplit).join(' '), words.slice(bestSplit).join(' ')]
+}
+
 function renderBroadcastMatchupTitle(matchup, e) {
   const homeName = matchup.home.toUpperCase()
   const awayName = matchup.away.toUpperCase()
@@ -1026,60 +1124,154 @@ function renderBroadcastSoloTitle(title, e) {
 }
 
 function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') {
+  // Audit fix G2: rewritten to match the canonical 02-broadcast direction —
+  // diagonal team-colour halves, chrome VS centrepiece, stroked corner
+  // initials, lower-third HOME/AWAY panel. Source-of-truth template lives at
+  // C:/Users/kepne/projects/L - PVTKRRX/PCnestspeaker/python-templates/02-broadcast/generate.py
+  // Scaled from canonical 400x600 to PVTKRRX 600x900 (1.5x).
   const m = templateData(event, theme, mode)
   const e = escapeXml
+  const W = BROADCAST_W   // 600
+  const H = BROADCAST_H   // 900
   const label = broadcastLabelForRender(event, m)
   const palette = broadcastPaletteFor(event, m, label)
-  const matchup = broadcastMatchupFromEvent(event, m)
-  const title = broadcastTitleFromEvent(event, m)
-  const titleBlock = matchup
-    ? renderBroadcastMatchupTitle(matchup, e)
-    : renderBroadcastSoloTitle(title, e)
-  const subtitle = broadcastSubtitleFromEvent(event, m, label, title, matchup)
-  const subtitleFont = subtitle.length > 52 ? 14 : subtitle.length > 44 ? 16 : subtitle.length > 34 ? 18 : 20
-  const pillWidth = Math.max(88, Math.min(250, Math.round(label.length * 10.6 + 28)))
-  const pattern = broadcastPatternSvg(palette.pattern)
-  const maybeLive = m.isLive
-    ? `<g data-role="broadcast-live" transform="translate(498 54)"><circle cx="0" cy="0" r="5" fill="${palette.accent2}"/><text x="14" y="5" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="12" font-weight="800" fill="#ffffff" letter-spacing="2">LIVE</text></g>`
+  const home = m.home
+  const away = m.away
+  const sportIcon = m.sport_icon || sportIconFor(event, m)
+  const round = normalizeSpace(m.round || m.session || m.eventDetail || '')
+  const venue = normalizeSpace(m.venue || '')
+  const date = normalizeSpace(m.date || '')
+  const time = normalizeSpace(m.time || '')
+  const homeName = (home?.name || '').toString()
+  const awayName = (away?.name || '').toString()
+  const homeShort = (home?.short || home?.initials || homeName.slice(0, 3) || 'HME').toString().toUpperCase()
+  const awayShort = (away?.short || away?.initials || awayName.slice(0, 3) || 'AWY').toString().toUpperCase()
+
+  // Diagonal halves (canonical 0,0 -> W*0.6,0 -> W*0.4,H -> 0,H for home)
+  const halves = `
+    <polygon data-role="home-half" points="0,0 ${W * 0.6},0 ${W * 0.4},${H} 0,${H}" fill="url(#broadcastSideHome)"/>
+    <polygon data-role="away-half" points="${W * 0.6},0 ${W},0 ${W},${H} ${W * 0.4},${H}" fill="url(#broadcastSideAway)"/>
+    <line x1="${W / 2 - 45}" y1="0" x2="${W / 2 + 45}" y2="${H}" stroke="rgba(255,255,255,0.85)" stroke-width="4" filter="url(#broadcastSeamBlur)" opacity="0.7"/>`
+
+  // Background sport glyph at very low opacity
+  const bgGlyph = sportGlyph(sportIcon, W / 2, H / 2, 630, '#ffffff', 0.06)
+
+  // Top bar — code box + league + sport + LIVE indicator
+  const liveDot = m.isLive
+    ? `<circle cx="${W - 66}" cy="42" r="5" fill="#ef4444" filter="url(#broadcastRedGlow)"/>
+       <text class="sans" data-role="broadcast-live" x="${W - 51}" y="48" font-size="14" font-weight="700" fill="white" letter-spacing="2">LIVE</text>`
     : ''
+  const topBar = `
+    <g data-role="broadcast-top">
+      <rect x="27" y="27" width="48" height="33" fill="none" stroke="white" stroke-width="1.4"/>
+      <text class="bebas" x="51" y="51" text-anchor="middle" font-size="20" fill="white">${e((m.league_code || label || '').toString().slice(0, 4).toUpperCase() || 'SP')}</text>
+      <text class="bebas" x="87" y="42" font-size="18" fill="white" letter-spacing="0.1em">${e((m.league || label || '').toString().toUpperCase())}</text>
+      <text class="mono" x="87" y="60" font-size="10" fill="white" opacity="0.65" letter-spacing="2.5">${e((m.sport || '').toString().toUpperCase())}</text>
+      ${liveDot}
+    </g>`
+
+  // Pair branch — diagonal halves + chrome VS + corner initials + lower third
+  const pairBlock = m.hasMatchup ? `
+    <text class="bebas" data-role="broadcast-initial-home" x="-12" y="480" font-size="330" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.4" letter-spacing="-12">${e(homeShort)}</text>
+    <text class="bebas" data-role="broadcast-initial-away" x="${W + 12}" y="810" text-anchor="end" font-size="330" fill="none" stroke="rgba(255,255,255,0.18)" stroke-width="1.4" letter-spacing="-12">${e(awayShort)}</text>
+    <g data-role="broadcast-versus-mark" transform="translate(${W / 2} ${H / 2})">
+      <text class="bebas" x="0" y="33" text-anchor="middle" font-size="132" fill="url(#broadcastChrome)" letter-spacing="6" filter="url(#broadcastVsShadow)" transform="skewX(-12)">VS</text>
+    </g>
+    ${round ? `<text class="mono" x="${W / 2}" y="${H / 2 + 147}" text-anchor="middle" font-size="14" fill="rgba(255,255,255,0.85)" letter-spacing="2.5">— ${e(round.toUpperCase())} —</text>` : ''}
+    <rect x="0" y="${H - 195}" width="${W}" height="195" fill="url(#broadcastBottomBar)"/>
+    <g fill="white">
+      <text data-role="broadcast-home-label" x="27" y="${H - 99}" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="13" font-weight="700" fill="${home.primary}" letter-spacing="1.8">${e(m.leftLabel)}</text>
+      <text data-role="broadcast-title" class="broadcast-title" x="27" y="${H - 72}" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="27" font-weight="800" fill="#ffffff" letter-spacing="1">${e(homeName)}</text>
+      <text data-role="broadcast-away-label" x="${W - 27}" y="${H - 99}" text-anchor="end" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="13" font-weight="700" fill="${away.primary}" letter-spacing="1.8">${e(m.rightLabel)}</text>
+      <text data-role="broadcast-title" class="broadcast-title" x="${W - 27}" y="${H - 72}" text-anchor="end" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="27" font-weight="800" fill="#ffffff" letter-spacing="1">${e(awayName)}</text>
+    </g>
+    <line x1="27" y1="${H - 57}" x2="${W - 27}" y2="${H - 57}" stroke="rgba(255,255,255,0.4)" stroke-width="0.9"/>
+    <text class="mono" data-role="broadcast-venue" x="27" y="${H - 33}" font-size="13" fill="rgba(255,255,255,0.7)" letter-spacing="1.6">${e(venue.toUpperCase())}</text>
+    <text class="mono" data-role="broadcast-date" x="${W - 27}" y="${H - 33}" text-anchor="end" font-size="13" fill="rgba(255,255,255,0.7)" letter-spacing="1.6">${e(date)}${time ? ` · ${e(time.toUpperCase())}` : ''}</text>
+    <text data-role="broadcast-wordmark" x="${W / 2}" y="${H - 12}" text-anchor="middle" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="11" font-weight="700" fill="rgba(255,255,255,0.55)" letter-spacing="4">${e(BROADCAST_WORDMARK)}</text>` : ''
+
+  // Solo branch — single-event poster (motorsport, golf, etc. with no real pair)
+  // Same diagonal background still draws but the lower-third + chrome VS are
+  // replaced with an event-only treatment so we don't render fake matchups.
+  // Prefer the original event title (richer signal — "Gear Up", "Islas Canarias
+  // Saturday Highlights", "British Grand Prix") over the adapter's shortened
+  // event_short which strips noise tokens we'd want on a poster.
+  const soloTitleRaw = normalizeSpace(
+    event.eventTitle ||
+    event.title ||
+    event.eventName ||
+    m.event_short ||
+    m.league ||
+    'Event'
+  )
+  const soloTitle = soloTitleRaw.toUpperCase()
+  // Wrap long titles to up to 2 lines + auto-shrink font size to keep text
+  // inside the 510px safe width (W=600 minus 45px margins each side).
+  const soloLines = wrapBroadcastSoloTitle(soloTitle, 510)
+  const soloFontSize = soloLines.length > 1 ? 44 : (soloTitle.length > 16 ? 46 : 58)
+  const soloBaseY = H / 2 + 195 - (soloLines.length - 1) * Math.round(soloFontSize * 0.5)
+  const soloBlock = !m.hasMatchup ? `
+    <g data-role="broadcast-solo">
+      ${sportGlyph(sportIcon, W / 2, H / 2 - 60, 240, '#ffffff', 0.94, 4)}
+      ${soloLines.map((line, idx) => `<text data-role="broadcast-title" class="broadcast-title" x="${W / 2}" y="${soloBaseY + idx * Math.round(soloFontSize * 1.05)}" text-anchor="middle" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="${soloFontSize}" font-weight="800" fill="white" letter-spacing="2">${e(line)}</text>`).join('\n      ')}
+      ${round ? `<text class="mono" x="${W / 2}" y="${soloBaseY + soloLines.length * Math.round(soloFontSize * 1.05) + 14}" text-anchor="middle" font-size="14" fill="rgba(255,255,255,0.85)" letter-spacing="2.5">— ${e(round.toUpperCase())} —</text>` : ''}
+    </g>
+    <rect x="0" y="${H - 130}" width="${W}" height="130" fill="url(#broadcastBottomBar)"/>
+    <text class="mono" data-role="broadcast-venue" x="27" y="${H - 60}" font-size="13" fill="rgba(255,255,255,0.7)" letter-spacing="1.6">${e(venue.toUpperCase())}</text>
+    <text class="mono" data-role="broadcast-date" x="${W - 27}" y="${H - 60}" text-anchor="end" font-size="13" fill="rgba(255,255,255,0.7)" letter-spacing="1.6">${e(date)}${time ? ` · ${e(time.toUpperCase())}` : ''}</text>
+    <text data-role="broadcast-wordmark" x="${W / 2}" y="${H - 24}" text-anchor="middle" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="11" font-weight="700" fill="rgba(255,255,255,0.55)" letter-spacing="4">${e(BROADCAST_WORDMARK)}</text>` : ''
+
   const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${BROADCAST_W}" height="${BROADCAST_H}" viewBox="0 0 ${BROADCAST_W} ${BROADCAST_H}" role="img" aria-label="${e(title)}">
+<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${e(soloTitle)}">
   <defs>
-    <linearGradient id="broadcastBgGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-      <stop offset="0%" stop-color="${palette.bg0}"/>
-      <stop offset="52%" stop-color="${palette.bg1}"/>
-      <stop offset="100%" stop-color="${palette.bg2}"/>
-    </linearGradient>
-    <radialGradient id="broadcastBgGlow" cx="25%" cy="18%" r="70%">
-      <stop offset="0%" stop-color="${palette.glow}"/>
-      <stop offset="60%" stop-color="${palette.glowSoft}"/>
-      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
+    <radialGradient id="broadcastSideHome" cx="30%" cy="40%" r="80%">
+      <stop offset="0%" stop-color="${home.primary || '#1f2a44'}"/>
+      <stop offset="70%" stop-color="${home.secondary || '#0a1020'}"/>
+      <stop offset="100%" stop-color="#060810"/>
     </radialGradient>
-    <linearGradient id="broadcastAccentStripe" x1="0%" y1="0%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="${palette.accent}"/>
-      <stop offset="58%" stop-color="${palette.accent2}"/>
-      <stop offset="100%" stop-color="${palette.accent}"/>
+    <radialGradient id="broadcastSideAway" cx="70%" cy="60%" r="80%">
+      <stop offset="0%" stop-color="${away.primary || '#3a1c1c'}"/>
+      <stop offset="70%" stop-color="${away.secondary || '#1a0808'}"/>
+      <stop offset="100%" stop-color="#060810"/>
+    </radialGradient>
+    <linearGradient id="broadcastChrome" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff"/>
+      <stop offset="45%" stop-color="#d8d8d8"/>
+      <stop offset="55%" stop-color="#8a8a8a"/>
+      <stop offset="100%" stop-color="#ffffff"/>
     </linearGradient>
-    <pattern id="broadcastFineLines" x="0" y="0" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(28)">
-      <rect x="0" y="0" width="3" height="18" fill="rgba(255,255,255,0.035)"/>
+    <linearGradient id="broadcastBottomBar" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="35%" stop-color="rgba(0,0,0,0.85)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.95)"/>
+    </linearGradient>
+    <radialGradient id="broadcastVignette" cx="50%" cy="50%" r="75%">
+      <stop offset="35%" stop-color="rgba(0,0,0,0)"/>
+      <stop offset="100%" stop-color="rgba(0,0,0,0.85)"/>
+    </radialGradient>
+    <pattern id="broadcastScanlines" x="0" y="0" width="3" height="3" patternUnits="userSpaceOnUse">
+      <rect width="3" height="1" fill="rgba(255,255,255,0.04)"/>
     </pattern>
+    <filter id="broadcastSeamBlur"><feGaussianBlur stdDeviation="2.2"/></filter>
+    <filter id="broadcastRedGlow"><feGaussianBlur stdDeviation="1.5"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="broadcastVsShadow"><feGaussianBlur in="SourceAlpha" stdDeviation="3"/><feOffset dy="4"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <style>${FONTS_BEBAS_MONO_SANS}</style>
   </defs>
   <g data-role="broadcast-layout" data-layout-family="BROADCAST" data-layout-style="sportsmeta-default-poster" data-palette="${e(palette.key)}">
-    <rect width="${BROADCAST_W}" height="${BROADCAST_H}" fill="url(#broadcastBgGradient)"/>
-    <rect width="${BROADCAST_W}" height="${BROADCAST_H}" fill="url(#broadcastBgGlow)"/>
-    <rect width="${BROADCAST_W}" height="${BROADCAST_H}" fill="url(#broadcastFineLines)" opacity="0.44"/>
-    <g data-role="broadcast-pattern" opacity="0.9">${pattern}</g>
+    <rect width="${W}" height="${H}" fill="#000"/>
+    ${halves}
+    <g data-role="broadcast-pattern" opacity="0.9">
+      <rect width="${W}" height="${H}" fill="url(#broadcastScanlines)" style="mix-blend-mode:overlay"/>
+      <rect width="${W}" height="${H}" fill="url(#broadcastVignette)"/>
+    </g>
+    ${bgGlyph}
+    ${topBar}
+    ${pairBlock}
+    ${soloBlock}
     <rect data-role="inner-border" x="30" y="30" width="540" height="840" rx="28" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
     <rect data-role="accent-top" x="30" y="30" width="540" height="4" rx="2" fill="${palette.accent}"/>
-    <rect data-role="accent-bottom" x="30" y="866" width="540" height="4" rx="2" fill="url(#broadcastAccentStripe)"/>
-    <g data-role="pill-badge">
-      <rect x="42" y="42" width="${pillWidth}" height="34" rx="17" fill="${palette.pill}" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-      <text data-role="broadcast-label" x="56" y="64" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="14" font-weight="700" fill="#ffffff" letter-spacing="2">${e(label)}</text>
-    </g>
-    ${maybeLive}
-    ${titleBlock}
-    ${subtitle ? `<text data-role="broadcast-subtitle" x="50" y="812" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="${subtitleFont}" font-weight="600" fill="rgba(255,255,255,0.85)" letter-spacing="1">${e(subtitle.toUpperCase())}</text>` : ''}
-    <text data-role="broadcast-wordmark" x="50" y="844" font-family="'Inter','Helvetica Neue','Arial',sans-serif" font-size="12" font-weight="700" fill="rgba(255,255,255,0.55)" letter-spacing="4">${e(BROADCAST_WORDMARK)}</text>
+    <rect data-role="accent-bottom" x="30" y="866" width="540" height="4" rx="2" fill="${palette.accent2}"/>
+    <g data-role="pill-badge"></g>
   </g>
 </svg>`
   return {
@@ -1489,7 +1681,7 @@ function renderSportsbook(event = {}, variant = 'poster', theme = {}, mode = '')
   <text class="mono" x="${SOURCE_W / 2}" y="145" text-anchor="middle" font-size="9" fill="#7B8390" letter-spacing="1.8">${e(m.league.toUpperCase())}</text>
   <circle cx="${SOURCE_W / 2}" cy="228" r="58" fill="url(#badge_L)" stroke="${m.home.accent}" stroke-width="1.5"/>
   ${sportGlyph(m.sport_icon, SOURCE_W / 2, 228, 86, 'white', 0.86)}
-  <text class="bebas" x="${SOURCE_W / 2}" y="330" text-anchor="middle" font-size="32" fill="white" letter-spacing="0.8">${e(m.event_short)}</text>
+  <text class="bebas" x="${SOURCE_W / 2}" y="330" text-anchor="middle" font-size="${(m.eventTitle || m.event_short || '').length > 18 ? 24 : 32}" fill="white" letter-spacing="0.8">${e(m.eventTitle || m.event_short)}</text>
   <text class="sans" x="${SOURCE_W / 2}" y="356" text-anchor="middle" font-size="10.5" fill="#D1D5DB">${e(m.session || m.round)}</text>`
   const inner = `<defs>
     <style>${FONTS_BEBAS_MONO_SANS}</style>
@@ -1547,9 +1739,23 @@ function renderTradingCard(event = {}, variant = 'poster', theme = {}, mode = ''
   const rays = Array.from({ length: 36 }, (_, i) => `<line x1="200" y1="280" x2="${(200 + Math.cos(i * Math.PI / 18) * 320).toFixed(1)}" y2="${(280 + Math.sin(i * Math.PI / 18) * 320).toFixed(1)}" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/>`).join('')
   const burst = Array.from({ length: 24 }, (_, i) => `<line x1="200" y1="115" x2="${(200 + Math.cos(i / 24 * 2 * Math.PI) * 260).toFixed(1)}" y2="${(115 + Math.sin(i / 24 * 2 * Math.PI) * 260).toFixed(1)}" stroke="#f8e08e" stroke-width="${i % 2 ? 0.6 : 1.2}"/>`).join('')
   const corner = (x, y, sx, sy) => `<g transform="translate(${x} ${y}) scale(${sx} ${sy})"><path d="M2 2 L20 2 M2 2 L2 20 M2 2 L14 14 M8 2 L2 8" stroke="#f8e08e" stroke-width="1" fill="none"/><circle cx="14" cy="14" r="2" fill="#f8e08e"/></g>`
+  // Audit fix G3.3: render team-initial monograms inside the badge orbs so
+  // free-tier trading-card matches the canonical 04-trading-card layout (MC,
+  // ARS letter monograms instead of empty solid orbs). Initials stay text-
+  // only — no real team logo bytes embedded (G5).
+  const homeMonoSize = (m.home.initials || '').length > 2 ? 30 : 36
+  const awayMonoSize = (m.away.initials || '').length > 2 ? 30 : 36
+  const homeMonoFill = readableAccent(m.home.primary)
+  const awayMonoFill = readableAccent(m.away.primary)
   const feature = m.hasMatchup
-    ? `<g transform="translate(110 170) rotate(-7)"><circle cx="0" cy="0" r="62" fill="url(#face)" stroke="${m.home.accent}" stroke-width="2" filter="url(#shadow1)"/></g>
-  <g transform="translate(${SOURCE_W - 110} 280) rotate(7)"><circle cx="0" cy="0" r="62" fill="${m.away.primary}" stroke="${m.away.accent}" stroke-width="2" filter="url(#shadow1)"/></g>
+    ? `<g transform="translate(110 170) rotate(-7)">
+    <circle cx="0" cy="0" r="62" fill="url(#face)" stroke="${m.home.accent}" stroke-width="2" filter="url(#shadow1)"/>
+    <text data-role="fallback-team-initials" data-team-side="home" data-team-name="${e(m.home.name)}" class="bebas" x="0" y="${Math.round(homeMonoSize * 0.34)}" text-anchor="middle" font-size="${homeMonoSize}" fill="${homeMonoFill}" letter-spacing="0">${e(m.home.initials)}</text>
+  </g>
+  <g transform="translate(${SOURCE_W - 110} 280) rotate(7)">
+    <circle cx="0" cy="0" r="62" fill="${m.away.primary}" stroke="${m.away.accent}" stroke-width="2" filter="url(#shadow1)"/>
+    <text data-role="fallback-team-initials" data-team-side="away" data-team-name="${e(m.away.name)}" class="bebas" x="0" y="${Math.round(awayMonoSize * 0.34)}" text-anchor="middle" font-size="${awayMonoSize}" fill="${awayMonoFill}" letter-spacing="0">${e(m.away.initials)}</text>
+  </g>
   <g transform="translate(${SOURCE_W / 2} 225) rotate(45)"><rect x="-38" y="-38" width="76" height="76" fill="url(#diamond)" stroke="#2a1a08" stroke-width="2"/></g>
   <text class="bebas" x="${SOURCE_W / 2}" y="232" text-anchor="middle" font-size="26" fill="#2a1a08" letter-spacing="1">VS</text>
   <rect x="18" y="380" width="${SOURCE_W - 36}" height="80" fill="url(#namePlate)" stroke="#2a1a08" stroke-width="1.5"/>
@@ -1558,7 +1764,7 @@ function renderTradingCard(event = {}, variant = 'poster', theme = {}, mode = ''
   <text class="serif" x="${SOURCE_W / 2}" y="448" text-anchor="middle" font-size="16" font-style="italic" font-weight="700" fill="#2a1a08">${e(m.away.name)}</text>`
     : `<g transform="translate(${SOURCE_W / 2} 210)"><circle cx="0" cy="0" r="74" fill="url(#face)" stroke="${m.home.accent}" stroke-width="2" filter="url(#shadow1)"/>${sportGlyph(m.sport_icon, 0, 0, 106, '#fff5d0', 0.82)}</g>
   <rect x="18" y="360" width="${SOURCE_W - 36}" height="104" fill="url(#namePlate)" stroke="#2a1a08" stroke-width="1.5"/>
-  <text class="serif" x="${SOURCE_W / 2}" y="396" text-anchor="middle" font-size="19" font-style="italic" font-weight="700" fill="#2a1a08">${e(m.event_short)}</text>
+  <text class="serif" x="${SOURCE_W / 2}" y="396" text-anchor="middle" font-size="${(m.eventTitle || m.event_short || '').length > 22 ? 14 : 19}" font-style="italic" font-weight="700" fill="#2a1a08">${e(m.eventTitle || m.event_short)}</text>
   <text class="mono" x="${SOURCE_W / 2}" y="424" text-anchor="middle" font-size="8" fill="#5a4a1f" letter-spacing="3">- ${e((m.session || m.round).toUpperCase())} -</text>`
   const inner = `<defs>
     <style>.bebas { font-family: 'Bebas Neue', Impact, sans-serif; }.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }.serif { font-family: 'Playfair Display', Georgia, serif; }</style>
@@ -1609,7 +1815,7 @@ function renderBrutalist(event = {}, variant = 'poster', theme = {}, mode = '') 
   <text class="mono" x="${SOURCE_W - 18}" y="${SOURCE_H / 2 + 4}" text-anchor="end" font-size="10" fill="${m.away.primary}" letter-spacing="1.8">${e(m.event_short.toUpperCase())} *</text>`
   const footer = m.hasMatchup
     ? `<text class="sans" x="18" y="${SOURCE_H - 50}" font-size="8" fill="white" opacity="0.7" letter-spacing="1.6">${e(m.leftLabel)}</text><text class="bebas" x="18" y="${SOURCE_H - 32}" font-size="18" fill="white" letter-spacing="1">${e(m.home.name)}</text><text class="sans" x="${SOURCE_W - 18}" y="${SOURCE_H - 50}" text-anchor="end" font-size="8" fill="white" opacity="0.7" letter-spacing="1.6">${e(m.rightLabel)}</text><text class="bebas" x="${SOURCE_W - 18}" y="${SOURCE_H - 32}" text-anchor="end" font-size="18" fill="white" letter-spacing="1">${e(m.away.name)}</text>`
-    : `<text class="sans" x="18" y="${SOURCE_H - 50}" font-size="8" fill="white" opacity="0.7" letter-spacing="1.6">EVENT</text><text class="bebas" x="18" y="${SOURCE_H - 32}" font-size="18" fill="white" letter-spacing="1">${e(m.event_short)}</text><text class="sans" x="${SOURCE_W - 18}" y="${SOURCE_H - 50}" text-anchor="end" font-size="8" fill="white" opacity="0.7" letter-spacing="1.6">SESSION</text><text class="bebas" x="${SOURCE_W - 18}" y="${SOURCE_H - 32}" text-anchor="end" font-size="18" fill="white" letter-spacing="1">${e(m.session || m.round)}</text>`
+    : `<text class="sans" x="18" y="${SOURCE_H - 50}" font-size="8" fill="white" opacity="0.7" letter-spacing="1.6">${e((m.league || m.sport || 'EVENT').toUpperCase())}</text><text class="bebas" x="18" y="${SOURCE_H - 32}" font-size="18" fill="white" letter-spacing="1">${e(m.eventTitle || m.event_short)}</text><text class="sans" x="${SOURCE_W - 18}" y="${SOURCE_H - 50}" text-anchor="end" font-size="8" fill="white" opacity="0.7" letter-spacing="1.6">${e(((m.session || m.round) ? 'SESSION' : 'DATE').toUpperCase())}</text><text class="bebas" x="${SOURCE_W - 18}" y="${SOURCE_H - 32}" text-anchor="end" font-size="18" fill="white" letter-spacing="1">${e(m.session || m.round || m.date)}</text>`
   const inner = `<defs><style>${FONTS_BEBAS_MONO_SANS}</style></defs>
   <rect width="${SOURCE_W}" height="${SOURCE_H}" fill="#0F0E0C"/>
   <polygon points="0,0 ${SOURCE_W},0 ${SOURCE_W},${y32} 0,${y78}" fill="${m.home.primary}"/>
@@ -1703,8 +1909,8 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
     : `<g transform="translate(${SOURCE_W / 2} 204)"><circle cx="0" cy="0" r="52" fill="${m.home.primary}" stroke="${m.home.accent}" stroke-width="2"/>${sportGlyph(m.sport_icon, 0, 0, 76, m.home.accent, 0.95)}</g>
   <line x1="20" y1="305" x2="160" y2="305" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
   <line x1="${SOURCE_W - 160}" y1="305" x2="${SOURCE_W - 20}" y2="305" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
-  <text class="bebas" x="${SOURCE_W / 2}" y="310" text-anchor="middle" font-size="13" fill="#5a3a1f" letter-spacing="3">EVENT</text>
-  <text class="bebas" x="${SOURCE_W / 2}" y="350" text-anchor="middle" font-size="28" fill="#1a1410" letter-spacing="1">${e(m.event_short)}</text>
+  <text class="bebas" x="${SOURCE_W / 2}" y="310" text-anchor="middle" font-size="13" fill="#5a3a1f" letter-spacing="3">${e((m.league || m.sport || '').toUpperCase()) || ''}</text>
+  <text class="bebas" x="${SOURCE_W / 2}" y="350" text-anchor="middle" font-size="28" fill="#1a1410" letter-spacing="1">${e(m.eventTitle || m.event_short)}</text>
   ${(m.session || m.round) ? `<text class="serif" x="${SOURCE_W / 2}" y="378" text-anchor="middle" font-style="italic" font-size="15" fill="#9b6f2f">${e(m.session || m.round)}</text>` : ''}`
   const inner = `<defs>
     <style>.bebas { font-family: 'Bebas Neue', Impact, sans-serif; }.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }.serif { font-family: 'Playfair Display', Georgia, serif; }.sans { font-family: 'Inter', system-ui, sans-serif; }</style>
@@ -1774,10 +1980,17 @@ function renderGlitch(event = {}, variant = 'poster', theme = {}, mode = '') {
         { role: 'league', left: 96, top: 158, size: 208 }
       ]
   const corners = [[14, 14, 0], [SOURCE_W - 14, 14, 90], [14, SOURCE_H - 14, 270], [SOURCE_W - 14, SOURCE_H - 14, 180]].map(([x, y, r]) => `<g transform="translate(${x} ${y}) rotate(${r})"><path d="M-12 -6 L-12 -12 L-6 -12" stroke="#ff0044" stroke-width="1.2" fill="none"/><path d="M-11 -5 L-11 -11 L-5 -11" stroke="#00d9ff" stroke-width="1" fill="none" opacity="0.7"/></g>`).join('')
+  // Audit fix (contract bug 3 / glitch): prefer source m.eventTitle so
+  // "Royal Rumble", "Brazilian Grand Prix", "Day 7 Highlights" etc. survive
+  // through to the rendered glitch SVG instead of being collapsed into the
+  // adapter-shortened event_short.
+  const soloHeadline = (m.eventTitle || m.event_short || '').toUpperCase()
+  // Glitch only fits ~20 chars at 88px without overflow; auto-shrink long titles
+  const soloHeadSize = soloHeadline.length > 18 ? 56 : (soloHeadline.length > 12 ? 72 : 88)
   const body = isSingle
-    ? `${glitchText(m.event_short.toUpperCase(), SOURCE_W / 2, 240, 88)}<text class="mono" x="${SOURCE_W / 2}" y="290" text-anchor="middle" font-size="11" fill="#fff" letter-spacing="3">${e((m.session || m.round).toUpperCase())}</text><g transform="translate(${SOURCE_W / 2} 360)"><text class="hero" x="-1" y="0" text-anchor="middle" font-size="22" fill="#ff0044" letter-spacing="8">MAIN</text><text class="hero" x="1" y="0" text-anchor="middle" font-size="22" fill="#00d9ff" letter-spacing="8">MAIN</text><text class="hero" x="0" y="0" text-anchor="middle" font-size="22" fill="#fff" letter-spacing="8">MAIN</text></g>`
+    ? `${glitchText(soloHeadline, SOURCE_W / 2, 240, soloHeadSize)}<text class="mono" x="${SOURCE_W / 2}" y="290" text-anchor="middle" font-size="11" fill="#fff" letter-spacing="3">${e((m.session || m.round).toUpperCase())}</text><g transform="translate(${SOURCE_W / 2} 360)"><text class="hero" x="-1" y="0" text-anchor="middle" font-size="22" fill="#ff0044" letter-spacing="8">MAIN</text><text class="hero" x="1" y="0" text-anchor="middle" font-size="22" fill="#00d9ff" letter-spacing="8">MAIN</text><text class="hero" x="0" y="0" text-anchor="middle" font-size="22" fill="#fff" letter-spacing="8">MAIN</text></g>`
     : `${glitchText(m.home.short, SOURCE_W / 2, 220, 150)}<text class="hero" x="${SOURCE_W / 2 - 1}" y="298" text-anchor="middle" font-size="28" fill="#ff0044" letter-spacing="6">VS</text><text class="hero" x="${SOURCE_W / 2 + 1}" y="298" text-anchor="middle" font-size="28" fill="#00d9ff" letter-spacing="6">VS</text><text class="hero" x="${SOURCE_W / 2}" y="298" text-anchor="middle" font-size="28" fill="#fff" letter-spacing="6">VS</text>${glitchText(m.away.short, SOURCE_W / 2, 388, 150)}<rect x="-10" y="252" width="${SOURCE_W + 20}" height="6" fill="#0A0A0C" transform="translate(10 0)"/>`
-  const taglineText = isSingle ? m.event_short.toUpperCase() : `${m.home.name.toUpperCase()} x ${m.away.name.toUpperCase()}`
+  const taglineText = isSingle ? soloHeadline : `${m.home.name.toUpperCase()} x ${m.away.name.toUpperCase()}`
   const taglineSize = taglineText.length > 28 ? 13 : 16
   const inner = `<defs>
     <style>.hero { font-family: 'Bebas Neue', Impact, sans-serif; }.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }</style>
@@ -1816,15 +2029,22 @@ function renderGlitch(event = {}, variant = 'poster', theme = {}, mode = '') {
 function renderSportsPosterTemplateSvg({ event = {}, variant = 'poster', template = 'editorial', theme = {}, mode = '' } = {}) {
   const normalizedTemplate = normalizeSportsPosterTemplate(template)
   const layoutFamily = layoutFamilyForSportsPosterRender(normalizedTemplate, event)
+  // Dispatch reorder (audit fix G1 / sports-artwork-template-vs-original.md):
+  // The requested template wins. Per-template renderers handle every sport
+  // (team-vs-team, competitor-vs-competitor, motorsport solo) directly, so
+  // the visual style stays consistent. The COMPETITOR_VS_COMPETITOR /
+  // SINGLE_EVENT_MOTORSPORT family branches only fire when no specific
+  // template was requested or the template slug is unknown.
   let artwork
   if (normalizedTemplate === 'broadcast') artwork = renderBroadcast(event, variant, theme, mode)
-  else if (layoutFamily === 'COMPETITOR_VS_COMPETITOR') artwork = renderCompetitorVsCompetitor(event, variant, theme, mode)
-  else if (layoutFamily === 'SINGLE_EVENT_MOTORSPORT') artwork = renderSingleEventMotorsport(event, variant, theme, mode)
+  else if (normalizedTemplate === 'editorial') artwork = renderEditorial(event, variant, theme, mode)
   else if (normalizedTemplate === 'sportsbook') artwork = renderSportsbook(event, variant, theme, mode)
   else if (normalizedTemplate === 'trading-card') artwork = renderTradingCard(event, variant, theme, mode)
   else if (normalizedTemplate === 'brutalist') artwork = renderBrutalist(event, variant, theme, mode)
   else if (normalizedTemplate === 'ticket-stub') artwork = renderTicketStub(event, variant, theme, mode)
   else if (normalizedTemplate === 'glitch') artwork = renderGlitch(event, variant, theme, mode)
+  else if (layoutFamily === 'COMPETITOR_VS_COMPETITOR') artwork = renderCompetitorVsCompetitor(event, variant, theme, mode)
+  else if (layoutFamily === 'SINGLE_EVENT_MOTORSPORT') artwork = renderSingleEventMotorsport(event, variant, theme, mode)
   else artwork = renderEditorial(event, variant, theme, mode)
   return {
     ...artwork,
@@ -1879,5 +2099,10 @@ module.exports = {
   normalizeSportsPosterTemplate,
   resolveSportsPosterTemplate,
   renderLogoGlyphSvg,
-  renderSportsPosterTemplateSvg
+  renderSportsPosterTemplateSvg,
+  // Family-shape renderers exported for tests + tooling that need to assert
+  // the layout-family markers directly. Production callers should still use
+  // renderSportsPosterTemplateSvg, which honours the requested template.
+  renderCompetitorVsCompetitor,
+  renderSingleEventMotorsport
 }

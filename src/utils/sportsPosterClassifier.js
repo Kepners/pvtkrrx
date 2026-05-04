@@ -234,6 +234,16 @@ function classifyByText(text, sport, paired) {
     return 'motorsport_event'
   }
 
+  // Wrestling must beat combat: WWE/AEW PPV titles contain "PPV" which the
+  // combat regex matches, and explicit `sport === 'wrestling'` must win over
+  // generic combat keywords either way.
+  if (
+    sport === 'wrestling' ||
+    /\b(?:wwe|aew|nxt|raw|smackdown|dynamite|collision|wrestlemania|royal rumble|summerslam|survivor series|money in the bank|crown jewel|backlash|all in|double or nothing|full gear|revolution)\b/.test(text)
+  ) {
+    return 'wrestling_event'
+  }
+
   if (
     sport === 'mma' ||
     sport === 'boxing' ||
@@ -248,13 +258,6 @@ function classifyByText(text, sport, paired) {
     /\b(?:pga(?: tour| championship)?|lpga|masters|ryder cup|liv golf|dp world tour|open championship|us open golf|u\.s\. open golf)\b/.test(text)
   ) {
     return 'golf_event'
-  }
-
-  if (
-    sport === 'wrestling' ||
-    /\b(?:wwe|aew|nxt|raw|smackdown|dynamite|collision|wrestlemania|royal rumble|summerslam|survivor series|money in the bank|crown jewel|backlash|all in|double or nothing|full gear|revolution)\b/.test(text)
-  ) {
-    return 'wrestling_event'
   }
 
   // Athletics has "Tour" and "Classic" event names, so it must win before cycling classics.

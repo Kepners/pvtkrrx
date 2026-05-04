@@ -62,19 +62,32 @@ async function main() {
     { name: 'UFC', expected: 'ufc', input: { sport: 'mma', league: 'UFC', title: 'UFC Fight Night' } },
     { name: 'F1', expected: 'formula1', input: { sport: 'motorsport', league: 'F1', title: 'Formula 1 Grand Prix' } },
     { name: 'MotoGP', expected: 'motogp', input: { sport: 'motorsport', league: 'MotoGP', title: 'MotoGP Brazil Gear Up', layoutFamily: 'BROADCAST' } },
-    { name: 'WRC neutral motorsport', expected: 'generic-sport', input: { sport: 'motorsport', league: 'WRC Spain', title: 'Islas Canarias Saturday Highlights', layoutFamily: 'BROADCAST' }, fallbackReason: 'neutral_motorsport_broadcast_backdrop_no_specific_asset' },
-    { name: 'generic motorsport neutral', expected: 'generic-sport', input: { sport: 'motorsport', league: 'Motorsport', title: 'Rally Highlights', layoutFamily: 'BROADCAST' }, fallbackReason: 'neutral_motorsport_broadcast_backdrop_no_specific_asset' },
+    // template-contract.md §2 row 17 + Q5.1: WRC/NASCAR/IndyCar/Supercars/
+    // WEC/Formula E/Dakar/etc. ROUTE to the planned `motorsport` bucket. The
+    // asset is Phase 5 backlog so the resolver falls back to generic-sport
+    // when checking file existence (resolvedBucket below).
+    { name: 'WRC routes to motorsport bucket', expected: 'motorsport', resolvedBucket: 'generic-sport', input: { sport: 'motorsport', league: 'WRC Spain', title: 'Islas Canarias Saturday Highlights', layoutFamily: 'BROADCAST' } },
+    { name: 'generic motorsport routes to motorsport bucket', expected: 'motorsport', resolvedBucket: 'generic-sport', input: { sport: 'motorsport', league: 'Motorsport', title: 'Rally Highlights', layoutFamily: 'BROADCAST' } },
+    // Phase 5 backlog: snooker/table-tennis/badminton route to their planned
+    // buckets but fall back to generic-sport at file-resolve time.
+    { name: 'snooker routes to snooker bucket', expected: 'snooker', resolvedBucket: 'generic-sport', input: { sport: 'snooker', league: 'World Snooker', title: 'Crucible Final', layoutFamily: 'BROADCAST' } },
+    { name: 'table-tennis routes to table-tennis bucket', expected: 'table-tennis', resolvedBucket: 'generic-sport', input: { sport: 'table-tennis', league: 'ITTF', title: 'Table Tennis World Tour' } },
+    { name: 'badminton routes to badminton bucket', expected: 'badminton', resolvedBucket: 'generic-sport', input: { sport: 'badminton', league: 'BWF', title: 'Badminton All England Open' } },
     { name: 'PGA/Golf', expected: 'golf', input: { sport: 'golf', league: 'PGA Tour', title: 'PGA Tour Highlights' } },
     { name: 'unknown', expected: 'generic-sport', input: { title: 'Unknown Sports Release' } }
   ]
 
   for (const testCase of cases) {
     const bucket = resolveSportBackdropBucket(testCase.input)
-    assert.equal(bucket, testCase.expected, `${testCase.name} bucket`)
+    assert.equal(bucket, testCase.expected, `${testCase.name} bucket intent`)
     const resolved = resolveSportBackdrop({ ...testCase.input, baseUrl: 'https://addon.test' })
+    // For Phase 5 backlog buckets the intent (testCase.expected) and the
+    // resolved-with-file-check bucket (testCase.resolvedBucket) differ
+    // until the asset ships. resolvedBucket falls back to generic-sport.
+    const urlBucket = testCase.resolvedBucket || testCase.expected
     assert.ok(
-      resolved.url.endsWith(`/sports-backdrops/${testCase.expected}-4k.jpg?v=20260429-sport-level-4k-v1`),
-      `${testCase.name} URL should use ${testCase.expected}-4k`
+      resolved.url.endsWith(`/sports-backdrops/${urlBucket}-4k.jpg?v=20260429-sport-level-4k-v1`),
+      `${testCase.name} URL should use ${urlBucket}-4k`
     )
     if (testCase.fallbackReason) {
       assert.equal(resolved.fallbackReason, testCase.fallbackReason, `${testCase.name} fallback reason`)
