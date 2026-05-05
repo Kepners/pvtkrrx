@@ -285,7 +285,7 @@ async function run() {
           pubDate: '2026-04-17T12:00:00.000Z',
           seeders: 98
         }),
-        trackerItem('MotoGP Qatar Grand Prix Race Replay 1080p', {
+        trackerItem('Moto Grand Prix (MotoGP, Moto2, Moto3) 2026 Stage 04 Spain (Jerez) Complete Weekend', {
           sportHint: 'motorsport',
           pubDate: '2026-04-07T12:00:00.000Z'
         })
@@ -298,6 +298,10 @@ async function run() {
   assert.ok(
     !motorsportNames.some((name) => /Blackburn|Coventry|EFL Championship|Leicester|Milwall/i.test(name)),
     'motorsport catalog should reject football rows even when the tracker category hint says motorsport'
+  )
+  assert.ok(
+    !motorsportNames.some((name) => /\bComplete\b/i.test(name)),
+    'motorsport catalog should strip upstream complete-package text from display names'
   )
 
   const staleMotoGpDate = isoDateOffset(-1)
