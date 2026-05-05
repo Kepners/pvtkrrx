@@ -983,7 +983,10 @@ function renderEditorial(event = {}, variant = 'poster', theme = {}, mode = '') 
   // Audit fix (contract bug 3): prefer the source eventTitle ("Royal Rumble",
   // "Day 7 Highlights", "Brazilian Grand Prix") over the adapter-shortened
   // event_short which strips session/round noise.
-  const headlineLines = splitLines((m.eventTitle && !m.hasMatchup ? m.eventTitle : m.event_short) || m.eventTitle || m.event_short || m.league || m.sport, 18, 2)
+  // Audit fix (2026-05-05): drop max-chars from 18→14 so 18-char titles like
+  // "British Grand Prix" wrap to 2 lines at the smaller 30px size instead of
+  // overflowing the right margin at 42px on a 400px canvas.
+  const headlineLines = splitLines((m.eventTitle && !m.hasMatchup ? m.eventTitle : m.event_short) || m.eventTitle || m.event_short || m.league || m.sport, 14, 2)
   const paper = '#EFEAE0'
   const ink = '#1a1612'
   const inkSoft = '#4a3d2e'
@@ -1176,25 +1179,38 @@ function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') 
   // Filled with each side's primary colour, white ring, white code text — readable at thumbnail size.
   const homePrimary = home.primary || '#1f2a44'
   const awayPrimary = away.primary || '#3a1c1c'
-  const badgeR = 52
+  // Audit fix (2026-05-05): badges shrunk from 52→40 so the central chrome VS
+  // regains primary focus on team-vs-team posters. Real SportsMeta logos drop
+  // into these slots later; the sized-down disc is the fallback weight.
+  const badgeR = 40
   const homeBadgeX = 170
   const homeBadgeY = 320
   const awayBadgeX = 430
   const awayBadgeY = 580
-  const codeFontSize = (code) => code.length <= 2 ? 44 : code.length <= 3 ? 38 : 30
+  const broadcastSlots = m.hasMatchup
+    ? [
+        { role: 'league', left: 30, top: 24, size: 42 },
+        { role: 'home', left: homeBadgeX - badgeR, top: homeBadgeY - badgeR, size: badgeR * 2 },
+        { role: 'away', left: awayBadgeX - badgeR, top: awayBadgeY - badgeR, size: badgeR * 2 }
+      ]
+    : [
+        { role: 'league', left: 30, top: 24, size: 42 }
+      ]
+  const codeFontSize = (code) => code.length <= 2 ? 32 : code.length <= 3 ? 28 : 22
+  const codeYOffset = (code) => Math.round(codeFontSize(code) * 0.34)
   const pairBlock = m.hasMatchup ? `
     <g data-role="broadcast-home-badge">
-      <circle cx="${homeBadgeX}" cy="${homeBadgeY + 5}" r="${badgeR}" fill="rgba(0,0,0,0.5)" filter="url(#broadcastSeamBlur)"/>
-      <circle cx="${homeBadgeX}" cy="${homeBadgeY}" r="${badgeR}" fill="${homePrimary}" stroke="rgba(255,255,255,0.92)" stroke-width="3"/>
-      <text class="bebas" data-role="broadcast-home-code" x="${homeBadgeX}" y="${homeBadgeY + 14}" text-anchor="middle" font-size="${codeFontSize(homeShort)}" fill="#ffffff" letter-spacing="2">${e(homeShort)}</text>
+      <circle cx="${homeBadgeX}" cy="${homeBadgeY + 4}" r="${badgeR}" fill="rgba(0,0,0,0.5)" filter="url(#broadcastSeamBlur)"/>
+      <circle cx="${homeBadgeX}" cy="${homeBadgeY}" r="${badgeR}" fill="${homePrimary}" stroke="rgba(255,255,255,0.92)" stroke-width="2.4"/>
+      <text class="bebas" data-role="broadcast-home-code" x="${homeBadgeX}" y="${homeBadgeY + codeYOffset(homeShort)}" text-anchor="middle" font-size="${codeFontSize(homeShort)}" fill="#ffffff" letter-spacing="1.6">${e(homeShort)}</text>
     </g>
     <g data-role="broadcast-versus-mark" transform="translate(${W / 2} ${H / 2})">
       <text class="bebas" x="0" y="33" text-anchor="middle" font-size="132" fill="url(#broadcastChrome)" letter-spacing="6" filter="url(#broadcastVsShadow)" transform="skewX(-12)">VS</text>
     </g>
     <g data-role="broadcast-away-badge">
-      <circle cx="${awayBadgeX}" cy="${awayBadgeY + 5}" r="${badgeR}" fill="rgba(0,0,0,0.5)" filter="url(#broadcastSeamBlur)"/>
-      <circle cx="${awayBadgeX}" cy="${awayBadgeY}" r="${badgeR}" fill="${awayPrimary}" stroke="rgba(255,255,255,0.92)" stroke-width="3"/>
-      <text class="bebas" data-role="broadcast-away-code" x="${awayBadgeX}" y="${awayBadgeY + 14}" text-anchor="middle" font-size="${codeFontSize(awayShort)}" fill="#ffffff" letter-spacing="2">${e(awayShort)}</text>
+      <circle cx="${awayBadgeX}" cy="${awayBadgeY + 4}" r="${badgeR}" fill="rgba(0,0,0,0.5)" filter="url(#broadcastSeamBlur)"/>
+      <circle cx="${awayBadgeX}" cy="${awayBadgeY}" r="${badgeR}" fill="${awayPrimary}" stroke="rgba(255,255,255,0.92)" stroke-width="2.4"/>
+      <text class="bebas" data-role="broadcast-away-code" x="${awayBadgeX}" y="${awayBadgeY + codeYOffset(awayShort)}" text-anchor="middle" font-size="${codeFontSize(awayShort)}" fill="#ffffff" letter-spacing="1.6">${e(awayShort)}</text>
     </g>
     ${round ? `<text class="mono" x="${W / 2}" y="${H / 2 + 147}" text-anchor="middle" font-size="14" fill="rgba(255,255,255,0.85)" letter-spacing="2.5">— ${e(round.toUpperCase())} —</text>` : ''}
     <rect x="0" y="${H - 195}" width="${W}" height="195" fill="url(#broadcastBottomBar)"/>
@@ -1236,6 +1252,8 @@ function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') 
     : leagueMarkRaw.length <= 3 ? 180
     : leagueMarkRaw.length <= 4 ? 140
     : 100
+  const accentTopY = 80
+  const accentBottomY = m.hasMatchup ? H - 205 : H - 137
   const soloBlock = !m.hasMatchup ? `
     <g data-role="broadcast-solo">
       <text class="bebas" data-role="broadcast-league-mark" x="${W / 2}" y="${H / 2 + 30}" text-anchor="middle" font-size="${leagueMarkSize}" font-weight="900" fill="#ffffff" letter-spacing="-2" filter="url(#broadcastVsShadow)">${e(leagueMarkRaw)}</text>
@@ -1295,14 +1313,14 @@ function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') 
     ${pairBlock}
     ${soloBlock}
     <rect data-role="inner-border" x="30" y="30" width="540" height="840" rx="28" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="1"/>
-    <rect data-role="accent-top" x="30" y="30" width="540" height="4" rx="2" fill="${palette.accent}"/>
-    <rect data-role="accent-bottom" x="30" y="866" width="540" height="4" rx="2" fill="${palette.accent2}"/>
+    <rect data-role="accent-top" x="30" y="${accentTopY}" width="540" height="4" rx="2" fill="${palette.accent}"/>
+    <rect data-role="accent-bottom" x="30" y="${accentBottomY}" width="540" height="4" rx="2" fill="${palette.accent2}"/>
     <g data-role="pill-badge"></g>
   </g>
 </svg>`
   return {
     svg,
-    slots: [],
+    slots: broadcastSlots,
     overlay: ''
   }
 }
@@ -1830,7 +1848,7 @@ function renderBrutalist(event = {}, variant = 'poster', theme = {}, mode = '') 
     ? [{ role: 'league', left: SOURCE_W - 98, top: 22, size: 32 }]
     : [
         { role: 'league', left: SOURCE_W - 98, top: 22, size: 32 },
-        { role: 'league', left: 96, top: 190, size: 208 }
+        { role: 'league', left: 24, top: 62, size: 48 }
       ]
   const middleStrip = m.hasMatchup
     ? `<text class="mono" x="18" y="${SOURCE_H / 2 + 4}" font-size="10" fill="${m.home.primary}" letter-spacing="1.8">* ${e(m.home.short)}</text>
@@ -1842,15 +1860,31 @@ function renderBrutalist(event = {}, variant = 'poster', theme = {}, mode = '') 
   const footer = m.hasMatchup
     ? `<text class="sans" x="18" y="${SOURCE_H - 50}" font-size="8" fill="white" opacity="0.7" letter-spacing="1.6">${e(m.leftLabel)}</text><text class="bebas" x="18" y="${SOURCE_H - 32}" font-size="18" fill="white" letter-spacing="1">${e(m.home.name)}</text><text class="sans" x="${SOURCE_W - 18}" y="${SOURCE_H - 50}" text-anchor="end" font-size="8" fill="white" opacity="0.7" letter-spacing="1.6">${e(m.rightLabel)}</text><text class="bebas" x="${SOURCE_W - 18}" y="${SOURCE_H - 32}" text-anchor="end" font-size="18" fill="white" letter-spacing="1">${e(m.away.name)}</text>`
     : `<text class="sans" x="18" y="${SOURCE_H - 50}" font-size="8" fill="white" opacity="0.7" letter-spacing="1.6">${e((m.league || m.sport || 'EVENT').toUpperCase())}</text><text class="bebas" x="18" y="${SOURCE_H - 32}" font-size="18" fill="white" letter-spacing="1">${e(m.eventTitle || m.event_short)}</text><text class="sans" x="${SOURCE_W - 18}" y="${SOURCE_H - 50}" text-anchor="end" font-size="8" fill="white" opacity="0.7" letter-spacing="1.6">${e(((m.session || m.round) ? 'SESSION' : 'DATE').toUpperCase())}</text><text class="bebas" x="${SOURCE_W - 18}" y="${SOURCE_H - 32}" text-anchor="end" font-size="18" fill="white" letter-spacing="1">${e(m.session || m.round || m.date)}</text>`
+  const identityLeagueLabel = normalizeSpace(m.league_code || m.league || m.sport || 'EVT').toUpperCase()
+  const identitySportLabel = normalizeSpace(m.sport || identityLeagueLabel).toUpperCase()
+  const identityLeagueAttrs = fitTextAttributes(identityLeagueLabel, 44, 11, 7)
+  const identitySportAttrs = fitTextAttributes(identitySportLabel, 44, 6.5, 5)
+  // Audit fix (2026-05-05): when there's no real matchup (motorsport, golf,
+  // tournament, wrestling), the giant opposing-corner letters used to be
+  // initials of `m.home/away` which fell back to event-shorthand and session
+  // strings — yielding unreadable pairs like "BG / QS" for F1 British GP /
+  // Qualifying Saturday. Derive top from league code (F1, MGP, PGA…) and
+  // bottom from event-title initials (BGP, PGA, WSC…) so the wordmark reads.
+  const giantTop = m.hasMatchup
+    ? m.home.initials
+    : (m.league_code || initialsFor(m.league || m.sport, 'EVT')).toString().slice(0, 3).toUpperCase()
+  const giantBottom = m.hasMatchup
+    ? m.away.initials
+    : initialsFor(m.eventTitle || m.event_short || m.round || m.session, m.away.initials || 'EVT').toString().slice(0, 3).toUpperCase()
   const inner = `<defs><style>${FONTS_BEBAS_MONO_SANS}</style></defs>
   <rect width="${SOURCE_W}" height="${SOURCE_H}" fill="#0F0E0C"/>
   <polygon points="0,0 ${SOURCE_W},0 ${SOURCE_W},${y32} 0,${y78}" fill="${m.home.primary}"/>
   <polygon points="0,${y78} ${SOURCE_W},${y32} ${SOURCE_W},${SOURCE_H} 0,${SOURCE_H}" fill="${m.away.primary}"/>
   <line x1="0" y1="${y78}" x2="${SOURCE_W}" y2="${y32}" stroke="#0F0E0C" stroke-width="4"/>
-  <text class="bebas" x="-16" y="240" font-size="340" fill="${m.home.accent}" style="mix-blend-mode:difference" letter-spacing="-15">${e(m.home.initials)}</text>
-  <text class="bebas" x="${SOURCE_W + 16}" y="${SOURCE_H - 20}" text-anchor="end" font-size="340" fill="${m.away.accent}" style="mix-blend-mode:difference" letter-spacing="-15">${e(m.away.initials)}</text>
+  <text class="bebas" x="-16" y="240" font-size="340" fill="${m.home.accent}" style="mix-blend-mode:difference" letter-spacing="-15">${e(giantTop)}</text>
+  <text class="bebas" x="${SOURCE_W + 16}" y="${SOURCE_H - 20}" text-anchor="end" font-size="340" fill="${m.away.accent}" style="mix-blend-mode:difference" letter-spacing="-15">${e(giantBottom)}</text>
   <g transform="translate(${SOURCE_W / 2} ${SOURCE_H / 2}) rotate(-12)" style="mix-blend-mode:exclusion">${sportGlyph(m.sport_icon, 0, 0, 180, 'white', 0.95)}</g>
-  <g transform="translate(${SOURCE_W - 104} 14)"><rect x="0" y="0" width="92" height="46" fill="#0F0E0C" stroke="rgba(255,255,255,0.15)"/><text class="bebas" x="44" y="20" font-size="11" fill="white" letter-spacing="0.1em">${e(m.league.toUpperCase())}</text><text class="mono" x="44" y="32" font-size="6.5" fill="white" opacity="0.65" letter-spacing="2">${e(m.sport.toUpperCase())}</text></g>
+  <g transform="translate(${SOURCE_W - 104} 14)"><rect x="0" y="0" width="92" height="46" fill="#0F0E0C" stroke="rgba(255,255,255,0.15)"/><text class="bebas" x="64" y="20" text-anchor="middle" ${identityLeagueAttrs} fill="white" letter-spacing="0.1em">${e(identityLeagueLabel)}</text><text class="mono" x="64" y="32" text-anchor="middle" ${identitySportAttrs} fill="white" opacity="0.65" letter-spacing="2">${e(identitySportLabel)}</text></g>
   <g transform="translate(28 122) rotate(-6)"><rect x="0" y="0" width="160" height="22" fill="rgba(239,234,224,0.9)" stroke="#0F0E0C" stroke-width="2"/><text class="bebas" x="80" y="16" text-anchor="middle" font-size="13" fill="#0F0E0C" letter-spacing="1">${e(m.round.toUpperCase())}</text></g>
   <rect x="0" y="${SOURCE_H / 2 - 18}" width="${SOURCE_W}" height="36" fill="#0F0E0C"/>
   ${middleStrip}
@@ -1990,6 +2024,36 @@ function splitGlitchText(text, x, y, size, fill = '#fff', anchor = 'start') {
   return `<g><text class="hero" x="${x - 1}" y="${y}" text-anchor="${anchor}" font-size="${size}" fill="#ff0044" opacity="0.85" letter-spacing="0.06em">${t}</text><text class="hero" x="${x + 1}" y="${y}" text-anchor="${anchor}" font-size="${size}" fill="#00d9ff" opacity="0.85" letter-spacing="0.06em">${t}</text><text class="hero" x="${x}" y="${y}" text-anchor="${anchor}" font-size="${size}" fill="${fill}" letter-spacing="0.06em">${t}</text></g>`
 }
 
+// Lay out a solo glitch headline so it never overflows the 400px source canvas.
+// Returns 1 or 2 lines plus a font size scaled to the longest line. Bebas Neue
+// at 88px averages ~37px per char; ~352px safe width fits ~9 chars at 88px.
+function layoutGlitchSoloTitle(text = '') {
+  const cleaned = String(text || '').trim()
+  if (!cleaned) return { lines: ['EVENT'], size: 88 }
+  const words = cleaned.split(/\s+/).filter(Boolean)
+  if (words.length === 1) {
+    const len = words[0].length
+    const size = len > 14 ? 48 : (len > 10 ? 58 : (len > 8 ? 64 : (len > 7 ? 72 : 96)))
+    return { lines: words, size }
+  }
+  let bestSplit = 1
+  let bestDiff = Infinity
+  for (let i = 1; i < words.length; i += 1) {
+    const a = words.slice(0, i).join(' ').length
+    const b = words.slice(i).join(' ').length
+    const diff = Math.abs(a - b)
+    if (diff < bestDiff) {
+      bestDiff = diff
+      bestSplit = i
+    }
+  }
+  const line1 = words.slice(0, bestSplit).join(' ')
+  const line2 = words.slice(bestSplit).join(' ')
+  const longest = Math.max(line1.length, line2.length)
+  const size = longest > 14 ? 44 : (longest > 11 ? 56 : (longest > 9 ? 64 : (longest > 8 ? 68 : 80)))
+  return { lines: [line1, line2], size }
+}
+
 function renderGlitch(event = {}, variant = 'poster', theme = {}, mode = '') {
   const m = templateData(event, theme, mode)
   const e = escapeXml
@@ -1998,12 +2062,12 @@ function renderGlitch(event = {}, variant = 'poster', theme = {}, mode = '') {
   const slots = m.hasMatchup
     ? [
         { role: 'league', left: 24, top: 22, size: 34 },
-        { role: 'home', left: 24, top: 538, size: 34 },
-        { role: 'away', left: 342, top: 538, size: 34 }
+        { role: 'home', left: 32, top: 430, size: 54 },
+        { role: 'away', left: 314, top: 430, size: 54 }
       ]
     : [
         { role: 'league', left: 24, top: 22, size: 34 },
-        { role: 'league', left: 96, top: 158, size: 208 }
+        { role: 'league', left: 310, top: 392, size: 58 }
       ]
   const corners = [[14, 14, 0], [SOURCE_W - 14, 14, 90], [14, SOURCE_H - 14, 270], [SOURCE_W - 14, SOURCE_H - 14, 180]].map(([x, y, r]) => `<g transform="translate(${x} ${y}) rotate(${r})"><path d="M-12 -6 L-12 -12 L-6 -12" stroke="#ff0044" stroke-width="1.2" fill="none"/><path d="M-11 -5 L-11 -11 L-5 -11" stroke="#00d9ff" stroke-width="1" fill="none" opacity="0.7"/></g>`).join('')
   // Audit fix (contract bug 3 / glitch): prefer source m.eventTitle so
@@ -2011,13 +2075,36 @@ function renderGlitch(event = {}, variant = 'poster', theme = {}, mode = '') {
   // through to the rendered glitch SVG instead of being collapsed into the
   // adapter-shortened event_short.
   const soloHeadline = (m.eventTitle || m.event_short || '').toUpperCase()
-  // Glitch only fits ~20 chars at 88px without overflow; auto-shrink long titles
-  const soloHeadSize = soloHeadline.length > 18 ? 56 : (soloHeadline.length > 12 ? 72 : 88)
+  // Solo headline: word-wrap to 1-2 lines so 18-char titles like
+  // "BRITISH GRAND PRIX" stop clipping the 400px canvas at 88px.
+  const soloLayout = layoutGlitchSoloTitle(soloHeadline)
+  const soloLineGap = Math.round(soloLayout.size * 0.92)
+  const soloCentreY = soloLayout.lines.length === 1 ? 240 : 232
+  const soloLineYs = soloLayout.lines.length === 1
+    ? [soloCentreY]
+    : [soloCentreY - Math.round(soloLineGap / 2), soloCentreY + Math.round(soloLineGap / 2)]
+  const soloHeadSvg = soloLayout.lines.map((line, idx) => glitchText(line, SOURCE_W / 2, soloLineYs[idx], soloLayout.size)).join('')
+  const soloSessionText = (m.session || m.round || m.sport || '').toString().toUpperCase()
+  const soloSessionY = soloLayout.lines.length === 1 ? 290 : (soloLineYs[soloLineYs.length - 1] + 28)
+  // Replace the literal "MAIN" ribbon with a derived session/round word so
+  // golf "Round 2", F1 "Qualifying", etc. are reflected. Length-adaptive font
+  // and letter-spacing keep the ribbon contained.
+  const ribbonRaw = (m.session || m.round || m.event_short || 'EVENT').toString()
+  const ribbonFirst = ribbonRaw.split(/[\s\-—–·\/]+/).filter(Boolean)[0] || ribbonRaw
+  const ribbonLabel = ribbonFirst.toUpperCase().slice(0, 12) || 'EVENT'
+  const ribbonSize = ribbonLabel.length > 8 ? 16 : 22
+  const ribbonSpacing = ribbonLabel.length > 8 ? 4 : 8
+  const ribbonY = soloLayout.lines.length === 1 ? 360 : Math.max(soloSessionY + 38, 360)
   const body = isSingle
-    ? `${glitchText(soloHeadline, SOURCE_W / 2, 240, soloHeadSize)}<text class="mono" x="${SOURCE_W / 2}" y="290" text-anchor="middle" font-size="11" fill="#fff" letter-spacing="3">${e((m.session || m.round).toUpperCase())}</text><g transform="translate(${SOURCE_W / 2} 360)"><text class="hero" x="-1" y="0" text-anchor="middle" font-size="22" fill="#ff0044" letter-spacing="8">MAIN</text><text class="hero" x="1" y="0" text-anchor="middle" font-size="22" fill="#00d9ff" letter-spacing="8">MAIN</text><text class="hero" x="0" y="0" text-anchor="middle" font-size="22" fill="#fff" letter-spacing="8">MAIN</text></g>`
+    ? `${soloHeadSvg}<text class="mono" x="${SOURCE_W / 2}" y="${soloSessionY}" text-anchor="middle" font-size="11" fill="#fff" letter-spacing="3">${e(soloSessionText)}</text><g transform="translate(${SOURCE_W / 2} ${ribbonY})"><text class="hero" x="-1" y="0" text-anchor="middle" font-size="${ribbonSize}" fill="#ff0044" letter-spacing="${ribbonSpacing}">${e(ribbonLabel)}</text><text class="hero" x="1" y="0" text-anchor="middle" font-size="${ribbonSize}" fill="#00d9ff" letter-spacing="${ribbonSpacing}">${e(ribbonLabel)}</text><text class="hero" x="0" y="0" text-anchor="middle" font-size="${ribbonSize}" fill="#fff" letter-spacing="${ribbonSpacing}">${e(ribbonLabel)}</text></g>`
     : `${glitchText(m.home.short, SOURCE_W / 2, 220, 150)}<text class="hero" x="${SOURCE_W / 2 - 1}" y="298" text-anchor="middle" font-size="28" fill="#ff0044" letter-spacing="6">VS</text><text class="hero" x="${SOURCE_W / 2 + 1}" y="298" text-anchor="middle" font-size="28" fill="#00d9ff" letter-spacing="6">VS</text><text class="hero" x="${SOURCE_W / 2}" y="298" text-anchor="middle" font-size="28" fill="#fff" letter-spacing="6">VS</text>${glitchText(m.away.short, SOURCE_W / 2, 388, 150)}<rect x="-10" y="252" width="${SOURCE_W + 20}" height="6" fill="#0A0A0C" transform="translate(10 0)"/>`
   const taglineText = isSingle ? soloHeadline : `${m.home.name.toUpperCase()} x ${m.away.name.toUpperCase()}`
   const taglineSize = taglineText.length > 28 ? 13 : 16
+  // Truncate the round string in the upper header so long labels like
+  // "WESTERN CONFERENCE FINALS · GAME 2" never collide with the right-anchored
+  // date at x=SOURCE_W-24. Mono 9px @ 2.5 letter-spacing leaves ~28 safe chars.
+  const headerRoundRaw = (m.round || '').toString().toUpperCase()
+  const headerRound = headerRoundRaw.length > 26 ? `${headerRoundRaw.slice(0, 25).trimEnd()}…` : headerRoundRaw
   const inner = `<defs>
     <style>.hero { font-family: 'Bebas Neue', Impact, sans-serif; }.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }</style>
     <radialGradient id="bgRad" cx="50%" cy="35%" r="80%"><stop offset="0%" stop-color="${tint}" stop-opacity="0.25"/><stop offset="45%" stop-color="#111114"/><stop offset="100%" stop-color="#050507"/></radialGradient>
@@ -2040,7 +2127,7 @@ function renderGlitch(event = {}, variant = 'poster', theme = {}, mode = '') {
   <text class="mono" x="68" y="32" font-size="9" fill="#fff" letter-spacing="3">${e(m.league.toUpperCase())}</text>
   <text class="mono" x="68" y="42" font-size="7" fill="#fff" opacity="0.6" letter-spacing="3">${e(m.sport.toUpperCase())}</text>
   <text class="mono" x="${SOURCE_W - 24}" y="36" text-anchor="end" font-size="9.5" fill="#ff0044" letter-spacing="3">REC</text>
-  <text class="mono" x="24" y="86" font-size="9" fill="#00d9ff" letter-spacing="2.5">&gt; ${e(m.round.toUpperCase())}</text>
+  <text class="mono" x="24" y="86" font-size="9" fill="#00d9ff" letter-spacing="2.5">&gt; ${e(headerRound)}</text>
   <text class="mono" x="${SOURCE_W - 24}" y="86" text-anchor="end" font-size="9" fill="#fff" opacity="0.65" letter-spacing="2.5">${e(m.date)}</text>
   ${body}
   <g transform="translate(0 504)"><rect x="18" y="0" width="${SOURCE_W - 36}" height="40" fill="rgba(0,0,0,0.55)" stroke="rgba(255,255,255,0.18)" stroke-width="1"/>${splitGlitchText(taglineText, 30, 26, taglineSize)}</g>
