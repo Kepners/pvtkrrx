@@ -5,6 +5,7 @@ const assert = require('node:assert/strict')
 const { buildPaidTemplateMatchup, cleanDisplayText } = require('../src/utils/sportsPosterAdapter')
 const { classifySportsEvent } = require('../src/utils/sportsEventClassifier')
 const { normalizeSportsEventMetadata } = require('../src/utils/sportsEventNormalizer')
+const { containsSportsReleaseNoise } = require('../src/utils/sportsReleaseNoise')
 
 const BAD_TEXT_RE = /\b(?:SPOR|BASK|undefined|null|unknown|n\/a)\b/i
 
@@ -155,7 +156,7 @@ function eventFor(input = {}) {
 function assertNoBadText(slug, value) {
   const text = typeof value === 'string' ? value : JSON.stringify(value)
   assert.doesNotMatch(text, BAD_TEXT_RE, `${slug} should not contain placeholder/release text`)
-  assert.doesNotMatch(text, /\b(?:2160p|1080p|720p|WEB-DL|x264|x265|H264|H265)\b/i, `${slug} should not contain release tags`)
+  assert.equal(containsSportsReleaseNoise(text), false, `${slug} should not contain shared release-noise tags`)
 }
 
 for (const testCase of CASES) {
@@ -177,6 +178,9 @@ for (const testCase of CASES) {
 
 const cleaned = cleanDisplayText('Formula.1.British.GP.1080p.WEB-DL.x264-Group', 'Event')
 assert.equal(cleaned, 'Formula 1 British GP', 'cleanDisplayText removes release noise')
+
+const cleanedRepack = cleanDisplayText('MotoGP.Spain.REPACK.Complete.Weekend.1080p.WEB-DL.x264-MWR', 'Event')
+assert.equal(cleanedRepack, 'MotoGP Spain Weekend', 'cleanDisplayText removes shared release/package noise')
 
 const cleanedMashed = cleanDisplayText('Inside the NBA 2026 28 04 720pEN60fps', 'Event')
 assert.doesNotMatch(cleanedMashed, /720p|60fps/i, 'cleanDisplayText strips mashed quality+language+fps tokens')

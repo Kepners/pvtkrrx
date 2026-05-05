@@ -1,7 +1,7 @@
 const { classifySportsPosterEvent, hasActualPair } = require('./sportsPosterClassifier')
+const { stripSportsReleaseNoise } = require('./sportsReleaseNoise')
 
 const FORBIDDEN_VALUE_RE = /^(?:undefined|null|unknown|n\/a|na|sport|sports|tba|tbd)$/i
-const RELEASE_NOISE_RE = /(?:\b(?:2160p|1080p|1080i|720p|576p|540p|480p)(?:[a-z]{1,6})?(?:\d{2,3}fps)?|\b\d{2,3}fps\b|\b(?:x264|x265|h264|h265|hevc|avc|av1|web[-._\s]?dl|web[-._\s]?rip|web|hdtv|repack|proper|complete|aac|ddp?\d?(?:\.\d)?|multi|english)\b)/gi
 
 const LEAGUE_CODES = Object.freeze({
   'english premier league': 'EPL',
@@ -112,9 +112,9 @@ function titleCase(value = '') {
 
 function cleanDisplayText(value = '', fallback = 'Event') {
   const clean = normalizeSpace(
-    String(value || '')
+    stripSportsReleaseNoise(String(value || '')
       .replace(/[._]+/g, ' ')
-      .replace(RELEASE_NOISE_RE, ' ')
+    )
       .replace(/\b(?:mkv|mp4|avi|ts)\b/gi, ' ')
       .replace(/\s+-\s*[A-Za-z0-9]{2,24}$/g, ' ')
       .replace(/\b(?:undefined|null|unknown)\b/gi, ' ')

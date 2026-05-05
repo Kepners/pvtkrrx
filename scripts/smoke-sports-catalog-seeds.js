@@ -47,14 +47,14 @@ function isoDateOffset(days) {
   return date.toISOString().slice(0, 10)
 }
 
-async function runCatalogSeedCase({ catalogId, expectedNames, expectedSeedQueries, queryResults }) {
+async function runCatalogSeedCase({ catalogId, expectedNames, expectedSeedQueries, queryResults, configOverrides = {} }) {
   const requestedQueries = []
   ProwlarrClient.prototype.search = async function search(query) {
     requestedQueries.push(String(query || ''))
     return queryResults.get(String(query || '')) || []
   }
 
-  const result = await handleCatalog(makeConfig(), 'sports', catalogId, '', {
+  const result = await handleCatalog({ ...makeConfig(), ...configOverrides }, 'sports', catalogId, '', {
     baseUrl: 'http://127.0.0.1:7000'
   })
 
@@ -288,6 +288,10 @@ async function run() {
         trackerItem('Moto Grand Prix (MotoGP, Moto2, Moto3) 2026 Stage 04 Spain (Jerez) Complete Weekend', {
           sportHint: 'motorsport',
           pubDate: '2026-04-07T12:00:00.000Z'
+        }),
+        trackerItem('Moto Grand Prix (MotoGP, Moto2, Moto3) 2026 Stage 05 France (Le Mans) REPACK Weekend', {
+          sportHint: 'motorsport',
+          pubDate: '2026-04-14T12:00:00.000Z'
         })
       ]],
       ['NASCAR', []],
@@ -302,6 +306,49 @@ async function run() {
   assert.ok(
     !motorsportNames.some((name) => /\bComplete\b/i.test(name)),
     'motorsport catalog should strip upstream complete-package text from display names'
+  )
+  assert.ok(
+    !motorsportNames.some((name) => /\bREPACK\b/i.test(name)),
+    'motorsport catalog should strip shared release-package text from display names'
+  )
+  assert.ok(
+    motorsportNames.some((name) => /France.*Weekend/i.test(name)),
+    'motorsport catalog should include the REPACK regression fixture after cleanup'
+  )
+  const motorsportPosterTitles = (motorsportResult.metas || []).map((meta) => {
+    try {
+      return new URL(String(meta?.poster || '')).searchParams.get('title') || ''
+    } catch {
+      return ''
+    }
+  })
+  assert.ok(
+    !motorsportPosterTitles.some((title) => /\b(?:Complete|REPACK)\b/i.test(title)),
+    'motorsport catalog should pass shared release-package cleanup through poster title fields'
+  )
+
+  const boxingQualityResult = await runCatalogSeedCase({
+    catalogId: 'pvtkrrx-sports',
+    expectedNames: ['Natasha Jonas'],
+    expectedSeedQueries: [''],
+    configOverrides: {
+      jackettUrl: 'https://prowlarr-boxing-quality.example'
+    },
+    queryResults: new Map([[
+      '',
+      [
+        trackerItem('Sky Sport Boxing Natasha Jonas vs Lauren Price 1080i FEED', {
+          sportHint: 'boxing',
+          pubDate: '2026-05-04T12:00:00.000Z'
+        })
+      ]
+    ]])
+  })
+  const boxingQualityText = JSON.stringify(boxingQualityResult.metas || [])
+  assert.doesNotMatch(
+    boxingQualityText,
+    /\b1080i\b/i,
+    'sports catalog fallback cleanup should strip shared interlaced quality tags from display and poster fields'
   )
 
   const staleMotoGpDate = isoDateOffset(-1)

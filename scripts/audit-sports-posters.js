@@ -5,6 +5,7 @@ const path = require('node:path')
 const sharp = require('sharp')
 
 const { SPORTS_ARTWORK_PROXY_VERSION } = require('../src/utils/sportsArtwork')
+const { containsSportsReleaseNoise } = require('../src/utils/sportsReleaseNoise')
 
 const OUT_DIR = path.join(process.cwd(), '.runtime', 'sports-poster-audit')
 // Track the live proxy version so this audit doesn't false-FAIL after a
@@ -23,8 +24,28 @@ const BACKDROP_ALLOWED_SOURCES = new Set([
   ...POSTER_ALLOWED_SOURCES,
   'pvtkrrx-sport-4k-backdrop'
 ])
-const BAD_TEXT_RE = /\b(?:SPOR\/SPOR|BASK\/BASK|undefined|null|unknown|x264|x265|h264|h265|2160p|1080p|720p|WEB-DL|HDTV|REPACK|COMPLETE)\b/i
+const BAD_TEXT_RE = /\b(?:SPOR\/SPOR|BASK\/BASK|undefined|null|unknown)\b/i
 const STALE_VERSION_RE = /paid-python-template|python-template-port|generated-card|sports-card|legacy|2026042[78]-|20260429-(?:sportcult-category-poster|paid-template-classifier)-v1|paid-template-classifier-v1/i
+const POSTER_TEXT_PARAMS = ['sport', 'league', 'title', 'detail', 'home', 'away', 'rawTitle']
+
+function containsBadText(value = '') {
+  return BAD_TEXT_RE.test(String(value || '')) || containsSportsReleaseNoise(value)
+}
+
+function posterTextFields(posterUrl = '') {
+  try {
+    const url = new URL(String(posterUrl || ''))
+    return POSTER_TEXT_PARAMS.map((param) => url.searchParams.get(param) || '').filter(Boolean)
+  } catch {
+    return []
+  }
+}
+
+function containsBadTextInImagePayload(contentType = '', payload = '') {
+  const text = String(payload || '')
+  if (/svg\+xml/i.test(contentType)) return containsBadText(text)
+  return BAD_TEXT_RE.test(text)
+}
 
 function parseArgs(argv = process.argv.slice(2)) {
   const args = {
@@ -139,7 +160,7 @@ async function inspectPoster({ manifestUrl, catalog, meta, index }) {
   }
   if (!posterUrl.includes(EXPECTED_VERSION)) row.failures.push('stale_or_missing_cache_version')
   if (STALE_VERSION_RE.test(posterUrl)) row.failures.push('stale_poster_url')
-  if (BAD_TEXT_RE.test(name) || BAD_TEXT_RE.test(posterUrl)) row.failures.push('raw_or_bad_text')
+  if (containsBadText(name) || posterTextFields(posterUrl).some(containsBadText)) row.failures.push('raw_or_bad_text')
 
   try {
     const response = await fetch(posterUrl, {
@@ -160,7 +181,7 @@ async function inspectPoster({ manifestUrl, catalog, meta, index }) {
     if (row.source && !allowedSources.has(row.source)) row.failures.push(`source_not_allowed_for_${row.variant || 'unknown'}_${row.source}`)
     if (!row.source) row.failures.push('missing_source_header')
     if (/generated-card|sports-card|legacy-default/i.test(row.source)) row.failures.push('legacy_source_header')
-    if (BAD_TEXT_RE.test(buffer.slice(0, Math.min(buffer.length, 32768)).toString('utf8'))) row.failures.push('bad_text_in_image_payload')
+    if (containsBadTextInImagePayload(row.contentType, buffer.slice(0, Math.min(buffer.length, 32768)).toString('utf8'))) row.failures.push('bad_text_in_image_payload')
 
     if (imageTypeAllowed(row.contentType) && buffer.length > 0) {
       const metadata = await sharp(buffer).metadata()

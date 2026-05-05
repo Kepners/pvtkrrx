@@ -10,6 +10,7 @@ const { isSportsCultIndexer, isSportsOnlyIndexer } = require('../utils/sportsInd
 const { formatSize, findVideoFile } = require('../utils/streams')
 const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
 const { parseSportsTorrentProfile, rankSportsTorrent } = require('../utils/sportsTorrentProfile')
+const { stripSportsReleaseNoise } = require('../utils/sportsReleaseNoise')
 const { getMappedLeagueEntry, mapLeague, normalizeLeagueCode } = require('../utils/leagueMap')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { encodeCustomId } = require('../utils/customId')
@@ -688,14 +689,12 @@ function normalizeSportsEventTitle(title, parsedSportsEvent = null, parsedEvent 
     return `${leagueDisplay} ${parsedEvent.eventName}`.trim()
   }
 
-  return cleanTitle(title)
+  const presentationCleaned = cleanTitle(title)
     .replace(/\butd\b/gi, 'united')
-    .replace(/\b\d{3,4}p(?:[a-z]{1,6})?(?:\d{2,3}fps)?/gi, ' ')
-    .replace(/\b\d{2,3}fps\b/gi, ' ')
-    .replace(/\b(?:mini|full|complete|extended|highlights?|replay|pre[\s.\-_]*match|post[\s.\-_]*match|match)\b/gi, ' ')
-    .replace(/\b(?:web[\s.\-_]*dl|webrip|hdtv|h264|h265|x264|x265|hevc|aac|ac3|ddp|multi|english|en|skynz|fubo)\b/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
+    .replace(/\b(?:mini|full|extended|highlights?|replay|pre[\s.\-_]*match|post[\s.\-_]*match|match)\b/gi, ' ')
+    .replace(/\b(?:en|skynz|fubo)\b/gi, ' ')
+
+  return stripSportsReleaseNoise(presentationCleaned)
 }
 
 function sportsEventKey(input) {
