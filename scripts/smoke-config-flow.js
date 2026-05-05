@@ -313,10 +313,11 @@ async function run() {
     assert.match(configureHtml, /route-parity\.js/, 'configure page should load shared parity helper')
     assert.match(configureHtml, /id="appVersionStatus"/, 'configure page should show app version and update status at the top')
     assert.match(configureHtml, /fetch\('\/version-status\.json'/, 'configure page should check the runtime version endpoint')
-    for (const template of ['ticket-stub', 'editorial', 'broadcast', 'sportsbook', 'trading-card', 'brutalist', 'glitch']) {
-      assert.match(configureHtml, new RegExp(`value="${template}"`, 'i'), `configure page should expose ${template} Sports Posters template`)
+    assert.match(configureHtml, /id="sportsPosterTemplate"[\s\S]*value="ticket-stub"/i, 'configure page should expose the single included Ticket Stub sports style')
+    for (const template of ['editorial', 'broadcast', 'sportsbook', 'trading-card', 'brutalist', 'glitch']) {
+      assert.doesNotMatch(configureHtml, new RegExp(`value="${template}"`, 'i'), `configure page should not expose ${template} as a free Sports Posters template`)
     }
-    assert.doesNotMatch(configureHtml, /<select id="sportsPosterTemplate" disabled>/i, 'configure page should not render the Sports Posters template selector as disabled')
+    assert.match(configureHtml, /<select id="sportsPosterTemplate" disabled aria-disabled="true">/i, 'configure page should render the included sports style as locked')
     assert.match(
       configureHtml,
       /SportsMeta service owns sports metadata and artwork[\s\S]*PVTKRRX is the Stremio-facing frontend and consumes that output as presentation enrichment/i,

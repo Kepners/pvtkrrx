@@ -517,8 +517,8 @@ async function run() {
   )
   assert.equal(
     templateSportsMetaResponse.meta?.poster,
-    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=glitch&v=20260501-competitor-vs-competitor-v1`,
-    'PVTKRRX should preserve the installer-selected Sports Posters template without exposing member tokens'
+    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260501-competitor-vs-competitor-v1`,
+    'PVTKRRX free-tier rule: configured sportsPosterTemplate=glitch must normalise to ticket-stub and must not expose SportsMeta member tokens'
   )
 
   const previousEnvMemberToken = process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN

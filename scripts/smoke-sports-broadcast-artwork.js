@@ -125,9 +125,13 @@ async function main() {
     const background = resolveSportsLandscapeAsset(artworkInput) || resolveSportsBackgroundAsset(artworkInput)
 
     assert.equal(artwork.layoutFamily, 'BROADCAST', `${testCase.slug} SVG layout family`)
-    assert.equal(posterResolved.layoutFamily, 'BROADCAST', `${testCase.slug} poster layout family`)
-    assert.equal(posterResolved.selectedTemplate, 'broadcast', `${testCase.slug} selected template`)
-    assert.match(posterResolved.poster, /template=broadcast/, `${testCase.slug} poster URL template`)
+    // Free-tier rule: the URL-build path clamps every configured template
+    // to ticket-stub. The Broadcast SVG renderer above still produces the
+    // BROADCAST layout for direct internal use (audit-contract-compliance),
+    // but the public artwork URL must carry template=ticket-stub.
+    assert.equal(posterResolved.selectedTemplate, 'ticket-stub', `${testCase.slug} selected template must clamp to ticket-stub for free configured users`)
+    assert.notEqual(posterResolved.layoutFamily, 'BROADCAST', `${testCase.slug} poster layout family must not leak BROADCAST through the configured artwork URL`)
+    assert.match(posterResolved.poster, /template=ticket-stub/, `${testCase.slug} poster URL template must be ticket-stub`)
     assert.match(background, /\/sports-backdrops\//, `${testCase.slug} background must use sport backdrop asset`)
     assert.doesNotMatch(background, /glitch/i, `${testCase.slug} background must not use glitch`)
     assert.match(svg, /viewBox="0 0 600 900"/, `${testCase.slug} native 600x900 viewBox`)

@@ -25,6 +25,7 @@
     "smoke:sportcult-category-map": "node scripts/smoke-sportcult-category-map.js",
     "smoke:sportcult-rss-replay": "node scripts/smoke-sportcult-rss-replay.js",
     "smoke:sports-template-families": "node scripts/smoke-sports-template-families.js",
+    "smoke:free-tier-artwork": "node scripts/smoke-free-tier-artwork.js",
     "smoke:sports-catalog-seeds": "node scripts/smoke-sports-catalog-seeds.js",
     "smoke:sports-latency": "node scripts/smoke-sports-catalog-latency.js",
     "smoke:sports-catalog-latency": "node scripts/smoke-sports-catalog-latency.js",
