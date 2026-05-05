@@ -113,6 +113,11 @@ function resolveEventClass(input = {}) {
   )
 }
 
+function isWeakCanonicalId(value = '') {
+  const id = normalizeSpace(value).toLowerCase()
+  return /\|general\|/.test(id) || /\|sports\|/.test(id)
+}
+
 function resolveConfiguredSportsPosterTemplate(input = {}) {
   // PVTKRRX has no in-addon paid Sports Posters entitlement surface. Treat all
   // configured/public artwork requests as the free surface and force the single
@@ -140,18 +145,21 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
   const awayTeam = resolveAwayTeam(input)
   if (canonicalId) {
     const url = new URL(`${addonBase}/sports-artwork/id/${encodeURIComponent(variant)}/${encodeURIComponent(canonicalId)}.png`)
-    const sport = resolveSport(input)
-    if (sport) url.searchParams.set('sport', sport)
-    if (league) url.searchParams.set('league', league)
-    if (title) url.searchParams.set('title', title)
-    if (date) url.searchParams.set('date', date)
-    if (homeTeam) url.searchParams.set('home', homeTeam)
-    if (awayTeam) url.searchParams.set('away', awayTeam)
-    if (input?.eventDetail) url.searchParams.set('detail', normalizeSpace(input.eventDetail))
-    const eventClass = resolveEventClass(input)
-    if (eventClass) url.searchParams.set('eventClass', eventClass)
-    if (input?.rawTitle) url.searchParams.set('rawTitle', normalizeSpace(input.rawTitle))
-    if (input?.source) url.searchParams.set('source', normalizeSpace(input.source))
+    const includeContext = variant === 'background' || variant === 'landscape' || isWeakCanonicalId(canonicalId)
+    if (includeContext) {
+      const sport = resolveSport(input)
+      if (sport) url.searchParams.set('sport', sport)
+      if (league) url.searchParams.set('league', league)
+      if (title) url.searchParams.set('title', title)
+      if (date) url.searchParams.set('date', date)
+      if (homeTeam) url.searchParams.set('home', homeTeam)
+      if (awayTeam) url.searchParams.set('away', awayTeam)
+      if (input?.eventDetail) url.searchParams.set('detail', normalizeSpace(input.eventDetail))
+      const eventClass = resolveEventClass(input)
+      if (eventClass) url.searchParams.set('eventClass', eventClass)
+      if (input?.rawTitle) url.searchParams.set('rawTitle', normalizeSpace(input.rawTitle))
+      if (input?.source) url.searchParams.set('source', normalizeSpace(input.source))
+    }
     url.searchParams.set('template', resolveConfiguredSportsPosterTemplate(input))
     url.searchParams.set('v', SPORTS_ARTWORK_PROXY_VERSION)
     return url.toString()
