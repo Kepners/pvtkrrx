@@ -1,5 +1,6 @@
 const sharp = require('sharp')
 const fs = require('fs')
+const path = require('path')
 const {
   buildSportsMetaAssetUrl,
   buildSportsMetaDefaultAssetUrl,
@@ -29,6 +30,7 @@ const {
   resolveSportBackdrop,
   resolveSportBackdropBucket
 } = require('../utils/sportBackdrops')
+const { SPORTS_ARTWORK_PROXY_VERSION } = require('../utils/sportsArtwork')
 
 const VARIANT_DIMENSIONS = {
   poster: { width: 600, height: 900 },
@@ -38,7 +40,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260505-real-logo-v1'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260505-real-logo-v4-inspect'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -57,6 +59,29 @@ const rasterCache = new Map()
 const rasterInFlight = new Map()
 const canonicalEventCache = new Map()
 const canonicalEventInFlight = new Map()
+const inspectAssetCache = new Map()
+const inspectAssetInFlight = new Map()
+let runtimeRevisionCache
+
+function resolveRuntimeRevision() {
+  if (runtimeRevisionCache !== undefined) return runtimeRevisionCache
+  runtimeRevisionCache = String(
+    process.env.SOURCE_COMMIT ||
+    process.env.COOLIFY_GIT_COMMIT ||
+    process.env.COOLIFY_COMMIT ||
+    process.env.COMMIT_SHA ||
+    ''
+  ).trim()
+  if (!runtimeRevisionCache) {
+    try {
+      runtimeRevisionCache = fs.readFileSync(path.join(process.cwd(), 'REVISION'), 'utf8').trim()
+    } catch {
+      runtimeRevisionCache = ''
+    }
+  }
+  if (!runtimeRevisionCache) runtimeRevisionCache = 'unknown'
+  return runtimeRevisionCache
+}
 
 function trimCache() {
   while (rasterCache.size > RASTER_CACHE_MAX_KEYS) {
@@ -486,8 +511,14 @@ function isSportsMetaRealLogoAsset(contentType = '', headers = {}) {
   const generated = /^true$/i.test(String(headers?.['x-sportsmeta-generated-asset'] || ''))
   if (generated) return false
   if (/default/.test(source) || /default/.test(assetClass)) return false
-  if (source === 'canonical-generator' && delivery === 'svg' && assetClass === 'public-canonical-svg') return true
+  // SportsMeta's `canonical-generator + public-canonical-svg` route emits a
+  // glyph-only SVG (just team initials like "A" / "AM") even when a real logo
+  // exists in the cache — verified via /inspect/asset which exposes the real
+  // CDN URL. So treat that signature as fallback, not a real logo.
+  if (source === 'canonical-generator') return false
   if (source === 'cached-asset' && delivery === 'raster' && /raster/.test(assetClass)) return true
+  // Direct CDN responses (e.g. r2.thesportsdb.com) carry no SportsMeta headers
+  // — we trust the content-type for those, since they are the upstream truth.
   if (!source && !delivery && !assetClass) return true
   return false
 }
@@ -746,6 +777,56 @@ function buildCanonicalBadgeUrl({ sportsmetaBaseUrl = '', canonicalId = '', vari
     : buildSportsMetaAssetUrl(sportsmetaBaseUrl, variant, canonicalId)
 }
 
+// SportsMeta's public canonical asset route returns a glyph-only SVG by
+// default. The real raster URL (e.g. on r2.thesportsdb.com) is exposed via
+// /inspect/asset/<variant>/<id> as `assetSourceUrl`. This helper resolves
+// that CDN URL so we can fetch the actual badge instead of the placeholder.
+async function loadInspectAssetSourceUrl({ canonicalId = '', sportsmetaBaseUrl = '', variant = '' } = {}) {
+  const id = normalizeSpace(canonicalId)
+  const v = normalizeSpace(variant)
+  if (!id || !v) return ''
+  const base = getPublicSportsMetaBaseUrl(sportsmetaBaseUrl)
+  const url = `${base}/inspect/asset/${encodeURIComponent(v)}/${encodeURIComponent(id)}`
+  const now = Date.now()
+  const hit = inspectAssetCache.get(url)
+  if (hit && hit.expiresAt > now) return hit.value
+  if (inspectAssetInFlight.has(url)) return inspectAssetInFlight.get(url)
+
+  const pending = (async () => {
+    try {
+      const response = await fetch(url, {
+        headers: { accept: 'application/json' },
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+      })
+      if (!response.ok) return ''
+      const payload = await response.json().catch(() => null)
+      const sourceUrl = normalizeSpace(payload?.assetSourceUrl || payload?.classification?.assetSourceUrl)
+      if (!sourceUrl) return ''
+      // Don't loop back into SportsMeta — only return URLs that point to a
+      // real CDN (TheSportsDB, etc.). If SportsMeta ever started serving its
+      // own raster via assetSourceUrl, we'd accept it via the existing
+      // cached-asset signal instead.
+      if (/sportsmeta\./i.test(sourceUrl)) return ''
+      return sourceUrl
+    } catch (_) {
+      return ''
+    }
+  })()
+    .then((value) => {
+      inspectAssetCache.set(url, { value, expiresAt: Date.now() + RASTER_CACHE_TTL_MS })
+      while (inspectAssetCache.size > RASTER_CACHE_MAX_KEYS) {
+        const oldestKey = inspectAssetCache.keys().next().value
+        if (!oldestKey) break
+        inspectAssetCache.delete(oldestKey)
+      }
+      return value
+    })
+    .finally(() => inspectAssetInFlight.delete(url))
+
+  inspectAssetInFlight.set(url, pending)
+  return pending
+}
+
 async function fetchCompositionImage(url = '', size = 210, options = {}) {
   const targetUrl = normalizeSpace(url)
   if (!targetUrl) return null
@@ -894,36 +975,27 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     }
   }
 
-  const homeBadgeUrl = buildCanonicalBadgeUrl({
-    sportsmetaBaseUrl,
-    canonicalId,
-    variant: 'homeBadge',
-    fallbackUrl: canonical?.assets?.homeBadge
-  })
-  const awayBadgeUrl = buildCanonicalBadgeUrl({
-    sportsmetaBaseUrl,
-    canonicalId,
-    variant: 'awayBadge',
-    fallbackUrl: canonical?.assets?.awayBadge
-  })
-  const leagueLogoUrl = buildCanonicalBadgeUrl({
-    sportsmetaBaseUrl,
-    canonicalId,
-    variant: 'leagueLogo',
-    fallbackUrl: canonical?.assets?.leagueLogo || canonical?.assets?.logo
-  })
-  const eventLogoUrl = buildCanonicalBadgeUrl({
-    sportsmetaBaseUrl,
-    canonicalId,
-    variant: 'logo',
-    fallbackUrl: canonical?.assets?.logo
-  })
-  const eventPosterUrl = buildCanonicalBadgeUrl({
-    sportsmetaBaseUrl,
-    canonicalId,
-    variant: 'poster',
-    fallbackUrl: canonical?.assets?.poster
-  })
+  // Resolve the real CDN URL for each badge variant via /inspect/asset. The
+  // public canonical /asset/<variant>/<id> route returns a glyph SVG even when
+  // a real logo exists in the upstream cache — inspect exposes the underlying
+  // assetSourceUrl. We prefer the CDN URL when present; otherwise fall back to
+  // the SportsMeta canonical URL (which the validator now correctly rejects
+  // as a glyph if it is one).
+  const inspectVariants = ['homeBadge', 'awayBadge', 'leagueLogo', 'logo', 'poster']
+  const inspectResults = await Promise.all(
+    inspectVariants.map((v) => loadInspectAssetSourceUrl({ canonicalId, sportsmetaBaseUrl, variant: v }))
+  )
+  const inspectByVariant = Object.fromEntries(inspectVariants.map((v, i) => [v, inspectResults[i] || '']))
+  const pickLogoUrl = (variantKey, fallbackUrl) => {
+    const cdn = inspectByVariant[variantKey]
+    if (cdn) return cdn
+    return buildCanonicalBadgeUrl({ sportsmetaBaseUrl, canonicalId, variant: variantKey, fallbackUrl })
+  }
+  const homeBadgeUrl = pickLogoUrl('homeBadge', canonical?.assets?.homeBadge)
+  const awayBadgeUrl = pickLogoUrl('awayBadge', canonical?.assets?.awayBadge)
+  const leagueLogoUrl = pickLogoUrl('leagueLogo', canonical?.assets?.leagueLogo || canonical?.assets?.logo)
+  const eventLogoUrl = pickLogoUrl('logo', canonical?.assets?.logo)
+  const eventPosterUrl = pickLogoUrl('poster', canonical?.assets?.poster)
 
   const normalizedVariant = ['poster', 'landscape', 'background'].includes(variant) ? variant : 'poster'
   const normalizedTemplate = normalizeSportsPosterTemplate(template)
@@ -1445,6 +1517,9 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
     res.setHeader('X-PVTKRRX-Artwork-Upstream', redactUrl(upstreamUrl))
     res.setHeader('X-PVTKRRX-Artwork-Source', result.selectedArtworkSource || 'unknown')
     res.setHeader('X-PVTKRRX-Artwork-Cache', result.cacheLayer || 'rendered')
+    res.setHeader('X-PVTKRRX-Revision', resolveRuntimeRevision())
+    res.setHeader('X-PVTKRRX-Artwork-Cache-Version', SPORTS_ARTWORK_PROXY_VERSION)
+    res.setHeader('X-PVTKRRX-Artwork-Render-Version', LOCAL_ARTWORK_RENDER_VERSION)
     res.setHeader('X-PVTKRRX-Artwork-Template', selectedTemplate)
     res.setHeader('X-PVTKRRX-Artwork-Layout-Family', layoutFamily)
     res.setHeader('X-PVTKRRX-Artwork-Logo-Kind', logoKind)
@@ -1460,6 +1535,7 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
     if (logoSourceUrl) res.setHeader('X-PVTKRRX-Logo-Source-Url', redactUrl(logoSourceUrl))
     if (logoSourceUrls.length) {
       res.setHeader('X-PVTKRRX-Artwork-Logo-Source-Count', String(logoSourceUrls.length))
+      res.setHeader('X-PVTKRRX-Logo-Source-Count', String(logoSourceUrls.length))
       res.setHeader('X-PVTKRRX-Artwork-Logo-Source-Urls', logoSourceUrls.map(redactUrl).join(' | '))
       res.setHeader('X-PVTKRRX-Logo-Source-Urls', logoSourceUrls.map(redactUrl).join(' | '))
     }
@@ -1619,6 +1695,7 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
         date,
         homeTeam,
         awayTeam,
+        eventClass: defaultEventClass,
         fallbackInput
       })
     : null

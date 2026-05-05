@@ -6,12 +6,12 @@ const CODEC_RE = /^(?:x264|x265|h264|h265|hevc|avc|av1)(?:-.+)?$/i
 const RELEASE_GROUP_RE = /^[A-Z0-9]+-[A-Za-z0-9]+$/
 const HLG_HDR_RE = /^(?:hlg|hdr10?\+?|dovi?|dv|10bit|8bit)$/i
 const GENERIC_SPORT_PREFIX_RE = /^(?:football|soccer|basketball|baseball|cricket|rugby|mma|boxing|wrestling|darts|golf|motorsport|motor|tennis|hockey|ice|american|uefa)$/i
-const LEADING_TEAM_NOISE_RE = /^(?:game|games|match|matches|week|round|heat|session|fight|night|grand|prix|qualifying|practice|sprint|race|main|card|prelims?|early|cup|bowl|super|opening|closing|ceremony|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|championship|title|event|world|wimbledon|australian|roland|garros|open|us|east|west|centre|center|court|heavyweight|middleweight|welterweight|lightweight|rs|qf|sf|f\d*|r\d+|m\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
+const LEADING_TEAM_NOISE_RE = /^(?:game|games|match|matches|week|round|heat|session|fight|night|grand|prix|qualifying|practice|sprint|race|main|card|prelims?|early|cup|bowl|super|opening|closing|ceremony|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|championship|conference|title|event|world|wimbledon|australian|roland|garros|open|us|east|west|western|eastern|centre|center|court|heavyweight|middleweight|welterweight|lightweight|rs|qf|sf|wcqf|ecqf|wcsf|ecsf|wcf|ecf|f\d*|r\d+|m\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
 const ROMAN_NUMERAL_RE = /^(?=[ivxlcdm]+$)m{0,4}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})$/i
 const TEAM_BROADCAST_RE = /\b(?:nbc|nbcsn|espn(?:2|p|plus|\+)?|f1tv|nesn|msg|usan?|yes(?:\s*network)?|sky(?:\s*sports?)?|bt(?:\s*sport)?|tnt(?:\s*sports?)?|fox(?:\s*sports?)?|cbs|abc|itv(?:4)?|tsn|sportsnet|sn|bally|bein(?:\s*sports?)?\d*|canal\+?|dazn|eurosport|skynz|kayo(?:\s*sports?)?|fubo|newvision)\b/gi
 const TEAM_LANGUAGE_RE = /\b(?:en|english|spanish|french|german|italian|portuguese)\b/gi
 const TEAM_PRESENTATION_RE = /\b(?:condensed(?:\s*game)?|extended(?:\s*highlights?)?|highlights?|replay)\b/gi
-const TEAM_TAIL_NOISE_RE = /^(?:game|games|round|matchday|main|card|pre|post|episode|show|event|fight|full|review|preview|highlights?|replay|coverage|studio|apple|tv|fubo|beinsport\d*|skynz|z3r0|nva|wrestlemania|east|west|centre|center|court|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|rs|qf|sf|f\d*|r\d+|m\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
+const TEAM_TAIL_NOISE_RE = /^(?:game|games|round|matchday|main|card|pre|post|episode|show|event|fight|full|review|preview|highlights?|replay|coverage|studio|apple|tv|fubo|beinsport\d*|skynz|z3r0|nva|wrestlemania|east|west|western|eastern|conference|centre|center|court|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|rs|qf|sf|wcqf|ecqf|wcsf|ecsf|wcf|ecf|f\d*|r\d+|m\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
 const EVENT_SOURCE_NOISE_RE = /^(?:apple|tv|atvp?|fubo|skynz|kayo|z3r0|nva|espn(?:p|plus|\+)?|f1tv|fs1|nesn|msg|usan?|nbc(?:sn|sba|sca)?|sny|snla|snp|sky|sports|fox|bbc|itv|cbs|abc|tnt|peacock|eurosport|nordic)$/i
 
 // Known league/series tokens that start non-vs event titles
@@ -84,6 +84,77 @@ const LEADING_LEAGUE_ALIASES = [
   [/^premier league darts$/i, 'Premier League Darts']
 ]
 
+const NBA_TEAM_ALIASES = new Map([
+  ['76ers', 'Philadelphia 76ers'],
+  ['sixers', 'Philadelphia 76ers'],
+  ['atlanta hawks', 'Atlanta Hawks'],
+  ['hawks', 'Atlanta Hawks'],
+  ['boston celtics', 'Boston Celtics'],
+  ['celtics', 'Boston Celtics'],
+  ['brooklyn nets', 'Brooklyn Nets'],
+  ['nets', 'Brooklyn Nets'],
+  ['charlotte hornets', 'Charlotte Hornets'],
+  ['hornets', 'Charlotte Hornets'],
+  ['chicago bulls', 'Chicago Bulls'],
+  ['bulls', 'Chicago Bulls'],
+  ['cleveland cavaliers', 'Cleveland Cavaliers'],
+  ['cavaliers', 'Cleveland Cavaliers'],
+  ['cavs', 'Cleveland Cavaliers'],
+  ['dallas mavericks', 'Dallas Mavericks'],
+  ['mavericks', 'Dallas Mavericks'],
+  ['mavs', 'Dallas Mavericks'],
+  ['denver nuggets', 'Denver Nuggets'],
+  ['nuggets', 'Denver Nuggets'],
+  ['detroit pistons', 'Detroit Pistons'],
+  ['pistons', 'Detroit Pistons'],
+  ['golden state warriors', 'Golden State Warriors'],
+  ['warriors', 'Golden State Warriors'],
+  ['houston rockets', 'Houston Rockets'],
+  ['rockets', 'Houston Rockets'],
+  ['indiana pacers', 'Indiana Pacers'],
+  ['pacers', 'Indiana Pacers'],
+  ['la clippers', 'LA Clippers'],
+  ['los angeles clippers', 'LA Clippers'],
+  ['clippers', 'LA Clippers'],
+  ['los angeles lakers', 'Los Angeles Lakers'],
+  ['la lakers', 'Los Angeles Lakers'],
+  ['lakers', 'Los Angeles Lakers'],
+  ['memphis grizzlies', 'Memphis Grizzlies'],
+  ['grizzlies', 'Memphis Grizzlies'],
+  ['miami heat', 'Miami Heat'],
+  ['heat', 'Miami Heat'],
+  ['milwaukee bucks', 'Milwaukee Bucks'],
+  ['bucks', 'Milwaukee Bucks'],
+  ['minnesota timberwolves', 'Minnesota Timberwolves'],
+  ['timberwolves', 'Minnesota Timberwolves'],
+  ['wolves', 'Minnesota Timberwolves'],
+  ['new orleans pelicans', 'New Orleans Pelicans'],
+  ['pelicans', 'New Orleans Pelicans'],
+  ['new york knicks', 'New York Knicks'],
+  ['knicks', 'New York Knicks'],
+  ['oklahoma city thunder', 'Oklahoma City Thunder'],
+  ['okc thunder', 'Oklahoma City Thunder'],
+  ['thunder', 'Oklahoma City Thunder'],
+  ['orlando magic', 'Orlando Magic'],
+  ['magic', 'Orlando Magic'],
+  ['philadelphia 76ers', 'Philadelphia 76ers'],
+  ['phoenix suns', 'Phoenix Suns'],
+  ['suns', 'Phoenix Suns'],
+  ['portland trail blazers', 'Portland Trail Blazers'],
+  ['trail blazers', 'Portland Trail Blazers'],
+  ['blazers', 'Portland Trail Blazers'],
+  ['sacramento kings', 'Sacramento Kings'],
+  ['kings', 'Sacramento Kings'],
+  ['san antonio spurs', 'San Antonio Spurs'],
+  ['spurs', 'San Antonio Spurs'],
+  ['toronto raptors', 'Toronto Raptors'],
+  ['raptors', 'Toronto Raptors'],
+  ['utah jazz', 'Utah Jazz'],
+  ['jazz', 'Utah Jazz'],
+  ['washington wizards', 'Washington Wizards'],
+  ['wizards', 'Washington Wizards']
+])
+
 function normalizeSegment(value) {
   return String(value || '')
     .normalize('NFKD')
@@ -91,6 +162,29 @@ function normalizeSegment(value) {
     .replace(/[._]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function sportsTeamAliasKey(value = '') {
+  return normalizeSegment(value)
+    .toLowerCase()
+    .replace(/^the\s+/, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+}
+
+function normalizeKnownSportsTeamAlias(value = '') {
+  const cleaned = normalizeSegment(value)
+  if (!cleaned) return ''
+  return NBA_TEAM_ALIASES.get(sportsTeamAliasKey(cleaned)) || cleaned
+}
+
+function shouldExpandKnownSportsTeamAlias(options = {}) {
+  const context = normalizeSegment([
+    options.league,
+    options.sport,
+    options.raw
+  ].filter(Boolean).join(' ')).toLowerCase()
+  return /\b(?:nba|basketball)\b/.test(context)
 }
 
 function titleCase(value = '') {
@@ -147,6 +241,7 @@ function splitEventTitleTokens(raw) {
 
 function splitMatchupTitleTokens(raw) {
   return String(raw || '')
+    .replace(/([A-Za-z0-9])@([A-Za-z0-9])/g, '$1 @ $2')
     .replace(/[()[\]{}]/g, ' ')
     .replace(/[._/\\:,-]+/g, ' ')
     .replace(/\s+/g, ' ')
@@ -390,8 +485,8 @@ function trimLeadingTeamNoise(tokens) {
   return parts
 }
 
-function normalizeTeamLabel(value) {
-  return normalizeSegment(
+function normalizeTeamLabel(value, options = {}) {
+  const cleaned = normalizeSegment(
     String(value || '')
       .replace(/\([^)]*\)/g, ' ')
       .replace(/\b\d+\s+of\s+\d+\b/gi, ' ')
@@ -403,9 +498,10 @@ function normalizeTeamLabel(value) {
       .replace(/\b(?:mlb|nba(?:\s+playoffs?)?|nfl|nhl|mls|ipl|pga(?:\s+tour)?|motogp|ufc|mma|pfl|bellator|atp|wta|pdc|darts?|wc|world\s+championship|snooker|tennis|boxing)\b$/gi, ' ')
       .replace(/\b(?:r\d+|gm\d+|g\d+|\d{2,3}fps|fps)\b/gi, ' ')
   )
+  return shouldExpandKnownSportsTeamAlias(options) ? normalizeKnownSportsTeamAlias(cleaned) : cleaned
 }
 
-function normalizeTeamTokens(tokens) {
+function normalizeTeamTokens(tokens, options = {}) {
   const normalized = trimTrailingMetadataTokens(
     (Array.isArray(tokens) ? tokens : [])
       .map(normalizeSegment)
@@ -436,7 +532,7 @@ function normalizeTeamTokens(tokens) {
     }
     trimmed.push(token)
   }
-  const cleanedLabel = normalizeTeamLabel(trimmed.join(' '))
+  const cleanedLabel = normalizeTeamLabel(trimmed.join(' '), options)
   return trimTrailingMetadataTokens(cleanedLabel.split(/\s+/)).join(' ')
 }
 
@@ -660,8 +756,9 @@ function parseFlexibleMatchupTitle(title, fallbackDate = '') {
     : afterSeparator
   const date = (useLeadingDate ? leadingDate?.date : '') || preSeparatorDate?.date || trailingDate?.date || extractFallbackDate(fallbackDate)
 
-  const homeTeam = normalizeTeamTokens(homeTeamTokens)
-  const awayTeam = normalizeTeamTokens(awayTeamTokens)
+  const teamAliasContext = { league: leadingLeague?.league || '', raw }
+  const homeTeam = normalizeTeamTokens(homeTeamTokens, teamAliasContext)
+  const awayTeam = normalizeTeamTokens(awayTeamTokens, teamAliasContext)
   if (!homeTeam || !awayTeam) return null
   const eventShort = leadingLeague?.league && /^\d{1,4}$/.test(String(preTeamTokens[0] || '').trim())
     ? `${leadingLeague.league} ${preTeamTokens[0]}`
@@ -856,8 +953,9 @@ function parseSportsTitle(title, fallbackDate = '') {
 
   if (homeTeamTokens.length === 0 || awayTeamTokens.length === 0) return parseFlexibleMatchupTitle(raw, fallbackDate)
 
-  const homeTeam = normalizeTeamTokens(homeTeamTokens)
-  const awayTeam = normalizeTeamTokens(awayTeamTokens)
+  const teamAliasContext = { league, raw }
+  const homeTeam = normalizeTeamTokens(homeTeamTokens, teamAliasContext)
+  const awayTeam = normalizeTeamTokens(awayTeamTokens, teamAliasContext)
   if (!league || !homeTeam || !awayTeam) return parseFlexibleMatchupTitle(raw, fallbackDate)
 
   const qualityToken = metadataIndex === -1 ? '' : trailingTokens[metadataIndex]
@@ -963,5 +1061,6 @@ function parseSportsEventTitle(title, fallbackDate = '') {
 
 module.exports = {
   parseSportsTitle,
-  parseSportsEventTitle
+  parseSportsEventTitle,
+  normalizeKnownSportsTeamAlias
 }

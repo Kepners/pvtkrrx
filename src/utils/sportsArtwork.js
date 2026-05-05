@@ -10,7 +10,7 @@ const {
 } = require('./sportsPosterTemplates')
 const { resolveSportBackdrop } = require('./sportBackdrops')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260505-real-logo-v1'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260505-real-logo-v4-inspect'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
@@ -26,6 +26,18 @@ function resolveSportsMetaBaseUrl(input = {}) {
 
 function resolveAddonBaseUrl(input = {}) {
   return normalizeSpace(input?.baseUrl || '').replace(/\/+$/, '')
+}
+
+function appendSportsArtworkVersion(urlString) {
+  const value = normalizeSpace(urlString)
+  if (!value) return ''
+  try {
+    const url = new URL(value)
+    url.searchParams.set('artworkV', SPORTS_ARTWORK_PROXY_VERSION)
+    return url.toString()
+  } catch {
+    return value
+  }
 }
 
 function resolveCanonicalId(input = {}) {
@@ -235,16 +247,16 @@ function resolveSportsBackdropForDefault(input = {}) {
 
 function resolveSportsBackgroundAsset(input = {}) {
   const broadcastBackdrop = resolveSportsBroadcastBackdrop(input)
-  if (broadcastBackdrop?.url) return broadcastBackdrop.url
+  if (broadcastBackdrop?.url) return appendSportsArtworkVersion(broadcastBackdrop.url)
   if (resolveCanonicalId(input)) return buildVariantUrl('background', input)
-  return resolveSportsBackdropForDefault(input).url || buildVariantUrl('background', input)
+  return appendSportsArtworkVersion(resolveSportsBackdropForDefault(input).url) || buildVariantUrl('background', input)
 }
 
 function resolveSportsLandscapeAsset(input = {}) {
   const broadcastBackdrop = resolveSportsBroadcastBackdrop(input)
-  if (broadcastBackdrop?.url) return broadcastBackdrop.url
+  if (broadcastBackdrop?.url) return appendSportsArtworkVersion(broadcastBackdrop.url)
   if (resolveCanonicalId(input)) return buildVariantUrl('landscape', input)
-  return resolveSportsBackdropForDefault(input).url || buildVariantUrl('landscape', input)
+  return appendSportsArtworkVersion(resolveSportsBackdropForDefault(input).url) || buildVariantUrl('landscape', input)
 }
 
 function resolveSportsLogoAsset(input = {}) {
