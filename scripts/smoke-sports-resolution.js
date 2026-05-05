@@ -579,7 +579,10 @@ async function run() {
   )
   assert.equal(unresolvedSportsMeta.meta?.posterShape, 'poster', 'unresolved sports detail should keep poster-shaped artwork')
   assert.match(String(unresolvedSportsMeta.meta?.poster || ''), /\/sports-artwork\/default\/poster\/basketball\.png/, 'unresolved sports detail poster should use the poster variant')
-  assert.match(String(unresolvedSportsMeta.meta?.background || ''), /\/sports-backdrops\/nba-4k\.jpg\?v=20260429-sport-level-4k-v1$/, 'unresolved sports detail background should use the reusable NBA 4K sport backdrop')
+  const unresolvedBackgroundUrl = new URL(String(unresolvedSportsMeta.meta?.background || ''))
+  assert.equal(unresolvedBackgroundUrl.pathname, '/sports-backdrops/nba-4k.jpg', 'unresolved sports detail background should use the reusable NBA 4K sport backdrop')
+  assert.equal(unresolvedBackgroundUrl.searchParams.get('v'), '20260429-sport-level-4k-v1', 'unresolved sports detail background should keep the reusable sport backdrop cache key')
+  assert.equal(unresolvedBackgroundUrl.searchParams.get('artworkV'), SPORTS_ARTWORK_PROXY_VERSION, 'sports detail background should also carry the current artwork cache key for Stremio URL-level busting')
   assert.doesNotMatch(String(unresolvedSportsMeta.meta?.background || ''), /\/poster\//, 'sports detail background must not be a blown-up poster')
   assert.match(String(unresolvedSportsMeta.meta?.description || ''), /Sport: Basketball/, 'sports detail description should include sport')
   assert.match(String(unresolvedSportsMeta.meta?.description || ''), /League: NBA Playoffs/, 'sports detail description should include league')
@@ -656,6 +659,34 @@ async function run() {
   assert.equal(nbaPlayoffsParsed?.league, 'NBA Playoffs', 'NBA Playoffs tracker rows should keep the postseason competition')
   assert.equal(nbaPlayoffsParsed?.homeTeam, 'San Antonio Spurs', 'NBA Playoffs parser should isolate the home team')
   assert.equal(nbaPlayoffsParsed?.awayTeam, 'Portland Trail Blazers', 'NBA Playoffs parser should isolate the away team')
+  const compactNbaWcsfTitle = 'NBA Playoffs WCSF Timberwolves@Spurs Game 1 04 05 2026 1080pEN60fps NBC'
+  const compactNbaWcsfParsed = parseSportsTitle(compactNbaWcsfTitle, '2026-05-05T12:00:00.000Z')
+  assert.equal(compactNbaWcsfParsed?.league, 'NBA Playoffs', 'compact NBA playoff rows should keep the postseason competition')
+  assert.equal(compactNbaWcsfParsed?.date, '2026-05-04', 'compact NBA playoff rows should extract the tracker event date')
+  assert.equal(compactNbaWcsfParsed?.homeTeam, 'Minnesota Timberwolves', 'compact NBA playoff rows should expand Timberwolves for SportsMeta lookup')
+  assert.equal(compactNbaWcsfParsed?.awayTeam, 'San Antonio Spurs', 'compact NBA playoff rows should expand Spurs for SportsMeta lookup')
+  const compactNbaWcsfNormalized = normalizeSportsEventMetadata({
+    rawTitle: compactNbaWcsfTitle,
+    sportHint: 'basketball',
+    competition: 'NBA Playoffs',
+    date: compactNbaWcsfParsed?.date
+  })
+  assert.equal(compactNbaWcsfNormalized.eventTitle, 'Minnesota Timberwolves vs San Antonio Spurs', 'compact NBA playoff rows should become two-team poster titles')
+  assert.equal(compactNbaWcsfNormalized.homeTeam, 'Minnesota Timberwolves', 'compact NBA normalized metadata should carry the expanded first team')
+  assert.equal(compactNbaWcsfNormalized.awayTeam, 'San Antonio Spurs', 'compact NBA normalized metadata should carry the expanded second team')
+  const compactNbaEcsfTitle = 'NBA Playoffs ECSF 76ers@Knicks Game 1 04 05 2026 1080pEN60fps TNT'
+  const compactNbaEcsfParsed = parseSportsTitle(compactNbaEcsfTitle, '2026-05-05T12:00:00.000Z')
+  assert.equal(compactNbaEcsfParsed?.homeTeam, 'Philadelphia 76ers', 'compact NBA playoff rows should expand 76ers for SportsMeta lookup')
+  assert.equal(compactNbaEcsfParsed?.awayTeam, 'New York Knicks', 'compact NBA playoff rows should expand Knicks for SportsMeta lookup')
+  const compactNbaProfile = parseSportsTorrentProfile({
+    title: compactNbaEcsfTitle,
+    pubDate: '2026-05-05T12:00:00.000Z',
+    sportHint: 'basketball',
+    seeders: 26
+  })
+  assert.equal(compactNbaProfile.event_class, 'team_vs_team', 'compact NBA playoff torrent profile should produce team-vs-team artwork inputs')
+  assert.equal(compactNbaProfile.home_team, 'Philadelphia 76ers', 'compact NBA playoff torrent profile should carry the expanded first team')
+  assert.equal(compactNbaProfile.away_team, 'New York Knicks', 'compact NBA playoff torrent profile should carry the expanded second team')
   const nbaPlayoffsResolution = await resolveSportsMetaIdentity(
     client,
     availability('NBA Playoffs 2026 / 1st Round / West / Game 4 / 26 04 2026 / {San Antonio Spurs @ Portland Trail Blazers m4rtyr', {

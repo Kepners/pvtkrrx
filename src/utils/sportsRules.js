@@ -56,7 +56,7 @@ function normalizeSportKey(value) {
   return raw
 }
 
-const NBA_TEAM_PATTERN = /\b(?:houston\s+rockets|los\s+angeles\s+lakers|lakers|rockets|boston\s+celtics|golden\s+state\s+warriors|chicago\s+bulls|new\s+york\s+knicks|miami\s+heat|dallas\s+mavericks|denver\s+nuggets|phoenix\s+suns|milwaukee\s+bucks|philadelphia\s+76ers)\b/i
+const NBA_TEAM_PATTERN = /\b(?:atlanta\s+hawks|hawks|boston\s+celtics|celtics|brooklyn\s+nets|nets|charlotte\s+hornets|hornets|chicago\s+bulls|bulls|cleveland\s+cavaliers|cavs?|dallas\s+mavericks|mavs?|denver\s+nuggets|nuggets|detroit\s+pistons|pistons|golden\s+state\s+warriors|warriors|houston\s+rockets|rockets|indiana\s+pacers|pacers|la\s+clippers|los\s+angeles\s+clippers|clippers|los\s+angeles\s+lakers|la\s+lakers|lakers|memphis\s+grizzlies|grizzlies|miami\s+heat|milwaukee\s+bucks|bucks|minnesota\s+timberwolves|timberwolves|new\s+orleans\s+pelicans|pelicans|new\s+york\s+knicks|knicks|oklahoma\s+city\s+thunder|okc\s+thunder|thunder|orlando\s+magic|magic|philadelphia\s+76ers|76ers|sixers|phoenix\s+suns|suns|portland\s+trail\s+blazers|trail\s+blazers|blazers|sacramento\s+kings|kings|san\s+antonio\s+spurs|spurs|toronto\s+raptors|raptors|utah\s+jazz|jazz|washington\s+wizards|wizards)\b/i
 const SNOOKER_PLAYER_PATTERN = /\b(?:john\s+higgins|shaun\s+murphy|ronnie\s+o['\s._-]*sullivan|judd\s+trump|mark\s+selby|mark\s+allen|neil\s+robertson|kyren\s+wilson|ding\s+junhui|mark\s+williams|stephen\s+maguire|jack\s+lisowski)\b/i
 
 function detectStrongSportHintFromTitle(title) {

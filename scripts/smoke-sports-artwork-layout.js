@@ -779,7 +779,7 @@ async function assertTeamBadgeArtworkProxy() {
       assert.equal(response.headers['content-type'], 'image/png', `team badge ${variant} proxy should return PNG`)
       assert.match(response.headers['x-pvtkrrx-artwork-source'], /^pvtkrrx-(?:template-glyph|public-template)$/, `central ${variant} proxy should stay on public/glyph artwork`)
       assert.equal(response.headers['x-pvtkrrx-sports-event-class'], 'team_vs_team', `central ${variant} proxy should classify team-vs-team events`)
-      assert.match(response.headers['x-pvtkrrx-artwork-fallback'] || '', /sportsmeta_central_svg_layout_replaced_with_team_badges/, `central ${variant} proxy should report the local template replacement`)
+      assert.match(response.headers['x-pvtkrrx-artwork-fallback'] || '', /sportsmeta_central_svg_layout_replaced_with_real_logos/, `central ${variant} proxy should report the local real-logo template replacement`)
       assert.ok(Buffer.isBuffer(response.body), `team badge ${variant} proxy should return bytes`)
       assert.deepEqual(pngDimensions(response.body), dimensions[variant], `team badge ${variant} dimensions`)
       fs.writeFileSync(path.join(PREVIEW_DIR, `team-badge-${variant}.png`), response.body)
@@ -831,8 +831,8 @@ async function assertTeamBadgeArtworkProxy() {
     assert.equal(invalidLandscapeResponse.headers['x-pvtkrrx-sports-event-class'], 'team_vs_team', 'invalid member landscape should preserve team-vs-team classification')
     assert.match(
       invalidLandscapeResponse.headers['x-pvtkrrx-artwork-fallback'] || '',
-      /sportsmeta_landscape_raster_(?:layout_replaced|composed)_with_team_badges/,
-      'invalid member landscape should report the layout fallback reason'
+      /sportsmeta_landscape_raster_(?:layout_replaced|composed)_with_real_logos/,
+      'invalid member landscape should report the real-logo layout fallback reason'
     )
     assert.deepEqual(pngDimensions(invalidLandscapeResponse.body), dimensions.landscape, 'invalid member landscape fallback dimensions')
 
