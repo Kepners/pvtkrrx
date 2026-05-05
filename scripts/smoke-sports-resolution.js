@@ -15,6 +15,7 @@ const {
   resolveSportsMetaIdentity
 } = require('../src/utils/sportsIdentityResolution')
 const {
+  SPORTS_ARTWORK_PROXY_VERSION,
   resolveSportsPosterAsset
 } = require('../src/utils/sportsArtwork')
 const {
@@ -499,9 +500,11 @@ async function run() {
     barcaId,
     { baseUrl: 'https://addon.test' }
   )
+  const expectedPublicProxyPoster = `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=${SPORTS_ARTWORK_PROXY_VERSION}`
+
   assert.equal(
     paidSportsMetaResponse.meta?.poster,
-    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260501-competitor-vs-competitor-v1`,
+    expectedPublicProxyPoster,
     'PVTKRRX must not expose or forward SportsMeta member tokens in stream-addon artwork URLs'
   )
 
@@ -517,7 +520,7 @@ async function run() {
   )
   assert.equal(
     templateSportsMetaResponse.meta?.poster,
-    `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260501-competitor-vs-competitor-v1`,
+    expectedPublicProxyPoster,
     'PVTKRRX free-tier rule: configured sportsPosterTemplate=glitch must normalise to ticket-stub and must not expose SportsMeta member tokens'
   )
 
@@ -531,7 +534,7 @@ async function run() {
     })
     assert.equal(
       envTokenPoster.poster,
-      `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=ticket-stub&v=20260501-competitor-vs-competitor-v1`,
+      expectedPublicProxyPoster,
       'PVTKRRX should ignore runtime env member tokens on stream-addon artwork URLs'
     )
     assert.equal(envTokenPoster.selectedArtworkSource, 'pvtkrrx-canonical-public-proxy')

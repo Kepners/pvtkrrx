@@ -10,7 +10,7 @@ const {
 } = require('./sportsPosterTemplates')
 const { resolveSportBackdrop } = require('./sportBackdrops')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260501-competitor-vs-competitor-v1'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260505-real-logo-v1'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()

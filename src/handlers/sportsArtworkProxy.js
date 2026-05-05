@@ -38,7 +38,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260501-competitor-vs-competitor-v1'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260505-real-logo-v1'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -210,6 +210,18 @@ async function readLocalSportBackdropFallback(variant, fallbackInput = {}, reaso
       fallbackReason: reason,
       sportBackdropBucket: backdrop.bucket || resolveSportBackdropBucket(fallbackInput),
       sportBackdropFallbackReason: backdrop.fallbackReason || '',
+      // Logo provenance: a backdrop is identity art for a SPORT, not a real
+      // logo. Audit treats this as fallback-backdrop (acceptable for
+      // background/landscape variants where a wide identity image is the
+      // intended outcome) — distinct from fallback-glyph.
+      logoKind: 'fallback-backdrop',
+      logoSourceUrl: '',
+      logoSourceUrls: [],
+      logoFallbackReason: reason,
+      logoRealCount: 0,
+      logoFallbackCount: 1,
+      logoSlots: [],
+      logoLookupAttempts: [],
       httpStatus: status,
       upstreamContentType: contentType
     }
@@ -237,9 +249,9 @@ async function renderEmergencyTemplatePng(variant, fallbackInput = {}, template 
     theme
   })
   const skipGeneratedSlots = (artwork.layoutFamily || layoutFamilyForSportsPosterRender(normalizedTemplate, event)) === 'COMPETITOR_VS_COMPETITOR'
+  const fallbackSlots = skipGeneratedSlots ? [] : (artwork.slots || [])
   const composites = []
-  for (const slot of artwork.slots || []) {
-    if (skipGeneratedSlots) continue
+  for (const slot of fallbackSlots) {
     const glyphSvg = renderLogoGlyphSvg({
       role: slot.role,
       event,
@@ -268,11 +280,25 @@ async function renderEmergencyTemplatePng(variant, fallbackInput = {}, template 
     selectedTemplate: normalizedTemplate,
     layoutFamily: layoutFamilyForSportsPosterRender(normalizedTemplate, event),
     eventClass,
+    // Emergency fallback always paints initials/glyphs — never a real logo.
+    logoKind: 'fallback-glyph',
+    logoSourceUrls: [],
+    logoFallbackReason: `emergency_${cause}`,
+    logoRealCount: 0,
+    logoFallbackCount: fallbackSlots.length,
+    logoSlots: fallbackSlots.map((slot) => ({
+      role: slot.role,
+      logoKind: 'fallback-glyph',
+      logoFallbackReason: `emergency_${cause}`,
+      left: slot.left,
+      top: slot.top,
+      size: slot.size
+    })),
     renderFailure: error?.message || String(error || '')
   }
 }
 
-async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, template = 'ticket-stub') {
+async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, template = 'ticket-stub', logoFallbackReason = 'template_glyph_fallback') {
   if (!['poster', 'landscape', 'background'].includes(variant)) {
     const svg = renderSportsArtworkSvg(fallbackInput, variant)
     const title = sourceTitleForAudit(fallbackInput)
@@ -282,7 +308,13 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
       selectedArtworkSource: 'pvtkrrx-emergency-legacy-fallback',
       selectedTemplate: normalizeSportsPosterTemplate(template),
       layoutFamily: layoutFamilyForSportsPosterRender(template, fallbackInput),
-      eventClass: fallbackInput.eventClass || classifySportsEvent(fallbackInput)
+      eventClass: fallbackInput.eventClass || classifySportsEvent(fallbackInput),
+      logoKind: 'fallback-glyph',
+      logoSourceUrls: [],
+      logoFallbackReason: `emergency_unsupported_variant_${variant}`,
+      logoRealCount: 0,
+      logoFallbackCount: 1,
+      logoSlots: []
     }
   }
 
@@ -305,9 +337,9 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
       theme
     })
     const skipGeneratedSlots = (artwork.layoutFamily || layoutFamilyForSportsPosterRender(normalizedTemplate, event)) === 'COMPETITOR_VS_COMPETITOR'
+    const fallbackSlots = skipGeneratedSlots ? [] : (artwork.slots || [])
     const composites = []
-    for (const slot of artwork.slots || []) {
-      if (skipGeneratedSlots) continue
+    for (const slot of fallbackSlots) {
       const glyphSvg = renderLogoGlyphSvg({
         role: slot.role,
         event,
@@ -327,12 +359,32 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
       .composite(composites)
       .png({ compressionLevel: 9, adaptiveFiltering: true })
       .toBuffer()
+    // Log the silent glyph fallback explicitly so it shows up in proxy logs
+    // alongside the upstream URL — previously this path was indistinguishable
+    // from a real-logo render in operational logs.
+    const auditTitle = sourceTitleForAudit(fallbackInput)
+    console.warn(
+      `[sports-poster] LOGO_GLYPH_FALLBACK variant=${variant} template=${normalizedTemplate} eventClass=${eventClass} reason=${logoFallbackReason} title=${auditTitle}`
+    )
     return {
       buffer,
       selectedArtworkSource: 'pvtkrrx-template-glyph',
       selectedTemplate: normalizedTemplate,
       layoutFamily: artwork.layoutFamily || layoutFamilyForSportsPosterRender(normalizedTemplate, event),
-      eventClass
+      eventClass,
+      logoKind: 'fallback-glyph',
+      logoSourceUrls: [],
+      logoFallbackReason,
+      logoRealCount: 0,
+      logoFallbackCount: fallbackSlots.length,
+      logoSlots: fallbackSlots.map((slot) => ({
+        role: slot.role,
+        logoKind: 'fallback-glyph',
+        logoFallbackReason,
+        left: slot.left,
+        top: slot.top,
+        size: slot.size
+      }))
     }
   } catch (error) {
     return renderEmergencyTemplatePng(variant, fallbackInput, normalizedTemplate, error)
@@ -420,6 +472,42 @@ function isSportsMetaRealRaster(contentType = '', headers = {}) {
   if (generated) return false
   if (!source && !delivery && !assetClass) return true
   return delivery === 'raster' && source === 'cached-asset' && /raster/.test(assetClass)
+}
+
+function isImageAssetContentType(contentType = '') {
+  return /^image\/(?:png|jpeg|jpg|webp|svg\+xml)/i.test(String(contentType || ''))
+}
+
+function isSportsMetaRealLogoAsset(contentType = '', headers = {}) {
+  if (!isImageAssetContentType(contentType)) return false
+  const source = String(headers?.['x-sportsmeta-source'] || '').toLowerCase()
+  const delivery = String(headers?.['x-sportsmeta-delivery-format'] || '').toLowerCase()
+  const assetClass = String(headers?.['x-sportsmeta-asset-class'] || '').toLowerCase()
+  const generated = /^true$/i.test(String(headers?.['x-sportsmeta-generated-asset'] || ''))
+  if (generated) return false
+  if (/default/.test(source) || /default/.test(assetClass)) return false
+  if (source === 'canonical-generator' && delivery === 'svg' && assetClass === 'public-canonical-svg') return true
+  if (source === 'cached-asset' && delivery === 'raster' && /raster/.test(assetClass)) return true
+  if (!source && !delivery && !assetClass) return true
+  return false
+}
+
+function logoKindForCandidate(key = '') {
+  if (key === 'home' || key === 'away') return 'real-team'
+  if (key === 'league') return 'real-league'
+  if (key === 'event') return 'real-event'
+  return 'fallback-glyph'
+}
+
+function preferredLogoKind(kinds = []) {
+  const priority = ['real-team', 'real-league', 'real-event']
+  return priority.find((kind) => kinds.includes(kind)) || 'fallback-glyph'
+}
+
+function summarizeLogoAttempts(attempts = []) {
+  return attempts
+    .map((attempt) => `${attempt.role || 'asset'}:${attempt.kind || 'unknown'}:${attempt.status || 0}:${attempt.result || 'unknown'}`)
+    .join(',')
 }
 
 function splitLines(value = '', maxChars = 18, maxLines = 2) {
@@ -628,6 +716,7 @@ async function loadCanonicalEvent(canonicalId = '', sportsmetaBaseUrl = '') {
         awayTeam: normalizeSpace(event.awayTeam)
       },
       assets: {
+        poster: normalizeSpace(assets.poster),
         homeBadge: normalizeSpace(assets.homeBadge),
         awayBadge: normalizeSpace(assets.awayBadge),
         leagueLogo: normalizeSpace(assets.leagueLogo),
@@ -688,11 +777,105 @@ async function fetchCompositionImage(url = '', size = 210, options = {}) {
   }
 }
 
+async function fetchLogoCandidate({ url = '', key = '', role = '', size = 210, fallbackColor = '#0f766e' } = {}) {
+  const targetUrl = normalizeSpace(url)
+  const attempt = {
+    role: role || key || 'logo',
+    kind: logoKindForCandidate(key),
+    url: targetUrl,
+    status: 0,
+    contentType: '',
+    result: targetUrl ? 'pending' : 'missing_url'
+  }
+  if (!targetUrl) return { image: null, attempt }
+
+  try {
+    const response = await fetch(targetUrl, {
+      headers: { accept: 'image/png,image/jpeg,image/webp,image/svg+xml,image/*' },
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+    })
+    attempt.status = response.status
+    attempt.contentType = String(response.headers.get('content-type') || '').toLowerCase()
+    const headers = {}
+    for (const [headerKey, value] of response.headers.entries()) {
+      headers[String(headerKey || '').toLowerCase()] = String(value || '')
+    }
+    attempt.source = String(headers['x-sportsmeta-source'] || '')
+    attempt.assetClass = String(headers['x-sportsmeta-asset-class'] || '')
+    attempt.delivery = String(headers['x-sportsmeta-delivery-format'] || '')
+    attempt.generated = String(headers['x-sportsmeta-generated-asset'] || '')
+
+    if (!response.ok) {
+      attempt.result = `http_${response.status}`
+      return { image: null, attempt }
+    }
+    if (!isSportsMetaRealLogoAsset(attempt.contentType, headers)) {
+      attempt.result = 'not_real_logo'
+      return { image: null, attempt }
+    }
+
+    const source = Buffer.from(await response.arrayBuffer())
+    const buffer = await sharp(source, { density: 192 })
+      .resize({ width: size, height: size, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer()
+    attempt.result = 'real_logo'
+    return {
+      image: {
+        buffer,
+        color: await dominantColorFromImage(source, fallbackColor),
+        contentType: attempt.contentType,
+        headers,
+        kind: attempt.kind,
+        sourceUrl: targetUrl,
+        sourceKey: key
+      },
+      attempt
+    }
+  } catch (error) {
+    attempt.result = `fetch_error_${failureReason(error?.message || error)}`
+    return { image: null, attempt }
+  }
+}
+
 async function resizeCompositionBuffer(buffer, size = 210) {
   return sharp(buffer, { density: 192 })
     .resize({ width: size, height: size, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png()
     .toBuffer()
+}
+
+async function buildMatchupLogoPair(homeBadge, awayBadge, size = 210) {
+  if (!homeBadge?.buffer || !awayBadge?.buffer) return null
+  const canvasSize = Math.max(32, Math.round(size))
+  const badgeSize = Math.max(24, Math.round(canvasSize * 0.48))
+  const vertical = Math.round((canvasSize - badgeSize) / 2)
+  const homeBuffer = await resizeCompositionBuffer(homeBadge.buffer, badgeSize)
+  const awayBuffer = await resizeCompositionBuffer(awayBadge.buffer, badgeSize)
+  const buffer = await sharp({
+    create: {
+      width: canvasSize,
+      height: canvasSize,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 }
+    }
+  })
+    .composite([
+      { input: homeBuffer, left: 0, top: vertical },
+      { input: awayBuffer, left: canvasSize - badgeSize, top: vertical }
+    ])
+    .png()
+    .toBuffer()
+  return {
+    buffer,
+    color: homeBadge.color || awayBadge.color || '#0f766e',
+    contentType: 'image/png',
+    headers: {},
+    kind: 'real-team',
+    sourceUrl: homeBadge.sourceUrl || awayBadge.sourceUrl || '',
+    sourceUrls: [homeBadge.sourceUrl, awayBadge.sourceUrl].filter(Boolean),
+    sourceKey: 'matchup'
+  }
 }
 
 async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl = '', variant = 'poster', template = 'editorial' } = {}) {
@@ -701,6 +884,15 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
   const hasMatchup = Boolean(event.homeTeam && event.awayTeam)
   const eventClass = classifySportsEvent(event)
   event.eventClass = eventClass
+
+  if (!canonical?.event?.id) {
+    return {
+      buffer: null,
+      logoKind: 'fallback-glyph',
+      logoFallbackReason: 'canonical_event_lookup_failed',
+      logoLookupAttempts: []
+    }
+  }
 
   const homeBadgeUrl = buildCanonicalBadgeUrl({
     sportsmetaBaseUrl,
@@ -720,31 +912,57 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     variant: 'leagueLogo',
     fallbackUrl: canonical?.assets?.leagueLogo || canonical?.assets?.logo
   })
+  const eventLogoUrl = buildCanonicalBadgeUrl({
+    sportsmetaBaseUrl,
+    canonicalId,
+    variant: 'logo',
+    fallbackUrl: canonical?.assets?.logo
+  })
+  const eventPosterUrl = buildCanonicalBadgeUrl({
+    sportsmetaBaseUrl,
+    canonicalId,
+    variant: 'poster',
+    fallbackUrl: canonical?.assets?.poster
+  })
 
   const normalizedVariant = ['poster', 'landscape', 'background'].includes(variant) ? variant : 'poster'
   const normalizedTemplate = normalizeSportsPosterTemplate(template)
   const layoutFamily = layoutFamilyForSportsPosterRender(normalizedTemplate, event)
-  const isCompetitorPoster = layoutFamily === 'COMPETITOR_VS_COMPETITOR'
-  const needsTeamBadges = hasMatchup && !isCompetitorPoster
   const dims = VARIANT_DIMENSIONS[normalizedVariant] || VARIANT_DIMENSIONS.poster
   const portrait = dims.height > dims.width
   const logoSize = Math.round(Math.min(dims.width * (portrait ? 0.42 : 0.22), dims.height * (portrait ? 0.36 : 0.4), portrait ? 260 : 390))
   const leagueLogoSize = Math.round(Math.min(dims.width * (portrait ? 0.42 : 0.22), dims.height * (portrait ? 0.34 : 0.36), portrait ? 260 : 390))
-  const [homeBadge, awayBadge, leagueLogo] = await Promise.all([
-    needsTeamBadges ? fetchCompositionImage(homeBadgeUrl, logoSize, { requireRealRaster: true, fallbackColor: colorForLabel(event.homeTeam, '#0f766e') }) : null,
-    needsTeamBadges ? fetchCompositionImage(awayBadgeUrl, logoSize, { requireRealRaster: true, fallbackColor: colorForLabel(event.awayTeam, '#123c69') }) : null,
-    fetchCompositionImage(leagueLogoUrl, leagueLogoSize, {
-      requireRealRaster: true,
-      fallbackColor: '#b58b2a'
-    })
+  const eventLogoSize = Math.max(logoSize, leagueLogoSize)
+  const candidateResults = await Promise.all([
+    hasMatchup
+      ? fetchLogoCandidate({ url: homeBadgeUrl, key: 'home', role: 'homeBadge', size: logoSize, fallbackColor: colorForLabel(event.homeTeam, '#0f766e') })
+      : Promise.resolve({ image: null, attempt: { role: 'homeBadge', kind: 'real-team', url: homeBadgeUrl, status: 0, result: 'not_applicable_no_matchup' } }),
+    hasMatchup
+      ? fetchLogoCandidate({ url: awayBadgeUrl, key: 'away', role: 'awayBadge', size: logoSize, fallbackColor: colorForLabel(event.awayTeam, '#123c69') })
+      : Promise.resolve({ image: null, attempt: { role: 'awayBadge', kind: 'real-team', url: awayBadgeUrl, status: 0, result: 'not_applicable_no_matchup' } }),
+    fetchLogoCandidate({ url: leagueLogoUrl, key: 'league', role: 'leagueLogo', size: leagueLogoSize, fallbackColor: '#b58b2a' }),
+    fetchLogoCandidate({ url: eventLogoUrl, key: 'event', role: 'eventLogo', size: eventLogoSize, fallbackColor: '#b58b2a' }),
+    fetchLogoCandidate({ url: eventPosterUrl, key: 'event', role: 'eventPoster', size: eventLogoSize, fallbackColor: '#b58b2a' })
   ])
-  if (needsTeamBadges && (!homeBadge?.buffer || !awayBadge?.buffer)) return null
-  if ((isCompetitorPoster || !hasMatchup) && !leagueLogo?.buffer) return null
+  const logoLookupAttempts = candidateResults.map((result) => result.attempt).filter(Boolean)
+  const homeBadge = candidateResults[0]?.image || null
+  const awayBadge = candidateResults[1]?.image || null
+  const leagueLogo = candidateResults[2]?.image || null
+  const eventIdentity = candidateResults[3]?.image || candidateResults[4]?.image || null
+  const matchupLogo = await buildMatchupLogoPair(homeBadge, awayBadge, Math.max(logoSize, leagueLogoSize))
+  if (!homeBadge && !awayBadge && !leagueLogo && !eventIdentity) {
+    return {
+      buffer: null,
+      logoKind: 'fallback-glyph',
+      logoFallbackReason: `no_real_logo_resolved:${summarizeLogoAttempts(logoLookupAttempts)}`,
+      logoLookupAttempts
+    }
+  }
 
   const theme = {
-    homeColor: homeBadge?.color || leagueLogo?.color || colorForLabel(event.homeTeam || event.sport, '#0f766e'),
+    homeColor: homeBadge?.color || leagueLogo?.color || eventIdentity?.color || colorForLabel(event.homeTeam || event.sport, '#0f766e'),
     awayColor: awayBadge?.color || colorForLabel(event.awayTeam || event.league || event.sport, '#123c69'),
-    accentColor: paperAccentFromHex(leagueLogo?.color || homeBadge?.color || readableAccentFromHex(homeBadge?.color))
+    accentColor: paperAccentFromHex(leagueLogo?.color || homeBadge?.color || eventIdentity?.color || readableAccentFromHex(homeBadge?.color))
   }
   let artwork
   try {
@@ -767,26 +985,68 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
       rawTitle: event.title || event.name || canonicalId,
       source: 'sportsmeta'
     }, normalizedTemplate, error)
-    return emergency
+    return {
+      ...emergency,
+      logoKind: emergency.logoKind || 'fallback-glyph',
+      logoFallbackReason: emergency.logoFallbackReason || `template_render_failed:${failureReason(error?.message || error)}`,
+      logoLookupAttempts
+    }
   }
-  const imageByRole = {
-    home: homeBadge,
-    away: awayBadge,
-    league: leagueLogo
+
+  const artworkSlots = artwork.slots || []
+  const hasTeamSpecificSlots = artworkSlots.some((slot) => slot.role === 'home' || slot.role === 'away')
+  const selectLogoForSlot = (role = '') => {
+    if (role === 'home') return homeBadge || leagueLogo || eventIdentity
+    if (role === 'away') return awayBadge || leagueLogo || eventIdentity
+    if (hasMatchup && !hasTeamSpecificSlots && matchupLogo) return matchupLogo
+    return leagueLogo || eventIdentity || homeBadge || awayBadge
   }
   const composites = []
-  for (const slot of artwork.slots || []) {
-    const image = imageByRole[slot.role]
-    if (!image?.buffer) continue
+  const logoSlots = []
+  for (const slot of artworkSlots) {
+    const image = selectLogoForSlot(slot.role)
+    if (!image?.buffer) {
+      logoSlots.push({
+        role: slot.role,
+        logoKind: 'fallback-glyph',
+        logoFallbackReason: `slot_${slot.role || 'logo'}_real_logo_unresolved`,
+        left: slot.left,
+        top: slot.top,
+        size: slot.size
+      })
+      continue
+    }
     composites.push({
       input: await resizeCompositionBuffer(image.buffer, slot.size),
       left: slot.left,
       top: slot.top
     })
+    logoSlots.push({
+      role: slot.role,
+      logoKind: image.kind,
+      logoSourceUrl: image.sourceUrl,
+      logoSourceUrls: image.sourceUrls || [image.sourceUrl].filter(Boolean),
+      sourceKey: image.sourceKey,
+      left: slot.left,
+      top: slot.top,
+      size: slot.size
+    })
   }
   if (artwork.overlay) {
     composites.push({ input: Buffer.from(artwork.overlay), left: 0, top: 0 })
   }
+
+  const realLogoSlots = logoSlots.filter((slot) => slot.logoKind && slot.logoKind !== 'fallback-glyph')
+  if (realLogoSlots.length === 0) {
+    return {
+      buffer: null,
+      logoKind: 'fallback-glyph',
+      logoFallbackReason: `no_real_logo_visible:${summarizeLogoAttempts(logoLookupAttempts)}`,
+      logoLookupAttempts,
+      logoSlots
+    }
+  }
+  const fallbackLogoSlots = logoSlots.filter((slot) => slot.logoKind === 'fallback-glyph')
 
   const buffer = await sharp(Buffer.from(artwork.svg))
     .composite(composites)
@@ -797,7 +1057,15 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     selectedArtworkSource: 'pvtkrrx-public-template',
     selectedTemplate: normalizedTemplate,
     layoutFamily: artwork.layoutFamily || layoutFamily,
-    eventClass
+    eventClass,
+    logoKind: preferredLogoKind(realLogoSlots.map((slot) => slot.logoKind)),
+    logoSourceUrl: realLogoSlots[0]?.logoSourceUrl || '',
+    logoSourceUrls: Array.from(new Set(realLogoSlots.flatMap((slot) => slot.logoSourceUrls || slot.logoSourceUrl || []).filter(Boolean))),
+    logoFallbackReason: fallbackLogoSlots.length ? `fallback_slots=${fallbackLogoSlots.map((slot) => slot.role || 'logo').join(',')}` : '',
+    logoRealCount: realLogoSlots.length,
+    logoFallbackCount: fallbackLogoSlots.length,
+    logoSlots,
+    logoLookupAttempts
   }
 }
 
@@ -871,33 +1139,60 @@ async function renderTeamBadgeArtworkPngLegacy({ canonicalId = '', sportsmetaBas
 }
 
 async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterContext = {}, template = 'editorial', status = 0, contentType = '', reason = 'sportsmeta_layout_replaced' } = {}) {
-  if (['poster', 'landscape', 'background'].includes(variant) && teamPosterContext?.canonicalId) {
+  // Whether we even attempted real-logo lookup. Audit needs to know this so a
+  // missing-logo result on a default URL with no canonical doesn't get scored
+  // as an unexpected fallback.
+  const realLogoLookupAttempted = ['poster', 'landscape', 'background'].includes(variant) && Boolean(teamPosterContext?.canonicalId)
+  let realLogoLookupFailure = null
+
+  if (realLogoLookupAttempted) {
     const teamPoster = await renderTeamBadgeArtworkPng({
       canonicalId: teamPosterContext.canonicalId,
       sportsmetaBaseUrl: teamPosterContext.sportsmetaBaseUrl,
       variant,
       template
     })
-    if (teamPoster) {
+    if (teamPoster?.buffer) {
       return {
-        buffer: teamPoster.buffer || teamPoster,
+        buffer: teamPoster.buffer,
         contentType: 'image/png',
         selectedArtworkSource: teamPoster.selectedArtworkSource || 'pvtkrrx-public-template',
-        fallbackReason: `${reason}_with_team_badges`,
+        fallbackReason: `${reason}_with_real_logos`,
         selectedTemplate: teamPoster.selectedTemplate || template,
         layoutFamily: teamPoster.layoutFamily || layoutFamilyForSportsPosterRender(teamPoster.selectedTemplate || template, fallbackInput),
         renderFailure: teamPoster.renderFailure || '',
         eventClass: teamPoster.eventClass || '',
+        logoKind: teamPoster.logoKind || 'real-event',
+        logoSourceUrl: teamPoster.logoSourceUrl || '',
+        logoSourceUrls: teamPoster.logoSourceUrls || [],
+        logoFallbackReason: teamPoster.logoFallbackReason || '',
+        logoRealCount: Number(teamPoster.logoRealCount || 0),
+        logoFallbackCount: Number(teamPoster.logoFallbackCount || 0),
+        logoSlots: teamPoster.logoSlots || [],
+        logoLookupAttempts: teamPoster.logoLookupAttempts || [],
+        realLogoLookupAttempted: true,
         httpStatus: status,
         upstreamContentType: contentType
       }
     }
+    realLogoLookupFailure = teamPoster || null
   }
 
   const localBackdrop = await readLocalSportBackdropFallback(variant, fallbackInput, reason, status, contentType, template)
-  if (localBackdrop) return localBackdrop
+  if (localBackdrop) {
+    return {
+      ...localBackdrop,
+      // Audit needs to know whether real-logo lookup was attempted so a
+      // backdrop served instead of real logos for a canonical event is
+      // distinguishable from a backdrop served because no canonical was known.
+      realLogoLookupAttempted
+    }
+  }
 
-  const rendered = await renderTemplateFallbackArtwork(variant, fallbackInput, template)
+  const glyphReason = realLogoLookupAttempted
+    ? (realLogoLookupFailure?.logoFallbackReason || `${reason}_real_logo_lookup_failed`)
+    : reason
+  const rendered = await renderTemplateFallbackArtwork(variant, fallbackInput, template, glyphReason)
   return {
     buffer: rendered.buffer,
     contentType: 'image/png',
@@ -907,6 +1202,15 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
     layoutFamily: rendered.layoutFamily || layoutFamilyForSportsPosterRender(rendered.selectedTemplate || template, fallbackInput),
     renderFailure: rendered.renderFailure || '',
     eventClass: rendered.eventClass || '',
+    logoKind: rendered.logoKind || 'fallback-glyph',
+    logoSourceUrl: rendered.logoSourceUrl || '',
+    logoSourceUrls: rendered.logoSourceUrls || [],
+    logoFallbackReason: rendered.logoFallbackReason || glyphReason,
+    logoRealCount: Number(rendered.logoRealCount || 0),
+    logoFallbackCount: Number(rendered.logoFallbackCount || 0),
+    logoSlots: rendered.logoSlots || [],
+    logoLookupAttempts: realLogoLookupFailure?.logoLookupAttempts || rendered.logoLookupAttempts || [],
+    realLogoLookupAttempted,
     httpStatus: status,
     upstreamContentType: contentType
   }
@@ -928,11 +1232,18 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
     return diskHit
   }
 
+  const realLogoLookupAttemptedAtUpstream = ['poster', 'landscape', 'background'].includes(variant) && Boolean(teamPosterContext?.canonicalId)
+
   const pending = (async () => {
     const fallbackEventClass = fallbackInput.eventClass || classifySportsEvent(fallbackInput)
     try {
       const { status, contentType, buffer, headers } = await fetchUpstream(upstreamUrl)
       const generatedAsset = /^true$/i.test(String(headers?.['x-sportsmeta-generated-asset'] || ''))
+      // Promote the SportsMeta `isSportsMetaRealRaster` signal so a passthrough
+      // PNG with no real-asset header is no longer counted as a real logo by
+      // the audit. SportsMeta sometimes serves text-only generated rasters via
+      // the same /asset/poster route — those must score as fallback.
+      const upstreamLooksReal = isSportsMetaRealRaster(contentType, headers)
       if (/^image\/(png|jpeg|jpg|webp)/i.test(contentType)) {
         const dimensions = await readRasterDimensions(buffer)
         if (!isExpectedRasterLayout(variant, dimensions) && shouldRenderLocalFallbackForSvg(variant)) {
@@ -954,6 +1265,15 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
           layoutFamily: layoutFamilyForSportsPosterRender(template, fallbackInput),
           eventClass: fallbackEventClass,
           fallbackReason: '',
+          logoKind: upstreamLooksReal ? 'real-event' : 'fallback-glyph',
+          logoSourceUrl: upstreamLooksReal ? upstreamUrl : '',
+          logoSourceUrls: upstreamLooksReal ? [upstreamUrl] : [],
+          logoFallbackReason: upstreamLooksReal ? '' : (generatedAsset ? 'sportsmeta_generated_raster' : 'sportsmeta_unverified_raster'),
+          logoRealCount: upstreamLooksReal ? 1 : 0,
+          logoFallbackCount: upstreamLooksReal ? 0 : 1,
+          logoSlots: [],
+          logoLookupAttempts: [],
+          realLogoLookupAttempted: realLogoLookupAttemptedAtUpstream,
           httpStatus: status,
           upstreamContentType: contentType
         }
@@ -971,6 +1291,7 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
       }
       if (/^image\/svg\+xml/i.test(contentType)) {
         const png = await rasterizeToPng(buffer, variant)
+        const upstreamSvgLooksReal = variant === 'logo' && isSportsMetaRealLogoAsset(contentType, headers)
         return {
           buffer: png,
           contentType: 'image/png',
@@ -979,6 +1300,15 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
           layoutFamily: layoutFamilyForSportsPosterRender(template, fallbackInput),
           eventClass: fallbackEventClass,
           fallbackReason: 'sportsmeta_svg_rasterized',
+          logoKind: upstreamSvgLooksReal ? 'real-event' : 'fallback-glyph',
+          logoSourceUrl: upstreamSvgLooksReal ? upstreamUrl : '',
+          logoSourceUrls: upstreamSvgLooksReal ? [upstreamUrl] : [],
+          logoFallbackReason: upstreamSvgLooksReal ? '' : (generatedAsset ? 'sportsmeta_generated_svg_rasterized' : 'sportsmeta_svg_rasterized'),
+          logoRealCount: upstreamSvgLooksReal ? 1 : 0,
+          logoFallbackCount: upstreamSvgLooksReal ? 0 : 1,
+          logoSlots: [],
+          logoLookupAttempts: [],
+          realLogoLookupAttempted: realLogoLookupAttemptedAtUpstream,
           httpStatus: status,
           upstreamContentType: contentType
         }
@@ -992,6 +1322,15 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
         layoutFamily: layoutFamilyForSportsPosterRender(template, fallbackInput),
         eventClass: fallbackEventClass,
         fallbackReason: /^image\/svg\+xml/i.test(contentType) ? 'sportsmeta_svg_rasterized' : 'sportsmeta_non_raster_rasterized',
+        logoKind: 'fallback-glyph',
+        logoSourceUrl: '',
+        logoSourceUrls: [],
+        logoFallbackReason: 'sportsmeta_non_raster_rasterized',
+        logoRealCount: 0,
+        logoFallbackCount: 1,
+        logoSlots: [],
+        logoLookupAttempts: [],
+        realLogoLookupAttempted: realLogoLookupAttemptedAtUpstream,
         httpStatus: status,
         upstreamContentType: contentType
       }
@@ -1005,19 +1344,29 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
         '',
         template
       )
-      if (localBackdrop) return localBackdrop
-      const rendered = await renderTemplateFallbackArtwork(variant, fallbackInput, template)
+      if (localBackdrop) return { ...localBackdrop, realLogoLookupAttempted: realLogoLookupAttemptedAtUpstream }
+      const upstreamFailureReason = `upstream_${error?.status || 'error'}`
+      const rendered = await renderTemplateFallbackArtwork(variant, fallbackInput, template, upstreamFailureReason)
       return {
         buffer: rendered.buffer,
         contentType: 'image/png',
         selectedArtworkSource: rendered.selectedArtworkSource || 'pvtkrrx-template-glyph',
         fallbackReason: rendered.renderFailure
-          ? `upstream_${error?.status || 'error'}_public_template_failed_${failureReason(rendered.renderFailure)}`
-          : `upstream_${error?.status || 'error'}`,
+          ? `${upstreamFailureReason}_public_template_failed_${failureReason(rendered.renderFailure)}`
+          : upstreamFailureReason,
         selectedTemplate: rendered.selectedTemplate || template,
         layoutFamily: rendered.layoutFamily || layoutFamilyForSportsPosterRender(rendered.selectedTemplate || template, fallbackInput),
         renderFailure: rendered.renderFailure || '',
         eventClass: rendered.eventClass || '',
+        logoKind: rendered.logoKind || 'fallback-glyph',
+        logoSourceUrl: rendered.logoSourceUrl || '',
+        logoSourceUrls: rendered.logoSourceUrls || [],
+        logoFallbackReason: rendered.logoFallbackReason || upstreamFailureReason,
+        logoRealCount: Number(rendered.logoRealCount || 0),
+        logoFallbackCount: Number(rendered.logoFallbackCount || 0),
+        logoSlots: rendered.logoSlots || [],
+        logoLookupAttempts: rendered.logoLookupAttempts || [],
+        realLogoLookupAttempted: realLogoLookupAttemptedAtUpstream,
         httpStatus: error?.status || 0,
         upstreamContentType: ''
       }
@@ -1079,6 +1428,17 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
     const { buffer, contentType } = result
     const selectedTemplate = normalizeSportsPosterTemplate(result.selectedTemplate || normalizedTemplate)
     const layoutFamily = result.layoutFamily || layoutFamilyForSportsPosterRender(selectedTemplate, fallbackInput)
+    // Logo provenance is propagated as response headers so the audit
+    // verifier can score real logo vs glyph fallback without re-running the
+    // pipeline. Default to fallback-glyph if absent so missing markers fail
+    // safe (fail audit, not silently pass).
+    const logoKind = String(result.logoKind || 'fallback-glyph')
+    const logoSourceUrls = Array.isArray(result.logoSourceUrls) ? result.logoSourceUrls : []
+    const logoSourceUrl = String(result.logoSourceUrl || logoSourceUrls[0] || '')
+    const logoFallbackReason = String(result.logoFallbackReason || '')
+    const logoRealCount = Number(result.logoRealCount || 0)
+    const logoFallbackCount = Number(result.logoFallbackCount || 0)
+    const logoLookupAttempts = Array.isArray(result.logoLookupAttempts) ? result.logoLookupAttempts : []
     res.setHeader('Content-Type', contentType || 'image/png')
     res.setHeader('Content-Length', String(buffer.length))
     res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000, stale-if-error=2592000')
@@ -1087,13 +1447,32 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
     res.setHeader('X-PVTKRRX-Artwork-Cache', result.cacheLayer || 'rendered')
     res.setHeader('X-PVTKRRX-Artwork-Template', selectedTemplate)
     res.setHeader('X-PVTKRRX-Artwork-Layout-Family', layoutFamily)
+    res.setHeader('X-PVTKRRX-Artwork-Logo-Kind', logoKind)
+    res.setHeader('X-PVTKRRX-Logo-Kind', logoKind)
+    res.setHeader('X-PVTKRRX-Logo-Real-Count', String(logoRealCount))
+    res.setHeader('X-PVTKRRX-Logo-Fallback-Count', String(logoFallbackCount))
+    res.setHeader('X-PVTKRRX-Artwork-Real-Logo-Lookup-Attempted', result.realLogoLookupAttempted ? 'true' : 'false')
+    res.setHeader('X-PVTKRRX-Logo-Lookup-Attempted', result.realLogoLookupAttempted ? 'true' : 'false')
+    if (logoFallbackReason) {
+      res.setHeader('X-PVTKRRX-Artwork-Logo-Fallback-Reason', logoFallbackReason)
+      res.setHeader('X-PVTKRRX-Logo-Fallback-Reason', logoFallbackReason)
+    }
+    if (logoSourceUrl) res.setHeader('X-PVTKRRX-Logo-Source-Url', redactUrl(logoSourceUrl))
+    if (logoSourceUrls.length) {
+      res.setHeader('X-PVTKRRX-Artwork-Logo-Source-Count', String(logoSourceUrls.length))
+      res.setHeader('X-PVTKRRX-Artwork-Logo-Source-Urls', logoSourceUrls.map(redactUrl).join(' | '))
+      res.setHeader('X-PVTKRRX-Logo-Source-Urls', logoSourceUrls.map(redactUrl).join(' | '))
+    }
+    if (logoLookupAttempts.length) {
+      res.setHeader('X-PVTKRRX-Logo-Lookup-Attempts', summarizeLogoAttempts(logoLookupAttempts))
+    }
     if (result.sportBackdropBucket) res.setHeader('X-PVTKRRX-Sport-Backdrop', result.sportBackdropBucket)
     if (result.sportBackdropFallbackReason) res.setHeader('X-PVTKRRX-Sport-Backdrop-Fallback', result.sportBackdropFallbackReason)
     if (result.eventClass) res.setHeader('X-PVTKRRX-Sports-Event-Class', result.eventClass)
     if (result.renderFailure) res.setHeader('X-PVTKRRX-Artwork-Render-Failure', result.renderFailure)
     if (result.fallbackReason) res.setHeader('X-PVTKRRX-Artwork-Fallback', result.fallbackReason)
     console.log(
-      `[sports-artwork] selectedArtworkSource=${result.selectedArtworkSource || 'unknown'} variant=${variant} template=${selectedTemplate} layoutFamily=${layoutFamily} eventClass=${result.eventClass || ''} cache=${result.cacheLayer || 'rendered'} artworkUrl=${redactUrl(upstreamUrl)} backdropFallbackReason="${result.sportBackdropFallbackReason || ''}" fallbackReason=${result.fallbackReason || ''} renderFailure="${result.renderFailure || ''}" httpStatus=${result.httpStatus || ''} contentType=${result.upstreamContentType || contentType || ''}`
+      `[sports-artwork] selectedArtworkSource=${result.selectedArtworkSource || 'unknown'} variant=${variant} template=${selectedTemplate} layoutFamily=${layoutFamily} eventClass=${result.eventClass || ''} logoKind=${logoKind} realLogoCount=${logoRealCount} fallbackLogoCount=${logoFallbackCount} realLogoLookupAttempted=${result.realLogoLookupAttempted ? 'true' : 'false'} logoSourceUrl="${redactUrl(logoSourceUrl)}" logoFallbackReason="${logoFallbackReason}" logoLookupAttempts="${summarizeLogoAttempts(logoLookupAttempts)}" cache=${result.cacheLayer || 'rendered'} artworkUrl=${redactUrl(upstreamUrl)} backdropFallbackReason="${result.sportBackdropFallbackReason || ''}" fallbackReason=${result.fallbackReason || ''} renderFailure="${result.renderFailure || ''}" httpStatus=${result.httpStatus || ''} contentType=${result.upstreamContentType || contentType || ''}`
     )
     res.status(200).end(buffer)
   } catch (err) {
@@ -1217,7 +1596,21 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
     fallbackInput.eventDetail = `${homeTeam} v ${awayTeam}`
   }
   if (defaultEventClass) fallbackInput.eventClass = defaultEventClass
-  const canonical = defaultEventClass === 'team_vs_team'
+  // Resolve a canonical SportsMeta event whenever there's enough query data to
+  // ask, not only for team_vs_team. Combat fights, tennis matches, racket
+  // matchups, and motorsport sessions also get cached SportsMeta artwork —
+  // without this expansion they fall through to default-URL glyph fallback
+  // even when SportsMeta has the real event indexed.
+  const canHaveCanonical = (defaultEventClass === 'team_vs_team' ||
+    defaultEventClass === 'combat_event' ||
+    defaultEventClass === 'tennis_or_snooker_match' ||
+    defaultEventClass === 'darts_event' ||
+    defaultEventClass === 'racket_event' ||
+    defaultEventClass === 'motorsport_event' ||
+    defaultEventClass === 'golf_event' ||
+    defaultEventClass === 'wrestling_event') &&
+    Boolean(date && (title || (homeTeam && awayTeam)))
+  const canonical = canHaveCanonical
     ? await resolveDefaultArtworkCanonical({
         sportsmetaBaseUrl,
         sportSlug,
@@ -1325,5 +1718,10 @@ module.exports = {
   handleDefaultSportsArtwork,
   handleCanonicalSportsArtwork,
   ALLOWED_VARIANTS,
-  SPORTS_POSTER_TEMPLATES
+  SPORTS_POSTER_TEMPLATES,
+  _test: {
+    isSportsMetaRealLogoAsset,
+    renderTeamBadgeArtworkPng,
+    renderTemplateFallbackArtwork
+  }
 }
