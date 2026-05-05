@@ -40,7 +40,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260506-real-logo-v7-league-context'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260506-real-logo-v8-upstream-error-retry'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -1976,6 +1976,84 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
       }
     } catch (error) {
       if (!shouldRenderLocalFallbackForSvg(variant) && variant !== 'logo') throw error
+      if (variant === 'logo' && teamPosterContext?.canonicalId) {
+        const realLogo = await tryRealLogoVariantPng({
+          canonicalId: teamPosterContext.canonicalId,
+          sportsmetaBaseUrl: teamPosterContext.sportsmetaBaseUrl,
+          variant: 'logo'
+        })
+        if (realLogo?.buffer) {
+          return {
+            buffer: realLogo.buffer,
+            contentType: 'image/png',
+            selectedArtworkSource: 'pvtkrrx-cdn-logo',
+            selectedTemplate: normalizeSportsPosterTemplate(template),
+            layoutFamily: layoutFamilyForSportsPosterRender(template, fallbackInput),
+            eventClass: fallbackEventClass,
+            fallbackReason: 'upstream_error_logo_replaced_with_cdn',
+            logoKind: realLogo.logoKind || 'real-league',
+            logoSourceUrl: realLogo.sourceUrl,
+            logoSourceUrls: [realLogo.sourceUrl],
+            logoFallbackReason: '',
+            logoRealCount: 1,
+            logoFallbackCount: 0,
+            logoSlots: [],
+            logoLookupAttempts: [{
+              role: 'logo',
+              kind: realLogo.logoKind || 'real-league',
+              url: realLogo.sourceUrl,
+              status: 200,
+              result: 'real_logo'
+            }],
+            realLogoLookupAttempted: true,
+            httpStatus: error?.status || 0,
+            upstreamContentType: ''
+          }
+        }
+      }
+      if (variant === 'logo' && !teamPosterContext?.canonicalId) {
+        const defaultLogo = await resolveDefaultLogoImage({
+          sportsmetaBaseUrl: teamPosterContext?.sportsmetaBaseUrl,
+          fallbackInput,
+          size: 420
+        })
+        if (defaultLogo?.image?.buffer) {
+          const logoPng = await renderLogoImageVariantPng(defaultLogo.image, 'logo')
+          return {
+            buffer: logoPng,
+            contentType: 'image/png',
+            selectedArtworkSource: 'pvtkrrx-cdn-logo',
+            selectedTemplate: normalizeSportsPosterTemplate(template),
+            layoutFamily: layoutFamilyForSportsPosterRender(template, fallbackInput),
+            eventClass: fallbackEventClass,
+            fallbackReason: 'upstream_error_default_logo_replaced_with_cdn',
+            logoKind: defaultLogo.image.kind || 'real-league',
+            logoSourceUrl: defaultLogo.image.sourceUrl || defaultLogo.logoSourceUrl || '',
+            logoSourceUrls: [defaultLogo.image.sourceUrl || defaultLogo.logoSourceUrl].filter(Boolean),
+            logoFallbackReason: '',
+            logoRealCount: 1,
+            logoFallbackCount: 0,
+            logoSlots: [],
+            logoLookupAttempts: defaultLogo.logoLookupAttempts || [],
+            realLogoLookupAttempted: true,
+            httpStatus: error?.status || 0,
+            upstreamContentType: ''
+          }
+        }
+      }
+      if (shouldRenderLocalFallbackForSvg(variant)) {
+        const upstreamFailureReason = `upstream_${error?.status || 'error'}`
+        const retry = await renderLayoutFallback({
+          variant,
+          fallbackInput,
+          teamPosterContext,
+          template,
+          status: error?.status || 0,
+          contentType: '',
+          reason: upstreamFailureReason
+        })
+        if (retry?.buffer) return retry
+      }
       const localBackdrop = await readLocalSportBackdropFallback(
         variant,
         fallbackInput,
