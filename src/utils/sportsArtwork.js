@@ -10,7 +10,7 @@ const {
 } = require('./sportsPosterTemplates')
 const { resolveSportBackdrop } = require('./sportBackdrops')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260505-real-logo-v4-inspect'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260506-real-logo-v7-league-context'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
@@ -140,20 +140,18 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
   const awayTeam = resolveAwayTeam(input)
   if (canonicalId) {
     const url = new URL(`${addonBase}/sports-artwork/id/${encodeURIComponent(variant)}/${encodeURIComponent(canonicalId)}.png`)
-    if (variant === 'background' || variant === 'landscape') {
-      const sport = resolveSport(input)
-      if (sport) url.searchParams.set('sport', sport)
-      if (league) url.searchParams.set('league', league)
-      if (title) url.searchParams.set('title', title)
-      if (date) url.searchParams.set('date', date)
-      if (homeTeam) url.searchParams.set('home', homeTeam)
-      if (awayTeam) url.searchParams.set('away', awayTeam)
-      if (input?.eventDetail) url.searchParams.set('detail', normalizeSpace(input.eventDetail))
-      const eventClass = resolveEventClass(input)
-      if (eventClass) url.searchParams.set('eventClass', eventClass)
-      if (input?.rawTitle) url.searchParams.set('rawTitle', normalizeSpace(input.rawTitle))
-      if (input?.source) url.searchParams.set('source', normalizeSpace(input.source))
-    }
+    const sport = resolveSport(input)
+    if (sport) url.searchParams.set('sport', sport)
+    if (league) url.searchParams.set('league', league)
+    if (title) url.searchParams.set('title', title)
+    if (date) url.searchParams.set('date', date)
+    if (homeTeam) url.searchParams.set('home', homeTeam)
+    if (awayTeam) url.searchParams.set('away', awayTeam)
+    if (input?.eventDetail) url.searchParams.set('detail', normalizeSpace(input.eventDetail))
+    const eventClass = resolveEventClass(input)
+    if (eventClass) url.searchParams.set('eventClass', eventClass)
+    if (input?.rawTitle) url.searchParams.set('rawTitle', normalizeSpace(input.rawTitle))
+    if (input?.source) url.searchParams.set('source', normalizeSpace(input.source))
     url.searchParams.set('template', resolveConfiguredSportsPosterTemplate(input))
     url.searchParams.set('v', SPORTS_ARTWORK_PROXY_VERSION)
     return url.toString()
