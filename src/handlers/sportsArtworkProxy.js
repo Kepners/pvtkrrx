@@ -2348,55 +2348,6 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
     return
   }
 
-  // No canonical event resolved (MotoGP weekend, ATP singles bracket, FA Cup
-  // matchday RSS, etc.). Try a league-level real logo via inspect before
-  // serving the default-generator glyph — this puts the real league crest on
-  // otherwise-generic sports posters.
-  if (['poster', 'landscape', 'background', 'logo'].includes(variant)) {
-    try {
-      const leaguePoster = await tryRealLeagueLogoPoster({
-        variant,
-        sport: sportSlug,
-        league,
-        sportsmetaBaseUrl,
-        fallbackInput,
-        template
-      })
-      if (leaguePoster?.buffer) {
-        const headerLogoSourceUrl = leaguePoster.logoSourceUrl || ''
-        res.setHeader('Content-Type', leaguePoster.contentType || 'image/png')
-        res.setHeader('Content-Length', String(leaguePoster.buffer.length))
-        res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000, stale-if-error=2592000')
-        res.setHeader('X-PVTKRRX-Artwork-Source', leaguePoster.selectedArtworkSource || 'pvtkrrx-cdn-league-poster')
-        res.setHeader('X-PVTKRRX-Artwork-Cache', 'rendered')
-        res.setHeader('X-PVTKRRX-Artwork-Cache-Version', LOCAL_ARTWORK_RENDER_VERSION)
-        res.setHeader('X-PVTKRRX-Artwork-Render-Version', LOCAL_ARTWORK_RENDER_VERSION)
-        res.setHeader('X-PVTKRRX-Revision', resolveRuntimeRevision())
-        res.setHeader('X-PVTKRRX-Artwork-Template', leaguePoster.selectedTemplate || 'ticket-stub')
-        res.setHeader('X-PVTKRRX-Artwork-Layout-Family', leaguePoster.layoutFamily || 'TICKET_STUB')
-        res.setHeader('X-PVTKRRX-Artwork-Logo-Kind', leaguePoster.logoKind || 'real-league')
-        res.setHeader('X-PVTKRRX-Logo-Kind', leaguePoster.logoKind || 'real-league')
-        res.setHeader('X-PVTKRRX-Logo-Real-Count', String(leaguePoster.logoRealCount || 1))
-        res.setHeader('X-PVTKRRX-Logo-Fallback-Count', String(leaguePoster.logoFallbackCount || 0))
-        res.setHeader('X-PVTKRRX-Artwork-Real-Logo-Lookup-Attempted', 'true')
-        res.setHeader('X-PVTKRRX-Logo-Lookup-Attempted', 'true')
-        if (headerLogoSourceUrl) {
-          res.setHeader('X-PVTKRRX-Logo-Source-Url', redactUrl(headerLogoSourceUrl))
-          res.setHeader('X-PVTKRRX-Logo-Source-Urls', redactUrl(headerLogoSourceUrl))
-          res.setHeader('X-PVTKRRX-Artwork-Logo-Source-Count', '1')
-        }
-        res.setHeader('X-PVTKRRX-Artwork-Fallback', leaguePoster.fallbackReason || 'sportsmeta_default_replaced_with_league_cdn_logo')
-        console.log(
-          `[sports-artwork] selectedArtworkSource=${leaguePoster.selectedArtworkSource} variant=${variant} logoKind=${leaguePoster.logoKind} logoSourceUrl="${redactUrl(headerLogoSourceUrl)}" sport=${sportSlug} league="${league}"`
-        )
-        res.status(200).end(leaguePoster.buffer)
-        return
-      }
-    } catch (err) {
-      console.warn(`[sports-artwork] league-logo poster fallback failed sport=${sportSlug} league="${league}": ${err.message}`)
-    }
-  }
-
   const cacheKey = buildDefaultArtworkCacheKey({ variant, template, sportSlug, league, title, date, homeTeam, awayTeam, detail, eventClass: defaultEventClass, seeders, size, rawTitle, sportsmetaBaseUrl })
   await sendArtwork(res, {
     cacheKey,

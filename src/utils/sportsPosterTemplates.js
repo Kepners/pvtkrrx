@@ -43,6 +43,12 @@ const {
 const LEAGUE_CODE_ALIASES = Object.freeze({
   'english premier league': 'EPL',
   'premier league': 'EPL',
+  'uefa champions league': 'UCL',
+  'champions league': 'UCL',
+  ucl: 'UCL',
+  'uefa europa league': 'UEL',
+  'europa league': 'UEL',
+  uel: 'UEL',
   'fa cup': 'FAC',
   'major league soccer': 'MLS',
   mls: 'MLS',
@@ -1911,6 +1917,7 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
   const perfRow = (y) => Array.from({ length: 25 }, (_, i) => 8 + i * 16).filter((x) => x < SOURCE_W).map((x) => `<circle cx="${x}" cy="${y}" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/>`).join('')
   const homeVisual = { x: 108, y: 205, size: 88 }
   const awayVisual = { x: 292, y: 355, size: 88 }
+  const leagueLogoSlot = { x: 24, y: 25, size: 54 }
   const homeInitialSize = m.home.initials.length > 2 ? 25 : 30
   const awayInitialSize = m.away.initials.length > 2 ? 25 : 30
   const homeNameAttrs = fitTextAttributes(m.home.name, 156, 18, 10)
@@ -1918,6 +1925,8 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
   const leagueLabel = normalizeSpace(m.league_code || m.league || m.sport).toUpperCase()
   const leagueLabelAttrs = fitTextAttributes(leagueLabel, 82, 18, 10)
   const sportLabelAttrs = fitTextAttributes(m.sport.toUpperCase(), 112, 6, 5)
+  const soloTitle = normalizeSpace(m.eventTitle || m.event_short || m.league || m.sport)
+  const soloTitleAttrs = fitTextAttributes(soloTitle, SOURCE_W - 44, 28, 18)
   const vsBox = { x: SOURCE_W / 2 - 35, y: SOURCE_H / 2 - 35, size: 70 }
   const layoutRole = m.isTeamMatchup ? 'team-vs-team-layout' : 'head-to-head-layout'
   const homeVisualRole = m.isTeamMatchup ? 'home-team-visual' : 'left-competitor-visual'
@@ -1933,12 +1942,12 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
     : `data-competitor-side="right" data-competitor-name="${e(m.away.name)}"`
   const slots = m.hasMatchup
     ? [
-        { role: 'league', left: 140, top: 30, size: 44 },
+        { role: 'league', left: leagueLogoSlot.x, top: leagueLogoSlot.y, size: leagueLogoSlot.size },
         { role: 'home', left: homeVisual.x - homeVisual.size / 2, top: homeVisual.y - homeVisual.size / 2, size: homeVisual.size },
         { role: 'away', left: awayVisual.x - awayVisual.size / 2, top: awayVisual.y - awayVisual.size / 2, size: awayVisual.size }
       ]
     : [
-        { role: 'league', left: 140, top: 30, size: 44 },
+        { role: 'league', left: leagueLogoSlot.x, top: leagueLogoSlot.y, size: leagueLogoSlot.size },
         { role: 'league', left: 152, top: 154, size: 96 }
       ]
   const stubY = SOURCE_H - 100
@@ -1970,7 +1979,7 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
   <line x1="20" y1="305" x2="160" y2="305" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
   <line x1="${SOURCE_W - 160}" y1="305" x2="${SOURCE_W - 20}" y2="305" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
   <text class="bebas" x="${SOURCE_W / 2}" y="310" text-anchor="middle" font-size="13" fill="#5a3a1f" letter-spacing="3">${e((m.league || m.sport || '').toUpperCase()) || ''}</text>
-  <text class="bebas" x="${SOURCE_W / 2}" y="350" text-anchor="middle" font-size="28" fill="#1a1410" letter-spacing="1">${e(m.eventTitle || m.event_short)}</text>
+  <text class="bebas" data-role="ticket-stub-solo-title" x="${SOURCE_W / 2}" y="350" text-anchor="middle" ${soloTitleAttrs} fill="#1a1410" letter-spacing="1">${e(soloTitle)}</text>
   ${(m.session || m.round) ? `<text class="serif" x="${SOURCE_W / 2}" y="378" text-anchor="middle" font-style="italic" font-size="15" fill="#9b6f2f">${e(m.session || m.round)}</text>` : ''}`
   const inner = `<defs>
     <style>.bebas { font-family: 'Bebas Neue', Impact, sans-serif; }.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }.serif { font-family: 'Playfair Display', Georgia, serif; }.sans { font-family: 'Inter', system-ui, sans-serif; }</style>
@@ -1985,7 +1994,7 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
   <rect x="0" y="0" width="${SOURCE_W}" height="100" fill="url(#mastheadOverlay)" style="mix-blend-mode:multiply"/>
   <line x1="${SOURCE_W / 2}" y1="12" x2="${SOURCE_W / 2}" y2="88" stroke="rgba(0,0,0,0.45)" stroke-width="2"/>
   <text class="bebas" x="${SOURCE_W / 2}" y="22" text-anchor="middle" font-size="9" fill="rgba(255,235,180,0.9)" letter-spacing="3">OFFICIAL - ADMITTANCE</text>
-  <g data-role="league-label-block" data-league-label="${e(leagueLabel)}" transform="translate(22 30)"><text data-role="league-label" data-league-label="${e(leagueLabel)}" class="bebas" x="0" y="16" ${leagueLabelAttrs} fill="#fff5d0" letter-spacing="0">${e(leagueLabel)}</text><text data-role="sport-label" class="mono" x="0" y="28" ${sportLabelAttrs} fill="#fff5d0" opacity="0.8" letter-spacing="0">${e(m.sport.toUpperCase())}</text></g>
+  <g data-role="league-logo-frame" data-league-label="${e(leagueLabel)}" transform="translate(${leagueLogoSlot.x - 4} ${leagueLogoSlot.y - 4})"><rect x="0" y="0" width="${leagueLogoSlot.size + 8}" height="${leagueLogoSlot.size + 8}" rx="8" fill="rgba(255,245,208,0.1)" stroke="rgba(255,245,208,0.24)" stroke-width="1"/></g>
   ${m.round ? `<text class="bebas" x="${SOURCE_W / 2}" y="78" text-anchor="middle" font-size="10" fill="rgba(255,245,220,0.85)" letter-spacing="2.5">- ${e(m.round.toUpperCase())} -</text>` : ''}
   <line x1="0" y1="100" x2="${SOURCE_W}" y2="100" stroke="rgba(60,40,15,0.45)" stroke-dasharray="3 3"/>
   ${perfRow(108)}
