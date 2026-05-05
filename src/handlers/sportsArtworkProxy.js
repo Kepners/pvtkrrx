@@ -1056,11 +1056,10 @@ function resolveSportsmetaBaseUrlFromConfig(config = {}) {
 }
 
 function resolveSportsPosterTemplateFromConfig(config = {}, req = null) {
-  return resolveSportsPosterTemplate(
-    config?.sportsPosterTemplate,
-    req?.query?.template,
-    'ticket-stub'
-  )
+  // PVTKRRX's public/configured artwork proxy is the free surface. Non-ticket
+  // templates stay renderable by internal template tools, but route selection
+  // is locked until a paid entitlement gate exists in this addon.
+  return resolveSportsPosterTemplate('ticket-stub')
 }
 
 function redactUrl(value) {

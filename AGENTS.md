@@ -66,3 +66,10 @@ For technical/product/deployment work, use this output structure unless told oth
 - E. Exact fixes made
 - F. Safe public wording
 
+## PASS 5 Local Proof Note - 2026-05-05
+
+- PASS 5 targeted free-tier sports artwork repair has local proof, but is not committed or deployed yet.
+- Do not claim the live Coolify image is fixed until this dirty tree is committed, pushed, deployed, and live routes are reprobed.
+- Product rule enforced locally: PVTKRRX configured/free sports artwork has exactly one included style, `ticket-stub`; requested non-ticket templates such as `glitch`, `broadcast`, `sportsbook`, `editorial`, `trading-card`, and `brutalist` normalize to `ticket-stub` until a paid entitlement surface exists inside PVTKRRX and is proven.
+- Emergency glyph/text fallback may remain only for missing or broken artwork/logo data. It is not a free tier and must not be advertised as one.
+

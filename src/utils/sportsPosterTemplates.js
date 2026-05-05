@@ -1002,7 +1002,8 @@ function renderEditorial(event = {}, variant = 'poster', theme = {}, mode = '') 
   // Audit fix G3.2: editorial hero now uses team-colour radial sun-burst
   // (matches canonical 01-editorial direction) instead of the generic dome+V.
   // Sun rays radiate from centre; sport glyph silhouette sits on top in
-  // ivory/paper colour. Free-tier compatible — text + glyph only, no logos.
+  // ivory/paper colour. Glyph rendering is an emergency fallback for missing
+  // or broken artwork, not a selectable free product tier.
   const sunRays = Array.from({ length: 24 }, (_, i) => {
     const angle = i * Math.PI / 12
     const r1 = 24

@@ -102,11 +102,10 @@ function resolveEventClass(input = {}) {
 }
 
 function resolveConfiguredSportsPosterTemplate(input = {}) {
-  return resolveSportsPosterTemplate(
-    input?.sportsPosterTemplate,
-    input?.config?.sportsPosterTemplate,
-    'ticket-stub'
-  )
+  // PVTKRRX has no in-addon paid Sports Posters entitlement surface. Treat all
+  // configured/public artwork requests as the free surface and force the single
+  // included style, regardless of stale token/query preferences.
+  return resolveSportsPosterTemplate('ticket-stub')
 }
 
 function resolveSportsArtworkLayoutFamily(input = {}) {

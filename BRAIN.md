@@ -88,3 +88,23 @@ ssh contabo 'docker exec coolify php artisan tinker --execute="
 - Member Sports Posters can use all seven templates.
 - Logo priority: SportsMeta/SportsDB league logo, home badge, and away badge first; sport-specific glyph fallback only when the DB image is missing.
 - If a sport/league/team repeatedly falls back to glyphs, log it as DB enrichment work rather than redesigning the poster.
+
+## PASS 5 Local Proof Note - Free-Tier Sports Artwork Repair 2026-05-05
+
+PASS 5 has local proof but is not committed or deployed yet. Do not claim the live Coolify image is fixed until this dirty tree is committed, pushed, deployed, and live routes are reprobed.
+
+What PASS 5 fixes locally:
+- PASS 4 hard failure: a configured token with `sportsPosterTemplate=glitch` emitted `posterTemplate=glitch` and `layoutFamily=GLITCH`.
+- Required rule: PVTKRRX configured/free sports artwork has exactly one included style, `ticket-stub`.
+- Requested non-ticket templates (`glitch`, `broadcast`, `sportsbook`, `editorial`, `trading-card`, `brutalist`) normalize to `ticket-stub` until PVTKRRX has an explicit paid entitlement gate and proof.
+- Text/glyph fallback remains emergency-only for missing/broken artwork/logo data, not a free product tier.
+
+Local proof captured:
+- `npm run smoke:free-tier-artwork` proves default/free aliasing, configured non-ticket normalization, configured meta output, locked configure UI, and stale-copy checks for the named surfaces.
+- Configured route repros for `sportsPosterTemplate=glitch` and `sportsPosterTemplate=broadcast` both emitted `posterTemplate=ticket-stub` and `layoutFamily=TICKET_STUB`; the poster route returned `image/png`, 600x900, non-zero bytes.
+- PASS 5 route/security smokes passed locally. `npm test`, `npm run lint`, and `npm run build` are not available scripts.
+
+Remaining caveats:
+- No PASS 5 commit or deploy has been made.
+- Existing live/selfhost poster audit still reported two live poster text failures and samples the currently deployed target, not this local repaired tree.
+- Other historical SportsMeta planning docs may still contain old SVG/free-tier wording; PASS 5 only repaired the named PVTKRRX/public surfaces.

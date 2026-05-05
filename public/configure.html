@@ -2595,18 +2595,12 @@
           <p class="simple-flow-copy" id="simpleFlowCopy">Do the next required action for the selected route. PVTKRRX keeps the install path short here and leaves lower-priority rescue tools below.</p>
           <div class="simple-flow-status info" id="simpleFlowStatus">Checking this PC so the simple install path can stay short.</div>
           <div class="simple-flow-setting" id="sportsPosterTemplateMain">
-            <label for="sportsPosterTemplate">Sports Posters Template</label>
-            <select id="sportsPosterTemplate">
-              <option value="ticket-stub">Ticket Stub</option>
-              <option value="editorial">Editorial</option>
-              <option value="broadcast">Broadcast</option>
-              <option value="sportsbook">Sportsbook</option>
-              <option value="trading-card">Trading Card</option>
-              <option value="brutalist">Brutalist</option>
-              <option value="glitch">Glitch</option>
+            <label for="sportsPosterTemplate">Included Sports Style</label>
+            <select id="sportsPosterTemplate" disabled aria-disabled="true">
+              <option value="ticket-stub" selected>Ticket Stub</option>
             </select>
-            <p class="hint">Choose the Sports Posters layout for this install. SportsMeta stays the sports metadata/artwork backend; PVTKRRX stores the preference and sends it through the Stremio-facing artwork route.</p>
-            <div class="simple-flow-status info" id="sportsPosterTemplateStatus">Template choice is saved with this PVTKRRX install. Playback, streams, and tracker results are unchanged.</div>
+            <p class="hint">Sports uses a logo/artwork-based presentation, with one included visual style in the free version. SportsMeta stays the sports metadata/artwork backend.</p>
+            <div class="simple-flow-status info" id="sportsPosterTemplateStatus">Ticket Stub is included with this PVTKRRX install. Playback, streams, and tracker results are unchanged.</div>
           </div>
           <div class="simple-flow-actions">
             <button class="btn-copy" type="button" id="simpleCheckStremioBtn" onclick="checkAndLinkStremioOnThisPc(this)">Check Stremio Login On This PC</button>
@@ -6437,7 +6431,7 @@
         provider: document.getElementById('provider').value,
         fileServerUrl: fileServerUrlInput ? fileServerUrlInput.replace(/\/+$/, '') : '',
         fileServerAuth: document.getElementById('fileServerAuth').value.trim(),
-        sportsPosterTemplate: document.getElementById('sportsPosterTemplate')?.value || 'ticket-stub',
+        sportsPosterTemplate: 'ticket-stub',
         pathMapping: {
           from: document.getElementById('pathFrom').value,
           to: document.getElementById('pathTo').value
@@ -6499,7 +6493,7 @@
       }
       const templateSelect = document.getElementById('sportsPosterTemplate');
       if (templateSelect) {
-        templateSelect.value = config.sportsPosterTemplate || 'ticket-stub';
+        templateSelect.value = 'ticket-stub';
         scheduleSportsPosterTemplateAutoSave();
       }
       if (config.localHostname) {
@@ -6760,9 +6754,7 @@
     }
 
     function scheduleSportsPosterTemplateAutoSave() {
-      const templateSelect = document.getElementById('sportsPosterTemplate');
-      const label = templateSelect?.options?.[templateSelect.selectedIndex]?.textContent || 'Ticket Stub';
-      setSportsPosterTemplateStatus('ok', `${label} selected. This template preference is saved into the generated PVTKRRX install link.`);
+      setSportsPosterTemplateStatus('ok', 'Included sports style: Ticket Stub. Non-ticket templates are not selected by the free PVTKRRX configure flow.');
     }
 
     async function testConnection() {
