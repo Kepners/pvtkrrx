@@ -40,7 +40,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260505-real-logo-v4-inspect'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260506-real-logo-v7-league-context'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -323,7 +323,7 @@ async function renderEmergencyTemplatePng(variant, fallbackInput = {}, template 
   }
 }
 
-async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, template = 'ticket-stub', logoFallbackReason = 'template_glyph_fallback') {
+async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, template = 'ticket-stub', logoFallbackReason = 'template_glyph_fallback', logoContext = {}) {
   if (!['poster', 'landscape', 'background'].includes(variant)) {
     const svg = renderSportsArtworkSvg(fallbackInput, variant)
     const title = sourceTitleForAudit(fallbackInput)
@@ -363,19 +363,48 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
     })
     const skipGeneratedSlots = (artwork.layoutFamily || layoutFamilyForSportsPosterRender(normalizedTemplate, event)) === 'COMPETITOR_VS_COMPETITOR'
     const fallbackSlots = skipGeneratedSlots ? [] : (artwork.slots || [])
+    const realLeagueLogo = logoContext?.leagueLogo || logoContext?.logo || null
     const composites = []
+    const logoSlots = []
     for (const slot of fallbackSlots) {
-      const glyphSvg = renderLogoGlyphSvg({
-        role: slot.role,
-        event,
-        theme,
-        size: slot.size
-      })
-      composites.push({
-        input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size),
-        left: slot.left,
-        top: slot.top
-      })
+      const isLeagueSlot = ['league', 'leagueLogo', 'logo'].includes(slot.role)
+      if (isLeagueSlot && realLeagueLogo?.buffer) {
+        composites.push({
+          input: await resizeCompositionBuffer(realLeagueLogo.buffer, slot.size),
+          left: slot.left,
+          top: slot.top
+        })
+        logoSlots.push({
+          role: slot.role,
+          logoKind: realLeagueLogo.kind || 'real-league',
+          logoSourceUrl: realLeagueLogo.sourceUrl || '',
+          logoSourceUrls: realLeagueLogo.sourceUrls || [realLeagueLogo.sourceUrl].filter(Boolean),
+          sourceKey: realLeagueLogo.sourceKey || 'league',
+          left: slot.left,
+          top: slot.top,
+          size: slot.size
+        })
+      } else {
+        const glyphSvg = renderLogoGlyphSvg({
+          role: slot.role,
+          event,
+          theme,
+          size: slot.size
+        })
+        composites.push({
+          input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size),
+          left: slot.left,
+          top: slot.top
+        })
+        logoSlots.push({
+          role: slot.role,
+          logoKind: 'fallback-glyph',
+          logoFallbackReason,
+          left: slot.left,
+          top: slot.top,
+          size: slot.size
+        })
+      }
     }
     if (artwork.overlay) {
       composites.push({ input: Buffer.from(artwork.overlay), left: 0, top: 0 })
@@ -384,32 +413,31 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
       .composite(composites)
       .png({ compressionLevel: 9, adaptiveFiltering: true })
       .toBuffer()
-    // Log the silent glyph fallback explicitly so it shows up in proxy logs
-    // alongside the upstream URL — previously this path was indistinguishable
-    // from a real-logo render in operational logs.
-    const auditTitle = sourceTitleForAudit(fallbackInput)
-    console.warn(
-      `[sports-poster] LOGO_GLYPH_FALLBACK variant=${variant} template=${normalizedTemplate} eventClass=${eventClass} reason=${logoFallbackReason} title=${auditTitle}`
-    )
+    const realLogoSlots = logoSlots.filter((slot) => slot.logoKind && slot.logoKind !== 'fallback-glyph')
+    const fallbackLogoSlots = logoSlots.filter((slot) => slot.logoKind === 'fallback-glyph')
+    // Log the silent full-glyph fallback explicitly so it shows up in proxy logs
+    // alongside the upstream URL. Mixed real+fallback slots are covered by the
+    // response provenance headers.
+    if (realLogoSlots.length === 0) {
+      const auditTitle = sourceTitleForAudit(fallbackInput)
+      console.warn(
+        `[sports-poster] LOGO_GLYPH_FALLBACK variant=${variant} template=${normalizedTemplate} eventClass=${eventClass} reason=${logoFallbackReason} title=${auditTitle}`
+      )
+    }
     return {
       buffer,
-      selectedArtworkSource: 'pvtkrrx-template-glyph',
+      selectedArtworkSource: realLogoSlots.length ? 'pvtkrrx-public-template' : 'pvtkrrx-template-glyph',
       selectedTemplate: normalizedTemplate,
       layoutFamily: artwork.layoutFamily || layoutFamilyForSportsPosterRender(normalizedTemplate, event),
       eventClass,
-      logoKind: 'fallback-glyph',
-      logoSourceUrls: [],
-      logoFallbackReason,
-      logoRealCount: 0,
-      logoFallbackCount: fallbackSlots.length,
-      logoSlots: fallbackSlots.map((slot) => ({
-        role: slot.role,
-        logoKind: 'fallback-glyph',
-        logoFallbackReason,
-        left: slot.left,
-        top: slot.top,
-        size: slot.size
-      }))
+      logoKind: realLogoSlots.length ? preferredLogoKind(realLogoSlots.map((slot) => slot.logoKind)) : 'fallback-glyph',
+      logoSourceUrl: realLogoSlots[0]?.logoSourceUrl || '',
+      logoSourceUrls: Array.from(new Set(realLogoSlots.flatMap((slot) => slot.logoSourceUrls || slot.logoSourceUrl || []).filter(Boolean))),
+      logoFallbackReason: fallbackLogoSlots.length ? `fallback_slots=${fallbackLogoSlots.map((slot) => slot.role || 'logo').join(',')}` : logoFallbackReason,
+      logoRealCount: realLogoSlots.length,
+      logoFallbackCount: fallbackLogoSlots.length,
+      logoSlots,
+      logoLookupAttempts: Array.isArray(logoContext.logoLookupAttempts) ? logoContext.logoLookupAttempts : []
     }
   } catch (error) {
     return renderEmergencyTemplatePng(variant, fallbackInput, normalizedTemplate, error)
@@ -827,6 +855,451 @@ async function loadInspectAssetSourceUrl({ canonicalId = '', sportsmetaBaseUrl =
   return pending
 }
 
+function leagueSlugFor(value = '') {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+const LEAGUE_SLUG_ALIASES = Object.freeze({
+  'epl': 'english-premier-league',
+  'premier league': 'english-premier-league',
+  'champions league': 'uefa-champions-league',
+  'europa league': 'uefa-europa-league',
+  'fa cup': 'fa-cup',
+  'mls': 'major-league-soccer',
+  'atp': 'atp-world-tour',
+  'wta': 'wta-tour',
+  'ufc': 'ufc',
+  'nba': 'nba',
+  'nfl': 'nfl',
+  'nhl': 'nhl',
+  'mlb': 'mlb',
+  'motogp': 'moto-gp',
+  'f1': 'formula-1',
+  'formula 1': 'formula-1'
+})
+
+function deriveLeagueCanonicalId(sport = '', league = '') {
+  const sportSlug = leagueSlugFor(sport)
+  if (!sportSlug) return ''
+  const leagueRaw = String(league || '').toLowerCase().trim()
+  const aliasSlug = LEAGUE_SLUG_ALIASES[leagueRaw]
+  const slug = aliasSlug || leagueSlugFor(league)
+  if (!slug) return ''
+  return `sportsmeta:league:${sportSlug}|${slug}`
+}
+
+// Build a poster/landscape/background/logo for a non-canonical league/sport
+// package using the real league logo from the inspect-revealed CDN URL.
+// MotoGP weekend, ATP singles bracket, FA Cup matchday RSS etc. now show e.g.
+// the real Champions League crest instead of a generic "ADMIT ONE" glyph.
+async function tryRealLeagueLogoPoster({ variant = 'poster', sport = '', league = '', sportsmetaBaseUrl = '', fallbackInput = {}, template = 'ticket-stub' } = {}) {
+  if (!['poster', 'landscape', 'background', 'logo'].includes(variant)) return null
+  const leagueCanonicalId = deriveLeagueCanonicalId(sport, league)
+  if (!leagueCanonicalId) return null
+  const cdnUrl = await loadInspectAssetSourceUrl({
+    canonicalId: leagueCanonicalId,
+    sportsmetaBaseUrl,
+    variant: 'leagueLogo'
+  })
+  if (!cdnUrl) return null
+
+  let leagueLogoBuffer
+  try {
+    const response = await fetch(cdnUrl, {
+      headers: { accept: 'image/png,image/jpeg,image/webp,image/*' },
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+    })
+    if (!response.ok) return null
+    const upstreamContentType = String(response.headers.get('content-type') || '').toLowerCase()
+    if (!/^image\/(png|jpeg|jpg|webp)/i.test(upstreamContentType)) return null
+    leagueLogoBuffer = Buffer.from(await response.arrayBuffer())
+  } catch (_) {
+    return null
+  }
+
+  if (variant === 'logo') {
+    const dims = VARIANT_DIMENSIONS.logo
+    const png = await sharp(leagueLogoBuffer, { density: 192 })
+      .resize({ width: dims.width, height: dims.height, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png({ compressionLevel: 9, adaptiveFiltering: true })
+      .toBuffer()
+    return {
+      buffer: png,
+      contentType: 'image/png',
+      selectedArtworkSource: 'pvtkrrx-cdn-league-logo',
+      selectedTemplate: normalizeSportsPosterTemplate(template),
+      layoutFamily: layoutFamilyForSportsPosterRender(template, fallbackInput),
+      eventClass: fallbackInput.eventClass || classifySportsEvent(fallbackInput),
+      fallbackReason: 'sportsmeta_default_replaced_with_league_cdn_logo',
+      logoKind: 'real-league',
+      logoSourceUrl: cdnUrl,
+      logoSourceUrls: [cdnUrl],
+      logoFallbackReason: '',
+      logoRealCount: 1,
+      logoFallbackCount: 0,
+      logoSlots: [],
+      logoLookupAttempts: [{ role: 'leagueLogo', kind: 'real-league', url: cdnUrl, status: 200, result: 'real_logo' }],
+      realLogoLookupAttempted: true
+    }
+  }
+
+  const normalizedTemplate = normalizeSportsPosterTemplate(template)
+  const event = buildTemplateFallbackEvent(fallbackInput)
+  const eventClass = fallbackInput.eventClass || classifySportsEvent(event)
+  event.eventClass = eventClass
+  const fallbackHomeColor = colorForLabel(event.league || event.sport || 'league', '#0f766e')
+  const dominant = await dominantColorFromImage(leagueLogoBuffer, fallbackHomeColor)
+  const theme = {
+    homeColor: dominant,
+    awayColor: dominant,
+    accentColor: paperAccentFromHex(readableAccentFromHex(dominant))
+  }
+  let artwork
+  try {
+    artwork = renderSportsPosterTemplateSvg({ event, variant, template: normalizedTemplate, theme })
+  } catch (_) {
+    return null
+  }
+  const slots = artwork.slots || []
+  const composites = []
+  let realCount = 0
+  for (const slot of slots) {
+    if (slot.role !== 'league') continue
+    const sized = await sharp(leagueLogoBuffer, { density: 192 })
+      .resize({ width: slot.size, height: slot.size, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer()
+    composites.push({ input: sized, left: slot.left, top: slot.top })
+    realCount += 1
+  }
+  if (realCount === 0) return null
+  if (artwork.overlay) composites.push({ input: Buffer.from(artwork.overlay), left: 0, top: 0 })
+  const buffer = await sharp(Buffer.from(artwork.svg))
+    .composite(composites)
+    .png({ compressionLevel: 9, adaptiveFiltering: true })
+    .toBuffer()
+  return {
+    buffer,
+    contentType: 'image/png',
+    selectedArtworkSource: 'pvtkrrx-cdn-league-poster',
+    selectedTemplate: normalizedTemplate,
+    layoutFamily: artwork.layoutFamily || layoutFamilyForSportsPosterRender(normalizedTemplate, event),
+    eventClass,
+    fallbackReason: 'sportsmeta_default_replaced_with_league_cdn_logo',
+    logoKind: 'real-league',
+    logoSourceUrl: cdnUrl,
+    logoSourceUrls: [cdnUrl],
+    logoFallbackReason: '',
+    logoRealCount: realCount,
+    logoFallbackCount: 0,
+    logoSlots: slots.filter((s) => s.role === 'league').map((s) => ({
+      role: 'league',
+      logoKind: 'real-league',
+      logoSourceUrl: cdnUrl,
+      left: s.left,
+      top: s.top,
+      size: s.size
+    })),
+    logoLookupAttempts: [{ role: 'leagueLogo', kind: 'real-league', url: cdnUrl, status: 200, result: 'real_logo' }],
+    realLogoLookupAttempted: true
+  }
+}
+
+// For variant=logo: try the inspect-revealed CDN URL (real league/team badge)
+// and return a rasterized PNG sized to the logo variant. Used by Stremio's
+// detail-panel small thumbnail (`meta.logo`). Returns null if no real CDN URL.
+async function tryRealLogoVariantPng({ canonicalId = '', sportsmetaBaseUrl = '', variant = 'logo' } = {}) {
+  if (!canonicalId) return null
+  // Logo variant — prefer the competition/league mark. Stremio's detail panel
+  // uses meta.logo, and for fixtures that should identify the competition
+  // (e.g. UEFA Champions League), not the first team badge.
+  const order = variant === 'logo'
+    ? ['leagueLogo', 'logo']
+    : [variant]
+  for (const inspectVariant of order) {
+    const cdnUrl = await loadInspectAssetSourceUrl({
+      canonicalId,
+      sportsmetaBaseUrl,
+      variant: inspectVariant
+    })
+    if (!cdnUrl) continue
+    try {
+      const response = await fetch(cdnUrl, {
+        headers: { accept: 'image/png,image/jpeg,image/webp,image/*' },
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+      })
+      if (!response.ok) continue
+      const upstreamContentType = String(response.headers.get('content-type') || '').toLowerCase()
+      if (!/^image\/(png|jpeg|jpg|webp)/i.test(upstreamContentType)) continue
+      const sourceBuffer = Buffer.from(await response.arrayBuffer())
+      const dims = VARIANT_DIMENSIONS[variant] || VARIANT_DIMENSIONS.logo
+      const png = await sharp(sourceBuffer, { density: 192 })
+        .resize({
+          width: dims.width,
+          height: dims.height,
+          fit: 'contain',
+          background: { r: 0, g: 0, b: 0, alpha: 0 }
+        })
+        .png({ compressionLevel: 9, adaptiveFiltering: true })
+        .toBuffer()
+      return {
+        buffer: png,
+        sourceUrl: cdnUrl,
+        inspectVariant,
+        logoKind: inspectVariant === 'leagueLogo' || inspectVariant === 'logo' ? 'real-league' : 'real-team',
+        upstreamContentType
+      }
+    } catch (_) {
+      continue
+    }
+  }
+  return null
+}
+
+const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
+  {
+    sport: 'football',
+    pattern: /\b(?:uefa\s+champions\s+league|champions\s+league|ucl)\b/i,
+    canonicalIds: ['sportsmeta:league:football|uefa-champions-league'],
+    searchTerms: ['UEFA Champions League']
+  },
+  {
+    sport: 'football',
+    pattern: /\b(?:uefa\s+europa\s+league|europa\s+league|uel)\b/i,
+    canonicalIds: ['sportsmeta:league:football|uefa-europa-league'],
+    searchTerms: ['UEFA Europa League']
+  },
+  {
+    sport: 'football',
+    pattern: /\b(?:english\s+premier\s+league|premier\s+league|epl)\b/i,
+    canonicalIds: ['sportsmeta:league:football|english-premier-league'],
+    searchTerms: ['English Premier League']
+  },
+  {
+    sport: 'football',
+    pattern: /\bfa\s+cup\b/i,
+    canonicalIds: [],
+    searchTerms: ['FA Cup']
+  },
+  {
+    sport: 'football',
+    pattern: /\b(?:major\s+league\s+soccer|mls)\b/i,
+    canonicalIds: ['sportsmeta:league:football|major-league-soccer'],
+    searchTerms: ['Major League Soccer']
+  },
+  {
+    sport: 'basketball',
+    pattern: /\b(?:nba|nba\s+playoffs?)\b/i,
+    canonicalIds: ['sportsmeta:league:basketball|nba'],
+    searchTerms: ['NBA']
+  },
+  {
+    sport: 'baseball',
+    pattern: /\b(?:mlb|major\s+league\s+baseball)\b/i,
+    canonicalIds: ['sportsmeta:league:baseball|mlb'],
+    searchTerms: ['MLB']
+  },
+  {
+    sport: 'hockey',
+    pattern: /\bnhl\b/i,
+    canonicalIds: ['sportsmeta:league:hockey|nhl'],
+    searchTerms: ['NHL']
+  },
+  {
+    sport: 'american-football',
+    pattern: /\bnfl\b/i,
+    canonicalIds: ['sportsmeta:league:american-football|nfl'],
+    searchTerms: ['NFL']
+  },
+  {
+    sport: 'motorsport',
+    pattern: /\b(?:moto\s*gp|motogp|moto\s+grand\s+prix)\b/i,
+    canonicalIds: ['sportsmeta:league:motorsport|motogp'],
+    searchTerms: ['MotoGP']
+  },
+  {
+    sport: 'mma',
+    pattern: /\bufc\b/i,
+    canonicalIds: ['sportsmeta:league:mma|ufc'],
+    searchTerms: ['UFC']
+  },
+  {
+    sport: 'tennis',
+    pattern: /\b(?:atp|atp\s+world\s+tour)\b/i,
+    canonicalIds: ['sportsmeta:league:tennis|atp-world-tour'],
+    searchTerms: ['ATP World Tour']
+  },
+  {
+    sport: 'cricket',
+    pattern: /\b(?:ipl|indian\s+premier\s+league)\b/i,
+    canonicalIds: ['sportsmeta:league:cricket|indian-premier-league'],
+    searchTerms: ['Indian Premier League']
+  },
+  {
+    sport: 'golf',
+    pattern: /\b(?:pga\s+tour|pga)\b/i,
+    canonicalIds: ['sportsmeta:league:golf|pga-tour'],
+    searchTerms: ['PGA Tour']
+  }
+])
+
+function sportMatchesLogoRule(ruleSport = '', sport = '') {
+  const rule = normalizeSpace(ruleSport).toLowerCase()
+  const value = normalizeSpace(sport).toLowerCase()
+  if (!rule || !value) return true
+  if (rule === value) return true
+  if (rule === 'hockey' && value === 'ice-hockey') return true
+  if (rule === 'american-football' && value === 'football') return false
+  return false
+}
+
+function defaultLogoLookupText(fallbackInput = {}) {
+  return normalizeSpace([
+    fallbackInput.sport,
+    fallbackInput.league,
+    fallbackInput.competition,
+    fallbackInput.eventTitle,
+    fallbackInput.title,
+    fallbackInput.rawTitle,
+    fallbackInput.eventDetail,
+    fallbackInput.detail
+  ].filter(Boolean).join(' '))
+}
+
+function buildDefaultLogoRequests(fallbackInput = {}) {
+  const sport = normalizeSpace(fallbackInput.sport)
+  const text = defaultLogoLookupText(fallbackInput)
+  const requests = []
+  const seen = new Set()
+  const addInspect = (canonicalId) => {
+    const id = normalizeSpace(canonicalId)
+    const key = `inspect:${id}`
+    if (!id || seen.has(key)) return
+    seen.add(key)
+    requests.push({ type: 'inspect', canonicalId: id })
+  }
+  const addSearch = (searchSport, term) => {
+    const q = normalizeSpace(term)
+    const s = normalizeSpace(searchSport || sport)
+    const key = `search:${s}:${q}`.toLowerCase()
+    if (!s || !q || seen.has(key)) return
+    seen.add(key)
+    requests.push({ type: 'search', sport: s, search: q })
+  }
+
+  for (const rule of DEFAULT_LEAGUE_LOGO_RULES) {
+    if (!sportMatchesLogoRule(rule.sport, sport)) continue
+    if (!rule.pattern.test(text)) continue
+    for (const canonicalId of rule.canonicalIds || []) addInspect(canonicalId)
+    for (const term of rule.searchTerms || []) addSearch(rule.sport || sport, term)
+  }
+
+  return requests
+}
+
+async function searchSportsMetaLogoSourceUrl({ sportsmetaBaseUrl = '', sport = '', search = '' } = {}) {
+  const base = getPublicSportsMetaBaseUrl(sportsmetaBaseUrl)
+  const sportSlug = resolveSportSlug(sport)
+  const query = normalizeSpace(search)
+  if (!base || !sportSlug || !query) return ''
+  try {
+    const url = `${base}/catalog/movie/sportsmeta-${encodeURIComponent(sportSlug)}/search=${encodeURIComponent(query)}.json`
+    const response = await fetch(url, {
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+    })
+    if (!response.ok) return ''
+    const payload = await response.json().catch(() => null)
+    const metas = Array.isArray(payload?.metas) ? payload.metas.slice(0, 5) : []
+    for (const meta of metas) {
+      const id = normalizeSpace(meta?.id)
+      if (!id) continue
+      for (const variant of ['leagueLogo', 'logo']) {
+        const sourceUrl = await loadInspectAssetSourceUrl({ canonicalId: id, sportsmetaBaseUrl, variant })
+        if (sourceUrl) return sourceUrl
+      }
+    }
+  } catch (_) {}
+  return ''
+}
+
+async function resolveDefaultLogoImage({ sportsmetaBaseUrl = '', fallbackInput = {}, size = 260 } = {}) {
+  const requests = buildDefaultLogoRequests(fallbackInput)
+  const logoLookupAttempts = []
+  for (const request of requests) {
+    let sourceUrl = ''
+    if (request.type === 'inspect') {
+      sourceUrl = await loadInspectAssetSourceUrl({
+        canonicalId: request.canonicalId,
+        sportsmetaBaseUrl,
+        variant: 'leagueLogo'
+      })
+      logoLookupAttempts.push({
+        role: 'leagueLogo',
+        kind: 'real-league',
+        url: request.canonicalId,
+        status: sourceUrl ? 200 : 0,
+        result: sourceUrl ? 'source_url' : 'missing_source_url'
+      })
+    } else if (request.type === 'search') {
+      sourceUrl = await searchSportsMetaLogoSourceUrl({
+        sportsmetaBaseUrl,
+        sport: request.sport,
+        search: request.search
+      })
+      logoLookupAttempts.push({
+        role: 'leagueLogo',
+        kind: 'real-league',
+        url: `${request.sport}:${request.search}`,
+        status: sourceUrl ? 200 : 0,
+        result: sourceUrl ? 'search_source_url' : 'search_miss'
+      })
+    }
+    if (!sourceUrl) continue
+    const candidate = await fetchLogoCandidate({
+      url: sourceUrl,
+      key: 'league',
+      role: 'leagueLogo',
+      size,
+      fallbackColor: '#b58b2a'
+    })
+    if (candidate.attempt) logoLookupAttempts.push(candidate.attempt)
+    if (candidate.image?.buffer) {
+      return {
+        image: candidate.image,
+        logoLookupAttempts,
+        logoSourceUrl: sourceUrl
+      }
+    }
+  }
+  return { image: null, logoLookupAttempts }
+}
+
+async function renderLogoImageVariantPng(image, variant = 'logo') {
+  if (!image?.buffer) return null
+  const dims = VARIANT_DIMENSIONS[variant] || VARIANT_DIMENSIONS.logo
+  const logoSize = Math.round(Math.min(dims.width, dims.height) * 0.82)
+  const logo = await resizeCompositionBuffer(image.buffer, logoSize)
+  return sharp({
+    create: {
+      width: dims.width,
+      height: dims.height,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 }
+    }
+  })
+    .composite([{
+      input: logo,
+      left: Math.round((dims.width - logoSize) / 2),
+      top: Math.round((dims.height - logoSize) / 2)
+    }])
+    .png({ compressionLevel: 9, adaptiveFiltering: true })
+    .toBuffer()
+}
+
 async function fetchCompositionImage(url = '', size = 210, options = {}) {
   const targetUrl = normalizeSpace(url)
   if (!targetUrl) return null
@@ -1070,6 +1543,12 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
   const selectLogoForSlot = (role = '') => {
     if (role === 'home') return homeBadge || leagueLogo || eventIdentity
     if (role === 'away') return awayBadge || leagueLogo || eventIdentity
+    // The league slot must show the league/event identity. Falling back to a
+    // team badge here puts (e.g.) the Arsenal crest in the UCL header slot,
+    // which the user has explicitly flagged as wrong. Prefer leagueLogo, then
+    // eventLogo/eventPoster (still "league-derived" for canonical events),
+    // and never substitute a single team badge.
+    if (role === 'league') return leagueLogo || eventIdentity || null
     if (hasMatchup && !hasTeamSpecificSlots && matchupLogo) return matchupLogo
     return leagueLogo || eventIdentity || homeBadge || awayBadge
   }
@@ -1214,8 +1693,9 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
   // Whether we even attempted real-logo lookup. Audit needs to know this so a
   // missing-logo result on a default URL with no canonical doesn't get scored
   // as an unexpected fallback.
-  const realLogoLookupAttempted = ['poster', 'landscape', 'background'].includes(variant) && Boolean(teamPosterContext?.canonicalId)
+  let realLogoLookupAttempted = ['poster', 'landscape', 'background'].includes(variant) && Boolean(teamPosterContext?.canonicalId)
   let realLogoLookupFailure = null
+  let defaultLogoContext = null
 
   if (realLogoLookupAttempted) {
     const teamPoster = await renderTeamBadgeArtworkPng({
@@ -1250,6 +1730,24 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
     realLogoLookupFailure = teamPoster || null
   }
 
+  if (!realLogoLookupAttempted && variant === 'poster') {
+    const defaultLogo = await resolveDefaultLogoImage({
+      sportsmetaBaseUrl: teamPosterContext?.sportsmetaBaseUrl,
+      fallbackInput,
+      size: 260
+    })
+    if (defaultLogo?.image?.buffer) {
+      defaultLogoContext = {
+        leagueLogo: defaultLogo.image,
+        logoLookupAttempts: defaultLogo.logoLookupAttempts || []
+      }
+    }
+    if ((defaultLogo?.logoLookupAttempts || []).length > 0) {
+      realLogoLookupAttempted = true
+      realLogoLookupFailure = defaultLogo
+    }
+  }
+
   const localBackdrop = await readLocalSportBackdropFallback(variant, fallbackInput, reason, status, contentType, template)
   if (localBackdrop) {
     return {
@@ -1261,10 +1759,12 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
     }
   }
 
-  const glyphReason = realLogoLookupAttempted
+  const glyphReason = defaultLogoContext?.leagueLogo
+    ? ''
+    : realLogoLookupAttempted
     ? (realLogoLookupFailure?.logoFallbackReason || `${reason}_real_logo_lookup_failed`)
     : reason
-  const rendered = await renderTemplateFallbackArtwork(variant, fallbackInput, template, glyphReason)
+  const rendered = await renderTemplateFallbackArtwork(variant, fallbackInput, template, glyphReason, defaultLogoContext || {})
   return {
     buffer: rendered.buffer,
     contentType: 'image/png',
@@ -1362,6 +1862,74 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
         })
       }
       if (/^image\/svg\+xml/i.test(contentType)) {
+        // Logo variant + canonical event: SportsMeta's `/asset/logo/<id>` returns
+        // a generated SVG glyph. The inspect endpoint reveals the real CDN
+        // league badge. Resolve it before rasterizing the glyph.
+        if (variant === 'logo' && teamPosterContext?.canonicalId) {
+          const realLogo = await tryRealLogoVariantPng({
+            canonicalId: teamPosterContext.canonicalId,
+            sportsmetaBaseUrl: teamPosterContext.sportsmetaBaseUrl,
+            variant: 'logo'
+          })
+          if (realLogo?.buffer) {
+            return {
+              buffer: realLogo.buffer,
+              contentType: 'image/png',
+              selectedArtworkSource: 'pvtkrrx-cdn-logo',
+              selectedTemplate: normalizeSportsPosterTemplate(template),
+              layoutFamily: layoutFamilyForSportsPosterRender(template, fallbackInput),
+              eventClass: fallbackEventClass,
+              fallbackReason: 'sportsmeta_logo_svg_replaced_with_cdn',
+              logoKind: realLogo.logoKind || 'real-league',
+              logoSourceUrl: realLogo.sourceUrl,
+              logoSourceUrls: [realLogo.sourceUrl],
+              logoFallbackReason: '',
+              logoRealCount: 1,
+              logoFallbackCount: 0,
+              logoSlots: [],
+              logoLookupAttempts: [{
+                role: 'logo',
+                kind: realLogo.logoKind || 'real-league',
+                url: realLogo.sourceUrl,
+                status: 200,
+                result: 'real_logo'
+              }],
+              realLogoLookupAttempted: true,
+              httpStatus: status,
+              upstreamContentType: contentType
+            }
+          }
+        }
+        if (variant === 'logo' && !teamPosterContext?.canonicalId) {
+          const defaultLogo = await resolveDefaultLogoImage({
+            sportsmetaBaseUrl: teamPosterContext?.sportsmetaBaseUrl,
+            fallbackInput,
+            size: 420
+          })
+          if (defaultLogo?.image?.buffer) {
+            const logoPng = await renderLogoImageVariantPng(defaultLogo.image, 'logo')
+            return {
+              buffer: logoPng,
+              contentType: 'image/png',
+              selectedArtworkSource: 'pvtkrrx-cdn-logo',
+              selectedTemplate: normalizeSportsPosterTemplate(template),
+              layoutFamily: layoutFamilyForSportsPosterRender(template, fallbackInput),
+              eventClass: fallbackEventClass,
+              fallbackReason: 'sportsmeta_default_logo_svg_replaced_with_cdn',
+              logoKind: defaultLogo.image.kind || 'real-league',
+              logoSourceUrl: defaultLogo.image.sourceUrl || defaultLogo.logoSourceUrl || '',
+              logoSourceUrls: [defaultLogo.image.sourceUrl || defaultLogo.logoSourceUrl].filter(Boolean),
+              logoFallbackReason: '',
+              logoRealCount: 1,
+              logoFallbackCount: 0,
+              logoSlots: [],
+              logoLookupAttempts: defaultLogo.logoLookupAttempts || [],
+              realLogoLookupAttempted: true,
+              httpStatus: status,
+              upstreamContentType: contentType
+            }
+          }
+        }
         const png = await rasterizeToPng(buffer, variant)
         const upstreamSvgLooksReal = variant === 'logo' && isSportsMetaRealLogoAsset(contentType, headers)
         return {
@@ -1616,6 +2184,44 @@ async function resolveDefaultArtworkCanonical({
   }
 }
 
+function isWeakSportsMetaCanonicalId(canonicalId = '') {
+  const id = normalizeSpace(canonicalId).toLowerCase()
+  return /\|general\|/.test(id) || /\|sports\|/.test(id)
+}
+
+function hasSpecificLeagueContext(value = '') {
+  const league = normalizeSpace(value).toLowerCase()
+  return Boolean(league && !['general', 'sports', 'sport', 'football', 'basketball', 'baseball', 'hockey', 'motorsport'].includes(league))
+}
+
+async function resolveArtworkCanonicalOverride({
+  canonicalId = '',
+  sportsmetaBaseUrl = '',
+  sportSlug = '',
+  league = '',
+  title = '',
+  date = '',
+  homeTeam = '',
+  awayTeam = '',
+  fallbackInput = {}
+} = {}) {
+  if (!isWeakSportsMetaCanonicalId(canonicalId)) return null
+  if (!hasSpecificLeagueContext(league)) return null
+  const resolved = await resolveDefaultArtworkCanonical({
+    sportsmetaBaseUrl,
+    sportSlug,
+    league,
+    title,
+    date,
+    homeTeam,
+    awayTeam,
+    fallbackInput
+  })
+  const overrideId = normalizeSpace(resolved?.canonicalId)
+  if (!overrideId || overrideId === canonicalId) return null
+  return resolved
+}
+
 async function handleDefaultSportsArtwork(req, res, config = {}) {
   const variant = normalizeVariant(req.params.variant)
   const rawSport = String(req.params.sport || '').replace(/\.png$/i, '')
@@ -1741,8 +2347,65 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
     })
     return
   }
+
+  // No canonical event resolved (MotoGP weekend, ATP singles bracket, FA Cup
+  // matchday RSS, etc.). Try a league-level real logo via inspect before
+  // serving the default-generator glyph — this puts the real league crest on
+  // otherwise-generic sports posters.
+  if (['poster', 'landscape', 'background', 'logo'].includes(variant)) {
+    try {
+      const leaguePoster = await tryRealLeagueLogoPoster({
+        variant,
+        sport: sportSlug,
+        league,
+        sportsmetaBaseUrl,
+        fallbackInput,
+        template
+      })
+      if (leaguePoster?.buffer) {
+        const headerLogoSourceUrl = leaguePoster.logoSourceUrl || ''
+        res.setHeader('Content-Type', leaguePoster.contentType || 'image/png')
+        res.setHeader('Content-Length', String(leaguePoster.buffer.length))
+        res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000, stale-if-error=2592000')
+        res.setHeader('X-PVTKRRX-Artwork-Source', leaguePoster.selectedArtworkSource || 'pvtkrrx-cdn-league-poster')
+        res.setHeader('X-PVTKRRX-Artwork-Cache', 'rendered')
+        res.setHeader('X-PVTKRRX-Artwork-Cache-Version', LOCAL_ARTWORK_RENDER_VERSION)
+        res.setHeader('X-PVTKRRX-Artwork-Render-Version', LOCAL_ARTWORK_RENDER_VERSION)
+        res.setHeader('X-PVTKRRX-Revision', resolveRuntimeRevision())
+        res.setHeader('X-PVTKRRX-Artwork-Template', leaguePoster.selectedTemplate || 'ticket-stub')
+        res.setHeader('X-PVTKRRX-Artwork-Layout-Family', leaguePoster.layoutFamily || 'TICKET_STUB')
+        res.setHeader('X-PVTKRRX-Artwork-Logo-Kind', leaguePoster.logoKind || 'real-league')
+        res.setHeader('X-PVTKRRX-Logo-Kind', leaguePoster.logoKind || 'real-league')
+        res.setHeader('X-PVTKRRX-Logo-Real-Count', String(leaguePoster.logoRealCount || 1))
+        res.setHeader('X-PVTKRRX-Logo-Fallback-Count', String(leaguePoster.logoFallbackCount || 0))
+        res.setHeader('X-PVTKRRX-Artwork-Real-Logo-Lookup-Attempted', 'true')
+        res.setHeader('X-PVTKRRX-Logo-Lookup-Attempted', 'true')
+        if (headerLogoSourceUrl) {
+          res.setHeader('X-PVTKRRX-Logo-Source-Url', redactUrl(headerLogoSourceUrl))
+          res.setHeader('X-PVTKRRX-Logo-Source-Urls', redactUrl(headerLogoSourceUrl))
+          res.setHeader('X-PVTKRRX-Artwork-Logo-Source-Count', '1')
+        }
+        res.setHeader('X-PVTKRRX-Artwork-Fallback', leaguePoster.fallbackReason || 'sportsmeta_default_replaced_with_league_cdn_logo')
+        console.log(
+          `[sports-artwork] selectedArtworkSource=${leaguePoster.selectedArtworkSource} variant=${variant} logoKind=${leaguePoster.logoKind} logoSourceUrl="${redactUrl(headerLogoSourceUrl)}" sport=${sportSlug} league="${league}"`
+        )
+        res.status(200).end(leaguePoster.buffer)
+        return
+      }
+    } catch (err) {
+      console.warn(`[sports-artwork] league-logo poster fallback failed sport=${sportSlug} league="${league}": ${err.message}`)
+    }
+  }
+
   const cacheKey = buildDefaultArtworkCacheKey({ variant, template, sportSlug, league, title, date, homeTeam, awayTeam, detail, eventClass: defaultEventClass, seeders, size, rawTitle, sportsmetaBaseUrl })
-  await sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput, template })
+  await sendArtwork(res, {
+    cacheKey,
+    upstreamUrl,
+    variant,
+    fallbackInput,
+    template,
+    teamPosterContext: { sportsmetaBaseUrl }
+  })
 }
 
 async function handleCanonicalSportsArtwork(req, res, config = {}) {
@@ -1755,13 +2418,6 @@ async function handleCanonicalSportsArtwork(req, res, config = {}) {
   }
   const sportsmetaBaseUrl = resolveSportsmetaBaseUrlFromConfig(config)
   const template = resolveSportsPosterTemplateFromConfig(config, req)
-  const upstreamUrl = buildUpstreamUrl({
-    kind: 'id',
-    variant,
-    canonicalId,
-    sportsmetaBaseUrl,
-    template
-  })
   const fallbackInput = buildArtworkInputFromRequest({
     canonicalId,
     sport: String(req.query?.sport || '').trim(),
@@ -1777,7 +2433,38 @@ async function handleCanonicalSportsArtwork(req, res, config = {}) {
   const eventClass = String(req.query?.eventClass || req.query?.class || '').trim()
   if (req.query?.detail) fallbackInput.eventDetail = String(req.query.detail).trim()
   if (eventClass) fallbackInput.eventClass = eventClass
-  const cacheKey = buildCanonicalArtworkCacheKey({ variant, template, canonicalId, sportsmetaBaseUrl })
+  const canonicalOverride = await resolveArtworkCanonicalOverride({
+    canonicalId,
+    sportsmetaBaseUrl,
+    sportSlug: fallbackInput.sport,
+    league: fallbackInput.league || fallbackInput.competition,
+    title: fallbackInput.eventTitle || fallbackInput.title,
+    date: fallbackInput.date,
+    homeTeam: fallbackInput.homeTeam,
+    awayTeam: fallbackInput.awayTeam,
+    fallbackInput
+  })
+  const artworkCanonicalId = normalizeSpace(canonicalOverride?.canonicalId) || canonicalId
+  if (canonicalOverride?.event) {
+    fallbackInput.canonicalId = artworkCanonicalId
+    fallbackInput.sport = normalizeSpace(canonicalOverride.event.sport) || fallbackInput.sport
+    fallbackInput.league = normalizeSpace(canonicalOverride.event.league) || fallbackInput.league
+    fallbackInput.competition = fallbackInput.league
+    fallbackInput.eventTitle = normalizeSpace(canonicalOverride.event.title || canonicalOverride.event.name) || fallbackInput.eventTitle
+    fallbackInput.title = fallbackInput.eventTitle
+    fallbackInput.date = normalizeSpace(canonicalOverride.event.date) || fallbackInput.date
+    fallbackInput.homeTeam = normalizeSpace(canonicalOverride.event.homeTeam) || fallbackInput.homeTeam
+    fallbackInput.awayTeam = normalizeSpace(canonicalOverride.event.awayTeam) || fallbackInput.awayTeam
+    fallbackInput.source = 'sportsmeta'
+  }
+  const upstreamUrl = buildUpstreamUrl({
+    kind: 'id',
+    variant,
+    canonicalId: artworkCanonicalId,
+    sportsmetaBaseUrl,
+    template
+  })
+  const cacheKey = buildCanonicalArtworkCacheKey({ variant, template, canonicalId: artworkCanonicalId, sportsmetaBaseUrl })
   await sendArtwork(res, {
     cacheKey,
     upstreamUrl,
@@ -1785,7 +2472,7 @@ async function handleCanonicalSportsArtwork(req, res, config = {}) {
     fallbackInput,
     template,
     teamPosterContext: {
-      canonicalId,
+      canonicalId: artworkCanonicalId,
       sportsmetaBaseUrl
     }
   })
