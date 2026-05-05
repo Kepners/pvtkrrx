@@ -1601,7 +1601,9 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
   // matchups, and motorsport sessions also get cached SportsMeta artwork —
   // without this expansion they fall through to default-URL glyph fallback
   // even when SportsMeta has the real event indexed.
-  const canHaveCanonical = (defaultEventClass === 'team_vs_team' ||
+  const hasExplicitMatchupQuery = Boolean(homeTeam && awayTeam)
+  const canHaveCanonical = (hasExplicitMatchupQuery ||
+    defaultEventClass === 'team_vs_team' ||
     defaultEventClass === 'combat_event' ||
     defaultEventClass === 'tennis_or_snooker_match' ||
     defaultEventClass === 'darts_event' ||
