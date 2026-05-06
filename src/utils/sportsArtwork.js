@@ -10,7 +10,7 @@ const {
 } = require('./sportsPosterTemplates')
 const { resolveSportBackdrop } = require('./sportBackdrops')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260506-real-logo-v9-direct-cdn-fallback'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260506-real-logo-v10-afl-rugby-rule'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()

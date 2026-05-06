@@ -40,7 +40,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260506-real-logo-v9-direct-cdn-fallback'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260506-real-logo-v10-afl-rugby-rule'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -1148,8 +1148,15 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
   // directly as a third tier so AFL / NRL / BWF posters still get a real
   // league badge instead of a generic "ADMIT ONE" glyph.
   {
+    sport: 'rugby',
+    pattern: /\b(?:afl|aussie\s+rules|australian\s+football|australian\s+rules\s+football)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/wvx4721525519372.png']
+  },
+  {
     sport: 'australian-rules-football',
-    pattern: /\b(?:afl|aussie\s+rules|australian\s+football|australian\s+rules\s+football|midweek\s+tackle)\b/i,
+    pattern: /\b(?:afl|aussie\s+rules|australian\s+football|australian\s+rules\s+football)\b/i,
     canonicalIds: [],
     searchTerms: [],
     directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/wvx4721525519372.png']
