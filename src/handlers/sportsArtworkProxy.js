@@ -40,7 +40,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260506-real-logo-v8-upstream-error-retry'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260506-real-logo-v9-direct-cdn-fallback'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -1143,6 +1143,30 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
     pattern: /\b(?:pga\s+tour|pga)\b/i,
     canonicalIds: ['sportsmeta:league:golf|pga-tour'],
     searchTerms: ['PGA Tour']
+  },
+  // Leagues SportsMeta does not currently index — use TheSportsDB CDN URLs
+  // directly as a third tier so AFL / NRL / BWF posters still get a real
+  // league badge instead of a generic "ADMIT ONE" glyph.
+  {
+    sport: 'australian-rules-football',
+    pattern: /\b(?:afl|aussie\s+rules|australian\s+football|australian\s+rules\s+football|midweek\s+tackle)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/wvx4721525519372.png']
+  },
+  {
+    sport: 'rugby',
+    pattern: /\b(?:nrl|national\s+rugby\s+league|midweek\s+tackle)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://www.thesportsdb.com/images/media/league/badge/g5ocbs1777721333.png']
+  },
+  {
+    sport: 'badminton',
+    pattern: /\b(?:bwf|bwf\s+world\s+tour|badminton)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/d5xvqq1750423289.png']
   }
 ])
 
@@ -1190,11 +1214,20 @@ function buildDefaultLogoRequests(fallbackInput = {}) {
     requests.push({ type: 'search', sport: s, search: q })
   }
 
+  const addDirect = (directUrl) => {
+    const url = normalizeSpace(directUrl)
+    const key = `direct:${url}`
+    if (!url || seen.has(key)) return
+    seen.add(key)
+    requests.push({ type: 'direct', url })
+  }
+
   for (const rule of DEFAULT_LEAGUE_LOGO_RULES) {
     if (!sportMatchesLogoRule(rule.sport, sport)) continue
     if (!rule.pattern.test(text)) continue
     for (const canonicalId of rule.canonicalIds || []) addInspect(canonicalId)
     for (const term of rule.searchTerms || []) addSearch(rule.sport || sport, term)
+    for (const directUrl of rule.directLogoUrls || []) addDirect(directUrl)
   }
 
   return requests
@@ -1256,6 +1289,15 @@ async function resolveDefaultLogoImage({ sportsmetaBaseUrl = '', fallbackInput =
         url: `${request.sport}:${request.search}`,
         status: sourceUrl ? 200 : 0,
         result: sourceUrl ? 'search_source_url' : 'search_miss'
+      })
+    } else if (request.type === 'direct') {
+      sourceUrl = request.url
+      logoLookupAttempts.push({
+        role: 'leagueLogo',
+        kind: 'real-league',
+        url: request.url,
+        status: 0,
+        result: 'direct_source_url'
       })
     }
     if (!sourceUrl) continue
