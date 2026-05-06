@@ -10,7 +10,7 @@ const {
 } = require('./sportsPosterTemplates')
 const { resolveSportBackdrop } = require('./sportBackdrops')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260506-real-logo-v12-default-show-logos'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260506-real-logo-v14-team-slot-logos'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
