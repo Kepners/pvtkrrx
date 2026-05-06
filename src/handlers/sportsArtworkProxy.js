@@ -40,7 +40,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260506-real-logo-v12-default-show-logos'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260506-real-logo-v14-team-slot-logos'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -364,22 +364,30 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
     const skipGeneratedSlots = (artwork.layoutFamily || layoutFamilyForSportsPosterRender(normalizedTemplate, event)) === 'COMPETITOR_VS_COMPETITOR'
     const fallbackSlots = skipGeneratedSlots ? [] : (artwork.slots || [])
     const realLeagueLogo = logoContext?.leagueLogo || logoContext?.logo || null
+    const realHomeLogo = logoContext?.homeBadge || null
+    const realAwayLogo = logoContext?.awayBadge || null
+    const realLogoForSlot = (role = '') => {
+      if (role === 'home') return realHomeLogo || realLeagueLogo
+      if (role === 'away') return realAwayLogo || realLeagueLogo
+      if (['league', 'leagueLogo', 'logo'].includes(role)) return realLeagueLogo || realHomeLogo || realAwayLogo
+      return realLeagueLogo || realHomeLogo || realAwayLogo
+    }
     const composites = []
     const logoSlots = []
     for (const slot of fallbackSlots) {
-      const isLeagueSlot = ['league', 'leagueLogo', 'logo'].includes(slot.role)
-      if (isLeagueSlot && realLeagueLogo?.buffer) {
+      const realLogo = realLogoForSlot(slot.role)
+      if (realLogo?.buffer) {
         composites.push({
-          input: await resizeCompositionBuffer(realLeagueLogo.buffer, slot.size),
+          input: await resizeCompositionBuffer(realLogo.buffer, slot.size),
           left: slot.left,
           top: slot.top
         })
         logoSlots.push({
           role: slot.role,
-          logoKind: realLeagueLogo.kind || 'real-league',
-          logoSourceUrl: realLeagueLogo.sourceUrl || '',
-          logoSourceUrls: realLeagueLogo.sourceUrls || [realLeagueLogo.sourceUrl].filter(Boolean),
-          sourceKey: realLeagueLogo.sourceKey || 'league',
+          logoKind: realLogo.kind || 'real-league',
+          logoSourceUrl: realLogo.sourceUrl || '',
+          logoSourceUrls: realLogo.sourceUrls || [realLogo.sourceUrl].filter(Boolean),
+          sourceKey: realLogo.sourceKey || slot.role || 'league',
           left: slot.left,
           top: slot.top,
           size: slot.size
@@ -1184,6 +1192,39 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
   }
 ])
 
+const DEFAULT_TEAM_LOGO_ALIASES = Object.freeze([
+  { sport: 'basketball', league: 'nba', team: 'Atlanta Hawks', aliases: ['hawks'] },
+  { sport: 'basketball', league: 'nba', team: 'Boston Celtics', aliases: ['celtics'] },
+  { sport: 'basketball', league: 'nba', team: 'Brooklyn Nets', aliases: ['nets'] },
+  { sport: 'basketball', league: 'nba', team: 'Charlotte Hornets', aliases: ['hornets'] },
+  { sport: 'basketball', league: 'nba', team: 'Chicago Bulls', aliases: ['bulls'] },
+  { sport: 'basketball', league: 'nba', team: 'Cleveland Cavaliers', aliases: ['cavaliers', 'cavs'] },
+  { sport: 'basketball', league: 'nba', team: 'Dallas Mavericks', aliases: ['mavericks', 'mavs'] },
+  { sport: 'basketball', league: 'nba', team: 'Denver Nuggets', aliases: ['nuggets'] },
+  { sport: 'basketball', league: 'nba', team: 'Detroit Pistons', aliases: ['pistons'] },
+  { sport: 'basketball', league: 'nba', team: 'Golden State Warriors', aliases: ['warriors'] },
+  { sport: 'basketball', league: 'nba', team: 'Houston Rockets', aliases: ['rockets'] },
+  { sport: 'basketball', league: 'nba', team: 'Indiana Pacers', aliases: ['pacers'] },
+  { sport: 'basketball', league: 'nba', team: 'Los Angeles Clippers', aliases: ['clippers'] },
+  { sport: 'basketball', league: 'nba', team: 'Los Angeles Lakers', aliases: ['lakers'] },
+  { sport: 'basketball', league: 'nba', team: 'Memphis Grizzlies', aliases: ['grizzlies'] },
+  { sport: 'basketball', league: 'nba', team: 'Miami Heat', aliases: ['heat'] },
+  { sport: 'basketball', league: 'nba', team: 'Milwaukee Bucks', aliases: ['bucks'] },
+  { sport: 'basketball', league: 'nba', team: 'Minnesota Timberwolves', aliases: ['timberwolves', 'wolves'] },
+  { sport: 'basketball', league: 'nba', team: 'New Orleans Pelicans', aliases: ['pelicans'] },
+  { sport: 'basketball', league: 'nba', team: 'New York Knicks', aliases: ['knicks'] },
+  { sport: 'basketball', league: 'nba', team: 'Oklahoma City Thunder', aliases: ['thunder', 'okc'] },
+  { sport: 'basketball', league: 'nba', team: 'Orlando Magic', aliases: ['magic'] },
+  { sport: 'basketball', league: 'nba', team: 'Philadelphia 76ers', aliases: ['76ers', 'sixers'] },
+  { sport: 'basketball', league: 'nba', team: 'Phoenix Suns', aliases: ['suns'] },
+  { sport: 'basketball', league: 'nba', team: 'Portland Trail Blazers', aliases: ['trail blazers', 'blazers'] },
+  { sport: 'basketball', league: 'nba', team: 'Sacramento Kings', aliases: ['kings'] },
+  { sport: 'basketball', league: 'nba', team: 'San Antonio Spurs', aliases: ['spurs'] },
+  { sport: 'basketball', league: 'nba', team: 'Toronto Raptors', aliases: ['raptors'] },
+  { sport: 'basketball', league: 'nba', team: 'Utah Jazz', aliases: ['jazz'] },
+  { sport: 'basketball', league: 'nba', team: 'Washington Wizards', aliases: ['wizards'] }
+])
+
 function sportMatchesLogoRule(ruleSport = '', sport = '') {
   const rule = normalizeSpace(ruleSport).toLowerCase()
   const value = normalizeSpace(sport).toLowerCase()
@@ -1250,6 +1291,52 @@ function buildDefaultLogoRequests(fallbackInput = {}) {
   return requests
 }
 
+function slugContainsToken(slug = '', token = '') {
+  const source = leagueSlugFor(slug)
+  const needle = leagueSlugFor(token)
+  if (!source || !needle) return false
+  return source === needle ||
+    source.startsWith(`${needle}-`) ||
+    source.endsWith(`-${needle}`) ||
+    source.includes(`-${needle}-`)
+}
+
+function teamLogoSearchTerms({ sport = '', league = '', team = '', text = '' } = {}) {
+  const terms = []
+  const seen = new Set()
+  const add = (value) => {
+    const term = normalizeSpace(value)
+    const key = term.toLowerCase()
+    if (!term || seen.has(key)) return
+    seen.add(key)
+    terms.push(term)
+  }
+  add(team)
+
+  const sportSlug = resolveSportSlug(sport)
+  const leagueSlug = leagueSlugFor(league)
+  const haystack = normalizeSpace([team, text].filter(Boolean).join(' '))
+  for (const alias of DEFAULT_TEAM_LOGO_ALIASES) {
+    if (resolveSportSlug(alias.sport) !== sportSlug) continue
+    if (leagueSlugFor(alias.league) && leagueSlug && leagueSlugFor(alias.league) !== leagueSlug) continue
+    const allTerms = [alias.team, ...(alias.aliases || [])]
+    if (allTerms.some((term) => slugContainsToken(haystack, term))) add(alias.team)
+  }
+  return terms
+}
+
+function parseSportsMetaEventId(canonicalId = '') {
+  const match = /^sportsmeta:event:([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)\|([^|]+)$/i.exec(normalizeSpace(canonicalId))
+  if (!match) return null
+  return {
+    sport: leagueSlugFor(match[1]),
+    date: match[2],
+    league: leagueSlugFor(match[3]),
+    home: leagueSlugFor(match[4]),
+    away: leagueSlugFor(match[5])
+  }
+}
+
 async function searchSportsMetaLogoSourceUrl({ sportsmetaBaseUrl = '', sport = '', search = '' } = {}) {
   const base = getPublicSportsMetaBaseUrl(sportsmetaBaseUrl)
   const sportSlug = resolveSportSlug(sport)
@@ -1276,9 +1363,101 @@ async function searchSportsMetaLogoSourceUrl({ sportsmetaBaseUrl = '', sport = '
   return ''
 }
 
+async function searchSportsMetaTeamBadgeSourceUrl({ sportsmetaBaseUrl = '', sport = '', league = '', team = '', role = '', text = '' } = {}) {
+  const base = getPublicSportsMetaBaseUrl(sportsmetaBaseUrl)
+  const sportSlug = resolveSportSlug(sport)
+  const leagueSlug = leagueSlugFor(league)
+  const terms = teamLogoSearchTerms({ sport, league, team, text: '' })
+  if (!base || !sportSlug || terms.length === 0) return null
+  for (const term of terms) {
+    try {
+      const url = `${base}/catalog/movie/sportsmeta-${encodeURIComponent(sportSlug)}/search=${encodeURIComponent(term)}.json`
+      const response = await fetch(url, {
+        headers: { accept: 'application/json' },
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+      })
+      if (!response.ok) continue
+      const payload = await response.json().catch(() => null)
+      const metas = Array.isArray(payload?.metas) ? payload.metas.slice(0, 12) : []
+      const targetSlugs = teamLogoSearchTerms({ sport, league, team: term, text: '' }).map(leagueSlugFor).filter(Boolean)
+      for (const meta of metas) {
+        const id = normalizeSpace(meta?.id)
+        const parsed = parseSportsMetaEventId(id)
+        if (!parsed || parsed.sport !== sportSlug) continue
+        if (leagueSlug && parsed.league !== leagueSlug) continue
+        const side = targetSlugs.includes(parsed.home) ? 'homeBadge' : targetSlugs.includes(parsed.away) ? 'awayBadge' : ''
+        if (!side) continue
+        const sourceUrl = await loadInspectAssetSourceUrl({ canonicalId: id, sportsmetaBaseUrl, variant: side })
+        if (sourceUrl) return { sourceUrl, canonicalId: id, variant: side, search: term, role }
+      }
+    } catch (_) {}
+  }
+  return null
+}
+
+async function resolveDefaultTeamLogoImage({ sportsmetaBaseUrl = '', fallbackInput = {}, role = '', team = '', size = 260 } = {}) {
+  const logoLookupAttempts = []
+  const text = defaultLogoLookupText(fallbackInput)
+  const found = await searchSportsMetaTeamBadgeSourceUrl({
+    sportsmetaBaseUrl,
+    sport: fallbackInput.sport,
+    league: fallbackInput.league,
+    team,
+    role,
+    text
+  })
+  logoLookupAttempts.push({
+    role,
+    kind: 'real-team',
+    url: team,
+    status: found?.sourceUrl ? 200 : 0,
+    result: found?.sourceUrl ? `team_source_url:${found.search}` : 'team_search_miss'
+  })
+  if (!found?.sourceUrl) return { image: null, logoLookupAttempts }
+  const candidate = await fetchLogoCandidate({
+    url: found.sourceUrl,
+    key: role === 'awayBadge' ? 'away' : 'home',
+    role,
+    size,
+    fallbackColor: colorForLabel(team, role === 'awayBadge' ? '#123c69' : '#0f766e')
+  })
+  if (candidate.attempt) logoLookupAttempts.push(candidate.attempt)
+  return {
+    image: candidate.image || null,
+    logoLookupAttempts,
+    sourceUrl: found.sourceUrl
+  }
+}
+
+async function resolveDefaultTeamLogoImages({ sportsmetaBaseUrl = '', fallbackInput = {}, size = 260 } = {}) {
+  const homeTeam = normalizeSpace(fallbackInput.homeTeam)
+  const awayTeam = normalizeSpace(fallbackInput.awayTeam)
+  if (!homeTeam && !awayTeam) return { homeBadge: null, awayBadge: null, logoLookupAttempts: [] }
+  const [homeResult, awayResult] = await Promise.all([
+    homeTeam
+      ? resolveDefaultTeamLogoImage({ sportsmetaBaseUrl, fallbackInput, role: 'homeBadge', team: homeTeam, size })
+      : Promise.resolve({ image: null, logoLookupAttempts: [] }),
+    awayTeam
+      ? resolveDefaultTeamLogoImage({ sportsmetaBaseUrl, fallbackInput, role: 'awayBadge', team: awayTeam, size })
+      : Promise.resolve({ image: null, logoLookupAttempts: [] })
+  ])
+  return {
+    homeBadge: homeResult.image || null,
+    awayBadge: awayResult.image || null,
+    logoLookupAttempts: [
+      ...(homeResult.logoLookupAttempts || []),
+      ...(awayResult.logoLookupAttempts || [])
+    ]
+  }
+}
+
 async function resolveDefaultLogoImage({ sportsmetaBaseUrl = '', fallbackInput = {}, size = 260 } = {}) {
   const requests = buildDefaultLogoRequests(fallbackInput)
   const logoLookupAttempts = []
+  const teamLogo = await resolveDefaultTeamLogoImages({ sportsmetaBaseUrl, fallbackInput, size })
+  logoLookupAttempts.push(...(teamLogo.logoLookupAttempts || []))
+  let leagueLogo = null
+  let leagueLogoSourceUrl = ''
   for (const request of requests) {
     let sourceUrl = ''
     if (request.type === 'inspect') {
@@ -1327,14 +1506,21 @@ async function resolveDefaultLogoImage({ sportsmetaBaseUrl = '', fallbackInput =
     })
     if (candidate.attempt) logoLookupAttempts.push(candidate.attempt)
     if (candidate.image?.buffer) {
-      return {
-        image: candidate.image,
-        logoLookupAttempts,
-        logoSourceUrl: sourceUrl
-      }
+      leagueLogo = candidate.image
+      leagueLogoSourceUrl = sourceUrl
+      break
     }
   }
-  return { image: null, logoLookupAttempts }
+  const matchupLogo = await buildMatchupLogoPair(teamLogo.homeBadge, teamLogo.awayBadge, Math.max(size, 260))
+  const image = matchupLogo || teamLogo.homeBadge || teamLogo.awayBadge || leagueLogo || null
+  return {
+    image,
+    homeBadge: teamLogo.homeBadge,
+    awayBadge: teamLogo.awayBadge,
+    leagueLogo,
+    logoLookupAttempts,
+    logoSourceUrl: image?.sourceUrl || leagueLogoSourceUrl || ''
+  }
 }
 
 async function renderLogoImageVariantPng(image, variant = 'logo') {
@@ -1797,7 +1983,9 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
     })
     if (defaultLogo?.image?.buffer) {
       defaultLogoContext = {
-        leagueLogo: defaultLogo.image,
+        leagueLogo: defaultLogo.leagueLogo || defaultLogo.image,
+        homeBadge: defaultLogo.homeBadge || null,
+        awayBadge: defaultLogo.awayBadge || null,
         logoLookupAttempts: defaultLogo.logoLookupAttempts || []
       }
     }
@@ -1818,7 +2006,7 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
     }
   }
 
-  const glyphReason = defaultLogoContext?.leagueLogo
+  const glyphReason = (defaultLogoContext?.leagueLogo || defaultLogoContext?.homeBadge || defaultLogoContext?.awayBadge)
     ? ''
     : realLogoLookupAttempted
     ? (realLogoLookupFailure?.logoFallbackReason || `${reason}_real_logo_lookup_failed`)
@@ -1967,6 +2155,11 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
           })
           if (defaultLogo?.image?.buffer) {
             const logoPng = await renderLogoImageVariantPng(defaultLogo.image, 'logo')
+            const logoSourceUrls = Array.from(new Set([
+              ...(defaultLogo.image.sourceUrls || []),
+              defaultLogo.image.sourceUrl,
+              defaultLogo.logoSourceUrl
+            ].filter(Boolean)))
             return {
               buffer: logoPng,
               contentType: 'image/png',
@@ -1976,8 +2169,8 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
               eventClass: fallbackEventClass,
               fallbackReason: 'sportsmeta_default_logo_svg_replaced_with_cdn',
               logoKind: defaultLogo.image.kind || 'real-league',
-              logoSourceUrl: defaultLogo.image.sourceUrl || defaultLogo.logoSourceUrl || '',
-              logoSourceUrls: [defaultLogo.image.sourceUrl || defaultLogo.logoSourceUrl].filter(Boolean),
+              logoSourceUrl: logoSourceUrls[0] || '',
+              logoSourceUrls,
               logoFallbackReason: '',
               logoRealCount: 1,
               logoFallbackCount: 0,
@@ -2078,6 +2271,11 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
         })
         if (defaultLogo?.image?.buffer) {
           const logoPng = await renderLogoImageVariantPng(defaultLogo.image, 'logo')
+          const logoSourceUrls = Array.from(new Set([
+            ...(defaultLogo.image.sourceUrls || []),
+            defaultLogo.image.sourceUrl,
+            defaultLogo.logoSourceUrl
+          ].filter(Boolean)))
           return {
             buffer: logoPng,
             contentType: 'image/png',
@@ -2087,8 +2285,8 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
             eventClass: fallbackEventClass,
             fallbackReason: 'upstream_error_default_logo_replaced_with_cdn',
             logoKind: defaultLogo.image.kind || 'real-league',
-            logoSourceUrl: defaultLogo.image.sourceUrl || defaultLogo.logoSourceUrl || '',
-            logoSourceUrls: [defaultLogo.image.sourceUrl || defaultLogo.logoSourceUrl].filter(Boolean),
+            logoSourceUrl: logoSourceUrls[0] || '',
+            logoSourceUrls,
             logoFallbackReason: '',
             logoRealCount: 1,
             logoFallbackCount: 0,
