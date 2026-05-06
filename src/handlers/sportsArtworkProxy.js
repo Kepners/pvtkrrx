@@ -40,7 +40,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260506-real-logo-v10-afl-rugby-rule'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260506-real-logo-v12-default-show-logos'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -1121,6 +1121,13 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
     searchTerms: ['MotoGP']
   },
   {
+    sport: 'motorsport',
+    pattern: /\b(?:wsbk|wssp|wwcr|world\s+super\s*bike|world\s*sbk|superbike\s+world\s+championship|sbk)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/g2j9rc1649703609.png']
+  },
+  {
     sport: 'mma',
     pattern: /\bufc\b/i,
     canonicalIds: ['sportsmeta:league:mma|ufc'],
@@ -1149,14 +1156,14 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
   // league badge instead of a generic "ADMIT ONE" glyph.
   {
     sport: 'rugby',
-    pattern: /\b(?:afl|aussie\s+rules|australian\s+football|australian\s+rules\s+football)\b/i,
+    pattern: /\b(?:afl|first\s+crack|aussie\s+rules|australian\s+football|australian\s+rules\s+football)\b/i,
     canonicalIds: [],
     searchTerms: [],
     directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/wvx4721525519372.png']
   },
   {
     sport: 'australian-rules-football',
-    pattern: /\b(?:afl|aussie\s+rules|australian\s+football|australian\s+rules\s+football)\b/i,
+    pattern: /\b(?:afl|first\s+crack|aussie\s+rules|australian\s+football|australian\s+rules\s+football)\b/i,
     canonicalIds: [],
     searchTerms: [],
     directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/wvx4721525519372.png']
@@ -1182,8 +1189,11 @@ function sportMatchesLogoRule(ruleSport = '', sport = '') {
   const value = normalizeSpace(sport).toLowerCase()
   if (!rule || !value) return true
   if (rule === value) return true
+  if (['sports', 'sport', 'general', 'other'].includes(value)) return true
+  if (rule === 'badminton' && value === 'tennis') return true
   if (rule === 'hockey' && value === 'ice-hockey') return true
   if (rule === 'american-football' && value === 'football') return false
+  if (rule === 'football' && value === 'american-football') return false
   return false
 }
 
@@ -2307,6 +2317,86 @@ async function resolveDefaultArtworkCanonical({
     return payload
   } catch (error) {
     console.warn(`[sports-artwork] default canonical lookup failed sport=${sportSlug} league="${league}" title="${title}" date="${date}": ${error.message}`)
+    const ambiguous = await resolveAmbiguousArtworkCanonical({
+      sportsmetaBaseUrl,
+      sportSlug,
+      league,
+      title,
+      date,
+      homeTeam,
+      awayTeam,
+      fallbackInput
+    })
+    if (ambiguous) return ambiguous
+    return null
+  }
+}
+
+async function resolveAmbiguousArtworkCanonical({
+  sportsmetaBaseUrl = '',
+  sportSlug = '',
+  league = '',
+  title = '',
+  date = '',
+  homeTeam = '',
+  awayTeam = '',
+  fallbackInput = {}
+} = {}) {
+  const homeSlug = leagueSlugFor(homeTeam || fallbackInput.homeTeam)
+  const awaySlug = leagueSlugFor(awayTeam || fallbackInput.awayTeam)
+  const sport = resolveSportSlug(sportSlug || fallbackInput.sport)
+  if (!homeSlug || !awaySlug || !sport) return null
+
+  try {
+    const url = new URL(`${getPublicSportsMetaBaseUrl(sportsmetaBaseUrl)}/resolve`)
+    const query = {
+      recordType: 'event',
+      sport,
+      league,
+      date,
+      home: homeTeam || fallbackInput.homeTeam,
+      away: awayTeam || fallbackInput.awayTeam,
+      event: title || fallbackInput.eventTitle,
+      title: title || fallbackInput.eventTitle
+    }
+    for (const [key, value] of Object.entries(query)) {
+      if (normalizeSpace(value)) url.searchParams.set(key, normalizeSpace(value))
+    }
+    const response = await fetch(url, {
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+    })
+    if (response.status !== 409) return null
+    const payload = await response.json().catch(() => null)
+    const candidateIds = Array.isArray(payload?.candidateCanonicalIds)
+      ? payload.candidateCanonicalIds.map(normalizeSpace).filter(Boolean)
+      : []
+    const selectedId = candidateIds.find((candidateId) => {
+      const id = candidateId.toLowerCase()
+      return id.includes(`:${sport}|`) && id.includes(`|${homeSlug}|${awaySlug}`)
+    }) || candidateIds.find((candidateId) => {
+      const id = candidateId.toLowerCase()
+      return id.includes(`|${homeSlug}|${awaySlug}`)
+    })
+    if (!selectedId) return null
+    console.warn(
+      `[sports-artwork] using ambiguous canonical for logo-only artwork sport=${sport} title="${title}" canonicalId=${selectedId}`
+    )
+    return {
+      canonicalId: selectedId,
+      event: {
+        id: selectedId,
+        sport,
+        league,
+        title: title || `${homeTeam} vs ${awayTeam}`,
+        name: title || `${homeTeam} vs ${awayTeam}`,
+        date,
+        homeTeam: homeTeam || fallbackInput.homeTeam,
+        awayTeam: awayTeam || fallbackInput.awayTeam
+      },
+      assets: {}
+    }
+  } catch (_) {
     return null
   }
 }
