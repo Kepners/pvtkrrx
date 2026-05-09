@@ -216,6 +216,7 @@ async function run() {
     assert.equal(bootstrapManifestRes.json?.id, 'com.kepners.pvtkrrx.bootstrap')
     assert.equal(bootstrapManifestRes.json?.name, 'PVTKRR')
     assert.match(String(bootstrapManifestRes.json?.description || ''), /Configure-first entry for the self-host server/i)
+    assert.match(String(bootstrapManifestRes.json?.description || ''), /SportsMeta/i)
     assert.match(String(bootstrapManifestRes.json?.description || ''), /generated route manifest/i)
 
     const privateTest = await request(

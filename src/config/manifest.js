@@ -66,12 +66,12 @@ function createBootstrapManifest(baseUrl = '', options = {}) {
   const desktopLocalOnly = runtimeOptions.desktopLocalOnly === true
   const guideOnlyBootstrap = runtimeOptions.guideOnlyBootstrap === true
   const bootstrapDescription = guideOnlyBootstrap
-    ? 'Configure-first entry for PVTKRR. Use the Windows host or your self-host server to connect Prowlarr/qBittorrent, then install the generated PC Local, LAN Bridge, or Remote Seedbox route manifest. This entry intentionally exposes no catalogs or streams.'
+    ? 'Configure-first entry for PVTKRR. Sports in Stremio are catalogued through SportsMeta, while playback still comes from your configured Prowlarr/qBittorrent setup. Use the Windows host or your self-host server, then install the generated PC Local, LAN Bridge, or Remote Seedbox route manifest. This bootstrap entry intentionally exposes no catalogs or streams.'
     : selfHostServerMode
-      ? `Configure-first entry for the self-host server. Open ${configureUrl}, save the Remote Seedbox route on this server, then install the generated route manifest. This entry intentionally exposes no catalogs or streams.`
+      ? `Configure-first entry for the self-host server. Sports in Stremio are catalogued through SportsMeta, while this server provides the Prowlarr/qBittorrent-backed route manifest. Open ${configureUrl}, save the Remote Seedbox route on this server, then install the generated route manifest. This bootstrap entry intentionally exposes no catalogs or streams.`
       : desktopLocalOnly
-        ? `Configure-first entry for the Windows desktop runtime. Open ${configureUrl}, connect Prowlarr/qBittorrent, then install PC Local or LAN Bridge from the generated route manifest. This entry intentionally exposes no catalogs or streams.`
-        : `Configure-first entry for PVTKRR. Open ${configureUrl}, connect Prowlarr/qBittorrent, then install PC Local, LAN Bridge, or Remote Seedbox from the generated route manifest. This entry intentionally exposes no catalogs or streams.`
+        ? `Configure-first entry for the Windows desktop runtime. Sports in Stremio are catalogued through SportsMeta, while this PC provides the Prowlarr/qBittorrent-backed route manifest. Open ${configureUrl}, then install PC Local or LAN Bridge from the generated route manifest. This bootstrap entry intentionally exposes no catalogs or streams.`
+        : `Configure-first entry for PVTKRR. Sports in Stremio are catalogued through SportsMeta, while playback still comes from your configured Prowlarr/qBittorrent setup. Open ${configureUrl}, then install PC Local, LAN Bridge, or Remote Seedbox from the generated route manifest. This bootstrap entry intentionally exposes no catalogs or streams.`
   return {
     id: 'com.kepners.pvtkrrx.bootstrap',
     version: manifest.version,
