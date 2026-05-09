@@ -214,8 +214,9 @@ async function run() {
     )
     assert.equal(bootstrapManifestRes.status, 200)
     assert.equal(bootstrapManifestRes.json?.id, 'com.kepners.pvtkrrx.bootstrap')
-    assert.equal(bootstrapManifestRes.json?.name, 'PVTKRRX Server (Setup Only)')
-    assert.match(String(bootstrapManifestRes.json?.description || ''), /do not install this root manifest as the working addon/i)
+    assert.equal(bootstrapManifestRes.json?.name, 'PVTKRR Server Setup')
+    assert.match(String(bootstrapManifestRes.json?.description || ''), /Configure-first entry for the self-host server/i)
+    assert.match(String(bootstrapManifestRes.json?.description || ''), /generated route manifest/i)
 
     const privateTest = await request(
       port,
@@ -296,7 +297,9 @@ async function run() {
     )
     assert.equal(manifestRes.status, 200)
     assert.equal(manifestRes.json?.id, 'com.kepners.pvtkrrx.selfhost')
-    assert.equal(manifestRes.json?.name, 'PVTKRRX ☁️')
+    assert.match(String(manifestRes.json?.description || ''), /Self-hosted server route/i)
+    assert.match(String(manifestRes.json?.description || ''), /saved Prowlarr\/qBittorrent config/i)
+    assert.match(String(manifestRes.json?.name || ''), /^PVTKRR(?:\s|$)/)
     assert.equal(manifestRes.json?.behaviorHints?.configurationRequired, false)
     assert.equal(String(manifestRes.headers['cache-control'] || '').toLowerCase(), 'no-store')
 

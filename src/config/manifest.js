@@ -4,8 +4,8 @@ const { buildSportsCatalogManifestEntries } = require('./sportsCatalogs')
 const manifest = {
   id: 'com.kepners.pvtkrrx',
   version: pkg.version || '0.0.0',
-  name: 'PVTKRRX',
-  description: 'Stream from your private tracker seedbox through Stremio — sports, movies, TV, and your library.',
+  name: 'PVTKRR',
+  description: 'Private trackers and seedbox content inside Stremio. No debrid, no third-party media host; PVTKRR bridges your configured Prowlarr/qBittorrent setup to sports, movies, TV, and library streams.',
   logo: 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.ico',
   resources: [
     'catalog',
@@ -66,19 +66,19 @@ function createBootstrapManifest(baseUrl = '', options = {}) {
   const desktopLocalOnly = runtimeOptions.desktopLocalOnly === true
   const guideOnlyBootstrap = runtimeOptions.guideOnlyBootstrap === true
   const bootstrapName = guideOnlyBootstrap
-    ? 'PVTKRRX Website Only'
+    ? 'PVTKRR Setup'
     : selfHostServerMode
-      ? 'PVTKRRX Server (Setup Only)'
+      ? 'PVTKRR Server Setup'
       : desktopLocalOnly
-        ? 'PVTKRRX Desktop (Setup Only)'
-        : 'PVTKRRX (Setup Only)'
+        ? 'PVTKRR Desktop Setup'
+        : 'PVTKRR Setup'
   const bootstrapDescription = guideOnlyBootstrap
-    ? 'Public website guide only. Configure on the Windows host that runs PVTKRRX or on your own self-host server. Do not install this root manifest as the working addon.'
+    ? 'Configure-first entry for PVTKRR. Use the Windows host or your self-host server to connect Prowlarr/qBittorrent, then install the generated PC Local, LAN Bridge, or Remote Seedbox route manifest. This entry intentionally exposes no catalogs or streams.'
     : selfHostServerMode
-      ? `Setup-only bootstrap. Do not install this root manifest as the working addon. Open ${configureUrl}, save the self-hosted server Remote Seedbox route, and install it from the generated route URL.`
+      ? `Configure-first entry for the self-host server. Open ${configureUrl}, save the Remote Seedbox route on this server, then install the generated route manifest. This entry intentionally exposes no catalogs or streams.`
       : desktopLocalOnly
-        ? `Setup-only bootstrap. Do not install this root manifest as the working addon. Open ${configureUrl}, configure first, then install PC Local or LAN Bridge from the generated route URL on the Windows desktop runtime.`
-        : `Setup-only bootstrap. Do not install this root manifest as the working addon. Open ${configureUrl}, configure first, then install PC Local, LAN Bridge, or Remote Seedbox from the generated route URL.`
+        ? `Configure-first entry for the Windows desktop runtime. Open ${configureUrl}, connect Prowlarr/qBittorrent, then install PC Local or LAN Bridge from the generated route manifest. This entry intentionally exposes no catalogs or streams.`
+        : `Configure-first entry for PVTKRR. Open ${configureUrl}, connect Prowlarr/qBittorrent, then install PC Local, LAN Bridge, or Remote Seedbox from the generated route manifest. This entry intentionally exposes no catalogs or streams.`
   return {
     id: 'com.kepners.pvtkrrx.bootstrap',
     version: manifest.version,
