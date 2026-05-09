@@ -65,13 +65,6 @@ function createBootstrapManifest(baseUrl = '', options = {}) {
   const selfHostServerMode = runtimeOptions.selfHostServerMode === true
   const desktopLocalOnly = runtimeOptions.desktopLocalOnly === true
   const guideOnlyBootstrap = runtimeOptions.guideOnlyBootstrap === true
-  const bootstrapName = guideOnlyBootstrap
-    ? 'PVTKRR Setup'
-    : selfHostServerMode
-      ? 'PVTKRR Server Setup'
-      : desktopLocalOnly
-        ? 'PVTKRR Desktop Setup'
-        : 'PVTKRR Setup'
   const bootstrapDescription = guideOnlyBootstrap
     ? 'Configure-first entry for PVTKRR. Use the Windows host or your self-host server to connect Prowlarr/qBittorrent, then install the generated PC Local, LAN Bridge, or Remote Seedbox route manifest. This entry intentionally exposes no catalogs or streams.'
     : selfHostServerMode
@@ -82,7 +75,7 @@ function createBootstrapManifest(baseUrl = '', options = {}) {
   return {
     id: 'com.kepners.pvtkrrx.bootstrap',
     version: manifest.version,
-    name: bootstrapName,
+    name: manifest.name,
     description: bootstrapDescription,
     logo: logoUrl,
     resources: [],
