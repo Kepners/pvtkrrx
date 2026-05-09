@@ -179,6 +179,28 @@ function testSelfHostAdminFlag() {
   })
   assert.equal(entitlement.source, ENTITLEMENT_SOURCE.ADMIN_OVERRIDE, 'self-host admin source')
   assert.equal(entitlement.resolvedTemplate, 'sportsbook', 'self-host admin resolved template')
+  assert.equal(entitlement.ownerEmailHash, 'self-host-admin', 'self-host admin sentinel hash')
+}
+
+async function testSelfHostAdminStampSurvivesRuntimeVerify() {
+  await withEnv({ PVTKRRX_SELF_HOST_MODE: 'true', PVTKRRX_OWNER_EMAILS: '', PVTKRRX_ADMIN_EMAILS: '' }, () => {
+    const verified = verifyStampedSportsPosterEntitlement({
+      requestedTemplate: 'glitch',
+      stampedSource: ENTITLEMENT_SOURCE.ADMIN_OVERRIDE,
+      stampedHash: 'self-host-admin'
+    })
+    assert.equal(verified.source, ENTITLEMENT_SOURCE.ADMIN_OVERRIDE, 'self-host admin sentinel survives verify in self-host mode')
+    assert.equal(verified.resolvedTemplate, 'glitch', 'self-host admin sentinel preserves template')
+  })
+  await withEnv({ PVTKRRX_SELF_HOST_MODE: '', PVTKRRX_OWNER_EMAILS: '', PVTKRRX_ADMIN_EMAILS: '' }, () => {
+    const verified = verifyStampedSportsPosterEntitlement({
+      requestedTemplate: 'glitch',
+      stampedSource: ENTITLEMENT_SOURCE.ADMIN_OVERRIDE,
+      stampedHash: 'self-host-admin'
+    })
+    assert.equal(verified.source, ENTITLEMENT_SOURCE.NONE, 'self-host admin sentinel rejected outside self-host mode')
+    assert.equal(verified.resolvedTemplate, 'ticket-stub', 'sentinel falls back when not self-host')
+  })
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -412,6 +434,7 @@ async function main() {
   testTrialActive()
   testUnpaidUser()
   testSelfHostAdminFlag()
+  await testSelfHostAdminStampSurvivesRuntimeVerify()
   testNormalizeWithoutEntitlementClamps()
   testNormalizeWithOwnerEntitlementPreserves()
   await testNormalizeRevokesWhenOwnerRemovedFromEnv()
