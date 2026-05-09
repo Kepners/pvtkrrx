@@ -8,6 +8,12 @@ const {
 
 const FREE_SPORTS_POSTER_TEMPLATE = 'ticket-stub'
 
+// Sentinel hash stamped on the config when entitlement was granted via the
+// self-host admin token (no email available). The runtime verify accepts it
+// only when PVTKRRX_SELF_HOST_MODE is on, so a leaked self-host token cannot
+// be replayed against a non-self-host runtime.
+const SELF_HOST_ADMIN_HASH = 'self-host-admin'
+
 const ENTITLEMENT_SOURCE = Object.freeze({
   OWNER_OVERRIDE: 'owner_override',
   ADMIN_OVERRIDE: 'admin_override',
@@ -144,7 +150,7 @@ function resolveSportsPosterEntitlement(input = {}) {
       source: ENTITLEMENT_SOURCE.ADMIN_OVERRIDE,
       allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
       requested,
-      ownerEmailHash: userEmail ? hashEmailForOwnerCheck(userEmail) : ''
+      ownerEmailHash: userEmail ? hashEmailForOwnerCheck(userEmail) : SELF_HOST_ADMIN_HASH
     })
   }
 
@@ -268,7 +274,13 @@ function verifyStampedSportsPosterEntitlement(input = {}) {
   }
 
   if (stampedSource === ENTITLEMENT_SOURCE.ADMIN_OVERRIDE) {
-    if (stampedHash && envAdminHashes(env).has(stampedHash)) {
+    const selfHostMode = isSelfHostModeEnabled(env)
+    const adminHashes = envAdminHashes(env)
+    const isSelfHostAdminStamp = stampedHash === SELF_HOST_ADMIN_HASH
+    if (
+      (stampedHash && adminHashes.has(stampedHash)) ||
+      (selfHostMode && isSelfHostAdminStamp)
+    ) {
       return finaliseEntitlement({
         source: ENTITLEMENT_SOURCE.ADMIN_OVERRIDE,
         allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
@@ -302,6 +314,10 @@ function verifyStampedSportsPosterEntitlement(input = {}) {
   })
 }
 
+function isSelfHostModeEnabled(env = process.env) {
+  return /^(1|true|yes|on)$/i.test(String(env.PVTKRRX_SELF_HOST_MODE || '').trim())
+}
+
 function envOwnerHashes(env = process.env) {
   const out = new Set()
   for (const email of getOwnerEmails(env)) {
@@ -333,6 +349,8 @@ module.exports = {
   ENTITLEMENT_SOURCE,
   ALL_ENTITLEMENT_SOURCES,
   FREE_SPORTS_POSTER_TEMPLATE,
+  SELF_HOST_ADMIN_HASH,
+  isSelfHostModeEnabled,
   hashEmailForOwnerCheck,
   parseEmailList,
   parseStremioUserIdList,
