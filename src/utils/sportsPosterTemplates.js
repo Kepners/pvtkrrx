@@ -145,11 +145,15 @@ function layoutFamilyForSportsPosterRender(value, event = {}) {
   const explicit = normalizeSpace(event.layoutFamily || event.sportsArtwork?.layoutFamily).toUpperCase()
   const paired = hasActualPair(event)
   const classifiedClass = classifySportsPosterEvent(event)
-  const teamLayoutAllowed = paired && classifiedClass === 'team_vs_team'
+  const explicitEventClass = normalizeSpace(event.eventClass || event.posterClass)
+  const teamLayoutAllowed = paired && (
+    classifiedClass === 'team_vs_team' ||
+    (explicitEventClass === 'team_vs_team' && classifiedClass !== 'tournament_event')
+  )
   if (explicit === 'TEAM_VS_TEAM' && teamLayoutAllowed) return 'TEAM_VS_TEAM'
   if (explicit === 'COMPETITOR_VS_COMPETITOR') return 'COMPETITOR_VS_COMPETITOR'
   if (explicit === 'SINGLE_EVENT_MOTORSPORT') return 'SINGLE_EVENT_MOTORSPORT'
-  const eventClass = normalizeSpace(event.eventClass || event.posterClass) || classifiedClass
+  const eventClass = explicitEventClass || classifiedClass
   if (eventClass === 'team_vs_team' && teamLayoutAllowed) return 'TEAM_VS_TEAM'
   if ((eventClass === 'tournament_event' || eventClass === 'generic_event') && teamLayoutAllowed) return 'TEAM_VS_TEAM'
   if (isCompetitorVsCompetitorEvent({ ...event, eventClass })) return 'COMPETITOR_VS_COMPETITOR'
@@ -463,7 +467,9 @@ function templateData(event = {}, theme = {}, mode = '') {
   const rawLeft = pickRealSide(event.principalA, event.homeTeam, event.home?.name, event.fighterA, event.playerA, event.teamA)
   const rawRight = pickRealSide(event.principalB, event.awayTeam, event.away?.name, event.fighterB, event.playerB, event.teamB)
   const hasRealPair = Boolean(hasActualPair(event) && rawLeft && rawRight && rawLeft.toLowerCase() !== rawRight.toLowerCase())
-  const teamLayoutAllowed = eventClass !== 'team_vs_team' || classifiedClass === 'team_vs_team'
+  const teamLayoutAllowed = eventClass !== 'team_vs_team' ||
+    classifiedClass === 'team_vs_team' ||
+    (hasRealPair && classifiedClass !== 'tournament_event')
   const motorsportNeverPair = eventClass === 'motorsport_event'
   // Audit fix (contract §4 row 1 fallback + Q2.3 + G8): team_vs_team with no
   // real pair must downgrade to tournament_event so we don't render a fake

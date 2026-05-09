@@ -595,6 +595,23 @@ for (const testCase of [
   )
 }
 
+{
+  const proxyEvent = {
+    title: 'Port Adelaide vs Western Bulldogs',
+    eventTitle: 'Port Adelaide vs Western Bulldogs',
+    league: 'Sports',
+    homeTeam: 'Port Adelaide',
+    awayTeam: 'Western Bulldogs',
+    eventClass: 'team_vs_team'
+  }
+  assert.equal(hasActualPair(proxyEvent), true, 'proxy-limited team event should expose an actual pair')
+  assert.equal(
+    layoutFamilyForSportsPosterRender('ticket-stub', proxyEvent),
+    'TEAM_VS_TEAM',
+    'proxy-limited team event should honor explicit team_vs_team when the pair is credible'
+  )
+}
+
 for (const testCase of [
   {
     slug: 'sportcult-euroleague-bracket-stripped',
