@@ -342,19 +342,28 @@
     }
 
     .hero-posters {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      display: flex;
+      flex-direction: row;
       gap: 8px;
       padding: 8px;
+      overflow-x: auto;
+      overflow-y: hidden;
+      scroll-snap-type: x mandatory;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 246, 255, 0.35) transparent;
+      -webkit-overflow-scrolling: touch;
     }
 
+    .hero-posters::-webkit-scrollbar { height: 6px; }
+    .hero-posters::-webkit-scrollbar-thumb { background: rgba(0, 246, 255, 0.35); border-radius: 3px; }
+
     .hero-posters img {
-      width: 100%;
+      flex: 0 0 auto;
+      width: clamp(110px, 32%, 150px);
       height: auto;
-      aspect-ratio: 2 / 3;
-      object-fit: contain;
       border-radius: 6px;
       background: #040812;
+      scroll-snap-align: start;
     }
 
     .kicker {
@@ -783,6 +792,7 @@
       display: grid;
       grid-template-columns: repeat(4, minmax(0, 1fr));
       gap: 14px;
+      align-items: start;
     }
 
     .poster-example {
@@ -799,8 +809,7 @@
     .poster-example img {
       display: block;
       width: 100%;
-      aspect-ratio: 2 / 3;
-      object-fit: contain;
+      height: auto;
       border-radius: 8px;
       background: #040812;
     }
@@ -1310,10 +1319,14 @@
           <div class="hero-backdrop">
             <img src="/sports-backdrops/formula1-4k.jpg" width="3840" height="2160" alt="Reusable Formula 1 4K sports backdrop sample">
           </div>
-          <div class="hero-posters">
+          <div class="hero-posters" role="region" aria-label="Free Ticket Stub fixture samples — scroll to see more">
             <img src="/sports-artwork/default/poster/football.png?league=Premier+League&amp;title=Arsenal+vs+Chelsea&amp;date=2026-04-30&amp;home=Arsenal&amp;away=Chelsea&amp;eventClass=team_vs_team&amp;seeders=42&amp;size=8.1+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" alt="Free Ticket Stub sports poster sample for an Arsenal vs Chelsea Premier League fixture">
             <img src="/sports-artwork/default/poster/baseball.png?league=MLB&amp;title=Boston+Red+Sox+vs+New+York+Yankees&amp;date=2026-04-30&amp;home=Boston+Red+Sox&amp;away=New+York+Yankees&amp;eventClass=team_vs_team&amp;seeders=14&amp;size=5.4+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" alt="Free Ticket Stub sports poster sample for a Red Sox vs Yankees MLB fixture">
             <img src="/sports-artwork/default/poster/basketball.png?league=NBA&amp;title=Detroit+Pistons+vs+Orlando+Magic&amp;date=2026-04-29&amp;home=Detroit+Pistons&amp;away=Orlando+Magic&amp;eventClass=team_vs_team&amp;seeders=18&amp;size=2.0+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" alt="Free Ticket Stub sports poster sample for a Pistons vs Magic NBA fixture">
+            <img src="/sports-artwork/default/poster/football.png?league=UEFA+Champions+League&amp;title=Arsenal+vs+Atletico+Madrid&amp;date=2026-04-29&amp;home=Arsenal&amp;away=Atletico+Madrid&amp;eventClass=team_vs_team&amp;seeders=30&amp;size=6.2+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" alt="Free Ticket Stub sports poster sample for an Arsenal vs Atletico Madrid Champions League fixture">
+            <img src="/sports-artwork/default/poster/mma.png?league=UFC&amp;title=UFC+312&amp;detail=Main+Event&amp;date=2026-06-14&amp;home=Du+Plessis&amp;away=Strickland&amp;eventClass=combat_event&amp;seeders=21&amp;size=4.7+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" alt="Free Ticket Stub sports poster sample for a UFC 312 main event fight card">
+            <img src="/sports-artwork/default/poster/snooker.png?league=Snooker&amp;title=John+Higgins+vs+Shaun+Murphy&amp;date=2026-04-30&amp;home=John+Higgins&amp;away=Shaun+Murphy&amp;eventClass=racket_event&amp;seeders=6&amp;size=6.9+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" alt="Free Ticket Stub sports poster sample for a Higgins vs Murphy snooker fixture">
+            <img src="/sports-artwork/default/poster/motorsport.png?league=Formula+1&amp;title=British+Grand+Prix&amp;detail=Qualifying&amp;date=2026-07-04&amp;eventClass=motorsport_event&amp;seeders=24&amp;size=7.6+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" alt="Free Ticket Stub sports poster sample for a Formula 1 British Grand Prix qualifying session">
           </div>
         </div>
       </div>
@@ -1392,25 +1405,13 @@
 
     <section class="section-block" id="poster-examples">
       <div class="section-head">
-        <div class="section-kicker">Latest Sports Artwork</div>
-        <h2 class="section-title">Free Ticket Stub layout, SportsMeta member styles, and 4K backdrops</h2>
+        <div class="section-kicker">Other Themes</div>
+        <h2 class="section-title">Six additional SportsMeta member poster styles, plus 4K backdrops</h2>
         <p class="section-copy">
-          Every PVTKRRX user currently gets the same public SportsMeta default artwork in the Ticket Stub layout. Six additional poster styles (Editorial, Broadcast, Sportsbook, Trading Card, Brutalist, Glitch) live on the separate SportsMeta member install. PVTKRRX does not switch artwork by entitlement — these member-style previews are shown so you can see the full SportsMeta artwork library that sits alongside the addon.
+          The free Ticket Stub layout that every PVTKRRX user currently gets is shown in the hero above. The six themes below — Editorial, Broadcast, Sportsbook, Trading Card, Brutalist, Glitch — live on the separate SportsMeta member install. PVTKRRX does not switch artwork by entitlement; these previews exist so you can see the full SportsMeta artwork library that sits alongside the addon.
         </p>
       </div>
-      <div class="poster-gallery" aria-label="Sports artwork samples — free Ticket Stub examples and SportsMeta member style previews">
-        <figure class="poster-example">
-          <img src="/sports-artwork/default/poster/football.png?league=Premier+League&amp;title=Arsenal+vs+Chelsea&amp;date=2026-04-30&amp;home=Arsenal&amp;away=Chelsea&amp;eventClass=team_vs_team&amp;seeders=42&amp;size=8.1+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" loading="lazy" decoding="async" alt="Free Ticket Stub sports poster sample for an Arsenal vs Chelsea Premier League fixture">
-          <figcaption><strong>Ticket Stub — Free</strong>Included football fixture presentation. Same layout every PVTKRRX user gets.</figcaption>
-        </figure>
-        <figure class="poster-example">
-          <img src="/sports-artwork/default/poster/basketball.png?league=NBA&amp;title=Detroit+Pistons+vs+Orlando+Magic&amp;date=2026-04-29&amp;home=Detroit+Pistons&amp;away=Orlando+Magic&amp;eventClass=team_vs_team&amp;seeders=18&amp;size=2.0+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" loading="lazy" decoding="async" alt="Free Ticket Stub sports poster sample for a Pistons vs Magic NBA fixture">
-          <figcaption><strong>Ticket Stub — Free</strong>Basketball matchup presentation in the included style.</figcaption>
-        </figure>
-        <figure class="poster-example">
-          <img src="/sports-artwork/default/poster/baseball.png?league=MLB&amp;title=Boston+Red+Sox+vs+New+York+Yankees&amp;date=2026-04-30&amp;home=Boston+Red+Sox&amp;away=New+York+Yankees&amp;eventClass=team_vs_team&amp;seeders=14&amp;size=5.4+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" loading="lazy" decoding="async" alt="Free Ticket Stub sports poster sample for a Red Sox vs Yankees MLB fixture">
-          <figcaption><strong>Ticket Stub — Free</strong>Baseball matchup presentation in the included style.</figcaption>
-        </figure>
+      <div class="poster-gallery" aria-label="SportsMeta member theme previews and 4K backdrops">
         <figure class="poster-example">
           <img src="/sports-artwork/default/poster/football.png?league=UEFA+Champions+League&amp;title=Arsenal+vs+Atletico+Madrid&amp;date=2026-04-29&amp;home=Arsenal&amp;away=Atletico+Madrid&amp;eventClass=team_vs_team&amp;seeders=30&amp;size=6.2+GB&amp;source=prowlarr&amp;template=editorial&amp;v=20260509-member-style-v2" width="600" height="900" loading="lazy" decoding="async" alt="SportsMeta member Editorial poster sample for an Arsenal vs Atletico Madrid Champions League fixture">
           <figcaption><strong>Editorial — SportsMeta member</strong>Magazine-style cover treatment available on the SportsMeta member install.</figcaption>
