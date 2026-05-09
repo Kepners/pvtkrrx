@@ -266,6 +266,9 @@ function stripCompetitionSideNoise(value = '') {
 
   text = normalizeSegment(
     text
+      .replace(TEAM_BROADCAST_RE, ' ')
+      .replace(TEAM_LANGUAGE_RE, ' ')
+      .replace(TEAM_PRESENTATION_RE, ' ')
       .replace(/\b(?:19|20)\d{2}(?:[/-]\d{2})?\b/g, ' ')
       .replace(/\b(?:pre?s|preseason)\b/gi, ' ')
       .replace(TEAM_SIDE_TRAILING_GAME_STATE_RE, ' ')

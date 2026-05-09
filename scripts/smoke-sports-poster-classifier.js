@@ -492,6 +492,13 @@ for (const testCase of [
     expectedAway: 'Kitchener'
   },
   {
+    slug: 'beinsports-away-broadcast-stripped',
+    rawTitle: 'UEFA Conference League SF L2 Shakhtar Donetsk v Crystal Palace BeinSports',
+    sportHint: 'football',
+    expectedHome: 'Shakhtar Donetsk',
+    expectedAway: 'Crystal Palace'
+  },
+  {
     slug: 'copa-sudamericana-competition-prefix-stripped',
     rawTitle: "Copa Sudamericana 2026 O'Higgins vs Sau Paulo",
     sportHint: 'football',
