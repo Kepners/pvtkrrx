@@ -3,6 +3,7 @@ const fs = require('node:fs')
 const http = require('node:http')
 const os = require('node:os')
 const path = require('node:path')
+const manifest = require('../src/config/manifest')
 
 process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'selfhost-smoke-secret-12345678901234567890'
 process.env.AUTH_TOKEN_SECRET = process.env.AUTH_TOKEN_SECRET || 'selfhost-auth-secret-12345678901234567890'
@@ -214,10 +215,11 @@ async function run() {
     )
     assert.equal(bootstrapManifestRes.status, 200)
     assert.equal(bootstrapManifestRes.json?.id, 'com.kepners.pvtkrrx.bootstrap')
-    assert.equal(bootstrapManifestRes.json?.name, 'PVTKRR')
+    assert.equal(bootstrapManifestRes.json?.name, manifest.BOOTSTRAP_MANIFEST_NAME)
     assert.match(String(bootstrapManifestRes.json?.description || ''), /Configure-first entry for the self-host server/i)
     assert.match(String(bootstrapManifestRes.json?.description || ''), /SportsMeta/i)
     assert.match(String(bootstrapManifestRes.json?.description || ''), /generated route manifest/i)
+    assert.notEqual(bootstrapManifestRes.json?.name, 'PVTKRR Setup', 'self-host bootstrap manifest name must not reintroduce setup branding')
 
     const privateTest = await request(
       port,

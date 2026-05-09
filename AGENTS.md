@@ -29,6 +29,12 @@
 - Apply global defaults first, then project-specific constraints from `./CLAUDE.md`.
 - Keep project details in `./CLAUDE.md`; keep this file as the stable routing contract.
 
+## Bootstrap Manifest Guardrail
+- Root `/manifest.json` is a setup/bootstrap manifest only: id `com.kepners.pvtkrrx.bootstrap`, no resources, no types, no catalogs, and `behaviorHints.configurationRequired=true`.
+- Its Stremio-visible `name` must remain exactly `PVTKRR`. Do not rename it to `PVTKRR Setup`, append route labels, append version text, or add marketing suffixes.
+- The public guide/bootstrap manifest description must remain exactly: `Configure-first entry for PVTKRR. Sports in Stremio are catalogued through SportsMeta, while playback still comes from your configured Prowlarr/qBittorrent setup. Use the Windows host or your self-host server, then install the generated PC Local, LAN Bridge, or Remote Seedbox route manifest. This bootstrap entry intentionally exposes no catalogs or streams.`
+- This copy lives in `src/config/manifest.js` as `BOOTSTRAP_MANIFEST_NAME` and `PUBLIC_BOOTSTRAP_MANIFEST_DESCRIPTION`, and `scripts/smoke-config-flow.js` asserts it exactly. If it must change, update the code, smoke proof, and this guardrail together.
+
 ## Sports Posters Template Guardrail
 - Before changing Sports Posters layouts, inspect `C:\Users\kepne\projects\L - PVTKRRX\PCnestspeaker\python-templates`.
 - Treat those Python template generators as the current source of truth for `editorial`, `broadcast`, `sportsbook`, `trading-card`, `brutalist`, `ticket-stub`, and `glitch`.

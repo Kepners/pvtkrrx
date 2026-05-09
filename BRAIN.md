@@ -11,6 +11,16 @@
 
 `/opt/pvtkrrx/` on the box still exists, but as a **shared resource directory** (Node binary used by `sportsmeta.service` + bind-mount points for the Coolify container). It is no longer a standalone runtime. See `/opt/pvtkrrx/README-OPS.md` on the box for the full breakdown.
 
+## Bootstrap Manifest Lock - 2026-05-09
+
+Root `/manifest.json` is the configure-first bootstrap entry only. It intentionally exposes no catalogs, streams, resources, or addon types; configured PC Local, LAN Bridge, Remote Seedbox, and self-host route manifests are the install surfaces that expose real catalog/stream behavior.
+
+Stremio-visible bootstrap copy is locked for update stability:
+- `name`: `PVTKRR`
+- public guide/bootstrap `description`: `Configure-first entry for PVTKRR. Sports in Stremio are catalogued through SportsMeta, while playback still comes from your configured Prowlarr/qBittorrent setup. Use the Windows host or your self-host server, then install the generated PC Local, LAN Bridge, or Remote Seedbox route manifest. This bootstrap entry intentionally exposes no catalogs or streams.`
+
+Do not rename this manifest to `PVTKRR Setup` or remove the SportsMeta sports-cataloguing wording during version bumps, release-index refreshes, installer updates, or manifest refactors. The locked values live in `src/config/manifest.js` as `BOOTSTRAP_MANIFEST_NAME` and `PUBLIC_BOOTSTRAP_MANIFEST_DESCRIPTION`; `npm run smoke:config` asserts the public description exactly.
+
 To deploy code to real users:
 1. Push to `Kepners/pvtkrrx` branch `main`.
 2. Coolify auto-detects the new SHA but does **not** auto-deploy from a webhook — it only auto-deploys via its UI / API / artisan dispatch path. Trigger via the UI at `https://coolify.buildsales.homes`, or programmatically via the artisan tinker pattern documented below.

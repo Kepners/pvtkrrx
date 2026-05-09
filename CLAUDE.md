@@ -58,6 +58,12 @@
 - For stream proof, use a configured `https://www.pvtkrrx.cc/:config/stream/...` route, not the bootstrap `/stream/...` compatibility path.
 - For sports poster artwork, real SportsDB/SportsMeta logos win. PVTKRRX may compose client-safe PNG posters from SportsMeta member `homeBadge`, `awayBadge`, and `leagueLogo` routes server-side, but it must not show text initials when cached/source badge assets exist. Generated sport-specific SVG/PNG fallback is only for unresolved or truly missing-logo rows.
 
+### Bootstrap Manifest Name/Description Lock
+- Root `/manifest.json` is only the configure-first bootstrap entry (`com.kepners.pvtkrrx.bootstrap`). It must expose no catalogs, streams, or types.
+- The Stremio-visible bootstrap `name` must remain exactly `PVTKRR`. Never change it back to `PVTKRR Setup`, and do not add route, version, desktop, server, or marketing suffixes.
+- The public guide/bootstrap description must remain exactly: `Configure-first entry for PVTKRR. Sports in Stremio are catalogued through SportsMeta, while playback still comes from your configured Prowlarr/qBittorrent setup. Use the Windows host or your self-host server, then install the generated PC Local, LAN Bridge, or Remote Seedbox route manifest. This bootstrap entry intentionally exposes no catalogs or streams.`
+- Treat this as an update-stability contract. The locked source is `src/config/manifest.js`; `scripts/smoke-config-flow.js` must fail if the public name or description changes.
+
 ### Sports Posters Template Source
 - **Live generator (canonical, edit here):** `backdrops/python-backdrops/` inside this repo. Each family lives in its own numbered folder with a `generate.py` and shared helpers under `_shared/`.
 - **External reference designs (read-only, do NOT edit):** `C:\Users\kepne\projects\L - PVTKRRX\PCnestspeaker\python-templates` and `C:\Users\kepne\projects\L - PVTKRRX\backdrops\python-backdrops`. These are design studies for visual proportions only — they do not contain the live `08-team-vs-team` source and are not regenerated when the in-repo generator runs.

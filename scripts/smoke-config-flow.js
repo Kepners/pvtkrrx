@@ -725,9 +725,10 @@ async function run() {
     assert.equal(bootstrapManifestRes.status, 200, 'GET /manifest.json should return 200')
     const bootstrapManifest = await bootstrapManifestRes.json()
     assert.equal(bootstrapManifest.id, 'com.kepners.pvtkrrx.bootstrap')
-    assert.equal(bootstrapManifest.name, 'PVTKRR')
+    assert.equal(bootstrapManifest.name, manifest.BOOTSTRAP_MANIFEST_NAME)
     assert.match(String(bootstrapManifest.description || ''), /Configure-first entry/i)
     assert.match(String(bootstrapManifest.description || ''), /SportsMeta/i)
+    assert.notEqual(bootstrapManifest.name, 'PVTKRR Setup', 'root bootstrap manifest name must not reintroduce setup branding')
     assert.equal(bootstrapManifest.behaviorHints?.configurationRequired, true)
     assert.deepEqual(bootstrapManifest.resources, [], 'root bootstrap manifest should not advertise addon resources')
     assert.deepEqual(bootstrapManifest.catalogs, [], 'root bootstrap manifest should not advertise addon catalogs')
@@ -906,23 +907,30 @@ async function run() {
     assert.equal(rootManifestRes.status, 200, 'GET /manifest.json should return 200')
     const rootManifest = await rootManifestRes.json()
     assert.equal(rootManifest.id, 'com.kepners.pvtkrrx.bootstrap')
-    assert.equal(rootManifest.name, 'PVTKRR')
+    assert.equal(rootManifest.name, manifest.BOOTSTRAP_MANIFEST_NAME)
     assert.match(String(rootManifest.description || ''), /SportsMeta/i)
+    assert.notEqual(rootManifest.name, 'PVTKRR Setup', 'root manifest name must not reintroduce setup branding')
     assert.equal(rootManifest.behaviorHints?.configurationRequired, true)
     assert.deepEqual(rootManifest.catalogs, [], 'root manifest should stay bootstrap-only')
     const rootHostedManifestRes = await fetch(`${base}/manifest.json?mode=hosted`)
     assert.equal(rootHostedManifestRes.status, 200, 'GET /manifest.json?mode=hosted should return 200')
     const rootHostedManifest = await rootHostedManifestRes.json()
     assert.equal(rootHostedManifest.id, 'com.kepners.pvtkrrx.bootstrap')
-    assert.equal(rootHostedManifest.name, 'PVTKRR')
+    assert.equal(rootHostedManifest.name, manifest.BOOTSTRAP_MANIFEST_NAME)
     assert.match(String(rootHostedManifest.description || ''), /SportsMeta/i)
+    assert.notEqual(rootHostedManifest.name, 'PVTKRR Setup', 'hosted-mode root manifest name must not reintroduce setup branding')
     assert.equal(rootHostedManifest.behaviorHints?.configurationRequired, true)
     assert.deepEqual(rootHostedManifest.catalogs, [], 'hosted-mode root manifest should stay bootstrap-only')
 
     const publicBootstrapManifest = manifest.createBootstrapManifest('https://www.pvtkrrx.cc', {
       guideOnlyBootstrap: true
     })
-    assert.equal(publicBootstrapManifest.name, 'PVTKRR')
+    assert.equal(publicBootstrapManifest.name, manifest.BOOTSTRAP_MANIFEST_NAME)
+    assert.equal(
+      publicBootstrapManifest.description,
+      manifest.PUBLIC_BOOTSTRAP_MANIFEST_DESCRIPTION,
+      'public bootstrap manifest description is Stremio-visible copy and must not drift on update'
+    )
     assert.doesNotMatch(String(publicBootstrapManifest.description || ''), /website only|guide only/i)
     assert.match(String(publicBootstrapManifest.description || ''), /Configure-first entry for PVTKRR/i)
     assert.match(String(publicBootstrapManifest.description || ''), /SportsMeta/i)

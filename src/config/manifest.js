@@ -1,6 +1,9 @@
 const pkg = require('../../package.json')
 const { buildSportsCatalogManifestEntries } = require('./sportsCatalogs')
 
+const BOOTSTRAP_MANIFEST_NAME = 'PVTKRR'
+const PUBLIC_BOOTSTRAP_MANIFEST_DESCRIPTION = 'Configure-first entry for PVTKRR. Sports in Stremio are catalogued through SportsMeta, while playback still comes from your configured Prowlarr/qBittorrent setup. Use the Windows host or your self-host server, then install the generated PC Local, LAN Bridge, or Remote Seedbox route manifest. This bootstrap entry intentionally exposes no catalogs or streams.'
+
 const manifest = {
   id: 'com.kepners.pvtkrrx',
   version: pkg.version || '0.0.0',
@@ -65,8 +68,11 @@ function createBootstrapManifest(baseUrl = '', options = {}) {
   const selfHostServerMode = runtimeOptions.selfHostServerMode === true
   const desktopLocalOnly = runtimeOptions.desktopLocalOnly === true
   const guideOnlyBootstrap = runtimeOptions.guideOnlyBootstrap === true
+  // Stremio-visible lock: the public bootstrap manifest must stay named
+  // "PVTKRR" and keep the SportsMeta sports-cataloguing copy asserted in
+  // smoke:config and documented in AGENTS.md, CLAUDE.md, and BRAIN.md.
   const bootstrapDescription = guideOnlyBootstrap
-    ? 'Configure-first entry for PVTKRR. Sports in Stremio are catalogued through SportsMeta, while playback still comes from your configured Prowlarr/qBittorrent setup. Use the Windows host or your self-host server, then install the generated PC Local, LAN Bridge, or Remote Seedbox route manifest. This bootstrap entry intentionally exposes no catalogs or streams.'
+    ? PUBLIC_BOOTSTRAP_MANIFEST_DESCRIPTION
     : selfHostServerMode
       ? `Configure-first entry for the self-host server. Sports in Stremio are catalogued through SportsMeta, while this server provides the Prowlarr/qBittorrent-backed route manifest. Open ${configureUrl}, save the Remote Seedbox route on this server, then install the generated route manifest. This bootstrap entry intentionally exposes no catalogs or streams.`
       : desktopLocalOnly
@@ -75,7 +81,7 @@ function createBootstrapManifest(baseUrl = '', options = {}) {
   return {
     id: 'com.kepners.pvtkrrx.bootstrap',
     version: manifest.version,
-    name: manifest.name,
+    name: BOOTSTRAP_MANIFEST_NAME,
     description: bootstrapDescription,
     logo: logoUrl,
     resources: [],
@@ -90,6 +96,16 @@ function createBootstrapManifest(baseUrl = '', options = {}) {
 
 Object.defineProperty(manifest, 'createBootstrapManifest', {
   value: createBootstrapManifest,
+  enumerable: false
+})
+
+Object.defineProperty(manifest, 'BOOTSTRAP_MANIFEST_NAME', {
+  value: BOOTSTRAP_MANIFEST_NAME,
+  enumerable: false
+})
+
+Object.defineProperty(manifest, 'PUBLIC_BOOTSTRAP_MANIFEST_DESCRIPTION', {
+  value: PUBLIC_BOOTSTRAP_MANIFEST_DESCRIPTION,
   enumerable: false
 })
 
