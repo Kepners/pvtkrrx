@@ -78,8 +78,8 @@ const SESSION_WORDS = new Set([
 ])
 
 const MATCHUP_PREFIX_NOISE_RE = /\b(?:english\s+premier\s+league|major\s+league\s+soccer|premier\s+league|champions\s+league|europa\s+league|conference\s+league|uefa\s+nations\s+league|fifa\s+world\s+cup|world\s+cup\s+qualifiers?|euro\s+qualifiers?|european\s+championship|copa\s+america|afcon|asian\s+cup|conmebol\s+qualifiers?|concacaf\s+qualifiers?|international\s+friendlies?|fa\s+cup|la\s+liga|serie\s+a|bundesliga|college\s+football|world\s+series|stanley\s+cup|super\s+league\s+rugby|super\s+league|six\s+nations|premiership\s+rugby|rugby\s+championship|rugby\s+league|test\s+cricket|indian\s+premier\s+league|the\s+ashes|world\s+championship|world\s+matchplay|fight\s+night|main\s+card|main\s+event|regular\s+season|formula\s+1|formula\s+e|pga\s+tour|tour\s+de\s+france|giro\s+d['’]?italia|vuelta\s+a\s+espana|australian\s+open|roland\s+garros|us\s+open|nhl|mlb|nba|nfl|mls|epl|ipl|odi|t20|atp|wta|pdc|ufc|pfl|wwe|aew|pga|lpga|motogp|nascar|indycar|wrc|wec|bkfc|wc|football|baseball|hockey|basketball|cricket|rugby|tennis|boxing|mma|wrestling|darts|golf|motorsport|playoffs?|postseason|finals?|prelims?|heavyweight|matchroom|queensberry|masters|wimbledon|classics|rs)\b/gi
-const MATCHUP_SIDE_EXTRA_NOISE_RE = /\b(?:efl\s+championship|efl|elc|cpl|ufl|ohl|kings?\s+cup|primera\s+feb|ncaa\s+(?:women\s+)?softball|qf|sf|bign|big\s*ten(?:\s*network)?)\b/gi
-const MATCHUP_SIDE_EXTRA_NOISE_TEST_RE = /\b(?:efl\s+championship|efl|elc|cpl|ufl|ohl|kings?\s+cup|primera\s+feb|ncaa\s+(?:women\s+)?softball|qf|sf|bign|big\s*ten(?:\s*network)?)\b/i
+const MATCHUP_SIDE_EXTRA_NOISE_RE = /\b(?:efl\s+championship|efl|elc|cpl|ufl|ohl|kings?\s+cup|primera\s+feb|ncaa\s+(?:women\s+)?softball|qf|sf|bign|big\s*ten(?:\s*network)?|flo(?:hockey|sports?))\b/gi
+const MATCHUP_SIDE_EXTRA_NOISE_TEST_RE = /\b(?:efl\s+championship|efl|elc|cpl|ufl|ohl|kings?\s+cup|primera\s+feb|ncaa\s+(?:women\s+)?softball|qf|sf|bign|big\s*ten(?:\s*network)?|flo(?:hockey|sports?))\b/i
 
 const RELEASE_GROUP_NOISE_RE = /\b(?:m4rtyr|thecig|mwr|billie|mgp|ntb|ctrlhd|deflate|organic|tgx|nf|int)\b.*$/i
 const NBA_TEAM_PATTERN = /\b(?:atlanta\s+hawks|hawks|boston\s+celtics|celtics|brooklyn\s+nets|nets|charlotte\s+hornets|hornets|chicago\s+bulls|bulls|cleveland\s+cavaliers|cavs?|dallas\s+mavericks|mavs?|denver\s+nuggets|detroit\s+pistons|golden\s+state\s+warriors|houston\s+rockets|los\s+angeles\s+lakers|la\s+lakers|lakers|rockets|indiana\s+pacers|la\s+clippers|los\s+angeles\s+clippers|memphis\s+grizzlies|miami\s+heat|dallas\s+mavericks|denver\s+nuggets|phoenix\s+suns|milwaukee\s+bucks|minnesota\s+timberwolves|timberwolves|new\s+york\s+knicks|knicks|philadelphia\s+76ers|76ers|sixers|san\s+antonio\s+spurs|spurs|portland\s+trail\s+blazers|trail\s+blazers|blazers|oklahoma\s+city\s+thunder|okc\s+thunder|thunder|orlando\s+magic|sacramento\s+kings|toronto\s+raptors|utah\s+jazz|washington\s+wizards)\b/i
@@ -161,7 +161,7 @@ function cleanTrackerText(value) {
       .replace(/\b(?:2160p|1080p|1080i|720p|576p|540p|480p)(?:[a-z]{1,4})?(?:\d{2,3}(?:fps)?)?\b/gi, ' ')
       .replace(/\b\d{2,3}fps\b/gi, ' ')
       .replace(/\b(?:x264|x265|h264|h265|hevc|avc|av1|web(?:rip|dl)?|hdtv|repack|proper|complete|aac|ac3|ddp)\b/gi, ' ')
-      .replace(/\b(?:en|english|fubo|skynz|usan?|yes\s*network|yes|nesn|msg|espn(?:p|plus|\+)?|tnt(?:sports?)?|sky|nbc|fox|sn|sportsnet|eurosport|bign|big\s*ten(?:\s*network)?|seeders?|leechers?)\b/gi, ' ')
+      .replace(/\b(?:en|english|fubo|skynz|usan?|yes\s*network|yes|nesn|msg|espn(?:p|plus|\+)?|tnt(?:sports?)?|sky|nbc|fox|sn|sportsnet|eurosport|bign|big\s*ten(?:\s*network)?|flo(?:hockey|sports?)|seeders?|leechers?)\b/gi, ' ')
   )
 }
 

@@ -26,7 +26,8 @@ const BROADCAST_RULES = [
   ['Peacock', /\bpeacock\b/i],
   ['Kayo Sports', /\bkayo(?:[\s._-]*sports?)?\b/i],
   ['Apple TV', /\batvp?\b|\bapple[\s._-]*tv\b/i],
-  ['Big Ten Network', /\bbign\b|\bbig[\s._-]*ten(?:[\s._-]*network)?\b/i]
+  ['Big Ten Network', /\bbign\b|\bbig[\s._-]*ten(?:[\s._-]*network)?\b/i],
+  ['FloHockey', /\bflo(?:hockey|sports?)\b/i]
 ]
 
 const SESSION_RULES = [

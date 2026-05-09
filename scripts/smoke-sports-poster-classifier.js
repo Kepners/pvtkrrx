@@ -485,6 +485,13 @@ for (const testCase of [
     expectedAway: 'Monbus Obradoiro'
   },
   {
+    slug: 'flohockey-away-broadcast-stripped',
+    rawTitle: 'OHL Finals 2026 Barrie vs Kitchener Game 2 FloHockey',
+    sportHint: 'hockey',
+    expectedHome: 'Barrie',
+    expectedAway: 'Kitchener'
+  },
+  {
     slug: 'copa-sudamericana-competition-prefix-stripped',
     rawTitle: "Copa Sudamericana 2026 O'Higgins vs Sau Paulo",
     sportHint: 'football',
