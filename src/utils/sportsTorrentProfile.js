@@ -25,7 +25,9 @@ const BROADCAST_RULES = [
   ['BBC', /\bbbc\b/i],
   ['Peacock', /\bpeacock\b/i],
   ['Kayo Sports', /\bkayo(?:[\s._-]*sports?)?\b/i],
-  ['Apple TV', /\batvp?\b|\bapple[\s._-]*tv\b/i]
+  ['Apple TV', /\batvp?\b|\bapple[\s._-]*tv\b/i],
+  ['Big Ten Network', /\bbign\b|\bbig[\s._-]*ten(?:[\s._-]*network)?\b/i],
+  ['FloHockey', /\bflo(?:hockey|sports?)\b/i]
 ]
 
 const SESSION_RULES = [
@@ -81,7 +83,7 @@ function titleCase(value) {
       const upper = part.toUpperCase()
       if (upper === 'SMACKDOWN') return 'SmackDown'
       if (upper === 'WRESTLEMANIA') return 'WrestleMania'
-      if (['AAC', 'AV1', 'DDP', 'FA', 'F1', 'GP', 'HD', 'IPL', 'MLB', 'MLS', 'MMA', 'NBA', 'NFL', 'NHL', 'PGA', 'RAW', 'UFC', 'WRC', 'WWE', 'NXT'].includes(upper)) {
+      if (['AAC', 'AV1', 'BIGN', 'CPL', 'DDP', 'ELC', 'FA', 'F1', 'FC', 'FEB', 'GP', 'HD', 'IPL', 'MLB', 'MLS', 'MMA', 'NBA', 'NCAA', 'NFL', 'NHL', 'OHL', 'PGA', 'RAW', 'UFC', 'UFL', 'WRC', 'WWE', 'NXT'].includes(upper)) {
         return upper
       }
       if (upper === 'MOTOGP') return 'MotoGP'

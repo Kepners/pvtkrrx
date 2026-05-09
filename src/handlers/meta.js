@@ -365,8 +365,8 @@ async function handleCustomMeta(config, id, context = {}) {
         source: canonicalSportsMeta ? 'sportsmeta' : 'prowlarr'
       })
     : null
-  const eventClass = isSports
-    ? carriedEventClass || classifySportsEvent({
+  const classifiedEventClass = isSports
+    ? classifySportsEvent({
         sport: resolvedSportHint || normalizedSportsEvent?.sport || '',
         league: normalizedSportsEvent?.competition || league,
         title: normalizedSportsEvent?.eventTitle || displayTitle,
@@ -376,6 +376,9 @@ async function handleCustomMeta(config, id, context = {}) {
         awayTeam: normalizedSportsEvent?.awayTeam || awayTeam,
         rawTitle: normalizedSportsEvent?.rawTitle || info.t || displayTitle
       })
+    : ''
+  const eventClass = isSports
+    ? (classifiedEventClass === 'team_vs_team' ? 'team_vs_team' : (carriedEventClass || classifiedEventClass))
     : ''
 
   const artworkInput = {
