@@ -342,28 +342,44 @@
     }
 
     .hero-posters {
-      display: flex;
-      flex-direction: row;
-      gap: 8px;
-      padding: 8px;
-      overflow-x: auto;
-      overflow-y: hidden;
-      scroll-snap-type: x mandatory;
-      scrollbar-width: thin;
-      scrollbar-color: rgba(0, 246, 255, 0.35) transparent;
-      -webkit-overflow-scrolling: touch;
+      display: grid;
+      grid-template-columns: 1fr;
+      grid-template-rows: 1fr;
+      padding: 12px;
+      align-items: stretch;
+      justify-items: stretch;
     }
 
-    .hero-posters::-webkit-scrollbar { height: 6px; }
-    .hero-posters::-webkit-scrollbar-thumb { background: rgba(0, 246, 255, 0.35); border-radius: 3px; }
-
     .hero-posters img {
-      flex: 0 0 auto;
-      width: clamp(110px, 32%, 150px);
+      grid-area: 1 / 1;
+      width: 100%;
       height: auto;
       border-radius: 6px;
       background: #040812;
-      scroll-snap-align: start;
+      opacity: 0;
+      animation: hero-poster-rotate 24s infinite;
+      animation-fill-mode: both;
+      will-change: opacity;
+    }
+
+    .hero-posters img:nth-child(1) { animation-delay: 0s; }
+    .hero-posters img:nth-child(2) { animation-delay: 4s; }
+    .hero-posters img:nth-child(3) { animation-delay: 8s; }
+    .hero-posters img:nth-child(4) { animation-delay: 12s; }
+    .hero-posters img:nth-child(5) { animation-delay: 16s; }
+    .hero-posters img:nth-child(6) { animation-delay: 20s; }
+
+    @keyframes hero-poster-rotate {
+      0% { opacity: 0; }
+      2% { opacity: 1; }
+      15% { opacity: 1; }
+      18% { opacity: 0; }
+      100% { opacity: 0; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      .hero-posters img { animation: none; opacity: 0; }
+      .hero-posters img:first-child { opacity: 1; }
     }
 
     .kicker {
@@ -1319,7 +1335,7 @@
           <div class="hero-backdrop">
             <img src="/sports-backdrops/formula1-4k.jpg" width="3840" height="2160" alt="Reusable Formula 1 4K sports backdrop sample">
           </div>
-          <div class="hero-posters" role="region" aria-label="Free Ticket Stub fixture samples — scroll to see more">
+          <div class="hero-posters" role="region" aria-label="Free Ticket Stub fixture samples — auto-rotating">
             <img src="/sports-artwork/default/poster/football.png?league=Premier+League&amp;title=Arsenal+vs+Chelsea&amp;date=2026-04-30&amp;home=Arsenal&amp;away=Chelsea&amp;eventClass=team_vs_team&amp;seeders=42&amp;size=8.1+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" alt="Free Ticket Stub sports poster sample for an Arsenal vs Chelsea Premier League fixture">
             <img src="/sports-artwork/default/poster/baseball.png?league=MLB&amp;title=Boston+Red+Sox+vs+New+York+Yankees&amp;date=2026-04-30&amp;home=Boston+Red+Sox&amp;away=New+York+Yankees&amp;eventClass=team_vs_team&amp;seeders=14&amp;size=5.4+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" alt="Free Ticket Stub sports poster sample for a Red Sox vs Yankees MLB fixture">
             <img src="/sports-artwork/default/poster/basketball.png?league=NBA&amp;title=Detroit+Pistons+vs+Orlando+Magic&amp;date=2026-04-29&amp;home=Detroit+Pistons&amp;away=Orlando+Magic&amp;eventClass=team_vs_team&amp;seeders=18&amp;size=2.0+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" alt="Free Ticket Stub sports poster sample for a Pistons vs Magic NBA fixture">
@@ -1413,27 +1429,27 @@
       </div>
       <div class="poster-gallery" aria-label="SportsMeta member theme previews and 4K backdrops">
         <figure class="poster-example">
-          <img src="/sports-artwork/default/poster/football.png?league=UEFA+Champions+League&amp;title=Arsenal+vs+Atletico+Madrid&amp;date=2026-04-29&amp;home=Arsenal&amp;away=Atletico+Madrid&amp;eventClass=team_vs_team&amp;seeders=30&amp;size=6.2+GB&amp;source=prowlarr&amp;template=editorial&amp;v=20260509-member-style-v2" width="600" height="900" loading="lazy" decoding="async" alt="SportsMeta member Editorial poster sample for an Arsenal vs Atletico Madrid Champions League fixture">
+          <img src="/sports-style-samples/editorial.png" width="600" height="900" loading="lazy" decoding="async" alt="SportsMeta member Editorial poster sample showing magazine-style cover treatment for an Arsenal vs Chelsea Premier League fixture">
           <figcaption><strong>Editorial — SportsMeta member</strong>Magazine-style cover treatment available on the SportsMeta member install.</figcaption>
         </figure>
         <figure class="poster-example">
-          <img src="/sports-artwork/default/poster/football.png?league=Premier+League&amp;title=Manchester+City+vs+Liverpool&amp;date=2026-05-04&amp;home=Manchester+City&amp;away=Liverpool&amp;eventClass=team_vs_team&amp;seeders=55&amp;size=7.8+GB&amp;source=prowlarr&amp;template=broadcast&amp;v=20260509-member-style-v2" width="600" height="900" loading="lazy" decoding="async" alt="SportsMeta member Broadcast poster sample for a Manchester City vs Liverpool Premier League fixture">
+          <img src="/sports-style-samples/broadcast.png" width="600" height="900" loading="lazy" decoding="async" alt="SportsMeta member Broadcast poster sample showing two-side split layout for an England vs France international fixture">
           <figcaption><strong>Broadcast — SportsMeta member</strong>Two-side split layout for team-vs-team fixtures.</figcaption>
         </figure>
         <figure class="poster-example">
-          <img src="/sports-artwork/default/poster/basketball.png?league=NBA&amp;title=Los+Angeles+Lakers+vs+Boston+Celtics&amp;date=2026-05-02&amp;home=Los+Angeles+Lakers&amp;away=Boston+Celtics&amp;eventClass=team_vs_team&amp;seeders=33&amp;size=3.4+GB&amp;source=prowlarr&amp;template=sportsbook&amp;v=20260509-member-style-v2" width="600" height="900" loading="lazy" decoding="async" alt="SportsMeta member Sportsbook poster sample for a Lakers vs Celtics NBA fixture">
+          <img src="/sports-style-samples/sportsbook.png" width="600" height="900" loading="lazy" decoding="async" alt="SportsMeta member Sportsbook poster sample showing odds-board styling for a UFC fight card">
           <figcaption><strong>Sportsbook — SportsMeta member</strong>Odds-board styling for matchups and tip-off cards.</figcaption>
         </figure>
         <figure class="poster-example">
-          <img src="/sports-artwork/default/poster/mma.png?league=UFC&amp;title=UFC+312&amp;detail=Main+Event&amp;date=2026-06-14&amp;home=Du+Plessis&amp;away=Strickland&amp;eventClass=combat_event&amp;seeders=21&amp;size=4.7+GB&amp;source=prowlarr&amp;template=trading-card&amp;v=20260509-member-style-v2" width="600" height="900" loading="lazy" decoding="async" alt="SportsMeta member Trading Card poster sample for a UFC 312 main event fight card">
+          <img src="/sports-style-samples/trading-card.png" width="600" height="900" loading="lazy" decoding="async" alt="SportsMeta member Trading Card poster sample showing spotlight card layout for a Sinner vs Alcaraz tennis match">
           <figcaption><strong>Trading Card — SportsMeta member</strong>Spotlight card layout for fight nights and headline events.</figcaption>
         </figure>
         <figure class="poster-example">
-          <img src="/sports-artwork/default/poster/snooker.png?league=Snooker&amp;title=John+Higgins+vs+Shaun+Murphy&amp;date=2026-04-30&amp;home=John+Higgins&amp;away=Shaun+Murphy&amp;eventClass=racket_event&amp;seeders=6&amp;size=6.9+GB&amp;source=prowlarr&amp;template=brutalist&amp;v=20260509-member-style-v2" width="600" height="900" loading="lazy" decoding="async" alt="SportsMeta member Brutalist poster sample for a snooker fixture">
+          <img src="/sports-style-samples/brutalist.png" width="600" height="900" loading="lazy" decoding="async" alt="SportsMeta member Brutalist poster sample showing stripped-back type-led layout for a World Snooker Championship fixture">
           <figcaption><strong>Brutalist — SportsMeta member</strong>Stripped-back type-led layout for racket and table sports.</figcaption>
         </figure>
         <figure class="poster-example">
-          <img src="/sports-artwork/default/poster/motorsport.png?league=Formula+1&amp;title=British+Grand+Prix&amp;detail=Qualifying&amp;date=2026-07-04&amp;eventClass=motorsport_event&amp;seeders=24&amp;size=7.6+GB&amp;source=prowlarr&amp;template=glitch&amp;v=20260509-member-style-v2" width="600" height="900" loading="lazy" decoding="async" alt="SportsMeta member Glitch poster sample for a Formula 1 British Grand Prix qualifying session">
+          <img src="/sports-style-samples/glitch.png" width="600" height="900" loading="lazy" decoding="async" alt="SportsMeta member Glitch poster sample showing high-energy distorted treatment for a Formula 1 British Grand Prix qualifying session">
           <figcaption><strong>Glitch — SportsMeta member</strong>High-energy distorted treatment for motorsport sessions and headline events.</figcaption>
         </figure>
         <figure class="poster-example backdrop">
