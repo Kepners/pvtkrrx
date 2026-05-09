@@ -1810,7 +1810,7 @@ function getManifest(req) {
     : profile === 'selfhost'
       ? 'Self-Hosted Server'
     : profile === 'hybrid'
-      ? 'Hybrid Home'
+      ? 'LAN Bridge'
     : profile === 'lan'
       ? 'LAN Bridge'
       : 'Remote Seedbox'
@@ -1824,7 +1824,7 @@ function getManifest(req) {
     : profile === 'lan' ? '🖥️'
     : SELF_HOST_SERVER_MODE ? '☁️'
     : ''
-  const displayName = sourceTag ? `PVTKRRX ${sourceTag}` : 'PVTKRRX'
+  const displayName = sourceTag ? `PVTKRR ${sourceTag}` : 'PVTKRR'
 
   const nextManifest = {
     ...manifest,
@@ -1837,34 +1837,34 @@ function getManifest(req) {
   if (profile === 'local') {
     return {
       ...nextManifest,
-      description: 'Local addon for the same Windows PC running PVTKRRX. Browse movies, TV, sports, and library, and stream directly from the local server.'
+      description: 'PC Local route for the Windows PC running PVTKRR. Uses your configured Prowlarr/qBittorrent setup and serves sports, movies, TV, and library from this local runtime.'
     }
   }
 
   if (profile === 'lan') {
     return {
       ...nextManifest,
-      description: 'LAN Bridge addon for your other home devices. Browse movies, TV, sports, and library, then redirect playback into the paired Windows host.'
+      description: 'Legacy LAN Bridge route for other home devices. Requires the paired Windows host to be online on the home network and redirects playback into that host.'
     }
   }
 
   if (profile === 'hybrid') {
     return {
       ...nextManifest,
-      description: 'Hybrid Home addon for one synced Stremio account. Use LAN playback automatically at home, then fall back to your hosted cloud endpoints away from home.'
+      description: 'LAN Bridge route for TVs, phones, and other home devices on the same Stremio account. Uses the paired Windows host at home and can fall back to configured public endpoints away from home.'
     }
   }
 
   if (profile === 'selfhost') {
     return {
       ...nextManifest,
-      description: 'Self-hosted server addon. Browse movies, TV, sports, and library, and stream directly from your seedbox.'
+      description: 'Self-hosted server route for your own VPS or seedbox. Uses this server runtime and its saved Prowlarr/qBittorrent config for sports, movies, TV, and library playback.'
     }
   }
 
   return {
     ...nextManifest,
-    description: 'Remote Seedbox addon for ready-file playback away from home. Browse movies, TV, sports, and library through your configured public file server.'
+    description: 'Remote Seedbox route for public away-from-home playback. Uses your configured public endpoints and ready-file paths for sports, movies, TV, and library streams.'
   }
 }
 

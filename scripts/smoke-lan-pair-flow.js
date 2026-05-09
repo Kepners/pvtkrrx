@@ -381,6 +381,9 @@ async function run() {
     assert.equal(hybridManifestRes.status, 200, 'hybrid manifest should resolve')
     const hybridManifest = await hybridManifestRes.json()
     assert.equal(hybridManifest?.id, 'com.kepners.pvtkrrx.hybrid', 'hybrid token should use dedicated hybrid manifest id')
+    assert.match(String(hybridManifest?.name || ''), /^PVTKRR(?:\s|$)/, 'hybrid manifest should use the current visible addon name')
+    assert.match(String(hybridManifest?.description || ''), /LAN Bridge route/i, 'hybrid manifest should use the LAN Bridge product label')
+    assert.doesNotMatch(String(hybridManifest?.description || ''), /Hybrid Home/i, 'hybrid manifest should not leak the old product label')
 
     const hybridCatalog = await requestWithHostHeader(
       port,
