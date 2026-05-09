@@ -37,6 +37,7 @@ const BROADCAST_WORDMARK = 'PVTKRRX \u00b7 BROADCAST'
 const { buildPaidTemplateMatchup } = require('./sportsPosterAdapter')
 const {
   classifySportsPosterEvent,
+  hasActualPair,
   isCompetitorVsCompetitorEvent
 } = require('./sportsPosterClassifier')
 
@@ -142,11 +143,14 @@ function layoutFamilyForSportsPosterRender(value, event = {}) {
   const template = normalizeSportsPosterTemplate(value)
   if (template === 'broadcast') return 'BROADCAST'
   const explicit = normalizeSpace(event.layoutFamily || event.sportsArtwork?.layoutFamily).toUpperCase()
-  if (explicit === 'TEAM_VS_TEAM') return 'TEAM_VS_TEAM'
+  const paired = hasActualPair(event)
+  const classifiedClass = classifySportsPosterEvent(event)
+  const teamLayoutAllowed = paired && classifiedClass === 'team_vs_team'
+  if (explicit === 'TEAM_VS_TEAM' && teamLayoutAllowed) return 'TEAM_VS_TEAM'
   if (explicit === 'COMPETITOR_VS_COMPETITOR') return 'COMPETITOR_VS_COMPETITOR'
   if (explicit === 'SINGLE_EVENT_MOTORSPORT') return 'SINGLE_EVENT_MOTORSPORT'
-  const eventClass = normalizeSpace(event.eventClass || event.posterClass) || classifySportsPosterEvent(event)
-  if (eventClass === 'team_vs_team') return 'TEAM_VS_TEAM'
+  const eventClass = normalizeSpace(event.eventClass || event.posterClass) || classifiedClass
+  if (eventClass === 'team_vs_team' && teamLayoutAllowed) return 'TEAM_VS_TEAM'
   if (isCompetitorVsCompetitorEvent({ ...event, eventClass })) return 'COMPETITOR_VS_COMPETITOR'
   if (eventClass === 'motorsport_event') return 'SINGLE_EVENT_MOTORSPORT'
   return layoutFamilyForSportsPosterTemplate(template)
@@ -432,7 +436,8 @@ function pickRealSide(...candidates) {
 }
 
 function templateData(event = {}, theme = {}, mode = '') {
-  const eventClass = event.eventClass || event.posterClass || classifySportsPosterEvent(event)
+  const classifiedClass = classifySportsPosterEvent(event)
+  const eventClass = event.eventClass || event.posterClass || classifiedClass
   const data = buildPaidTemplateMatchup(event, eventClass)
   const requestedMode = normalizeKey(mode)
   const eventFormat = ['matchup', 'single', 'solo'].includes(requestedMode)
@@ -456,14 +461,15 @@ function templateData(event = {}, theme = {}, mode = '') {
   // event title text, never by a fake "vs" layout.
   const rawLeft = pickRealSide(event.principalA, event.homeTeam, event.home?.name, event.fighterA, event.playerA, event.teamA)
   const rawRight = pickRealSide(event.principalB, event.awayTeam, event.away?.name, event.fighterB, event.playerB, event.teamB)
-  const hasRealPair = Boolean(rawLeft && rawRight && rawLeft.toLowerCase() !== rawRight.toLowerCase())
+  const hasRealPair = Boolean(hasActualPair(event) && rawLeft && rawRight && rawLeft.toLowerCase() !== rawRight.toLowerCase())
+  const teamLayoutAllowed = eventClass !== 'team_vs_team' || classifiedClass === 'team_vs_team'
   const motorsportNeverPair = eventClass === 'motorsport_event'
   // Audit fix (contract §4 row 1 fallback + Q2.3 + G8): team_vs_team with no
   // real pair must downgrade to tournament_event so we don't render a fake
   // "Highlights vs Highlights" matchup. Without this guard, the adapter still
   // returns event_format='matchup' for team_vs_team class even when no real
   // sides parsed.
-  const teamWithoutPair = eventClass === 'team_vs_team' && !hasRealPair
+  const teamWithoutPair = eventClass === 'team_vs_team' && (!hasRealPair || !teamLayoutAllowed)
   // Wrestling per Q5.4 / contract §4 row 5: event-show shape, no fake paired
   // headline. Suppress matchup layout even when test data supplies a fake
   // headline pair.
@@ -1193,15 +1199,7 @@ function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') 
   const homeBadgeY = 320
   const awayBadgeX = 430
   const awayBadgeY = 580
-  const broadcastSlots = m.hasMatchup
-    ? [
-        { role: 'league', left: 30, top: 24, size: 42 },
-        { role: 'home', left: homeBadgeX - badgeR, top: homeBadgeY - badgeR, size: badgeR * 2 },
-        { role: 'away', left: awayBadgeX - badgeR, top: awayBadgeY - badgeR, size: badgeR * 2 }
-      ]
-    : [
-        { role: 'league', left: 30, top: 24, size: 42 }
-      ]
+  const broadcastSlots = []
   const codeFontSize = (code) => code.length <= 2 ? 32 : code.length <= 3 ? 28 : 22
   const codeYOffset = (code) => Math.round(codeFontSize(code) * 0.34)
   const pairBlock = m.hasMatchup ? `

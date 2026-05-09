@@ -13,6 +13,14 @@ const TEAM_LANGUAGE_RE = /\b(?:en|english|spanish|french|german|italian|portugue
 const TEAM_PRESENTATION_RE = /\b(?:condensed(?:\s*game)?|extended(?:\s*highlights?)?|highlights?|replay)\b/gi
 const TEAM_TAIL_NOISE_RE = /^(?:game|games|round|matchday|main|card|pre|post|episode|show|event|fight|full|review|preview|highlights?|replay|coverage|studio|apple|tv|fubo|beinsport\d*|skynz|z3r0|nva|wrestlemania|east|west|western|eastern|conference|centre|center|court|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|rs|qf|sf|wcqf|ecqf|wcsf|ecsf|wcf|ecf|f\d*|r\d+|m\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
 const EVENT_SOURCE_NOISE_RE = /^(?:apple|tv|atvp?|fubo|skynz|kayo|z3r0|nva|espn(?:p|plus|\+)?|f1tv|fs1|nesn|msg|usan?|nbc(?:sn|sba|sca)?|sny|snla|snp|sky|sports|fox|bbc|itv|cbs|abc|tnt|peacock|eurosport|nordic)$/i
+const TEAM_SIDE_LEADING_COMPETITION_RE = /^(?:(?:english\s+)?premier\s+league|efl\s+championship|championship|uefa\s+champions\s+league|champions\s+league|uefa\s+conference\s+league|conference\s+league|uecl|uefa\s+europa\s+league|europa\s+league|copa\s+libertadores|copa\s+sudamericana|copa\s+america|basketball\s+champions\s+league(?:\s+of\s+americas)?|ncaa\s+(?:women\s+)?softball|ncaa\s+(?:women\s+)?basketball|ncaa\s+football|wnba\s+(?:pre?s|preseason)|turkish\s+league|rsl|afl|final\s+four|four|f4|league|l\d+)\b/i
+const TEAM_SIDE_EXACT_COMPETITION_RE = /^(?:(?:english\s+)?premier\s+league|efl\s+championship|championship|uefa\s+champions\s+league|champions\s+league|uefa\s+conference\s+league|conference\s+league|uecl|uefa\s+europa\s+league|europa\s+league|copa\s+libertadores|copa\s+sudamericana|basketball\s+champions\s+league(?:\s+of\s+americas)?|ncaa\s+(?:women\s+)?softball|ncaa\s+(?:women\s+)?basketball|ncaa\s+football|wnba\s+(?:pre?s|preseason)|turkish\s+league|rsl|afl|final\s+four|four|f4|league|l\d+)$/i
+const TEAM_SIDE_SEASON_NOISE_RE = /^(?:(?:19|20)\d{2}(?:[/-]\d{2})?|pre?s|preseason|quarter\s*final|semi\s*final|(?:\d{1,2}(?:st|nd|rd|th)?\s+)?leg|first\s+leg|second\s+leg|full\s+match|post\s+match|pre\s+show|pre\s+match|game\s*\d+|round\s*\d+|r\d+|g\d+|gm\d+|f\d+|\d{1,2}(?:st|nd|rd|th)?|\d{1,2})\b/i
+const TEAM_SIDE_TRAILING_SPORT_NOISE_RE = /\b(?:4k|hockey|ice\s+hockey|basketball|football|baseball|softball|soccer|rugby)\s*$/i
+// Game-state injections appear between team name and "vs" in MLB rescheduled
+// games and a few other sports: "Colorado Rockies Makeup of vs New York Mets".
+// Strip the trailing phrase so it does not become part of the team name.
+const TEAM_SIDE_TRAILING_GAME_STATE_RE = /\b(?:make[\s-]*up\s+of|completion\s+of|continuation\s+of|resumption\s+of|postponed|suspended|rain[\s-]*delayed?|resumed|tba)\s*$/i
 
 // Known league/series tokens that start non-vs event titles
 const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|PFL|Bellator|ONE|WWE|AEW|TNA|ROH|NJPW|MotoGP|Moto\s*GP|NASCAR|IndyCar|WRC|Supercars|Supercars\s*Championship|V8SC|Bathurst|WSBK|WEC|FormulaE|Rally|Dakar|PGA|PGA\s*Tour|LPGA|LPGA\s*Tour|Masters|ATP|ATP\s*World\s*Tour|WTA|WTA\s*Tour|Wimbledon|Australian\s*Open|Roland\s*Garros|French\s*Open|US\s*Open|U\.S\.\s*Open|Davis\s*Cup|Laver\s*Cup|PDC|PDC\s*Darts|Premier\s*League\s*Darts|World\s*Championship\s*Darts|World\s*Matchplay|IPL|IPLM\d+|Indian\s*Premier\s*League|MLS|Major\s*League\s*Soccer|MLB|Major\s*League\s*Baseball|NCAA\s*Baseball|World\s*Baseball\s*Classic|NBA|NBA\s*Playoffs|EuroLeague|EasyCredit\s*BBL|Basketball\s*Champions\s*League(?:\s*of\s*Americas)?|Super\s*Rugby|MLR|Major\s*League\s*Rugby|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
@@ -188,16 +196,24 @@ function shouldExpandKnownSportsTeamAlias(options = {}) {
 }
 
 function titleCase(value = '') {
+  const upperTokens = new Set([
+    'AC', 'AEK', 'AEW', 'AFCON', 'AFC', 'ATP', 'CF', 'EFL', 'EPL', 'FA', 'F1', 'FC',
+    'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA',
+    'NBA', 'NCAA', 'NFL', 'NHL', 'NJPW', 'NXT', 'PDC', 'PFL', 'PGA', 'PPV',
+    'PSG', 'ROH', 'SC', 'TNA', 'UCL', 'UCLA', 'UECL', 'UEFA', 'UFC', 'UEL',
+    'WC', 'WEC', 'WNBA', 'WRC', 'WTA', 'WWE'
+  ])
   return normalizeSegment(value)
     .split(/\s+/)
     .filter(Boolean)
     .map((part) => {
       const upper = part.toUpperCase()
-      if (['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'F1', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'NBA', 'NFL', 'NHL', 'NXT', 'PDC', 'PFL', 'PGA', 'PPV', 'UFC', 'UEFA', 'WC', 'WEC', 'WRC', 'WTA', 'WWE'].includes(upper)) return upper
+      if (upperTokens.has(upper)) return upper
       if (upper === 'MOTOGP') return 'MotoGP'
       if (upper === 'SMACKDOWN') return 'SmackDown'
       if (upper === 'WRESTLEMANIA') return 'WrestleMania'
-      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+      const cased = part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+      return cased.replace(/\bO'([a-z])/g, (_, letter) => `O'${letter.toUpperCase()}`)
     })
     .join(' ')
 }
@@ -233,6 +249,32 @@ function isReleaseGroupToken(token) {
   return RELEASE_GROUP_RE.test(String(token || '').trim())
 }
 
+function stripCompetitionSideNoise(value = '') {
+  let text = normalizeSegment(value)
+  if (!text) return ''
+
+  let changed = true
+  while (changed && text) {
+    const before = text
+    text = normalizeSegment(
+      text
+        .replace(TEAM_SIDE_LEADING_COMPETITION_RE, ' ')
+        .replace(TEAM_SIDE_SEASON_NOISE_RE, ' ')
+    )
+    changed = text !== before
+  }
+
+  text = normalizeSegment(
+    text
+      .replace(/\b(?:19|20)\d{2}(?:[/-]\d{2})?\b/g, ' ')
+      .replace(/\b(?:pre?s|preseason)\b/gi, ' ')
+      .replace(TEAM_SIDE_TRAILING_GAME_STATE_RE, ' ')
+      .replace(TEAM_SIDE_TRAILING_SPORT_NOISE_RE, ' ')
+  )
+
+  return TEAM_SIDE_EXACT_COMPETITION_RE.test(text) ? '' : text
+}
+
 function splitEventTitleTokens(raw) {
   const dotted = String(raw || '').split('.').map(token => token.trim()).filter(Boolean)
   if (dotted.length >= 2) return dotted
@@ -243,7 +285,7 @@ function splitMatchupTitleTokens(raw) {
   return String(raw || '')
     .replace(/([A-Za-z0-9])@([A-Za-z0-9])/g, '$1 @ $2')
     .replace(/[()[\]{}]/g, ' ')
-    .replace(/[._/\\:,-]+/g, ' ')
+    .replace(/[._/\\:,;|-]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .split(/\s+/)
@@ -486,7 +528,7 @@ function trimLeadingTeamNoise(tokens) {
 }
 
 function normalizeTeamLabel(value, options = {}) {
-  const cleaned = normalizeSegment(
+  const cleaned = stripCompetitionSideNoise(normalizeSegment(
     String(value || '')
       .replace(/\([^)]*\)/g, ' ')
       .replace(/\b\d+\s+of\s+\d+\b/gi, ' ')
@@ -497,7 +539,7 @@ function normalizeTeamLabel(value, options = {}) {
       .replace(TEAM_PRESENTATION_RE, ' ')
       .replace(/\b(?:mlb|nba(?:\s+playoffs?)?|nfl|nhl|mls|ipl|pga(?:\s+tour)?|motogp|ufc|mma|pfl|bellator|atp|wta|pdc|darts?|wc|world\s+championship|snooker|tennis|boxing)\b$/gi, ' ')
       .replace(/\b(?:r\d+|gm\d+|g\d+|\d{2,3}fps|fps)\b/gi, ' ')
-  )
+  ))
   return shouldExpandKnownSportsTeamAlias(options) ? normalizeKnownSportsTeamAlias(cleaned) : cleaned
 }
 
@@ -1062,5 +1104,6 @@ function parseSportsEventTitle(title, fallbackDate = '') {
 module.exports = {
   parseSportsTitle,
   parseSportsEventTitle,
-  normalizeKnownSportsTeamAlias
+  normalizeKnownSportsTeamAlias,
+  stripCompetitionSideNoise
 }

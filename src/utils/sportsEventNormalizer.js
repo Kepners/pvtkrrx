@@ -1,7 +1,8 @@
 const {
   parseSportsTitle,
   parseSportsEventTitle,
-  normalizeKnownSportsTeamAlias
+  normalizeKnownSportsTeamAlias,
+  stripCompetitionSideNoise
 } = require('./sportsTitleParser')
 const { normalizeSportKey, resolveSportHint } = require('./sportsRules')
 const { getMappedLeagueEntry, mapLeague } = require('./leagueMap')
@@ -86,12 +87,18 @@ function normalizeSpace(value) {
 }
 
 function titleCase(value) {
+  const upperTokens = new Set([
+    'AC', 'AEK', 'AFC', 'AEW', 'CF', 'EFL', 'EPL', 'FA', 'F1', 'FC', 'FIFA', 'GP',
+    'IPL', 'MLB', 'MLS', 'MMA', 'MOTOGP', 'NBA', 'NCAA', 'NFL', 'NHL', 'NJPW',
+    'PGA', 'PSG', 'ROH', 'SC', 'TNA', 'UCL', 'UCLA', 'UECL', 'UEFA', 'UFC',
+    'UEL', 'WC', 'WEC', 'WNBA', 'WRC', 'WWE'
+  ])
   return normalizeSpace(value)
     .split(/[\s-]+/)
     .filter(Boolean)
     .map((part, index) => {
       const upper = part.toUpperCase()
-      if (['EPL', 'FA', 'F1', 'GP', 'IPL', 'MLB', 'MLS', 'MMA', 'MOTOGP', 'NBA', 'NFL', 'NHL', 'PGA', 'UFC', 'WC', 'WRC', 'WWE'].includes(upper)) {
+      if (upperTokens.has(upper)) {
         return upper === 'MOTOGP' ? 'MotoGP' : upper
       }
       const lower = part.toLowerCase()
@@ -101,7 +108,8 @@ function titleCase(value) {
       if (/^O[A-Z][a-z]+/.test(part) || /^[A-Z][a-z]+[A-Z][a-z]+/.test(part)) {
         return part
       }
-      return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+      const cased = part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
+      return cased.replace(/\bO'([a-z])/g, (_, letter) => `O'${letter.toUpperCase()}`)
     })
     .join(' ')
 }
@@ -147,11 +155,11 @@ function labelsMatch(left = '', right = '') {
 function cleanTrackerText(value) {
   return normalizeSpace(
     String(value || '')
-      .replace(/[._]+/g, ' ')
-      .replace(/\b(?:2160p|1080p|1080i|720p|576p|540p|480p)(?:\d{2,3}(?:fps)?)?\b/gi, ' ')
+      .replace(/[._/|]+/g, ' ')
+      .replace(/\b(?:2160p|1080p|1080i|720p|576p|540p|480p)(?:[a-z]{1,4})?(?:\d{2,3}(?:fps)?)?\b/gi, ' ')
       .replace(/\b\d{2,3}fps\b/gi, ' ')
       .replace(/\b(?:x264|x265|h264|h265|hevc|avc|av1|web(?:rip|dl)?|hdtv|repack|proper|complete|aac|ac3|ddp)\b/gi, ' ')
-      .replace(/\b(?:en|english|fubo|skynz|usan?|yes\s*network|yes|nesn|msg|espn(?:p|plus|\+)?|tnt|sky|nbc|fox|sn|sportsnet|eurosport)\b/gi, ' ')
+      .replace(/\b(?:en|english|fubo|skynz|usan?|yes\s*network|yes|nesn|msg|espn(?:p|plus|\+)?|tnt(?:sports?)?|sky|nbc|fox|sn|sportsnet|eurosport|seeders?|leechers?)\b/gi, ' ')
   )
 }
 
@@ -174,7 +182,8 @@ function stripMatchupSideNoise(value, side = 'left') {
     .replace(/[{}\[\]()]/g, ' ')
     .replace(RELEASE_GROUP_NOISE_RE, ' ')
     .replace(MATCHUP_PREFIX_NOISE_RE, ' ')
-    .replace(/\b(?:ucl|quarter\s+final|semi\s+final|first\s+leg|second\s+leg|leg)\b/gi, ' ')
+    .replace(/\b(?:ucl|quarter\s*final|semi\s*final|first\s+leg|second\s+leg|full\s+match|post\s+match|pre\s+show|pre\s+match|leg)\b/gi, ' ')
+    .replace(/\b(?:uefa|semi|quarter|final)\b/gi, ' ')
     .replace(/\b\d{1,2}(?:st|nd|rd|th)\b/gi, ' ')
     .replace(/\b(?:game|gm|g|r|round)\s*\d+\b/gi, ' ')
     .replace(/\b(?:19|20)\d{2}\b/g, ' ')
@@ -208,7 +217,8 @@ function cleanMatchupSide(value, side = 'left', options = {}) {
     /\b(?:ucl|elc|quarter\s+final|semi\s+final|first\s+leg|second\s+leg|leg)\b/i.test(raw) ||
     /\b\d{1,2}(?:st|nd|rd|th)\b/i.test(raw) ||
     /\b(?:19|20)\d{2}\b/.test(raw)
-  const label = hasNoise ? titleCase(stripMatchupSideNoise(raw, side)) : titleCase(raw)
+  const stripped = stripCompetitionSideNoise(hasNoise ? stripMatchupSideNoise(raw, side) : raw)
+  const label = titleCase(stripped)
   return shouldExpandKnownTeamAlias(options) ? normalizeKnownSportsTeamAlias(label) : label
 }
 

@@ -25,6 +25,7 @@ const fs = require('node:fs')
 const path = require('node:path')
 
 const { mapSportsCultCategory } = require('../src/config/sportsCultCategoryMap')
+const { normalizeSportsEventMetadata } = require('../src/utils/sportsEventNormalizer')
 const {
   POSTER_CLASSES,
   classifySportsPosterEvent
@@ -73,25 +74,32 @@ for (const sample of samples) {
     canonicalSportMatches += 1
   }
 
+  const normalized = normalizeSportsEventMetadata({
+    rawTitle: sample.title,
+    source: 'prowlarr',
+    sportHint: entry.appSportHint,
+    competition: sample.parsedCompetition || entry.topLevelLabel || sourceCategory
+  })
+
   // Replay the classifier against the same SportsCult context the fixture
-  // captured. We pass the parsed home/away from the fixture so the classifier
-  // sees the same `hasActualPair` signal the fixture saw at generation time.
+  // captured, but with current parser output so stale parsedHome/parsedAway
+  // fixture artifacts cannot re-authorize fake matchups.
   const classified = classifySportsPosterEvent({
-    sportKey: sample.appSportHint,
-    sportHint: sample.appSportHint,
-    sport: sample.parsedSport,
-    competition: sample.parsedCompetition,
-    league: sample.parsedCompetition,
-    eventTitle: sample.parsedTitle,
-    eventName: sample.parsedTitle,
+    sportKey: entry.appSportHint,
+    sportHint: entry.appSportHint,
+    sport: normalized.sport || sample.parsedSport,
+    competition: normalized.competition || sample.parsedCompetition,
+    league: normalized.competition || sample.parsedCompetition,
+    eventTitle: normalized.eventTitle || sample.parsedTitle,
+    eventName: normalized.eventName || normalized.eventTitle || sample.parsedTitle,
     title: sample.title,
     rawTitle: sample.title,
-    eventDetail: sample.parsedDetail,
-    detail: sample.parsedDetail,
-    homeTeam: sample.parsedHome,
-    awayTeam: sample.parsedAway,
-    principalA: sample.parsedHome,
-    principalB: sample.parsedAway,
+    eventDetail: normalized.eventDetail || sample.parsedDetail,
+    detail: normalized.eventDetail || sample.parsedDetail,
+    homeTeam: normalized.homeTeam || '',
+    awayTeam: normalized.awayTeam || '',
+    principalA: normalized.principalA || normalized.homeTeam || '',
+    principalB: normalized.principalB || normalized.awayTeam || '',
     sportsCultCategory: sourceCategory,
     sportsCultCategoryNames: sample.categoryNames,
     indexerCategoryName: sample.indexerCategoryName

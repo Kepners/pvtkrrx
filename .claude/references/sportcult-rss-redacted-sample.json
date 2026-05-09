@@ -1,7 +1,7 @@
 {
   "generatedAt": "2026-04-30T16:01:04.665Z",
   "source": "sportscult.org RSS feed (credentials redacted, download URLs stripped)",
-  "note": "Regenerated from the existing redacted titles with the current PVTKRRX normalizer/classifier. SportsCult RSS embeds category in [Brackets] at start of title; categoryNames XML element was absent on the captured feed, so bracket categories are replayed as categoryNames/indexerCategoryName for audit reasoning. parsedHome/parsedAway are current normalized fields only; poster classification does not invent missing pairs from tracker/indexer names.",
+  "note": "Redacted SportsCult RSS replay sample. SportsCult RSS embeds category in [Brackets] at start of title; categoryNames XML element was absent on the captured feed, so bracket categories are replayed as categoryNames/indexerCategoryName for audit reasoning. parsedHome/parsedAway are retained parser reference fields; the smoke script classifies current normalized parser output so stale fields cannot re-authorize missing or fake pairs.",
   "itemCount": 20,
   "samples": [
     {
@@ -38,9 +38,9 @@
       "proposedPosterMode": "solo",
       "parsedSport": "Football",
       "parsedCompetition": "UEFA Champions League",
-      "parsedTitle": "Arsenal",
+      "parsedTitle": "Atletico Madrid vs Arsenal",
       "parsedDetail": "",
-      "parsedHome": "",
+      "parsedHome": "Atletico Madrid",
       "parsedAway": "Arsenal",
       "parsedEvent": ""
     },
@@ -98,9 +98,9 @@
       "proposedPosterMode": "matchup",
       "parsedSport": "Football",
       "parsedCompetition": "UEFA Champions League",
-      "parsedTitle": "| vs Arsenal",
+      "parsedTitle": "Atletico Madrid vs Arsenal",
       "parsedDetail": "",
-      "parsedHome": "|",
+      "parsedHome": "Atletico Madrid",
       "parsedAway": "Arsenal",
       "parsedEvent": ""
     },
@@ -134,13 +134,13 @@
       "sourceCategory": "Champions League",
       "appSportHint": "football",
       "canonicalSport": "football",
-      "detectedPosterClass": "tournament_event",
-      "proposedPosterMode": "solo",
+      "detectedPosterClass": "team_vs_team",
+      "proposedPosterMode": "matchup",
       "parsedSport": "Football",
       "parsedCompetition": "UEFA Champions League",
-      "parsedTitle": "Arsenal",
+      "parsedTitle": "Atletico Madrid vs Arsenal",
       "parsedDetail": "",
-      "parsedHome": "",
+      "parsedHome": "Atletico Madrid",
       "parsedAway": "Arsenal",
       "parsedEvent": ""
     },
