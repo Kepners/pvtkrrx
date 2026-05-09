@@ -5,11 +5,11 @@ Audit and verify the sports template/rendering system after the SportsCult contr
 
 Product/system boundary:
 - PVTKRRX is the Stremio addon/runtime.
-- SportsCult/Prowlarr results remain the source of truth for what appears in the sports catalog.
+- Prowlarr/Torznab-compatible indexers remain the source of truth for what appears in the sports catalog. SportsCult is one supported source/profile, not a requirement.
 - TheSportsDB is enrichment only: posters, fanart, thumbnails, league/team/event metadata where available.
 - Do NOT flip the catalog to TheSportsDB schedule-first.
-- Do NOT show events unless SportsCult/Prowlarr has them.
-- Non-SportsCult sports sources may appear as extra stream sources only when they match a SportsCult-owned event.
+- Do NOT show events unless the user's configured Prowlarr/Torznab-compatible indexers have them.
+- Non-SportsCult sports sources may create catalog rows when they pass the same sports filters and category/title-confidence rules.
 - Hosted relay must not become a video proxy.
 - Preserve the three-route model: PC Local, LAN Bridge, Remote Seedbox.
 
@@ -143,8 +143,8 @@ If screenshots cannot be generated automatically, create a manual verification H
 Phase 5 — negative regression checks
 Prove these do NOT regress:
 - Movie/TV sports contamination filter still blocks sports-only indexers from movie/TV searches.
-- Sports catalog still uses SportsCult/Prowlarr availability, not TheSportsDB schedule browsing.
-- Non-SportsCult sports results do not create independent catalog tiles.
+- Sports catalog still uses Prowlarr/Torznab availability, not TheSportsDB schedule browsing.
+- Non-SportsCult sports results can create independent catalog tiles when they pass the same sports filters and category/title-confidence rules.
 - SVG fallback remains available when artwork cannot be found.
 - Hosted /file and /playback still fail fast where required.
 - PC Local, LAN Bridge, Remote Seedbox route model remains unchanged.
@@ -166,7 +166,7 @@ Do not hide missing scripts. If a command does not exist, mark it as NOT AVAILAB
 Phase 7 — acceptance criteria
 Work is not complete unless all are true:
 
-1. SportsCult/Prowlarr remains the catalog source of truth.
+1. Prowlarr/Torznab-compatible indexers remain the catalog source of truth; SportsCult is one supported source/profile, not a requirement.
 2. TheSportsDB enrichment improves posters/backdrops but does not populate schedule-only catalog items.
 3. Sports templates are explicitly audited.
 4. At least four representative template families are rendered or screenshot-tested.

@@ -216,7 +216,7 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
   - `weak_match`
   - `fallback_only`
 - Resolved sports rows now emit the raw canonical SportsMeta id on the addon-facing catalog/meta/stream path while retaining an internal availability anchor back to the original Prowlarr tracker item so stream playback stays tied to the real torrent source.
-- SportsCult-owned Prowlarr results drive sports catalog rows when the result passes the sports title/detail filters. Category-limited `5060` searches remain the first pass, and non-SportsCult Prowlarr sports results can attach only as extra stream sources after they clearly match a SportsCult-owned catalog event.
+- Prowlarr/Torznab-compatible indexers drive sports catalog rows when a returned result passes the sports title/detail filters. SportsCult is one supported Prowlarr source/profile, not a requirement. Category-limited `5060` searches remain the first pass; when category hints are missing or broad, PVTKRRX falls back to conservative title parsing instead of requiring a SportsCult anchor.
 - Sports detail meta now exposes Stremio `genres` tags from the resolved sport classification when available.
 - Sports title parsing now handles both team-vs-team formats (`EPL.2026.03.15.Arsenal.vs.Chelsea`) and non-vs event formats (`Formula1.2026.03.28.Japanese.Grand.Prix.Qualifying`, `UFC.Fight.Night.270.Main.Card`).
 - Motorsport coverage now includes F1, MotoGP, NASCAR, IndyCar, WRC, Supercars/V8, WSBK, WEC, and Formula E.

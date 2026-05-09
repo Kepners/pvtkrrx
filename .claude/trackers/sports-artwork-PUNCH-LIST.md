@@ -95,6 +95,41 @@ Everything else is either an asset drop (Phase 5.1) or routine release housekeep
 
 ---
 
+## Update 2026-05-04 19:35 — LIVE & FIXED ✅
+
+**Both production runtimes now render posters with correct text:**
+
+| Runtime | URL | SOURCE_COMMIT | Status |
+|---|---|---|---|
+| Coolify Docker container (public) | `https://www.pvtkrrx.cc/sports-artwork/default/poster/...png` | `7b7eee4` | ✅ HTTP 200, text renders, no `□` boxes — see [.claude/proofs/sports-artwork/coolify-post-deploy/](.claude/proofs/sports-artwork/coolify-post-deploy/) |
+| systemd `pvtkrrx.service` (Contabo seedbox at pvt.kepners.co.uk) | `https://pvt.kepners.co.uk/selfhost/manifest.json?mode=hosted` | `64d3132` | ✅ HTTP 200, text renders, ready to install in Stremio |
+
+**Three Coolify build attempts:**
+- Build 562 (push of merge `64d3132`) — **failed** on nixpacks (default build pack, didn't use Dockerfile, apt-get hung).
+- Build 563 (after flipping `applications.build_pack` to `dockerfile` in Coolify DB) — **failed** during BuildKit layer export because `.git/` (4.6GB) was in the build context.
+- Build 564 (after committing `.dockerignore`, push `7b7eee4`) — **finished**. Container swapped, raster cache busted.
+
+**Live container fonts**: 41 total — `Bebas Neue` (1), `Inter` (10), `Playfair Display` (14), `JetBrains Mono` (16). The fc-list assertion in the Dockerfile makes this regression impossible to silently ship again — build fails if any canonical font is missing.
+
+**End-to-end verification proof**: live PNG samples at [.claude/proofs/sports-artwork/coolify-post-deploy/](.claude/proofs/sports-artwork/coolify-post-deploy/) — pulled from the public URL after the container swap + cache bust, all 600×900 RGBA PNGs, all text reads cleanly.
+
+## Update 2026-05-01 18:30 — DEPLOYED to main (Coolify rebuild in flight)
+
+Three commits pushed to `origin/main` (fe44f93..64d3132):
+
+1. `16ccef5` 🔥 fix: sports artwork contract enforcement — 336/336 cells PASS
+2. `a74b459` 🚨 fix: install fonts in Coolify container — fixes □-text on every live poster
+3. `d0cd391` 🧹 docs: sports artwork audit trail (briefs, trackers, reconciled docs)
+
+Plus the merge commit `64d3132` 🚀 merge: sports artwork contract + Coolify font fix.
+
+**Coolify rebuild was triggered by the push.** Monitor polling every 30s for `SOURCE_COMMIT=64d3132` on the live container.
+
+Post-deploy actions still to run after the rebuild completes:
+- `ssh contabo 'rm -rf /opt/pvtkrrx/data/pvtkrrx/sports-artwork-raster-cache/* /opt/pvtkrrx/runtime/sports-artwork-raster-cache/*'` (cache bust so old □-text PNGs are evicted)
+- Re-probe `https://www.pvtkrrx.cc/sports-artwork/default/poster/football.png?title=ProbeMatch&template=ticket-stub` and visually inspect — should show "PROBEMATCH" cleanly, no `□` boxes
+- Update this punch list with deploy verdict
+
 ## Update 2026-05-01 16:00 — what shipped after the user said "carry on and don't stop"
 
 ### 🚨 Critical production bug found AND fixed locally (not yet deployed)

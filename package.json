@@ -1,6 +1,6 @@
 {
   "name": "pvtkrrx",
-  "version": "1.1.65",
+  "version": "1.1.66",
   "description": "PVTKRRX — Stream from your private tracker seedbox through Stremio",
   "main": "index.js",
   "scripts": {
@@ -26,6 +26,7 @@
     "smoke:sportcult-rss-replay": "node scripts/smoke-sportcult-rss-replay.js",
     "smoke:sports-template-families": "node scripts/smoke-sports-template-families.js",
     "smoke:free-tier-artwork": "node scripts/smoke-free-tier-artwork.js",
+    "smoke:entitlement": "node scripts/smoke-entitlement.js",
     "smoke:sports-catalog-seeds": "node scripts/smoke-sports-catalog-seeds.js",
     "smoke:sports-latency": "node scripts/smoke-sports-catalog-latency.js",
     "smoke:sports-catalog-latency": "node scripts/smoke-sports-catalog-latency.js",

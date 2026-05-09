@@ -1,0 +1,438 @@
+#!/usr/bin/env node
+'use strict'
+
+const assert = require('node:assert/strict')
+
+// Set ENCRYPTION_SECRET BEFORE shared.js is required so the runtime accepts
+// the smoke-only secret. Other env vars are flipped per scenario below.
+process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET ||
+  'smoke-entitlement-secret-aaaaaaaaaaaaaaaaaaaa'
+
+const {
+  ENTITLEMENT_SOURCE,
+  resolveSportsPosterEntitlement,
+  verifyStampedSportsPosterEntitlement,
+  hashEmailForOwnerCheck,
+  clampSportsPosterTemplate
+} = require('../src/utils/entitlement')
+const {
+  SPORTS_POSTER_TEMPLATES,
+  normalizeSportsPosterTemplate
+} = require('../src/utils/sportsPosterTemplates')
+const {
+  normalizeAddonConfig,
+  applySportsPosterEntitlement,
+  buildConfigReadback
+} = require('../src/lib/shared')
+const {
+  resolveSportsPosterAsset,
+  resolveSportsArtworkLayoutFamily
+} = require('../src/utils/sportsArtwork')
+
+const OWNER_EMAIL = 'kepners@gmail.com'
+const ADMIN_EMAIL = 'admin@pvtkrrx.cc'
+const PAID_USER_EMAIL = 'paid@example.com'
+const UNPAID_USER_EMAIL = 'unpaid@example.com'
+const PAID_TEMPLATES = ['editorial', 'broadcast', 'sportsbook', 'trading-card', 'brutalist', 'glitch']
+
+async function withEnv(values, fn) {
+  const previous = {}
+  for (const [key, value] of Object.entries(values)) {
+    previous[key] = process.env[key]
+    if (value === undefined || value === null) delete process.env[key]
+    else process.env[key] = String(value)
+  }
+  try {
+    return await fn()
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key]
+      else process.env[key] = value
+    }
+  }
+}
+
+function assertEntitlement(actual, expected, label) {
+  assert.equal(actual.source, expected.source, `${label}: source ${actual.source} != ${expected.source}`)
+  assert.deepEqual(
+    [...actual.allowedTemplates].sort(),
+    [...expected.allowedTemplates].sort(),
+    `${label}: allowedTemplates`
+  )
+  assert.equal(actual.resolvedTemplate, expected.resolvedTemplate, `${label}: resolvedTemplate`)
+  assert.equal(actual.allowed, expected.allowed, `${label}: allowed`)
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// 1. Resolver precedence (owner > admin > manual_grant > member_token > trial > none)
+// ────────────────────────────────────────────────────────────────────────
+function testOwnerOverrideByEmail() {
+  withEnv({ PVTKRRX_OWNER_EMAILS: OWNER_EMAIL }, () => {
+    const entitlement = resolveSportsPosterEntitlement({
+      user: { email: OWNER_EMAIL, id: 'usr_owner' },
+      requestedTemplate: 'glitch'
+    })
+    assertEntitlement(entitlement, {
+      source: ENTITLEMENT_SOURCE.OWNER_OVERRIDE,
+      allowedTemplates: SPORTS_POSTER_TEMPLATES,
+      resolvedTemplate: 'glitch',
+      allowed: true
+    }, 'owner override by email')
+    assert.equal(entitlement.ownerEmailHash, hashEmailForOwnerCheck(OWNER_EMAIL), 'owner ownerEmailHash')
+  })
+}
+
+function testOwnerOverrideByStremioUserId() {
+  withEnv({ PVTKRRX_OWNER_STREMIO_USER_IDS: 'stremio-user-abc' }, () => {
+    const entitlement = resolveSportsPosterEntitlement({
+      user: { id: 'usr_x', stremio: { userId: 'stremio-user-abc' } },
+      requestedTemplate: 'broadcast'
+    })
+    assertEntitlement(entitlement, {
+      source: ENTITLEMENT_SOURCE.OWNER_OVERRIDE,
+      allowedTemplates: SPORTS_POSTER_TEMPLATES,
+      resolvedTemplate: 'broadcast',
+      allowed: true
+    }, 'owner override by Stremio userId')
+  })
+}
+
+function testAdminOverride() {
+  withEnv({ PVTKRRX_ADMIN_EMAILS: ADMIN_EMAIL }, () => {
+    const entitlement = resolveSportsPosterEntitlement({
+      user: { email: ADMIN_EMAIL, id: 'usr_admin' },
+      requestedTemplate: 'editorial'
+    })
+    assertEntitlement(entitlement, {
+      source: ENTITLEMENT_SOURCE.ADMIN_OVERRIDE,
+      allowedTemplates: SPORTS_POSTER_TEMPLATES,
+      resolvedTemplate: 'editorial',
+      allowed: true
+    }, 'admin override')
+  })
+}
+
+function testManualGrantOnAccount() {
+  const entitlement = resolveSportsPosterEntitlement({
+    user: {
+      email: PAID_USER_EMAIL,
+      id: 'usr_paid',
+      entitlements: { sportsPosterTemplates: ['broadcast', 'editorial'] }
+    },
+    requestedTemplate: 'broadcast'
+  })
+  assertEntitlement(entitlement, {
+    source: ENTITLEMENT_SOURCE.MANUAL_GRANT,
+    allowedTemplates: ['broadcast', 'editorial', 'ticket-stub'],
+    resolvedTemplate: 'broadcast',
+    allowed: true
+  }, 'manual grant – allowed template')
+
+  const blocked = resolveSportsPosterEntitlement({
+    user: {
+      email: PAID_USER_EMAIL,
+      id: 'usr_paid',
+      entitlements: { sportsPosterTemplates: ['broadcast'] }
+    },
+    requestedTemplate: 'glitch'
+  })
+  assert.equal(blocked.resolvedTemplate, 'ticket-stub', 'manual grant – non-granted template clamped')
+}
+
+function testMemberTokenOnConfig() {
+  const entitlement = resolveSportsPosterEntitlement({
+    user: { email: PAID_USER_EMAIL, id: 'usr_paid' },
+    config: { sportsPosterMemberToken: 'sm_xxx' },
+    requestedTemplate: 'sportsbook'
+  })
+  assert.equal(entitlement.source, ENTITLEMENT_SOURCE.MEMBER_TOKEN, 'member token source')
+  assert.equal(entitlement.resolvedTemplate, 'sportsbook', 'member token resolved template')
+}
+
+function testTrialActive() {
+  const entitlement = resolveSportsPosterEntitlement({
+    user: { email: PAID_USER_EMAIL, id: 'usr_trial', trial: { active: true } },
+    requestedTemplate: 'trading-card'
+  })
+  assert.equal(entitlement.source, ENTITLEMENT_SOURCE.TRIAL, 'trial source')
+  assert.equal(entitlement.resolvedTemplate, 'trading-card', 'trial resolved template')
+}
+
+function testUnpaidUser() {
+  const entitlement = resolveSportsPosterEntitlement({
+    user: { email: UNPAID_USER_EMAIL, id: 'usr_unpaid' },
+    requestedTemplate: 'glitch'
+  })
+  assertEntitlement(entitlement, {
+    source: ENTITLEMENT_SOURCE.NONE,
+    allowedTemplates: ['ticket-stub'],
+    resolvedTemplate: 'ticket-stub',
+    allowed: false
+  }, 'unpaid user blocked')
+}
+
+function testSelfHostAdminFlag() {
+  const entitlement = resolveSportsPosterEntitlement({
+    user: null,
+    requestedTemplate: 'sportsbook',
+    selfHostAdmin: true
+  })
+  assert.equal(entitlement.source, ENTITLEMENT_SOURCE.ADMIN_OVERRIDE, 'self-host admin source')
+  assert.equal(entitlement.resolvedTemplate, 'sportsbook', 'self-host admin resolved template')
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// 2. normalizeAddonConfig respects options.entitlement and clamps when absent
+// ────────────────────────────────────────────────────────────────────────
+function testNormalizeWithoutEntitlementClamps() {
+  const normalized = normalizeAddonConfig({ sportsPosterTemplate: 'glitch' })
+  assert.equal(normalized.sportsPosterTemplate, 'ticket-stub', 'unstamped → ticket-stub')
+  assert.equal(normalized.entitlementSource, ENTITLEMENT_SOURCE.NONE, 'unstamped source')
+  assert.equal(normalized.entitlementOwnerEmailHash, undefined, 'no owner hash on unstamped')
+}
+
+function testNormalizeWithOwnerEntitlementPreserves() {
+  const ownerHash = hashEmailForOwnerCheck(OWNER_EMAIL)
+  const normalized = normalizeAddonConfig({ sportsPosterTemplate: 'broadcast' }, {
+    entitlement: {
+      source: ENTITLEMENT_SOURCE.OWNER_OVERRIDE,
+      allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
+      resolvedTemplate: 'broadcast',
+      allowed: true,
+      ownerEmailHash: ownerHash
+    }
+  })
+  assert.equal(normalized.sportsPosterTemplate, 'broadcast', 'owner entitlement preserves template')
+  assert.equal(normalized.entitlementSource, ENTITLEMENT_SOURCE.OWNER_OVERRIDE, 'stamped owner source')
+  assert.equal(normalized.entitlementOwnerEmailHash, ownerHash, 'stamped owner hash')
+}
+
+function testNormalizeRevokesWhenOwnerRemovedFromEnv() {
+  const ownerHash = hashEmailForOwnerCheck(OWNER_EMAIL)
+  withEnv({ PVTKRRX_OWNER_EMAILS: '' }, () => {
+    const normalized = normalizeAddonConfig({
+      sportsPosterTemplate: 'broadcast',
+      entitlementSource: ENTITLEMENT_SOURCE.OWNER_OVERRIDE,
+      entitlementOwnerEmailHash: ownerHash
+    })
+    assert.equal(normalized.sportsPosterTemplate, 'ticket-stub', 'revoked owner downgraded')
+    assert.equal(normalized.entitlementSource, ENTITLEMENT_SOURCE.NONE, 'revoked source becomes none')
+    assert.equal(normalized.entitlementOwnerEmailHash, undefined, 'revoked owner hash dropped')
+  })
+}
+
+function testNormalizeHonoursOwnerWhenEnvStillContains() {
+  const ownerHash = hashEmailForOwnerCheck(OWNER_EMAIL)
+  withEnv({ PVTKRRX_OWNER_EMAILS: OWNER_EMAIL }, () => {
+    const normalized = normalizeAddonConfig({
+      sportsPosterTemplate: 'glitch',
+      entitlementSource: ENTITLEMENT_SOURCE.OWNER_OVERRIDE,
+      entitlementOwnerEmailHash: ownerHash
+    })
+    assert.equal(normalized.sportsPosterTemplate, 'glitch', 'env-confirmed owner keeps template')
+    assert.equal(normalized.entitlementSource, ENTITLEMENT_SOURCE.OWNER_OVERRIDE, 'env-confirmed source preserved')
+  })
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// 3. End-to-end save path stamps entitlement and unlocks the URL builder
+// ────────────────────────────────────────────────────────────────────────
+async function testApplySportsPosterEntitlementForOwnerSave() {
+  await withEnv({ PVTKRRX_OWNER_EMAILS: OWNER_EMAIL }, async () => {
+    const initial = normalizeAddonConfig({ sportsPosterTemplate: 'broadcast' }) // forced to ticket-stub
+    const { config: stamped, entitlement } = await applySportsPosterEntitlement(initial, {
+      requestedTemplate: 'broadcast',
+      user: { email: OWNER_EMAIL, id: 'usr_owner' }
+    })
+    assert.equal(stamped.sportsPosterTemplate, 'broadcast', 'owner save unlocks broadcast')
+    assert.equal(stamped.entitlementSource, ENTITLEMENT_SOURCE.OWNER_OVERRIDE, 'stamped owner source')
+    assert.equal(entitlement.source, ENTITLEMENT_SOURCE.OWNER_OVERRIDE, 'returned entitlement source')
+
+    const eventInput = {
+      baseUrl: 'https://www.pvtkrrx.cc',
+      sportsmetaBaseUrl: 'https://sportsmeta.pvtkrrx.cc',
+      sportsPosterTemplate: stamped.sportsPosterTemplate,
+      entitlementSource: stamped.entitlementSource,
+      entitlementOwnerEmailHash: stamped.entitlementOwnerEmailHash,
+      canonicalId: 'sportsmeta:event:football|2026-04-10|epl|arsenal-vs-chelsea',
+      sportHint: 'football',
+      league: 'EPL',
+      title: 'Arsenal vs Chelsea',
+      date: '2026-04-10',
+      source: 'sportsmeta'
+    }
+    const poster = resolveSportsPosterAsset(eventInput)
+    const tplFromUrl = new URL(poster.poster).searchParams.get('template')
+    assert.equal(tplFromUrl, 'broadcast', 'URL builder honours owner-stamped template')
+    assert.equal(poster.selectedTemplate, 'broadcast', 'resolveSportsPosterAsset selectedTemplate')
+    assert.equal(resolveSportsArtworkLayoutFamily(eventInput), 'BROADCAST', 'broadcast layoutFamily')
+  })
+}
+
+async function testApplySportsPosterEntitlementForUnpaidSave() {
+  // No env owner/admin entries, no manual grant, no member token, no trial.
+  await withEnv({ PVTKRRX_OWNER_EMAILS: '', PVTKRRX_ADMIN_EMAILS: '' }, async () => {
+    const initial = normalizeAddonConfig({ sportsPosterTemplate: 'glitch' })
+    const { config: stamped, entitlement } = await applySportsPosterEntitlement(initial, {
+      requestedTemplate: 'glitch',
+      user: { email: UNPAID_USER_EMAIL, id: 'usr_unpaid' }
+    })
+    assert.equal(stamped.sportsPosterTemplate, 'ticket-stub', 'unpaid save clamped to ticket-stub')
+    assert.equal(stamped.entitlementSource, ENTITLEMENT_SOURCE.NONE, 'unpaid source = none')
+    assert.equal(entitlement.allowed, false, 'unpaid entitlement.allowed = false')
+
+    const eventInput = {
+      baseUrl: 'https://www.pvtkrrx.cc',
+      sportsmetaBaseUrl: 'https://sportsmeta.pvtkrrx.cc',
+      sportsPosterTemplate: stamped.sportsPosterTemplate,
+      entitlementSource: stamped.entitlementSource,
+      entitlementOwnerEmailHash: stamped.entitlementOwnerEmailHash,
+      canonicalId: 'sportsmeta:event:football|2026-04-10|epl|test',
+      sportHint: 'football',
+      league: 'EPL',
+      title: 'Test'
+    }
+    const poster = resolveSportsPosterAsset(eventInput)
+    const tplFromUrl = new URL(poster.poster).searchParams.get('template')
+    assert.equal(tplFromUrl, 'ticket-stub', 'URL builder still ticket-stub for unpaid')
+  })
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// 4. Replay protection: forged stamps without env confirmation are rejected
+// ────────────────────────────────────────────────────────────────────────
+function testForgedOwnerStampWithoutEnvIsRejected() {
+  withEnv({ PVTKRRX_OWNER_EMAILS: OWNER_EMAIL }, () => {
+    const fakeHash = hashEmailForOwnerCheck('attacker@example.com')
+    const verified = verifyStampedSportsPosterEntitlement({
+      requestedTemplate: 'broadcast',
+      stampedSource: ENTITLEMENT_SOURCE.OWNER_OVERRIDE,
+      stampedHash: fakeHash
+    })
+    assert.equal(verified.source, ENTITLEMENT_SOURCE.NONE, 'forged owner hash rejected')
+    assert.equal(verified.resolvedTemplate, 'ticket-stub', 'forged owner falls back')
+  })
+}
+
+function testRuntimeURLIgnoresStaleQueryAfterRevocation() {
+  // Decrypted config no longer trusts stamp; URL builders read from input.
+  const eventInput = {
+    baseUrl: 'https://www.pvtkrrx.cc',
+    sportsmetaBaseUrl: 'https://sportsmeta.pvtkrrx.cc',
+    sportsPosterTemplate: 'broadcast', // attacker tries to set
+    entitlementSource: '', // no stamp
+    entitlementOwnerEmailHash: '',
+    canonicalId: 'sportsmeta:event:football|2026-04-10|epl|stale-test',
+    sportHint: 'football',
+    league: 'EPL',
+    title: 'Stale Test'
+  }
+  const poster = resolveSportsPosterAsset(eventInput)
+  const tplFromUrl = new URL(poster.poster).searchParams.get('template')
+  assert.equal(tplFromUrl, 'ticket-stub', 'stale ?template ignored without entitlement stamp')
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// 5. buildConfigReadback exposes entitlement source + allowed templates
+// ────────────────────────────────────────────────────────────────────────
+function testReadbackExposesEntitlement() {
+  const ownerHash = hashEmailForOwnerCheck(OWNER_EMAIL)
+  withEnv({ PVTKRRX_OWNER_EMAILS: OWNER_EMAIL }, () => {
+    const persisted = normalizeAddonConfig({
+      sportsPosterTemplate: 'glitch',
+      entitlementSource: ENTITLEMENT_SOURCE.OWNER_OVERRIDE,
+      entitlementOwnerEmailHash: ownerHash
+    })
+    const readback = buildConfigReadback(persisted)
+    assert.equal(readback.entitlement.source, ENTITLEMENT_SOURCE.OWNER_OVERRIDE, 'readback source')
+    assert.equal(readback.entitlement.allowed, true, 'readback allowed = true')
+    assert.equal(readback.sportsPosterTemplate, 'glitch', 'readback resolved template')
+    assert.deepEqual(
+      [...readback.entitlement.allowedSportsPosterTemplates].sort(),
+      [...SPORTS_POSTER_TEMPLATES].sort(),
+      'readback exposes all 7 allowed templates for owner'
+    )
+    assert.equal(readback.entitlementOwnerEmailHash, undefined, 'owner email hash not leaked to readback')
+  })
+}
+
+function testReadbackForUnpaid() {
+  withEnv({ PVTKRRX_OWNER_EMAILS: '', PVTKRRX_ADMIN_EMAILS: '' }, () => {
+    const persisted = normalizeAddonConfig({ sportsPosterTemplate: 'glitch' })
+    const readback = buildConfigReadback(persisted)
+    assert.equal(readback.entitlement.source, ENTITLEMENT_SOURCE.NONE, 'unpaid readback source')
+    assert.equal(readback.entitlement.allowed, false, 'unpaid readback allowed = false')
+    assert.deepEqual(
+      readback.entitlement.allowedSportsPosterTemplates,
+      ['ticket-stub'],
+      'unpaid readback only allows ticket-stub'
+    )
+  })
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// 6. Locked template family contract — must remain 7
+// ────────────────────────────────────────────────────────────────────────
+function testTemplateContractIntact() {
+  assert.equal(SPORTS_POSTER_TEMPLATES.length, 7, 'template contract must remain 7 families')
+  for (const t of PAID_TEMPLATES) {
+    assert.equal(normalizeSportsPosterTemplate(t), t, `${t} normalizer round-trip`)
+  }
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// 7. clampSportsPosterTemplate enforces allow-list on every call
+// ────────────────────────────────────────────────────────────────────────
+function testClampHelper() {
+  const ownerEntitlement = {
+    source: ENTITLEMENT_SOURCE.OWNER_OVERRIDE,
+    allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
+    resolvedTemplate: 'broadcast',
+    allowed: true
+  }
+  const noneEntitlement = {
+    source: ENTITLEMENT_SOURCE.NONE,
+    allowedTemplates: ['ticket-stub'],
+    resolvedTemplate: 'ticket-stub',
+    allowed: false
+  }
+  assert.equal(clampSportsPosterTemplate('broadcast', ownerEntitlement), 'broadcast', 'owner clamp owner-allowed')
+  assert.equal(clampSportsPosterTemplate('glitch', ownerEntitlement), 'glitch', 'owner clamp glitch-allowed')
+  assert.equal(clampSportsPosterTemplate('broadcast', noneEntitlement), 'ticket-stub', 'no entitlement clamps broadcast')
+  assert.equal(clampSportsPosterTemplate('', noneEntitlement), 'ticket-stub', 'no entitlement clamps empty')
+}
+
+async function main() {
+  testTemplateContractIntact()
+  await testOwnerOverrideByEmail()
+  await testOwnerOverrideByStremioUserId()
+  await testAdminOverride()
+  testManualGrantOnAccount()
+  testMemberTokenOnConfig()
+  testTrialActive()
+  testUnpaidUser()
+  testSelfHostAdminFlag()
+  testNormalizeWithoutEntitlementClamps()
+  testNormalizeWithOwnerEntitlementPreserves()
+  await testNormalizeRevokesWhenOwnerRemovedFromEnv()
+  await testNormalizeHonoursOwnerWhenEnvStillContains()
+  await testApplySportsPosterEntitlementForOwnerSave()
+  await testApplySportsPosterEntitlementForUnpaidSave()
+  await testForgedOwnerStampWithoutEnvIsRejected()
+  testRuntimeURLIgnoresStaleQueryAfterRevocation()
+  await testReadbackExposesEntitlement()
+  await testReadbackForUnpaid()
+  testClampHelper()
+
+  console.log(
+    'Entitlement smoke passed. ' +
+    'precedence=owner_override>admin_override>manual_grant>member_token>trial>none ' +
+    'sources=owner|admin|manual|token|trial|none ' +
+    'normalize=owner-preserve+revoke unpaid=blocked readback=visible'
+  )
+}
+
+main().catch((err) => {
+  console.error(err.stack || err.message)
+  process.exit(1)
+})

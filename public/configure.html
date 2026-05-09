@@ -2520,6 +2520,7 @@
             <li>Save the server-side Prowlarr, qBittorrent, file serving, and path settings on that private server.</li>
             <li>Install <code>Remote Seedbox</code> from your own server origin. Keep <code>pvtkrrx.cc</code> out of the private control plane unless you intentionally want the official relay.</li>
           </ol>
+          <p class="setup-guide-copy">No public HTTPS domain yet? Use same-PC <code>127.0.0.1</code> for PC Local, or use the hosted PVTKRRX route. A raw IP HTTP addon URL is not a stable Stremio install path.</p>
           <div class="setup-guide-actions">
             <button class="btn-copy" type="button" onclick="focusInstallTarget('seedbox')">Focus Private Server Flow</button>
           </div>
@@ -6431,7 +6432,7 @@
         provider: document.getElementById('provider').value,
         fileServerUrl: fileServerUrlInput ? fileServerUrlInput.replace(/\/+$/, '') : '',
         fileServerAuth: document.getElementById('fileServerAuth').value.trim(),
-        sportsPosterTemplate: 'ticket-stub',
+        sportsPosterTemplate: resolveSelectedSportsPosterTemplate('ticket-stub'),
         pathMapping: {
           from: document.getElementById('pathFrom').value,
           to: document.getElementById('pathTo').value
@@ -6491,9 +6492,12 @@
       if (typeof config.watchedDeleteGraceSeconds === 'number' && Number.isFinite(config.watchedDeleteGraceSeconds)) {
         document.getElementById('watchedDeleteGraceSeconds').value = String(config.watchedDeleteGraceSeconds);
       }
+      applySportsPosterEntitlementToUi(config.entitlement || null);
       const templateSelect = document.getElementById('sportsPosterTemplate');
       if (templateSelect) {
-        templateSelect.value = 'ticket-stub';
+        const desired = String(config.sportsPosterTemplate || 'ticket-stub').trim() || 'ticket-stub';
+        const allowed = Array.from(templateSelect.options).map((opt) => opt.value);
+        templateSelect.value = allowed.includes(desired) ? desired : 'ticket-stub';
         scheduleSportsPosterTemplateAutoSave();
       }
       if (config.localHostname) {
@@ -6754,7 +6758,80 @@
     }
 
     function scheduleSportsPosterTemplateAutoSave() {
-      setSportsPosterTemplateStatus('ok', 'Included sports style: Ticket Stub. Non-ticket templates are not selected by the free PVTKRRX configure flow.');
+      const entitlement = window.__pvtkrrxSportsPosterEntitlement || null;
+      const allowed = entitlement && Array.isArray(entitlement.allowedSportsPosterTemplates)
+        ? entitlement.allowedSportsPosterTemplates
+        : ['ticket-stub'];
+      const select = document.getElementById('sportsPosterTemplate');
+      const value = select && allowed.includes(select.value) ? select.value : 'ticket-stub';
+      const labels = {
+        editorial: 'Editorial',
+        broadcast: 'Broadcast',
+        sportsbook: 'Sportsbook',
+        'trading-card': 'Trading Card',
+        brutalist: 'Brutalist',
+        'ticket-stub': 'Ticket Stub',
+        glitch: 'Glitch'
+      };
+      const sourceLabel = entitlement && entitlement.source ? entitlement.source : 'none';
+      if (sourceLabel === 'owner_override' || sourceLabel === 'admin_override') {
+        setSportsPosterTemplateStatus('ok', 'Server-side ' + sourceLabel.replace('_', ' ') + ' active. Selected style: ' + (labels[value] || value) + '.');
+      } else if (sourceLabel === 'manual_grant' || sourceLabel === 'member_token' || sourceLabel === 'trial') {
+        setSportsPosterTemplateStatus('ok', 'Entitlement source: ' + sourceLabel.replace('_', ' ') + '. Selected style: ' + (labels[value] || value) + '.');
+      } else {
+        setSportsPosterTemplateStatus('ok', 'Included sports style: Ticket Stub. Other templates require an entitlement (owner override, admin override, manual grant, member token, or trial).');
+      }
+    }
+
+    function resolveSelectedSportsPosterTemplate(fallback) {
+      const safeFallback = String(fallback || 'ticket-stub').trim() || 'ticket-stub';
+      const select = document.getElementById('sportsPosterTemplate');
+      const entitlement = window.__pvtkrrxSportsPosterEntitlement || null;
+      const allowed = entitlement && Array.isArray(entitlement.allowedSportsPosterTemplates)
+        ? entitlement.allowedSportsPosterTemplates
+        : ['ticket-stub'];
+      if (!select) return safeFallback;
+      const value = String(select.value || '').trim();
+      return value && allowed.includes(value) ? value : safeFallback;
+    }
+
+    function applySportsPosterEntitlementToUi(entitlement) {
+      window.__pvtkrrxSportsPosterEntitlement = entitlement && typeof entitlement === 'object'
+        ? entitlement
+        : { source: 'none', allowed: false, allowedSportsPosterTemplates: ['ticket-stub'], resolvedSportsPosterTemplate: 'ticket-stub' };
+      const select = document.getElementById('sportsPosterTemplate');
+      if (!select) return;
+      const allowed = Array.isArray(window.__pvtkrrxSportsPosterEntitlement.allowedSportsPosterTemplates)
+        ? window.__pvtkrrxSportsPosterEntitlement.allowedSportsPosterTemplates.slice()
+        : ['ticket-stub'];
+      const labels = {
+        editorial: 'Editorial',
+        broadcast: 'Broadcast',
+        sportsbook: 'Sportsbook',
+        'trading-card': 'Trading Card',
+        brutalist: 'Brutalist',
+        'ticket-stub': 'Ticket Stub',
+        glitch: 'Glitch'
+      };
+      const present = new Set(Array.from(select.options).map((opt) => opt.value));
+      for (const template of allowed) {
+        if (present.has(template)) continue;
+        const opt = document.createElement('option');
+        opt.value = template;
+        opt.textContent = labels[template] || template;
+        select.appendChild(opt);
+        present.add(template);
+      }
+      const showSelector = allowed.length > 1;
+      if (showSelector) {
+        select.removeAttribute('disabled');
+        select.removeAttribute('aria-disabled');
+        const label = document.querySelector('label[for="sportsPosterTemplate"]');
+        if (label) label.textContent = 'Sports Poster Style';
+      } else {
+        select.setAttribute('disabled', 'disabled');
+        select.setAttribute('aria-disabled', 'true');
+      }
     }
 
     async function testConnection() {

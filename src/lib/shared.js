@@ -16,6 +16,13 @@ const { handleMeta } = require('../handlers/meta')
 const { ProwlarrClient } = require('../clients/prowlarr')
 const { QBitClient } = require('../clients/qbittorrent')
 const { normalizeSportsPosterTemplate } = require('../utils/sportsPosterTemplates')
+const {
+  ENTITLEMENT_SOURCE,
+  FREE_SPORTS_POSTER_TEMPLATE,
+  resolveSportsPosterEntitlement,
+  verifyStampedSportsPosterEntitlement,
+  clampSportsPosterTemplate
+} = require('../utils/entitlement')
 const { autoProvisionWindows, ensureWindowsLanAccess, discoverProwlarrConfig } = require('../utils/provision')
 const { getLanIpv4Addresses, normalizeLocalHostname, startLanAlias } = require('../utils/lanAlias')
 const { buildLocalModeUrls } = require('../utils/localInstallUrls')
@@ -966,11 +973,37 @@ function normalizeAddonConfig(config = {}, options = {}) {
     ...stripLegacySportsMetadataConfigFields(config),
     additionalStorageRoots: normalizeLocalStorageRoots(config.additionalStorageRoots)
   }
-  // PVTKRRX is not the Sports Posters entitlement-token surface. Until an
-  // entitlement gate exists here, every configured install uses the one
-  // included free sports style.
+  // Sports-Posters entitlement gate.
+  // Save path: caller passes options.entitlement (resolved from the
+  //   authenticated owner/admin/account). The stamped source survives
+  //   on the encrypted token so the runtime knows what was approved.
+  // Read path (no options.entitlement): re-verify the stamped source
+  //   against the current env. Owner/admin revocations apply
+  //   immediately; manual_grant / member_token / trial trust the stamp
+  //   until the token is regenerated.
   normalized.sportsPosterMemberToken = ''
-  normalized.sportsPosterTemplate = normalizeSportsPosterTemplate('ticket-stub')
+  const requestedTemplate = String(config.sportsPosterTemplate || '').trim()
+  const stampedSource = String(config.entitlementSource || '').trim()
+  const stampedHash = String(config.entitlementOwnerEmailHash || '').trim()
+
+  let entitlement
+  if (options.entitlement && typeof options.entitlement === 'object') {
+    entitlement = options.entitlement
+  } else {
+    entitlement = verifyStampedSportsPosterEntitlement({
+      requestedTemplate,
+      stampedSource,
+      stampedHash
+    })
+  }
+
+  normalized.sportsPosterTemplate = clampSportsPosterTemplate(requestedTemplate, entitlement)
+  normalized.entitlementSource = entitlement.source || ENTITLEMENT_SOURCE.NONE
+  if (entitlement.ownerEmailHash) {
+    normalized.entitlementOwnerEmailHash = entitlement.ownerEmailHash
+  } else {
+    delete normalized.entitlementOwnerEmailHash
+  }
   const explicitProfile = normalizeRouteProfile(normalized.routeProfile)
   const localProfile = explicitProfile === 'local'
   const callerControlsLanPairDefaults =
@@ -1073,6 +1106,12 @@ function mergeRetainedSecrets(config = {}, existingConfig = null) {
   if (!sanitizePairOwnerId(next.lanPairOwnerId) && sanitizePairOwnerId(existing.lanPairOwnerId)) {
     next.lanPairOwnerId = existing.lanPairOwnerId
   }
+  if (!String(next.entitlementSource || '').trim() && String(existing.entitlementSource || '').trim()) {
+    next.entitlementSource = existing.entitlementSource
+  }
+  if (!String(next.entitlementOwnerEmailHash || '').trim() && String(existing.entitlementOwnerEmailHash || '').trim()) {
+    next.entitlementOwnerEmailHash = existing.entitlementOwnerEmailHash
+  }
 
   return next
 }
@@ -1135,6 +1174,43 @@ async function resolveAccountUserForConfig(config = {}, options = {}) {
     user = await accountStore.createOrLinkStremioUser({ stremioUserId })
   }
   return user
+}
+
+async function resolveSportsPosterEntitlementForConfig(config = {}, options = {}) {
+  const requestedTemplate =
+    options.requestedTemplate !== undefined
+      ? options.requestedTemplate
+      : config?.sportsPosterTemplate
+  const explicitUser = options.user && typeof options.user === 'object' ? options.user : null
+  const user = explicitUser || (await resolveAccountUserForConfig(config))
+  return resolveSportsPosterEntitlement({
+    user,
+    config,
+    requestedTemplate,
+    selfHostAdmin: options.selfHostAdmin === true
+  })
+}
+
+async function applySportsPosterEntitlement(config = {}, options = {}) {
+  const next = config && typeof config === 'object' ? { ...config } : {}
+  const entitlement = await resolveSportsPosterEntitlementForConfig(next, {
+    requestedTemplate: options.requestedTemplate,
+    user: options.user,
+    selfHostAdmin: options.selfHostAdmin === true
+  })
+  next.sportsPosterTemplate = clampSportsPosterTemplate(
+    options.requestedTemplate !== undefined
+      ? options.requestedTemplate
+      : next.sportsPosterTemplate,
+    entitlement
+  )
+  next.entitlementSource = entitlement.source || ENTITLEMENT_SOURCE.NONE
+  if (entitlement.ownerEmailHash) {
+    next.entitlementOwnerEmailHash = entitlement.ownerEmailHash
+  } else {
+    delete next.entitlementOwnerEmailHash
+  }
+  return { config: next, entitlement }
 }
 
 async function persistAccountHostedTakeoverConfig(config = {}) {
@@ -1220,16 +1296,33 @@ function buildConfigReadback(config = {}) {
     lanPairKey: Boolean(String(safe.lanPairKey || '').trim())
   }
 
+  // Re-verify the stamped entitlement so the frontend reflects the
+  // CURRENT server-side decision (env-removed owners get downgraded
+  // immediately) instead of trusting whatever was on disk.
+  const verifiedEntitlement = verifyStampedSportsPosterEntitlement({
+    requestedTemplate: safe.sportsPosterTemplate,
+    stampedSource: safe.entitlementSource,
+    stampedHash: safe.entitlementOwnerEmailHash
+  })
+
   for (const field of SECRET_CONFIG_FIELDS) delete safe[field]
   delete safe.accountUserId
   delete safe.lanPairKey
   delete safe.lanPairOwnerId
   delete safe.sourceConfigToken
   delete safe.retainSecretFields
+  delete safe.entitlementOwnerEmailHash
 
   return {
     ...safe,
-    savedSecrets
+    savedSecrets,
+    sportsPosterTemplate: verifiedEntitlement.resolvedTemplate,
+    entitlement: {
+      source: verifiedEntitlement.source,
+      allowed: verifiedEntitlement.allowed,
+      allowedSportsPosterTemplates: verifiedEntitlement.allowedTemplates,
+      resolvedSportsPosterTemplate: verifiedEntitlement.resolvedTemplate
+    }
   }
 }
 
@@ -2492,6 +2585,9 @@ module.exports = {
   mergeRetainedSecrets,
   loadConfigFromSourceToken,
   hydrateAccountLinkForConfig,
+  resolveAccountUserForConfig,
+  resolveSportsPosterEntitlementForConfig,
+  applySportsPosterEntitlement,
   persistAccountHostedTakeoverConfig,
   buildConfigReadback,
   resolveExistingConfigForBody,
