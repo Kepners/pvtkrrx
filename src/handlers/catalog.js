@@ -1277,6 +1277,22 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     if (eventDate) descriptionParts.push(eventDate)
     if (league) descriptionParts.push(league)
 
+    const carriedEventClass = availability.eventClass || availability.sportsProfile?.event_class || ''
+    const classifiedArtworkEventClass = classifySportsEvent({
+      sportHint: resolvedSportHint || normalizedSportsEvent.sport,
+      sport: normalizedSportsEvent.sport,
+      competition: normalizedSportsEvent.competition || league,
+      league: normalizedSportsEvent.competition || league,
+      eventTitle: normalizedSportsEvent.eventTitle || displayTitle,
+      eventDetail: normalizedSportsEvent.eventDetail || '',
+      homeTeam: normalizedSportsEvent.homeTeam || fallbackHomeTeam,
+      awayTeam: normalizedSportsEvent.awayTeam || fallbackAwayTeam,
+      rawTitle: normalizedSportsEvent.rawTitle || availability?.title || displayTitle
+    })
+    const artworkEventClass = classifiedArtworkEventClass === 'team_vs_team'
+      ? 'team_vs_team'
+      : (carriedEventClass || classifiedArtworkEventClass)
+
     const artworkInput = {
       baseUrl: addonBaseUrl,
       sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
@@ -1290,7 +1306,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       homeTeam: normalizedSportsEvent.homeTeam || fallbackHomeTeam,
       awayTeam: normalizedSportsEvent.awayTeam || fallbackAwayTeam,
       eventDetail: normalizedSportsEvent.eventDetail || '',
-      eventClass: availability.eventClass || availability.sportsProfile?.event_class || '',
+      eventClass: artworkEventClass,
       date: normalizedSportsEvent.date || eventDate,
       seeders: normalizedSportsEvent.seeders,
       size: normalizedSportsEvent.size,
@@ -1343,7 +1359,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
             x: canonicalCatalogId,
             q: String(sportsMetaResolution?.status || SPORTS_META_RESOLUTION_STATUS.FALLBACK_ONLY),
             ak: availabilityAnchorKey,
-            ec: availability.eventClass || availability.sportsProfile?.event_class || ''
+            ec: artworkEventClass
           }, {
             compress: true,
             compact: 'sports'
