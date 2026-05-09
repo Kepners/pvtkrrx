@@ -57,7 +57,9 @@ const {
   // Config & pair helpers
   loadLocalConfigFile, saveLocalConfigFile, detectLanAddresses, getMdnsHost,
   normalizeBaseUrl, normalizeAddonConfig, mergeRetainedSecrets,
-  hydrateAccountLinkForConfig, buildConfigReadback, resolveExistingConfigForBody,
+  hydrateAccountLinkForConfig, resolveAccountUserForConfig,
+  resolveSportsPosterEntitlementForConfig, applySportsPosterEntitlement,
+  buildConfigReadback, resolveExistingConfigForBody,
   getConfigIssues, getPublicBaseUrl, getPlaybackBaseUrl, loadConfigFromSourceToken,
   persistAccountHostedTakeoverConfig,
   ensureLanPairConfig, normalizeRetainedSecretFields, stripEphemeralConfigFields,
@@ -1104,7 +1106,10 @@ app.post('/encrypt', async (req, res) => {
 
   const existingConfig = resolveExistingConfigForBody(req.body)
   const mergedConfig = mergeRetainedSecrets(req.body, existingConfig)
-  const normalizedConfig = await hydrateAccountLinkForConfig(normalizeAddonConfig(mergedConfig))
+  const requestedSportsTemplate = String(req.body?.sportsPosterTemplate || '').trim()
+  const hydratedConfig = await hydrateAccountLinkForConfig(normalizeAddonConfig(mergedConfig))
+  const { config: normalizedConfig, entitlement: encryptEntitlement } =
+    await applySportsPosterEntitlement(hydratedConfig, { requestedTemplate: requestedSportsTemplate })
   const issues = getConfigIssues(normalizedConfig, {
     requestBaseUrl: getPublicBaseUrl(req)
   })
@@ -1131,11 +1136,21 @@ app.post('/encrypt', async (req, res) => {
     queueAnalyticsEvent(req, 'config_generated', {
       route: analyticsRouteLabelFromProfile(normalizedConfig.routeProfile),
       route_profile: normalizedConfig.routeProfile || 'online',
-      linked: Boolean(String(normalizedConfig.stremioUserId || '').trim())
+      linked: Boolean(String(normalizedConfig.stremioUserId || '').trim()),
+      entitlement_source: encryptEntitlement?.source || 'none'
     }, {
       url: '/encrypt'
     })
-    res.json({ token, cloudTakeoverSaved })
+    res.json({
+      token,
+      cloudTakeoverSaved,
+      entitlement: {
+        source: encryptEntitlement?.source || 'none',
+        allowed: Boolean(encryptEntitlement?.allowed),
+        allowedSportsPosterTemplates: encryptEntitlement?.allowedTemplates || ['ticket-stub'],
+        resolvedSportsPosterTemplate: encryptEntitlement?.resolvedTemplate || 'ticket-stub'
+      }
+    })
   } catch (err) {
     res.status(400).json({ error: 'Encryption failed' })
   }
@@ -1153,7 +1168,8 @@ app.post('/local-config', requireLocalNetworkRoute, async (req, res) => {
     const mergedConfig = mergeRetainedSecrets(cfg, existingConfig)
     const localHostname = normalizeLocalHostname(cfg.localHostname || DEFAULT_LOCAL_HOSTNAME)
     const localHostnameCustom = localHostname !== DEFAULT_LOCAL_HOSTNAME
-    const saved = await hydrateAccountLinkForConfig(normalizeAddonConfig({
+    const requestedSportsTemplate = String(cfg?.sportsPosterTemplate || '').trim()
+    const hydratedConfig = await hydrateAccountLinkForConfig(normalizeAddonConfig({
       ...mergedConfig,
       localHostname,
       localHostnameCustom
@@ -1162,6 +1178,9 @@ app.post('/local-config', requireLocalNetworkRoute, async (req, res) => {
       defaultRequired: true,
       includeLocalSecrets: true
     }))
+    const { config: saved } = await applySportsPosterEntitlement(hydratedConfig, {
+      requestedTemplate: requestedSportsTemplate
+    })
     const persisted = saveLocalConfigFile(saved)
     scheduleLocalProviderWarmup(persisted, console, 'local-config-save').catch(err => {
       console.warn('[config-save] Provider warmup failed:', err.message)
@@ -1190,9 +1209,14 @@ app.post('/server-config', requireCsrfToken, requireServerAdminToken, async (req
   try {
     const existingConfig = resolveExistingConfigForBody(cfg, { preferLocal: true })
     const mergedConfig = mergeRetainedSecrets(cfg, existingConfig)
-    const saved = await hydrateAccountLinkForConfig(normalizeAddonConfig(mergedConfig, {
+    const requestedSportsTemplate = String(cfg?.sportsPosterTemplate || '').trim()
+    const hydratedConfig = await hydrateAccountLinkForConfig(normalizeAddonConfig(mergedConfig, {
       includeLocalSecrets: true
     }))
+    const { config: saved } = await applySportsPosterEntitlement(hydratedConfig, {
+      requestedTemplate: requestedSportsTemplate,
+      selfHostAdmin: true
+    })
     const persisted = saveLocalConfigFile(saved)
     scheduleLocalProviderWarmup(persisted, console, 'server-config-save').catch(err => {
       console.warn('[server-config-save] Provider warmup failed:', err.message)

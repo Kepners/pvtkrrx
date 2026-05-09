@@ -108,7 +108,11 @@ async function main() {
     'public configure page must expose exactly one selectable sports poster option'
   )
   assert.match(configureHtml, /Included Sports Style/i, 'configure page should present the included sports style')
-  assert.match(configureHtml, /sportsPosterTemplate:\s*'ticket-stub'/, 'configure save payload must force ticket-stub')
+  assert.match(
+    configureHtml,
+    /sportsPosterTemplate:\s*resolveSelectedSportsPosterTemplate\(\s*'ticket-stub'\s*\)/,
+    'configure save payload must default to ticket-stub when entitlement is absent'
+  )
   for (const template of BLOCKED_TEMPLATES) {
     assert.doesNotMatch(configureHtml, new RegExp(`value="${template}"`, 'i'), `configure page leaks ${template}`)
   }

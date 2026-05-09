@@ -31,6 +31,7 @@ const {
   resolveSportBackdropBucket
 } = require('../utils/sportBackdrops')
 const { SPORTS_ARTWORK_PROXY_VERSION } = require('../utils/sportsArtwork')
+const { verifyStampedSportsPosterEntitlement } = require('../utils/entitlement')
 
 const VARIANT_DIMENSIONS = {
   poster: { width: 600, height: 900 },
@@ -2380,10 +2381,20 @@ function resolveSportsmetaBaseUrlFromConfig(config = {}) {
 }
 
 function resolveSportsPosterTemplateFromConfig(config = {}, req = null) {
-  // PVTKRRX's public/configured artwork proxy is the free surface. Non-ticket
-  // templates stay renderable by internal template tools, but route selection
-  // is locked until a paid entitlement gate exists in this addon.
-  return resolveSportsPosterTemplate('ticket-stub')
+  // The proxy is the public/configured artwork surface. Honour the stamped
+  // entitlement on the decrypted config token; revoke instantly when the
+  // env owner list no longer covers the stamped owner-email hash. Stale
+  // ?template= query strings are ignored so a leaked URL cannot bypass
+  // the gate when the saved config was downgraded.
+  const requestedTemplate = String(config?.sportsPosterTemplate || '').trim()
+  const stampedSource = String(config?.entitlementSource || '').trim()
+  const stampedHash = String(config?.entitlementOwnerEmailHash || '').trim()
+  const verified = verifyStampedSportsPosterEntitlement({
+    requestedTemplate,
+    stampedSource,
+    stampedHash
+  })
+  return resolveSportsPosterTemplate(verified.resolvedTemplate || 'ticket-stub')
 }
 
 function redactUrl(value) {

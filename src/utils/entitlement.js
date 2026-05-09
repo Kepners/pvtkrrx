@@ -1,0 +1,350 @@
+'use strict'
+
+const crypto = require('crypto')
+const {
+  SPORTS_POSTER_TEMPLATES,
+  normalizeSportsPosterTemplate
+} = require('./sportsPosterTemplates')
+
+const FREE_SPORTS_POSTER_TEMPLATE = 'ticket-stub'
+
+const ENTITLEMENT_SOURCE = Object.freeze({
+  OWNER_OVERRIDE: 'owner_override',
+  ADMIN_OVERRIDE: 'admin_override',
+  MANUAL_GRANT: 'manual_grant',
+  MEMBER_TOKEN: 'member_token',
+  TRIAL: 'trial',
+  NONE: 'none'
+})
+
+const ALL_ENTITLEMENT_SOURCES = Object.freeze(Object.values(ENTITLEMENT_SOURCE))
+
+const VALID_TEMPLATES = new Set(SPORTS_POSTER_TEMPLATES)
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase()
+}
+
+function hashEmailForOwnerCheck(value) {
+  const normalized = normalizeEmail(value)
+  if (!normalized) return ''
+  return crypto.createHash('sha256').update(normalized).digest('hex')
+}
+
+function parseEmailList(value) {
+  const out = new Set()
+  for (const part of String(value || '').split(/[,;\s]+/)) {
+    const email = normalizeEmail(part)
+    if (email && email.includes('@')) out.add(email)
+  }
+  return out
+}
+
+function parseStremioUserIdList(value) {
+  const out = new Set()
+  for (const part of String(value || '').split(/[,;\s]+/)) {
+    const id = String(part || '').trim()
+    if (id) out.add(id)
+  }
+  return out
+}
+
+function getOwnerEmails(env = process.env) {
+  return parseEmailList(env.PVTKRRX_OWNER_EMAILS || env.OWNER_EMAILS || '')
+}
+
+function getAdminEmails(env = process.env) {
+  return parseEmailList(env.PVTKRRX_ADMIN_EMAILS || env.ADMIN_EMAILS || '')
+}
+
+function getOwnerStremioUserIds(env = process.env) {
+  return parseStremioUserIdList(env.PVTKRRX_OWNER_STREMIO_USER_IDS || '')
+}
+
+function getAdminStremioUserIds(env = process.env) {
+  return parseStremioUserIdList(env.PVTKRRX_ADMIN_STREMIO_USER_IDS || '')
+}
+
+function isOwnerEmail(email, env = process.env) {
+  const normalized = normalizeEmail(email)
+  if (!normalized) return false
+  return getOwnerEmails(env).has(normalized)
+}
+
+function isAdminEmail(email, env = process.env) {
+  const normalized = normalizeEmail(email)
+  if (!normalized) return false
+  return getAdminEmails(env).has(normalized)
+}
+
+function isOwnerStremioUserId(id, env = process.env) {
+  const trimmed = String(id || '').trim()
+  if (!trimmed) return false
+  return getOwnerStremioUserIds(env).has(trimmed)
+}
+
+function isAdminStremioUserId(id, env = process.env) {
+  const trimmed = String(id || '').trim()
+  if (!trimmed) return false
+  return getAdminStremioUserIds(env).has(trimmed)
+}
+
+function getEntitlementGrantsFromUser(user) {
+  if (!user || typeof user !== 'object') return null
+  const grants = user.entitlements && typeof user.entitlements === 'object'
+    ? user.entitlements
+    : null
+  if (!grants) return null
+  const sports = Array.isArray(grants.sportsPosterTemplates)
+    ? grants.sportsPosterTemplates
+        .map((t) => normalizeSportsPosterTemplate(t))
+        .filter((t) => VALID_TEMPLATES.has(t))
+    : null
+  if (!sports || !sports.length) return null
+  return { sportsPosterTemplates: Array.from(new Set(sports)) }
+}
+
+/**
+ * Resolve sports-poster entitlement at SAVE time.
+ *
+ * Precedence (matches docs/SALES_SPEC.md and the audit brief):
+ *   1. Owner override     (env-listed email or stremio userId)
+ *   2. Admin override     (env-listed email or stremio userId)
+ *   3. Explicit manual grant on the account record
+ *   4. Member token present on config (deferred verification)
+ *   5. Active trial flag on the account
+ *   6. None — only the free `ticket-stub` template
+ *
+ * Returns:
+ *   {
+ *     allowed: boolean,
+ *     source: ENTITLEMENT_SOURCE.*,
+ *     allowedTemplates: string[],
+ *     resolvedTemplate: string,    // the template that should be persisted
+ *     ownerEmailHash: string       // sha256(email) when owner/admin, '' otherwise
+ *   }
+ */
+function resolveSportsPosterEntitlement(input = {}) {
+  const env = input.env && typeof input.env === 'object' ? input.env : process.env
+  const user = input.user && typeof input.user === 'object' ? input.user : null
+  const config = input.config && typeof input.config === 'object' ? input.config : {}
+  const requestedRaw = String(input.requestedTemplate || config.sportsPosterTemplate || '').trim()
+  const requested = requestedRaw ? normalizeSportsPosterTemplate(requestedRaw) : ''
+
+  const userEmail = normalizeEmail(user?.email || input.email || '')
+  const stremioUserId = String(
+    user?.stremio?.userId || config.stremioUserId || input.stremioUserId || ''
+  ).trim()
+  const memberToken = String(config.sportsPosterMemberToken || '').trim()
+  const trialActive = Boolean(user?.trial?.active)
+  const selfHostAdmin = input.selfHostAdmin === true
+
+  if (selfHostAdmin) {
+    return finaliseEntitlement({
+      source: ENTITLEMENT_SOURCE.ADMIN_OVERRIDE,
+      allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
+      requested,
+      ownerEmailHash: userEmail ? hashEmailForOwnerCheck(userEmail) : ''
+    })
+  }
+
+  if (userEmail && isOwnerEmail(userEmail, env)) {
+    return finaliseEntitlement({
+      source: ENTITLEMENT_SOURCE.OWNER_OVERRIDE,
+      allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
+      requested,
+      ownerEmailHash: hashEmailForOwnerCheck(userEmail)
+    })
+  }
+  if (stremioUserId && isOwnerStremioUserId(stremioUserId, env)) {
+    return finaliseEntitlement({
+      source: ENTITLEMENT_SOURCE.OWNER_OVERRIDE,
+      allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
+      requested,
+      ownerEmailHash: userEmail ? hashEmailForOwnerCheck(userEmail) : ''
+    })
+  }
+
+  if (userEmail && isAdminEmail(userEmail, env)) {
+    return finaliseEntitlement({
+      source: ENTITLEMENT_SOURCE.ADMIN_OVERRIDE,
+      allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
+      requested,
+      ownerEmailHash: hashEmailForOwnerCheck(userEmail)
+    })
+  }
+  if (stremioUserId && isAdminStremioUserId(stremioUserId, env)) {
+    return finaliseEntitlement({
+      source: ENTITLEMENT_SOURCE.ADMIN_OVERRIDE,
+      allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
+      requested,
+      ownerEmailHash: userEmail ? hashEmailForOwnerCheck(userEmail) : ''
+    })
+  }
+
+  const grants = getEntitlementGrantsFromUser(user)
+  if (grants) {
+    return finaliseEntitlement({
+      source: ENTITLEMENT_SOURCE.MANUAL_GRANT,
+      allowedTemplates: grants.sportsPosterTemplates,
+      requested
+    })
+  }
+
+  if (memberToken) {
+    return finaliseEntitlement({
+      source: ENTITLEMENT_SOURCE.MEMBER_TOKEN,
+      allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
+      requested
+    })
+  }
+
+  if (trialActive) {
+    return finaliseEntitlement({
+      source: ENTITLEMENT_SOURCE.TRIAL,
+      allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
+      requested
+    })
+  }
+
+  return finaliseEntitlement({
+    source: ENTITLEMENT_SOURCE.NONE,
+    allowedTemplates: [FREE_SPORTS_POSTER_TEMPLATE],
+    requested
+  })
+}
+
+function finaliseEntitlement({ source, allowedTemplates, requested, ownerEmailHash = '' }) {
+  const allowed = Array.isArray(allowedTemplates) && allowedTemplates.length
+    ? allowedTemplates.filter((t) => VALID_TEMPLATES.has(t))
+    : [FREE_SPORTS_POSTER_TEMPLATE]
+  const set = new Set(allowed)
+  if (!set.has(FREE_SPORTS_POSTER_TEMPLATE)) {
+    set.add(FREE_SPORTS_POSTER_TEMPLATE)
+    allowed.push(FREE_SPORTS_POSTER_TEMPLATE)
+  }
+  const resolved = requested && set.has(requested)
+    ? requested
+    : FREE_SPORTS_POSTER_TEMPLATE
+  return {
+    allowed: source !== ENTITLEMENT_SOURCE.NONE,
+    source,
+    allowedTemplates: Array.from(new Set(allowed)),
+    resolvedTemplate: resolved,
+    ownerEmailHash
+  }
+}
+
+/**
+ * Re-verify an entitlement that was already STAMPED on a config token.
+ * Used at runtime when we don't have the original user record but only
+ * the decrypted config. Owner/admin sources are revoked instantly when
+ * the env owners list changes; other sources trust the stamp until the
+ * token is regenerated (their revocation requires async accountStore
+ * lookup).
+ */
+function verifyStampedSportsPosterEntitlement(input = {}) {
+  const env = input.env && typeof input.env === 'object' ? input.env : process.env
+  const requested = String(input.requestedTemplate || '').trim()
+    ? normalizeSportsPosterTemplate(input.requestedTemplate)
+    : ''
+  const stampedSource = String(input.stampedSource || '').trim()
+  const stampedHash = String(input.stampedHash || '').trim()
+
+  if (stampedSource === ENTITLEMENT_SOURCE.OWNER_OVERRIDE) {
+    if (stampedHash && envOwnerHashes(env).has(stampedHash)) {
+      return finaliseEntitlement({
+        source: ENTITLEMENT_SOURCE.OWNER_OVERRIDE,
+        allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
+        requested,
+        ownerEmailHash: stampedHash
+      })
+    }
+    return finaliseEntitlement({
+      source: ENTITLEMENT_SOURCE.NONE,
+      allowedTemplates: [FREE_SPORTS_POSTER_TEMPLATE],
+      requested
+    })
+  }
+
+  if (stampedSource === ENTITLEMENT_SOURCE.ADMIN_OVERRIDE) {
+    if (stampedHash && envAdminHashes(env).has(stampedHash)) {
+      return finaliseEntitlement({
+        source: ENTITLEMENT_SOURCE.ADMIN_OVERRIDE,
+        allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
+        requested,
+        ownerEmailHash: stampedHash
+      })
+    }
+    return finaliseEntitlement({
+      source: ENTITLEMENT_SOURCE.NONE,
+      allowedTemplates: [FREE_SPORTS_POSTER_TEMPLATE],
+      requested
+    })
+  }
+
+  if (
+    stampedSource === ENTITLEMENT_SOURCE.MANUAL_GRANT ||
+    stampedSource === ENTITLEMENT_SOURCE.MEMBER_TOKEN ||
+    stampedSource === ENTITLEMENT_SOURCE.TRIAL
+  ) {
+    return finaliseEntitlement({
+      source: stampedSource,
+      allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
+      requested
+    })
+  }
+
+  return finaliseEntitlement({
+    source: ENTITLEMENT_SOURCE.NONE,
+    allowedTemplates: [FREE_SPORTS_POSTER_TEMPLATE],
+    requested
+  })
+}
+
+function envOwnerHashes(env = process.env) {
+  const out = new Set()
+  for (const email of getOwnerEmails(env)) {
+    const hash = hashEmailForOwnerCheck(email)
+    if (hash) out.add(hash)
+  }
+  return out
+}
+
+function envAdminHashes(env = process.env) {
+  const out = new Set()
+  for (const email of getAdminEmails(env)) {
+    const hash = hashEmailForOwnerCheck(email)
+    if (hash) out.add(hash)
+  }
+  return out
+}
+
+function clampSportsPosterTemplate(requested, entitlement) {
+  if (!entitlement || typeof entitlement !== 'object') return FREE_SPORTS_POSTER_TEMPLATE
+  const candidate = String(requested || entitlement.resolvedTemplate || '').trim()
+  if (!candidate) return entitlement.resolvedTemplate || FREE_SPORTS_POSTER_TEMPLATE
+  const normalized = normalizeSportsPosterTemplate(candidate)
+  const allowed = new Set(entitlement.allowedTemplates || [FREE_SPORTS_POSTER_TEMPLATE])
+  return allowed.has(normalized) ? normalized : FREE_SPORTS_POSTER_TEMPLATE
+}
+
+module.exports = {
+  ENTITLEMENT_SOURCE,
+  ALL_ENTITLEMENT_SOURCES,
+  FREE_SPORTS_POSTER_TEMPLATE,
+  hashEmailForOwnerCheck,
+  parseEmailList,
+  parseStremioUserIdList,
+  getOwnerEmails,
+  getAdminEmails,
+  getOwnerStremioUserIds,
+  getAdminStremioUserIds,
+  isOwnerEmail,
+  isAdminEmail,
+  isOwnerStremioUserId,
+  isAdminStremioUserId,
+  resolveSportsPosterEntitlement,
+  verifyStampedSportsPosterEntitlement,
+  clampSportsPosterTemplate
+}
