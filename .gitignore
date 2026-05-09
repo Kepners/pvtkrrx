@@ -15,6 +15,10 @@ node_modules/
 !public/favicon-16x16.png
 !public/favicon-32x32.png
 !public/social/*.png
+!public/sports-style-samples/*.png
+!public/sports-backdrops/*.png
+!public/sports-backdrops/*.jpg
+!public/sports-backdrops/*.jpeg
 
 # Playwright cache
 .playwright-mcp/
