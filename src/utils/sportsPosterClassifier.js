@@ -42,12 +42,12 @@ const COMPETITOR_EVENT_CLASSES = new Set([
 ])
 
 const MOTORSPORT_TEXT_RE = /\b(?:formula\s*1|formula\s*one|formula1|f1|motogp|moto\s*gp|nascar|indycar|wrc|supercars?|v8sc|wec|formula\s*e|grand prix|rally|daytona 500)\b/i
-const TEAM_SPORT_TEXT_RE = /\b(?:basketball|nba|wnba|euroleague|football|soccer|nfl|super bowl|mlb|world series|nhl|stanley cup|ipl|cricket|rugby|afl|softball|volleyball|handball|copa libertadores|copa sudamericana|libertadores|sudamericana)\b/i
+const TEAM_SPORT_TEXT_RE = /\b(?:basketball|nba|wnba|euroleague|football|soccer|nfl|ufl|super bowl|mlb|world series|nhl|ohl|stanley cup|ipl|cricket|rugby|afl|cpl|softball|volleyball|handball|copa libertadores|copa sudamericana|libertadores|sudamericana)\b/i
 const COMPETITOR_TEXT_RE = /\b(?:snooker|billiards|pool|tennis|wimbledon|atp|wta|darts?|pdc|ufc|mma|pfl|bellator|boxing|fight night|wrestling|wwe|aew|badminton|squash|table tennis)\b/i
 const NON_TEAM_EVENT_TEXT_RE = /\b(?:recaps?|recapping|previews?|all\s+games|road\s+(?:to|in)|post\s+match|pre\s+show|studio\s+show|highlights?|replay|press\s+conference)\b/i
-const COMPETITION_SIDE_RE = /^(?:(?:english\s+)?premier\s+league|efl\s+championship|championship|uefa\s+champions\s+league|champions\s+league|uefa\s+conference\s+league|conference\s+league|uecl|uefa\s+europa\s+league|europa\s+league|copa\s+libertadores|copa\s+sudamericana|basketball\s+champions\s+league(?:\s+of\s+americas)?|ncaa\s+(?:women\s+)?softball|ncaa\s+(?:women\s+)?basketball|ncaa\s+football|wnba\s+(?:pre?s|preseason)|turkish\s+league|rsl|afl|final\s+four|four|f4|league|l\d+)$/i
-const COMPETITION_PREFIX_RE = /^(?:(?:english\s+)?premier\s+league|efl\s+championship|championship|uefa\s+champions\s+league|champions\s+league|uefa\s+conference\s+league|conference\s+league|uecl|uefa\s+europa\s+league|europa\s+league|copa\s+libertadores|copa\s+sudamericana|basketball\s+champions\s+league(?:\s+of\s+americas)?|ncaa\s+(?:women\s+)?softball|ncaa\s+(?:women\s+)?basketball|ncaa\s+football|wnba\s+(?:pre?s|preseason)|turkish\s+league|rsl|afl|final\s+four|four|f4|league|l\d+)\b/i
-const COMPETITION_SEASON_RE = /^(?:(?:19|20)\d{2}(?:[/-]\d{2})?|pre?s|preseason|quarter\s*final|semi\s*final|(?:\d{1,2}(?:st|nd|rd|th)?\s+)?leg|first\s+leg|second\s+leg|full\s+match|post\s+match|pre\s+show|pre\s+match|game\s*\d+|round\s*\d+|r\d+|g\d+|gm\d+|f\d+|\d{1,2}(?:st|nd|rd|th)?|\d{1,2})\b/i
+const COMPETITION_SIDE_RE = /^(?:(?:english\s+)?premier\s+league|efl\s+championship|efl|elc|championship|uefa\s+champions\s+league|champions\s+league|uefa\s+conference\s+league|conference\s+league|uecl|ucl|uefa\s+europa\s+league|europa\s+league|uel|copa\s+libertadores|copa\s+sudamericana|copa\s+america|kings?\s+cup|basketball\s+champions\s+league(?:\s+of\s+americas)?|primera\s+feb|ncaa\s+(?:women\s+)?softball|ncaa\s+(?:women\s+)?basketball|ncaa\s+football|wnba\s+(?:pre?s|preseason)|turkish\s+league|rsl|afl|cpl|ufl|ohl|final\s+four|four|f4|league|l\d+)$/i
+const COMPETITION_PREFIX_RE = /^(?:(?:english\s+)?premier\s+league|efl\s+championship|efl|elc|championship|uefa\s+champions\s+league|champions\s+league|uefa\s+conference\s+league|conference\s+league|uecl|ucl|uefa\s+europa\s+league|europa\s+league|uel|copa\s+libertadores|copa\s+sudamericana|copa\s+america|kings?\s+cup|basketball\s+champions\s+league(?:\s+of\s+americas)?|primera\s+feb|ncaa\s+(?:women\s+)?softball|ncaa\s+(?:women\s+)?basketball|ncaa\s+football|wnba\s+(?:pre?s|preseason)|turkish\s+league|rsl|afl|cpl|ufl|ohl|final\s+four|four|f4|league|l\d+)\b/i
+const COMPETITION_SEASON_RE = /^(?:(?:19|20)\d{2}(?:[/-]\d{2})?|pre?s|preseason|playoffs?|quarter\s*final|semi\s*final|qf|sf|(?:\d{1,2}(?:st|nd|rd|th)?\s+)?leg|first\s+leg|second\s+leg|full\s+match|post\s+match|pre\s+show|pre\s+match|game\s*\d+|round\s*\d+|r\d+|g\d+|gm\d+|f\d+|\d{1,2}(?:st|nd|rd|th)?|\d{1,2})\b/i
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
@@ -93,7 +93,7 @@ function sideName(value) {
 // side. Defends against upstream parser regressions and stale catalog cache from
 // pre-fix runtimes that leaked competition prefixes/suffixes into homeTeam or
 // awayTeam (e.g. "EFL Championship", "AFL", "NCAA Women Softball", "UECL").
-const COMPETITION_ONLY_SIDE_RE = /^(?:(?:english\s+)?premier\s+league|efl(?:\s+championship)?|championship|uefa\s+champions\s+league|champions\s+league|uefa\s+conference\s+league|conference\s+league|uefa\s+europa\s+league|europa\s+league|uecl|ucl|uel|copa\s+libertadores|copa\s+sudamericana|copa\s+america|basketball\s+champions\s+league(?:\s+of\s+americas)?|ncaa(?:\s+(?:women\s+)?(?:softball|basketball|football))?|wnba(?:\s+(?:pre?s|preseason))?|turkish\s+league|rsl|afl|final\s+four|league|l\d+|four|f4)$/i
+const COMPETITION_ONLY_SIDE_RE = /^(?:(?:english\s+)?premier\s+league|efl(?:\s+championship)?|elc|championship|uefa\s+champions\s+league|champions\s+league|uefa\s+conference\s+league|conference\s+league|uefa\s+europa\s+league|europa\s+league|uecl|ucl|uel|copa\s+libertadores|copa\s+sudamericana|copa\s+america|kings?\s+cup|basketball\s+champions\s+league(?:\s+of\s+americas)?|primera\s+feb|ncaa(?:\s+(?:women\s+)?(?:softball|basketball|football))?|wnba(?:\s+(?:pre?s|preseason))?|turkish\s+league|rsl|afl|cpl|ufl|ohl|final\s+four|league|l\d+|four|f4)$/i
 
 function isPlaceholderSide(value) {
   const clean = normalizeSpace(value).toLowerCase()
@@ -120,7 +120,7 @@ function stripCompetitionSide(value = '') {
   clean = normalizeSpace(
     clean
       .replace(/\b(?:19|20)\d{2}(?:[/-]\d{2})?\b/g, ' ')
-      .replace(/\b(?:pre?s|preseason|4k)\b/gi, ' ')
+      .replace(/\b(?:pre?s|preseason|bign|4k)\b/gi, ' ')
   )
   return COMPETITION_SIDE_RE.test(clean) ? '' : clean
 }
@@ -341,7 +341,7 @@ function classifyByText(text, sport, paired) {
     return 'tournament_event'
   }
 
-  if (paired && (TEAM_SPORT_KEYS.has(sport) || /\b(?:football|soccer|premier league|fa cup|mls|champions league|europa league|conference league|la liga|serie a|bundesliga|world cup|nations league|euro qualifiers?|copa america|copa libertadores|copa sudamericana|libertadores|sudamericana|afcon|asian cup|nba|wnba|euroleague|nfl|super bowl|mlb|world series|nhl|stanley cup|iihf|ipl|test cricket|odi|t20|the ashes|rugby|softball|volleyball|handball|afl)\b/.test(text))) {
+  if (paired && (TEAM_SPORT_KEYS.has(sport) || /\b(?:football|soccer|premier league|fa cup|mls|cpl|champions league|europa league|conference league|la liga|serie a|bundesliga|world cup|nations league|euro qualifiers?|copa america|copa libertadores|copa sudamericana|libertadores|sudamericana|afcon|asian cup|basketball|nba|wnba|euroleague|american football|nfl|ufl|super bowl|baseball|mlb|world series|hockey|nhl|ohl|stanley cup|iihf|cricket|ipl|test cricket|odi|t20|the ashes|rugby|softball|volleyball|handball|afl)\b/.test(text))) {
     return 'team_vs_team'
   }
 

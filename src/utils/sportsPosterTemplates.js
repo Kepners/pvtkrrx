@@ -151,6 +151,7 @@ function layoutFamilyForSportsPosterRender(value, event = {}) {
   if (explicit === 'SINGLE_EVENT_MOTORSPORT') return 'SINGLE_EVENT_MOTORSPORT'
   const eventClass = normalizeSpace(event.eventClass || event.posterClass) || classifiedClass
   if (eventClass === 'team_vs_team' && teamLayoutAllowed) return 'TEAM_VS_TEAM'
+  if ((eventClass === 'tournament_event' || eventClass === 'generic_event') && teamLayoutAllowed) return 'TEAM_VS_TEAM'
   if (isCompetitorVsCompetitorEvent({ ...event, eventClass })) return 'COMPETITOR_VS_COMPETITOR'
   if (eventClass === 'motorsport_event') return 'SINGLE_EVENT_MOTORSPORT'
   return layoutFamilyForSportsPosterTemplate(template)

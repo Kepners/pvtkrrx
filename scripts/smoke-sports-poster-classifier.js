@@ -366,6 +366,10 @@ for (const testCase of [
   {
     slug: 'sports-league-token-is-not-away-team',
     rawTitle: 'Indiana Hoosiers vs NCAA Women Softball'
+  },
+  {
+    slug: 'ohl-is-not-away-team',
+    rawTitle: 'Kitchener vs OHL'
   }
 ]) {
   const event = eventFor({ rawTitle: testCase.rawTitle })
@@ -424,6 +428,62 @@ for (const testCase of [
 }
 
 for (const testCase of [
+  {
+    slug: 'efl-playoff-stage-prefix-stripped',
+    rawTitle: 'EFL Championship 2026 Playoff SF 1st Leg Hull City vs Millwall 08 05',
+    sportHint: 'football',
+    expectedHome: 'Hull City',
+    expectedAway: 'Millwall'
+  },
+  {
+    slug: 'afl-round-prefix-stripped',
+    rawTitle: 'AFL 2026 Round 9 Game 3 Port Adelaide V Western Bulldogs',
+    sportHint: 'rugby',
+    expectedHome: 'Port Adelaide',
+    expectedAway: 'Western Bulldogs'
+  },
+  {
+    slug: 'ncaa-softball-qf-and-broadcast-stripped',
+    rawTitle: 'NCAA Women Softball QF 2026 Washington Huskies vs Indiana Hoosiers 07 05 BIGN',
+    sportHint: 'baseball',
+    expectedHome: 'Washington Huskies',
+    expectedAway: 'Indiana Hoosiers'
+  },
+  {
+    slug: 'ufl-away-league-prefix-stripped',
+    rawTitle: 'St Louis Battlehawks vs UFL Columbus Aviators',
+    sportHint: 'american-football',
+    expectedHome: 'St Louis Battlehawks',
+    expectedAway: 'Columbus Aviators'
+  },
+  {
+    slug: 'kings-cup-away-prefix-stripped',
+    rawTitle: 'Al Kholood vs Kings Cup Al Hilal',
+    sportHint: 'football',
+    expectedHome: 'Al Kholood',
+    expectedAway: 'Al Hilal'
+  },
+  {
+    slug: 'elc-home-prefix-stripped',
+    rawTitle: 'ELC Hull vs Millwall',
+    sportHint: 'football',
+    expectedHome: 'Hull',
+    expectedAway: 'Millwall'
+  },
+  {
+    slug: 'cpl-home-prefix-stripped',
+    rawTitle: 'CPL FC Supra vs Woodbridge Strikers',
+    sportHint: 'football',
+    expectedHome: 'FC Supra',
+    expectedAway: 'Woodbridge Strikers'
+  },
+  {
+    slug: 'primera-feb-away-prefix-stripped',
+    rawTitle: 'Inveready Gipuzkoa vs Primera FEB Monbus Obradoiro',
+    sportHint: 'basketball',
+    expectedHome: 'Inveready Gipuzkoa',
+    expectedAway: 'Monbus Obradoiro'
+  },
   {
     slug: 'copa-sudamericana-competition-prefix-stripped',
     rawTitle: "Copa Sudamericana 2026 O'Higgins vs Sau Paulo",
@@ -502,6 +562,30 @@ for (const testCase of [
   assert.equal(hasActualPair(event), true, `${testCase.slug} should expose an actual pair`)
   assert.equal(classifySportsPosterEvent(event), 'team_vs_team', `${testCase.slug} class`)
   assert.equal(layoutFamilyForSportsPosterRender('ticket-stub', event), 'TEAM_VS_TEAM', `${testCase.slug} layout family`)
+}
+
+for (const testCase of [
+  {
+    slug: 'tournament-class-afl-with-credible-pair-upgrades-to-team-layout',
+    rawTitle: 'AFL 2026 Round 9 Game 3 Port Adelaide V Western Bulldogs',
+    sportHint: 'rugby'
+  },
+  {
+    slug: 'tournament-class-cricket-with-credible-pair-upgrades-to-team-layout',
+    rawTitle: 'Bangladesh vs Pakistan',
+    sportHint: 'cricket'
+  }
+]) {
+  const event = eventFor({ rawTitle: testCase.rawTitle, sportHint: testCase.sportHint })
+  assert.equal(hasActualPair(event), true, `${testCase.slug} should expose an actual pair`)
+  assert.equal(
+    layoutFamilyForSportsPosterRender('ticket-stub', {
+      ...event,
+      eventClass: 'tournament_event'
+    }),
+    'TEAM_VS_TEAM',
+    `${testCase.slug} layout family`
+  )
 }
 
 for (const testCase of [

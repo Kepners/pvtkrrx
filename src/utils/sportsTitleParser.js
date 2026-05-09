@@ -1,21 +1,21 @@
 const { getMappedLeagueEntry } = require('./leagueMap')
 
 const QUALITY_RE = /^(?:(?:2160p|1080p|1080i|720p|576p|540p|480p|sd|hd|fhd|uhd)(?:[a-z]{1,4})?(?:\d{2,3}(?:fps)?)?|\d{2,3}fps)$/i
-const SOURCE_RE = /^(?:hdtv|pdtv|sdtv|webrip|webdl|web-dl|web|bluray|bdrip|dvdrip|satfeed|iptv|repack|proper|complete|espn(?:p|plus|\+)?|f1tv|fs1|nesn|msg|usan?|nbcsn|nbcsba|nbcsca|sportsnet|sn|sny|snla|snp|bally|bein(?:sport)?\d*|eurosport|skynz|kayo|fubo|newvision|tnt|fox|bbc|itv|cbs|abc|peacock|atvp?|apple)$/i
+const SOURCE_RE = /^(?:hdtv|pdtv|sdtv|webrip|webdl|web-dl|web|bluray|bdrip|dvdrip|satfeed|iptv|repack|proper|complete|espn(?:p|plus|\+)?|f1tv|fs1|nesn|msg|usan?|nbcsn|nbcsba|nbcsca|sportsnet|sn|sny|snla|snp|bally|bein(?:sport)?\d*|eurosport|skynz|kayo|fubo|newvision|tnt|fox|bbc|itv|cbs|abc|peacock|atvp?|apple|bign)$/i
 const CODEC_RE = /^(?:x264|x265|h264|h265|hevc|avc|av1)(?:-.+)?$/i
 const RELEASE_GROUP_RE = /^[A-Z0-9]+-[A-Za-z0-9]+$/
 const HLG_HDR_RE = /^(?:hlg|hdr10?\+?|dovi?|dv|10bit|8bit)$/i
 const GENERIC_SPORT_PREFIX_RE = /^(?:football|soccer|basketball|baseball|cricket|rugby|mma|boxing|wrestling|darts|golf|motorsport|motor|tennis|hockey|ice|american|uefa)$/i
 const LEADING_TEAM_NOISE_RE = /^(?:game|games|match|matches|week|round|heat|session|fight|night|grand|prix|qualifying|practice|sprint|race|main|card|prelims?|early|cup|bowl|super|opening|closing|ceremony|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|championship|conference|title|event|world|wimbledon|australian|roland|garros|open|us|east|west|western|eastern|centre|center|court|heavyweight|middleweight|welterweight|lightweight|rs|qf|sf|wcqf|ecqf|wcsf|ecsf|wcf|ecf|f\d*|r\d+|m\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
 const ROMAN_NUMERAL_RE = /^(?=[ivxlcdm]+$)m{0,4}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})$/i
-const TEAM_BROADCAST_RE = /\b(?:nbc|nbcsn|espn(?:2|p|plus|\+)?|f1tv|nesn|msg|usan?|yes(?:\s*network)?|sky(?:\s*sports?)?|bt(?:\s*sport)?|tnt(?:\s*sports?)?|fox(?:\s*sports?)?|cbs|abc|itv(?:4)?|tsn|sportsnet|sn|bally|bein(?:\s*sports?)?\d*|canal\+?|dazn|eurosport|skynz|kayo(?:\s*sports?)?|fubo|newvision)\b/gi
+const TEAM_BROADCAST_RE = /\b(?:nbc|nbcsn|espn(?:2|p|plus|\+)?|f1tv|nesn|msg|usan?|yes(?:\s*network)?|sky(?:\s*sports?)?|bt(?:\s*sport)?|tnt(?:\s*sports?)?|fox(?:\s*sports?)?|cbs|abc|itv(?:4)?|tsn|sportsnet|sn|bally|bein(?:\s*sports?)?\d*|canal\+?|dazn|eurosport|skynz|kayo(?:\s*sports?)?|fubo|newvision|bign|big\s*ten(?:\s*network)?)\b/gi
 const TEAM_LANGUAGE_RE = /\b(?:en|english|spanish|french|german|italian|portuguese)\b/gi
 const TEAM_PRESENTATION_RE = /\b(?:condensed(?:\s*game)?|extended(?:\s*highlights?)?|highlights?|replay)\b/gi
-const TEAM_TAIL_NOISE_RE = /^(?:game|games|round|matchday|main|card|pre|post|episode|show|event|fight|full|review|preview|highlights?|replay|coverage|studio|apple|tv|fubo|beinsport\d*|skynz|z3r0|nva|wrestlemania|east|west|western|eastern|conference|centre|center|court|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|rs|qf|sf|wcqf|ecqf|wcsf|ecsf|wcf|ecf|f\d*|r\d+|m\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
-const EVENT_SOURCE_NOISE_RE = /^(?:apple|tv|atvp?|fubo|skynz|kayo|z3r0|nva|espn(?:p|plus|\+)?|f1tv|fs1|nesn|msg|usan?|nbc(?:sn|sba|sca)?|sny|snla|snp|sky|sports|fox|bbc|itv|cbs|abc|tnt|peacock|eurosport|nordic)$/i
-const TEAM_SIDE_LEADING_COMPETITION_RE = /^(?:(?:english\s+)?premier\s+league|efl\s+championship|championship|uefa\s+champions\s+league|champions\s+league|uefa\s+conference\s+league|conference\s+league|uecl|uefa\s+europa\s+league|europa\s+league|copa\s+libertadores|copa\s+sudamericana|copa\s+america|basketball\s+champions\s+league(?:\s+of\s+americas)?|ncaa\s+(?:women\s+)?softball|ncaa\s+(?:women\s+)?basketball|ncaa\s+football|wnba\s+(?:pre?s|preseason)|turkish\s+league|rsl|afl|final\s+four|four|f4|league|l\d+)\b/i
-const TEAM_SIDE_EXACT_COMPETITION_RE = /^(?:(?:english\s+)?premier\s+league|efl\s+championship|championship|uefa\s+champions\s+league|champions\s+league|uefa\s+conference\s+league|conference\s+league|uecl|uefa\s+europa\s+league|europa\s+league|copa\s+libertadores|copa\s+sudamericana|basketball\s+champions\s+league(?:\s+of\s+americas)?|ncaa\s+(?:women\s+)?softball|ncaa\s+(?:women\s+)?basketball|ncaa\s+football|wnba\s+(?:pre?s|preseason)|turkish\s+league|rsl|afl|final\s+four|four|f4|league|l\d+)$/i
-const TEAM_SIDE_SEASON_NOISE_RE = /^(?:(?:19|20)\d{2}(?:[/-]\d{2})?|pre?s|preseason|quarter\s*final|semi\s*final|(?:\d{1,2}(?:st|nd|rd|th)?\s+)?leg|first\s+leg|second\s+leg|full\s+match|post\s+match|pre\s+show|pre\s+match|game\s*\d+|round\s*\d+|r\d+|g\d+|gm\d+|f\d+|\d{1,2}(?:st|nd|rd|th)?|\d{1,2})\b/i
+const TEAM_TAIL_NOISE_RE = /^(?:game|games|round|matchday|main|card|pre|post|episode|show|event|fight|full|review|preview|highlights?|replay|coverage|studio|apple|tv|fubo|beinsport\d*|skynz|z3r0|nva|bign|wrestlemania|east|west|western|eastern|conference|centre|center|court|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|rs|qf|sf|wcqf|ecqf|wcsf|ecsf|wcf|ecf|f\d*|r\d+|m\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
+const EVENT_SOURCE_NOISE_RE = /^(?:apple|tv|atvp?|fubo|skynz|kayo|z3r0|nva|espn(?:p|plus|\+)?|f1tv|fs1|nesn|msg|usan?|nbc(?:sn|sba|sca)?|sny|snla|snp|sky|sports|fox|bbc|itv|cbs|abc|tnt|peacock|eurosport|nordic|bign)$/i
+const TEAM_SIDE_LEADING_COMPETITION_RE = /^(?:(?:english\s+)?premier\s+league|efl\s+championship|efl|elc|championship|uefa\s+champions\s+league|champions\s+league|uefa\s+conference\s+league|conference\s+league|uecl|ucl|uefa\s+europa\s+league|europa\s+league|uel|copa\s+libertadores|copa\s+sudamericana|copa\s+america|kings?\s+cup|basketball\s+champions\s+league(?:\s+of\s+americas)?|primera\s+feb|ncaa\s+(?:women\s+)?softball(?:\s+(?:qf|sf|quarter\s*final|semi\s*final))?|ncaa\s+(?:women\s+)?basketball|ncaa\s+football|wnba\s+(?:pre?s|preseason)|turkish\s+league|rsl|afl|cpl|ufl|ohl|final\s+four|four|f4|league|l\d+)\b/i
+const TEAM_SIDE_EXACT_COMPETITION_RE = /^(?:(?:english\s+)?premier\s+league|efl\s+championship|efl|elc|championship|uefa\s+champions\s+league|champions\s+league|uefa\s+conference\s+league|conference\s+league|uecl|ucl|uefa\s+europa\s+league|europa\s+league|uel|copa\s+libertadores|copa\s+sudamericana|copa\s+america|kings?\s+cup|basketball\s+champions\s+league(?:\s+of\s+americas)?|primera\s+feb|ncaa\s+(?:women\s+)?softball(?:\s+(?:qf|sf|quarter\s*final|semi\s*final))?|ncaa\s+(?:women\s+)?basketball|ncaa\s+football|wnba\s+(?:pre?s|preseason)|turkish\s+league|rsl|afl|cpl|ufl|ohl|final\s+four|four|f4|league|l\d+)$/i
+const TEAM_SIDE_SEASON_NOISE_RE = /^(?:(?:19|20)\d{2}(?:[/-]\d{2})?|pre?s|preseason|playoffs?|quarter\s*final|semi\s*final|qf|sf|(?:\d{1,2}(?:st|nd|rd|th)?\s+)?leg|first\s+leg|second\s+leg|full\s+match|post\s+match|pre\s+show|pre\s+match|game\s*\d+|round\s*\d+|r\d+|g\d+|gm\d+|f\d+|\d{1,2}(?:st|nd|rd|th)?|\d{1,2})\b/i
 const TEAM_SIDE_TRAILING_SPORT_NOISE_RE = /\b(?:4k|hockey|ice\s+hockey|basketball|football|baseball|softball|soccer|rugby)\s*$/i
 // Game-state injections appear between team name and "vs" in MLB rescheduled
 // games and a few other sports: "Colorado Rockies Makeup of vs New York Mets".
@@ -197,10 +197,10 @@ function shouldExpandKnownSportsTeamAlias(options = {}) {
 
 function titleCase(value = '') {
   const upperTokens = new Set([
-    'AC', 'AEK', 'AEW', 'AFCON', 'AFC', 'ATP', 'CF', 'EFL', 'EPL', 'FA', 'F1', 'FC',
-    'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA',
+    'AC', 'AEK', 'AEW', 'AFCON', 'AFC', 'ATP', 'BIGN', 'CF', 'CPL', 'EFL',
+    'ELC', 'EPL', 'FA', 'F1', 'FC', 'FEB', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA',
     'NBA', 'NCAA', 'NFL', 'NHL', 'NJPW', 'NXT', 'PDC', 'PFL', 'PGA', 'PPV',
-    'PSG', 'ROH', 'SC', 'TNA', 'UCL', 'UCLA', 'UECL', 'UEFA', 'UFC', 'UEL',
+    'OHL', 'PSG', 'ROH', 'SC', 'TNA', 'UCL', 'UCLA', 'UECL', 'UEFA', 'UFC', 'UEL', 'UFL',
     'WC', 'WEC', 'WNBA', 'WRC', 'WTA', 'WWE'
   ])
   return normalizeSegment(value)
