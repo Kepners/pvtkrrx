@@ -132,12 +132,12 @@ async function run() {
     throw new Error(`Unexpected fetch in smoke-sports-catalog-seeds: ${url}`)
   }
   ProwlarrClient.prototype.caps = async function caps() {
-    return [{ name: 'SportsCult' }]
+    return [{ name: 'GenericSportsTracker' }]
   }
 
-  const nonSportsCultCatalogCalls = []
+  const genericIndexerCatalogCalls = []
   ProwlarrClient.prototype.search = async function search(query, cats, type, options = {}) {
-    nonSportsCultCatalogCalls.push({
+    genericIndexerCatalogCalls.push({
       query: String(query || ''),
       cats: String(cats || ''),
       useCategories: options.useCategories === true
@@ -150,23 +150,41 @@ async function run() {
       })
     ]
   }
-  const nonSportsCultConfig = makeConfig()
-  nonSportsCultConfig.jackettUrl = 'https://prowlarr-non-sportscult.example'
-  const nonSportsCultCatalogResult = await handleCatalog(
-    nonSportsCultConfig,
+  const genericIndexerConfig = makeConfig()
+  genericIndexerConfig.jackettUrl = 'https://prowlarr-generic-sports.example'
+  const genericIndexerCatalogResult = await handleCatalog(
+    genericIndexerConfig,
     'sports',
     'pvtkrrx-sports',
     '',
     { baseUrl: 'http://127.0.0.1:7000' }
   )
-  assert.deepEqual(
-    nonSportsCultCatalogResult.metas || [],
-    [],
-    'sports catalogs must not emit non-SportsCult Prowlarr rows as catalog-owned events'
+  assert.ok(
+    Array.isArray(genericIndexerCatalogResult.metas) && genericIndexerCatalogResult.metas.length > 0,
+    'sports catalogs should emit generic Prowlarr/Torznab sports rows when they pass sports filters'
+  )
+  const genericIndexerMeta = genericIndexerCatalogResult.metas.find((meta) => String(meta?.name || '').includes('Atlanta Hawks vs New York Knicks'))
+  assert.ok(genericIndexerMeta, 'generic Prowlarr/Torznab sports rows should appear in sports catalog metas')
+  assert.equal(genericIndexerMeta.posterShape, 'poster', 'generic Prowlarr/Torznab sports rows should render with poster shape')
+  assert.match(
+    String(genericIndexerMeta.poster || ''),
+    /\/sports-artwork\/(?:id|default)\/poster\//,
+    'generic Prowlarr/Torznab sports rows should use generated sports poster artwork'
+  )
+  const decodedGenericPoster = decodeURIComponent(String(genericIndexerMeta.poster || '')).replace(/\+/g, ' ')
+  assert.match(
+    decodedGenericPoster,
+    /home=Atlanta Hawks/,
+    'generic Prowlarr/Torznab team-vs-team rows should preserve parsed home team in artwork URL'
+  )
+  assert.match(
+    decodedGenericPoster,
+    /away=New York Knicks/,
+    'generic Prowlarr/Torznab team-vs-team rows should preserve parsed away team in artwork URL'
   )
   assert.ok(
-    nonSportsCultCatalogCalls.length > 0 && nonSportsCultCatalogCalls.every((call) => call.cats === '5060' && call.useCategories),
-    'non-SportsCult catalog rejection should still prove the Prowlarr sports-category contract'
+    genericIndexerCatalogCalls.length > 0 && genericIndexerCatalogCalls.every((call) => call.cats === '5060' && call.useCategories),
+    'generic Prowlarr/Torznab catalog acceptance should still prove the sports-category contract'
   )
 
   const sportsMetaScheduleOnlyCalls = []
@@ -227,7 +245,7 @@ async function run() {
   assert.deepEqual(
     sportsMetaScheduleOnlyResult.metas || [],
     [],
-    'SportsMeta schedule/catalog rows must not create sports catalog items without SportsCult availability'
+    'SportsMeta schedule/catalog rows must not create sports catalog items without Prowlarr/Torznab availability'
   )
   assert.ok(
     sportsMetaScheduleOnlyCalls.length > 0 && sportsMetaScheduleOnlyCalls.every((call) => call.cats === '5060' && call.useCategories),
@@ -236,7 +254,7 @@ async function run() {
   assert.equal(
     sportsMetaScheduleFetches,
     0,
-    'SportsMeta must not be queried for schedule/catalog enrichment when SportsCult availability is empty'
+    'SportsMeta must not be queried for schedule/catalog enrichment when Prowlarr/Torznab availability is empty'
   )
   global.fetch = async (input) => {
     const url = String(input || '')

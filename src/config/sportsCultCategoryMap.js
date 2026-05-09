@@ -1,11 +1,12 @@
-// SportsCult category mapping — contract-locked.
+// SportsCult category profile - contract-locked.
 //
-// SportsCult is the source of truth for sports torrent rows. Their category
-// names are the strongest classification hint we have. This file maps every
-// SportsCult category we have seen to:
+// Prowlarr/Torznab-compatible indexers are the sports availability layer.
+// SportsCult is one supported Prowlarr source, not a catalog requirement.
+// When SportsCult-style category names are present, they are strong
+// classification hints. This file maps every SportsCult category we have seen to:
 //
 //   - appSportHint        the broad sport bucket PVTKRRX exposes (`football`,
-//                         `motorsport`, ...) — kept narrow on purpose so
+//                         `motorsport`, ...) - kept narrow on purpose so
 //                         Stremio rows stay broad and useful.
 //   - canonicalSport      the canonical sport key SportsMeta uses, may be the
 //                         same as appSportHint or a more specific value.
@@ -21,8 +22,9 @@
 //                            Olympic games -> Athletics, ...).
 //   - notes               human-readable hint for future contributors.
 //
-// Title parsing must NOT override SportsCult truths. Premier League Darts is
-// darts. EuroLeague Basketbal is basketball. Formula1 is motorsport.
+// Title parsing must not override explicit mapped category hints unless the
+// entry allows refinement. Premier League Darts is darts. EuroLeague Basketbal
+// is basketball. Formula1 is motorsport.
 
 const POSTER_CLASSES = Object.freeze([
   'team_vs_team',

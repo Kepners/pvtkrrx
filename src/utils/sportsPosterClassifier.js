@@ -158,8 +158,8 @@ function extractBracketedCategory(rawTitle = '') {
   return match ? match[1].trim() : ''
 }
 
-// SportsCult category truths beat title parsing for hard cases. Title parsing
-// only refines when the category map says allowTitleRefinement.
+// Explicit mapped category hints beat title parsing for hard cases. Title
+// parsing only refines when the category map says allowTitleRefinement.
 function resolveSportsCultContext(input = {}) {
   const explicit = normalizeSpace(input.sportsCultCategory || input.sportscultCategory || '')
   const direct = explicit ? mapSportsCultCategory(explicit) : null
@@ -169,7 +169,7 @@ function resolveSportsCultContext(input = {}) {
   if (Array.isArray(input.sportsCultCategoryNames)) names.push(...input.sportsCultCategoryNames)
   if (Array.isArray(input.categoryNames)) names.push(...input.categoryNames)
   if (input.indexerCategoryName) names.push(input.indexerCategoryName)
-  // SportsCult RSS embeds the category in [Brackets] at the start of the
+  // Some tracker feeds embed the category in [Brackets] at the start of the
   // title; treat that as a category-name hint when no explicit one was given.
   const bracketed = extractBracketedCategory(input.rawTitle || input.title || '')
   if (bracketed) names.push(bracketed)
@@ -363,8 +363,8 @@ function classifySportsPosterEvent(input = {}) {
   const context = resolveSportsCultContext(input)
   const nonTeamEvent = NON_TEAM_EVENT_TEXT_RE.test(text)
 
-  // Title-driven precision overrides: even when SportsCult points at a broad
-  // category, "Premier League Darts" is darts not football, "EuroLeague
+  // Title-driven precision overrides: even when a mapped category points at a
+  // broad category, "Premier League Darts" is darts not football, "EuroLeague
   // Basketbal" is basketball not football. Run the text classifier first and
   // accept its highly specific verdicts only.
   const textClass = classifyByText(text, sport, paired)
@@ -372,7 +372,7 @@ function classifySportsPosterEvent(input = {}) {
     const refined = refineByCategory(context, text)
     const allow = context.allowTitleRefinement
 
-    // SportsCult locked-down categories — text classifier may not override
+    // Locked-down category hints - text classifier may not override
     // unless the context allows refinement.
     if (!allow) {
       // If the locked context is team_vs_team, downgrade to tournament_event

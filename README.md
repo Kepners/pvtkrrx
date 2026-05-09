@@ -79,6 +79,12 @@ The installer sets up the app, Node runtime, production dependencies, saved serv
 
 Self-hosted server mode can use private or localhost Prowlarr/qBittorrent URLs after server-admin authentication, but the Stremio-facing install origin still needs a real public HTTPS hostname.
 
+### Setup Paths If You Do Not Have A Domain
+
+1. Same PC: use `http://127.0.0.1:7000/configure` and install the PC Local route on that same machine.
+2. Hosted PVTKRRX route: use the hosted LAN Bridge or Remote Seedbox token flow when you do not have your own addon URL. Remote Seedbox still needs public HTTPS playback endpoints that you control.
+3. Full VPS self-host: use your own public HTTPS domain or subdomain for the addon origin. A raw `http://IP:port` URL is not a stable Stremio install path; a VPS setup needs DNS, a reverse proxy, and a valid TLS certificate, or you should use the hosted route instead.
+
 ## Release Tags
 
 Release numbering is app-aligned. The Windows/desktop release uses `vX.Y.Z`; the paired self-host/seedbox release uses `vX.Y.Z-selfhost`. For example, app version `1.1.44` is released as `v1.1.44` and `v1.1.44-selfhost`.
@@ -116,6 +122,8 @@ All routes expose the same addon family:
 - qBittorrent library items
 
 The route changes playback capability, not the catalog family.
+
+Sports availability comes from your configured Prowlarr/Torznab-compatible indexers. SportsCult is one supported source/profile, not a requirement, and SportsMeta only enriches rows that already have tracker availability.
 
 Important playback differences:
 

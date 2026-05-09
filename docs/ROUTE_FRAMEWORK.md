@@ -152,6 +152,8 @@ When `fileServerAuth` is configured:
 - Use `PC Local` only on the Windows host that runs PVTKRRX.
 - Use `LAN Bridge` for phone, TV, web, and Apple TV on the same Stremio account as the host.
 - Use `Remote Seedbox` when playback endpoints are already public and reachable over HTTPS.
+- If you do not have your own domain or public addon URL, use same-PC `127.0.0.1` for `PC Local`, or use the hosted PVTKRRX token route for `LAN Bridge` / hosted `Remote Seedbox`.
+- Full VPS self-hosting requires a public HTTPS domain or subdomain for the Stremio-facing addon origin. Raw IP HTTP is not a stable install path; configure DNS, a reverse proxy, and a valid TLS certificate, or stay on the hosted route.
 
 ## What `.pvtk` Is Not
 

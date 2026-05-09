@@ -5,7 +5,7 @@
 ## Current Product Boundary
 
 - PVTKRRX is the Stremio addon/runtime for tracker-backed sports, movies, TV, and library rows.
-- SportsCult/Prowlarr remains the source of truth for what appears in PVTKRRX sports catalogs.
+- Prowlarr/Torznab-compatible indexers remain the source of truth for what appears in PVTKRRX sports catalogs. SportsCult is one supported source/profile, not a requirement.
 - SportsMeta is enrichment: canonical sports identity, event metadata, logos, artwork URLs, and assets where available.
 - SportsMeta must not create schedule-only rows inside PVTKRRX sports catalogs.
 - Sports Posters member routes, checkout, entitlement, and premium artwork remain SportsMeta-owned surfaces. They are not a paid tier inside the PVTKRRX stream addon.
@@ -28,7 +28,7 @@ Approved wording:
 
 Extended wording:
 
-> Sports uses a logo/artwork-based presentation, with one included visual style in the free version. SportsCult remains the catalog source, while SportsMeta enriches artwork and event presentation.
+> Sports uses a logo/artwork-based presentation, with one included visual style in the free version. Prowlarr/Torznab-compatible indexers drive what appears. SportsCult is one supported source, not a requirement, while SportsMeta enriches artwork and event presentation.
 
 Avoid wording that implies the free sports surface is a deliberately degraded visual mode.
 
@@ -49,7 +49,7 @@ Do not use these claims:
 - PVTKRRX has an in-addon paid sports poster entitlement.
 - PVTKRRX free sports is intentionally degraded.
 - PVTKRRX free sports is a text-card tier.
-- SportsMeta creates PVTKRRX catalog rows without SportsCult/Prowlarr ownership.
+- SportsMeta creates PVTKRRX catalog rows without Prowlarr/Torznab availability from the user's configured indexers.
 
 ## Proof Expectations
 
