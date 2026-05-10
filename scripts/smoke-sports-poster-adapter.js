@@ -54,9 +54,28 @@ const CASES = [
     }
   },
   {
-    slug: 'combat-head-to-head',
+    // Boxing 1v1 product — no card wrapper, two fighters IS the event.
+    // Should still render head-to-head.
+    slug: 'combat-boxing-head-to-head',
     expectedClass: 'combat_event',
     expectedFormat: 'single',
+    input: {
+      sportHint: 'boxing',
+      competition: 'Boxing',
+      rawTitle: 'Tyson Fury vs Oleksandr Usyk Heavyweight Title 1080p',
+      eventTitle: 'Tyson Fury vs Oleksandr Usyk',
+      homeTeam: 'Tyson Fury',
+      awayTeam: 'Oleksandr Usyk'
+    }
+  },
+  {
+    // UFC/MMA card events (UFC NNN, UFC Fight Night, PFL, Bellator) MUST
+    // render solo F1-style — event mark dominant + headline as subtitle —
+    // even when the title parses a fighter pair. Per
+    // feedback_ufc_card_layout.md.
+    slug: 'combat-ufc-card-solo',
+    expectedClass: 'combat_event',
+    expectedFormat: 'solo',
     input: {
       sportHint: 'mma',
       competition: 'UFC',
@@ -68,7 +87,7 @@ const CASES = [
     }
   },
   {
-    slug: 'combat-card-solo',
+    slug: 'combat-card-solo-no-pair',
     expectedClass: 'combat_event',
     expectedFormat: 'solo',
     input: {

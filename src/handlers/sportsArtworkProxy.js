@@ -41,7 +41,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260506-real-logo-v14-team-slot-logos'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260510-real-logo-v15-catalog-orientation'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -1678,9 +1678,57 @@ async function buildMatchupLogoPair(homeBadge, awayBadge, size = 210) {
   }
 }
 
-async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl = '', variant = 'poster', template = 'editorial' } = {}) {
+async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl = '', variant = 'poster', template = 'editorial', requestedHome = '', requestedAway = '', requestedTitle = '' } = {}) {
   const canonical = await loadCanonicalEvent(canonicalId, sportsmetaBaseUrl)
-  const event = canonical?.event || {}
+  const event = { ...(canonical?.event || {}) }
+
+  // Catalog title order wins: SportsMeta canonical home/away encodes the
+  // actual home venue (e.g. NHL home = team that owns the arena), but the
+  // Stremio meta.name shown above the card is built from the Prowlarr/
+  // SportsCult catalog title — and those orders can disagree. PVTKRRX
+  // honours the catalog order so the rendered poster matches the displayed
+  // title. Two signals indicate inversion:
+  //   1. Request home/away (from ?home= / ?away=) is flipped vs canonical
+  //   2. Request title parses as "X vs|v|@ Y" with X matching canonical away
+  let assetHomeKey = 'homeBadge'
+  let assetAwayKey = 'awayBadge'
+  const canonHomeKey = leagueSlugFor(event.homeTeam)
+  const canonAwayKey = leagueSlugFor(event.awayTeam)
+  const reqHomeKey = leagueSlugFor(requestedHome)
+  const reqAwayKey = leagueSlugFor(requestedAway)
+  let inverted = (
+    reqHomeKey && reqAwayKey && canonHomeKey && canonAwayKey &&
+    reqHomeKey !== canonHomeKey &&
+    reqHomeKey === canonAwayKey &&
+    reqAwayKey === canonHomeKey
+  )
+  if (!inverted && requestedTitle && canonHomeKey && canonAwayKey) {
+    const titleMatch = String(requestedTitle).match(/^\s*(.+?)\s+(vs?\.?|@)\s+(.+?)\s*$/i)
+    if (titleMatch) {
+      const sep = titleMatch[2].toLowerCase()
+      // `vs`/`v` convention: first team is home. `@` convention (US sports):
+      // first team is away, second is home.
+      const isAtSeparator = sep === '@'
+      const titleHomeKey = leagueSlugFor(isAtSeparator ? titleMatch[3] : titleMatch[1])
+      const titleAwayKey = leagueSlugFor(isAtSeparator ? titleMatch[1] : titleMatch[3])
+      if (
+        titleHomeKey && titleAwayKey &&
+        titleHomeKey !== canonHomeKey &&
+        titleHomeKey === canonAwayKey &&
+        titleAwayKey === canonHomeKey
+      ) {
+        inverted = true
+      }
+    }
+  }
+  if (inverted) {
+    const swappedHome = event.awayTeam
+    event.awayTeam = event.homeTeam
+    event.homeTeam = swappedHome
+    assetHomeKey = 'awayBadge'
+    assetAwayKey = 'homeBadge'
+  }
+
   const hasMatchup = Boolean(event.homeTeam && event.awayTeam)
   const eventClass = classifySportsEvent(event)
   event.eventClass = eventClass
@@ -1710,8 +1758,8 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     if (cdn) return cdn
     return buildCanonicalBadgeUrl({ sportsmetaBaseUrl, canonicalId, variant: variantKey, fallbackUrl })
   }
-  const homeBadgeUrl = pickLogoUrl('homeBadge', canonical?.assets?.homeBadge)
-  const awayBadgeUrl = pickLogoUrl('awayBadge', canonical?.assets?.awayBadge)
+  const homeBadgeUrl = pickLogoUrl(assetHomeKey, canonical?.assets?.[assetHomeKey])
+  const awayBadgeUrl = pickLogoUrl(assetAwayKey, canonical?.assets?.[assetAwayKey])
   const leagueLogoUrl = pickLogoUrl('leagueLogo', canonical?.assets?.leagueLogo || canonical?.assets?.logo)
   const eventLogoUrl = pickLogoUrl('logo', canonical?.assets?.logo)
   const eventPosterUrl = pickLogoUrl('poster', canonical?.assets?.poster)
@@ -1948,7 +1996,10 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
       canonicalId: teamPosterContext.canonicalId,
       sportsmetaBaseUrl: teamPosterContext.sportsmetaBaseUrl,
       variant,
-      template
+      template,
+      requestedHome: teamPosterContext.requestedHome || fallbackInput.homeTeam || '',
+      requestedAway: teamPosterContext.requestedAway || fallbackInput.awayTeam || '',
+      requestedTitle: teamPosterContext.requestedTitle || fallbackInput.eventTitle || fallbackInput.title || ''
     })
     if (teamPoster?.buffer) {
       return {
@@ -2494,8 +2545,27 @@ function buildDefaultArtworkCacheKey({ variant, template, sportSlug, league, tit
   ].join('|')
 }
 
-function buildCanonicalArtworkCacheKey({ variant, template, canonicalId, sportsmetaBaseUrl }) {
-  return `${LOCAL_ARTWORK_RENDER_VERSION}|id|${variant}|${normalizeSportsPosterTemplate(template)}|${canonicalId}|${(sportsmetaBaseUrl || '').trim().toLowerCase()}`
+function buildCanonicalArtworkCacheKey({ variant, template, canonicalId, sportsmetaBaseUrl, requestedHome = '', requestedAway = '', requestedTitle = '' }) {
+  // Orientation must be in the cache key: SportsMeta canonical home/away can
+  // disagree with the catalog title order (e.g. NHL canonical home = actual
+  // venue but catalog wrote "Away vs Home"). PVTKRRX honours the catalog
+  // order so the rendered poster matches Stremio's displayed meta.name. Both
+  // request home/away and the request title can carry the catalog signal, so
+  // both contribute to the cache key.
+  const homeKey = leagueSlugFor(requestedHome)
+  const awayKey = leagueSlugFor(requestedAway)
+  const titleKey = leagueSlugFor(requestedTitle)
+  return [
+    LOCAL_ARTWORK_RENDER_VERSION,
+    'id',
+    variant,
+    normalizeSportsPosterTemplate(template),
+    canonicalId,
+    (sportsmetaBaseUrl || '').trim().toLowerCase(),
+    homeKey,
+    awayKey,
+    titleKey
+  ].join('|')
 }
 
 async function resolveDefaultArtworkCanonical({
@@ -2739,14 +2809,17 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
       sportsmetaBaseUrl,
       template
     })
+    // Catalog title order wins (Prowlarr title is authoritative). If the
+    // request supplied home/away, keep them; only fall back to canonical
+    // home/away when the request didn't have any.
     const canonicalFallbackInput = buildArtworkInputFromRequest({
       canonicalId: canonical.canonicalId,
       sport: canonical.event?.sport || sportSlug,
       league: canonical.event?.league || league,
       title: canonical.event?.title || canonical.event?.name || title,
       date: canonical.event?.date || date,
-      homeTeam: canonical.event?.homeTeam || homeTeam,
-      awayTeam: canonical.event?.awayTeam || awayTeam,
+      homeTeam: homeTeam || canonical.event?.homeTeam,
+      awayTeam: awayTeam || canonical.event?.awayTeam,
       seeders,
       size,
       rawTitle,
@@ -2758,7 +2831,10 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
       variant,
       template,
       canonicalId: canonical.canonicalId,
-      sportsmetaBaseUrl
+      sportsmetaBaseUrl,
+      requestedHome: homeTeam,
+      requestedAway: awayTeam,
+      requestedTitle: title
     })
     await sendArtwork(res, {
       cacheKey: canonicalCacheKey,
@@ -2768,7 +2844,10 @@ async function handleDefaultSportsArtwork(req, res, config = {}) {
       template,
       teamPosterContext: {
         canonicalId: canonical.canonicalId,
-        sportsmetaBaseUrl
+        sportsmetaBaseUrl,
+        requestedHome: homeTeam,
+        requestedAway: awayTeam,
+        requestedTitle: title
       }
     })
     return
@@ -2830,8 +2909,11 @@ async function handleCanonicalSportsArtwork(req, res, config = {}) {
     fallbackInput.eventTitle = normalizeSpace(canonicalOverride.event.title || canonicalOverride.event.name) || fallbackInput.eventTitle
     fallbackInput.title = fallbackInput.eventTitle
     fallbackInput.date = normalizeSpace(canonicalOverride.event.date) || fallbackInput.date
-    fallbackInput.homeTeam = normalizeSpace(canonicalOverride.event.homeTeam) || fallbackInput.homeTeam
-    fallbackInput.awayTeam = normalizeSpace(canonicalOverride.event.awayTeam) || fallbackInput.awayTeam
+    // Catalog title order wins: only fill home/away from canonical when the
+    // request didn't supply either. Prevents SportsMeta canonical (which
+    // encodes the actual home venue) from inverting Prowlarr's catalog order.
+    if (!fallbackInput.homeTeam) fallbackInput.homeTeam = normalizeSpace(canonicalOverride.event.homeTeam)
+    if (!fallbackInput.awayTeam) fallbackInput.awayTeam = normalizeSpace(canonicalOverride.event.awayTeam)
     fallbackInput.source = 'sportsmeta'
   }
   const upstreamUrl = buildUpstreamUrl({
@@ -2841,7 +2923,15 @@ async function handleCanonicalSportsArtwork(req, res, config = {}) {
     sportsmetaBaseUrl,
     template
   })
-  const cacheKey = buildCanonicalArtworkCacheKey({ variant, template, canonicalId: artworkCanonicalId, sportsmetaBaseUrl })
+  const cacheKey = buildCanonicalArtworkCacheKey({
+    variant,
+    template,
+    canonicalId: artworkCanonicalId,
+    sportsmetaBaseUrl,
+    requestedHome: fallbackInput.homeTeam,
+    requestedAway: fallbackInput.awayTeam,
+    requestedTitle: fallbackInput.eventTitle || fallbackInput.title
+  })
   await sendArtwork(res, {
     cacheKey,
     upstreamUrl,
@@ -2850,7 +2940,10 @@ async function handleCanonicalSportsArtwork(req, res, config = {}) {
     template,
     teamPosterContext: {
       canonicalId: artworkCanonicalId,
-      sportsmetaBaseUrl
+      sportsmetaBaseUrl,
+      requestedHome: fallbackInput.homeTeam,
+      requestedAway: fallbackInput.awayTeam,
+      requestedTitle: fallbackInput.eventTitle || fallbackInput.title
     }
   })
 }

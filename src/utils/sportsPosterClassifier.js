@@ -41,7 +41,7 @@ const COMPETITOR_EVENT_CLASSES = new Set([
   'wrestling_event'
 ])
 
-const MOTORSPORT_TEXT_RE = /\b(?:formula\s*1|formula\s*one|formula1|f1|motogp|moto\s*gp|nascar|indycar|wrc|supercars?|v8sc|wec|formula\s*e|grand prix|rally|daytona 500)\b/i
+const MOTORSPORT_TEXT_RE = /\b(?:formula\s*1|formula\s*one|formula1|f1|motogp|moto\s*gp|moto\s*\d+|moto\s*e|nascar|indycar|wrc|supercars?|v8sc|wec|formula\s*e|grand prix|rally|daytona 500)\b/i
 const TEAM_SPORT_TEXT_RE = /\b(?:basketball|nba|wnba|euroleague|football|soccer|nfl|ufl|super bowl|mlb|world series|nhl|ohl|stanley cup|ipl|cricket|rugby|afl|cpl|softball|volleyball|handball|copa libertadores|copa sudamericana|libertadores|sudamericana)\b/i
 const COMPETITOR_TEXT_RE = /\b(?:snooker|billiards|pool|tennis|wimbledon|atp|wta|darts?|pdc|ufc|mma|pfl|bellator|boxing|fight night|wrestling|wwe|aew|badminton|squash|table tennis)\b/i
 const NON_TEAM_EVENT_TEXT_RE = /\b(?:recaps?|recapping|previews?|all\s+games|road\s+(?:to|in)|post\s+match|pre\s+show|studio\s+show|highlights?|replay|press\s+conference)\b/i
@@ -271,7 +271,7 @@ function classifyByText(text, sport, paired) {
 
   if (
     sport === 'motorsport' ||
-    /\b(?:formula\s*1|formula\s*one|f1|motogp|moto\s*gp|nascar|indycar|wrc|supercars?|v8sc|wec|formula\s*e|grand prix|daytona 500|rally)\b/.test(text)
+    /\b(?:formula\s*1|formula\s*one|f1|motogp|moto\s*gp|moto\s*\d+|moto\s*e|nascar|indycar|wrc|supercars?|v8sc|wec|formula\s*e|grand prix|daytona 500|rally)\b/.test(text)
   ) {
     return 'motorsport_event'
   }
