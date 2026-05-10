@@ -1142,11 +1142,63 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
     canonicalIds: ['sportsmeta:league:mma|ufc'],
     searchTerms: ['UFC']
   },
+  // Tennis — SportsMeta does not index tennis as a sport slug, so every tennis
+  // tournament has to lean on TheSportsDB CDN league badges. ATP/WTA badges
+  // double as the tour mark for any singles tournament on that tour. Grand
+  // Slams (Wimbledon / US Open / Australian Open / Roland Garros) and team
+  // events (Davis Cup / Laver Cup / United Cup / Olympics) get specific marks
+  // where TheSportsDB carries them.
   {
     sport: 'tennis',
-    pattern: /\b(?:atp|atp\s+world\s+tour)\b/i,
-    canonicalIds: ['sportsmeta:league:tennis|atp-world-tour'],
-    searchTerms: ['ATP World Tour']
+    pattern: /\b(?:atp|atp\s+world\s+tour|men\'?s\s+singles|davis\s+cup)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/q7aej51769857150.png']
+  },
+  {
+    sport: 'tennis',
+    pattern: /\b(?:wta|wta\s+tour|women\'?s\s+singles|billie\s+jean\s+king\s+cup)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/bddhun1768230678.png']
+  },
+  {
+    sport: 'tennis',
+    pattern: /\b(?:wimbledon|us\s+open|u\.s\.\s+open|aus\s+open|australian\s+open|french\s+open|roland\s+garros)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/q7aej51769857150.png']
+  },
+  {
+    sport: 'tennis',
+    pattern: /\bunited\s+cup\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/6dhk9z1775665150.png']
+  },
+  {
+    sport: 'tennis',
+    pattern: /\blaver\s+cup\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/pd74m91572093834.png']
+  },
+  {
+    sport: 'tennis',
+    pattern: /\b(?:olympic\s+tennis|olympics\s+tennis|olympics?)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/5m0rwm1687510227.png']
+  },
+  // Catch-all tennis fallback — any tennis-flagged event without a matched
+  // tournament still gets the ATP World Tour mark instead of a glyph. The
+  // sport-only pattern always fires when sport is "tennis".
+  {
+    sport: 'tennis',
+    pattern: /\btennis\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/q7aej51769857150.png']
   },
   {
     sport: 'cricket',
@@ -1190,6 +1242,25 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
     canonicalIds: [],
     searchTerms: [],
     directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/d5xvqq1750423289.png']
+  },
+  // Snooker — SportsMeta does not index snooker. World Snooker (WST) badge
+  // covers every ranking event (World Championship, UK Championship, Masters,
+  // German Masters, Champion of Champions, Players Championship, Tour
+  // Championship). Matched per-tournament keywords first, then a sport-only
+  // catch-all so any snooker-flagged event still gets a real badge.
+  {
+    sport: 'snooker',
+    pattern: /\b(?:world\s+snooker|world\s+championship\s+snooker|wst|uk\s+championship|masters\s+snooker|german\s+masters|champion\s+of\s+champions|players\s+championship|tour\s+championship|crucible)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/0gmkgj1555600537.png']
+  },
+  {
+    sport: 'snooker',
+    pattern: /\bsnooker\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/0gmkgj1555600537.png']
   }
 ])
 

@@ -147,7 +147,14 @@ async function main() {
     assert.match(svg, testCase.titlePattern, `${testCase.slug} readable title text`)
     assert.match(svg, new RegExp(BROADCAST_WORDMARK), `${testCase.slug} honest Broadcast wordmark`)
     assert.match(normalized.sport, testCase.expectedSport, `${testCase.slug} normalized sport`)
-    assert.equal((artwork.slots || []).length, 0, `${testCase.slug} broadcast poster must not allocate fake logo slots`)
+    // Broadcast template MUST emit real-logo slots so the runtime composites
+    // SportsMeta/TheSportsDB league + team badges over the colored discs.
+    // Was: ==0 (the old "no fake slots" rule from the chrome-circle direction).
+    // Now: matchup -> [league, home, away], solo -> [league, leagueWatermark].
+    const slotsLen = (artwork.slots || []).length
+    assert.ok(slotsLen >= 2, `${testCase.slug} broadcast poster must allocate >=2 real-logo slots (got ${slotsLen})`)
+    const slotRoles = (artwork.slots || []).map((s) => s.role)
+    assert.ok(slotRoles.includes('league'), `${testCase.slug} broadcast poster must include league slot (roles=${slotRoles.join(',')})`)
     assert.doesNotMatch(svg, /viewBox="0 0 400 600"/, `${testCase.slug} must not wrap old 400x600 source`)
     assert.doesNotMatch(svg, /data-role="broadcast-title"[^>]*class="bebas"/i, `${testCase.slug} Broadcast title must not use Bebas`)
     assert.doesNotMatch(svg, /homeGrad/i, `${testCase.slug} must not use homeGrad`)

@@ -1211,7 +1211,21 @@ function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') 
   const homeBadgeY = 320
   const awayBadgeX = 430
   const awayBadgeY = 580
-  const broadcastSlots = []
+  // Real-logo slot positions — match the SVG circle geometry exactly so the
+  // composited PNG fills the colored disc. Top-bar code chip is square slotted
+  // over the rect at (27, 27, 48, 33) — the league badge sits inside that.
+  const broadcastSlots = m.hasMatchup
+    ? [
+        { role: 'league', left: 27, top: 21, size: 48 },
+        { role: 'home', left: homeBadgeX - badgeR, top: homeBadgeY - badgeR, size: badgeR * 2 },
+        { role: 'away', left: awayBadgeX - badgeR, top: awayBadgeY - badgeR, size: badgeR * 2 }
+      ]
+    : [
+        { role: 'league', left: 27, top: 21, size: 48 },
+        // Solo: place a watermark league logo over the giant league wordmark
+        // centre so the real mark dominates the visual identity.
+        { role: 'league', left: W / 2 - 80, top: H / 2 - 80, size: 160 }
+      ]
   const codeFontSize = (code) => code.length <= 2 ? 32 : code.length <= 3 ? 28 : 22
   const codeYOffset = (code) => Math.round(codeFontSize(code) * 0.34)
   const pairBlock = m.hasMatchup ? `
