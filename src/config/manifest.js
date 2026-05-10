@@ -15,7 +15,7 @@ const manifest = {
   version: pkg.version || '0.0.0',
   name: 'PVTKRR',
   description: 'Private trackers and seedbox content inside Stremio. No debrid, no third-party media host; PVTKRR bridges your configured Prowlarr/qBittorrent setup to sports, movies, TV, and library streams.',
-  logo: 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.ico',
+  logo: 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg',
   resources: [
     'catalog',
     {
@@ -69,7 +69,13 @@ const manifest = {
 function createBootstrapManifest(baseUrl = '', options = {}) {
   const normalizedBaseUrl = String(baseUrl || '').trim().replace(/\/+$/, '')
   const configureUrl = normalizedBaseUrl ? `${normalizedBaseUrl}/configure` : '/configure'
-  const logoUrl = normalizedBaseUrl ? `${normalizedBaseUrl}/logo.ico` : manifest.logo
+  // Caddy intercepts /logo.ico on www.pvtkrrx.cc and serves a 393-byte stripped
+  // 64x64 SVG with Content-Type image/svg+xml. Stremio renders it, but
+  // stremio-addons.net and other directory crawlers strict-check the extension
+  // and can break on the mismatch. Use /logo.svg instead so the URL extension,
+  // Content-Type, and bytes all agree, and the response is the full 512x512
+  // brand SVG served by Express (Caddy passes it straight through).
+  const logoUrl = normalizedBaseUrl ? `${normalizedBaseUrl}/logo.svg` : manifest.logo
   const runtimeOptions = options && typeof options === 'object' ? options : {}
   const selfHostServerMode = runtimeOptions.selfHostServerMode === true
   const desktopLocalOnly = runtimeOptions.desktopLocalOnly === true
