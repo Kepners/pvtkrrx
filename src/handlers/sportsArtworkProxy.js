@@ -41,7 +41,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260510-real-logo-v17-reject-sportsmeta-scheme'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260511-real-logo-v18-no-glyph-fallback'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -278,12 +278,11 @@ async function renderEmergencyTemplatePng(variant, fallbackInput = {}, template 
   const fallbackSlots = skipGeneratedSlots ? [] : (artwork.slots || [])
   const composites = []
   for (const slot of fallbackSlots) {
-    const glyphSvg = renderLogoGlyphSvg({
-      role: slot.role,
-      event,
-      theme,
-      size: slot.size
-    })
+    // User directive 2026-05-11: glyph fallback removed. renderLogoGlyphSvg
+    // now returns null. If the real-logo pipeline didn't fill this slot,
+    // the slot is intentionally left empty rather than painted with initials.
+    const glyphSvg = renderLogoGlyphSvg({ role: slot.role, event, theme, size: slot.size })
+    if (!glyphSvg) continue
     composites.push({
       input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size),
       left: slot.left,
@@ -394,20 +393,24 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
           size: slot.size
         })
       } else {
-        const glyphSvg = renderLogoGlyphSvg({
-          role: slot.role,
-          event,
-          theme,
-          size: slot.size
-        })
-        composites.push({
-          input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size),
-          left: slot.left,
-          top: slot.top
-        })
+        // User directive 2026-05-11: glyph fallback removed.
+        // renderLogoGlyphSvg now returns null. The slot is intentionally
+        // skipped (no composite added) — no painted initials, no sport-icon
+        // emblem. logoSlots still records the slot so audit headers report
+        // why this slot is empty and which team needs SportsDB seeding.
+        const glyphSvg = renderLogoGlyphSvg({ role: slot.role, event, theme, size: slot.size })
+        if (glyphSvg) {
+          composites.push({
+            input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size),
+            left: slot.left,
+            top: slot.top
+          })
+        } else {
+          console.warn(`[sports-poster] LOGO_MISSING_NO_GLYPH variant=${variant} template=${normalizedTemplate} role=${slot.role} reason=${logoFallbackReason} title=${sourceTitleForAudit(fallbackInput)}`)
+        }
         logoSlots.push({
           role: slot.role,
-          logoKind: 'fallback-glyph',
+          logoKind: 'missing-no-glyph',
           logoFallbackReason,
           left: slot.left,
           top: slot.top,

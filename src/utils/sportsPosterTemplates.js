@@ -2250,35 +2250,14 @@ function sportGlyphMarkup(icon = 'sports', size = 256) {
   return sportGlyph(mapped, size / 2, size / 2, size * 0.78, '#ffffff', 1, Math.max(4, Math.round(size * 0.02)))
 }
 
-function renderLogoGlyphSvg({ role = 'league', event = {}, theme = {}, size = 256 } = {}) {
-  const facts = eventFacts(event)
-  const icon = sportIconFor(event, facts)
-  const primary = role === 'away' ? (theme.awayColor || '#123c69') : (theme.homeColor || '#0f766e')
-  const secondary = role === 'league' ? (theme.accentColor || '#b58b2a') : (theme.accentColor || '#f5d76e')
-  if (role === 'home' || role === 'away') {
-    const eventClass = normalizeSpace(event.eventClass || event.posterClass) || classifySportsPosterEvent(event)
-    const isTeam = eventClass === 'team_vs_team'
-    const name = role === 'away' ? facts.away : facts.home
-    const label = role === 'away'
-      ? (facts.awayInitials || initialsFor(name, 'AW'))
-      : (facts.homeInitials || initialsFor(name, 'HM'))
-    const fontSize = label.length > 2 ? Math.round(size * 0.26) : Math.round(size * 0.32)
-    const accent = readableAccent(primary)
-    const roleAttr = isTeam
-      ? `data-role="fallback-team-initials" data-team-side="${escapeXml(role)}" data-team-name="${escapeXml(name)}"`
-      : `data-role="fallback-competitor-initials" data-competitor-side="${role === 'away' ? 'right' : 'left'}" data-competitor-name="${escapeXml(name)}"`
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-  <defs><radialGradient id="g" cx="35%" cy="30%" r="78%"><stop offset="0" stop-color="${secondary}"/><stop offset="1" stop-color="${primary}"/></radialGradient></defs>
-  <circle cx="${size / 2}" cy="${size / 2}" r="${size * 0.43}" fill="url(#g)" stroke="rgba(255,255,255,0.78)" stroke-width="${Math.max(3, Math.round(size * 0.03))}"/>
-  <text ${roleAttr} x="${size / 2}" y="${Math.round(size * 0.5 + fontSize * 0.35)}" text-anchor="middle" font-family="'Bebas Neue', Impact, Arial, sans-serif" font-size="${fontSize}" font-weight="800" fill="${accent}" letter-spacing="0">${escapeXml(label)}</text>
-</svg>`
-  }
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-  <defs><radialGradient id="g" cx="35%" cy="30%" r="78%"><stop offset="0" stop-color="${secondary}"/><stop offset="1" stop-color="${primary}"/></radialGradient></defs>
-  <rect width="${size}" height="${size}" rx="${Math.round(size * 0.18)}" fill="rgba(2,6,23,0)"/>
-  <circle cx="${size / 2}" cy="${size / 2}" r="${size * 0.43}" fill="url(#g)" stroke="rgba(255,255,255,0.78)" stroke-width="${Math.max(3, Math.round(size * 0.03))}"/>
-  ${sportGlyphMarkup(icon, size)}
-</svg>`
+function renderLogoGlyphSvg() {
+  // User directive 2026-05-11: glyph fallback (text initials + sport-icon
+  // glyphs) is REMOVED from templates entirely. Real team and league logos
+  // come from SportsMeta (which fetches from TheSportsDB). When a real logo
+  // cannot be resolved for a slot, the slot is now skipped — never painted
+  // with a fake "WHU" / "AFC" / sport-emblem placeholder.
+  // Callers must check for null and skip the composite when this returns null.
+  return null
 }
 
 module.exports = {
