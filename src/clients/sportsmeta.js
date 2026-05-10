@@ -12,8 +12,21 @@ const SPORTS_META_CACHE_MAX_KEYS = Math.max(
   100,
   parseInt(process.env.PVTKRRX_SPORTSMETA_CACHE_MAX_KEYS || '3000', 10)
 )
+const SPORTS_META_RESOLVE_NEG_TTL_MS = Math.max(
+  60 * 1000,
+  parseInt(process.env.PVTKRRX_SPORTSMETA_RESOLVE_NEG_TTL_MS || String(60 * 60 * 1000), 10)
+)
+const SPORTS_META_RESOLVE_POS_TTL_MS = Math.max(
+  60 * 1000,
+  parseInt(process.env.PVTKRRX_SPORTSMETA_RESOLVE_POS_TTL_MS || String(6 * 60 * 60 * 1000), 10)
+)
+const SPORTS_META_RESOLVE_CACHE_MAX_KEYS = Math.max(
+  100,
+  parseInt(process.env.PVTKRRX_SPORTSMETA_RESOLVE_CACHE_MAX_KEYS || '5000', 10)
+)
 const sportsMetaJsonCache = new Map()
 const sportsMetaJsonInFlight = new Map()
+const sportsMetaResolveCache = new Map()
 
 function normalizeBaseUrl(value) {
   return String(value || '').trim().replace(/\/+$/, '')
@@ -55,6 +68,34 @@ function trimSportsMetaCache() {
     if (!oldestKey) break
     sportsMetaJsonCache.delete(oldestKey)
   }
+}
+
+function buildResolveStableCacheKey(query = {}) {
+  const recordType = String(query?.recordType || query?.type || 'event').trim().toLowerCase()
+  const sport = String(query?.sport || '').trim().toLowerCase()
+  const league = String(query?.league || '').trim().toLowerCase()
+  const date = String(query?.date || '').trim().toLowerCase()
+  const home = String(query?.home || query?.homeTeam || '').trim().toLowerCase()
+  const away = String(query?.away || query?.awayTeam || '').trim().toLowerCase()
+  // Only build a stable key when the structured tuple is rich enough to identify
+  // the event independently of the title/event hint. Without sport+date, the
+  // cache key would collide across unrelated events; without home or away the
+  // tuple cannot disambiguate same-day fixtures in the same league.
+  if (!sport || !date) return ''
+  if (!home && !away) return ''
+  return `${recordType}|${sport}|${league}|${date}|${home}|${away}`
+}
+
+function trimResolveCache() {
+  while (sportsMetaResolveCache.size > SPORTS_META_RESOLVE_CACHE_MAX_KEYS) {
+    const oldestKey = sportsMetaResolveCache.keys().next().value
+    if (!oldestKey) break
+    sportsMetaResolveCache.delete(oldestKey)
+  }
+}
+
+function clearSportsMetaResolveCache() {
+  sportsMetaResolveCache.clear()
 }
 
 async function requestSportsMetaJson(urlString, timeoutMs) {
@@ -238,8 +279,25 @@ class SportsMetaClient {
     const normalizedQuery = normalizeSportsMetaResolveQuery(query)
     if (Object.keys(normalizedQuery).length === 0 || !this.baseUrl) return null
 
+    const stableKey = buildResolveStableCacheKey(normalizedQuery)
+    if (stableKey) {
+      const cached = sportsMetaResolveCache.get(stableKey)
+      if (cached && cached.expiresAt > Date.now()) return cached.value
+    }
+
     const payload = await this._requestJson('/resolve', normalizedQuery)
-    return normalizeSportsMetaPayload(payload)
+    const result = normalizeSportsMetaPayload(payload)
+
+    if (stableKey) {
+      const ttl = result === null ? SPORTS_META_RESOLVE_NEG_TTL_MS : SPORTS_META_RESOLVE_POS_TTL_MS
+      sportsMetaResolveCache.set(stableKey, {
+        value: result,
+        expiresAt: Date.now() + ttl
+      })
+      trimResolveCache()
+    }
+
+    return result
   }
 
   async searchCatalog(sport, search = '', options = {}) {
@@ -392,6 +450,7 @@ module.exports = {
   buildSportsMetaAssetUrl,
   buildSportsMetaDefaultAssetUrl,
   buildSportsMetaMemberAssetUrl,
+  clearSportsMetaResolveCache,
   getPublicSportsMetaBaseUrl,
   normalizeSportsMetaPayload,
   normalizeSportsMetaResolveQuery,
