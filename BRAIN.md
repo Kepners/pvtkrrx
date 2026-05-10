@@ -82,6 +82,18 @@ ssh contabo 'docker exec coolify php artisan tinker --execute="
 
 **Critical**: always set `application_name` when creating a queue row by hand. The Windows Coolify deploy watcher (`contabo-infra/scripts/13-watch-coolify-deploy-failures.ps1`) used to throw `Cannot bind argument to parameter 'ApplicationName' because it is an empty string` on null/empty rows; that's been patched on 2026-04-30 to tolerate it (commit `983b5ca` in `contabo-infra-notes`), but it's still much cleaner not to leave NULL rows in `application_deployment_queues`.
 
+## Bootstrap Manifest Lock (Stremio-visible name + description)
+
+The root `/manifest.json` is the configure-first bootstrap entry (`com.kepners.pvtkrrx.bootstrap`). It must expose no catalogs, streams, or types.
+
+- **Locked name** — every mode (guide, default, self-host, desktop) returns name `PVTKRR`. No `Setup` / `Server Setup` / `Desktop Setup` suffix; no route/version/marketing suffix.
+- **Locked public description** — `Configure-first entry for PVTKRR. Sports in Stremio are catalogued through SportsMeta, while playback still comes from your configured Prowlarr/qBittorrent setup. Use the Windows host or your self-host server, then install the generated PC Local, LAN Bridge, or Remote Seedbox route manifest. This bootstrap entry intentionally exposes no catalogs or streams.`
+- The locked strings live in `src/config/manifest.js` as the constants `PUBLIC_BOOTSTRAP_MANIFEST_NAME` and `PUBLIC_BOOTSTRAP_MANIFEST_DESCRIPTION`.
+- Self-host (`selfHostServerMode=true`) and desktop (`desktopLocalOnly=true`) keep mode-specific descriptions referencing `configureUrl`. The **name** still pins to `PVTKRR` in those modes.
+- Smoke gates: `scripts/smoke-config-flow.js` and `scripts/smoke-selfhost-server.js` assert against the exported constants. Either smoke fails if a bootstrap manifest's name or description drifts from the locked values.
+
+If a future change wants to amend either string, it must touch the constants in `src/config/manifest.js` AND update CLAUDE.md, this BRAIN.md entry, and AGENTS.md in the same commit. Do not edit one without the others.
+
 ## Sports Posters Template Memory
 
 - Canonical design source: `C:\Users\kepne\projects\L - PVTKRRX\PCnestspeaker\python-templates`.

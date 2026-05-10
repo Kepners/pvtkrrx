@@ -60,9 +60,10 @@
 
 ### Bootstrap Manifest Name/Description Lock
 - Root `/manifest.json` is only the configure-first bootstrap entry (`com.kepners.pvtkrrx.bootstrap`). It must expose no catalogs, streams, or types.
-- The Stremio-visible bootstrap `name` must remain exactly `PVTKRR`. Never change it back to `PVTKRR Setup`, and do not add route, version, desktop, server, or marketing suffixes.
+- The Stremio-visible bootstrap `name` must remain exactly `PVTKRR`. Never change it back to `PVTKRR Setup`, `PVTKRR Server Setup`, `PVTKRR Desktop Setup`, or any other route/version/desktop/server/marketing suffix. This rule applies to **every** mode — public guide, default, self-host, and desktop runtimes all serve a Stremio-visible bootstrap and all must read `PVTKRR`.
 - The public guide/bootstrap description must remain exactly: `Configure-first entry for PVTKRR. Sports in Stremio are catalogued through SportsMeta, while playback still comes from your configured Prowlarr/qBittorrent setup. Use the Windows host or your self-host server, then install the generated PC Local, LAN Bridge, or Remote Seedbox route manifest. This bootstrap entry intentionally exposes no catalogs or streams.`
-- Treat this as an update-stability contract. The locked source is `src/config/manifest.js`; `scripts/smoke-config-flow.js` must fail if the public name or description changes.
+- The locked text is the value of `PUBLIC_BOOTSTRAP_MANIFEST_DESCRIPTION` exported from `src/config/manifest.js`. Self-host and desktop modes carry mode-specific copy with a configureUrl — that copy is outside the lock because those routes serve a different device class (an admin who already chose self-host/desktop), but the **name** still pins to `PVTKRR`.
+- Treat this as an update-stability contract. The locked source is `src/config/manifest.js` (constants `PUBLIC_BOOTSTRAP_MANIFEST_NAME` + `PUBLIC_BOOTSTRAP_MANIFEST_DESCRIPTION`). Both `scripts/smoke-config-flow.js` and `scripts/smoke-selfhost-server.js` MUST fail if either constant or any served bootstrap manifest's name/description drifts from these values.
 
 ### Sports Posters Template Source
 - **Live generator (canonical, edit here):** `backdrops/python-backdrops/` inside this repo. Each family lives in its own numbered folder with a `generate.py` and shared helpers under `_shared/`.

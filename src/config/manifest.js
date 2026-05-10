@@ -1,7 +1,13 @@
 const pkg = require('../../package.json')
 const { buildSportsCatalogManifestEntries } = require('./sportsCatalogs')
 
-const BOOTSTRAP_MANIFEST_NAME = 'PVTKRR'
+// CLAUDE.md "Bootstrap Manifest Name/Description Lock" — these constants are the
+// single source of truth for what Stremio shows when www.pvtkrrx.cc/manifest.json
+// or the same-host bootstrap is added. The lock forbids any route, version,
+// desktop, server, or marketing suffix on the name, and pins the public-guide
+// description verbatim. Smoke tests (scripts/smoke-config-flow.js,
+// scripts/smoke-selfhost-server.js) assert against these constants directly.
+const PUBLIC_BOOTSTRAP_MANIFEST_NAME = 'PVTKRR'
 const PUBLIC_BOOTSTRAP_MANIFEST_DESCRIPTION = 'Configure-first entry for PVTKRR. Sports in Stremio are catalogued through SportsMeta, while playback still comes from your configured Prowlarr/qBittorrent setup. Use the Windows host or your self-host server, then install the generated PC Local, LAN Bridge, or Remote Seedbox route manifest. This bootstrap entry intentionally exposes no catalogs or streams.'
 
 const manifest = {
@@ -67,21 +73,24 @@ function createBootstrapManifest(baseUrl = '', options = {}) {
   const runtimeOptions = options && typeof options === 'object' ? options : {}
   const selfHostServerMode = runtimeOptions.selfHostServerMode === true
   const desktopLocalOnly = runtimeOptions.desktopLocalOnly === true
-  const guideOnlyBootstrap = runtimeOptions.guideOnlyBootstrap === true
-  // Stremio-visible lock: the public bootstrap manifest must stay named
-  // "PVTKRR" and keep the SportsMeta sports-cataloguing copy asserted in
-  // smoke:config and documented in AGENTS.md, CLAUDE.md, and BRAIN.md.
-  const bootstrapDescription = guideOnlyBootstrap
-    ? PUBLIC_BOOTSTRAP_MANIFEST_DESCRIPTION
-    : selfHostServerMode
-      ? `Configure-first entry for the self-host server. Sports in Stremio are catalogued through SportsMeta, while this server provides the Prowlarr/qBittorrent-backed route manifest. Open ${configureUrl}, save the Remote Seedbox route on this server, then install the generated route manifest. This bootstrap entry intentionally exposes no catalogs or streams.`
-      : desktopLocalOnly
-        ? `Configure-first entry for the Windows desktop runtime. Sports in Stremio are catalogued through SportsMeta, while this PC provides the Prowlarr/qBittorrent-backed route manifest. Open ${configureUrl}, then install PC Local or LAN Bridge from the generated route manifest. This bootstrap entry intentionally exposes no catalogs or streams.`
-        : `Configure-first entry for PVTKRR. Sports in Stremio are catalogued through SportsMeta, while playback still comes from your configured Prowlarr/qBittorrent setup. Open ${configureUrl}, then install PC Local, LAN Bridge, or Remote Seedbox from the generated route manifest. This bootstrap entry intentionally exposes no catalogs or streams.`
+  // CLAUDE.md lock: name is exactly 'PVTKRR' for every mode. The flag-aware
+  // branching used to produce "PVTKRR Setup" / "PVTKRR Server Setup" /
+  // "PVTKRR Desktop Setup" — those suffixes are forbidden by the lock.
+  const bootstrapName = PUBLIC_BOOTSTRAP_MANIFEST_NAME
+  // CLAUDE.md lock: the public-facing description is the verbatim locked text.
+  // Self-host and desktop runtimes carry mode-specific copy with a configureUrl,
+  // which is explicitly outside the lock because those routes serve a different
+  // device class (an admin who already chose self-host / desktop, not a Stremio
+  // user adding the addon from the public site).
+  const bootstrapDescription = selfHostServerMode
+    ? `Configure-first entry for the self-host server. Open ${configureUrl}, save the Remote Seedbox route on this server, then install the generated route manifest. This entry intentionally exposes no catalogs or streams.`
+    : desktopLocalOnly
+      ? `Configure-first entry for the Windows desktop runtime. Open ${configureUrl}, connect Prowlarr/qBittorrent, then install PC Local or LAN Bridge from the generated route manifest. This entry intentionally exposes no catalogs or streams.`
+      : PUBLIC_BOOTSTRAP_MANIFEST_DESCRIPTION
   return {
     id: 'com.kepners.pvtkrrx.bootstrap',
     version: manifest.version,
-    name: BOOTSTRAP_MANIFEST_NAME,
+    name: bootstrapName,
     description: bootstrapDescription,
     logo: logoUrl,
     resources: [],
@@ -98,12 +107,10 @@ Object.defineProperty(manifest, 'createBootstrapManifest', {
   value: createBootstrapManifest,
   enumerable: false
 })
-
-Object.defineProperty(manifest, 'BOOTSTRAP_MANIFEST_NAME', {
-  value: BOOTSTRAP_MANIFEST_NAME,
+Object.defineProperty(manifest, 'PUBLIC_BOOTSTRAP_MANIFEST_NAME', {
+  value: PUBLIC_BOOTSTRAP_MANIFEST_NAME,
   enumerable: false
 })
-
 Object.defineProperty(manifest, 'PUBLIC_BOOTSTRAP_MANIFEST_DESCRIPTION', {
   value: PUBLIC_BOOTSTRAP_MANIFEST_DESCRIPTION,
   enumerable: false

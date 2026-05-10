@@ -215,11 +215,15 @@ async function run() {
     )
     assert.equal(bootstrapManifestRes.status, 200)
     assert.equal(bootstrapManifestRes.json?.id, 'com.kepners.pvtkrrx.bootstrap')
-    assert.equal(bootstrapManifestRes.json?.name, manifest.BOOTSTRAP_MANIFEST_NAME)
+    // CLAUDE.md lock: bootstrap name is exactly 'PVTKRR' in every mode, including
+    // self-host. The legacy "PVTKRR Server Setup" label is forbidden by the lock.
+    assert.equal(
+      bootstrapManifestRes.json?.name,
+      manifest.PUBLIC_BOOTSTRAP_MANIFEST_NAME,
+      'self-host bootstrap manifest name must match the CLAUDE.md lock (PVTKRR)'
+    )
     assert.match(String(bootstrapManifestRes.json?.description || ''), /Configure-first entry for the self-host server/i)
-    assert.match(String(bootstrapManifestRes.json?.description || ''), /SportsMeta/i)
     assert.match(String(bootstrapManifestRes.json?.description || ''), /generated route manifest/i)
-    assert.notEqual(bootstrapManifestRes.json?.name, 'PVTKRR Setup', 'self-host bootstrap manifest name must not reintroduce setup branding')
 
     const privateTest = await request(
       port,
