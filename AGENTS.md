@@ -35,6 +35,14 @@
 - `ticket-stub` is the free/default layout. The paid/member Sports Posters surface can use all seven layouts.
 - Real SportsMeta/SportsDB logo images must replace placeholder text in league/team slots when present; glyph fallback is only for missing images.
 
+## Bootstrap Manifest Name/Description Lock
+- The root `/manifest.json` bootstrap entry (`com.kepners.pvtkrrx.bootstrap`) has a name and a public-guide description that are pinned. Do not change them as part of unrelated work.
+- **Name (every mode)**: `PVTKRR`. No `Setup`, `Server Setup`, `Desktop Setup`, route, version, or marketing suffix — public guide, default, self-host, and desktop modes all return `PVTKRR`.
+- **Public-guide description (verbatim)**: `Configure-first entry for PVTKRR. Sports in Stremio are catalogued through SportsMeta, while playback still comes from your configured Prowlarr/qBittorrent setup. Use the Windows host or your self-host server, then install the generated PC Local, LAN Bridge, or Remote Seedbox route manifest. This bootstrap entry intentionally exposes no catalogs or streams.`
+- Locked source: `src/config/manifest.js` constants `PUBLIC_BOOTSTRAP_MANIFEST_NAME` + `PUBLIC_BOOTSTRAP_MANIFEST_DESCRIPTION`. Self-host and desktop modes carry mode-specific descriptions referencing `configureUrl`; that is outside the lock, but their name still pins to `PVTKRR`.
+- Smoke gates: `scripts/smoke-config-flow.js` and `scripts/smoke-selfhost-server.js` import those constants and assert equality. Either smoke fails if a bootstrap manifest drifts.
+- If a future change wants to alter either string, touch the constants in `src/config/manifest.js`, the CLAUDE.md lock section, the BRAIN.md "Bootstrap Manifest Lock" entry, and this AGENTS.md entry in the same commit — do not edit one without the others.
+
 ## Audit-And-Proof Standard
 
 Do not optimize for a nice-sounding answer. Optimize for a truthful one. Work in a strict audit-and-proof style.
