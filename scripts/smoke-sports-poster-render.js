@@ -42,18 +42,20 @@ const TEAM_EVENT = {
   eventClass: 'team_vs_team'
 }
 
+// Boxing 1v1 — still renders head-to-head because the fight IS the event,
+// no card wrapper. UFC/PFL/Bellator etc. are CARD events and render solo
+// F1-style (see feedback_ufc_card_layout.md), so they do not belong in this
+// "single = head-to-head" fixture.
 const SINGLE_EVENT = {
-  sport: 'MMA',
-  sportHint: 'mma',
-  league: 'UFC',
-  competition: 'UFC',
-  title: 'UFC 312',
-  eventTitle: 'UFC 312',
-  eventName: 'UFC 312',
-  eventDetail: 'Main Event',
-  session: 'Main Event',
-  homeTeam: 'Makhachev',
-  awayTeam: 'Oliveira',
+  sport: 'Boxing',
+  sportHint: 'boxing',
+  league: 'Boxing',
+  competition: 'Boxing',
+  title: 'Tyson Fury vs Oleksandr Usyk',
+  eventTitle: 'Tyson Fury vs Oleksandr Usyk',
+  eventName: 'Tyson Fury vs Oleksandr Usyk',
+  homeTeam: 'Tyson Fury',
+  awayTeam: 'Oleksandr Usyk',
   date: '2026-06-14',
   eventClass: 'combat_event'
 }

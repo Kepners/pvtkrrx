@@ -265,9 +265,29 @@ function sportIconFor(input = {}) {
   return 'soccer'
 }
 
+// UFC, PFL, Bellator, ONE Championship etc. are MULTI-FIGHT CARDS with a
+// headline bout — like F1 events. They render as single-event posters with the
+// event mark dominant and the headline fight as a subtitle line, never as a
+// head-to-head matchup. Pure boxing fights without a card wrapper still render
+// as head-to-head. (See feedback_ufc_card_layout.md.)
+const MMA_CARD_EVENT_RE = /\b(?:ufc|pfl|bellator|one\s*championship|cage\s*warriors|fight\s*night)\b/i
+
+function isMmaCardEvent(input = {}) {
+  const text = [
+    input.sportKey, input.sportHint, input.sport,
+    input.competition, input.league,
+    input.eventName, input.eventShort, input.eventTitle,
+    input.title, input.rawTitle
+  ].filter(Boolean).join(' ')
+  return MMA_CARD_EVENT_RE.test(text)
+}
+
 function eventFormatFor(classification, input = {}) {
   if (classification === 'team_vs_team') return 'matchup'
   if (classification === 'tennis_or_snooker_match') return 'single'
+  if (classification === 'combat_event' && isMmaCardEvent(input)) {
+    return 'solo'
+  }
   if (
     (classification === 'combat_event' ||
      classification === 'darts_event' ||
@@ -382,13 +402,17 @@ function eventShortFor(input = {}, classification = '') {
 }
 
 function sessionFor(input = {}, classification = '', eventShort = '') {
+  // UFC/MMA card events render F1-style with the headline fight already in
+  // eventTitle; auto-composing "Fighter A v Fighter B" as session here would
+  // duplicate the headline. Skip the auto-pair fallback for those.
+  const skipAutoPair = classification === 'combat_event' && isMmaCardEvent(input)
   const raw = pickFirst(
     input.session,
     input.eventDetail,
     input.detail,
     input.roundShort,
     input.round,
-    (classification === 'team_vs_team' || classification === 'combat_event' || classification === 'tennis_or_snooker_match' || classification === 'darts_event' || classification === 'racket_event') && hasActualPair(input)
+    !skipAutoPair && (classification === 'team_vs_team' || classification === 'combat_event' || classification === 'tennis_or_snooker_match' || classification === 'darts_event' || classification === 'racket_event') && hasActualPair(input)
       ? `${sideName(input, 'home')} v ${sideName(input, 'away')}`
       : '',
     classification === 'wrestling_event' ? input.date : ''
@@ -471,10 +495,15 @@ function buildPaidTemplateMatchup(normalizedEvent = {}, classification = '') {
   return {
     sport,
     league,
-    league_code: leagueCodeFor(pickFirst(normalizedEvent.leagueCode, normalizedEvent.league_code, league), sport),
+    // Explicit leagueCode/league_code passes through verbatim (e.g. "UFC 272"
+    // for MMA card events). Otherwise derive abbreviation from league/sport.
+    league_code: pickFirst(normalizedEvent.leagueCode, normalizedEvent.league_code) || leagueCodeFor(league, sport),
     league_full: truncate(pickFirst(normalizedEvent.leagueFull, normalizedEvent.league_full, league), 46),
     round: blankIfPlaceholder(truncate(pickFirst(normalizedEvent.round, normalizedEvent.roundShort, session), 42)),
-    venue: blankIfPlaceholder(truncate(pickFirst(normalizedEvent.venue, league, sport), 42)),
+    // Venue is only authoritative when the source supplies it. Don't fall back
+    // to league or sport — that's fabricated metadata (forbidden per
+    // feedback_no_fabricated_sport_metadata.md).
+    venue: blankIfPlaceholder(truncate(pickFirst(normalizedEvent.venue), 42)),
     date: cleanOptionalDisplayText(pickFirst(normalizedEvent.date, normalizedEvent.localDate)),
     time: cleanOptionalDisplayText(pickFirst(normalizedEvent.time, normalizedEvent.timestamp)),
     home,

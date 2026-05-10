@@ -481,7 +481,12 @@ function templateData(event = {}, theme = {}, mode = '') {
   // headline. Suppress matchup layout even when test data supplies a fake
   // headline pair.
   const wrestlingNeverPair = eventClass === 'wrestling_event'
-  const hasMatchup = !motorsportNeverPair && !teamWithoutPair && !wrestlingNeverPair && (
+  // UFC/MMA card events render F1-style: event mark dominant, headline fight
+  // as a subtitle line. The fighter pair from the title becomes the subtitle,
+  // not the layout driver. Pure boxing fights without a card wrapper still
+  // get head-to-head. (See feedback_ufc_card_layout.md.)
+  const mmaCardNeverPair = eventClass === 'combat_event' && eventFormat === 'solo'
+  const hasMatchup = !motorsportNeverPair && !teamWithoutPair && !wrestlingNeverPair && !mmaCardNeverPair && (
     eventFormat === 'matchup' || eventFormat === 'single' || (eventFormat === 'solo' && hasRealPair)
   )
   const isTeamMatchup = eventFormat === 'matchup' && !motorsportNeverPair && !teamWithoutPair
@@ -1258,11 +1263,14 @@ function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') 
   const soloBaseY = H / 2 + 195 - (soloLines.length - 1) * Math.round(soloFontSize * 0.5)
   // Solo: dominant league wordmark (F1, UFC, ATP, etc.) replaces the sport glyph
   // so single-event posters echo the broadcast pair treatment.
-  const leagueMarkRaw = (m.league_code || label || m.sport || '').toString().toUpperCase().slice(0, 6) || 'EVENT'
+  // Length cap accommodates UFC card events ("UFC 272", "UFC 310") and similar
+  // up to 8 chars. Font size tier extended so longer marks still read big.
+  const leagueMarkRaw = (m.league_code || label || m.sport || '').toString().toUpperCase().slice(0, 8) || 'EVENT'
   const leagueMarkSize = leagueMarkRaw.length <= 2 ? 220
     : leagueMarkRaw.length <= 3 ? 180
     : leagueMarkRaw.length <= 4 ? 140
-    : 100
+    : leagueMarkRaw.length <= 6 ? 100
+    : 80
   const accentTopY = 80
   const accentBottomY = m.hasMatchup ? H - 205 : H - 137
   const soloBlock = !m.hasMatchup ? `
@@ -1716,7 +1724,6 @@ function renderSportsbook(event = {}, variant = 'poster', theme = {}, mode = '')
         { role: 'league', left: 18, top: 18, size: 32 },
         { role: 'league', left: 124, top: 164, size: 152 }
       ]
-  const panelY = SOURCE_H - 110
   const board = m.hasMatchup
     ? `<rect x="16" y="106" width="3" height="320" fill="${m.home.primary}" filter="url(#barGlow_L)"/>
   <text class="mono" x="24" y="130" font-size="9" fill="#7B8390" letter-spacing="1.8">&gt;&gt; ${e(m.leftLabel)}</text>
@@ -1732,12 +1739,22 @@ function renderSportsbook(event = {}, variant = 'poster', theme = {}, mode = '')
   <line x1="${SOURCE_W / 2}" y1="262" x2="${SOURCE_W / 2}" y2="380" stroke="rgba(255,255,255,0.25)" stroke-width="0.5"/>
   <circle cx="${SOURCE_W / 2}" cy="240" r="22" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.18)"/>
   <text class="bebas" x="${SOURCE_W / 2}" y="248" text-anchor="middle" font-size="18" fill="#FCD34D" letter-spacing="0.5">VS</text>`
-    : `<rect x="26" y="116" width="${SOURCE_W - 52}" height="260" fill="rgba(255,255,255,0.035)" stroke="rgba(255,255,255,0.08)"/>
-  <text class="mono" x="${SOURCE_W / 2}" y="145" text-anchor="middle" font-size="9" fill="#7B8390" letter-spacing="1.8">${e(m.league.toUpperCase())}</text>
-  <circle cx="${SOURCE_W / 2}" cy="228" r="58" fill="url(#badge_L)" stroke="${m.home.accent}" stroke-width="1.5"/>
-  ${sportGlyph(m.sport_icon, SOURCE_W / 2, 228, 86, 'white', 0.86)}
-  <text class="bebas" x="${SOURCE_W / 2}" y="330" text-anchor="middle" font-size="${(m.eventTitle || m.event_short || '').length > 18 ? 24 : 32}" fill="white" letter-spacing="0.8">${e(m.eventTitle || m.event_short)}</text>
-  <text class="sans" x="${SOURCE_W / 2}" y="356" text-anchor="middle" font-size="10.5" fill="#D1D5DB">${e(m.session || m.round)}</text>`
+    : (() => {
+      // Solo treatment: F1-style. Big event mark dominant (e.g. "UFC 272",
+      // "F1", "BRITISH GP"), then a single subtitle line for the headline
+      // (e.g. "Covington vs Masvidal"). Replaces the sport-glyph circle so the
+      // event identity reads as the product, not a generic glove icon.
+      const markRaw = (m.league_code || m.league || m.sport || '').toString().toUpperCase().slice(0, 8) || 'EVENT'
+      const markSize = markRaw.length <= 2 ? 96 : markRaw.length <= 3 ? 84 : markRaw.length <= 4 ? 72 : markRaw.length <= 6 ? 56 : 48
+      const subtitle = (m.eventTitle || m.event_short || '').toString()
+      const subtitleSize = subtitle.length > 22 ? 22 : subtitle.length > 18 ? 26 : 30
+      const tertiary = (m.session || m.round || '').toString()
+      return `<rect x="26" y="116" width="${SOURCE_W - 52}" height="260" fill="rgba(255,255,255,0.035)" stroke="rgba(255,255,255,0.08)"/>
+  <text class="mono" x="${SOURCE_W / 2}" y="148" text-anchor="middle" font-size="9" fill="#7B8390" letter-spacing="1.8">${e(m.league.toUpperCase())}</text>
+  <text class="bebas" x="${SOURCE_W / 2}" y="248" text-anchor="middle" font-size="${markSize}" font-weight="900" fill="white" letter-spacing="2">${e(markRaw)}</text>
+  <text class="bebas" x="${SOURCE_W / 2}" y="320" text-anchor="middle" font-size="${subtitleSize}" fill="white" letter-spacing="0.8">${e(subtitle)}</text>
+  ${tertiary ? `<text class="sans" x="${SOURCE_W / 2}" y="350" text-anchor="middle" font-size="10.5" fill="#D1D5DB">${e(tertiary)}</text>` : ''}`
+    })()
   const inner = `<defs>
     <style>${FONTS_BEBAS_MONO_SANS}</style>
     <radialGradient id="bgRad" cx="50%" cy="0%" r="100%"><stop offset="0%" stop-color="#14181F"/><stop offset="70%" stop-color="#07090C"/></radialGradient>
@@ -1761,18 +1778,41 @@ function renderSportsbook(event = {}, variant = 'poster', theme = {}, mode = '')
   <line x1="0" y1="86" x2="${SOURCE_W}" y2="86" stroke="rgba(255,255,255,0.04)"/>
   <text class="mono" x="18" y="78" font-size="10" fill="#9CA3AF" letter-spacing="1.5"><tspan fill="#FCD34D">&gt;</tspan> ${e(m.round.toUpperCase())}</text>
   ${board}
-  <rect x="16" y="${panelY}" width="${SOURCE_W - 32}" height="94" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.06)"/>
-  <text class="mono" x="26" y="${panelY + 18}" font-size="10" fill="#7B8390" letter-spacing="1.2">VENUE</text>
-  <text class="mono" x="${SOURCE_W - 26}" y="${panelY + 18}" text-anchor="end" font-size="10" fill="#E6E6E6">${e(m.venue)}</text>
-  <line x1="22" y1="${panelY + 24}" x2="${SOURCE_W - 22}" y2="${panelY + 24}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="2 2"/>
-  <text class="mono" x="26" y="${panelY + 40}" font-size="10" fill="#7B8390" letter-spacing="1.2">DATE</text>
-  <text class="mono" x="${SOURCE_W - 26}" y="${panelY + 40}" text-anchor="end" font-size="10" fill="#E6E6E6">${e(m.date)}</text>
-  <line x1="22" y1="${panelY + 46}" x2="${SOURCE_W - 22}" y2="${panelY + 46}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="2 2"/>
-  <text class="mono" x="26" y="${panelY + 62}" font-size="10" fill="#7B8390" letter-spacing="1.2">TIME</text>
-  <text class="mono" x="${SOURCE_W - 26}" y="${panelY + 62}" text-anchor="end" font-size="10" fill="#E6E6E6">${e(m.time)}</text>
-  <line x1="22" y1="${panelY + 68}" x2="${SOURCE_W - 22}" y2="${panelY + 68}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="2 2"/>
-  <text class="mono" x="26" y="${panelY + 84}" font-size="10" fill="#7B8390" letter-spacing="1.2">STATUS</text>
-  <text class="mono" x="${SOURCE_W - 26}" y="${panelY + 84}" text-anchor="end" font-size="10" fill="#22C55E">UPCOMING</text>`
+  ${(() => {
+    // Footer rail: only render rows whose data the source actually supplied.
+    // No hardcoded "UPCOMING", no league-as-venue fallback. Per
+    // feedback_no_fabricated_sport_metadata.md, missing data must stay missing.
+    const venueText = normalizeSpace(m.venue)
+    const dateText = normalizeSpace(m.date)
+    const timeText = normalizeSpace(m.time)
+    const statusText = normalizeSpace(event.status || event.broadcastStatus || m.status)
+    const rows = [
+      { label: 'VENUE', value: venueText, fill: '#E6E6E6' },
+      { label: 'DATE', value: dateText, fill: '#E6E6E6' },
+      { label: 'TIME', value: timeText, fill: '#E6E6E6' },
+      { label: 'STATUS', value: statusText, fill: '#22C55E' }
+    ].filter((row) => row.value)
+    if (!rows.length) return ''
+    const rowH = 22
+    const padY = 14
+    const panelH = padY * 2 + rows.length * rowH
+    const panelTopY = SOURCE_H - panelH - 16
+    return [
+      `<rect x="16" y="${panelTopY}" width="${SOURCE_W - 32}" height="${panelH}" fill="rgba(255,255,255,0.03)" stroke="rgba(255,255,255,0.06)"/>`,
+      ...rows.flatMap((row, idx) => {
+        const rowBaseY = panelTopY + padY + idx * rowH
+        const valueY = rowBaseY + 14
+        const sep = idx < rows.length - 1
+          ? `<line x1="22" y1="${rowBaseY + rowH - 2}" x2="${SOURCE_W - 22}" y2="${rowBaseY + rowH - 2}" stroke="rgba(255,255,255,0.06)" stroke-dasharray="2 2"/>`
+          : ''
+        return [
+          `<text class="mono" x="26" y="${valueY}" font-size="10" fill="#7B8390" letter-spacing="1.2">${e(row.label)}</text>`,
+          `<text class="mono" x="${SOURCE_W - 26}" y="${valueY}" text-anchor="end" font-size="10" fill="${row.fill}">${e(row.value)}</text>`,
+          sep
+        ]
+      })
+    ].join('\n  ')
+  })()}`
   return wrapTemplateSvg(inner, slots, variant)
 }
 
@@ -1817,10 +1857,21 @@ function renderTradingCard(event = {}, variant = 'poster', theme = {}, mode = ''
   <text class="serif" x="${SOURCE_W / 2}" y="406" text-anchor="middle" font-size="16" font-style="italic" font-weight="700" fill="#2a1a08">${e(m.home.name)}</text>
   <text class="mono" x="${SOURCE_W / 2}" y="422" text-anchor="middle" font-size="8" fill="#5a4a1f" letter-spacing="3">- VERSUS -</text>
   <text class="serif" x="${SOURCE_W / 2}" y="448" text-anchor="middle" font-size="16" font-style="italic" font-weight="700" fill="#2a1a08">${e(m.away.name)}</text>`
-    : `<g transform="translate(${SOURCE_W / 2} 210)"><circle cx="0" cy="0" r="74" fill="url(#face)" stroke="${m.home.accent}" stroke-width="2" filter="url(#shadow1)"/>${sportGlyph(m.sport_icon, 0, 0, 106, '#fff5d0', 0.82)}</g>
+    : (() => {
+      // Solo treatment: F1-style. Big event mark inside the spotlight circle
+      // (e.g. "UFC 272", "F1", "BRITISH GP"), name plate carries the headline
+      // (e.g. "Covington vs Masvidal"). Replaces the sport-glyph emblem so the
+      // event identity reads as the product.
+      const markRaw = (m.league_code || m.league || m.sport || '').toString().toUpperCase().slice(0, 8) || 'EVENT'
+      const markSize = markRaw.length <= 2 ? 84 : markRaw.length <= 3 ? 72 : markRaw.length <= 4 ? 58 : markRaw.length <= 6 ? 44 : 36
+      const subtitle = (m.eventTitle || m.event_short || '').toString()
+      const subtitleSize = subtitle.length > 22 ? 14 : subtitle.length > 18 ? 17 : 19
+      const tertiary = (m.session || m.round || '').toString()
+      return `<g transform="translate(${SOURCE_W / 2} 210)"><circle cx="0" cy="0" r="74" fill="url(#face)" stroke="${m.home.accent}" stroke-width="2" filter="url(#shadow1)"/><text class="bebas" x="0" y="${Math.round(markSize * 0.34)}" text-anchor="middle" font-size="${markSize}" font-weight="900" fill="#fff5d0" letter-spacing="2">${e(markRaw)}</text></g>
   <rect x="18" y="360" width="${SOURCE_W - 36}" height="104" fill="url(#namePlate)" stroke="#2a1a08" stroke-width="1.5"/>
-  <text class="serif" x="${SOURCE_W / 2}" y="396" text-anchor="middle" font-size="${(m.eventTitle || m.event_short || '').length > 22 ? 14 : 19}" font-style="italic" font-weight="700" fill="#2a1a08">${e(m.eventTitle || m.event_short)}</text>
-  <text class="mono" x="${SOURCE_W / 2}" y="424" text-anchor="middle" font-size="8" fill="#5a4a1f" letter-spacing="3">- ${e((m.session || m.round).toUpperCase())} -</text>`
+  <text class="serif" x="${SOURCE_W / 2}" y="396" text-anchor="middle" font-size="${subtitleSize}" font-style="italic" font-weight="700" fill="#2a1a08">${e(subtitle)}</text>
+  ${tertiary ? `<text class="mono" x="${SOURCE_W / 2}" y="424" text-anchor="middle" font-size="8" fill="#5a4a1f" letter-spacing="3">- ${e(tertiary.toUpperCase())} -</text>` : ''}`
+    })()
   const inner = `<defs>
     <style>.bebas { font-family: 'Bebas Neue', Impact, sans-serif; }.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }.serif { font-family: 'Playfair Display', Georgia, serif; }</style>
     <linearGradient id="foil" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#f8e08e"/><stop offset="18%" stop-color="#d4af37"/><stop offset="36%" stop-color="#faf0a8"/><stop offset="54%" stop-color="#b8941f"/><stop offset="72%" stop-color="#f8e08e"/><stop offset="90%" stop-color="#8c6e1c"/><stop offset="100%" stop-color="#d4af37"/></linearGradient>
