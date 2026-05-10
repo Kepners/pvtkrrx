@@ -357,7 +357,7 @@
       border-radius: 6px;
       background: #040812;
       opacity: 0;
-      animation: hero-poster-rotate 24s infinite;
+      animation: hero-poster-rotate 28s infinite;
       animation-fill-mode: both;
       will-change: opacity;
     }
@@ -368,12 +368,13 @@
     .hero-posters img:nth-child(4) { animation-delay: 12s; }
     .hero-posters img:nth-child(5) { animation-delay: 16s; }
     .hero-posters img:nth-child(6) { animation-delay: 20s; }
+    .hero-posters img:nth-child(7) { animation-delay: 24s; }
 
     @keyframes hero-poster-rotate {
       0% { opacity: 0; }
       2% { opacity: 1; }
-      15% { opacity: 1; }
-      18% { opacity: 0; }
+      13% { opacity: 1; }
+      15% { opacity: 0; }
       100% { opacity: 0; }
     }
 
@@ -1468,24 +1469,24 @@
         <div class="section-kicker">SportsDB Cache Audit</div>
         <h2 class="section-title">What has actually been audited and cleaned</h2>
         <p class="section-copy">
-          Latest live Contabo snapshot, checked 2026-04-29. The DB has been mapped and evidence-linked, but the cache has not been blindly deleted or compacted. Cleanup must stay guarded because many cached images are still linked to generated member artwork.
+          Latest live Contabo snapshot, checked 2026-05-10. The DB has been mapped and evidence-linked, but the cache has not been blindly deleted or compacted. Cleanup must stay guarded because many cached images are still linked to generated member artwork.
         </p>
       </div>
       <div class="audit-grid" aria-label="Live SportsMeta cache audit figures">
         <article class="audit-card">
-          <div class="audit-value">37 GB</div>
-          <p class="audit-label">Current <span class="inline-code">/opt/sportsmeta/data</span> footprint. The old 12 GB working figure is no longer accurate after central poster generation.</p>
+          <div class="audit-value">31 GB</div>
+          <p class="audit-label">Current <span class="inline-code">/opt/sportsmeta/data</span> footprint, of which 25 GB is the asset cache and 5.9 GB is the SQLite DB.</p>
         </article>
         <article class="audit-card">
-          <div class="audit-value">117,476</div>
-          <p class="audit-label">Cached asset rows. Live disk also reports 117,476 JSON cache files and 117,476 media cache files.</p>
+          <div class="audit-value">157,697</div>
+          <p class="audit-label">Cached asset rows in <span class="inline-code">sportsmeta_assets</span>. The on-disk asset cache holds 320,975 files across the same path.</p>
         </article>
         <article class="audit-card">
-          <div class="audit-value">20,749</div>
-          <p class="audit-label">SportsMeta records currently mapped, including 20,628 event records and league/sport/entity records.</p>
+          <div class="audit-value">12,232</div>
+          <p class="audit-label">SportsMeta records currently mapped, covering events, leagues, sports, and entity rows used to attach streams and artwork.</p>
         </article>
         <article class="audit-card">
-          <div class="audit-value">269,652</div>
+          <div class="audit-value">527,905</div>
           <p class="audit-label">Resolved image-evidence rows, including posters, logos, league logos, badges, backgrounds, and landscapes.</p>
         </article>
       </div>
