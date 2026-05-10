@@ -41,7 +41,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260510-real-logo-v15-catalog-orientation'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260510-real-logo-v17-reject-sportsmeta-scheme'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -839,10 +839,14 @@ async function loadInspectAssetSourceUrl({ canonicalId = '', sportsmetaBaseUrl =
       const payload = await response.json().catch(() => null)
       const sourceUrl = normalizeSpace(payload?.assetSourceUrl || payload?.classification?.assetSourceUrl)
       if (!sourceUrl) return ''
-      // Don't loop back into SportsMeta — only return URLs that point to a
-      // real CDN (TheSportsDB, etc.). If SportsMeta ever started serving its
-      // own raster via assetSourceUrl, we'd accept it via the existing
-      // cached-asset signal instead.
+      // SportsMeta's /inspect returns several non-fetchable shapes for the
+      // optimized-logo pipeline (e.g. `sportsmeta://optimized-logo/v1/...` —
+      // an internal asset reference, NOT a fetchable URL). Reject anything
+      // that isn't an http(s) URL; the caller falls back to the public
+      // /asset/<variant>/<id> route which DOES serve the optimized WebP.
+      // Also reject loops back into SportsMeta's own host so a misconfigured
+      // /inspect response can't pull us into an infinite proxy chain.
+      if (!/^https?:\/\//i.test(sourceUrl)) return ''
       if (/sportsmeta\./i.test(sourceUrl)) return ''
       return sourceUrl
     } catch (_) {

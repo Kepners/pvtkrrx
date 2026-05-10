@@ -11,7 +11,7 @@ const {
 const { resolveSportBackdrop } = require('./sportBackdrops')
 const { verifyStampedSportsPosterEntitlement } = require('./entitlement')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260510-real-logo-v16-tennis-snooker-broadcast'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260510-real-logo-v17-reject-sportsmeta-scheme'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
