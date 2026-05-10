@@ -972,30 +972,15 @@ function broadcastSubtitleFromEvent(event = {}, m = {}, label = '', title = '', 
   return unique.join(' \u2022 ')
 }
 
-function sportGlyph(icon = 'soccer', x = 50, y = 50, size = 100, color = '#fff', opacity = 1, strokeWidth = 2) {
-  const shapes = {
-    soccer: `<circle cx="50" cy="50" r="38"/><polygon points="50,32 62,40 58,54 42,54 38,40" fill="currentColor" stroke="none"/><line x1="50" y1="32" x2="50" y2="20"/><line x1="62" y1="40" x2="72" y2="34"/><line x1="58" y1="54" x2="68" y2="64"/><line x1="42" y1="54" x2="32" y2="64"/><line x1="38" y1="40" x2="28" y2="34"/>`,
-    hockey: `<ellipse cx="50" cy="58" rx="32" ry="10" fill="currentColor" stroke="none"/><ellipse cx="50" cy="54" rx="32" ry="10"/><line x1="18" y1="54" x2="18" y2="58"/><line x1="82" y1="54" x2="82" y2="58"/>`,
-    basketball: `<circle cx="50" cy="50" r="38"/><path d="M12,50 Q50,30 88,50"/><path d="M12,50 Q50,70 88,50"/><line x1="50" y1="12" x2="50" y2="88"/>`,
-    football: `<ellipse cx="50" cy="50" rx="38" ry="22" transform="rotate(-20 50 50)"/><line x1="38" y1="50" x2="62" y2="50"/><line x1="42" y1="46" x2="42" y2="54"/><line x1="50" y1="44" x2="50" y2="56"/><line x1="58" y1="46" x2="58" y2="54"/>`,
-    baseball: `<circle cx="50" cy="50" r="34"/><path d="M22,38 Q40,46 36,72"/><path d="M78,38 Q60,46 64,72"/>`,
-    f1: `<path d="M10,60 L30,60 L40,48 L60,48 L70,60 L90,60 L90,68 L70,68 L60,76 L40,76 L30,68 L10,68 Z" fill="currentColor" stroke="none"/><circle cx="30" cy="72" r="6" fill="currentColor" stroke="none"/><circle cx="70" cy="72" r="6" fill="currentColor" stroke="none"/>`,
-    motogp: `<path d="M18,66 L34,66 L46,52 L62,52 L74,66 L86,66"/><circle cx="30" cy="70" r="10"/><circle cx="74" cy="70" r="10"/><path d="M44,50 L54,34 L66,40 L62,52"/><circle cx="58" cy="26" r="6" fill="currentColor" stroke="none"/><path d="M52,36 L38,44"/>`,
-    motorsport: `<path d="M20,74 C38,34 66,34 84,58"/><path d="M22,74 L88,74"/><path d="M34,62 L42,50 L58,50 L68,62"/><path d="M72,22 L72,58"/><path d="M72,22 L88,28 L72,34"/><circle cx="34" cy="74" r="7" fill="currentColor" stroke="none"/><circle cx="72" cy="74" r="7" fill="currentColor" stroke="none"/>`,
-    mma: `<path d="M28,30 L44,30 L44,22 L60,22 L60,30 L72,30 L76,42 L72,68 L60,76 L40,76 L28,68 L24,42 Z"/><line x1="40" y1="44" x2="60" y2="44"/><line x1="40" y1="56" x2="60" y2="56"/>`,
-    tennis: `<circle cx="50" cy="50" r="34"/><path d="M22,32 Q50,50 22,68"/><path d="M78,32 Q50,50 78,68"/>`,
-    golf: `<circle cx="38" cy="68" r="14" fill="currentColor" stroke="none"/><path d="M48,68 C66,62 76,52 82,38"/><line x1="62" y1="18" x2="62" y2="76"/><path d="M62,18 L84,26 L62,34 Z" fill="currentColor" stroke="none"/>`,
-    darts: `<circle cx="50" cy="50" r="38"/><circle cx="50" cy="50" r="25"/><circle cx="50" cy="50" r="10" fill="currentColor" stroke="none"/><line x1="50" y1="12" x2="50" y2="88"/><line x1="12" y1="50" x2="88" y2="50"/>`,
-    cycling: `<circle cx="28" cy="68" r="16"/><circle cx="74" cy="68" r="16"/><path d="M28,68 L46,40 L58,68 L42,68 L56,42 L72,68"/><path d="M42,32 L54,32"/><circle cx="58" cy="24" r="7" fill="currentColor" stroke="none"/>`,
-    athletics: `<path d="M30,78 C42,62 54,48 70,24"/><path d="M30,78 L50,78"/><path d="M46,56 L68,62"/><path d="M54,46 L42,30"/><circle cx="72" cy="20" r="8" fill="currentColor" stroke="none"/>`,
-    cricket: `<path d="M26,76 L72,30"/><path d="M66,24 L80,38 L74,44 L60,30 Z" fill="currentColor" stroke="none"/><circle cx="28" cy="34" r="9"/>`,
-    rugby: `<ellipse cx="50" cy="50" rx="36" ry="24" transform="rotate(-28 50 50)"/><path d="M28,50 Q50,40 72,50"/><path d="M28,50 Q50,60 72,50"/>`,
-    snooker: `<circle cx="36" cy="62" r="13" fill="currentColor" stroke="none"/><circle cx="58" cy="62" r="13"/><circle cx="48" cy="40" r="13"/><path d="M22,82 L82,22"/>`,
-    wrestling: `<rect x="20" y="34" width="60" height="42"/><line x1="20" y1="44" x2="80" y2="44"/><line x1="20" y1="56" x2="80" y2="56"/><line x1="20" y1="68" x2="80" y2="68"/><circle cx="30" cy="34" r="4" fill="currentColor" stroke="none"/><circle cx="70" cy="34" r="4" fill="currentColor" stroke="none"/><circle cx="30" cy="76" r="4" fill="currentColor" stroke="none"/><circle cx="70" cy="76" r="4" fill="currentColor" stroke="none"/>`
-  }
-  const inner = shapes[icon] || shapes.soccer
-  const scale = size / 100
-  return `<g transform="translate(${x - size / 2} ${y - size / 2}) scale(${scale})" fill="none" stroke="${color}" stroke-width="${strokeWidth}" color="${color}" opacity="${opacity}">${inner}</g>`
+function sportGlyph() {
+  // User directive 2026-05-11: sport-icon glyphs (basketball, motorsport
+  // crosshair, cricket bat, MMA gloves, F1, MotoGP, etc.) are REMOVED from
+  // every template — foreground chrome-circle marks, background patterns,
+  // and decorative overlays. Real league/event logos must come from
+  // SportsMeta (which sources from TheSportsDB). When no league logo can
+  // be resolved, the slot stays empty rather than reverting to a generic
+  // sport silhouette.
+  return ''
 }
 
 function renderEditorial(event = {}, variant = 'poster', theme = {}, mode = '') {
@@ -1521,7 +1506,16 @@ function fitMotorsportTitle(text = '', maxWidth = 350, baseSize = 50, minSize = 
   return { text: clean, lines, fontSize, maxWidth, status: fitted ? 'fit' : 'fit-with-textLength' }
 }
 
-function motorsportGlyphMarkup(iconKind, cx, cy, size, paper, accent) {
+function motorsportGlyphMarkup(_iconKind, _cx, _cy, _size, _paper, _accent) {
+  // User directive 2026-05-11: motorsport glyph (F1 car, MotoGP, WRC rally,
+  // WEC, IndyCar) silhouettes are REMOVED from templates. Real league
+  // logos come from SportsMeta / TheSportsDB. Slot stays empty rather
+  // than rendering a stylised car/bike vector.
+  return ''
+}
+// Legacy implementation kept commented for reference only — do not re-enable
+// without explicit product approval to reintroduce glyph fallbacks.
+function _legacyMotorsportGlyphMarkup(iconKind, cx, cy, size, paper, accent) {
   const half = size / 2
   const ringRadius = size * 0.46
   const strokeColor = paper
