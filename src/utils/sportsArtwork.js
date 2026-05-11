@@ -11,7 +11,7 @@ const {
 const { resolveSportBackdrop } = require('./sportBackdrops')
 const { verifyStampedSportsPosterEntitlement } = require('./entitlement')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260511-real-logo-v20-big-central-league'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260511-real-logo-v21-dark-backdrop-frame'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()

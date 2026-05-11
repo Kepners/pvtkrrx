@@ -2005,13 +2005,17 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
     ? `data-team-side="away" data-team-name="${e(m.away.name)}"`
     : `data-competitor-side="right" data-competitor-name="${e(m.away.name)}"`
   // Solo branch slot sizing 2026-05-11: after the v18/v19 glyph removal, the
-  // central chrome-and-glyph decoration is gone. Make the central league
-  // logo composite the dominant visual element (220x220 in source = 330x330
-  // in 600x900 output) so UFC marks, IndyCar logos, MotoGP logos, NBA marks
-  // etc are actually visible on Indy 500, UFC 328, MotoGP France, NBA Tip
-  // Off, WEC, WRC, etc posters. The top-left small slot is also kept so the
-  // league mark also appears as a chip in the masthead.
-  const soloCentralLeagueSlot = { x: 90, y: 130, size: 220 }
+  // central chrome-and-glyph decoration is gone. SportsMeta's league logos
+  // come back as 256x99 banners (aspect 2.59:1) with mean alpha 28-69 / 255 —
+  // they're designed for placement on a DARK background where the transparent
+  // areas read as solid colour. On the cream ticket-stub paper, transparent
+  // pixels show through as cream and the logo looks washed out. The fix is a
+  // dark rounded-rect backdrop drawn into the SVG BEHIND the composite. The
+  // logo is scaled to fit a 220x220 square (220 wide, ~85 tall after aspect
+  // preservation), and the dark backdrop fills the rest of the 220x220 area
+  // so the logo's transparent pixels reveal a uniform dark frame instead of
+  // the cream paper.
+  const soloCentralLeagueSlot = { x: 90, y: 170, size: 220 }
   const slots = m.hasMatchup
     ? [
         { role: 'league', left: leagueLogoSlot.x, top: leagueLogoSlot.y, size: leagueLogoSlot.size },
@@ -2047,12 +2051,15 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
     <text class="mono" x="${SOURCE_W - 28}" y="446" text-anchor="end" font-size="8" fill="#5a3a1f" letter-spacing="1.6">${e(m.rightLabel)}</text>
     <text data-role="${awayNameRole}"${m.isTeamMatchup ? ` data-team-side="away" data-team-name="${e(m.away.name)}"` : ''} class="bebas" x="${SOURCE_W - 28}" y="468" text-anchor="end" ${awayNameAttrs} fill="#1a1410" letter-spacing="0">${e(m.away.name)}</text>
   </g>`
-    : `<g data-role="solo-league-logo-slot" data-box-x="${soloCentralLeagueSlot.x}" data-box-y="${soloCentralLeagueSlot.y}" data-box-width="${soloCentralLeagueSlot.size}" data-box-height="${soloCentralLeagueSlot.size}"></g>
-  <line x1="20" y1="380" x2="160" y2="380" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
-  <line x1="${SOURCE_W - 160}" y1="380" x2="${SOURCE_W - 20}" y2="380" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
-  <text class="bebas" x="${SOURCE_W / 2}" y="386" text-anchor="middle" font-size="13" fill="#5a3a1f" letter-spacing="3">${e((m.league || m.sport || '').toUpperCase()) || ''}</text>
-  <text class="bebas" data-role="ticket-stub-solo-title" x="${SOURCE_W / 2}" y="426" text-anchor="middle" ${soloTitleAttrs} fill="#1a1410" letter-spacing="1">${e(soloTitle)}</text>
-  ${(m.session || m.round) ? `<text class="serif" x="${SOURCE_W / 2}" y="454" text-anchor="middle" font-style="italic" font-size="15" fill="#9b6f2f">${e(m.session || m.round)}</text>` : ''}`
+    : `<g data-role="solo-league-logo-slot" data-box-x="${soloCentralLeagueSlot.x}" data-box-y="${soloCentralLeagueSlot.y}" data-box-width="${soloCentralLeagueSlot.size}" data-box-height="${soloCentralLeagueSlot.size}">
+    <rect x="${soloCentralLeagueSlot.x}" y="${soloCentralLeagueSlot.y}" width="${soloCentralLeagueSlot.size}" height="${soloCentralLeagueSlot.size}" rx="14" fill="#101521" stroke="#9b6f2f" stroke-width="2.4"/>
+    <rect x="${soloCentralLeagueSlot.x + 6}" y="${soloCentralLeagueSlot.y + 6}" width="${soloCentralLeagueSlot.size - 12}" height="${soloCentralLeagueSlot.size - 12}" rx="10" fill="none" stroke="rgba(255,245,208,0.16)" stroke-width="0.8"/>
+  </g>
+  <line x1="20" y1="416" x2="160" y2="416" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
+  <line x1="${SOURCE_W - 160}" y1="416" x2="${SOURCE_W - 20}" y2="416" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
+  <text class="bebas" x="${SOURCE_W / 2}" y="422" text-anchor="middle" font-size="13" fill="#5a3a1f" letter-spacing="3">${e((m.league || m.sport || '').toUpperCase()) || ''}</text>
+  <text class="bebas" data-role="ticket-stub-solo-title" x="${SOURCE_W / 2}" y="462" text-anchor="middle" ${soloTitleAttrs} fill="#1a1410" letter-spacing="1">${e(soloTitle)}</text>
+  ${(m.session || m.round) ? `<text class="serif" x="${SOURCE_W / 2}" y="490" text-anchor="middle" font-style="italic" font-size="15" fill="#9b6f2f">${e(m.session || m.round)}</text>` : ''}`
   const inner = `<defs>
     <style>.bebas { font-family: 'Bebas Neue', Impact, sans-serif; }.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }.serif { font-family: 'Playfair Display', Georgia, serif; }.sans { font-family: 'Inter', system-ui, sans-serif; }</style>
     <linearGradient id="mastheadOverlay" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="rgba(40,25,10,0.4)"/><stop offset="50%" stop-color="rgba(40,25,10,0)"/><stop offset="100%" stop-color="rgba(40,25,10,0.4)"/></linearGradient>

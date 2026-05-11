@@ -41,7 +41,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260511-real-logo-v20-big-central-league'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260511-real-logo-v21-dark-backdrop-frame'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
