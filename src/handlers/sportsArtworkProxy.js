@@ -41,7 +41,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260510-real-logo-v17-reject-sportsmeta-scheme'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260511-real-logo-v19-cache-logo-metadata'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -814,6 +814,21 @@ function buildCanonicalBadgeUrl({ sportsmetaBaseUrl = '', canonicalId = '', vari
     : buildSportsMetaAssetUrl(sportsmetaBaseUrl, variant, canonicalId)
 }
 
+function extractFetchableInspectAssetSourceUrl(sourceUrl = '') {
+  const raw = normalizeSpace(sourceUrl)
+  if (!raw) return ''
+  if (/^https?:\/\//i.test(raw) && !/sportsmeta\./i.test(raw)) return raw
+
+  const optimizedMatch = raw.match(/^sportsmeta:\/\/optimized-logo\/v\d+\/[^/]+\/[^/]+\/[^/]+\/(.+)$/i)
+  if (!optimizedMatch?.[1]) return ''
+  try {
+    const decoded = decodeURIComponent(optimizedMatch[1])
+    return /^https?:\/\//i.test(decoded) && !/sportsmeta\./i.test(decoded) ? decoded : ''
+  } catch (_) {
+    return ''
+  }
+}
+
 // SportsMeta's public canonical asset route returns a glyph-only SVG by
 // default. The real raster URL (e.g. on r2.thesportsdb.com) is exposed via
 // /inspect/asset/<variant>/<id> as `assetSourceUrl`. This helper resolves
@@ -839,16 +854,10 @@ async function loadInspectAssetSourceUrl({ canonicalId = '', sportsmetaBaseUrl =
       const payload = await response.json().catch(() => null)
       const sourceUrl = normalizeSpace(payload?.assetSourceUrl || payload?.classification?.assetSourceUrl)
       if (!sourceUrl) return ''
-      // SportsMeta's /inspect returns several non-fetchable shapes for the
-      // optimized-logo pipeline (e.g. `sportsmeta://optimized-logo/v1/...` —
-      // an internal asset reference, NOT a fetchable URL). Reject anything
-      // that isn't an http(s) URL; the caller falls back to the public
-      // /asset/<variant>/<id> route which DOES serve the optimized WebP.
-      // Also reject loops back into SportsMeta's own host so a misconfigured
-      // /inspect response can't pull us into an infinite proxy chain.
-      if (!/^https?:\/\//i.test(sourceUrl)) return ''
-      if (/sportsmeta\./i.test(sourceUrl)) return ''
-      return sourceUrl
+      // SportsMeta may return `sportsmeta://optimized-logo/.../<encoded-url>`
+      // for real public rasters. Decode the embedded original CDN URL and keep
+      // rejecting anything that is not a fetchable external HTTP(S) image.
+      return extractFetchableInspectAssetSourceUrl(sourceUrl)
     } catch (_) {
       return ''
     }

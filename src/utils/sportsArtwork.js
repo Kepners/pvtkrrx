@@ -11,7 +11,7 @@ const {
 const { resolveSportBackdrop } = require('./sportBackdrops')
 const { verifyStampedSportsPosterEntitlement } = require('./entitlement')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260510-real-logo-v17-reject-sportsmeta-scheme'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260511-real-logo-v19-cache-logo-metadata'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()

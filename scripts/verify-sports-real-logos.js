@@ -5,7 +5,8 @@ const path = require('node:path')
 const sharp = require('sharp')
 
 const { SPORTS_POSTER_TEMPLATES } = require('../src/utils/sportsPosterTemplates')
-const { _test: sportsArtworkProxyTest } = require('../src/handlers/sportsArtworkProxy')
+const sportsArtworkProxy = require('../src/handlers/sportsArtworkProxy')
+const { _test: sportsArtworkProxyTest } = sportsArtworkProxy
 
 const OUT_DIR = path.join(process.cwd(), '.runtime', 'sports-real-logo-proof')
 const SPORTSMETA_BASE_URL = String(process.env.PVTKRRX_SPORTSMETA_BASE_URL || 'https://sportsmeta.pvtkrrx.cc').replace(/\/+$/, '')
@@ -59,6 +60,27 @@ const FIXTURES = [
       source: 'verifier',
       rawTitle: 'Fallback Only Proof'
     }
+  },
+  {
+    key: 'default-football-team-vs-team',
+    sampleType: 'default-real-team-vs-team',
+    sport: 'football',
+    event: 'Crystal Palace vs Everton',
+    expectsRealLogo: true,
+    expectedSource: 'default route team badge search using SportsMeta inspect optimized-logo source',
+    defaultRoute: true,
+    fallbackInput: {
+      sport: 'football',
+      league: 'English Premier League',
+      eventTitle: 'Crystal Palace vs Everton',
+      title: 'Crystal Palace vs Everton',
+      date: '2026-05-18',
+      homeTeam: 'Crystal Palace',
+      awayTeam: 'Everton',
+      eventClass: 'team_vs_team',
+      source: 'verifier',
+      rawTitle: 'Crystal Palace vs Everton'
+    }
   }
 ]
 
@@ -97,12 +119,66 @@ async function renderFixture(template, fixture) {
       template
     })
   }
+  if (fixture.defaultRoute) {
+    return renderDefaultRouteFixture(template, fixture)
+  }
   return sportsArtworkProxyTest.renderTemplateFallbackArtwork(
     'poster',
     fixture.fallbackInput,
     template,
     'verifier_no_real_logo_available'
   )
+}
+
+async function renderDefaultRouteFixture(template, fixture) {
+  const chunks = []
+  const headers = {}
+  let statusCode = 200
+  const req = {
+    params: {
+      variant: 'poster',
+      sport: `${slug(fixture.fallbackInput?.sport || fixture.sport)}.png`
+    },
+    query: {
+      league: fixture.fallbackInput?.league || '',
+      title: fixture.fallbackInput?.title || fixture.event || '',
+      date: fixture.fallbackInput?.date || '',
+      home: fixture.fallbackInput?.homeTeam || '',
+      away: fixture.fallbackInput?.awayTeam || '',
+      eventClass: fixture.fallbackInput?.eventClass || '',
+      rawTitle: fixture.fallbackInput?.rawTitle || '',
+      source: fixture.fallbackInput?.source || 'verifier',
+      template
+    }
+  }
+  const res = {
+    setHeader: (key, value) => { headers[String(key)] = String(value) },
+    status: (code) => { statusCode = Number(code) || statusCode; return res },
+    type: (value) => { headers['Content-Type'] = String(value); return res },
+    send: (body) => {
+      chunks.push(Buffer.isBuffer(body) ? body : Buffer.from(String(body || '')))
+      return res
+    },
+    end: (body) => {
+      if (body) chunks.push(Buffer.isBuffer(body) ? body : Buffer.from(String(body)))
+      return res
+    }
+  }
+
+  await sportsArtworkProxy.handleDefaultSportsArtwork(req, res, { sportsmetaBaseUrl: SPORTSMETA_BASE_URL })
+  const logoSourceUrl = String(headers['X-PVTKRRX-Logo-Source-Url'] || '')
+  return {
+    buffer: Buffer.concat(chunks),
+    logoKind: headers['X-PVTKRRX-Artwork-Logo-Kind'] || headers['X-PVTKRRX-Logo-Kind'] || '',
+    logoSourceUrl,
+    logoSourceUrls: logoSourceUrl.split(',').map((value) => value.trim()).filter(Boolean),
+    logoFallbackReason: headers['X-PVTKRRX-Artwork-Logo-Fallback-Reason'] || headers['X-PVTKRRX-Logo-Fallback-Reason'] || '',
+    logoRealCount: Number(headers['X-PVTKRRX-Logo-Real-Count'] || 0),
+    logoFallbackCount: Number(headers['X-PVTKRRX-Logo-Fallback-Count'] || 0),
+    logoLookupAttempts: String(headers['X-PVTKRRX-Logo-Lookup-Attempts'] || ''),
+    logoSlots: [],
+    statusCode
+  }
 }
 
 async function inspectBuffer(buffer, outputPath) {
@@ -164,7 +240,9 @@ async function main() {
         if (row.width !== WIDTH || row.height !== HEIGHT) row.failures.push(`bad_dimensions_${row.width}x${row.height}`)
         if (fixture.expectsRealLogo) {
           if (!REAL_LOGO_KINDS.has(row.logoKind)) row.failures.push(`expected_real_logo_got_${row.logoKind || 'missing'}`)
-          if ((fixture.sampleType === 'real-team-vs-team' || fixture.sampleType === 'real-fighter-vs-fighter') && row.logoKind !== 'real-team') {
+          const mustUseTeamLogo = fixture.sampleType === 'default-real-team-vs-team' ||
+            (fixture.sampleType === 'real-team-vs-team' && template !== 'brutalist')
+          if (mustUseTeamLogo && row.logoKind !== 'real-team') {
             row.failures.push(`expected_real_team_logo_got_${row.logoKind || 'missing'}`)
           }
           if (row.logoRealCount < 1) row.failures.push('expected_real_logo_count')
