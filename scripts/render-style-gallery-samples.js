@@ -9,78 +9,32 @@ const { renderSportsPosterTemplateSvg } = require('../src/utils/sportsPosterTemp
 const SPORTSMETA_BASE_URL = process.env.SPORTSMETA_BASE_URL || 'https://sportsmeta.pvtkrrx.cc'
 const OUT_DIR = path.join(process.cwd(), 'public', 'sports-style-samples')
 
-// Each sample renders one theme. Themes whose templates expose home/away/league
-// logo slots (editorial, brutalist, glitch) go through the real-logo pipeline
-// using SportsMeta canonical events that have working logo coverage. Broadcast,
-// sportsbook, and trading-card render template-only with hand-crafted
-// matchup fixtures so the gallery showcases the matchup branch of each layout
-// (real-logo combat-event canonicals lacked parsed fighter pairs and rendered
-// the empty solo branch, and Levante vs Sevilla collapsed both broadcast
-// halves to similar reds via the deterministic palette hash).
+// Each sample renders one theme through the real-logo pipeline. Canonical IDs
+// were verified to have homeBadge + awayBadge + leagueLogo cached in SportsMeta
+// so every preview is a guaranteed three-real-logo render (no glyph fallback,
+// no template-only initials). Different sports per template so the gallery
+// shows variety: football editorial / football broadcast / hockey sportsbook /
+// basketball trading-card / F1 brutalist / F1 glitch.
 const SAMPLES = [
   {
     theme: 'editorial',
     canonicalId: 'sportsmeta:event:football|2026-04-23|spanish-la-liga|levante|sevilla',
     realLogos: true
   },
-  // Broadcast fixture: render only fields verifiable from the title. No
-  // fabricated venue or date.
   {
     theme: 'broadcast',
-    realLogos: false,
-    eventOverride: {
-      sport: 'Football',
-      sportHint: 'football',
-      league: 'Spanish La Liga',
-      title: 'Real Madrid vs Barcelona',
-      eventTitle: 'Real Madrid vs Barcelona',
-      homeTeam: 'Real Madrid',
-      awayTeam: 'Barcelona',
-      eventClass: 'team_vs_team'
-    }
+    canonicalId: 'sportsmeta:event:football|2026-05-13|english-premier-league|manchester-city|crystal-palace',
+    realLogos: true
   },
-  // UFC fixtures: render only fields verifiable from the catalog title itself.
-  // No fabricated venue, time, round, session, status, or title-fight label —
-  // the upstream catalog title is the only authoritative source. (See feedback
-  // memory: "Don't fabricate sport-event metadata".)
-  // UFC fixtures render F1-style: big "UFC 272" event mark, headline fight as
-  // the subtitle line. eventTitle is the headline only; leagueCode supplies the
-  // big mark with the event number. (See feedback_ufc_card_layout.md.)
   {
     theme: 'sportsbook',
-    realLogos: false,
-    eventOverride: {
-      sport: 'MMA',
-      sportHint: 'mma',
-      league: 'UFC',
-      leagueCode: 'UFC 272',
-      title: 'UFC 272',
-      eventTitle: 'Covington vs Masvidal',
-      eventName: 'UFC 272',
-      principalA: 'Colby Covington',
-      principalB: 'Jorge Masvidal',
-      fighterA: 'Colby Covington',
-      fighterB: 'Jorge Masvidal',
-      eventClass: 'combat_event'
-    }
+    canonicalId: 'sportsmeta:event:ice-hockey|2026-05-08|canadian-whl|everett-silvertips|prince-albert-raiders',
+    realLogos: true
   },
   {
     theme: 'trading-card',
-    realLogos: false,
-    eventOverride: {
-      sport: 'MMA',
-      sportHint: 'mma',
-      league: 'UFC',
-      leagueCode: 'UFC 272',
-      title: 'UFC 272',
-      eventTitle: 'Covington vs Masvidal',
-      eventName: 'UFC 272',
-      principalA: 'Colby Covington',
-      principalB: 'Jorge Masvidal',
-      fighterA: 'Colby Covington',
-      fighterB: 'Jorge Masvidal',
-      eventClass: 'combat_event'
-    }
+    canonicalId: 'sportsmeta:event:basketball|2026-05-14|wnba|connecticut-sun|las-vegas-aces',
+    realLogos: true
   },
   {
     theme: 'brutalist',
