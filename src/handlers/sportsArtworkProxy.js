@@ -41,7 +41,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260511-real-logo-v19-cache-logo-metadata'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260511-real-logo-v22-league-canonical-fallback'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -1763,7 +1763,8 @@ async function buildMatchupLogoPair(homeBadge, awayBadge, size = 210) {
 }
 
 async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl = '', variant = 'poster', template = 'editorial', requestedHome = '', requestedAway = '', requestedTitle = '' } = {}) {
-  const canonical = await loadCanonicalEvent(canonicalId, sportsmetaBaseUrl)
+  let effectiveCanonicalId = canonicalId
+  let canonical = await loadCanonicalEvent(canonicalId, sportsmetaBaseUrl)
   const event = { ...(canonical?.event || {}) }
 
   // Catalog title order wins: SportsMeta canonical home/away encodes the
@@ -1818,11 +1819,37 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
   event.eventClass = eventClass
 
   if (!canonical?.event?.id) {
-    return {
-      buffer: null,
-      logoKind: 'fallback-glyph',
-      logoFallbackReason: 'canonical_event_lookup_failed',
-      logoLookupAttempts: []
+    // Solo-event league fallback: SportsCult RSS surfaces show-style fixtures
+    // (e.g. "Inside the NBA", "Bundesliga Show", "UFC Deep Waters", "On The
+    // Couch") that SportsMeta has no canonical event record for. The PARENT
+    // league IS cached though — parse `sportsmeta:event:<sport>|<date>|<league>|...`
+    // and try `sportsmeta:league:<sport>|<league>` so the renderer still
+    // picks up the real NBA / Bundesliga / UFC mark instead of falling to a
+    // generic sport-family glyph.
+    const eventIdMatch = String(canonicalId).match(/^sportsmeta:event:([a-z0-9-]+)\|[^|]+\|([a-z0-9-]+)/i)
+    if (eventIdMatch) {
+      const fallbackLeagueId = `sportsmeta:league:${eventIdMatch[1].toLowerCase()}|${eventIdMatch[2].toLowerCase()}`
+      const leagueCanonical = await loadCanonicalEvent(fallbackLeagueId, sportsmetaBaseUrl)
+      if (leagueCanonical?.event?.id) {
+        canonical = leagueCanonical
+        effectiveCanonicalId = fallbackLeagueId
+        // Backfill the in-flight event object so the renderer has sport +
+        // league context for theme colours and labels. Don't overwrite home/
+        // away — solo events don't have them and that's intentional.
+        event.id = leagueCanonical.event.id
+        event.sport = event.sport || leagueCanonical.event.sport
+        event.league = event.league || leagueCanonical.event.league
+        event.title = event.title || leagueCanonical.event.title
+        event.name = event.name || leagueCanonical.event.name
+      }
+    }
+    if (!canonical?.event?.id) {
+      return {
+        buffer: null,
+        logoKind: 'fallback-glyph',
+        logoFallbackReason: 'canonical_event_lookup_failed',
+        logoLookupAttempts: []
+      }
     }
   }
 
@@ -1834,13 +1861,13 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
   // as a glyph if it is one).
   const inspectVariants = ['homeBadge', 'awayBadge', 'leagueLogo', 'logo', 'poster']
   const inspectResults = await Promise.all(
-    inspectVariants.map((v) => loadInspectAssetSourceUrl({ canonicalId, sportsmetaBaseUrl, variant: v }))
+    inspectVariants.map((v) => loadInspectAssetSourceUrl({ canonicalId: effectiveCanonicalId, sportsmetaBaseUrl, variant: v }))
   )
   const inspectByVariant = Object.fromEntries(inspectVariants.map((v, i) => [v, inspectResults[i] || '']))
   const pickLogoUrl = (variantKey, fallbackUrl) => {
     const cdn = inspectByVariant[variantKey]
     if (cdn) return cdn
-    return buildCanonicalBadgeUrl({ sportsmetaBaseUrl, canonicalId, variant: variantKey, fallbackUrl })
+    return buildCanonicalBadgeUrl({ sportsmetaBaseUrl, canonicalId: effectiveCanonicalId, variant: variantKey, fallbackUrl })
   }
   const homeBadgeUrl = pickLogoUrl(assetHomeKey, canonical?.assets?.[assetHomeKey])
   const awayBadgeUrl = pickLogoUrl(assetAwayKey, canonical?.assets?.[assetAwayKey])
