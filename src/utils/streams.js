@@ -6,6 +6,7 @@ const SAMPLE_HINT_RE = /(^|[\\/.\-_ ])[sS]ample([\\/.\-_ ]|$)|(^|[\\/.\-_ ])[tT]
 const ARCHIVE_EXT_RE = /\.(?:rar|r\d{2,3}|zip|7z|001)$/i
 const RAR_EXT_RE = /\.(?:rar|r\d{2,3}|part\d{1,3}\.rar)$/i
 const ARCHIVE_VIDEO_INCLUDE_PATTERNS = ['/\\.(mkv|mp4|avi|wmv|ts|m4v)$/i']
+const LEGACY_AVI_TITLE_RE = /(?:^|[ ._\-[\]()])(?:xvid|divx)(?:$|[ ._\-[\]()])|\.avi(?:$|[ ._\-[\]()])/i
 
 function formatSize(bytes) {
   if (!bytes || bytes <= 0) return '0 B'
@@ -335,6 +336,15 @@ function buildInfoStream(code, helpUrl, count = 1) {
         'Refresh later or choose another source that can be verified and queued safely.'
       ]
     )
+  } else if (code === 'legacy-avi-suppressed') {
+    name = '[INFO] AVI Source Hidden'
+    description = withExtraDescription(
+      'A legacy AVI/XviD/DivX source was hidden because Stremio failed to start that format reliably.',
+      [
+        `${total} legacy video ${noun} ${verb} skipped so playback selection favours MKV/MP4-style sources that can actually start.`,
+        'Choose a WEB-DL, WEBRip, HDTV, MKV, or MP4 source instead.'
+      ]
+    )
   }
 
   return {
@@ -354,6 +364,22 @@ function buildInfoStream(code, helpUrl, count = 1) {
 function isVideoFileName(name) {
   const value = String(name || '').toLowerCase()
   return VIDEO_EXTENSIONS.some(ext => value.endsWith(ext))
+}
+
+function titleLooksLegacyAvi(title) {
+  return LEGACY_AVI_TITLE_RE.test(String(title || ''))
+}
+
+function isLegacyAviVideoName(name) {
+  const value = String(name || '').toLowerCase()
+  return value.endsWith('.avi') || titleLooksLegacyAvi(value)
+}
+
+function hasLegacyAviVideoFiles(files) {
+  return (Array.isArray(files) ? files : []).some(file => {
+    const name = String(file?.name || '')
+    return isVideoFileName(name) && isLegacyAviVideoName(name) && !isSampleVideoName(name)
+  })
 }
 
 function isSampleVideoName(name) {
@@ -433,7 +459,7 @@ function findVideoFile(files, options = {}) {
   const list = Array.isArray(files) ? files : []
   if (list.length === 0) return null
 
-  const videoFiles = list.filter(f => isVideoFileName(f?.name))
+  const videoFiles = list.filter(f => isVideoFileName(f?.name) && !isLegacyAviVideoName(f?.name))
   if (videoFiles.length === 0) return null
 
   const nonSample = videoFiles.filter(f => !isSampleVideoName(f?.name))
@@ -452,7 +478,8 @@ function findEpisodeFile(files, season, episode) {
   if (!Number.isFinite(seasonNum) || !Number.isFinite(episodeNum)) return null
 
   const videoFiles = (Array.isArray(files) ? files : []).filter(f =>
-    VIDEO_EXTENSIONS.some(ext => String(f.name || '').toLowerCase().endsWith(ext))
+    VIDEO_EXTENSIONS.some(ext => String(f.name || '').toLowerCase().endsWith(ext)) &&
+    !isLegacyAviVideoName(f.name)
   )
   if (videoFiles.length === 0) return null
 
@@ -582,5 +609,8 @@ module.exports = {
   arePackedArchiveFilesReady,
   findVideoFile,
   findEpisodeFile,
+  titleLooksLegacyAvi,
+  isLegacyAviVideoName,
+  hasLegacyAviVideoFiles,
   sortStreams
 }

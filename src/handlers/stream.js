@@ -12,7 +12,7 @@ const {
   getSportsAvailabilityAnchorByCanonical
 } = require('../utils/sportsAvailabilityStore')
 const { isSportsCultIndexer, isSportsOnlyIndexer } = require('../utils/sportsIndexers')
-const { buildOnSeedboxStream, buildOnBufferingStream, buildOnArchiveStream, buildOnTrackerStream, buildInfoStream, findVideoFile, findPackedArchiveFiles, arePackedArchiveFilesReady, findEpisodeFile, sortStreams } = require('../utils/streams')
+const { buildOnSeedboxStream, buildOnBufferingStream, buildOnArchiveStream, buildOnTrackerStream, buildInfoStream, findVideoFile, findPackedArchiveFiles, arePackedArchiveFilesReady, findEpisodeFile, titleLooksLegacyAvi, hasLegacyAviVideoFiles, sortStreams } = require('../utils/streams')
 const { encodePlaybackStateToken, encodeFileStateToken } = require('../utils/opaqueState')
 const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
 const { buildPlaybackFileUrl, canEmitTrackerPlayback, getTrackerPlaybackRestriction } = require('../utils/fileServing')
@@ -25,7 +25,16 @@ const { getMappedLeagueEntry } = require('../utils/leagueMap')
 
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '10000', 10))
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '12000', 10))
+const STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS = Math.max(1000, parseInt(
+  process.env.PVTKRRX_STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS ||
+  String(Math.min(2500, STREAM_TITLE_FALLBACK_TIMEOUT_MS)),
+  10
+))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '20', 10))
+const STREAM_CANDIDATE_CONCURRENCY = Math.max(1, Math.min(
+  12,
+  parseInt(process.env.PVTKRRX_STREAM_CANDIDATE_CONCURRENCY || '5', 10)
+))
 const STREAM_SPORTS_MAX_SEARCH_QUERIES = Math.max(4, parseInt(process.env.PVTKRRX_STREAM_SPORTS_MAX_SEARCH_QUERIES || '12', 10))
 const STREAM_SPORTS_MAX_SEARCH_QUERIES_WITH_DIRECT = Math.max(1, parseInt(process.env.PVTKRRX_STREAM_SPORTS_MAX_SEARCH_QUERIES_WITH_DIRECT || '3', 10))
 const STREAM_SPORTS_SUPPLEMENTAL_BUDGET_MS = Math.max(2500, parseInt(process.env.PVTKRRX_STREAM_SPORTS_SUPPLEMENTAL_BUDGET_MS || '8000', 10))
@@ -81,6 +90,24 @@ function canServeBuiltinFileRoute(configToken) {
   return String(configToken || '') === 'local' || !hostedRelayRuntime
 }
 
+async function mapWithConcurrency(items, limit, mapper) {
+  const list = Array.isArray(items) ? items : []
+  const concurrency = Math.max(1, Math.min(Number(limit) || 1, list.length || 1))
+  const results = new Array(list.length)
+  let nextIndex = 0
+
+  async function worker() {
+    while (nextIndex < list.length) {
+      const index = nextIndex
+      nextIndex += 1
+      results[index] = await mapper(list[index], index)
+    }
+  }
+
+  await Promise.all(Array.from({ length: concurrency }, worker))
+  return results
+}
+
 async function statPlayableFile(filePath) {
   const target = String(filePath || '').trim()
   if (!target) return null
@@ -113,6 +140,7 @@ async function buildOrphanedCustomFileStream(config, configToken, playbackBaseUr
   if (!infoHash || !filePath || !path.isAbsolute(filePath)) return null
   const stat = await statPlayableFile(filePath)
   if (!stat) return null
+  if (titleLooksLegacyAvi(filePath) || titleLooksLegacyAvi(info?.t)) return null
 
   const fileUrl = buildDirectLocalFileUrl(playbackBaseUrl, configToken, infoHash, filePath)
   if (!fileUrl) return null
@@ -147,10 +175,12 @@ async function inspectTrackerLink(link) {
       return {
         infoHash: String(inspection.infoHash || '').toLowerCase(),
         packedOnly: Boolean(inspection.packedOnly),
+        legacyAviOnly: Boolean(inspection.legacyAviOnly),
         inspected: true,
         fileCount: inspection.files.length,
         archiveCount: inspection.archiveFiles.length,
-        directVideoCount: inspection.directVideoFiles.length
+        directVideoCount: inspection.directVideoFiles.length,
+        supportedDirectVideoCount: inspection.supportedDirectVideoFiles.length
       }
     } catch (err) {
       return {
@@ -300,7 +330,8 @@ function createNoticeCounts() {
     packedArchiveLiveUnsupported: 0,
     packedArchiveExtracting: 0,
     packedArchiveExtractorUnavailable: 0,
-    trackerLinkUnverified: 0
+    trackerLinkUnverified: 0,
+    legacyAviSuppressed: 0
   }
 }
 
@@ -337,6 +368,9 @@ function appendNoticeStreams(streams, noticeCounts, addonUrl) {
   }
   if (noticeCounts.trackerLinkUnverified > 0) {
     streams.push(buildInfoStream('tracker-link-unverified', helpUrl, noticeCounts.trackerLinkUnverified))
+  }
+  if (noticeCounts.legacyAviSuppressed > 0) {
+    streams.push(buildInfoStream('legacy-avi-suppressed', helpUrl, noticeCounts.legacyAviSuppressed))
   }
 }
 
@@ -936,6 +970,10 @@ async function buildSupplementalSportsStreams({
       break
     }
     const titleLooksPacked = isLikelyPackedReleaseTitle(item.title)
+    if (titleLooksLegacyAvi(item.title)) {
+      if (noticeCounts) noticeCounts.legacyAviSuppressed += 1
+      continue
+    }
     const knownInfoHash = String(item?.infohash || '').toLowerCase()
     const inspection = titleLooksPacked
       ? { packedOnly: true, inspected: false }
@@ -944,6 +982,10 @@ async function buildSupplementalSportsStreams({
         : await inspectTrackerLink(item.link)
     if (titleLooksPacked || inspection.packedOnly) {
       if (noticeCounts) noticeCounts.packedArchiveLiveUnsupported += 1
+      continue
+    }
+    if (inspection.legacyAviOnly) {
+      if (noticeCounts) noticeCounts.legacyAviSuppressed += 1
       continue
     }
     if (!inspection.inspected) {
@@ -1123,7 +1165,7 @@ function titleRelevant(resultTitle, queryTitle, options = {}) {
   return false
 }
 
-function buildTitleFallbackQueries(contentTitle, type) {
+function buildTitleFallbackQueries(contentTitle, type, season = null, episode = null) {
   const normalized = normalizeSearchQuery(contentTitle)
   const queries = []
   const seen = new Set()
@@ -1135,10 +1177,23 @@ function buildTitleFallbackQueries(contentTitle, type) {
     queries.push(query)
   }
 
+  const seasonNum = Number.parseInt(String(season || ''), 10)
+  const episodeNum = Number.parseInt(String(episode || ''), 10)
+  const episodeMarker = (
+    type === 'series' &&
+    Number.isFinite(seasonNum) &&
+    Number.isFinite(episodeNum)
+  )
+    ? `S${String(seasonNum).padStart(2, '0')}E${String(episodeNum).padStart(2, '0')}`
+    : ''
+
+  if (episodeMarker) add(`${normalized} ${episodeMarker}`)
   add(normalized)
   if (type === 'series') {
     const words = titleWords(normalized)
+    if (episodeMarker && words.length >= 2) add(`${words.slice(-2).join(' ')} ${episodeMarker}`)
     if (words.length >= 2) add(words.slice(-2).join(' '))
+    if (episodeMarker && words.length >= 3) add(`${words.slice(0, 3).join(' ')} ${episodeMarker}`)
     if (words.length >= 3) add(words.slice(0, 3).join(' '))
   }
 
@@ -1148,13 +1203,16 @@ function buildTitleFallbackQueries(contentTitle, type) {
 async function searchTitleFallback(torznab, query, cats) {
   console.log(`[stream] Title fallback query="${query}" cats="${cats}" useCategories=true`)
   const categorized = await settleWithTimeout(
-    torznab.search(query, cats, 'search', { useCategories: Boolean(String(cats || '').trim()) }),
-    STREAM_TITLE_FALLBACK_TIMEOUT_MS,
+    torznab.search(query, cats, 'search', {
+      useCategories: Boolean(String(cats || '').trim()),
+      timeoutMs: STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS + 500
+    }),
+    STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS,
     []
   )
   const categorizedItems = Array.isArray(categorized.value) ? categorized.value : []
   if (categorized.timedOut) {
-    console.warn(`[stream] Title fallback timed out after ${STREAM_TITLE_FALLBACK_TIMEOUT_MS}ms`)
+    console.warn(`[stream] Title fallback category search timed out after ${STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS}ms`)
   }
   if (categorized.error) {
     console.error('[stream] Title fallback error:', categorized.error?.message)
@@ -1163,7 +1221,10 @@ async function searchTitleFallback(torznab, query, cats) {
 
   console.log(`[stream] Title fallback broad query="${query}" cats="all" useCategories=false`)
   const broad = await settleWithTimeout(
-    torznab.search(query, cats, 'search', { useCategories: false }),
+    torznab.search(query, cats, 'search', {
+      useCategories: false,
+      timeoutMs: STREAM_TITLE_FALLBACK_TIMEOUT_MS + 500
+    }),
     STREAM_TITLE_FALLBACK_TIMEOUT_MS,
     []
   )
@@ -1235,6 +1296,12 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
     if (items.length < beforePacked) {
       console.log(`[stream] Packed-release filter removed ${beforePacked - items.length} source(s)`)
     }
+    const beforeLegacy = items.length
+    items = items.filter(item => !titleLooksLegacyAvi(item.title))
+    if (items.length < beforeLegacy) {
+      noticeCounts.legacyAviSuppressed += beforeLegacy - items.length
+      console.log(`[stream] Legacy AVI/XviD filter removed ${beforeLegacy - items.length} source(s)`)
+    }
     if (contentTitle) {
       const before = items.length
       items = items.filter(item => titleRelevant(item.title, contentTitle, { type, season, episode }))
@@ -1254,10 +1321,19 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
     qbitMap.set(String(t.hash || '').toLowerCase(), t)
   }
 
+  const qbitTitleFallbackItems = contentTitle && qbitTorrents.length > 0
+    ? buildQbitTitleFallbackItems(qbitTorrents, contentTitle, { type, season, episode })
+    : []
+
+  if (jackettItems.length === 0 && qbitTitleFallbackItems.length > 0) {
+    console.log('[stream] using qBit title fallback before slow title search')
+    jackettItems = qbitTitleFallbackItems
+  }
+
   // Fallback: title search if IMDB search returned nothing useful after filtering.
   // Use generic type=search — private trackers (HD-Torrents, SpeedCD) only support type=search.
   if (jackettItems.length === 0 && contentTitle) {
-    const fallbackQueries = buildTitleFallbackQueries(contentTitle, type)
+    const fallbackQueries = buildTitleFallbackQueries(contentTitle, type, season, episode)
     for (const fallbackQuery of fallbackQueries) {
       console.log(`[stream] Falling back to title search: "${fallbackQuery}"`)
       const fallbackItems = await searchTitleFallback(torznab, fallbackQuery, cats)
@@ -1272,8 +1348,8 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
     ? jackettItems.filter(item => matchesEpisode(item.title, season, episode))
     : jackettItems
 
-  if (filtered.length === 0 && contentTitle && qbitTorrents.length > 0) {
-    filtered = buildQbitTitleFallbackItems(qbitTorrents, contentTitle, { type, season, episode })
+  if (filtered.length === 0 && qbitTitleFallbackItems.length > 0) {
+    filtered = qbitTitleFallbackItems
   }
 
   filtered = preferSeededResults(filtered, 'imdb candidates', (item) => {
@@ -1287,9 +1363,9 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
   }
 
   const streams = []
-  for (const item of filtered.slice(0, STREAM_MAX_CANDIDATES)) {
+  const candidateStreams = await mapWithConcurrency(filtered.slice(0, STREAM_MAX_CANDIDATES), STREAM_CANDIDATE_CONCURRENCY, async (item) => {
     // Private trackers don't return infohashes — allow items through if they have a download link
-    if (!item.infohash && !item.link) continue
+    if (!item.infohash && !item.link) return null
     const parsed = parse(item.title)
     const matched = item.infohash ? qbitMap.get(item.infohash) : null
 
@@ -1301,13 +1377,17 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
           ? findEpisodeFile(files, season, episode)
           : findVideoFile(files)
         if (!videoFile?.name) {
+          if (hasLegacyAviVideoFiles(files)) {
+            noticeCounts.legacyAviSuppressed += 1
+            return null
+          }
           const archiveResult = await buildMatchedArchiveCompatibleStream(config, configToken, playbackBaseUrl, matched, files, item, parsed, streamSourceOptions)
           if (archiveResult.stream) {
-            streams.push(archiveResult.stream)
+            return archiveResult.stream
           } else if (findPackedArchiveFiles(files).length > 0) {
             recordPackedArchiveOutcome(noticeCounts, archiveResult)
           }
-          continue
+          return null
         }
         const videoProgress = Number(videoFile?.progress || 0)
         const requireCurrentPathProof = !isCompletedTorrent(matched, videoProgress)
@@ -1319,30 +1399,39 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
           if (requireCurrentPathProof && config?.fileServerUrl) {
             noticeCounts.bufferingPathUnproven += 1
           }
-          continue
+          return null
         }
         if (isCompletedTorrent(matched, videoProgress)) {
-          streams.push(buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed, streamSourceOptions))
+          return buildOnSeedboxStream(item, fileUrl, videoFile.name, videoFile.size, config, parsed, streamSourceOptions)
         } else {
           const percent = Math.max(0, Math.min(99, Math.floor(videoProgress * 100)))
           const bufferingUrl = buildBufferingStreamUrl(playbackBaseUrl, configToken, fileUrl, matched.hash, videoFile.name)
-          streams.push(buildOnBufferingStream(item, bufferingUrl, videoFile.name, videoFile.size, config, parsed, percent, streamSourceOptions))
+          return buildOnBufferingStream(item, bufferingUrl, videoFile.name, videoFile.size, config, parsed, percent, streamSourceOptions)
         }
       } catch (e) {
         // File listing failed, skip this stream
+        return null
       }
     } else if (item.link) {
       const titleLooksPacked = isLikelyPackedReleaseTitle(item.title)
+      if (titleLooksLegacyAvi(item.title)) {
+        noticeCounts.legacyAviSuppressed += 1
+        return null
+      }
       const inspection = titleLooksPacked
         ? { packedOnly: true, inspected: false }
         : await inspectTrackerLink(item.link)
       if (titleLooksPacked || inspection.packedOnly) {
         noticeCounts.packedArchiveLiveUnsupported += 1
-        continue
+        return null
+      }
+      if (inspection.legacyAviOnly) {
+        noticeCounts.legacyAviSuppressed += 1
+        return null
       }
       if (!inspection.inspected) {
         noticeCounts.trackerLinkUnverified += 1
-        continue
+        return null
       }
       if (trackerPlaybackEnabled) {
         // On tracker — playback URL (works with or without infohash)
@@ -1351,15 +1440,21 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
             h: item.infohash || inspection.infoHash || '',
             l: item.link
           })
-          if (!playbackUrl) continue
-          streams.push(buildOnTrackerStream(item, playbackUrl, parsed, streamSourceOptions))
+          if (!playbackUrl) return null
+          return buildOnTrackerStream(item, playbackUrl, parsed, streamSourceOptions)
         } catch (_) {
           // Skip invalid playback payloads instead of leaking raw tracker URLs.
+          return null
         }
       } else {
         recordTrackerRestrictionNotice(noticeCounts, trackerPlaybackRestriction)
       }
     }
+    return null
+  })
+
+  for (const stream of candidateStreams) {
+    if (stream) streams.push(stream)
   }
 
   appendNoticeStreams(streams, noticeCounts, addonUrl)
@@ -1413,9 +1508,10 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
     }
   }
   const likelyPackedDirectRelease = isLikelyPackedReleaseTitle(resolvedInfo.t)
+  const likelyLegacyAviDirectRelease = titleLooksLegacyAvi(resolvedInfo.t)
   let directInspection = null
   let matched = infoHash ? torrents.find(t => t.hash.toLowerCase() === infoHash) : null
-  if (!matched && !infoHash && directLink && !likelyPackedDirectRelease) {
+  if (!matched && !infoHash && directLink && !likelyPackedDirectRelease && !likelyLegacyAviDirectRelease) {
     directInspection = await inspectTrackerLink(directLink)
     if (directInspection.infoHash) {
       infoHash = String(directInspection.infoHash || '').toLowerCase()
@@ -1438,23 +1534,27 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
       const files = await qbit.files(matched.hash)
       const videoFile = findVideoFile(files)
       if (!videoFile?.name) {
-        const archiveResult = await buildMatchedArchiveCompatibleStream(
-          effectiveConfig,
-          configToken,
-          playbackBaseUrl,
-          matched,
-          files,
-          { title: resolvedInfo.t, size: resolvedInfo.s, seeders: resolvedInfo.d, indexer: resolvedInfo.i || '' },
-          parsed,
-          streamSourceOptions
-        )
-        if (archiveResult.stream) {
-          streams.push(archiveResult.stream)
-        } else if (findPackedArchiveFiles(files).length > 0) {
-          packedArchivePending = true
-          recordPackedArchiveOutcome(noticeCounts, archiveResult)
+        if (hasLegacyAviVideoFiles(files)) {
+          noticeCounts.legacyAviSuppressed += 1
         } else {
-          throw new Error('No playable video in matched torrent')
+          const archiveResult = await buildMatchedArchiveCompatibleStream(
+            effectiveConfig,
+            configToken,
+            playbackBaseUrl,
+            matched,
+            files,
+            { title: resolvedInfo.t, size: resolvedInfo.s, seeders: resolvedInfo.d, indexer: resolvedInfo.i || '' },
+            parsed,
+            streamSourceOptions
+          )
+          if (archiveResult.stream) {
+            streams.push(archiveResult.stream)
+          } else if (findPackedArchiveFiles(files).length > 0) {
+            packedArchivePending = true
+            recordPackedArchiveOutcome(noticeCounts, archiveResult)
+          } else {
+            throw new Error('No playable video in matched torrent')
+          }
         }
       } else {
         const videoProgress = Number(videoFile?.progress || 0)
@@ -1491,7 +1591,9 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
   }
 
   if (streams.length === 0 && directLink && !packedArchivePending) {
-    const inspection = directInspection || (likelyPackedDirectRelease
+    const inspection = directInspection || (likelyLegacyAviDirectRelease
+      ? { legacyAviOnly: true, inspected: true }
+      : likelyPackedDirectRelease
       ? { packedOnly: true, inspected: false }
       : infoHash
         ? { packedOnly: false, inspected: true, infoHash }
@@ -1499,6 +1601,8 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
 
     if (inspection.packedOnly) {
       noticeCounts.packedArchiveLiveUnsupported += 1
+    } else if (inspection.legacyAviOnly) {
+      noticeCounts.legacyAviSuppressed += 1
     } else if (!inspection.inspected) {
       noticeCounts.trackerLinkUnverified += 1
     } else if (trackerPlaybackEnabled) {
@@ -1572,6 +1676,7 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
         if (!allowSupplementalSportsResults && !isSportsCultIndexer(r.indexer)) return false
         if (infoHash && String(r.infohash || '').toLowerCase() === infoHash) return true
         if (isLikelyPackedReleaseTitle(r.title)) return false
+        if (titleLooksLegacyAvi(r.title)) return false
         return (
           similarTitle(r.title, primaryTargetTitle) ||
           similarTitle(r.title, query)
@@ -1591,11 +1696,19 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
 
       for (const item of ordered) {
         const titleLooksPacked = isLikelyPackedReleaseTitle(item.title)
+        if (titleLooksLegacyAvi(item.title)) {
+          noticeCounts.legacyAviSuppressed += 1
+          continue
+        }
         const inspection = titleLooksPacked
           ? { packedOnly: true, inspected: false }
           : await inspectTrackerLink(item.link)
         if (titleLooksPacked || inspection.packedOnly) {
           noticeCounts.packedArchiveLiveUnsupported += 1
+          continue
+        }
+        if (inspection.legacyAviOnly) {
+          noticeCounts.legacyAviSuppressed += 1
           continue
         }
         if (!inspection.inspected) {

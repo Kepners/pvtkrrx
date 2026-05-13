@@ -3,6 +3,7 @@ const crypto = require('node:crypto')
 const VIDEO_EXTENSIONS = [ '.mkv', '.mp4', '.avi', '.mov', '.wmv', '.ts', '.m4v' ]
 const RAR_EXT_RE = /\.(?:rar|r\d{2,3}|part\d{1,3}\.rar)$/i
 const SAMPLE_HINT_RE = /(^|[\\/._ -])(sample|trailer)([\\/._ -]|$)/i
+const LEGACY_AVI_TITLE_RE = /(?:^|[ ._\-[\]()])(?:xvid|divx)(?:$|[ ._\-[\]()])|\.avi(?:$|[ ._\-[\]()])/i
 
 function parseTorrentFileName(contentDisposition, fallback = 'download.torrent') {
   const text = String(contentDisposition || '')
@@ -177,6 +178,11 @@ function isVideoFileName(name) {
   return VIDEO_EXTENSIONS.some(ext => value.endsWith(ext))
 }
 
+function isLegacyAviVideoName(name) {
+  const value = String(name || '').toLowerCase()
+  return value.endsWith('.avi') || LEGACY_AVI_TITLE_RE.test(value)
+}
+
 function isArchiveFileName(name) {
   return RAR_EXT_RE.test(String(name || '').toLowerCase())
 }
@@ -190,6 +196,8 @@ function inspectTorrentPayload(bytes) {
   const archiveFiles = files.filter(file => isArchiveFileName(file.name))
   const videoFiles = files.filter(file => isVideoFileName(file.name))
   const directVideoFiles = videoFiles.filter(file => !isSampleVideoName(file.name))
+  const legacyAviVideoFiles = directVideoFiles.filter(file => isLegacyAviVideoName(file.name))
+  const supportedDirectVideoFiles = directVideoFiles.filter(file => !isLegacyAviVideoName(file.name))
   const infoHash = computeTorrentInfoHash(bytes)
 
   return {
@@ -198,6 +206,9 @@ function inspectTorrentPayload(bytes) {
     archiveFiles,
     videoFiles,
     directVideoFiles,
+    legacyAviVideoFiles,
+    supportedDirectVideoFiles,
+    legacyAviOnly: directVideoFiles.length > 0 && supportedDirectVideoFiles.length === 0,
     packedOnly: archiveFiles.length > 0 && directVideoFiles.length === 0
   }
 }

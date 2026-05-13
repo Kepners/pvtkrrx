@@ -2669,6 +2669,11 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
       try {
         trackerPayload = await fetchTorrentPayload(info.l)
         trackerInspection = inspectTorrentPayload(trackerPayload.bytes)
+        if (trackerInspection.legacyAviOnly) {
+          return res.status(422).json({
+            error: 'Legacy AVI/XviD source detected. Pick an MKV or MP4 source instead.'
+          })
+        }
         if (trackerInspection.infoHash) {
           trackedHash = String(trackerInspection.infoHash || '').toLowerCase()
         }
@@ -2748,6 +2753,11 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
           }
           if (!trackerInspection) {
             trackerInspection = inspectTorrentPayload(trackerPayload.bytes)
+            if (trackerInspection.legacyAviOnly) {
+              return res.status(422).json({
+                error: 'Legacy AVI/XviD source detected. Pick an MKV or MP4 source instead.'
+              })
+            }
             if (!trackedHash && trackerInspection.infoHash) {
               trackedHash = String(trackerInspection.infoHash || '').toLowerCase()
             }

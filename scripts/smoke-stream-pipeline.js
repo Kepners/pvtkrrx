@@ -1162,6 +1162,131 @@ async function run() {
 
     await withScenario(async () => {
       delete process.env.PVTKRRX_HOSTED_RELAY
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      CinemetaClient.prototype.getSeries = async () => ({ name: 'The Curse of Oak Island' })
+      ProwlarrClient.prototype.searchImdb = async () => []
+      const broadQueries = []
+      ProwlarrClient.prototype.search = async (query, _cats, _type, options = {}) => {
+        if (!options.useCategories) broadQueries.push(String(query || ''))
+        return []
+      }
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([
+        { path: 'Oak.Island.S12E20.1080p.mkv', length: 1_660_000_000 }
+      ]))
+      global.__pvtkrrxBroadQueries = broadQueries
+    }, async () => {
+      await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'series',
+        'tt3455408:12:20',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(global.__pvtkrrxBroadQueries[0], 'The Curse of Oak Island S12E20', '#4o1 TV title fallback should try the exact episode marker before broad title-only searches')
+      delete global.__pvtkrrxBroadQueries
+    })
+
+    await withScenario(async () => {
+      delete process.env.PVTKRRX_HOSTED_RELAY
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
+      ProwlarrClient.prototype.searchImdb = async () => [
+        trackerItem({
+          title: 'Movie Name 2026 DVDRip XviD AVI',
+          link: 'https://tracker.example/download/movie-name-xvid.torrent',
+          size: 900_000_000,
+          seeders: 9
+        })
+      ]
+      ProwlarrClient.prototype.search = async () => []
+      global.fetch = async () => {
+        throw new Error('legacy AVI title should be suppressed before tracker payload fetch')
+      }
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        'tt1234567',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4o3 legacy AVI/XviD titles should not emit playback streams')
+      assert.ok(findNoticeStream(result.streams, 'legacy-avi-suppressed'), '#4o3 legacy AVI/XviD suppression should be visible as an info row')
+    })
+
+    await withScenario(async () => {
+      delete process.env.PVTKRRX_HOSTED_RELAY
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
+      ProwlarrClient.prototype.searchImdb = async () => [
+        trackerItem({
+          title: 'Movie Name 2026 480p DVDRip',
+          link: 'https://tracker.example/download/movie-name-legacy-video.torrent',
+          size: 900_000_000,
+          seeders: 9
+        })
+      ]
+      ProwlarrClient.prototype.search = async () => []
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([
+        { path: 'Movie.Name.2026.480p.DVDRip.avi', length: 900_000_000 }
+      ]))
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        'tt1234567',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4o4 inspected AVI-only payloads should not emit playback streams')
+      assert.ok(findNoticeStream(result.streams, 'legacy-avi-suppressed'), '#4o4 inspected AVI-only payloads should show the AVI hidden notice')
+    })
+
+    await withScenario(async () => {
+      delete process.env.PVTKRRX_HOSTED_RELAY
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
+      ProwlarrClient.prototype.searchImdb = async () => Array.from({ length: 5 }, (_, index) => trackerItem({
+        title: `Movie Name 2026 1080p WEB-DL x264 Source ${index}`,
+        link: `https://tracker.example/download/movie-name-concurrent-${index}.torrent`,
+        seeders: 20 - index
+      }))
+      ProwlarrClient.prototype.search = async () => []
+      let activeFetches = 0
+      let maxActiveFetches = 0
+      global.fetch = async () => {
+        activeFetches += 1
+        maxActiveFetches = Math.max(maxActiveFetches, activeFetches)
+        await new Promise(resolve => setTimeout(resolve, 30))
+        activeFetches -= 1
+        return createFetchResponse(buildTorrentPayload([
+          { path: 'Movie.Name.2026.1080p.WEB-DL.x264.mkv', length: 2_000_000_000 }
+        ]))
+      }
+      global.__pvtkrrxMaxActiveFetches = () => maxActiveFetches
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        'tt1234567',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 5, '#4o5 concurrent tracker inspection should still emit verified playback streams')
+      assert.ok(global.__pvtkrrxMaxActiveFetches() > 1, '#4o5 tracker payload inspection should run concurrently instead of serially')
+      delete global.__pvtkrrxMaxActiveFetches
+    })
+
+    await withScenario(async () => {
+      delete process.env.PVTKRRX_HOSTED_RELAY
       QBitClient.prototype.torrents = async () => [
         matchedTorrent({
           hash: '89abcdef012345670123456789abcdef01234567',
@@ -1178,7 +1303,9 @@ async function run() {
       ]
       CinemetaClient.prototype.getSeries = async () => ({ name: 'The Curse of Oak Island' })
       ProwlarrClient.prototype.searchImdb = async () => []
-      ProwlarrClient.prototype.search = async () => []
+      ProwlarrClient.prototype.search = async () => {
+        throw new Error('qBit exact-title fallback should not wait for title fallback search')
+      }
     }, async () => {
       const result = await handleStream(
         makeBaseConfig({ fileServerUrl: '' }),
