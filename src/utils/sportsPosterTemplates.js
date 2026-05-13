@@ -972,30 +972,15 @@ function broadcastSubtitleFromEvent(event = {}, m = {}, label = '', title = '', 
   return unique.join(' \u2022 ')
 }
 
-function sportGlyph(icon = 'soccer', x = 50, y = 50, size = 100, color = '#fff', opacity = 1, strokeWidth = 2) {
-  const shapes = {
-    soccer: `<circle cx="50" cy="50" r="38"/><polygon points="50,32 62,40 58,54 42,54 38,40" fill="currentColor" stroke="none"/><line x1="50" y1="32" x2="50" y2="20"/><line x1="62" y1="40" x2="72" y2="34"/><line x1="58" y1="54" x2="68" y2="64"/><line x1="42" y1="54" x2="32" y2="64"/><line x1="38" y1="40" x2="28" y2="34"/>`,
-    hockey: `<ellipse cx="50" cy="58" rx="32" ry="10" fill="currentColor" stroke="none"/><ellipse cx="50" cy="54" rx="32" ry="10"/><line x1="18" y1="54" x2="18" y2="58"/><line x1="82" y1="54" x2="82" y2="58"/>`,
-    basketball: `<circle cx="50" cy="50" r="38"/><path d="M12,50 Q50,30 88,50"/><path d="M12,50 Q50,70 88,50"/><line x1="50" y1="12" x2="50" y2="88"/>`,
-    football: `<ellipse cx="50" cy="50" rx="38" ry="22" transform="rotate(-20 50 50)"/><line x1="38" y1="50" x2="62" y2="50"/><line x1="42" y1="46" x2="42" y2="54"/><line x1="50" y1="44" x2="50" y2="56"/><line x1="58" y1="46" x2="58" y2="54"/>`,
-    baseball: `<circle cx="50" cy="50" r="34"/><path d="M22,38 Q40,46 36,72"/><path d="M78,38 Q60,46 64,72"/>`,
-    f1: `<path d="M10,60 L30,60 L40,48 L60,48 L70,60 L90,60 L90,68 L70,68 L60,76 L40,76 L30,68 L10,68 Z" fill="currentColor" stroke="none"/><circle cx="30" cy="72" r="6" fill="currentColor" stroke="none"/><circle cx="70" cy="72" r="6" fill="currentColor" stroke="none"/>`,
-    motogp: `<path d="M18,66 L34,66 L46,52 L62,52 L74,66 L86,66"/><circle cx="30" cy="70" r="10"/><circle cx="74" cy="70" r="10"/><path d="M44,50 L54,34 L66,40 L62,52"/><circle cx="58" cy="26" r="6" fill="currentColor" stroke="none"/><path d="M52,36 L38,44"/>`,
-    motorsport: `<path d="M20,74 C38,34 66,34 84,58"/><path d="M22,74 L88,74"/><path d="M34,62 L42,50 L58,50 L68,62"/><path d="M72,22 L72,58"/><path d="M72,22 L88,28 L72,34"/><circle cx="34" cy="74" r="7" fill="currentColor" stroke="none"/><circle cx="72" cy="74" r="7" fill="currentColor" stroke="none"/>`,
-    mma: `<path d="M28,30 L44,30 L44,22 L60,22 L60,30 L72,30 L76,42 L72,68 L60,76 L40,76 L28,68 L24,42 Z"/><line x1="40" y1="44" x2="60" y2="44"/><line x1="40" y1="56" x2="60" y2="56"/>`,
-    tennis: `<circle cx="50" cy="50" r="34"/><path d="M22,32 Q50,50 22,68"/><path d="M78,32 Q50,50 78,68"/>`,
-    golf: `<circle cx="38" cy="68" r="14" fill="currentColor" stroke="none"/><path d="M48,68 C66,62 76,52 82,38"/><line x1="62" y1="18" x2="62" y2="76"/><path d="M62,18 L84,26 L62,34 Z" fill="currentColor" stroke="none"/>`,
-    darts: `<circle cx="50" cy="50" r="38"/><circle cx="50" cy="50" r="25"/><circle cx="50" cy="50" r="10" fill="currentColor" stroke="none"/><line x1="50" y1="12" x2="50" y2="88"/><line x1="12" y1="50" x2="88" y2="50"/>`,
-    cycling: `<circle cx="28" cy="68" r="16"/><circle cx="74" cy="68" r="16"/><path d="M28,68 L46,40 L58,68 L42,68 L56,42 L72,68"/><path d="M42,32 L54,32"/><circle cx="58" cy="24" r="7" fill="currentColor" stroke="none"/>`,
-    athletics: `<path d="M30,78 C42,62 54,48 70,24"/><path d="M30,78 L50,78"/><path d="M46,56 L68,62"/><path d="M54,46 L42,30"/><circle cx="72" cy="20" r="8" fill="currentColor" stroke="none"/>`,
-    cricket: `<path d="M26,76 L72,30"/><path d="M66,24 L80,38 L74,44 L60,30 Z" fill="currentColor" stroke="none"/><circle cx="28" cy="34" r="9"/>`,
-    rugby: `<ellipse cx="50" cy="50" rx="36" ry="24" transform="rotate(-28 50 50)"/><path d="M28,50 Q50,40 72,50"/><path d="M28,50 Q50,60 72,50"/>`,
-    snooker: `<circle cx="36" cy="62" r="13" fill="currentColor" stroke="none"/><circle cx="58" cy="62" r="13"/><circle cx="48" cy="40" r="13"/><path d="M22,82 L82,22"/>`,
-    wrestling: `<rect x="20" y="34" width="60" height="42"/><line x1="20" y1="44" x2="80" y2="44"/><line x1="20" y1="56" x2="80" y2="56"/><line x1="20" y1="68" x2="80" y2="68"/><circle cx="30" cy="34" r="4" fill="currentColor" stroke="none"/><circle cx="70" cy="34" r="4" fill="currentColor" stroke="none"/><circle cx="30" cy="76" r="4" fill="currentColor" stroke="none"/><circle cx="70" cy="76" r="4" fill="currentColor" stroke="none"/>`
-  }
-  const inner = shapes[icon] || shapes.soccer
-  const scale = size / 100
-  return `<g transform="translate(${x - size / 2} ${y - size / 2}) scale(${scale})" fill="none" stroke="${color}" stroke-width="${strokeWidth}" color="${color}" opacity="${opacity}">${inner}</g>`
+function sportGlyph() {
+  // User directive 2026-05-11: sport-icon glyphs (basketball, motorsport
+  // crosshair, cricket bat, MMA gloves, F1, MotoGP, etc.) are REMOVED from
+  // every template — foreground chrome-circle marks, background patterns,
+  // and decorative overlays. Real league/event logos must come from
+  // SportsMeta (which sources from TheSportsDB). When no league logo can
+  // be resolved, the slot stays empty rather than reverting to a generic
+  // sport silhouette.
+  return ''
 }
 
 function renderEditorial(event = {}, variant = 'poster', theme = {}, mode = '') {
@@ -1525,7 +1510,16 @@ function fitMotorsportTitle(text = '', maxWidth = 350, baseSize = 50, minSize = 
   return { text: clean, lines, fontSize, maxWidth, status: fitted ? 'fit' : 'fit-with-textLength' }
 }
 
-function motorsportGlyphMarkup(iconKind, cx, cy, size, paper, accent) {
+function motorsportGlyphMarkup(_iconKind, _cx, _cy, _size, _paper, _accent) {
+  // User directive 2026-05-11: motorsport glyph (F1 car, MotoGP, WRC rally,
+  // WEC, IndyCar) silhouettes are REMOVED from templates. Real league
+  // logos come from SportsMeta / TheSportsDB. Slot stays empty rather
+  // than rendering a stylised car/bike vector.
+  return ''
+}
+// Legacy implementation kept commented for reference only — do not re-enable
+// without explicit product approval to reintroduce glyph fallbacks.
+function _legacyMotorsportGlyphMarkup(iconKind, cx, cy, size, paper, accent) {
   const half = size / 2
   const ringRadius = size * 0.46
   const strokeColor = paper
@@ -2024,6 +2018,18 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
   const awayVisualIdentity = m.isTeamMatchup
     ? `data-team-side="away" data-team-name="${e(m.away.name)}"`
     : `data-competitor-side="right" data-competitor-name="${e(m.away.name)}"`
+  // Solo branch slot sizing 2026-05-11: after the v18/v19 glyph removal, the
+  // central chrome-and-glyph decoration is gone. SportsMeta's league logos
+  // come back as 256x99 banners (aspect 2.59:1) with mean alpha 28-69 / 255 —
+  // they're designed for placement on a DARK background where the transparent
+  // areas read as solid colour. On the cream ticket-stub paper, transparent
+  // pixels show through as cream and the logo looks washed out. The fix is a
+  // dark rounded-rect backdrop drawn into the SVG BEHIND the composite. The
+  // logo is scaled to fit a 220x220 square (220 wide, ~85 tall after aspect
+  // preservation), and the dark backdrop fills the rest of the 220x220 area
+  // so the logo's transparent pixels reveal a uniform dark frame instead of
+  // the cream paper.
+  const soloCentralLeagueSlot = { x: 90, y: 170, size: 220 }
   const slots = m.hasMatchup
     ? [
         { role: 'league', left: leagueLogoSlot.x, top: leagueLogoSlot.y, size: leagueLogoSlot.size },
@@ -2032,7 +2038,7 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
       ]
     : [
         { role: 'league', left: leagueLogoSlot.x, top: leagueLogoSlot.y, size: leagueLogoSlot.size },
-        { role: 'league', left: 110, top: 130, size: 180 }
+        { role: 'league', left: soloCentralLeagueSlot.x, top: soloCentralLeagueSlot.y, size: soloCentralLeagueSlot.size }
       ]
   const stubY = SOURCE_H - 100
   const feature = m.hasMatchup
@@ -2059,12 +2065,15 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
     <text class="mono" x="${SOURCE_W - 28}" y="446" text-anchor="end" font-size="8" fill="#5a3a1f" letter-spacing="1.6">${e(m.rightLabel)}</text>
     <text data-role="${awayNameRole}"${m.isTeamMatchup ? ` data-team-side="away" data-team-name="${e(m.away.name)}"` : ''} class="bebas" x="${SOURCE_W - 28}" y="468" text-anchor="end" ${awayNameAttrs} fill="#1a1410" letter-spacing="0">${e(m.away.name)}</text>
   </g>`
-    : `<g transform="translate(${SOURCE_W / 2} 204)"><circle cx="0" cy="0" r="52" fill="${m.home.primary}" stroke="${m.home.accent}" stroke-width="2"/>${sportGlyph(m.sport_icon, 0, 0, 76, m.home.accent, 0.95)}</g>
-  <line x1="20" y1="305" x2="160" y2="305" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
-  <line x1="${SOURCE_W - 160}" y1="305" x2="${SOURCE_W - 20}" y2="305" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
-  <text class="bebas" x="${SOURCE_W / 2}" y="310" text-anchor="middle" font-size="13" fill="#5a3a1f" letter-spacing="3">${e((m.league || m.sport || '').toUpperCase()) || ''}</text>
-  <text class="bebas" data-role="ticket-stub-solo-title" x="${SOURCE_W / 2}" y="350" text-anchor="middle" ${soloTitleAttrs} fill="#1a1410" letter-spacing="1">${e(soloTitle)}</text>
-  ${(m.session || m.round) ? `<text class="serif" x="${SOURCE_W / 2}" y="378" text-anchor="middle" font-style="italic" font-size="15" fill="#9b6f2f">${e(m.session || m.round)}</text>` : ''}`
+    : `<g data-role="solo-league-logo-slot" data-box-x="${soloCentralLeagueSlot.x}" data-box-y="${soloCentralLeagueSlot.y}" data-box-width="${soloCentralLeagueSlot.size}" data-box-height="${soloCentralLeagueSlot.size}">
+    <rect x="${soloCentralLeagueSlot.x}" y="${soloCentralLeagueSlot.y}" width="${soloCentralLeagueSlot.size}" height="${soloCentralLeagueSlot.size}" rx="14" fill="#101521" stroke="#9b6f2f" stroke-width="2.4"/>
+    <rect x="${soloCentralLeagueSlot.x + 6}" y="${soloCentralLeagueSlot.y + 6}" width="${soloCentralLeagueSlot.size - 12}" height="${soloCentralLeagueSlot.size - 12}" rx="10" fill="none" stroke="rgba(255,245,208,0.16)" stroke-width="0.8"/>
+  </g>
+  <line x1="20" y1="416" x2="160" y2="416" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
+  <line x1="${SOURCE_W - 160}" y1="416" x2="${SOURCE_W - 20}" y2="416" stroke="#5a3a1f" stroke-width="0.6" stroke-dasharray="2 2"/>
+  <text class="bebas" x="${SOURCE_W / 2}" y="422" text-anchor="middle" font-size="13" fill="#5a3a1f" letter-spacing="3">${e((m.league || m.sport || '').toUpperCase()) || ''}</text>
+  <text class="bebas" data-role="ticket-stub-solo-title" x="${SOURCE_W / 2}" y="462" text-anchor="middle" ${soloTitleAttrs} fill="#1a1410" letter-spacing="1">${e(soloTitle)}</text>
+  ${(m.session || m.round) ? `<text class="serif" x="${SOURCE_W / 2}" y="490" text-anchor="middle" font-style="italic" font-size="15" fill="#9b6f2f">${e(m.session || m.round)}</text>` : ''}`
   const inner = `<defs>
     <style>.bebas { font-family: 'Bebas Neue', Impact, sans-serif; }.mono { font-family: 'JetBrains Mono', ui-monospace, monospace; }.serif { font-family: 'Playfair Display', Georgia, serif; }.sans { font-family: 'Inter', system-ui, sans-serif; }</style>
     <linearGradient id="mastheadOverlay" x1="0%" y1="0%" x2="0%" y2="100%"><stop offset="0%" stop-color="rgba(40,25,10,0.4)"/><stop offset="50%" stop-color="rgba(40,25,10,0)"/><stop offset="100%" stop-color="rgba(40,25,10,0.4)"/></linearGradient>
@@ -2264,35 +2273,14 @@ function sportGlyphMarkup(icon = 'sports', size = 256) {
   return sportGlyph(mapped, size / 2, size / 2, size * 0.78, '#ffffff', 1, Math.max(4, Math.round(size * 0.02)))
 }
 
-function renderLogoGlyphSvg({ role = 'league', event = {}, theme = {}, size = 256 } = {}) {
-  const facts = eventFacts(event)
-  const icon = sportIconFor(event, facts)
-  const primary = role === 'away' ? (theme.awayColor || '#123c69') : (theme.homeColor || '#0f766e')
-  const secondary = role === 'league' ? (theme.accentColor || '#b58b2a') : (theme.accentColor || '#f5d76e')
-  if (role === 'home' || role === 'away') {
-    const eventClass = normalizeSpace(event.eventClass || event.posterClass) || classifySportsPosterEvent(event)
-    const isTeam = eventClass === 'team_vs_team'
-    const name = role === 'away' ? facts.away : facts.home
-    const label = role === 'away'
-      ? (facts.awayInitials || initialsFor(name, 'AW'))
-      : (facts.homeInitials || initialsFor(name, 'HM'))
-    const fontSize = label.length > 2 ? Math.round(size * 0.26) : Math.round(size * 0.32)
-    const accent = readableAccent(primary)
-    const roleAttr = isTeam
-      ? `data-role="fallback-team-initials" data-team-side="${escapeXml(role)}" data-team-name="${escapeXml(name)}"`
-      : `data-role="fallback-competitor-initials" data-competitor-side="${role === 'away' ? 'right' : 'left'}" data-competitor-name="${escapeXml(name)}"`
-    return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-  <defs><radialGradient id="g" cx="35%" cy="30%" r="78%"><stop offset="0" stop-color="${secondary}"/><stop offset="1" stop-color="${primary}"/></radialGradient></defs>
-  <circle cx="${size / 2}" cy="${size / 2}" r="${size * 0.43}" fill="url(#g)" stroke="rgba(255,255,255,0.78)" stroke-width="${Math.max(3, Math.round(size * 0.03))}"/>
-  <text ${roleAttr} x="${size / 2}" y="${Math.round(size * 0.5 + fontSize * 0.35)}" text-anchor="middle" font-family="'Bebas Neue', Impact, Arial, sans-serif" font-size="${fontSize}" font-weight="800" fill="${accent}" letter-spacing="0">${escapeXml(label)}</text>
-</svg>`
-  }
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
-  <defs><radialGradient id="g" cx="35%" cy="30%" r="78%"><stop offset="0" stop-color="${secondary}"/><stop offset="1" stop-color="${primary}"/></radialGradient></defs>
-  <rect width="${size}" height="${size}" rx="${Math.round(size * 0.18)}" fill="rgba(2,6,23,0)"/>
-  <circle cx="${size / 2}" cy="${size / 2}" r="${size * 0.43}" fill="url(#g)" stroke="rgba(255,255,255,0.78)" stroke-width="${Math.max(3, Math.round(size * 0.03))}"/>
-  ${sportGlyphMarkup(icon, size)}
-</svg>`
+function renderLogoGlyphSvg() {
+  // User directive 2026-05-11: glyph fallback (text initials + sport-icon
+  // glyphs) is REMOVED from templates entirely. Real team and league logos
+  // come from SportsMeta (which fetches from TheSportsDB). When a real logo
+  // cannot be resolved for a slot, the slot is now skipped — never painted
+  // with a fake "WHU" / "AFC" / sport-emblem placeholder.
+  // Callers must check for null and skip the composite when this returns null.
+  return null
 }
 
 module.exports = {

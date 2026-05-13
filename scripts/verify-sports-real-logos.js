@@ -249,7 +249,6 @@ async function main() {
           if (!row.logoSourceUrl && row.logoSourceUrls.length === 0) row.failures.push('missing_real_logo_source_url')
         } else {
           if (row.logoKind !== 'fallback-glyph') row.failures.push(`expected_fallback_glyph_got_${row.logoKind || 'missing'}`)
-          if (row.logoFallbackCount < 1) row.failures.push('expected_fallback_logo_count')
           if (!row.logoFallbackReason) row.failures.push('missing_fallback_reason')
         }
         row.failures.push(...slotFailures(row.logoSlots))

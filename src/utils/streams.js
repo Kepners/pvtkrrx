@@ -1,6 +1,6 @@
 // Build Stremio stream objects - two patterns: on-seedbox and on-tracker
 
-const PVTKRRX_LOGO_URL = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.ico'
+const PVTKRRX_LOGO_URL = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 const VIDEO_EXTENSIONS = ['.mkv', '.mp4', '.avi', '.wmv', '.ts', '.m4v']
 const SAMPLE_HINT_RE = /(^|[\\/.\-_ ])[sS]ample([\\/.\-_ ]|$)|(^|[\\/.\-_ ])[tT]railer([\\/.\-_ ]|$)|(^|[\\/.\-_ ])[pP]review([\\/.\-_ ]|$)|(^|[\\/.\-_ ])[pP]roof([\\/.\-_ ]|$)/
 const ARCHIVE_EXT_RE = /\.(?:rar|r\d{2,3}|zip|7z|001)$/i
