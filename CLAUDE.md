@@ -58,6 +58,13 @@
 - For stream proof, use a configured `https://www.pvtkrrx.cc/:config/stream/...` route, not the bootstrap `/stream/...` compatibility path.
 - For sports poster artwork, real SportsDB/SportsMeta logos win. PVTKRRX may compose client-safe PNG posters from SportsMeta member `homeBadge`, `awayBadge`, and `leagueLogo` routes server-side, but it must not show text initials when cached/source badge assets exist. Generated sport-specific SVG/PNG fallback is only for unresolved or truly missing-logo rows.
 
+### Canonical Hostname Lock (NOTE FOR ALL AI'S)
+- The **only** brand/manifest/logo hostname that may appear in any Stremio-visible artifact is `https://www.pvtkrrx.cc`. This applies to every runtime: Coolify container, Contabo systemd, Windows desktop, and any future self-host install.
+- `pvt.kepners.co.uk` is **the user's own personal server hostname** — used only by the owner to reach their own private data. It must NEVER appear in shipped manifests, logo URLs, brand artwork, install links, or any artifact a third party will see.
+- If you find `pvt.kepners.co.uk` (or `kepners.co.uk` in any subdomain form) inside a manifest's `logo`, `background`, `addonCatalogs`, `behaviorHints.configurationURL`, or any user-facing string, treat it as a bug and replace with `https://www.pvtkrrx.cc`.
+- The Contabo systemd `.env` MUST set `PVTKRRX_PUBLIC_BASE_URL=https://www.pvtkrrx.cc` and `PVTKRRX_PLAYBACK_BASE_URL=https://www.pvtkrrx.cc`. `pvt.kepners.co.uk` may stay in `PVTKRRX_ALLOWED_WEB_ORIGINS` so the owner can browse via their personal hostname, but it never participates in manifest URL construction.
+- Audit before every release: `curl -s https://www.pvtkrrx.cc/manifest.json | grep -i kepners` must return nothing. Same for every served `/local/manifest.json`, `/configure`, and any signed-install token output.
+
 ### Bootstrap Manifest Name/Description Lock
 - Root `/manifest.json` is only the configure-first bootstrap entry (`com.kepners.pvtkrrx.bootstrap`). It must expose no catalogs, streams, or types.
 - The Stremio-visible bootstrap `name` must remain exactly `PVTKRR`. Never change it back to `PVTKRR Setup`, `PVTKRR Server Setup`, `PVTKRR Desktop Setup`, or any other route/version/desktop/server/marketing suffix. This rule applies to **every** mode — public guide, default, self-host, and desktop runtimes all serve a Stremio-visible bootstrap and all must read `PVTKRR`.
