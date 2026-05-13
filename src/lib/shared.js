@@ -1814,7 +1814,7 @@ function getManifest(req) {
     : profile === 'lan'
       ? 'LAN Bridge'
       : 'Remote Seedbox'
-  const defaultLogoUrl = `${getPublicBaseUrl(req)}/logo.svg`
+  const defaultLogoUrl = `${getPublicBaseUrl(req)}/logo.png`
   // Keep local profile self-contained; hosted/lan profiles can use manifest logo URL.
   const logoUrl = profile === 'local'
     ? defaultLogoUrl
