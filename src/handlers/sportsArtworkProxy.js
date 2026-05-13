@@ -62,6 +62,10 @@ const RASTER_CACHE_MAX_KEYS = Math.max(
   200,
   parseInt(process.env.PVTKRRX_SPORTS_ARTWORK_CACHE_MAX_KEYS || '2000', 10)
 )
+const LOGO_ERROR_TTL_MS = Math.max(
+  5000,
+  parseInt(process.env.PVTKRRX_SPORTS_ARTWORK_LOGO_ERROR_CACHE_MS || '30000', 10)
+)
 
 const rasterCache = new Map()
 const rasterInFlight = new Map()
@@ -69,6 +73,8 @@ const canonicalEventCache = new Map()
 const canonicalEventInFlight = new Map()
 const inspectAssetCache = new Map()
 const inspectAssetInFlight = new Map()
+const logoFetchCache = new Map()
+const logoFetchInFlight = new Map()
 let runtimeRevisionCache
 
 function resolveRuntimeRevision() {
@@ -1683,52 +1689,112 @@ async function fetchLogoCandidate({ url = '', key = '', role = '', size = 210, f
   }
   if (!targetUrl) return { image: null, attempt }
 
-  try {
-    const response = await fetch(targetUrl, {
-      headers: { accept: 'image/png,image/jpeg,image/webp,image/svg+xml,image/*' },
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+  // Stremio cold-loads ~50 posters at once and many share the same league/team
+  // logo. Cache the fetched+resized buffer keyed by `url|size` and dedup
+  // in-flight requests so we run one HTTP fetch and one Sharp pipeline per
+  // unique logo, not one per poster. Errors get a short TTL so a transient
+  // upstream blip does not poison fixtures for hours.
+  const cacheKey = `${targetUrl}|${size}`
+  const now = Date.now()
+
+  const hit = logoFetchCache.get(cacheKey)
+  if (hit && hit.expiresAt > now) return applyCachedLogoResult(hit.value, attempt, { targetUrl, key, fallbackColor })
+
+  let pending = logoFetchInFlight.get(cacheKey)
+  if (!pending) {
+    pending = (async () => {
+      const value = {
+        status: 0,
+        contentType: '',
+        headers: {},
+        source: '',
+        assetClass: '',
+        delivery: '',
+        generated: '',
+        result: '',
+        error: false,
+        buffer: null,
+        color: null
+      }
+      try {
+        const response = await fetch(targetUrl, {
+          headers: { accept: 'image/png,image/jpeg,image/webp,image/svg+xml,image/*' },
+          signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+        })
+        value.status = response.status
+        value.contentType = String(response.headers.get('content-type') || '').toLowerCase()
+        for (const [headerKey, headerValue] of response.headers.entries()) {
+          value.headers[String(headerKey || '').toLowerCase()] = String(headerValue || '')
+        }
+        value.source = String(value.headers['x-sportsmeta-source'] || '')
+        value.assetClass = String(value.headers['x-sportsmeta-asset-class'] || '')
+        value.delivery = String(value.headers['x-sportsmeta-delivery-format'] || '')
+        value.generated = String(value.headers['x-sportsmeta-generated-asset'] || '')
+
+        if (!response.ok) {
+          value.result = `http_${response.status}`
+          value.error = true
+          return value
+        }
+        if (!isSportsMetaRealLogoAsset(value.contentType, value.headers)) {
+          value.result = 'not_real_logo'
+          value.error = true
+          return value
+        }
+
+        const sourceBuf = Buffer.from(await response.arrayBuffer())
+        value.buffer = await sharp(sourceBuf, { density: 192 })
+          .resize({ width: size, height: size, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+          .png()
+          .toBuffer()
+        value.color = await dominantColorFromImage(sourceBuf, fallbackColor)
+        value.result = 'real_logo'
+        return value
+      } catch (error) {
+        value.result = `fetch_error_${failureReason(error?.message || error)}`
+        value.error = true
+        return value
+      }
+    })().then((value) => {
+      const ttl = value.error ? LOGO_ERROR_TTL_MS : RASTER_CACHE_TTL_MS
+      logoFetchCache.set(cacheKey, { value, expiresAt: Date.now() + ttl })
+      while (logoFetchCache.size > RASTER_CACHE_MAX_KEYS) {
+        const oldestKey = logoFetchCache.keys().next().value
+        if (!oldestKey) break
+        logoFetchCache.delete(oldestKey)
+      }
+      return value
+    }).finally(() => {
+      logoFetchInFlight.delete(cacheKey)
     })
-    attempt.status = response.status
-    attempt.contentType = String(response.headers.get('content-type') || '').toLowerCase()
-    const headers = {}
-    for (const [headerKey, value] of response.headers.entries()) {
-      headers[String(headerKey || '').toLowerCase()] = String(value || '')
-    }
-    attempt.source = String(headers['x-sportsmeta-source'] || '')
-    attempt.assetClass = String(headers['x-sportsmeta-asset-class'] || '')
-    attempt.delivery = String(headers['x-sportsmeta-delivery-format'] || '')
-    attempt.generated = String(headers['x-sportsmeta-generated-asset'] || '')
+    logoFetchInFlight.set(cacheKey, pending)
+  }
 
-    if (!response.ok) {
-      attempt.result = `http_${response.status}`
-      return { image: null, attempt }
-    }
-    if (!isSportsMetaRealLogoAsset(attempt.contentType, headers)) {
-      attempt.result = 'not_real_logo'
-      return { image: null, attempt }
-    }
+  const resolved = await pending
+  return applyCachedLogoResult(resolved, attempt, { targetUrl, key, fallbackColor })
+}
 
-    const source = Buffer.from(await response.arrayBuffer())
-    const buffer = await sharp(source, { density: 192 })
-      .resize({ width: size, height: size, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-      .png()
-      .toBuffer()
-    attempt.result = 'real_logo'
-    return {
-      image: {
-        buffer,
-        color: await dominantColorFromImage(source, fallbackColor),
-        contentType: attempt.contentType,
-        headers,
-        kind: attempt.kind,
-        sourceUrl: targetUrl,
-        sourceKey: key
-      },
-      attempt
-    }
-  } catch (error) {
-    attempt.result = `fetch_error_${failureReason(error?.message || error)}`
-    return { image: null, attempt }
+function applyCachedLogoResult(value, attempt, { targetUrl, key, fallbackColor }) {
+  attempt.status = value.status
+  attempt.contentType = value.contentType
+  attempt.source = value.source
+  attempt.assetClass = value.assetClass
+  attempt.delivery = value.delivery
+  attempt.generated = value.generated
+  attempt.result = value.result
+  if (value.error || !value.buffer) return { image: null, attempt }
+  return {
+    image: {
+      // Shared by reference across concurrent callers — do not mutate.
+      buffer: value.buffer,
+      color: value.color || fallbackColor,
+      contentType: value.contentType,
+      headers: value.headers,
+      kind: attempt.kind,
+      sourceUrl: targetUrl,
+      sourceKey: key
+    },
+    attempt
   }
 }
 
