@@ -59,6 +59,11 @@ COPY . .
 # Coolify routes inbound traffic to port 3000 by default for Node services.
 ENV PORT=3000
 ENV PVTKRRX_HOSTED_RELAY=true
+# Expand libuv's worker thread pool from the default 4 to 16. Paired with
+# sharp.concurrency(1) in src/handlers/sportsArtworkProxy.js, this lets cold
+# catalog loads render up to 16 posters concurrently (one thread each) instead
+# of 4 renders thrashing all cores. See ⚡ perf upgrade 2026-05-13.
+ENV UV_THREADPOOL_SIZE=16
 EXPOSE 3000
 
 CMD ["node", "index.js"]

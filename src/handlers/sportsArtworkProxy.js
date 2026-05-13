@@ -1,4 +1,11 @@
 const sharp = require('sharp')
+// Pin sharp/libvips to 1 thread per render so libuv can dispatch many small
+// poster renders in parallel via UV_THREADPOOL_SIZE instead of 4 renders
+// fighting for all cores. Stremio catalog cold-loads request 30-50 posters at
+// once; this flip removes the CPU thrash on first-screen paint.
+sharp.concurrency(1)
+sharp.cache({ memory: 200, files: 0 })
+
 const fs = require('fs')
 const path = require('path')
 const {
