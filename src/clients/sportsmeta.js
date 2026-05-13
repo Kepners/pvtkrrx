@@ -70,7 +70,10 @@ function trimSportsMetaCache() {
   }
 }
 
-function buildResolveStableCacheKey(query = {}) {
+function buildResolveStableCacheKey(query = {}, baseUrls = []) {
+  const scope = uniqueBaseUrls(Array.isArray(baseUrls) ? baseUrls : [baseUrls])
+    .map((baseUrl) => baseUrl.toLowerCase())
+    .join(',')
   const recordType = String(query?.recordType || query?.type || 'event').trim().toLowerCase()
   const sport = String(query?.sport || '').trim().toLowerCase()
   const league = String(query?.league || '').trim().toLowerCase()
@@ -81,9 +84,10 @@ function buildResolveStableCacheKey(query = {}) {
   // the event independently of the title/event hint. Without sport+date, the
   // cache key would collide across unrelated events; without home or away the
   // tuple cannot disambiguate same-day fixtures in the same league.
+  if (!scope) return ''
   if (!sport || !date) return ''
   if (!home && !away) return ''
-  return `${recordType}|${sport}|${league}|${date}|${home}|${away}`
+  return `${scope}|${recordType}|${sport}|${league}|${date}|${home}|${away}`
 }
 
 function trimResolveCache() {
@@ -279,7 +283,10 @@ class SportsMetaClient {
     const normalizedQuery = normalizeSportsMetaResolveQuery(query)
     if (Object.keys(normalizedQuery).length === 0 || !this.baseUrl) return null
 
-    const stableKey = buildResolveStableCacheKey(normalizedQuery)
+    const stableKey = buildResolveStableCacheKey(normalizedQuery, [
+      this.baseUrl,
+      ...this.fallbackBaseUrls
+    ])
     if (stableKey) {
       const cached = sportsMetaResolveCache.get(stableKey)
       if (cached && cached.expiresAt > Date.now()) return cached.value

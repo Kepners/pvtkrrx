@@ -6,7 +6,10 @@ const path = require('node:path')
 const persistentBackfillRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-sports-backfill-'))
 process.env.PVTKRRX_SPORTS_IDENTITY_BACKFILL_FILE = path.join(persistentBackfillRoot, 'sports-identity-backfill-cache.json')
 
-const { SportsMetaClient } = require('../src/clients/sportsmeta')
+const {
+  clearSportsMetaResolveCache,
+  SportsMetaClient
+} = require('../src/clients/sportsmeta')
 const { ProwlarrClient } = require('../src/clients/prowlarr')
 const { handleMeta } = require('../src/handlers/meta')
 const { handleCatalog } = require('../src/handlers/catalog')
@@ -482,6 +485,51 @@ async function run() {
   assert.equal(fetchCounts.get(`https://sportsmeta.test/event/${encodeURIComponent(barcaId)}`) || 0, 1, 'football fallback search should cache repeated canonical event fetches')
   assert.equal(fetchCounts.get(`https://sportsmeta.test/event/${encodeURIComponent(barcaOtherId)}`) || 0, 0, 'football fallback search should skip mismatched-date candidates before fetching canonical events')
   assert.equal(fetchCounts.get(`https://sportsmeta.test/event/${encodeURIComponent(barcaWomenId)}`) || 0, 0, 'football fallback search should not walk unrelated same-term candidates')
+
+  clearSportsMetaResolveCache()
+  const sportsMetaTestFetch = global.fetch
+  const scopedResolveCalls = []
+  try {
+    global.fetch = async (input) => {
+      const url = new URL(String(input))
+      if (url.hostname !== 'sportsmeta-a.test' && url.hostname !== 'sportsmeta-b.test') {
+        return sportsMetaTestFetch(input)
+      }
+      scopedResolveCalls.push(url.toString())
+      if (url.pathname !== '/resolve') {
+        throw new Error(`Unexpected scoped SportsMeta smoke path: ${url.pathname}`)
+      }
+      return new Response(JSON.stringify(canonicalPayload({
+        id: `sportsmeta:event:football|2026-04-22|spanish-la-liga|${url.hostname}|celta-vigo`,
+        name: `${url.hostname} vs Celta Vigo`,
+        league: 'Spanish La Liga',
+        date: '2026-04-22',
+        sport: 'football',
+        homeTeam: url.hostname,
+        awayTeam: 'Celta Vigo'
+      })), {
+        status: 200,
+        headers: { 'content-type': 'application/json' }
+      })
+    }
+
+    const scopedResolveQuery = {
+      recordType: 'event',
+      date: '2026-04-22',
+      sport: 'football',
+      league: 'Spanish La Liga',
+      home: 'Barcelona',
+      away: 'Celta Vigo'
+    }
+    const scopedResolveA = await new SportsMetaClient({ baseUrl: 'https://sportsmeta-a.test' }).resolveEvent(scopedResolveQuery)
+    const scopedResolveB = await new SportsMetaClient({ baseUrl: 'https://sportsmeta-b.test' }).resolveEvent(scopedResolveQuery)
+    assert.match(scopedResolveA.canonicalId, /sportsmeta-a\.test/, 'SportsMeta /resolve cache should retain client A result')
+    assert.match(scopedResolveB.canonicalId, /sportsmeta-b\.test/, 'SportsMeta /resolve cache should be scoped by base URL')
+    assert.equal(scopedResolveCalls.length, 2, 'same structured tuple on two SportsMeta base URLs should make two upstream /resolve calls')
+  } finally {
+    global.fetch = sportsMetaTestFetch
+    clearSportsMetaResolveCache()
+  }
 
   const sportsMetaResponse = await handleMeta(
     { sportsmetaBaseUrl: 'https://sportsmeta.test' },
