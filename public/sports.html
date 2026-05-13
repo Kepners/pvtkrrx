@@ -319,17 +319,17 @@
       width: min(100%, 920px);
       margin-top: 26px;
       display: grid;
-      grid-template-columns: minmax(0, 1.25fr) minmax(240px, 0.75fr);
+      /* Single column 2026-05-13: previously a two-column layout with the
+         Formula 1 backdrop JPG on the left and the rotating poster carousel
+         on the right. The JPG visually bled into the poster card, so the
+         backdrop element was removed. 4K backdrop samples still live in the
+         gallery section below. */
+      grid-template-columns: minmax(0, 1fr);
       gap: 14px;
       align-items: stretch;
-      /* Cap the showcase height so the bordered .hero container always
-         contains both panels. Without this, the 600x900 ticket-stub poster
-         (height: auto at 100% column width) grew the showcase to ~510px,
-         pushing it below the cyan bordered ::before frame. */
       max-height: clamp(260px, 36vh, 380px);
     }
 
-    .hero-backdrop,
     .hero-posters {
       border: 1px solid rgba(0, 246, 255, 0.22);
       border-radius: 8px;
@@ -337,13 +337,6 @@
       overflow: hidden;
       box-shadow: 0 0 24px rgba(0, 168, 255, 0.18);
       min-height: 0;
-    }
-
-    .hero-backdrop img {
-      display: block;
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
     }
 
     .hero-posters {
@@ -1190,10 +1183,6 @@
         grid-template-columns: repeat(3, minmax(0, 1fr));
       }
 
-      .hero-backdrop img {
-        min-height: 180px;
-      }
-
       .hero::before {
         inset: 4% 0;
       }
@@ -1343,9 +1332,6 @@
           <a class="btn btn-secondary" href="https://sportsmeta.pvtkrrx.cc/proof" data-umami-event="cta_sportsmeta_proof" data-umami-event-page="sports" data-umami-event-section="hero">Open Proof Page</a>
         </div>
         <div class="hero-showcase" aria-label="Current PVTKRRX sports artwork samples">
-          <div class="hero-backdrop">
-            <img src="/sports-backdrops/formula1-4k.jpg" width="3840" height="2160" alt="Reusable Formula 1 4K sports backdrop sample">
-          </div>
           <div class="hero-posters" role="region" aria-label="Free Ticket Stub fixture samples — auto-rotating">
             <img src="/sports-artwork/default/poster/football.png?league=Premier+League&amp;title=Arsenal+vs+Chelsea&amp;date=2026-04-30&amp;home=Arsenal&amp;away=Chelsea&amp;eventClass=team_vs_team&amp;seeders=42&amp;size=8.1+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" alt="Free Ticket Stub sports poster sample for an Arsenal vs Chelsea Premier League fixture">
             <img src="/sports-artwork/default/poster/baseball.png?league=MLB&amp;title=Boston+Red+Sox+vs+New+York+Yankees&amp;date=2026-04-30&amp;home=Boston+Red+Sox&amp;away=New+York+Yankees&amp;eventClass=team_vs_team&amp;seeders=14&amp;size=5.4+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" alt="Free Ticket Stub sports poster sample for a Red Sox vs Yankees MLB fixture">
