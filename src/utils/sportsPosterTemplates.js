@@ -1188,10 +1188,13 @@ function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') 
   // Filled with each side's primary colour, white ring, white code text — readable at thumbnail size.
   const homePrimary = home.primary || '#1f2a44'
   const awayPrimary = away.primary || '#3a1c1c'
-  // Audit fix (2026-05-05): badges shrunk from 52→40 so the central chrome VS
-  // regains primary focus on team-vs-team posters. Real SportsMeta logos drop
-  // into these slots later; the sized-down disc is the fallback weight.
-  const badgeR = 40
+  // Badge radius matched to trading-card / editorial weight (~124px diameter
+  // on the 600x900 canvas) so the real club crests read at the same scale as
+  // the other SportsMeta-member templates. Earlier 40px radius left them
+  // visually tiny next to the central chrome VS; 62px brings them in line
+  // with the rest of the family while still keeping ~10px clearance from
+  // the VS mark on the diagonal seam.
+  const badgeR = 62
   const homeBadgeX = 170
   const homeBadgeY = 320
   const awayBadgeX = 430
