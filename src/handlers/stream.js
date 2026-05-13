@@ -30,17 +30,21 @@ const STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS = Math.max(1000, parseInt(
   String(Math.min(2500, STREAM_TITLE_FALLBACK_TIMEOUT_MS)),
   10
 ))
-const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '20', 10))
+const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '12', 10))
 const STREAM_CANDIDATE_CONCURRENCY = Math.max(1, Math.min(
-  12,
-  parseInt(process.env.PVTKRRX_STREAM_CANDIDATE_CONCURRENCY || '5', 10)
+  16,
+  parseInt(process.env.PVTKRRX_STREAM_CANDIDATE_CONCURRENCY || '10', 10)
 ))
 const STREAM_SPORTS_MAX_SEARCH_QUERIES = Math.max(4, parseInt(process.env.PVTKRRX_STREAM_SPORTS_MAX_SEARCH_QUERIES || '12', 10))
 const STREAM_SPORTS_MAX_SEARCH_QUERIES_WITH_DIRECT = Math.max(1, parseInt(process.env.PVTKRRX_STREAM_SPORTS_MAX_SEARCH_QUERIES_WITH_DIRECT || '3', 10))
 const STREAM_SPORTS_SUPPLEMENTAL_BUDGET_MS = Math.max(2500, parseInt(process.env.PVTKRRX_STREAM_SPORTS_SUPPLEMENTAL_BUDGET_MS || '8000', 10))
 const STREAM_SPORTS_RESPONSE_TIMEOUT_MS = Math.max(5000, parseInt(process.env.PVTKRRX_STREAM_SPORTS_RESPONSE_TIMEOUT_MS || '14000', 10))
-const TRACKER_LINK_INSPECTION_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_TIMEOUT_MS || '4000', 10))
+const TRACKER_LINK_INSPECTION_TIMEOUT_MS = Math.max(1000, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_TIMEOUT_MS || '2500', 10))
 const TRACKER_LINK_INSPECTION_CACHE_MS = Math.max(60 * 1000, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_CACHE_MS || String(10 * 60 * 1000), 10))
+const STREAM_EPISODE_IMDB_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(
+  process.env.PVTKRRX_STREAM_EPISODE_IMDB_FALLBACK_TIMEOUT_MS || '3000',
+  10
+))
 
 // Module-level constant Sets — avoid recreating on every call
 const TITLE_RELEVANT_STOPWORDS = new Set(['the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or'])
@@ -1256,6 +1260,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
 
   const cats = type === 'series' ? TV_CATS : MOVIE_CATS
   const searchType = type === 'series' ? 'series' : 'movie'
+  const hasEpisodeMarker = type === 'series' && Number.isFinite(season) && Number.isFinite(episode)
 
   console.log(`[stream] ${type} ${id} → imdbId=${imdbId} season=${season} ep=${episode}`)
 
@@ -1263,8 +1268,11 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
   // Cinemeta runs in parallel so it adds zero latency on the happy path.
   // We always need the title to filter out sports content that leaks from non-movie indexers.
   const cinemeta = new CinemetaClient()
+  const initialProwlarrLookup = hasEpisodeMarker
+    ? Promise.resolve({ value: [], skippedTitleFirst: true })
+    : settleWithTimeout(torznab.searchImdb(imdbId, cats, searchType), STREAM_UPSTREAM_TIMEOUT_MS, [])
   const [jackettResult, qbitResult, cinemetaResult] = await Promise.all([
-    settleWithTimeout(torznab.searchImdb(imdbId, cats, searchType), STREAM_UPSTREAM_TIMEOUT_MS, []),
+    initialProwlarrLookup,
     settleWithTimeout(qbit.torrents('all'), STREAM_UPSTREAM_TIMEOUT_MS, []),
     settleWithTimeout(
       type === 'series' ? cinemeta.getSeries(imdbId) : cinemeta.getMovie(imdbId),
@@ -1278,6 +1286,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
   const contentTitle = cinemetaResult.value?.name || null
 
   console.log(`[stream] IMDB search returned ${jackettItems.length} results, qBit has ${qbitTorrents.length} torrents, title="${contentTitle}"`)
+  if (jackettResult.skippedTitleFirst) console.log('[stream] TV episode title-first lookup: skipping initial IMDB wait')
   if (jackettResult.timedOut) console.warn(`[stream] Prowlarr IMDB lookup timed out after ${STREAM_UPSTREAM_TIMEOUT_MS}ms`)
   if (qbitResult.timedOut) console.warn(`[stream] qBit torrent lookup timed out after ${STREAM_UPSTREAM_TIMEOUT_MS}ms`)
   if (cinemetaResult.timedOut) console.warn(`[stream] Cinemeta lookup timed out after ${STREAM_UPSTREAM_TIMEOUT_MS}ms`)
@@ -1341,6 +1350,21 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
       console.log(`[stream] Title search returned ${jackettItems.length} results after filtering`)
       if (jackettItems.length > 0) break
     }
+  }
+
+  if (jackettItems.length === 0 && hasEpisodeMarker && !jackettResult.error && !jackettResult.timedOut) {
+    console.log(`[stream] TV episode title-first found no sources; trying short IMDB fallback (${STREAM_EPISODE_IMDB_FALLBACK_TIMEOUT_MS}ms)`)
+    const imdbFallback = await settleWithTimeout(
+      torznab.searchImdb(imdbId, cats, searchType, {
+        timeoutMs: STREAM_EPISODE_IMDB_FALLBACK_TIMEOUT_MS + 500
+      }),
+      STREAM_EPISODE_IMDB_FALLBACK_TIMEOUT_MS,
+      []
+    )
+    if (imdbFallback.timedOut) console.warn(`[stream] TV episode IMDB fallback timed out after ${STREAM_EPISODE_IMDB_FALLBACK_TIMEOUT_MS}ms`)
+    if (imdbFallback.error) console.error('[stream] TV episode IMDB fallback error:', imdbFallback.error?.message)
+    jackettItems = applyFilters(Array.isArray(imdbFallback.value) ? imdbFallback.value : [])
+    console.log(`[stream] TV episode IMDB fallback returned ${jackettItems.length} results after filtering`)
   }
 
   // Filter by episode if series
