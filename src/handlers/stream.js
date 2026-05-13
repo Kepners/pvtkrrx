@@ -81,6 +81,17 @@ function canServeBuiltinFileRoute(configToken) {
   return String(configToken || '') === 'local' || !hostedRelayRuntime
 }
 
+async function statPlayableFile(filePath) {
+  const target = String(filePath || '').trim()
+  if (!target) return null
+  try {
+    const stat = await fs.promises.stat(target)
+    return stat?.isFile?.() ? stat : null
+  } catch (_) {
+    return null
+  }
+}
+
 function buildDirectLocalFileUrl(playbackBaseUrl, configToken, hash, filePath) {
   try {
     const info = encodeFileStateToken({
@@ -93,22 +104,15 @@ function buildDirectLocalFileUrl(playbackBaseUrl, configToken, hash, filePath) {
   }
 }
 
-function buildOrphanedCustomFileStream(config, configToken, playbackBaseUrl, info, parsed) {
+async function buildOrphanedCustomFileStream(config, configToken, playbackBaseUrl, info, parsed) {
   if (!canServeBuiltinFileRoute(configToken)) return null
   const streamSourceOptions = getStreamSourceOptions(configToken)
 
   const infoHash = String(info?.h || '').toLowerCase()
   const filePath = String(info?.f || '').trim()
   if (!infoHash || !filePath || !path.isAbsolute(filePath)) return null
-  if (!fs.existsSync(filePath)) return null
-
-  let stat = null
-  try {
-    stat = fs.statSync(filePath)
-  } catch (_) {
-    return null
-  }
-  if (!stat?.isFile?.()) return null
+  const stat = await statPlayableFile(filePath)
+  if (!stat) return null
 
   const fileUrl = buildDirectLocalFileUrl(playbackBaseUrl, configToken, infoHash, filePath)
   if (!fileUrl) return null
@@ -211,17 +215,12 @@ function buildMatchedArchiveStream(config, configToken, playbackBaseUrl, matched
   )
 }
 
-function buildExtractedArchiveStream(config, configToken, playbackBaseUrl, matched, item, parsed, extractedFilePath, streamSourceOptions = {}) {
+async function buildExtractedArchiveStream(config, configToken, playbackBaseUrl, matched, item, parsed, extractedFilePath, streamSourceOptions = {}) {
   const absolutePath = path.normalize(String(extractedFilePath || '').trim())
-  if (!absolutePath || !fs.existsSync(absolutePath)) return null
+  if (!absolutePath) return null
 
-  let stat = null
-  try {
-    stat = fs.statSync(absolutePath)
-  } catch (_) {
-    stat = null
-  }
-  if (!stat?.isFile?.()) return null
+  const stat = await statPlayableFile(absolutePath)
+  if (!stat) return null
 
   const fileName = path.basename(absolutePath)
   const fileUrl = buildFileUrl(config, configToken, playbackBaseUrl, matched.hash, matched, fileName, {
@@ -239,7 +238,7 @@ function buildExtractedArchiveStream(config, configToken, playbackBaseUrl, match
 async function buildMatchedArchiveCompatibleStream(config, configToken, playbackBaseUrl, matched, files, item, parsed, streamSourceOptions = {}) {
   let extractedFilePath = findExtractedArchiveVideoPath(matched)
   if (extractedFilePath) {
-    const extractedStream = buildExtractedArchiveStream(config, configToken, playbackBaseUrl, matched, item, parsed, extractedFilePath, streamSourceOptions)
+    const extractedStream = await buildExtractedArchiveStream(config, configToken, playbackBaseUrl, matched, item, parsed, extractedFilePath, streamSourceOptions)
     if (extractedStream) {
       return { stream: extractedStream, extractionStatus: 'ready', streamKind: 'direct' }
     }
@@ -251,7 +250,7 @@ async function buildMatchedArchiveCompatibleStream(config, configToken, playback
     extractionStatus = String(extraction?.status || '')
     if (extractionStatus === 'ready' && extraction?.path) {
       extractedFilePath = extraction.path
-      const extractedStream = buildExtractedArchiveStream(config, configToken, playbackBaseUrl, matched, item, parsed, extractedFilePath, streamSourceOptions)
+      const extractedStream = await buildExtractedArchiveStream(config, configToken, playbackBaseUrl, matched, item, parsed, extractedFilePath, streamSourceOptions)
       if (extractedStream) {
         return { stream: extractedStream, extractionStatus, streamKind: 'direct' }
       }
@@ -1485,7 +1484,7 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
   }
 
   if (streams.length === 0) {
-    const orphanedFileStream = buildOrphanedCustomFileStream(effectiveConfig, configToken, playbackBaseUrl, resolvedInfo, parsed)
+    const orphanedFileStream = await buildOrphanedCustomFileStream(effectiveConfig, configToken, playbackBaseUrl, resolvedInfo, parsed)
     if (orphanedFileStream) {
       streams.push(orphanedFileStream)
     }

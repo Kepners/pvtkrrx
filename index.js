@@ -31,7 +31,7 @@ const {
   // State & singletons
   lanPairStore, accountStore, stremioLinkStore, rateLimiters,
   watchedDeleteTimers, watchedDeleteInFlight,
-  IS_HOSTED_RELAY_RUNTIME, SELF_HOST_SERVER_MODE, DEFAULT_LOCAL_HOSTNAME,
+  IS_HOSTED_RELAY_RUNTIME, SELF_HOST_SERVER_MODE, EXPRESS_TRUST_PROXY_SETTING, DEFAULT_LOCAL_HOSTNAME,
   STREAM_WAIT_TIMEOUT_MS, STREAM_WAIT_INTERVAL_MS,
   STREAM_RANGE_WAIT_TIMEOUT_MS, STREAM_RANGE_WAIT_INTERVAL_MS,
   STREAM_READY_START_FRACTION, STREAM_PRIORITIZE_LAST_PIECES,
@@ -99,7 +99,7 @@ const {
 } = shared
 
 const app = express()
-app.set('trust proxy', false)
+app.set('trust proxy', EXPRESS_TRUST_PROXY_SETTING)
 app.use(express.json({
   limit: '1mb',
   verify: (req, _res, buf) => {
@@ -2326,11 +2326,16 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
 
     if (!playback?.torrent) {
       const absoluteTokenPath = path.isAbsolute(p) ? path.normalize(p) : ''
-      if (!absoluteTokenPath || !fs.existsSync(absoluteTokenPath)) {
+      if (!absoluteTokenPath) {
         console.warn(`[file-route] torrent not found hash=${String(h || '').slice(0, 8)}`)
         return res.status(404).json({ error: 'Torrent not found' })
       }
-      orphanFileStat = fs.statSync(absoluteTokenPath)
+      try {
+        orphanFileStat = await fs.promises.stat(absoluteTokenPath)
+      } catch (_) {
+        console.warn(`[file-route] torrent not found hash=${String(h || '').slice(0, 8)}`)
+        return res.status(404).json({ error: 'Torrent not found' })
+      }
       if (!orphanFileStat?.isFile()) {
         console.warn(`[file-route] orphan path is not a file hash=${String(h || '').slice(0, 8)}`)
         return res.status(404).json({ error: 'File not found' })

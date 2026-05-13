@@ -62,6 +62,15 @@ const IS_HOSTED_RELAY_RUNTIME = (
   /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_HOSTED_RELAY || '').trim())
 )
 const SELF_HOST_SERVER_MODE = !IS_HOSTED_RELAY_RUNTIME && EXPLICIT_SELF_HOST_SERVER_MODE
+const TRUST_PROXY_ENABLED = /^(1|true|yes|on)$/i.test(String(
+  process.env.PVTKRRX_TRUST_PROXY ||
+  (IS_HOSTED_RELAY_RUNTIME ? 'true' : 'false')
+).trim())
+const parsedTrustProxyHops = parseInt(process.env.PVTKRRX_TRUST_PROXY_HOPS || '1', 10)
+const TRUST_PROXY_HOPS = Number.isFinite(parsedTrustProxyHops) && parsedTrustProxyHops > 0
+  ? parsedTrustProxyHops
+  : 1
+const EXPRESS_TRUST_PROXY_SETTING = TRUST_PROXY_ENABLED ? TRUST_PROXY_HOPS : false
 const STREAM_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_WAIT_TIMEOUT_MS || '90000', 10)
 const STREAM_WAIT_INTERVAL_MS = parseInt(process.env.STREAM_WAIT_INTERVAL_MS || '2000', 10)
 const STREAM_RANGE_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_RANGE_WAIT_TIMEOUT_MS || '45000', 10)
@@ -216,20 +225,86 @@ const stremioLinkStore = new StremioLinkStore({
 let bootLanAccessPromise = null
 let localProviderWarmupPromise = null
 let localConfigRepairPromise = null
+let localConfigCache = {
+  loadedAt: 0,
+  exists: false,
+  mtimeMs: 0,
+  size: 0,
+  value: null
+}
 
 if (serverAdminState.created && serverAdminState.path) {
   console.warn(`[self-host] Self-host password created at ${serverAdminState.path}`)
 }
 
-function loadLocalConfigFile() {
+function cloneJsonValue(value) {
+  if (value === null || value === undefined) return value
+  return JSON.parse(JSON.stringify(value))
+}
+
+function getLocalConfigSignature() {
   try {
+    const stat = fs.statSync(localConfigPath)
+    return {
+      exists: true,
+      mtimeMs: Number(stat.mtimeMs || 0),
+      size: Number(stat.size || 0)
+    }
+  } catch (_) {
+    return {
+      exists: false,
+      mtimeMs: 0,
+      size: 0
+    }
+  }
+}
+
+function rememberLocalConfigCache(value, signature = null) {
+  const sig = signature || getLocalConfigSignature()
+  localConfigCache = {
+    loadedAt: Date.now(),
+    exists: sig.exists === true,
+    mtimeMs: Number(sig.mtimeMs || 0),
+    size: Number(sig.size || 0),
+    value: cloneJsonValue(value)
+  }
+}
+
+function localConfigCacheMatches(signature) {
+  return (
+    localConfigCache.exists === (signature.exists === true) &&
+    Number(localConfigCache.mtimeMs || 0) === Number(signature.mtimeMs || 0) &&
+    Number(localConfigCache.size || 0) === Number(signature.size || 0)
+  )
+}
+
+function loadLocalConfigFile(options = {}) {
+  try {
+    const now = Date.now()
+    const signature = getLocalConfigSignature()
+    if (!signature.exists) {
+      rememberLocalConfigCache(null, signature)
+      return null
+    }
+
+    if (options.force !== true && localConfigCache.loadedAt > 0 && localConfigCacheMatches(signature)) {
+      localConfigCache.loadedAt = now
+      return cloneJsonValue(localConfigCache.value)
+    }
+
     const parsed = loadSecureJsonFile(localConfigPath, { defaultValue: null })
-    if (!parsed || typeof parsed !== 'object') return null
+    if (!parsed || typeof parsed !== 'object') {
+      rememberLocalConfigCache(null, signature)
+      return null
+    }
     const normalized = normalizeDiskBackedDesktopHomeRouteConfig(parsed)
     if (JSON.stringify(normalized) !== JSON.stringify(parsed)) {
       saveSecureJsonFile(localConfigPath, normalized)
+      rememberLocalConfigCache(normalized)
+      return cloneJsonValue(normalized)
     }
-    return normalized
+    rememberLocalConfigCache(normalized, signature)
+    return cloneJsonValue(normalized)
   } catch (_) {
     return null
   }
@@ -238,7 +313,8 @@ function loadLocalConfigFile() {
 function saveLocalConfigFile(config) {
   const normalized = normalizeDiskBackedDesktopHomeRouteConfig(config)
   saveSecureJsonFile(localConfigPath, normalized)
-  return normalized
+  rememberLocalConfigCache(normalized)
+  return cloneJsonValue(normalized)
 }
 
 function detectLanAddresses() {
@@ -742,12 +818,22 @@ function getSocketIp(req) {
   return normalizeClientIp(String(req.socket?.remoteAddress || req.connection?.remoteAddress || ''))
 }
 
+function getTrustedProxyIp(req) {
+  if (!TRUST_PROXY_ENABLED) return ''
+  const expressIp = normalizeClientIp(String(req.ip || ''))
+  if (expressIp) return expressIp
+  const forwarded = String(req.headers?.['x-forwarded-for'] || '')
+    .split(',')[0]
+    .trim()
+  return normalizeClientIp(forwarded)
+}
+
 function isLoopbackIp(ip) {
   return ip === '127.0.0.1' || ip === '::1' || ip === '0:0:0:0:0:0:0:1'
 }
 
 function getClientIp(req) {
-  return getSocketIp(req)
+  return getTrustedProxyIp(req) || getSocketIp(req)
 }
 
 function isSameHostRequest(req) {
@@ -2137,6 +2223,17 @@ async function primeTorrentForStreaming(qbit, torrent, videoFile, allFiles = nul
   }
 }
 
+async function statPlayableFile(filePath) {
+  const target = String(filePath || '').trim()
+  if (!target) return null
+  try {
+    const stat = await fs.promises.stat(target)
+    return stat?.isFile?.() ? stat : null
+  } catch (_) {
+    return null
+  }
+}
+
 async function loadTorrentPlaybackState(qbit, hash, targetPath, additionalStorageRoots = []) {
   if (!hash) return null
   const list = await qbit.torrentsByHashes(hash, 'all')
@@ -2181,12 +2278,8 @@ async function loadTorrentPlaybackState(qbit, hash, targetPath, additionalStorag
   } else if (preferredVideoFile) {
     chosenFile = preferredVideoFile
   } else if (extractedFilePath) {
-    let extractedSize = 0
-    try {
-      extractedSize = fs.statSync(extractedFilePath).size
-    } catch (_) {
-      extractedSize = 0
-    }
+    const extractedStat = await statPlayableFile(extractedFilePath)
+    const extractedSize = Number(extractedStat?.size || 0)
     chosenFile = {
       name: path.basename(extractedFilePath),
       size: extractedSize,
@@ -2200,8 +2293,9 @@ async function loadTorrentPlaybackState(qbit, hash, targetPath, additionalStorag
   const resolvedFilePath = chosenFile?.extracted
     ? extractedFilePath
     : resolveTorrentFilePath(torrent, chosenFile?.name || targetPath, additionalStorageRoots)
-  const fileExists = Boolean(resolvedFilePath && fs.existsSync(resolvedFilePath))
-  const diskSize = fileExists ? fs.statSync(resolvedFilePath).size : 0
+  const resolvedFileStat = await statPlayableFile(resolvedFilePath)
+  const fileExists = Boolean(resolvedFileStat)
+  const diskSize = fileExists ? Number(resolvedFileStat.size || 0) : 0
   const readableBytes = chosenFile?.extracted ? diskSize : getReadableBytes(chosenFile, torrent, diskSize)
   return {
     torrent,
@@ -2524,6 +2618,8 @@ module.exports = {
   STREMIO_AUTH_SCAN_DIRS_OVERRIDE,
   IS_HOSTED_RELAY_RUNTIME,
   SELF_HOST_SERVER_MODE,
+  TRUST_PROXY_ENABLED,
+  EXPRESS_TRUST_PROXY_SETTING,
   SENSITIVE_WEB_ORIGINS,
   CSRF_COOKIE_NAME,
   SECRET_CONFIG_FIELDS,
@@ -2565,6 +2661,7 @@ module.exports = {
   createLinkedStremioAuthSession,
   normalizeClientIp,
   getSocketIp,
+  getTrustedProxyIp,
   isLoopbackIp,
   getClientIp,
   isSameHostRequest,

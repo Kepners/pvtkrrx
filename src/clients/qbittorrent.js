@@ -1,4 +1,33 @@
+const crypto = require('crypto')
+
 const TIMEOUT_MS = Math.max(5000, parseInt(process.env.PVTKRRX_QBIT_TIMEOUT_MS || '12000', 10))
+const SESSION_CACHE_TTL_MS = Math.max(
+  60000,
+  parseInt(process.env.PVTKRRX_QBIT_SESSION_CACHE_TTL_MS || '1800000', 10)
+)
+const sessionCache = new Map()
+const loginInFlight = new Map()
+
+function buildSessionCacheKey(url, username, password) {
+  const secretHash = crypto
+    .createHash('sha256')
+    .update(String(password || ''))
+    .digest('base64url')
+  return [
+    String(url || '').trim().replace(/\/$/, ''),
+    String(username || '').trim(),
+    secretHash
+  ].join('\n')
+}
+
+function readCachedSession(cacheKey) {
+  const cached = sessionCache.get(cacheKey)
+  if (!cached || Number(cached.expiresAt || 0) <= Date.now()) {
+    sessionCache.delete(cacheKey)
+    return null
+  }
+  return cached
+}
 
 class QBitClient {
   constructor(url, username, password) {
@@ -8,11 +37,60 @@ class QBitClient {
     this.sid = null
     // Try localhost/no-auth first, then fall back to cookie auth when needed.
     this.noAuth = true
+    this.cacheKey = buildSessionCacheKey(this.url, this.username, this.password)
+    this.applyCachedSession()
   }
 
-  async login() {
-    if (this.sid) return this.sid
+  applyCachedSession() {
+    const cached = readCachedSession(this.cacheKey)
+    if (!cached) return
+    this.sid = cached.sid || null
+    if (typeof cached.noAuth === 'boolean' && (cached.noAuth || this.username)) {
+      this.noAuth = cached.noAuth
+    }
+  }
 
+  rememberSession() {
+    sessionCache.set(this.cacheKey, {
+      sid: this.sid || '',
+      noAuth: this.noAuth === true,
+      expiresAt: Date.now() + SESSION_CACHE_TTL_MS
+    })
+  }
+
+  clearSession() {
+    this.sid = null
+    sessionCache.delete(this.cacheKey)
+  }
+
+  async login(force = false) {
+    if (this.sid && !force) return this.sid
+    if (force) this.sid = null
+
+    if (!force) {
+      this.applyCachedSession()
+      if (this.sid) return this.sid
+
+      const pendingLogin = loginInFlight.get(this.cacheKey)
+      if (pendingLogin) {
+        const sid = await pendingLogin
+        this.applyCachedSession()
+        return this.sid || sid
+      }
+    }
+
+    const loginPromise = this.performLogin()
+    loginInFlight.set(this.cacheKey, loginPromise)
+    try {
+      return await loginPromise
+    } finally {
+      if (loginInFlight.get(this.cacheKey) === loginPromise) {
+        loginInFlight.delete(this.cacheKey)
+      }
+    }
+  }
+
+  async performLogin() {
     if (!this.username) {
       throw new Error('qBit requires WebUI credentials or localhost auth disabled')
     }
@@ -41,6 +119,8 @@ class QBitClient {
     if (!match) throw new Error('qBit login: no SID cookie')
 
     this.sid = match[1]
+    this.noAuth = false
+    this.rememberSession()
     return this.sid
   }
 
@@ -64,22 +144,38 @@ class QBitClient {
     // First attempt without auth when enabled
     if (this.noAuth) {
       const res = await doFetch(false)
-      if (res.ok) return expect === 'text' ? res.text() : res.json()
+      if (res.ok) {
+        this.sid = null
+        this.noAuth = true
+        this.rememberSession()
+        return expect === 'text' ? res.text() : res.json()
+      }
       if (res.status !== 403) throw new Error(`qBit ${path} HTTP ${res.status}`)
       this.noAuth = false
+      this.rememberSession()
     }
 
     await this.login()
     let res = await doFetch(true)
     if (res.status === 403) {
+      this.clearSession()
+      try {
+        await this.login(true)
+        res = await doFetch(true)
+      } catch (_) {}
+    }
+    if (res.status === 403) {
       // Retry without auth in case localhost auth is disabled but cookie flow failed.
       res = await doFetch(false)
       if (res.ok) {
         this.noAuth = true
+        this.sid = null
+        this.rememberSession()
         return expect === 'text' ? res.text() : res.json()
       }
     }
     if (!res.ok) throw new Error(`qBit ${path} HTTP ${res.status}`)
+    this.rememberSession()
     return expect === 'text' ? res.text() : res.json()
   }
 
