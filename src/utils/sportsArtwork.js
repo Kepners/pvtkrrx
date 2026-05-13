@@ -11,7 +11,7 @@ const {
 const { resolveSportBackdrop } = require('./sportBackdrops')
 const { verifyStampedSportsPosterEntitlement } = require('./entitlement')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260511-real-logo-v22-league-canonical-fallback'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260513-uniform-slot-sizes-v23'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()

@@ -1020,11 +1020,11 @@ function renderEditorial(event = {}, variant = 'poster', theme = {}, mode = '') 
   const slots = [{ role: 'league', left: 20, top: 14, size: 42 }]
   if (m.hasMatchup) {
     slots.push(
-      { role: 'home', left: 50, top: 132, size: 116 },
-      { role: 'away', left: 234, top: 132, size: 116 }
+      { role: 'home', left: 42, top: 128, size: 124 },
+      { role: 'away', left: 234, top: 128, size: 124 }
     )
   } else {
-    slots.push({ role: 'league', left: 132, top: 118, size: 136 })
+    slots.push({ role: 'league', left: 110, top: 100, size: 180 })
   }
   // Audit fix G3.2: editorial hero now uses team-colour radial sun-burst
   // (matches canonical 01-editorial direction) instead of the generic dome+V.
@@ -1203,17 +1203,17 @@ function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') 
   // Filled with each side's primary colour, white ring, white code text — readable at thumbnail size.
   const homePrimary = home.primary || '#1f2a44'
   const awayPrimary = away.primary || '#3a1c1c'
-  // Badge radius matched to trading-card / editorial weight (~124px diameter
-  // on the 600x900 canvas) so the real club crests read at the same scale as
-  // the other SportsMeta-member templates. Earlier 40px radius left them
-  // visually tiny next to the central chrome VS; 62px brings them in line
-  // with the rest of the family while still keeping ~10px clearance from
-  // the VS mark on the diagonal seam.
-  const badgeR = 62
-  const homeBadgeX = 170
-  const homeBadgeY = 320
-  const awayBadgeX = 430
-  const awayBadgeY = 580
+  // Badge radius normalized to match the rest of the family — a 124-unit
+  // diameter on 400x600 templates equals 186 units (radius 93) on this
+  // 600x900 canvas, so the real crests render at the same visual weight as
+  // editorial / sportsbook / trading-card / ticket-stub. Home/away pulled
+  // further apart on the diagonal so the larger discs still clear the
+  // central chrome VS mark with ~10-12px breathing room.
+  const badgeR = 93
+  const homeBadgeX = 190
+  const homeBadgeY = 290
+  const awayBadgeX = 410
+  const awayBadgeY = 610
   // Real-logo slot positions — match the SVG circle geometry exactly so the
   // composited PNG fills the colored disc. Top-bar code chip is square slotted
   // over the rect at (27, 27, 48, 33) — the league badge sits inside that.
@@ -1225,9 +1225,10 @@ function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') 
       ]
     : [
         { role: 'league', left: 27, top: 21, size: 48 },
-        // Solo: place a watermark league logo over the giant league wordmark
-        // centre so the real mark dominates the visual identity.
-        { role: 'league', left: W / 2 - 80, top: H / 2 - 80, size: 160 }
+        // Solo: oversized centre-stage league mark — bigger than any matchup
+        // badge so single-mark sports (golf, motorsport, wrestling brands)
+        // dominate the visual.
+        { role: 'league', left: W / 2 - 135, top: H / 2 - 135, size: 270 }
       ]
   const codeFontSize = (code) => code.length <= 2 ? 32 : code.length <= 3 ? 28 : 22
   const codeYOffset = (code) => Math.round(codeFontSize(code) * 0.34)
@@ -1734,22 +1735,22 @@ function renderSportsbook(event = {}, variant = 'poster', theme = {}, mode = '')
   const slots = m.hasMatchup
     ? [
         { role: 'league', left: 18, top: 18, size: 32 },
-        { role: 'home', left: 24, top: 190, size: 100 },
-        { role: 'away', left: 276, top: 190, size: 100 }
+        { role: 'home', left: 12, top: 178, size: 124 },
+        { role: 'away', left: 264, top: 178, size: 124 }
       ]
     : [
         { role: 'league', left: 18, top: 18, size: 32 },
-        { role: 'league', left: 124, top: 164, size: 152 }
+        { role: 'league', left: 110, top: 150, size: 180 }
       ]
   const board = m.hasMatchup
     ? `<rect x="16" y="106" width="3" height="320" fill="${m.home.primary}" filter="url(#barGlow_L)"/>
   <text class="mono" x="24" y="130" font-size="9" fill="#7B8390" letter-spacing="1.8">&gt;&gt; ${e(m.leftLabel)}</text>
-  <circle cx="74" cy="240" r="50" fill="url(#badge_L)" stroke="${m.home.accent}" stroke-width="1.5"/>
+  <circle cx="74" cy="240" r="62" fill="url(#badge_L)" stroke="${m.home.accent}" stroke-width="1.5"/>
   <text class="bebas" x="24" y="350" font-size="38" fill="white" letter-spacing="0.4">${e(m.home.short)}</text>
   <text class="sans" x="24" y="372" font-size="10.5" fill="#D1D5DB">${e(m.home.name)}</text>
   <rect x="${SOURCE_W - 19}" y="106" width="3" height="320" fill="${m.away.primary}" filter="url(#barGlow_R)"/>
   <text class="mono" x="${SOURCE_W - 24}" y="130" text-anchor="end" font-size="9" fill="#7B8390" letter-spacing="1.8">${e(m.rightLabel)} &lt;&lt;</text>
-  <circle cx="326" cy="240" r="50" fill="url(#badge_R)" stroke="${m.away.accent}" stroke-width="1.5"/>
+  <circle cx="326" cy="240" r="62" fill="url(#badge_R)" stroke="${m.away.accent}" stroke-width="1.5"/>
   <text class="bebas" x="${SOURCE_W - 24}" y="350" text-anchor="end" font-size="38" fill="white" letter-spacing="0.4">${e(m.away.short)}</text>
   <text class="sans" x="${SOURCE_W - 24}" y="372" text-anchor="end" font-size="10.5" fill="#D1D5DB">${e(m.away.name)}</text>
   <line x1="${SOURCE_W / 2}" y1="116" x2="${SOURCE_W / 2}" y2="220" stroke="rgba(255,255,255,0.25)" stroke-width="0.5"/>
@@ -1845,7 +1846,7 @@ function renderTradingCard(event = {}, variant = 'poster', theme = {}, mode = ''
       ]
     : [
         { role: 'league', left: 160, top: 24, size: 42 },
-        { role: 'league', left: 128, top: 132, size: 144 }
+        { role: 'league', left: 110, top: 100, size: 180 }
       ]
   const rings = Array.from({ length: 18 }, (_, i) => `<circle cx="200" cy="280" r="${20 + i * 18}" fill="none" stroke="#f8e08e" stroke-width="0.5"/>`).join('')
   const rays = Array.from({ length: 36 }, (_, i) => `<line x1="200" y1="280" x2="${(200 + Math.cos(i * Math.PI / 18) * 320).toFixed(1)}" y2="${(280 + Math.sin(i * Math.PI / 18) * 320).toFixed(1)}" stroke="#f8e08e" stroke-width="0.3" opacity="0.5"/>`).join('')
@@ -1924,10 +1925,20 @@ function renderBrutalist(event = {}, variant = 'poster', theme = {}, mode = '') 
   const y78 = SOURCE_H * 0.78
   const reg = (x, y) => `<g transform="translate(${x} ${y})" style="mix-blend-mode:difference"><line x1="0" y1="-7" x2="0" y2="7" stroke="white" stroke-width="0.6"/><line x1="-7" y1="0" x2="7" y2="0" stroke="white" stroke-width="0.6"/><circle cx="0" cy="0" r="3" fill="none" stroke="white" stroke-width="0.6"/></g>`
   const slots = m.hasMatchup
-    ? [{ role: 'league', left: SOURCE_W - 98, top: 22, size: 32 }]
+    ? [
+        { role: 'league', left: SOURCE_W - 98, top: 22, size: 32 },
+        // Diagonal-stagger home/away crests — same 124-unit size as the rest
+        // of the family. Brutalist remains type-led but the real club marks
+        // ride the diagonal split: home upper-left of the seam on the home-
+        // colour polygon, away lower-right on the away-colour polygon.
+        { role: 'home', left: 40, top: 80, size: 124 },
+        { role: 'away', left: 236, top: 396, size: 124 }
+      ]
     : [
         { role: 'league', left: SOURCE_W - 98, top: 22, size: 32 },
-        { role: 'league', left: 24, top: 62, size: 48 }
+        // Solo: enlarged centre-mark so single-mark sports (golf, motorsport,
+        // wrestling brands) read at the same dominance as the other templates.
+        { role: 'league', left: 110, top: 210, size: 180 }
       ]
   const middleStrip = m.hasMatchup
     ? `<text class="mono" x="18" y="${SOURCE_H / 2 + 4}" font-size="10" fill="${m.home.primary}" letter-spacing="1.8">* ${e(m.home.short)}</text>
@@ -1988,8 +1999,8 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
   const m = templateData(event, theme, mode)
   const e = escapeXml
   const perfRow = (y) => Array.from({ length: 25 }, (_, i) => 8 + i * 16).filter((x) => x < SOURCE_W).map((x) => `<circle cx="${x}" cy="${y}" r="3.5" fill="#E6DEC9" stroke="rgba(60,40,15,0.35)"/>`).join('')
-  const homeVisual = { x: 108, y: 205, size: 88 }
-  const awayVisual = { x: 292, y: 355, size: 88 }
+  const homeVisual = { x: 92, y: 185, size: 124 }
+  const awayVisual = { x: 308, y: 395, size: 124 }
   const leagueLogoSlot = { x: 24, y: 25, size: 54 }
   const homeInitialSize = m.home.initials.length > 2 ? 25 : 30
   const awayInitialSize = m.away.initials.length > 2 ? 25 : 30
@@ -2021,7 +2032,7 @@ function renderTicketStub(event = {}, variant = 'poster', theme = {}, mode = '')
       ]
     : [
         { role: 'league', left: leagueLogoSlot.x, top: leagueLogoSlot.y, size: leagueLogoSlot.size },
-        { role: 'league', left: 152, top: 154, size: 96 }
+        { role: 'league', left: 110, top: 130, size: 180 }
       ]
   const stubY = SOURCE_H - 100
   const feature = m.hasMatchup
@@ -2144,12 +2155,12 @@ function renderGlitch(event = {}, variant = 'poster', theme = {}, mode = '') {
   const slots = m.hasMatchup
     ? [
         { role: 'league', left: 24, top: 22, size: 34 },
-        { role: 'home', left: 32, top: 430, size: 54 },
-        { role: 'away', left: 314, top: 430, size: 54 }
+        { role: 'home', left: 24, top: 380, size: 124 },
+        { role: 'away', left: 252, top: 380, size: 124 }
       ]
     : [
         { role: 'league', left: 24, top: 22, size: 34 },
-        { role: 'league', left: 310, top: 392, size: 58 }
+        { role: 'league', left: 110, top: 290, size: 180 }
       ]
   const corners = [[14, 14, 0], [SOURCE_W - 14, 14, 90], [14, SOURCE_H - 14, 270], [SOURCE_W - 14, SOURCE_H - 14, 180]].map(([x, y, r]) => `<g transform="translate(${x} ${y}) rotate(${r})"><path d="M-12 -6 L-12 -12 L-6 -12" stroke="#ff0044" stroke-width="1.2" fill="none"/><path d="M-11 -5 L-11 -11 L-5 -11" stroke="#00d9ff" stroke-width="1" fill="none" opacity="0.7"/></g>`).join('')
   // Audit fix (contract bug 3 / glitch): prefer source m.eventTitle so
