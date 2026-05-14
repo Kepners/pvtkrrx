@@ -1684,6 +1684,21 @@
       color: #cfeaf5;
     }
 
+    .seedbox-url-role-panel {
+      display: block;
+      text-align: left;
+      margin: 0.1rem 0 1rem;
+      padding: 0.72rem 0.85rem;
+      border-radius: 8px;
+      border: 1px solid rgba(0, 246, 255, 0.24);
+      background: rgba(0, 246, 255, 0.08);
+      color: #cce6ff;
+      font-family: 'IBM Plex Mono', monospace;
+      font-size: 0.72rem;
+      line-height: 1.5;
+      letter-spacing: 0.35px;
+    }
+
     .provider-preset-panel {
       margin: -0.2rem 0 0.9rem;
       padding: 0.95rem;
@@ -2752,14 +2767,15 @@
         <button type="button" class="service-tab" data-service-tab="options" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('options')">Settings</button>
       </div>
       <p class="hint" id="serviceTabHint">Prowlarr settings are open.</p>
+      <div class="seedbox-url-role-panel mode-hidden" id="seedboxUrlRolePanel">Remote Seedbox URL roles: Prowlarr and qBittorrent are backend service URLs, not the public PVTKRRX install URL. The public addon origin belongs to the server/domain setup.</div>
 
       <div class="service-card active" id="serviceCard-prowlarr" data-service-visible="pc lan seedbox">
         <h2>Prowlarr</h2>
-        <label for="jackettUrl">Prowlarr Base URL</label>
-        <input type="url" id="jackettUrl" placeholder="http://localhost:9696">
+        <label for="jackettUrl" id="jackettUrlLabel">Prowlarr URL</label>
+        <input type="url" id="jackettUrl" placeholder="http://127.0.0.1:9696">
         <p class="backend-host-static-hint" id="jackettUrlStaticHint">Same-host setups use <code>http://127.0.0.1:9696</code>. Put the reachable URL here if Prowlarr runs on a different seedbox or VPS (for example <code>http://seedbox.example.com:9696</code>).</p>
         <p class="backend-host-note" id="jackettBackendNote" hidden></p>
-        <p class="hint">Paste the base URL only. Legacy Torznab/API URLs are auto-normalized.</p>
+        <p class="hint" id="jackettUrlFormatHint">Paste the Prowlarr service root only. Legacy Torznab/API URLs are auto-normalized.</p>
         <label for="jackettApiKey">API Key</label>
         <input type="text" id="jackettApiKey" placeholder="Your Prowlarr API key">
         <div class="service-launch-actions">
@@ -2770,8 +2786,8 @@
 
       <div class="service-card" id="serviceCard-qbit" data-service-visible="pc lan seedbox">
         <h2>qBittorrent</h2>
-        <label for="qbitUrl">WebUI URL</label>
-        <input type="url" id="qbitUrl" placeholder="https://qbit.example.com:8080">
+        <label for="qbitUrl" id="qbitUrlLabel">qBittorrent WebUI URL</label>
+        <input type="url" id="qbitUrl" placeholder="http://127.0.0.1:8080">
         <p class="backend-host-static-hint" id="qbitUrlStaticHint">Same-host setups use <code>http://127.0.0.1:8080</code>. Put the reachable URL here if qBittorrent runs on a different seedbox or VPS.</p>
         <p class="backend-host-note" id="qbitBackendNote" hidden></p>
         <div class="row">
@@ -2855,9 +2871,10 @@
             <a class="secondary-link" href="/runbooks" target="_blank" rel="noopener">Open Full Runbooks</a>
           </div>
         </div>
-        <label for="fileServerUrl">Public File Server URL</label>
+        <label for="fileServerUrl" id="fileServerUrlLabel">Public File Server URL</label>
         <input type="url" id="fileServerUrl" placeholder="https://username.seedbox.com/files">
         <p class="backend-host-note" id="fileServerBackendNote" hidden></p>
+        <p class="backend-host-static-hint" id="fileServerUrlStaticHint">Hosted Remote Seedbox needs a public HTTPS completed-file URL. Self-hosted server mode can leave this empty when this server reads and serves qBittorrent files itself.</p>
         <label for="fileServerAuth">Basic Auth (optional)</label>
         <input type="text" id="fileServerAuth" placeholder="user:password">
         <p class="hint">Leave empty if no authentication required.</p>
@@ -3672,6 +3689,73 @@
       return providers[key] || providers[providerCatalog.defaultId] || providers.custom || fallbackProvider;
     }
 
+    function setTextById(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.textContent = value;
+    }
+
+    function setPlaceholderById(id, value) {
+      const el = document.getElementById(id);
+      if (el) el.placeholder = value;
+    }
+
+    function syncConnectionFieldCopy() {
+      const target = getInstallTarget();
+      const selfHosted = isSelfHostedServerRuntime();
+      const seedboxSelected = target === 'seedbox';
+      const providerId = document.getElementById('provider')?.value;
+      const preset = getProviderPreset(providerId);
+      const rolePanel = document.getElementById('seedboxUrlRolePanel');
+
+      if (rolePanel) {
+        rolePanel.classList.toggle('mode-hidden', !seedboxSelected);
+        if (seedboxSelected && selfHosted) {
+          rolePanel.textContent = 'Self-hosted Seedbox uses this server as the runtime. Prowlarr and qBittorrent URLs are backend service addresses this server can reach, so 127.0.0.1 is correct when those apps run on this same seedbox or VPS. The public PVTKRRX/Stremio install URL is the server origin, not one of these fields.';
+        } else if (seedboxSelected) {
+          rolePanel.textContent = 'Hosted Remote Seedbox uses the official relay. Prowlarr, qBittorrent, and File Server URLs must be public HTTPS endpoints on your seedbox that www.pvtkrrx.cc can reach. Do not use localhost, 127.0.0.1, LAN IPs, raw internal app ports, or the PVTKRRX install URL here.';
+        }
+      }
+
+      if (seedboxSelected && selfHosted) {
+        setTextById('jackettUrlLabel', 'Prowlarr URL on this seedbox');
+        setTextById('qbitUrlLabel', 'qBittorrent URL on this seedbox');
+        setTextById('fileServerUrlLabel', 'External file server URL (optional)');
+        setTextById('jackettUrlStaticHint', 'Use http://127.0.0.1:9696 when Prowlarr runs on this same seedbox or VPS. Use a different hostname only when this PVTKRRX server must reach Prowlarr somewhere else.');
+        setTextById('qbitUrlStaticHint', 'Use http://127.0.0.1:8080 when qBittorrent runs on this same seedbox or VPS. Use your provider/internal hostname only when qBittorrent lives outside this PVTKRRX runtime.');
+        setTextById('fileServerUrlStaticHint', 'Leave this empty when this server can read qBittorrent files and serve built-in /file or /playback itself. Fill it only when completed files should come from a separate public file URL.');
+        setTextById('jackettUrlFormatHint', 'Paste the Prowlarr service root only. Do not paste the public PVTKRRX addon/install URL here. Legacy Torznab/API URLs are auto-normalized.');
+        setPlaceholderById('jackettUrl', 'http://127.0.0.1:9696');
+        setPlaceholderById('qbitUrl', 'http://127.0.0.1:8080');
+        setPlaceholderById('fileServerUrl', 'https://files.example.com/media');
+        return;
+      }
+
+      if (seedboxSelected) {
+        setTextById('jackettUrlLabel', 'Public Prowlarr URL');
+        setTextById('qbitUrlLabel', 'Public qBittorrent URL');
+        setTextById('fileServerUrlLabel', 'Public completed-file URL');
+        setTextById('jackettUrlStaticHint', 'Use the public HTTPS Prowlarr URL exposed by your seedbox provider. Hosted Remote Seedbox cannot use localhost, private LAN hosts, or the PVTKRRX install URL for this field.');
+        setTextById('qbitUrlStaticHint', 'Use the public HTTPS qBittorrent WebUI URL exposed by your seedbox provider. Include the full app path if your provider mounts qBittorrent below the root.');
+        setTextById('fileServerUrlStaticHint', 'Required for hosted Remote Seedbox completed-file playback. Point this at the public HTTPS web root that reaches the same files qBittorrent saves.');
+        setTextById('jackettUrlFormatHint', 'Paste the Prowlarr service root only. Legacy Torznab/API URLs are auto-normalized.');
+        setPlaceholderById('jackettUrl', preset?.preset?.prowlarrPlaceholder || fallbackProvider.preset.prowlarrPlaceholder);
+        setPlaceholderById('qbitUrl', preset?.preset?.qbitPlaceholder || fallbackProvider.preset.qbitPlaceholder);
+        setPlaceholderById('fileServerUrl', preset?.preset?.fileServerPlaceholder || fallbackProvider.preset.fileServerPlaceholder);
+        return;
+      }
+
+      setTextById('jackettUrlLabel', target === 'pc' ? 'Prowlarr URL on this PC' : 'Prowlarr URL on the Windows host');
+      setTextById('qbitUrlLabel', target === 'pc' ? 'qBittorrent URL on this PC' : 'qBittorrent URL on the Windows host');
+      setTextById('fileServerUrlLabel', 'Public file server URL (optional fallback)');
+      setTextById('jackettUrlStaticHint', 'Use http://127.0.0.1:9696 when Prowlarr runs on the Windows host. Use another reachable URL only if this runtime can actually reach Prowlarr somewhere else.');
+      setTextById('qbitUrlStaticHint', 'Use http://127.0.0.1:8080 when qBittorrent runs on the Windows host. Use another reachable URL only if this runtime can actually reach qBittorrent somewhere else.');
+      setTextById('fileServerUrlStaticHint', 'Optional fallback for completed files when you intentionally expose them through a separate public HTTPS file server.');
+      setTextById('jackettUrlFormatHint', 'Paste the Prowlarr service root only. Legacy Torznab/API URLs are auto-normalized.');
+      setPlaceholderById('jackettUrl', 'http://127.0.0.1:9696');
+      setPlaceholderById('qbitUrl', 'http://127.0.0.1:8080');
+      setPlaceholderById('fileServerUrl', 'https://files.example.com/media');
+    }
+
     function getProviderField(preset, label) {
       return (preset?.fields || []).find((field) => field && field.label === label) || null;
     }
@@ -3747,6 +3831,7 @@
         prowlarrInput.placeholder = preset.preset.prowlarrPlaceholder;
       }
       renderProviderPresetInfo(providerId);
+      syncConnectionFieldCopy();
     }
 
     function normalizeLocalHostname(raw) {
@@ -5590,6 +5675,7 @@
         }
       }
 
+      syncConnectionFieldCopy();
       const localInstall = document.getElementById('localInstall');
       const hostedInstall = document.getElementById('hostedInstall');
       const pcPanel = document.getElementById('installPanelPc');
@@ -5868,10 +5954,10 @@
       lanPair.required = false;
       if (!lanPair.relayUrl) lanPair.relayUrl = resolveDefaultRelayBaseUrl();
       if (!document.getElementById('jackettUrl').value.trim()) {
-        document.getElementById('jackettUrl').value = 'http://localhost:9696';
+        document.getElementById('jackettUrl').value = 'http://127.0.0.1:9696';
       }
       if (!document.getElementById('qbitUrl').value.trim()) {
-        document.getElementById('qbitUrl').value = 'http://localhost:8080';
+        document.getElementById('qbitUrl').value = 'http://127.0.0.1:8080';
       }
       document.getElementById('provider').value = 'custom';
       document.getElementById('fileServerUrl').value = '';
@@ -6036,9 +6122,12 @@
       }
 
       if (selfHosted) {
+        const isLoopback = host === 'localhost' || host === '127.0.0.1' || host === '::1';
         return {
-          tone: 'separate-host',
-          message: `${label} uses ${host}. This is only valid if ${label} runs on this same server as PVTKRRX. If ${label} runs on a different seedbox or VPS, replace ${host} with the hostname PVTKRRX can reach from this server.`
+          tone: 'same-host',
+          message: isLoopback
+            ? `${label} uses ${host}. That is correct when ${label} runs on this same seedbox or VPS as PVTKRRX. This is a backend service URL, not the public PVTKRRX/Stremio install URL.`
+            : `${label} uses private host ${host}. Self-hosted Seedbox can use private backend URLs after server password access, but the PVTKRRX server itself must be able to reach that host.`
         };
       }
 

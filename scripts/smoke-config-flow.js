@@ -324,9 +324,14 @@ async function run() {
       /SportsMeta service owns sports metadata and artwork[\s\S]*PVTKRRX is the Stremio-facing frontend and consumes that output as presentation enrichment/i,
       'configure page should explain the SportsMeta-owned sports metadata/artwork boundary'
     )
-    assert.doesNotMatch(configureHtml, /Prowlarr Base URL\s*-\s*<code>http:\/\/localhost:9696<\/code>/i, 'configure page should not present localhost as the default Remote Seedbox truth')
-    assert.match(configureHtml, /Same-host setups use <code>http:\/\/127\.0\.0\.1:9696<\/code>\. Put the reachable URL here if Prowlarr runs on a different seedbox or VPS/i, 'configure page should explain when loopback is valid for Prowlarr')
-    assert.match(configureHtml, /Same-host setups use <code>http:\/\/127\.0\.0\.1:8080<\/code>\. Put the reachable URL here if qBittorrent runs on a different seedbox or VPS/i, 'configure page should explain when loopback is valid for qBittorrent')
+    assert.doesNotMatch(configureHtml, /<label for="jackettUrl"[^>]*>\s*Prowlarr Base URL\s*<\/label>/i, 'configure page should not label Prowlarr as a generic Base URL')
+    assert.match(configureHtml, /id="seedboxUrlRolePanel"/, 'configure page should render Seedbox URL role guidance')
+    assert.match(configureHtml, /Self-hosted Seedbox uses this server as the runtime[\s\S]*The public PVTKRRX\/Stremio install URL is the server origin, not one of these fields/i, 'configure page should separate self-host backend URLs from the public install origin')
+    assert.match(configureHtml, /Hosted Remote Seedbox uses the official relay[\s\S]*Do not use localhost, 127\.0\.0\.1, LAN IPs, raw internal app ports, or the PVTKRRX install URL here/i, 'configure page should explain hosted Seedbox public URL requirements')
+    assert.match(configureHtml, /Prowlarr URL on this seedbox/i, 'configure page should include a self-host Seedbox-specific Prowlarr label')
+    assert.match(configureHtml, /qBittorrent URL on this seedbox/i, 'configure page should include a self-host Seedbox-specific qBittorrent label')
+    assert.match(configureHtml, /Use the public HTTPS Prowlarr URL exposed by your seedbox provider/i, 'configure page should include hosted Seedbox Prowlarr guidance')
+    assert.match(configureHtml, /Use the public HTTPS qBittorrent WebUI URL exposed by your seedbox provider/i, 'configure page should include hosted Seedbox qBittorrent guidance')
     assert.match(configureHtml, /That looks like this PC's local .*Remote Seedbox through the hosted relay needs a public URL/i, 'configure page should warn about stale PC-local values on the Remote Seedbox route')
 
     const versionStatusRes = await fetch(`${base}/version-status.json`)

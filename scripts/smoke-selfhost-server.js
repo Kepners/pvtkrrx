@@ -203,6 +203,9 @@ async function run() {
     assert.match(configureRes.text, /This page is the server app\./i)
     assert.match(configureRes.text, /Generate Server Install (URL|Link)/)
     assert.match(configureRes.text, /Remote Seedbox is the only route in self-hosted server mode/i)
+    assert.match(configureRes.text, /Prowlarr URL on this seedbox/i, 'self-host configure page should use Seedbox-specific Prowlarr wording')
+    assert.match(configureRes.text, /That is correct when .* runs on this same seedbox or VPS as PVTKRRX/i, 'self-host configure page should treat localhost service URLs as same-box backend URLs')
+    assert.match(configureRes.text, /The public PVTKRRX\/Stremio install URL is the server origin, not one of these fields/i, 'self-host configure page should separate backend service URLs from the public install origin')
 
     const bootstrapManifestRes = await request(
       port,
