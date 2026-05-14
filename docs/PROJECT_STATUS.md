@@ -4,9 +4,9 @@ Updated: 2026-05-14
 
 ## Current Stage
 
-PVTKRRX is preparing the synchronized `1.1.67` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The current release priority is the Windows installer finish-path repair plus the Contabo `/selfhost/*` route split so the self-host manifest works with and without `www`.
+PVTKRRX is preparing the synchronized `1.1.68` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The current release priority is the Windows installer finish-path repair plus the Contabo `/selfhost/*` route split so the self-host manifest works with and without `www`.
 
-## 2026-05-14: v1.1.67 installer finish-path and self-host route repair
+## 2026-05-14: v1.1.68 installer finish-path and self-host route repair
 
 - Reproduced the live Stremio install failure for `https://www.pvtkrrx.cc/selfhost/manifest.json`: Caddy sent `/selfhost/*` to the public Coolify app, which treated `selfhost` as a config token and returned `400 Invalid config token`.
 - Fixed the Contabo Caddy route so `https://www.pvtkrrx.cc/selfhost/*` and `https://pvtkrrx.cc/selfhost/*` proxy to the native `/opt/pvtkrrx` systemd runtime on port `7000`, while non-selfhost apex traffic still redirects to `https://www.pvtkrrx.cc`.
