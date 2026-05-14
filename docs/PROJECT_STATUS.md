@@ -1,10 +1,19 @@
 # PVTKRRX Project Status
 
-Updated: 2026-04-30
+Updated: 2026-05-14
 
 ## Current Stage
 
-PVTKRRX is on the synchronized `1.1.63` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The self-host Stremio install route uses the dedicated manifest id `com.kepners.pvtkrrx.selfhost`, so it no longer collides with hosted Remote Seedbox token installs.
+PVTKRRX is preparing the synchronized `1.1.67` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The current release priority is the Windows installer finish-path repair plus the Contabo `/selfhost/*` route split so the self-host manifest works with and without `www`.
+
+## 2026-05-14: v1.1.67 installer finish-path and self-host route repair
+
+- Reproduced the live Stremio install failure for `https://www.pvtkrrx.cc/selfhost/manifest.json`: Caddy sent `/selfhost/*` to the public Coolify app, which treated `selfhost` as a config token and returned `400 Invalid config token`.
+- Fixed the Contabo Caddy route so `https://www.pvtkrrx.cc/selfhost/*` and `https://pvtkrrx.cc/selfhost/*` proxy to the native `/opt/pvtkrrx` systemd runtime on port `7000`, while non-selfhost apex traffic still redirects to `https://www.pvtkrrx.cc`.
+- Proved the installer hang source locally: NSIS `customInstall` synchronously executed the installed Electron app with `--pvtkrrx-network-access-only`, so slow firewall/Bonjour PowerShell checks could hold the setup progress bar near the end.
+- Moved LAN access checks out of the blocking NSIS install phase. The desktop first-launch provisioning path remains responsible for firewall/Bonjour checks and elevated repair.
+- Added a Windows installer guard that fails if the NSIS install phase synchronously runs `$appExe` again, if `--pvtkrrx-network-access-only` returns to the installer script, or if release surfaces contain PCNESTSPEAKER/user-path/private-host markers.
+- Local proof passed: `npm run smoke:win-installer-path`, `npm run smoke:desktop`, `npm run smoke:parity`, `npm run smoke:guards`, `npm run smoke:config`, `npm run smoke:selfhost`, and `npm run dist:win`.
 
 ## 2026-04-30: v1.1.63 sport-level 4K backdrops and SportsCult category contract
 
