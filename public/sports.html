@@ -316,18 +316,11 @@
     }
 
     .hero-showcase {
-      width: min(100%, 920px);
+      width: min(100%, clamp(120px, 12vw, 180px));
       margin-top: 26px;
-      display: grid;
-      /* Single column 2026-05-13: previously a two-column layout with the
-         Formula 1 backdrop JPG on the left and the rotating poster carousel
-         on the right. The JPG visually bled into the poster card, so the
-         backdrop element was removed. 4K backdrop samples still live in the
-         gallery section below. */
-      grid-template-columns: minmax(0, 1fr);
-      gap: 14px;
-      align-items: stretch;
-      max-height: clamp(260px, 36vh, 380px);
+      display: block;
+      /* Compact teaser card. The 600x900 poster is a sample, not the
+         centerpiece — keep it small so it doesn't dominate the hero. */
     }
 
     .hero-posters {
@@ -336,26 +329,26 @@
       background: rgba(4, 8, 18, 0.72);
       overflow: hidden;
       box-shadow: 0 0 24px rgba(0, 168, 255, 0.18);
+      width: 100%;
+      aspect-ratio: 2 / 3;
       min-height: 0;
     }
 
     .hero-posters {
       display: grid;
       grid-template-columns: 1fr;
-      grid-template-rows: 1fr;
-      padding: 12px;
-      align-items: stretch;
-      justify-items: stretch;
+      grid-template-rows: minmax(0, 1fr);
+      padding: 10px;
+      place-items: center;
     }
 
     .hero-posters img {
+      display: block;
       grid-area: 1 / 1;
       width: 100%;
       height: 100%;
-      /* contain keeps the 600x900 aspect ratio without forcing the panel
-         to grow taller than its parent — letterboxes if the column is
-         wider than 2/3 of its height, which is what we want here so the
-         poster stays fully visible within the showcase max-height. */
+      max-width: 100%;
+      max-height: 100%;
       object-fit: contain;
       border-radius: 6px;
       background: #040812;
@@ -1123,7 +1116,7 @@
       }
 
       .hero-showcase {
-        grid-template-columns: 1fr;
+        width: min(100%, 170px);
       }
 
       .hero {
@@ -1175,12 +1168,13 @@
       }
 
       .hero-showcase {
-        gap: 10px;
+        width: min(100%, 150px);
         margin-top: 18px;
       }
 
       .hero-posters {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: 1fr;
+        padding: 8px;
       }
 
       .hero::before {

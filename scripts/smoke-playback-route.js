@@ -279,6 +279,9 @@ async function run() {
   const inferredPayload = buildTorrentPayload([
     { path: file.name, length: payload.length }
   ])
+  const legacyAviPayload = buildTorrentPayload([
+    { path: 'Legacy/Movie.Name.2026.DVDRip.XviD.avi', length: 900_000_000 }
+  ])
   const inferredHash = String(inspectTorrentPayload(inferredPayload).infoHash || '').toLowerCase()
   const inferredTorrent = {
     ...torrent,
@@ -341,6 +344,9 @@ async function run() {
     if (/existing-without-hash\.torrent/i.test(String(url || ''))) {
       return createFetchResponse(inferredPayload)
     }
+    if (/legacy-avi\.torrent/i.test(String(url || ''))) {
+      return createFetchResponse(legacyAviPayload)
+    }
     throw new Error(`unexpected fetch ${String(url || '')}`)
   }
 
@@ -370,6 +376,7 @@ async function run() {
     const playbackToken = encodePlaybackStateToken({ h: hash })
     const incompletePlaybackToken = encodePlaybackStateToken({ h: incompleteHash })
     const inferredPlaybackToken = encodePlaybackStateToken({ h: '', l: 'https://tracker.example/existing-without-hash.torrent' })
+    const legacyAviPlaybackToken = encodePlaybackStateToken({ h: '', l: 'https://tracker.example/legacy-avi.torrent' })
     const packedPlaybackToken = encodePlaybackStateToken({ h: packedHash })
     const readyPackedPlaybackToken = encodePlaybackStateToken({ h: readyPackedHash })
     const targetedPlaybackToken = encodePlaybackStateToken({ h: targetedHash, p: targetedFiles[1].name })
@@ -389,6 +396,10 @@ async function run() {
     const inferredFileResponse = await request(server.address().port, String(inferredResponse.headers.location || ''))
     assert.equal(inferredFileResponse.status, 200, 'recovered existing torrent should still redirect into the shared file route')
     assert.equal(inferredFileResponse.text, payload.toString('utf8'))
+
+    const legacyAviResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(legacyAviPlaybackToken)}`)
+    assert.equal(legacyAviResponse.status, 422, 'AVI-only tracker playback should fail fast before qBit queueing instead of handing Stremio a source that never starts')
+    assert.match(String(legacyAviResponse.text || ''), /Legacy AVI\/XviD source detected/i)
 
     const incompleteResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(incompletePlaybackToken)}`)
     assert.equal(incompleteResponse.status, 302, 'incomplete playback should redirect into the shared file route instead of timing out inside /playback')
