@@ -231,10 +231,10 @@ Never push to a different branch expecting the live site to update.
 
 | Runtime | What it is | What it serves | How to update |
 |---|---|---|---|
-| **Coolify Docker container** `w14jewmw5ubscrxh8zzfhq7d-...` (image tag = source commit) | The PUBLIC website | `https://www.pvtkrrx.cc/` (Caddy → `pvtkrrx:3000`) | Push to GitHub `main`, Coolify auto-rebuilds (`COOLIFY_BRANCH=main`). Trigger via Coolify UI at `https://coolify.buildsales.homes` resource UUID `w14jewmw5ubscrxh8zzfhq7d` |
-| **systemd `pvtkrrx.service`** (`/opt/pvtkrrx/index.js`, port 7000) | Native self-host runtime | NOT public — hits to host port 7000 only (e.g. local LAN, `127.0.0.1:7000`) | rsync source over SSH alias `contabo`, update `/opt/pvtkrrx/REVISION`, `systemctl restart pvtkrrx.service` |
+| **Coolify Docker container** `w14jewmw5ubscrxh8zzfhq7d-...` (image tag = source commit) | The PUBLIC website | `https://www.pvtkrrx.cc/` except `/selfhost/*` (Caddy → `pvtkrrx:3000`) | Push to GitHub `main`, Coolify auto-rebuilds (`COOLIFY_BRANCH=main`). Trigger via Coolify UI at `https://coolify.buildsales.homes` resource UUID `w14jewmw5ubscrxh8zzfhq7d` |
+| **systemd `pvtkrrx.service`** (`/opt/pvtkrrx/index.js`, port 7000) | Native self-host runtime | `https://www.pvtkrrx.cc/selfhost/*`, `https://pvtkrrx.cc/selfhost/*`, `https://pvt.kepners.co.uk/*`, and host port 7000 | rsync source over SSH alias `contabo`, update `/opt/pvtkrrx/REVISION`, `systemctl restart pvtkrrx.service` |
 
-**Caddy config** (in container `caddy:2-alpine`, file `/etc/caddy/apps-enabled/pvtkrrx.cc.caddy`): `pvtkrrx.cc, www.pvtkrrx.cc { reverse_proxy pvtkrrx:3000 }`. Only the Coolify container is reachable as `pvtkrrx:3000` on the docker network.
+**Caddy config** (in container `caddy:2-alpine`, file `/etc/caddy/apps-enabled/pvtkrrx.cc.caddy`): `pvtkrrx.cc, www.pvtkrrx.cc` normally routes to Coolify alias `pvtkrrx:3000`, but `/selfhost` and `/selfhost/*` route to `host.docker.internal:7000` so the stable self-host manifest works with and without `www`. The non-selfhost apex path still redirects to `https://www.pvtkrrx.cc{uri}`.
 
 **Updating the systemd service does NOT change what real users see.** The native systemd runtime is for self-host installs / LAN bridge / desktop heartbeat use only. Real-user broadcast posters etc. all come from the Coolify container.
 

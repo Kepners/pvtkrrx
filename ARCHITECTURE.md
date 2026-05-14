@@ -12,7 +12,7 @@ Updated: 2026-04-24
 
 PVTKRRX is one addon system with a hosted relay, a local runtime, and a Windows desktop wrapper.
 
-Current Contabo note: `www.pvtkrrx.cc` is presently served through Caddy into the Coolify-hosted `pvtkrrx` app container. A separate `/opt/pvtkrrx` `systemd` runtime can exist on the same host for self-host/manual use, but it is not the public route unless Caddy is repointed.
+Current Contabo note: `www.pvtkrrx.cc` is presently served through Caddy into the Coolify-hosted `pvtkrrx` app container for the public website and hosted relay, except `/selfhost/*`, which is routed to the host-level `/opt/pvtkrrx` `systemd` runtime on port `7000`. The apex host `pvtkrrx.cc` still redirects to `www` for normal public paths, but `/selfhost/*` is also routed directly to the systemd runtime so the stable self-host manifest works with and without `www`.
 
 ```text
 Stremio client
@@ -28,7 +28,7 @@ Stremio client
    |
    +-- LAN Bridge / Remote Seedbox ----------> Hosted relay (https://www.pvtkrrx.cc)
                                              - Contabo Caddy -> live Express runtime
-                                             - current public target: Coolify alias pvtkrrx:3000
+                                             - current public target: Coolify alias pvtkrrx:3000 except /selfhost/*
                                              - hosted manifests/config tokens
                                              - pair heartbeat/status
                                              - Stremio account link
@@ -39,7 +39,7 @@ Stremio client
                                                        or
                                                        +--> uses public remote playback path
 
-Self-hosted server mode uses the same Express runtime on a VPS/seedbox, but with `PVTKRRX_SELF_HOST_MODE=true` so the server can persist a disk-backed config, expose a stable `/selfhost/manifest.json?mode=hosted`, and accept authenticated private/localhost service URLs from the configure page.
+Self-hosted server mode uses the same Express runtime on a VPS/seedbox, but with `PVTKRRX_SELF_HOST_MODE=true` so the server can persist a disk-backed config, expose a stable `/selfhost/manifest.json?mode=hosted`, and accept authenticated private/localhost service URLs from the configure page. On Contabo, Caddy routes `www.pvtkrrx.cc/selfhost/*` and `pvtkrrx.cc/selfhost/*` to this systemd runtime.
 ```
 
 ## SportsMeta Boundary

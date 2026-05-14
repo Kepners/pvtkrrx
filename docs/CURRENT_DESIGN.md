@@ -151,9 +151,10 @@ Verified on 2026-04-08:
 
 Contabo runtime note:
 
-- `www.pvtkrrx.cc` currently reaches the Coolify-hosted `pvtkrrx` app container through Caddy.
-- A separate host-level `pvtkrrx.service` runtime can also run from `/opt/pvtkrrx` on port `7000`.
-- Treat those as separate runtimes until the reverse proxy target is deliberately changed.
+- `www.pvtkrrx.cc` currently reaches the Coolify-hosted `pvtkrrx` app container through Caddy for normal public website and hosted relay paths.
+- `www.pvtkrrx.cc/selfhost/*` and `pvtkrrx.cc/selfhost/*` deliberately route through Caddy to the host-level `pvtkrrx.service` runtime at `/opt/pvtkrrx` on port `7000`, so the stable self-host manifest works with and without `www`.
+- `pvtkrrx.cc` still redirects to `https://www.pvtkrrx.cc` for non-selfhost public paths.
+- Treat the Coolify runtime and the host-level systemd runtime as separate runtimes unless the reverse proxy target is deliberately changed again.
 - Verified on 2026-04-08: the live Coolify app now bind-mounts the whole hosted runtime root from `/opt/pvtkrrx/runtime` into `/root/.local/share/PVTKRRX/runtime`, so hosted runtime JSON/config state survives container replacement instead of living only in the container layer.
 - Legacy hosted `sports-image-cache/` persistence notes are historical only; the live sports metadata/artwork path now depends on SportsMeta rather than a PVTKRRX-owned image cache.
 
