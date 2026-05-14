@@ -1139,8 +1139,7 @@ function renderBroadcastSoloTitle(title, e) {
 function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') {
   // Audit fix G2: rewritten to match the canonical 02-broadcast direction —
   // diagonal team-colour halves, chrome VS centrepiece, stroked corner
-  // initials, lower-third HOME/AWAY panel. Source-of-truth template lives at
-  // C:/Users/kepne/projects/L - PVTKRRX/PCnestspeaker/python-templates/02-broadcast/generate.py
+  // initials, lower-third HOME/AWAY panel.
   // Scaled from canonical 400x600 to PVTKRRX 600x900 (1.5x).
   const m = templateData(event, theme, mode)
   const e = escapeXml
