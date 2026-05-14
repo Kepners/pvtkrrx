@@ -88,6 +88,68 @@ const SPORTS_IDENTITY_PASS_BUDGET_MS = Math.max(
 )
 const DEBUG_SPORTS_RESOLUTION = /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_DEBUG_SPORTS_RESOLUTION || '').trim())
 
+function formatCatalogSportLabel(value) {
+  const normalized = String(value || '').trim().toLowerCase()
+  if (!normalized) return ''
+  const labels = {
+    'american-football': 'American Football',
+    basketball: 'Basketball',
+    baseball: 'Baseball',
+    boxing: 'Boxing',
+    cricket: 'Cricket',
+    cycling: 'Cycling',
+    darts: 'Darts',
+    football: 'Football',
+    golf: 'Golf',
+    hockey: 'Hockey',
+    mma: 'MMA',
+    motorsport: 'Motorsport',
+    rugby: 'Rugby',
+    snooker: 'Snooker',
+    tennis: 'Tennis',
+    wrestling: 'Wrestling'
+  }
+  return labels[normalized] || normalized
+    .split(/[\s-]+/)
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(' ')
+}
+
+function pushUniqueCatalogLine(lines, value) {
+  const text = String(value || '').trim()
+  if (!text) return
+  if (!lines.some((line) => line.toLowerCase() === text.toLowerCase())) lines.push(text)
+}
+
+function buildSportsCatalogDescription(input = {}) {
+  const lines = []
+  const sport = formatCatalogSportLabel(input.sportHint || input.sport)
+  const league = String(input.league || '').trim()
+  const title = String(input.eventTitle || input.title || '').trim()
+  const detail = String(input.eventDetail || '').trim()
+  const date = String(input.date || '').trim()
+  const homeTeam = String(input.homeTeam || '').trim()
+  const awayTeam = String(input.awayTeam || '').trim()
+  const availability = []
+
+  if (sport) pushUniqueCatalogLine(lines, `Sport: ${sport}`)
+  if (league) pushUniqueCatalogLine(lines, `League: ${league}`)
+  if (title) pushUniqueCatalogLine(lines, `Event: ${title}`)
+  if (detail) pushUniqueCatalogLine(lines, `Session: ${detail}`)
+  if (date) pushUniqueCatalogLine(lines, `Date: ${date}`)
+  if (homeTeam && awayTeam) pushUniqueCatalogLine(lines, `Teams: ${homeTeam} vs ${awayTeam}`)
+  if (Number(input.seeders) > 0) availability.push(`${Number(input.seeders)} seeders`)
+  if (input.size) availability.push(String(input.size).trim())
+  if (Number(input.sourceCount) > 0) {
+    const count = Number(input.sourceCount)
+    availability.push(`${count} source${count === 1 ? '' : 's'}`)
+  }
+  if (availability.length > 0) pushUniqueCatalogLine(lines, `Availability: ${availability.join(' | ')}`)
+  if (input.indexer) pushUniqueCatalogLine(lines, `Indexer: ${input.indexer}`)
+  return lines
+}
+
 function redactArtworkUrl(value) {
   return String(value || '')
     .replace(/\/member\/([^/?#]+)\/asset\//i, '/member/[redacted]/asset/')
@@ -1274,6 +1336,19 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     ]
     if (eventDate) descriptionParts.push(eventDate)
     if (league) descriptionParts.push(league)
+    const descriptionLines = buildSportsCatalogDescription({
+      sportHint: resolvedSportHint || normalizedSportsEvent.sport,
+      league: normalizedSportsEvent.competition || league,
+      eventTitle: normalizedSportsEvent.eventTitle || displayTitle,
+      eventDetail: normalizedSportsEvent.eventDetail || '',
+      date: normalizedSportsEvent.date || eventDate,
+      homeTeam: normalizedSportsEvent.homeTeam || fallbackHomeTeam,
+      awayTeam: normalizedSportsEvent.awayTeam || fallbackAwayTeam,
+      seeders: availability.seeders,
+      size: formatSize(availability.size),
+      sourceCount: group.availabilityCount,
+      indexer: availability?.trackerSource?.indexer || availability?.indexer || ''
+    })
 
     const carriedEventClass = availability.eventClass || availability.sportsProfile?.event_class || ''
     const classifiedArtworkEventClass = classifySportsEvent({
@@ -1323,7 +1398,16 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     console.log(
       `[sports-artwork-select] id="${sportsMetaResolution?.canonicalId || 'fallback'}" selectedArtworkSource=${posterResolved.selectedArtworkSource || ''} layoutFamily=${posterResolved.layoutFamily || ''} posterUrl="${redactArtworkUrl(posterUrl)}" backdropUrl="${redactArtworkUrl(landscapeUrl || backgroundUrl)}" fallbackReason="${sportsMetaResolution?.reason || ''}"`
     )
-    const availabilityAnchorKey = setSportsAvailabilityAnchor(availability.trackerSource || availability)
+    const availabilityAnchorKey = setSportsAvailabilityAnchor({
+      ...(availability.trackerSource || availability),
+      sourceCount: group.availabilityCount,
+      eventDate,
+      league,
+      sportHint: resolvedSportHint || normalizedSportsEvent.sport,
+      homeTeam: normalizedSportsEvent.homeTeam || fallbackHomeTeam,
+      awayTeam: normalizedSportsEvent.awayTeam || fallbackAwayTeam,
+      title: availability?.trackerSource?.title || availability?.title || displayTitle
+    })
     const canonicalCatalogId = String(sportsMetaResolution?.canonicalId || '').trim()
     if (
       sportsMetaResolution.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED &&
@@ -1366,7 +1450,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
           }),
       type: mediaType,
       name: displayTitle,
-      description: descriptionParts.join(' | '),
+      description: descriptionLines.join('\n') || descriptionParts.join(' | '),
       poster: catalogPosterUrl,
       background: landscapeUrl || backgroundUrl || undefined,
       logo: logoUrl || undefined,

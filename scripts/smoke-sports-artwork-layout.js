@@ -604,6 +604,16 @@ async function assertTeamBadgeArtworkProxy() {
     global.fetch = async (input) => {
       const url = new URL(String(input))
       if (
+        url.hostname === 'a.espncdn.com' ||
+        url.hostname === 'r2.thesportsdb.com' ||
+        url.hostname === 'www.thesportsdb.com'
+      ) {
+        return new Response(await teamBadgePng('#0f172a', '#38bdf8'), {
+          status: 200,
+          headers: { 'content-type': 'image/png' }
+        })
+      }
+      if (
         url.pathname === `/asset/poster/${encodeURIComponent(canonicalId)}` ||
         url.pathname === `/asset/landscape/${encodeURIComponent(canonicalId)}`
       ) {
@@ -664,7 +674,12 @@ async function assertTeamBadgeArtworkProxy() {
         })
       }
       if (url.pathname === '/resolve') {
-        if (url.searchParams.get('sport') !== 'hockey' || url.searchParams.get('league') !== 'NHL') {
+        if (
+          url.searchParams.get('sport') !== 'hockey' ||
+          url.searchParams.get('league') !== 'NHL' ||
+          url.searchParams.get('home') !== 'Utah Mammoth' ||
+          url.searchParams.get('away') !== 'Vegas Golden Knights'
+        ) {
           return new Response(JSON.stringify({ ok: false, error: 'not_found' }), {
             status: 404,
             headers: { 'content-type': 'application/json' }
@@ -946,6 +961,87 @@ async function assertTeamBadgeArtworkProxy() {
       assert.equal(response.headers['x-pvtkrrx-sports-event-class'], testCase.expectedClass, `${testCase.slug} classification`)
       assert.equal(response.headers['x-pvtkrrx-artwork-template'], testCase.expectedTemplate, `${testCase.slug} selected template`)
       assert.doesNotMatch(response.headers['x-pvtkrrx-artwork-source'], /generated-card|team-badge|emergency-svg|emergency-legacy/, `${testCase.slug} should not use old generated or emergency art`)
+      assert.deepEqual(pngDimensions(response.body), dimensions.poster, `${testCase.slug} poster dimensions`)
+      fs.writeFileSync(path.join(PREVIEW_DIR, `${testCase.slug}.png`), response.body)
+    }
+
+    const directLogoCases = [
+      {
+        slug: 'direct-nhl-team-logos',
+        sport: 'hockey.png',
+        query: {
+          league: 'NHL',
+          title: 'Detroit Red Wings vs Florida Panthers',
+          date: '2026-04-15',
+          home: 'Detroit Red Wings',
+          away: 'Florida Panthers',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/nhl\/500\/det\.png/i, /\/nhl\/500\/fla\.png/i]
+      },
+      {
+        slug: 'direct-mls-team-logos',
+        sport: 'football.png',
+        query: {
+          league: 'Major League Soccer',
+          title: 'Chicago Fire FC vs St Louis CITY SC',
+          date: '2026-04-29',
+          home: 'Chicago Fire FC',
+          away: 'St Louis CITY SC',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/soccer\/500\/182\.png/i, /\/soccer\/500\/21812\.png/i]
+      },
+      {
+        slug: 'direct-wnba-team-logos',
+        sport: 'basketball.png',
+        query: {
+          league: 'WNBA',
+          title: 'Golden State Valkyries vs Chicago Sky',
+          date: '2026-05-14',
+          home: 'Golden State Valkyries',
+          away: 'Chicago Sky',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/wnba\/500\/gs\.png/i, /\/wnba\/500\/chi\.png/i]
+      },
+      {
+        slug: 'direct-ufc-red-league-logo',
+        sport: 'mma.png',
+        query: {
+          league: 'UFC',
+          title: 'UFC 328',
+          detail: 'Main Card',
+          date: '2026-05-09',
+          eventClass: 'combat_event'
+        },
+        expectedSources: [/bewnz31717531281\.png/i]
+      }
+    ]
+
+    for (const testCase of directLogoCases) {
+      const response = makeMockResponse()
+      await handleDefaultSportsArtwork(
+        {
+          params: {
+            variant: 'poster',
+            sport: testCase.sport
+          },
+          query: testCase.query
+        },
+        response,
+        {
+          sportsmetaBaseUrl: 'https://sportsmeta.test'
+        }
+      )
+      assert.equal(response.statusCode, 200, `${testCase.slug} should return 200`)
+      assert.equal(response.headers['content-type'], 'image/png', `${testCase.slug} should return PNG`)
+      assert.match(response.headers['x-pvtkrrx-artwork-source'], /^pvtkrrx-public-template$/, `${testCase.slug} should use real-logo public template art`)
+      assert.ok(Number(response.headers['x-pvtkrrx-logo-real-count'] || 0) >= 1, `${testCase.slug} should paint at least one real logo`)
+      const sourceUrls = String(response.headers['x-pvtkrrx-logo-source-urls'] || '')
+      for (const expectedSource of testCase.expectedSources) {
+        assert.match(sourceUrls, expectedSource, `${testCase.slug} should expose ${expectedSource}`)
+      }
       assert.deepEqual(pngDimensions(response.body), dimensions.poster, `${testCase.slug} poster dimensions`)
       fs.writeFileSync(path.join(PREVIEW_DIR, `${testCase.slug}.png`), response.body)
     }

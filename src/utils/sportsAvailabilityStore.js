@@ -19,9 +19,14 @@ function normalizeSportsAvailabilitySource(source = {}) {
     infohash: String(source?.infohash || '').trim().toLowerCase(),
     size: Math.max(0, Number(source?.size || 0)),
     seeders: Math.max(0, Number(source?.seeders || 0)),
+    sourceCount: Math.max(0, Number(source?.sourceCount || source?.sources || 0)),
     indexer: String(source?.indexer || '').trim(),
     pubDate: String(source?.pubDate || source?.publishDate || '').trim(),
-    sportHint: String(source?.sportHint || '').trim()
+    sportHint: String(source?.sportHint || '').trim(),
+    eventDate: String(source?.eventDate || source?.date || '').trim(),
+    league: String(source?.league || '').trim(),
+    homeTeam: String(source?.homeTeam || '').trim(),
+    awayTeam: String(source?.awayTeam || '').trim()
   }
 }
 

@@ -17,6 +17,7 @@ const {
 } = require('../utils/sportsArtwork')
 const { normalizeSportsEventMetadata } = require('../utils/sportsEventNormalizer')
 const { classifySportsEvent } = require('../utils/sportsEventClassifier')
+const { getSportsAvailabilityAnchorByCanonical } = require('../utils/sportsAvailabilityStore')
 const BRAND_POSTER = BRAND_ARTWORK
 const BRAND_LOGO = BRAND_ARTWORK
 
@@ -80,6 +81,8 @@ function buildSportsDescriptionLines(input = {}) {
   const time = String(input.time || input.timestamp || '').trim()
   const homeTeam = String(input.homeTeam || '').trim()
   const awayTeam = String(input.awayTeam || '').trim()
+  const releaseTitle = String(input.releaseTitle || '').trim()
+  const indexer = String(input.indexer || '').trim()
   const canonicalDescription = String(input.canonicalDescription || '').trim()
 
   if (canonicalDescription) {
@@ -97,6 +100,8 @@ function buildSportsDescriptionLines(input = {}) {
   if (venue) pushUniqueLine(lines, `Venue: ${venue}`)
   if (time) pushUniqueLine(lines, `Time: ${time}`)
   if (homeTeam && awayTeam) pushUniqueLine(lines, `Teams: ${homeTeam} vs ${awayTeam}`)
+  if (releaseTitle) pushUniqueLine(lines, `Release: ${releaseTitle}`)
+  if (indexer) pushUniqueLine(lines, `Indexer: ${indexer}`)
 
   const availability = []
   if (Number(input.seeders) > 0) availability.push(`${Number(input.seeders)} seeders`)
@@ -163,8 +168,11 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, 
   const league = String(canonicalEvent?.league || '').trim()
   const eventDate = String(canonicalEvent?.date || '').trim()
   const displayTitle = String(canonicalEvent?.name || canonicalEvent?.title || requestedId).trim() || requestedId
+  const canonicalId = String(canonicalEvent?.id || canonical?.canonicalId || requestedId || '').trim()
+  const availabilityAnchor = getSportsAvailabilityAnchorByCanonical(canonicalId) || getSportsAvailabilityAnchorByCanonical(requestedId)
+  const availabilitySource = availabilityAnchor?.source || {}
   const normalizedSportsEvent = normalizeSportsEventMetadata({
-    canonicalId: String(canonicalEvent?.id || canonical?.canonicalId || requestedId || '').trim(),
+    canonicalId,
     canonicalEvent,
     sportHint,
     competition: league,
@@ -179,7 +187,7 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, 
     sportsPosterTemplate: config?.sportsPosterTemplate,
     entitlementSource: config?.entitlementSource,
     entitlementOwnerEmailHash: config?.entitlementOwnerEmailHash,
-    canonicalId: String(canonicalEvent?.id || canonical?.canonicalId || requestedId || '').trim(),
+    canonicalId,
     sportHint: sportHint || normalizedSportsEvent.sport,
     league: normalizedSportsEvent.competition || league,
     title: normalizedSportsEvent.eventTitle || displayTitle,
@@ -206,6 +214,11 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, 
     time: canonicalEvent?.time || canonicalEvent?.timestamp,
     homeTeam: canonicalEvent?.homeTeam,
     awayTeam: canonicalEvent?.awayTeam,
+    seeders: Number(availabilitySource.seeders || 0),
+    size: Number(availabilitySource.size || 0) > 0 ? formatSize(availabilitySource.size) : '',
+    sourceCount: Number(availabilitySource.sourceCount || 0),
+    releaseTitle: availabilitySource.title,
+    indexer: availabilitySource.indexer,
     source: 'sportsmeta'
   })
   const meta = {

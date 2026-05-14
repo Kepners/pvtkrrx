@@ -11,7 +11,7 @@ const {
 const { resolveSportBackdrop } = require('./sportBackdrops')
 const { verifyStampedSportsPosterEntitlement } = require('./entitlement')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260513-uniform-slot-sizes-v23'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260514-team-logo-overrides-v24'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
