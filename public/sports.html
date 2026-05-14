@@ -316,22 +316,33 @@
     }
 
     .hero-showcase {
-      width: min(100%, clamp(120px, 12vw, 180px));
-      margin-top: 26px;
-      display: block;
-      /* Compact teaser card. The 600x900 poster is a sample, not the
-         centerpiece — keep it small so it doesn't dominate the hero. */
+      width: min(100%, clamp(360px, 46vw, 520px));
+      margin-top: 22px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(150px, 1fr);
+      gap: 12px;
+      align-items: stretch;
+      /* Cap height so both panels stay inside the bordered hero card.
+         Two-column layout: F1 backdrop on the left, rotating ticket-stub
+         poster on the right. */
+      max-height: clamp(200px, 26vh, 260px);
     }
 
+    .hero-backdrop,
     .hero-posters {
       border: 1px solid rgba(0, 246, 255, 0.22);
       border-radius: 8px;
       background: rgba(4, 8, 18, 0.72);
       overflow: hidden;
       box-shadow: 0 0 24px rgba(0, 168, 255, 0.18);
-      width: 100%;
-      aspect-ratio: 2 / 3;
       min-height: 0;
+    }
+
+    .hero-backdrop img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
     }
 
     .hero-posters {
@@ -1116,7 +1127,8 @@
       }
 
       .hero-showcase {
-        width: min(100%, 170px);
+        width: min(100%, 460px);
+        max-height: clamp(180px, 24vh, 240px);
       }
 
       .hero {
@@ -1168,8 +1180,14 @@
       }
 
       .hero-showcase {
-        width: min(100%, 150px);
+        width: min(100%, calc(100vw - 40px));
         margin-top: 18px;
+        max-height: clamp(160px, 38vw, 220px);
+        gap: 8px;
+      }
+
+      .hero-backdrop img {
+        min-height: 140px;
       }
 
       .hero-posters {
@@ -1326,6 +1344,9 @@
           <a class="btn btn-secondary" href="https://sportsmeta.pvtkrrx.cc/proof" data-umami-event="cta_sportsmeta_proof" data-umami-event-page="sports" data-umami-event-section="hero">Open Proof Page</a>
         </div>
         <div class="hero-showcase" aria-label="Current PVTKRRX sports artwork samples">
+          <div class="hero-backdrop">
+            <img src="/sports-backdrops/formula1-4k.jpg" width="3840" height="2160" loading="lazy" decoding="async" alt="Reusable Formula 1 4K sports backdrop sample">
+          </div>
           <div class="hero-posters" role="region" aria-label="Free Ticket Stub fixture samples — auto-rotating">
             <img src="/sports-artwork/default/poster/football.png?league=Premier+League&amp;title=Arsenal+vs+Chelsea&amp;date=2026-04-30&amp;home=Arsenal&amp;away=Chelsea&amp;eventClass=team_vs_team&amp;seeders=42&amp;size=8.1+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" alt="Free Ticket Stub sports poster sample for an Arsenal vs Chelsea Premier League fixture">
             <img src="/sports-artwork/default/poster/baseball.png?league=MLB&amp;title=Boston+Red+Sox+vs+New+York+Yankees&amp;date=2026-04-30&amp;home=Boston+Red+Sox&amp;away=New+York+Yankees&amp;eventClass=team_vs_team&amp;seeders=14&amp;size=5.4+GB&amp;source=prowlarr&amp;template=ticket-stub&amp;v=20260509-free-ticket-stub-v2" width="600" height="900" alt="Free Ticket Stub sports poster sample for a Red Sox vs Yankees MLB fixture">
