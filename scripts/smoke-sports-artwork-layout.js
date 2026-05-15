@@ -1025,6 +1025,36 @@ async function assertTeamBadgeArtworkProxy() {
         expectedSources: [/\/soccer\/500\/182\.png/i, /\/soccer\/500\/21812\.png/i]
       },
       {
+        slug: 'direct-champions-league-team-logos',
+        sport: 'football.png',
+        query: {
+          league: 'UEFA Champions League',
+          title: 'Arsenal vs Real Madrid',
+          date: '2026-04-29',
+          home: 'Arsenal',
+          away: 'Real Madrid',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/soccer\/500\/359\.png/i, /\/soccer\/500\/86\.png/i],
+        expectedSlots: [/home:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/soccer\/500\/359\.png/i, /away:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/soccer\/500\/86\.png/i],
+        unexpectedSlots: [/home:real-league/i, /away:real-league/i]
+      },
+      {
+        slug: 'direct-champions-league-accented-team-logos',
+        sport: 'football.png',
+        query: {
+          league: 'Champions League',
+          title: 'Atletico Madrid vs Paris Saint-Germain',
+          date: '2026-04-29',
+          home: 'Atletico Madrid',
+          away: 'Paris Saint-Germain',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/soccer\/500\/1068\.png/i, /\/soccer\/500\/160\.png/i],
+        expectedSlots: [/home:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/soccer\/500\/1068\.png/i, /away:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/soccer\/500\/160\.png/i],
+        unexpectedSlots: [/home:real-league/i, /away:real-league/i]
+      },
+      {
         slug: 'direct-wnba-team-logos',
         sport: 'basketball.png',
         query: {
@@ -1036,6 +1066,32 @@ async function assertTeamBadgeArtworkProxy() {
           eventClass: 'team_vs_team'
         },
         expectedSources: [/\/wnba\/500\/gs\.png/i, /\/wnba\/500\/chi\.png/i]
+      },
+      {
+        slug: 'direct-womens-basketball-league-team-logos',
+        sport: 'basketball.png',
+        query: {
+          league: 'Women Basketball League',
+          title: 'Los Angeles Sparks vs Phoenix Mercury',
+          date: '2026-05-14',
+          home: 'Los Angeles Sparks',
+          away: 'Phoenix Mercury',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/wnba\/500\/la\.png/i, /\/wnba\/500\/phx\.png/i],
+        expectedSlots: [/home:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/wnba\/500\/la\.png/i, /away:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/wnba\/500\/phx\.png/i],
+        unexpectedSlots: [/home:real-league/i, /away:real-league/i]
+      },
+      {
+        slug: 'direct-womens-basketball-league-logo',
+        sport: 'basketball.png',
+        query: {
+          league: 'Women Basketball League',
+          title: 'WNBA Tip Off',
+          date: '2026-05-14',
+          eventClass: 'tournament_event'
+        },
+        expectedSources: [/league\/logo\/3fv4p01573154525\.png/i]
       },
       {
         slug: 'direct-ufc-red-league-logo',
