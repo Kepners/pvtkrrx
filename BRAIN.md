@@ -1,5 +1,18 @@
 # PVTKRRX Brain
 
+## 2026-05-15: Coolify sharp/libvips Dockerfile fix proven, not deployed
+
+- Scope: public Coolify Docker build path only. Production still runs on the cached recovery image `w14jewmw5ubscrxh8zzfhq7d:e43a9fe4363850108db3c17e5a7658b35afc3d50` via `pvtkrrx-recovery`; this follow-up did not move public traffic to a fresh Coolify image.
+- Root cause proof: the crashed fresh image `w14jewmw5ubscrxh8zzfhq7d:540e9fa017e15d2de55ff866a0883acb07bdf98f` is missing `@img/sharp-libvips-linux-x64` while the healthy recovery image has it.
+- Fix staged in repo: Dockerfile now installs production dependencies with `npm ci --omit=dev --include=optional`, rebuilds `sharp`, asserts the linux-x64 sharp/libvips packages and `libvips-cpp.so*` exist, then runs a build-time `require('sharp')` probe.
+- Proof captured:
+  - Local `docker build --no-cache --progress=plain -t pvtkrrx-sharp-proof:local .` passed with `sharp ok 0.34.5 8.17.3`.
+  - Local throwaway container served `/manifest.json` with `HTTP 200` and reported `{"sharp":"0.34.5","vips":"8.17.3"}`.
+  - Contabo throwaway build from `main` plus only the patched Dockerfile also passed with `sharp ok 0.34.5 8.17.3`.
+  - Contabo throwaway container served `http://127.0.0.1:13080/manifest.json` with `HTTP 200` and reported the same sharp/vips versions.
+  - Throwaway Contabo container/image and `/tmp/pvtkrrx-sharp-proof` were removed after proof.
+- Current production guardrail: Coolify auto-deploy remains disabled. Do not re-enable it until a controlled Coolify deployment of this hardened Dockerfile boots and live routes are rechecked.
+
 ## Live Topology (verified 2026-04-30)
 
 **There is exactly one PVTKRRX runtime serving real users**: the Coolify Docker container. The systemd `pvtkrrx.service` that used to coexist on `/opt/pvtkrrx` has been stopped + disabled + masked on 2026-04-30 because it was a redundant second runtime that real users never hit. Do not bring it back without explicit need.

@@ -49,9 +49,16 @@ RUN sh -c 'set -e; for f in "Bebas Neue" "Inter" "Playfair Display" "JetBrains M
 WORKDIR /app
 
 # Install production deps first so Docker layer cache can reuse them when
-# only source files change.
+# only source files change. The explicit optional/native checks protect the
+# hosted relay from a repeat of the 2026-05-15 Coolify build break where
+# @img/sharp-libvips-linux-x64 was missing but the image still built.
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --include=optional \
+        && npm rebuild sharp \
+        && test -d node_modules/@img/sharp-linux-x64 \
+        && test -d node_modules/@img/sharp-libvips-linux-x64 \
+        && find node_modules/@img/sharp-libvips-linux-x64 -name 'libvips-cpp.so*' -print -quit | grep -q . \
+        && node -e "const sharp = require('sharp'); console.log('sharp ok', sharp.versions.sharp, sharp.versions.vips)"
 
 # App source
 COPY . .
