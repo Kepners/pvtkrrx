@@ -48,7 +48,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260514-team-logo-overrides-v24'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260515-visible-logo-fallback-v25'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -291,9 +291,8 @@ async function renderEmergencyTemplatePng(variant, fallbackInput = {}, template 
   const fallbackSlots = skipGeneratedSlots ? [] : (artwork.slots || [])
   const composites = []
   for (const slot of fallbackSlots) {
-    // User directive 2026-05-11: glyph fallback removed. renderLogoGlyphSvg
-    // now returns null. If the real-logo pipeline didn't fill this slot,
-    // the slot is intentionally left empty rather than painted with initials.
+    // Visible fallback is intentionally plain: it marks unresolved logo data
+    // without pretending a league mark is a team badge.
     const glyphSvg = renderLogoGlyphSvg({ role: slot.role, event, theme, size: slot.size })
     if (!glyphSvg) continue
     composites.push({
@@ -379,8 +378,8 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
     const realHomeLogo = logoContext?.homeBadge || null
     const realAwayLogo = logoContext?.awayBadge || null
     const realLogoForSlot = (role = '') => {
-      if (role === 'home') return realHomeLogo || realLeagueLogo
-      if (role === 'away') return realAwayLogo || realLeagueLogo
+      if (role === 'home') return realHomeLogo
+      if (role === 'away') return realAwayLogo
       if (['league', 'leagueLogo', 'logo'].includes(role)) return realLeagueLogo || realHomeLogo || realAwayLogo
       return realLeagueLogo || realHomeLogo || realAwayLogo
     }
@@ -390,7 +389,7 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
       const realLogo = realLogoForSlot(slot.role)
       if (realLogo?.buffer) {
         composites.push({
-          input: await resizeCompositionBuffer(realLogo.buffer, slot.size),
+          input: await resizeCompositionBuffer(realLogo.buffer, slot.size, { frame: true }),
           left: slot.left,
           top: slot.top
         })
@@ -405,11 +404,8 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
           size: slot.size
         })
       } else {
-        // User directive 2026-05-11: glyph fallback removed.
-        // renderLogoGlyphSvg now returns null. The slot is intentionally
-        // skipped (no composite added) — no painted initials, no sport-icon
-        // emblem. logoSlots still records the slot so audit headers report
-        // why this slot is empty and which team needs SportsDB seeding.
+        // Visible fallback is intentionally plain: it marks unresolved logo
+        // data without pretending a league mark is a team badge.
         const glyphSvg = renderLogoGlyphSvg({ role: slot.role, event, theme, size: slot.size })
         if (glyphSvg) {
           composites.push({
@@ -417,17 +413,25 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
             left: slot.left,
             top: slot.top
           })
+          logoSlots.push({
+            role: slot.role,
+            logoKind: 'fallback-glyph',
+            logoFallbackReason,
+            left: slot.left,
+            top: slot.top,
+            size: slot.size
+          })
         } else {
           console.warn(`[sports-poster] LOGO_MISSING_NO_GLYPH variant=${variant} template=${normalizedTemplate} role=${slot.role} reason=${logoFallbackReason} title=${sourceTitleForAudit(fallbackInput)}`)
+          logoSlots.push({
+            role: slot.role,
+            logoKind: 'missing-no-glyph',
+            logoFallbackReason,
+            left: slot.left,
+            top: slot.top,
+            size: slot.size
+          })
         }
-        logoSlots.push({
-          role: slot.role,
-          logoKind: 'missing-no-glyph',
-          logoFallbackReason,
-          left: slot.left,
-          top: slot.top,
-          size: slot.size
-        })
       }
     }
     if (artwork.overlay) {
@@ -1071,22 +1075,37 @@ async function rasterizeLogoUrlForVariant(cdnUrl = '', variant = 'logo', inspect
   const sourceUrl = normalizeSpace(cdnUrl)
   if (!sourceUrl) return null
   try {
-    const response = await fetch(sourceUrl, {
-      headers: { accept: 'image/png,image/jpeg,image/webp,image/*' },
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
-    })
-    if (!response.ok) return null
-    const upstreamContentType = String(response.headers.get('content-type') || '').toLowerCase()
-    if (!/^image\/(png|jpeg|jpg|webp)/i.test(upstreamContentType)) return null
-    const sourceBuffer = Buffer.from(await response.arrayBuffer())
+    let sourceBuffer
+    let upstreamContentType = ''
+    if (sourceUrl === 'pvtkrrx://logo/ufc-red') {
+      sourceBuffer = Buffer.from(renderUfcRedLogoSvg(640))
+      upstreamContentType = 'image/svg+xml'
+    } else {
+      const response = await fetch(sourceUrl, {
+        headers: { accept: 'image/png,image/jpeg,image/webp,image/svg+xml,image/*' },
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+      })
+      if (!response.ok) return null
+      upstreamContentType = String(response.headers.get('content-type') || '').toLowerCase()
+      if (!/^image\/(png|jpeg|jpg|webp|svg\+xml)/i.test(upstreamContentType)) return null
+      sourceBuffer = Buffer.from(await response.arrayBuffer())
+    }
     const dims = VARIANT_DIMENSIONS[variant] || VARIANT_DIMENSIONS.logo
-    const png = await sharp(sourceBuffer, { density: 192 })
-      .resize({
+    const logoSize = Math.round(Math.min(dims.width, dims.height) * 0.86)
+    const logo = await resizeCompositionBuffer(sourceBuffer, logoSize, { frame: true })
+    const png = await sharp({
+      create: {
         width: dims.width,
         height: dims.height,
-        fit: 'contain',
+        channels: 4,
         background: { r: 0, g: 0, b: 0, alpha: 0 }
-      })
+      }
+    })
+      .composite([{
+        input: logo,
+        left: Math.round((dims.width - logoSize) / 2),
+        top: Math.round((dims.height - logoSize) / 2)
+      }])
       .png({ compressionLevel: 9, adaptiveFiltering: true })
       .toBuffer()
     return {
@@ -1133,21 +1152,57 @@ async function tryRealLogoVariantPng({ canonicalId = '', sportsmetaBaseUrl = '',
 const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
   {
     sport: 'football',
+    pattern: /\b(?:scottish\s+women'?s?\s+premier\s+league|swpl)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://upload.wikimedia.org/wikipedia/commons/c/cc/SWPL_Logo_Brandmarque_Colour.png']
+  },
+  {
+    sport: 'football',
     pattern: /\b(?:uefa\s+champions\s+league|champions\s+league|ucl)\b/i,
     canonicalIds: ['sportsmeta:league:football|uefa-champions-league'],
     searchTerms: ['UEFA Champions League']
   },
   {
     sport: 'football',
-    pattern: /\b(?:uefa\s+europa\s+league|europa\s+league|uel)\b/i,
-    canonicalIds: ['sportsmeta:league:football|uefa-europa-league'],
-    searchTerms: ['UEFA Europa League']
+    pattern: /\b(?:uefa\s+conference\s+league|conference\s+league|uecl)\b/i,
+    canonicalIds: ['sportsmeta:league:football|uefa-conference-league'],
+    searchTerms: ['UEFA Conference League'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/ymfo5j1718775759.png']
   },
   {
     sport: 'football',
-    pattern: /\b(?:english\s+premier\s+league|premier\s+league|epl)\b/i,
+    pattern: /\b(?:uefa\s+europa\s+(?:and|&)\s+conference\s+league|europa\s+(?:and|&)\s+conference\s+league)\b/i,
+    canonicalIds: ['sportsmeta:league:football|uefa-europa-league'],
+    searchTerms: ['UEFA Europa League'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/mlsr7d1718774547.png']
+  },
+  {
+    sport: 'football',
+    pattern: /\b(?:uefa\s+europa\s+league|europa\s+league|uel)\b/i,
+    canonicalIds: ['sportsmeta:league:football|uefa-europa-league'],
+    searchTerms: ['UEFA Europa League'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/mlsr7d1718774547.png']
+  },
+  {
+    sport: 'football',
+    pattern: /^(?!.*\bscottish\b)(?!.*\bwomen'?s?\b).*\b(?:english\s+premier\s+league|premier\s+league|epl)\b/i,
     canonicalIds: ['sportsmeta:league:football|english-premier-league'],
     searchTerms: ['English Premier League']
+  },
+  {
+    sport: 'football',
+    pattern: /\b(?:spanish\s+la\s+liga|la\s*liga|laliga)\b/i,
+    canonicalIds: ['sportsmeta:league:football|spanish-la-liga'],
+    searchTerms: ['Spanish La Liga'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/ja4it51687628717.png']
+  },
+  {
+    sport: 'football',
+    pattern: /\b(?:german\s+bundesliga|bundesliga)\b/i,
+    canonicalIds: ['sportsmeta:league:football|german-bundesliga'],
+    searchTerms: ['German Bundesliga'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/teqh1b1679952008.png']
   },
   {
     sport: 'football',
@@ -1226,7 +1281,7 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
     pattern: /\bufc\b/i,
     canonicalIds: ['sportsmeta:league:mma|ufc'],
     searchTerms: ['UFC'],
-    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/bewnz31717531281.png']
+    directLogoUrls: ['pvtkrrx://logo/ufc-red']
   },
   // Tennis — SportsMeta does not index tennis as a sport slug, so every tennis
   // tournament has to lean on TheSportsDB CDN league badges. ATP/WTA badges
@@ -1384,9 +1439,15 @@ const DEFAULT_TEAM_LOGO_ALIASES = Object.freeze([
 ])
 
 const DIRECT_LEAGUE_LOGO_OVERRIDES = Object.freeze([
+  { sport: 'football', league: 'Scottish Womens Premier League', pattern: /\b(?:scottish\s+women'?s?\s+premier\s+league|swpl)\b/i, urls: ['https://upload.wikimedia.org/wikipedia/commons/c/cc/SWPL_Logo_Brandmarque_Colour.png'] },
+  { sport: 'football', league: 'Spanish La Liga', pattern: /\b(?:spanish\s+la\s+liga|la\s*liga|laliga)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/ja4it51687628717.png'] },
+  { sport: 'football', league: 'German Bundesliga', pattern: /\b(?:german\s+bundesliga|bundesliga)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/teqh1b1679952008.png'] },
+  { sport: 'football', league: 'UEFA Conference League', pattern: /\b(?:uefa\s+conference\s+league|conference\s+league|uecl)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/ymfo5j1718775759.png'] },
+  { sport: 'football', league: 'UEFA Europa League', pattern: /\b(?:uefa\s+europa\s+(?:and|&)\s+conference\s+league|europa\s+(?:and|&)\s+conference\s+league|uefa\s+europa\s+league|europa\s+league|uel)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/mlsr7d1718774547.png'] },
+  { sport: 'football', league: 'Scottish Premiership', pattern: /\b(?:scottish\s+premiership|scottish\s+premier\s+league|cinch\s+premiership|celtic|motherwell|falkirk|heart\s+of\s+midlothian|hibernian|rangers)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/72d3zc1688333496.png'] },
   { sport: 'football', league: 'Major League Soccer', pattern: /\b(?:major\s+league\s+soccer|mls)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/dqo6r91549878326.png'] },
   { sport: 'basketball', league: 'WNBA', pattern: /\b(?:wnba|women\'?s\s+national\s+basketball\s+association)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/3fv4p01573154525.png'] },
-  { sport: 'mma', league: 'UFC', pattern: /\bufc\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/bewnz31717531281.png'] },
+  { sport: 'mma', league: 'UFC', pattern: /\bufc\b/i, urls: ['pvtkrrx://logo/ufc-red'] },
   { sport: 'motorsport', league: 'IndyCar Series', pattern: /\b(?:indy\s*car|indycar|ntt\s+indycar|indianapolis\s+500|indy\s*500)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/mkv0xb1641916982.png'] },
   { sport: 'motorsport', league: 'WRC', pattern: /\b(?:wrc|world\s+rally\s+championship)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/5f36o51544372922.png'] },
   { sport: 'rugby', league: 'AFL', pattern: /\b(?:afl|first\s+crack|aussie\s+rules|australian\s+football|australian\s+rules\s+football)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/wvx4721525519372.png'] },
@@ -1924,7 +1985,7 @@ async function renderLogoImageVariantPng(image, variant = 'logo') {
   if (!image?.buffer) return null
   const dims = VARIANT_DIMENSIONS[variant] || VARIANT_DIMENSIONS.logo
   const logoSize = Math.round(Math.min(dims.width, dims.height) * 0.82)
-  const logo = await resizeCompositionBuffer(image.buffer, logoSize)
+  const logo = await resizeCompositionBuffer(image.buffer, logoSize, { frame: true })
   return sharp({
     create: {
       width: dims.width,
@@ -1973,6 +2034,16 @@ async function fetchCompositionImage(url = '', size = 210, options = {}) {
   }
 }
 
+function renderUfcRedLogoSvg(size = 320) {
+  const width = Math.max(160, Math.round(Number(size) || 320))
+  const height = Math.round(width * 0.42)
+  const fontSize = Math.round(width * 0.34)
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img">
+    <rect width="${width}" height="${height}" fill="none"/>
+    <text x="${Math.round(width / 2)}" y="${Math.round(height * 0.76)}" text-anchor="middle" font-family="Arial Black, Impact, Arial, sans-serif" font-size="${fontSize}" font-weight="900" font-style="italic" fill="#D20A0A" letter-spacing="0">UFC</text>
+  </svg>`
+}
+
 async function fetchLogoCandidate({ url = '', key = '', role = '', size = 210, fallbackColor = '#0f766e' } = {}) {
   const targetUrl = normalizeSpace(url)
   const attempt = {
@@ -2013,6 +2084,21 @@ async function fetchLogoCandidate({ url = '', key = '', role = '', size = 210, f
         color: null
       }
       try {
+        if (targetUrl === 'pvtkrrx://logo/ufc-red') {
+          const sourceBuf = Buffer.from(renderUfcRedLogoSvg(Math.max(320, size * 2)))
+          value.status = 200
+          value.contentType = 'image/svg+xml'
+          value.source = 'pvtkrrx-direct-logo'
+          value.assetClass = 'logo'
+          value.delivery = 'svg'
+          value.buffer = await sharp(sourceBuf, { density: 192 })
+            .resize({ width: size, height: size, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+            .png()
+            .toBuffer()
+          value.color = '#D20A0A'
+          value.result = 'real_logo'
+          return value
+        }
         const response = await fetch(targetUrl, {
           headers: { accept: 'image/png,image/jpeg,image/webp,image/svg+xml,image/*' },
           signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
@@ -2094,9 +2180,38 @@ function applyCachedLogoResult(value, attempt, { targetUrl, key, fallbackColor }
   }
 }
 
-async function resizeCompositionBuffer(buffer, size = 210) {
-  return sharp(buffer, { density: 192 })
-    .resize({ width: size, height: size, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+async function resizeCompositionBuffer(buffer, size = 210, options = {}) {
+  const canvasSize = Math.max(24, Math.round(Number(size) || 210))
+  const framed = options.frame === true
+  if (!framed) {
+    return sharp(buffer, { density: 192 })
+      .resize({ width: canvasSize, height: canvasSize, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer()
+  }
+  const pad = Math.max(3, Math.round(canvasSize * 0.08))
+  const innerSize = Math.max(12, canvasSize - pad * 2)
+  const logo = await sharp(buffer, { density: 192 })
+    .resize({ width: innerSize, height: innerSize, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer()
+  const radius = Math.max(5, Math.round(canvasSize * 0.12))
+  const stroke = Math.max(2, Math.round(canvasSize * 0.035))
+  const frameSvg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${canvasSize}" height="${canvasSize}" viewBox="0 0 ${canvasSize} ${canvasSize}">
+    <rect x="${Math.round(stroke / 2)}" y="${Math.round(stroke / 2)}" width="${canvasSize - stroke}" height="${canvasSize - stroke}" rx="${radius}" fill="rgba(248,242,223,0.96)" stroke="#ffffff" stroke-width="${stroke}"/>
+  </svg>`)
+  return sharp({
+    create: {
+      width: canvasSize,
+      height: canvasSize,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 }
+    }
+  })
+    .composite([
+      { input: frameSvg, left: 0, top: 0 },
+      { input: logo, left: pad, top: pad }
+    ])
     .png()
     .toBuffer()
 }
@@ -2343,8 +2458,8 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
   const artworkSlots = artwork.slots || []
   const hasTeamSpecificSlots = artworkSlots.some((slot) => slot.role === 'home' || slot.role === 'away')
   const selectLogoForSlot = (role = '') => {
-    if (role === 'home') return homeBadge || leagueLogo || eventIdentity
-    if (role === 'away') return awayBadge || leagueLogo || eventIdentity
+    if (role === 'home') return homeBadge
+    if (role === 'away') return awayBadge
     // The league slot must show the league/event identity. Falling back to a
     // team badge here puts (e.g.) the Arsenal crest in the UCL header slot,
     // which the user has explicitly flagged as wrong. Prefer leagueLogo, then
@@ -2359,6 +2474,14 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
   for (const slot of artworkSlots) {
     const image = selectLogoForSlot(slot.role)
     if (!image?.buffer) {
+      const glyphSvg = renderLogoGlyphSvg({ role: slot.role, event, theme, size: slot.size })
+      if (glyphSvg) {
+        composites.push({
+          input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size),
+          left: slot.left,
+          top: slot.top
+        })
+      }
       logoSlots.push({
         role: slot.role,
         logoKind: 'fallback-glyph',
@@ -2370,7 +2493,7 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
       continue
     }
     composites.push({
-      input: await resizeCompositionBuffer(image.buffer, slot.size),
+      input: await resizeCompositionBuffer(image.buffer, slot.size, { frame: true }),
       left: slot.left,
       top: slot.top
     })
@@ -2984,6 +3107,7 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
     const logoRealCount = Number(result.logoRealCount || 0)
     const logoFallbackCount = Number(result.logoFallbackCount || 0)
     const logoLookupAttempts = Array.isArray(result.logoLookupAttempts) ? result.logoLookupAttempts : []
+    const logoSlots = Array.isArray(result.logoSlots) ? result.logoSlots : []
     res.setHeader('Content-Type', contentType || 'image/png')
     res.setHeader('Content-Length', String(buffer.length))
     res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000, stale-if-error=2592000')
@@ -3011,6 +3135,16 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
       res.setHeader('X-PVTKRRX-Logo-Source-Count', String(logoSourceUrls.length))
       res.setHeader('X-PVTKRRX-Artwork-Logo-Source-Urls', logoSourceUrls.map(redactUrl).join(' | '))
       res.setHeader('X-PVTKRRX-Logo-Source-Urls', logoSourceUrls.map(redactUrl).join(' | '))
+    }
+    if (logoSlots.length) {
+      const slotSummary = logoSlots
+        .map((slot) => [
+          slot.role || 'logo',
+          slot.logoKind || 'unknown',
+          redactUrl(slot.logoSourceUrl || slot.logoFallbackReason || '')
+        ].join(':'))
+        .join(' | ')
+      res.setHeader('X-PVTKRRX-Logo-Slots', slotSummary.slice(0, 3800))
     }
     if (logoLookupAttempts.length) {
       res.setHeader('X-PVTKRRX-Logo-Lookup-Attempts', summarizeLogoAttempts(logoLookupAttempts))

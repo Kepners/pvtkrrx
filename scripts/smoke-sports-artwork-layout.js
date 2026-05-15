@@ -18,6 +18,7 @@ const {
   handleCanonicalSportsArtwork,
   handleDefaultSportsArtwork
 } = require('../src/handlers/sportsArtworkProxy')
+const { renderLogoGlyphSvg } = require('../src/utils/sportsPosterTemplates')
 const { SPORTS_DISCOVERY_CATALOGS } = require('../src/config/sportsCatalogs')
 const { normalizeSportsEventMetadata } = require('../src/utils/sportsEventNormalizer')
 
@@ -606,7 +607,8 @@ async function assertTeamBadgeArtworkProxy() {
       if (
         url.hostname === 'a.espncdn.com' ||
         url.hostname === 'r2.thesportsdb.com' ||
-        url.hostname === 'www.thesportsdb.com'
+        url.hostname === 'www.thesportsdb.com' ||
+        url.hostname === 'upload.wikimedia.org'
       ) {
         return new Response(await teamBadgePng('#0f172a', '#38bdf8'), {
           status: 200,
@@ -980,6 +982,36 @@ async function assertTeamBadgeArtworkProxy() {
         expectedSources: [/\/nhl\/500\/det\.png/i, /\/nhl\/500\/fla\.png/i]
       },
       {
+        slug: 'direct-nhl-user-screenshot-logos',
+        sport: 'hockey.png',
+        query: {
+          league: 'NHL',
+          title: 'Ottawa Senators vs Toronto Maple Leafs',
+          date: '2026-04-15',
+          home: 'Ottawa Senators',
+          away: 'Toronto Maple Leafs',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/nhl\/500\/ott\.png/i, /\/nhl\/500\/tor\.png/i],
+        expectedSlots: [/home:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/nhl\/500\/ott\.png/i, /away:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/nhl\/500\/tor\.png/i],
+        unexpectedSlots: [/home:real-league/i, /away:real-league/i, /home:real-team:https:\/\/r2\.thesportsdb\.com\/images\/media\/league\/badge\/4cem2k1619616539\.png/i, /away:real-team:https:\/\/r2\.thesportsdb\.com\/images\/media\/league\/badge\/4cem2k1619616539\.png/i]
+      },
+      {
+        slug: 'direct-nhl-blackhawks-sharks-logos',
+        sport: 'hockey.png',
+        query: {
+          league: 'NHL',
+          title: 'Chicago Blackhawks vs San Jose Sharks',
+          date: '2026-04-15',
+          home: 'Chicago Blackhawks',
+          away: 'San Jose Sharks',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/nhl\/500\/chi\.png/i, /\/nhl\/500\/sj\.png/i],
+        expectedSlots: [/home:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/nhl\/500\/chi\.png/i, /away:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/nhl\/500\/sj\.png/i],
+        unexpectedSlots: [/home:real-league/i, /away:real-league/i, /home:real-team:https:\/\/r2\.thesportsdb\.com\/images\/media\/league\/badge\/4cem2k1619616539\.png/i, /away:real-team:https:\/\/r2\.thesportsdb\.com\/images\/media\/league\/badge\/4cem2k1619616539\.png/i]
+      },
+      {
         slug: 'direct-mls-team-logos',
         sport: 'football.png',
         query: {
@@ -1015,7 +1047,19 @@ async function assertTeamBadgeArtworkProxy() {
           date: '2026-05-09',
           eventClass: 'combat_event'
         },
-        expectedSources: [/bewnz31717531281\.png/i]
+        expectedSources: [/pvtkrrx:\/\/logo\/ufc-red/i]
+      },
+      {
+        slug: 'direct-scottish-womens-premier-logo',
+        sport: 'football.png',
+        query: {
+          league: 'Scottish Womens Premier League',
+          title: 'Scottish Womens Premier League 2025/26 Show',
+          date: '2026-04-26',
+          eventClass: 'tournament_event'
+        },
+        expectedSources: [/SWPL_Logo_Brandmarque_Colour\.png/i],
+        unexpectedSources: [/english-premier-league|premier-league/i]
       }
     ]
 
@@ -1042,6 +1086,16 @@ async function assertTeamBadgeArtworkProxy() {
       for (const expectedSource of testCase.expectedSources) {
         assert.match(sourceUrls, expectedSource, `${testCase.slug} should expose ${expectedSource}`)
       }
+      for (const unexpectedSource of testCase.unexpectedSources || []) {
+        assert.doesNotMatch(sourceUrls, unexpectedSource, `${testCase.slug} should not expose ${unexpectedSource}`)
+      }
+      const slotSummary = String(response.headers['x-pvtkrrx-logo-slots'] || '')
+      for (const expectedSlot of testCase.expectedSlots || []) {
+        assert.match(slotSummary, expectedSlot, `${testCase.slug} should expose slot ${expectedSlot}`)
+      }
+      for (const unexpectedSlot of testCase.unexpectedSlots || []) {
+        assert.doesNotMatch(slotSummary, unexpectedSlot, `${testCase.slug} should not expose slot ${unexpectedSlot}`)
+      }
       assert.deepEqual(pngDimensions(response.body), dimensions.poster, `${testCase.slug} poster dimensions`)
       fs.writeFileSync(path.join(PREVIEW_DIR, `${testCase.slug}.png`), response.body)
     }
@@ -1052,6 +1106,15 @@ async function assertTeamBadgeArtworkProxy() {
 
 async function main() {
   fs.mkdirSync(PREVIEW_DIR, { recursive: true })
+
+  const fallbackLogoSvg = renderLogoGlyphSvg({
+    role: 'home',
+    event: { sport: 'Basketball', league: 'WNBA', homeTeam: 'Dallas Stars' },
+    size: 120
+  })
+  assert.match(fallbackLogoSvg, /data-role="logo-fallback-svg"/, 'fallback logo SVG should be visible and auditable')
+  assert.match(fallbackLogoSvg, /LOGO PENDING/, 'fallback logo SVG should label unresolved logo data')
+  assert.doesNotMatch(fallbackLogoSvg, /data-role="visual-initials"/, 'fallback logo SVG should not use the old invisible initials marker')
 
   const requiredSportHints = SPORTS_DISCOVERY_CATALOGS
     .map((catalog) => catalog.sportHint)
