@@ -2272,54 +2272,14 @@ function sportGlyphMarkup(icon = 'sports', size = 256) {
   return sportGlyph(mapped, size / 2, size / 2, size * 0.78, '#ffffff', 1, Math.max(4, Math.round(size * 0.02)))
 }
 
-function roleLabelForVisibleLogoFallback(role = '') {
-  const normalized = normalizeSpace(role).toLowerCase()
-  if (normalized === 'home') return 'HOME'
-  if (normalized === 'away') return 'AWAY'
-  if (normalized === 'league' || normalized === 'logo' || normalized === 'leaguelogo') return 'LEAGUE'
-  return 'SPORT'
-}
-
-function labelForVisibleLogoFallback({ role = '', event = {} } = {}) {
-  const normalized = normalizeSpace(role).toLowerCase()
-  if (normalized === 'home') return normalizeSpace(event.homeTeam || event.home?.name || event.title || event.eventName)
-  if (normalized === 'away') return normalizeSpace(event.awayTeam || event.away?.name || event.title || event.eventName)
-  if (normalized === 'league' || normalized === 'logo' || normalized === 'leaguelogo') {
-    return normalizeSpace(event.league || event.competition || event.sport || event.title || event.eventName)
-  }
-  return normalizeSpace(event.title || event.eventName || event.league || event.competition || event.sport)
-}
-
-function renderLogoGlyphSvg({ role = '', event = {}, theme = {}, size = 180 } = {}) {
-  const box = Math.max(48, Math.round(Number(size) || 180))
-  const roleLabel = roleLabelForVisibleLogoFallback(role)
-  const label = labelForVisibleLogoFallback({ role, event }) || roleLabel
-  const initials = initialsFor(label, roleLabel.slice(0, 2))
-  const primary = normalizeSpace(theme.homeColor || theme.accentColor || '#0f766e')
-  const secondary = normalizeSpace(theme.awayColor || '#123c69')
-  const accent = normalizeSpace(theme.accentColor || '#d4b76a')
-  const markSize = initials.length <= 2 ? Math.round(box * 0.32) : Math.round(box * 0.27)
-  const labelSize = Math.max(6, Math.round(box * 0.075))
-  const subSize = Math.max(5, Math.round(box * 0.052))
-  const e = escapeXml
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${box}" height="${box}" viewBox="0 0 ${box} ${box}" role="img" data-role="logo-fallback-svg" data-fallback-kind="logo-glyph" data-fallback-role="${e(roleLabel)}">
-  <defs>
-    <linearGradient id="fallbackBg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="${e(primary)}"/>
-      <stop offset="100%" stop-color="${e(secondary)}"/>
-    </linearGradient>
-    <filter id="fallbackShadow" x="-20%" y="-20%" width="140%" height="140%">
-      <feDropShadow dx="0" dy="${Math.max(1, Math.round(box * 0.035))}" stdDeviation="${Math.max(1, Math.round(box * 0.045))}" flood-color="#000000" flood-opacity="0.32"/>
-    </filter>
-  </defs>
-  <rect x="${Math.round(box * 0.06)}" y="${Math.round(box * 0.06)}" width="${Math.round(box * 0.88)}" height="${Math.round(box * 0.88)}" rx="${Math.round(box * 0.14)}" fill="#f8f2df" stroke="#ffffff" stroke-width="${Math.max(2, Math.round(box * 0.035))}" filter="url(#fallbackShadow)"/>
-  <rect x="${Math.round(box * 0.11)}" y="${Math.round(box * 0.11)}" width="${Math.round(box * 0.78)}" height="${Math.round(box * 0.78)}" rx="${Math.round(box * 0.105)}" fill="url(#fallbackBg)" stroke="${e(accent)}" stroke-width="${Math.max(1, Math.round(box * 0.018))}"/>
-  <circle cx="${Math.round(box * 0.5)}" cy="${Math.round(box * 0.48)}" r="${Math.round(box * 0.255)}" fill="rgba(5,7,13,0.28)" stroke="rgba(255,255,255,0.32)" stroke-width="${Math.max(1, Math.round(box * 0.014))}"/>
-  <text x="${Math.round(box * 0.5)}" y="${Math.round(box * 0.515)}" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="${markSize}" font-weight="900" letter-spacing="0">${e(initials)}</text>
-  <text x="${Math.round(box * 0.5)}" y="${Math.round(box * 0.785)}" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="${labelSize}" font-weight="800" letter-spacing="0">${e(roleLabel)}</text>
-  <text x="${Math.round(box * 0.5)}" y="${Math.round(box * 0.855)}" text-anchor="middle" fill="rgba(255,255,255,0.72)" font-family="Arial, Helvetica, sans-serif" font-size="${subSize}" font-weight="700" letter-spacing="0">LOGO PENDING</text>
-</svg>`
+function renderLogoGlyphSvg() {
+  // User directive 2026-05-11: glyph fallback (text initials + sport-icon
+  // glyphs) is REMOVED from templates entirely. Real team and league logos
+  // come from SportsMeta (which fetches from TheSportsDB). When a real logo
+  // cannot be resolved for a slot, the slot is now skipped — never painted
+  // with a fake "WHU" / "AFC" / sport-emblem placeholder.
+  // Callers must check for null and skip the composite when this returns null.
+  return null
 }
 
 module.exports = {

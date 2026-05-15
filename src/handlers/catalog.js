@@ -1417,8 +1417,6 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       setSportsAvailabilityCanonicalAnchor(canonicalCatalogId, availabilityAnchorKey)
     }
 
-    const catalogDescription = descriptionLines.join('\n') || descriptionParts.join(' | ')
-
     return {
       id: (
         sportsMetaResolution.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED &&
@@ -1452,8 +1450,7 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
           }),
       type: mediaType,
       name: displayTitle,
-      description: catalogDescription,
-      overview: catalogDescription,
+      description: descriptionLines.join('\n') || descriptionParts.join(' | '),
       poster: catalogPosterUrl,
       background: landscapeUrl || backgroundUrl || undefined,
       logo: logoUrl || undefined,

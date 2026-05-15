@@ -226,7 +226,6 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, 
     type: metaType,
     name: displayTitle,
     description: descriptionLines.join('\n'),
-    overview: descriptionLines.join('\n'),
     poster,
     background,
     logo
@@ -469,7 +468,6 @@ async function handleCustomMeta(config, id, context = {}) {
     type: String(info.y || 'movie'),
     name: displayTitle,
     description,
-    overview: description,
     poster,
     background,
     logo

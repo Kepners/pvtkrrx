@@ -274,12 +274,12 @@ function assertRuntimeTeamPoster(fixture) {
   // positions so future template tweaks can't silently shift the composite slots.
   assert.deepEqual(
     artwork.slots.find((slot) => slot.role === 'home'),
-    { role: 'home', size: 186, left: 45, top: 185 },
+    { role: 'home', size: 132, left: 96, top: 242 },
     `${fixture.slug} home composite slot coordinates`
   )
   assert.deepEqual(
     artwork.slots.find((slot) => slot.role === 'away'),
-    { role: 'away', size: 186, left: 369, top: 500 },
+    { role: 'away', size: 132, left: 372, top: 467 },
     `${fixture.slug} away composite slot coordinates`
   )
   return {
