@@ -28,7 +28,7 @@ const {
   renderLogoGlyphSvg,
   renderSportsPosterTemplateSvg
 } = require('../utils/sportsPosterTemplates')
-const { classifySportsEvent } = require('../utils/sportsEventClassifier')
+const { classifySportsEvent, hasActualPair } = require('../utils/sportsEventClassifier')
 const {
   readSportsArtworkDiskCache,
   writeSportsArtworkDiskCache
@@ -48,7 +48,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260515-ucl-wnba-logo-coverage-v26'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260515-parser-clean-initials-v27'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -380,8 +380,8 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
     const realLogoForSlot = (role = '') => {
       if (role === 'home') return realHomeLogo
       if (role === 'away') return realAwayLogo
-      if (['league', 'leagueLogo', 'logo'].includes(role)) return realLeagueLogo || realHomeLogo || realAwayLogo
-      return realLeagueLogo || realHomeLogo || realAwayLogo
+      if (['league', 'leagueLogo', 'logo'].includes(role)) return realLeagueLogo
+      return realLeagueLogo
     }
     const composites = []
     const logoSlots = []
@@ -1721,23 +1721,18 @@ function directLeagueLogoUrlsForCanonicalId(canonicalId = '') {
   return []
 }
 
-function directTeamLogoUrlFor({ sport = '', league = '', team = '', text = '' } = {}) {
+function directTeamLogoUrlFor({ sport = '', league = '', team = '' } = {}) {
   const sportSlug = resolveSportSlug(sport)
   const leagueSlug = normalizedLeagueSlug(league)
   const teamSlug = leagueSlugFor(team)
-  const haystack = leagueSlugFor([team, text].filter(Boolean).join(' '))
-  if (!sportSlug || (!teamSlug && !haystack)) return ''
+  if (!sportSlug || !teamSlug) return ''
 
   for (const rule of DIRECT_TEAM_LOGO_OVERRIDES) {
     if (resolveSportSlug(rule.sport) !== sportSlug) continue
     const ruleLeagueSlug = normalizedLeagueSlug(rule.league)
     if (ruleLeagueSlug && leagueSlug && ruleLeagueSlug !== leagueSlug) continue
     const aliases = [rule.team, ...(rule.aliases || [])].map(leagueSlugFor).filter(Boolean)
-    if (teamSlug) {
-      if (aliases.includes(teamSlug) || aliases.some((alias) => slugContainsToken(teamSlug, alias))) return rule.url
-      continue
-    }
-    if (haystack && aliases.some((alias) => slugContainsToken(haystack, alias))) return rule.url
+    if (aliases.includes(teamSlug) || aliases.some((alias) => slugContainsToken(teamSlug, alias))) return rule.url
   }
   return ''
 }
@@ -2344,9 +2339,9 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     assetAwayKey = 'homeBadge'
   }
 
-  const hasMatchup = Boolean(event.homeTeam && event.awayTeam)
   const eventClass = classifySportsEvent(event)
   event.eventClass = eventClass
+  const hasMatchup = eventClass === 'team_vs_team' && hasActualPair(event)
 
   if (!canonical?.event?.id) {
     // Solo-event league fallback: SportsCult RSS surfaces show-style fixtures
@@ -2455,15 +2450,6 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
   const leagueLogo = candidateResults[2]?.image || null
   const eventIdentity = candidateResults[3]?.image || candidateResults[4]?.image || null
   const matchupLogo = await buildMatchupLogoPair(homeBadge, awayBadge, Math.max(logoSize, leagueLogoSize))
-  if (!homeBadge && !awayBadge && !leagueLogo && !eventIdentity) {
-    return {
-      buffer: null,
-      logoKind: 'fallback-glyph',
-      logoFallbackReason: `no_real_logo_resolved:${summarizeLogoAttempts(logoLookupAttempts)}`,
-      logoLookupAttempts
-    }
-  }
-
   const theme = {
     homeColor: homeBadge?.color || leagueLogo?.color || eventIdentity?.color || colorForLabel(event.homeTeam || event.sport, '#0f766e'),
     awayColor: awayBadge?.color || colorForLabel(event.awayTeam || event.league || event.sport, '#123c69'),
@@ -2556,15 +2542,6 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
   }
 
   const realLogoSlots = logoSlots.filter((slot) => slot.logoKind && !['fallback-glyph', 'missing-no-glyph'].includes(slot.logoKind))
-  if (realLogoSlots.length === 0) {
-    return {
-      buffer: null,
-      logoKind: 'fallback-glyph',
-      logoFallbackReason: `no_real_logo_visible:${summarizeLogoAttempts(logoLookupAttempts)}`,
-      logoLookupAttempts,
-      logoSlots
-    }
-  }
   const fallbackLogoSlots = logoSlots.filter((slot) => slot.logoKind === 'fallback-glyph')
 
   const buffer = await sharp(Buffer.from(artwork.svg))
@@ -2580,7 +2557,9 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     logoKind: preferredLogoKind(realLogoSlots.map((slot) => slot.logoKind)),
     logoSourceUrl: realLogoSlots[0]?.logoSourceUrl || '',
     logoSourceUrls: Array.from(new Set(realLogoSlots.flatMap((slot) => slot.logoSourceUrls || slot.logoSourceUrl || []).filter(Boolean))),
-    logoFallbackReason: fallbackLogoSlots.length ? `fallback_slots=${fallbackLogoSlots.map((slot) => slot.role || 'logo').join(',')}` : '',
+    logoFallbackReason: fallbackLogoSlots.length
+      ? `fallback_slots=${fallbackLogoSlots.map((slot) => slot.role || 'logo').join(',')}`
+      : '',
     logoRealCount: realLogoSlots.length,
     logoFallbackCount: fallbackLogoSlots.length,
     logoSlots,
@@ -2709,7 +2688,7 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
     })
     if (defaultLogo?.image?.buffer) {
       defaultLogoContext = {
-        leagueLogo: defaultLogo.leagueLogo || defaultLogo.image,
+        leagueLogo: defaultLogo.leagueLogo || null,
         homeBadge: defaultLogo.homeBadge || null,
         awayBadge: defaultLogo.awayBadge || null,
         logoLookupAttempts: defaultLogo.logoLookupAttempts || []

@@ -11,7 +11,7 @@ const {
 const { resolveSportBackdrop } = require('./sportBackdrops')
 const { verifyStampedSportsPosterEntitlement } = require('./entitlement')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260515-ucl-wnba-logo-coverage-v26'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260515-parser-clean-initials-v27'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()

@@ -643,6 +643,21 @@ async function run() {
   assert.equal(noisyLaLiga?.homeTeam, 'Levante', 'sports parser should keep the home team after stripping league/year noise')
   assert.equal(noisyLaLiga?.awayTeam, 'Sevilla', 'sports parser should strip quality/language/broadcast tokens from away team')
 
+  const compactMatchweek = parseSportsTitle('EPL.2026.04.30.Manchester.United.vs.Manchester.City.MW36.1080p', '2026-04-30T12:00:00Z')
+  assert.equal(compactMatchweek?.homeTeam, 'Manchester United', 'compact matchweek title should keep clean home team')
+  assert.equal(compactMatchweek?.awayTeam, 'Manchester City', 'compact matchweek title should strip MW tokens from away team')
+  const spacedMatchweek = parseSportsTitle('Premier League Manchester United vs Wolverhampton Wanderers Matchweek 35', '2026-05-15T12:00:00Z')
+  assert.equal(spacedMatchweek?.league, 'English Premier League', 'spaced matchweek title should keep the league')
+  assert.equal(spacedMatchweek?.awayTeam, 'Wolverhampton Wanderers', 'spaced matchweek title should strip Matchweek tokens')
+  const leadingMatchweek = parseSportsTitle('EPL.MW36.Manchester.United.vs.Brighton.and.Hove.Albion.2026.05.10.1080p.WEB-DL', '2026-05-10T12:00:00Z')
+  assert.equal(leadingMatchweek?.homeTeam, 'Manchester United', 'leading MW title should strip compact matchweek from home team')
+  assert.equal(leadingMatchweek?.awayTeam, 'Brighton and Hove Albion', 'leading MW title should keep the clean away team')
+  const trailingLeague = parseSportsTitle('Manchester.United.vs.Manchester.City.2026.04.30.EPL.MW36.1080p.WEB.h264-FOO', '2026-04-30T12:00:00Z')
+  assert.equal(trailingLeague?.league, 'English Premier League', 'date-before-league title should recover trailing EPL league')
+  assert.equal(trailingLeague?.awayTeam, 'Manchester City', 'date-before-league title should strip trailing MW noise from away team')
+  const leagueAsOpponent = parseSportsTitle('Soccer.EPL.2026.05.10.Manchester.United.vs.Womens.Super.League.1080p', '2026-05-10T12:00:00Z')
+  assert.equal(leagueAsOpponent, null, 'competition phrases must not be accepted as an away team')
+
   const womensChampionsTitle = 'UEFA Womens Champions League 2025 26 Quarter Final 1st Leg 24 03 2026 Arsenal vs Chelsea 1080p 50fps EN BBC'
   const womensChampions = parseSportsTitle(womensChampionsTitle, '2026-04-24T12:00:00Z')
   assert.equal(womensChampions?.league, 'UEFA Womens Champions League', 'women Champions League titles should keep the full competition label')

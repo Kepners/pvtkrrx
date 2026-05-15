@@ -967,6 +967,35 @@ async function assertTeamBadgeArtworkProxy() {
       fs.writeFileSync(path.join(PREVIEW_DIR, `${testCase.slug}.png`), response.body)
     }
 
+    const fakeOpponentResponse = makeMockResponse()
+    await handleDefaultSportsArtwork(
+      {
+        params: {
+          variant: 'poster',
+          sport: 'football.png'
+        },
+        query: {
+          league: 'English Premier League',
+          title: 'Arsenal vs Womens Super League',
+          date: '2026-05-10',
+          home: 'Arsenal',
+          away: 'Womens Super League',
+          eventClass: 'team_vs_team'
+        }
+      },
+      fakeOpponentResponse,
+      {
+        sportsmetaBaseUrl: 'https://sportsmeta.test'
+      }
+    )
+    assert.equal(fakeOpponentResponse.statusCode, 200, 'league-as-opponent fallback should return 200')
+    assert.equal(fakeOpponentResponse.headers['content-type'], 'image/png', 'league-as-opponent fallback should return PNG')
+    assert.equal(fakeOpponentResponse.headers['x-pvtkrrx-artwork-logo-kind'], 'fallback-glyph', 'league-as-opponent fallback should not promote a team badge to a league/event logo')
+    assert.equal(Number(fakeOpponentResponse.headers['x-pvtkrrx-logo-real-count'] || 0), 0, 'league-as-opponent fallback should not paint real logos from the full title haystack')
+    assert.ok(Number(fakeOpponentResponse.headers['x-pvtkrrx-logo-fallback-count'] || 0) >= 1, 'league-as-opponent fallback should paint visible fallback initials')
+    assert.doesNotMatch(String(fakeOpponentResponse.headers['x-pvtkrrx-logo-slots'] || ''), /real-team/i, 'league-as-opponent slots should not contain team crest assignments')
+    assert.deepEqual(pngDimensions(fakeOpponentResponse.body), dimensions.poster, 'league-as-opponent fallback dimensions')
+
     const directLogoCases = [
       {
         slug: 'direct-nhl-team-logos',

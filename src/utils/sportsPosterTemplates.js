@@ -428,7 +428,7 @@ function eventFacts(event = {}) {
 // Names that look like placeholder fallbacks rather than real
 // competitor/team names. Used to suppress fake-matchup rendering on
 // solo events that only have generic event labels.
-const FORBIDDEN_PAIR_NAMES = new Set(['', 'home', 'away', 'team', 'event', 'session', 'fighter', 'player', 'competitor', 'tba', 'tbd', 'unknown', 'n/a', 'na', 'sports', 'sport'])
+const FORBIDDEN_PAIR_NAMES = new Set(['', 'home', 'away', 'team', 'event', 'session', 'fighter', 'player', 'competitor', 'tba', 'tbd', 'unknown', 'n/a', 'na', 'sports', 'sport', 'league', 'matchweek', 'mw', 'gw', 'md', 'wd', 'wsm'])
 
 function pickRealSide(...candidates) {
   for (const candidate of candidates) {
