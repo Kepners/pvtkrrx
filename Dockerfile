@@ -51,7 +51,9 @@ WORKDIR /app
 # Install production deps first so Docker layer cache can reuse them when
 # only source files change.
 COPY package*.json ./
-RUN npm ci --omit=dev
+RUN npm ci --omit=dev --include=optional \
+        && npm rebuild sharp \
+        && node -e "const sharp = require('sharp'); console.log('sharp ok', sharp.versions.sharp, sharp.versions.vips)"
 
 # App source
 COPY . .
