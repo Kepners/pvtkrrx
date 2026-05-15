@@ -291,6 +291,7 @@ async function run() {
     assert.match(configureHtml, /<meta name="robots" content="noindex,nofollow,noarchive">/i, 'configure page should not be indexable')
     assert.match(configureHtml, /<meta property="og:image" content="https:\/\/www\.pvtkrrx\.cc\/social\/pvtkrrx-configure\.png">/i, 'configure page should expose the configure social image')
     assert.equal(String(configureRes.headers.get('x-robots-tag') || '').toLowerCase(), 'noindex, nofollow, noarchive', 'configure page should emit an X-Robots-Tag header')
+    assert.match(String(configureRes.headers.get('cache-control') || ''), /no-store/i, 'configure page should not be publicly cached')
     assert.doesNotMatch(configureHtml, />Manifest<\/a>/i, 'configure page should not render a manifest nav link')
     assert.match(configureHtml, /Windows Host App/, 'configure page should include the desktop host app console header')
     assert.match(configureHtml, /This page runs on the Windows host\./, 'configure page should include the desktop host app summary copy')

@@ -473,6 +473,7 @@ function sendConfigurePage(req, res) {
   const runtimeHeadExtras = `<script>window.__PVTKRRX_RUNTIME_BOOTSTRAP__=${runtimeBootstrapJson};</script>`
   const runtimeBodyClass = getConfigureBodyClasses(runtimeConfig)
   res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive')
+  res.setHeader('Cache-Control', 'no-store')
   res.type('html').send(
     configPageTemplate
       .replace('</head>', `${runtimeHeadExtras}</head>`)

@@ -197,6 +197,7 @@ async function run() {
     const configureRes = await request(port, 'GET', '/configure')
     assert.equal(configureRes.status, 200)
     const csrf = readCsrf(configureRes.headers['set-cookie'])
+    assert.match(String(configureRes.headers['cache-control'] || ''), /no-store/i, 'self-host configure page should not be publicly cached')
     assert.match(configureRes.text, /<body class="[^"]*runtime-config-pending[^"]*selfhost-seedbox-only[^"]*">/i)
     assert.match(configureRes.text, /__PVTKRRX_RUNTIME_BOOTSTRAP__/)
     assert.match(configureRes.text, /Self-Hosted Server/i)
