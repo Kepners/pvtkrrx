@@ -148,6 +148,23 @@ function resolveConfiguredSportsPosterTemplate(input = {}) {
   return resolveSportsPosterTemplate(verified.resolvedTemplate || 'ticket-stub')
 }
 
+// The artwork proxy route carries NO config token (Stremio hits it directly).
+// To make a configured owner/admin's selected style actually reach the
+// renderer, the catalog forwards the STAMPED entitlement fields on the URL.
+// The proxy re-runs verifyStampedSportsPosterEntitlement against the LIVE env
+// owner/admin list, so a leaked URL with a non-owner stamp still degrades to
+// ticket-stub (anti-leak preserved) — only a genuine, env-verifiable owner/
+// admin stamp unlocks the selected style.
+function appendEntitlementStampParams(url, input = {}) {
+  const config = input && typeof input.config === 'object' ? input.config : null
+  const requestedTemplate = String(input?.sportsPosterTemplate || config?.sportsPosterTemplate || '').trim()
+  const stampedSource = String(input?.entitlementSource || config?.entitlementSource || '').trim()
+  const stampedHash = String(input?.entitlementOwnerEmailHash || config?.entitlementOwnerEmailHash || '').trim()
+  if (requestedTemplate) url.searchParams.set('reqTemplate', requestedTemplate)
+  if (stampedSource) url.searchParams.set('entSource', stampedSource)
+  if (stampedHash) url.searchParams.set('entHash', stampedHash)
+}
+
 function resolveSportsArtworkLayoutFamily(input = {}) {
   return layoutFamilyForSportsPosterRender(resolveConfiguredSportsPosterTemplate(input), input)
 }
@@ -184,6 +201,7 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
       if (input?.source) url.searchParams.set('source', normalizeSpace(input.source))
     }
     url.searchParams.set('template', resolveConfiguredSportsPosterTemplate(input))
+    appendEntitlementStampParams(url, input)
     url.searchParams.set('v', SPORTS_ARTWORK_PROXY_VERSION)
     return url.toString()
   }
@@ -202,6 +220,7 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
   if (input?.size) url.searchParams.set('size', normalizeSpace(input.size))
   if (input?.source) url.searchParams.set('source', normalizeSpace(input.source))
   url.searchParams.set('template', resolveConfiguredSportsPosterTemplate(input))
+  appendEntitlementStampParams(url, input)
   url.searchParams.set('v', SPORTS_ARTWORK_PROXY_VERSION)
   return url.toString()
 }

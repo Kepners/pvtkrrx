@@ -3096,19 +3096,42 @@ function resolveSportsmetaBaseUrlFromConfig(config = {}) {
 }
 
 function resolveSportsPosterTemplateFromConfig(config = {}, req = null) {
-  // Server-side admin override wins first. This is the OPERATOR's explicit
-  // server-wide env choice (the "Server-side admin override active" the
-  // configure page reports). The public artwork route is hit by Stremio with
-  // no config token, so without this the admin's selected style could never
-  // reach the renderer. Honouring an env-level operator choice does not
-  // weaken anti-leak (that protects against leaked *user* config URLs).
+  // (1) Server-side admin override wins first. This is the OPERATOR's
+  // explicit server-wide env choice (the "Server-side admin override active"
+  // the configure page reports). The public artwork route is hit by Stremio
+  // with no config token, so without this the admin's selected style could
+  // never reach the renderer. An env-level operator choice does not weaken
+  // anti-leak (that protects against leaked *user* config URLs).
   const serverAdminTemplate = resolveServerAdminPosterTemplate(process.env)
   if (serverAdminTemplate) return resolveSportsPosterTemplate(serverAdminTemplate)
 
-  // Otherwise honour the stamped entitlement on the decrypted config token;
-  // revoke instantly when the env owner list no longer covers the stamped
-  // owner-email hash. Stale ?template= query strings are ignored so a leaked
-  // URL cannot bypass the gate when the saved config was downgraded.
+  // (2) URL-forwarded stamped entitlement. The configured catalog/meta
+  // handler decrypted the user's token and forwarded the stamp
+  // (entSource/entHash + reqTemplate) on the artwork URL because this route
+  // has no token of its own. Re-run the SAME verification the catalog ran,
+  // against the LIVE env owner/admin list — a leaked URL with a non-owner
+  // (or absent) stamp still verifies to NONE -> ticket-stub, so the public
+  // free-tier lock is intact; only a genuine env-verifiable owner/admin
+  // stamp unlocks the selected style. This is what makes a fresh configured
+  // install that selected broadcast/glitch/etc. actually render it.
+  const q = req && typeof req.query === 'object' ? req.query : {}
+  const urlReqTemplate = String(q.reqTemplate || '').trim()
+  const urlEntSource = String(q.entSource || '').trim()
+  const urlEntHash = String(q.entHash || '').trim()
+  if (urlEntSource) {
+    const urlVerified = verifyStampedSportsPosterEntitlement({
+      requestedTemplate: urlReqTemplate,
+      stampedSource: urlEntSource,
+      stampedHash: urlEntHash
+    })
+    if (urlVerified.allowed && urlVerified.resolvedTemplate) {
+      return resolveSportsPosterTemplate(urlVerified.resolvedTemplate)
+    }
+  }
+
+  // (3) Otherwise honour the stamped entitlement on the decrypted config
+  // token (when this handler IS given one); revoke instantly when the env
+  // owner list no longer covers the stamped owner-email hash.
   const requestedTemplate = String(config?.sportsPosterTemplate || '').trim()
   const stampedSource = String(config?.entitlementSource || '').trim()
   const stampedHash = String(config?.entitlementOwnerEmailHash || '').trim()
