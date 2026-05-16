@@ -2320,6 +2320,9 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
     const h = String(state?.h || '').toLowerCase()
     const p = String(state?.p || '')
     console.log(`[file-route] hash=${String(h || '').slice(0, 8)} hasPath=${Boolean(p)}`)
+    res.setHeader('Accept-Ranges', 'bytes')
+    res.setHeader('Cache-Control', 'no-store')
+    res.setHeader('Connection', 'keep-alive')
     const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
     const playback = await loadTorrentPlaybackState(qbit, String(h || '').toLowerCase(), p, req.config.additionalStorageRoots)
     let isOrphanFile = false
@@ -2658,6 +2661,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
 
       const canBufferViaBuiltinFileRoute = fileUrl.startsWith(builtinFileUrlPrefix)
       if (!complete && !canBufferViaBuiltinFileRoute) return false
+      if (!complete && state.ready !== true) return false
 
       console.log(
         `[playback-route] ${reason} -> redirect file${complete ? '' : ' (buffering via /file)'}`

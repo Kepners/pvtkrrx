@@ -295,8 +295,8 @@ async function run() {
     { path: 'Legacy/Movie.Name.2026.DVDRip.XviD.avi', length: 900_000_000 }
   ])
   const newQueuedPayload = buildTorrentPayload([
-    { path: 'Movie.Name.2026.1080p.WEB-DL.x264.mkv', length: 12_000_000_000 },
-    { path: 'Extras/behind-the-scenes.mkv', length: 800_000_000 }
+    { path: 'Movie.Name.2026.1080p.WEB-DL.x264.mkv', length: 100 * 1024 * 1024 },
+    { path: 'Extras/behind-the-scenes.nfo', length: 800_000 }
   ])
   const inferredHash = String(inspectTorrentPayload(inferredPayload).infoHash || '').toLowerCase()
   const newQueuedHash = String(inspectTorrentPayload(newQueuedPayload).infoHash || '').toLowerCase()
@@ -317,19 +317,20 @@ async function run() {
   const newQueuedFiles = [
     {
       name: 'Movie.Name.2026.1080p.WEB-DL.x264.mkv',
-      size: 12_000_000_000,
+      size: 100 * 1024 * 1024,
       progress: 0.01,
       index: 0,
       piece_range: [0, 2400]
     },
     {
-      name: 'Extras/behind-the-scenes.mkv',
-      size: 800_000_000,
+      name: 'Extras/behind-the-scenes.nfo',
+      size: 800_000,
       progress: 0,
       index: 1,
       piece_range: [2401, 2560]
     }
   ]
+  fs.writeFileSync(path.join(runtimeDir, newQueuedFiles[0].name), Buffer.alloc(64 * 1024 * 1024, 9))
 
   QBitClient.prototype.torrents = async () => [
     torrent,
@@ -382,7 +383,7 @@ async function run() {
       }
       return states
     }
-    if (normalized === newQueuedHash) return [2, 0, 0, 0, 0, 0]
+    if (normalized === newQueuedHash) return Array.from({ length: 20 }, (_value, index) => index < 6 ? 2 : 0)
     return []
   }
   QBitClient.prototype.add = async (_link, options = {}) => {
@@ -505,6 +506,11 @@ async function run() {
       'new tracker torrents should prioritize the selected video file and demote unrelated files'
     )
 
+    const coldIncompleteResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(incompletePlaybackToken)}`)
+    assert.equal(coldIncompleteResponse.status, 503, 'incomplete playback should not redirect into /file before the selected file has a real contiguous head buffer')
+    assert.equal(String(coldIncompleteResponse.headers.location || ''), '', 'cold incomplete playback should not hand Stremio a premature file URL')
+
+    incompletePieceStates = [2, 2, 2, 2, 2, 2]
     const incompleteResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(incompletePlaybackToken)}`)
     assert.equal(incompleteResponse.status, 302, 'incomplete playback should redirect into the shared file route instead of timing out inside /playback')
     assert.match(String(incompleteResponse.headers.location || ''), new RegExp(`/${configToken}/file/`), 'incomplete playback redirect should target the shared file route')
@@ -524,6 +530,7 @@ async function run() {
     assert.equal(seekRangeResponse.status, 206, 'seek-like range probes should stay on the player when qBit has already downloaded the requested piece window')
     assert.match(String(seekRangeResponse.headers['content-range'] || ''), /^bytes 20971520-\d+\/31457280$/)
 
+    incompletePieceStates = [2, 2, 2, 0, 2, 2]
     const sequentialToggleCountBeforeUnavailableSeek = sequentialToggleCalls.length
     promoteIncompleteSeekWindow = true
     const unavailableSeekResponse = await request(
