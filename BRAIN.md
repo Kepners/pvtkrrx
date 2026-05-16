@@ -1,5 +1,36 @@
 # PVTKRRX Brain
 
+## 2026-05-16: Partial Playback Buffer Handoff Hotfix Deployed
+
+- Scope: repair Stremio playback startup for partially downloaded qBittorrent files. This changed both active PVTKRRX server surfaces: the native `/opt/pvtkrrx` `pvtkrrx.service` runtime used by `pvt.kepners.co.uk` and `/selfhost/*`, and the public Coolify container for `www.pvtkrrx.cc`. It did not change DNS, Caddy route files, qBittorrent credentials, Prowlarr credentials/indexers, SportsMeta, Stripe, Mailcow, or download paths.
+- Root cause: `/playback` could redirect Stremio into `/file` once qBittorrent exposed the selected file path, even when qBit had downloaded scattered pieces rather than a contiguous playable head buffer. The old readiness estimate used progress percent, which can be misleading for progressive playback.
+- Fix shipped:
+  - `/playback` now requires `state.ready === true` before redirecting an incomplete torrent to `/file`.
+  - `loadTorrentPlaybackState` now computes contiguous readable bytes from qBittorrent `properties().piece_size`, file `piece_range`, and `pieceStates()`; if qBit cannot prove the contiguous head pieces for an incomplete local file, playback fails closed and waits.
+  - `/file` now sets media-friendly `Accept-Ranges: bytes`, `Cache-Control: no-store`, and `Connection: keep-alive` headers before serving.
+- Release-line/self-host deploy:
+  - `main` hotfix commit: `b5b4b748611e343aa89e2ae6b3c3ae66a083e244` (`Harden playback buffer readiness proof`), cherry-picked on top of `1.1.69`.
+  - `/opt/pvtkrrx/REVISION` now records `b5b4b748611e343aa89e2ae6b3c3ae66a083e244`.
+  - Backup: `/opt/pvtkrrx-backups/20260517-004715-playback-buffer-b5b4b74/pvtkrrx-code-pre-b5b4b74.tar`.
+  - `pvtkrrx.service` restarted and returned `active/running`.
+- Public Coolify deploy:
+  - Existing Coolify branch remains `integrate/sportcult-category-contract`.
+  - Deployment queue row `733` finished for `ab5caa61f8b756685732d9bf855d18bf2c34f81b`.
+  - Running container: `w14jewmw5ubscrxh8zzfhq7d-225009626040`.
+  - Running image: `w14jewmw5ubscrxh8zzfhq7d:ab5caa61f8b756685732d9bf855d18bf2c34f81b`.
+  - Container env: `SOURCE_COMMIT=ab5caa61f8b756685732d9bf855d18bf2c34f81b`, `COOLIFY_BRANCH=integrate/sportcult-category-contract`.
+- Proof:
+  - Feature branch `ab5caa61f8b756685732d9bf855d18bf2c34f81b`: `npm run smoke:playback` and `npm run smoke:pipeline` passed.
+  - Clean release-line hotfix worktree `b5b4b748611e343aa89e2ae6b3c3ae66a083e244`: `npm run smoke:playback`, `npm run smoke:pipeline`, and `npm run smoke:selfhost` passed with package version `1.1.69`.
+  - Remote `/opt/pvtkrrx` playback smoke passed with `./.node/node-v22.14.0-linux-x64/bin/node scripts/smoke-playback-route.js`.
+  - `https://pvt.kepners.co.uk/health`, local `http://127.0.0.1:7000/health`, and `https://www.pvtkrrx.cc/health` returned healthy responses after deploy.
+  - `https://pvt.kepners.co.uk/version-status.json` returned `currentVersion=1.1.69`, `latestVersion=1.1.69`, `updateAvailable=false`.
+  - Code grep confirmed both live surfaces contain the `pieceVerifiedReadableBytes` logic, incomplete-torrent `state.ready !== true` guard, and `Accept-Ranges` headers.
+- Weak points:
+  - No real Stremio client playback test was run against an actively partial torrent after deployment.
+  - The public Coolify container still reports package version `1.1.68` from the feature branch, so `https://www.pvtkrrx.cc/version-status.json` still says update available to `1.1.69`.
+  - The branch split remains unresolved: public Coolify tracks `integrate/sportcult-category-contract`, while `/opt/pvtkrrx` is deliberately on a `1.1.69` main hotfix to avoid downgrading the self-host server.
+
 ## 2026-05-15: Coolify sharp/libvips Dockerfile fix proven, not deployed
 
 - Scope: public Coolify Docker build path only. Production still runs on the cached recovery image `w14jewmw5ubscrxh8zzfhq7d:e43a9fe4363850108db3c17e5a7658b35afc3d50` via `pvtkrrx-recovery`; this follow-up did not move public traffic to a fresh Coolify image.
@@ -13,16 +44,17 @@
   - Throwaway Contabo container/image and `/tmp/pvtkrrx-sharp-proof` were removed after proof.
 - Current production guardrail: Coolify auto-deploy remains disabled. Do not re-enable it until a controlled Coolify deployment of this hardened Dockerfile boots and live routes are rechecked.
 
-## Live Topology (verified 2026-04-30)
+## Live Topology (verified 2026-05-16)
 
-**There is exactly one PVTKRRX runtime serving real users**: the Coolify Docker container. The systemd `pvtkrrx.service` that used to coexist on `/opt/pvtkrrx` has been stopped + disabled + masked on 2026-04-30 because it was a redundant second runtime that real users never hit. Do not bring it back without explicit need.
+There are currently two PVTKRRX server surfaces on Contabo. Keep them separate when proving or deploying fixes:
 
 | Surface | Where | Watches |
 |---|---|---|
-| `https://www.pvtkrrx.cc` | Coolify Docker container `w14jewmw5ubscrxh8zzfhq7d-...` (image tag = git SHA on `main`), bound to internal `pvtkrrx:3000`, fronted by Caddy reverse_proxy | GitHub `Kepners/pvtkrrx` branch `main` |
+| `https://www.pvtkrrx.cc` except `/selfhost/*` | Coolify Docker container `w14jewmw5ubscrxh8zzfhq7d-...`, bound to internal `pvtkrrx:3000`, fronted by Caddy reverse_proxy | GitHub `Kepners/pvtkrrx` branch `integrate/sportcult-category-contract` as of the 2026-05-16 playback deploy |
+| `https://www.pvtkrrx.cc/selfhost/*`, `https://pvtkrrx.cc/selfhost/*`, and `https://pvt.kepners.co.uk/*` | Native systemd `pvtkrrx.service`, working directory `/opt/pvtkrrx`, port `7000`, fronted by Caddy `host.docker.internal:7000` | Manual tarball/rsync-style deploy into `/opt/pvtkrrx`, currently on `main` hotfix commit `b5b4b748611e343aa89e2ae6b3c3ae66a083e244` |
 | `https://sportsmeta.pvtkrrx.cc` | systemd `sportsmeta.service` (no Docker, no Coolify), source at `/opt/sportsmeta/app` | manual rsync deploy |
 
-`/opt/pvtkrrx/` on the box still exists, but as a **shared resource directory** (Node binary used by `sportsmeta.service` + bind-mount points for the Coolify container). It is no longer a standalone runtime. See `/opt/pvtkrrx/README-OPS.md` on the box for the full breakdown.
+Do not use the public Coolify container as proof that the self-host playback route changed, and do not use `/opt/pvtkrrx` proof as proof that the normal public website changed. The 2026-05-16 playback fix was intentionally deployed to both surfaces.
 
 ## Bootstrap Manifest Lock - 2026-05-09
 
