@@ -1,10 +1,20 @@
 # PVTKRRX Project Status
 
-Updated: 2026-05-14
+Updated: 2026-05-16
 
 ## Current Stage
 
-PVTKRRX is preparing the synchronized `1.1.68` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The current release priority is the Windows installer finish-path repair plus the Contabo `/selfhost/*` route split so the self-host manifest works with and without `www`.
+PVTKRRX is synchronized on the `1.1.69` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The current release priority was the seedbox/playback fix: selected torrents are resumed, moved to top qBittorrent queue priority when supported, kept sequential, and selected files are prioritized before playback waits.
+
+## 2026-05-16: v1.1.69 seedbox playback priority release
+
+- Released commit `ae7d908c0f6066a82475d475cfae83b0fbba7b1c` to `main`, GitHub desktop release `v1.1.69`, paired self-host release `v1.1.69-selfhost`, the public Coolify website, and the native `/opt/pvtkrrx` self-host runtime.
+- Playback fix: `/playback` now adds new torrents unpaused with sequential download, resumes incomplete selected torrents, requests top queue priority when qBittorrent supports queueing, promotes the selected video/archive files, demotes unrelated files, and redirects to `/file` as soon as qBittorrent exposes the selected file.
+- Windows release assets published: `PVTKRRX-Setup-1.1.69.exe`, `PVTKRRX.1.1.69.exe`, `PVTKRRX-Setup-1.1.69.exe.blockmap`, `latest.yml`, and `install-selfhost.sh`.
+- Local proof passed before release: `npm run smoke:win-installer-path`, `npm run smoke:playback`, `npm run smoke:desktop`, `npm run smoke:config`, `npm run smoke:selfhost`, `npm run smoke:pipeline`, `npm run smoke:remote-seedbox-guard`, `npm run smoke:guards`, `npm run smoke:parity`, and `npm run dist:win`.
+- Live proof after release: `https://www.pvtkrrx.cc/version-status.json` returned `currentVersion=1.1.69`, `latestVersion=1.1.69`, `updateAvailable=false`, setup asset `PVTKRRX-Setup-1.1.69.exe`, and portable asset `PVTKRRX.1.1.69.exe`.
+- Live download proof: `https://www.pvtkrrx.cc/download/windows/setup` redirects to the `v1.1.69` setup EXE, and `/download/windows/portable` redirects to the `v1.1.69` portable EXE.
+- Live seedbox proof: `https://www.pvtkrrx.cc/selfhost/manifest.json?mode=hosted` and `https://pvtkrrx.cc/selfhost/manifest.json?mode=hosted` both return manifest version `1.1.69`; `pvtkrrx.service` is active on `/opt/pvtkrrx` at revision `ae7d908c0f6066a82475d475cfae83b0fbba7b1c`.
 
 ## 2026-05-14: v1.1.68 installer finish-path and self-host route repair
 
