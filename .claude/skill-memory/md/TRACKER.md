@@ -17,6 +17,17 @@
 | 6 | ✅ done | Implement parser fix per §7 (test-driven harness) | 2026-05-16 | ✅ commit `d761c01`, 23/23 green (17 §7 + 6 regression); `parseSportsTitleContract` + clubIdentity.js + leagueMap; NOT yet wired to consumers |
 | 7 | ✅ DONE | SHIP IT — client-authorised test deploy: wire contract into consumers + hardened Dockerfile + controlled Coolify deploy + verify live | 2026-05-16 | ✅ commit `da6bdb4` LIVE on `www.pvtkrrx.cc` (container `w14jewmw5ubscrxh8zzfhq7d-165144371361`, SOURCE_COMMIT=da6bdb4, manifest 200, hostname-clean, parser fix observable, RestartCount=0). Branch HEAD = parser `d761c01` + Codex playback `9cc94b7` + consumer migration `da6bdb4` all deployed together. Site never 502 (rolling update). Gate: smoke:sports-parser 23/23, smoke:sports-resolution + pipeline + playback + remote-seedbox-guard PASS; only known motorsport smoke fails (== baseline) |
 
+## Live regressions found in client testing 2026-05-16 (parser shipped, artwork NOT)
+| # | Priority | Item | Status |
+|---|----------|------|--------|
+| 8 | 🔴 DIR-001 BLOCKER | Blank black squares on single-event/combat/ancillary posters — live logs: `pvtkrrx-template-glyph` glyph fallback renders empty black centre (200/svg, not a crash). Team-vs-team fine. | 🔄 local fixes on feature branch; visual-proof gate still required after v28 deploy |
+| 9 | 🔴 HIGH | Poster-style admin override ignored — 100% live renders `template=ticket-stub` despite "Server-side admin override active. Selected style: Glitch"; `resolveSportsPosterTemplateFromConfig`→`verifyStampedSportsPosterEntitlement` always falls back to ticket-stub | ✅ live env fixed and 09a07a0 logs now show `template=glitch`; keep verifying after next deploy |
+| 10 | 🟠 HIGH | Catalog ~30s + incomplete — `cache=rendered` not `cache=hit` (cache-key churn?), per-item SportsMeta lookups serial | 🔄 same agent |
+| — | note | All 3 are BACKEND Node (`sportsArtworkProxy.js` + catalog handler) — no EXE needed for hosted route; desktop EXE is separate later parity release. MD over-claimed "verified" on the parser ship — must verify on-screen, not via smoke logs (client correction). |
+| 9a | 🔴 ROOT CAUSE | BUG 9 cause FOUND: live Coolify container had **NO `PVTKRRX_OWNER_EMAILS`/`PVTKRRX_ADMIN_EMAILS` env set** → `verifyStampedSportsPosterEntitlement` (entitlement.js:252) owner allowlist was empty → always ticket-stub. Owner=`kepners@gmail.com`, sha256=`d86b1757…bf60f7`. Fix: set `PVTKRRX_OWNER_EMAILS=kepners@gmail.com` durably at Coolify resource level + verify configure stamps OWNER_OVERRIDE+hash. | ✅ verified live container has `PVTKRRX_OWNER_EMAILS` and Coolify app env row exists |
+| 11 | 🟡 PARKED | Client asked: check Stripe users afterwards (after parser/artwork stable) — do once the live fixes are verified | ⏳ parked, not lost |
+| 12 | 🔴 DIR-001 | White/light logos or fallback initials disappear on cream ticket-stub body. | 🔄 v28 local fix adds luminance-aware dark plates + URL/cache version bump; proof PNGs generated under `.runtime/sports-artwork-previews` |
+
 ## Incident
 - [2026-05-15 Coolify sharp build outage](../../incidents/2026-05-15_coolify-sharp-build-outage.md) — P1 total outage from Codex push auto-deployed by Coolify; recovered on cached known-good image (`pvtkrrx-recovery` container, `e43a9fe`); Coolify auto-deploy disabled (`application_settings.is_auto_deploy_enabled=false`). Dockerfile hardening proven locally + Contabo daemon, NOT via Coolify yet. Build fix must precede any redeploy + DIR-001 gate.
 

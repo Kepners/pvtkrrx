@@ -38,7 +38,11 @@ const {
   resolveSportBackdropBucket
 } = require('../utils/sportBackdrops')
 const { SPORTS_ARTWORK_PROXY_VERSION } = require('../utils/sportsArtwork')
-const { verifyStampedSportsPosterEntitlement, resolveServerAdminPosterTemplate } = require('../utils/entitlement')
+const {
+  ENTITLEMENT_SOURCE,
+  verifyStampedSportsPosterEntitlement,
+  resolveServerAdminPosterTemplate
+} = require('../utils/entitlement')
 
 const VARIANT_DIMENSIONS = {
   poster: { width: 600, height: 900 },
@@ -48,7 +52,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260515-parser-clean-initials-v27'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260516-contrast-safe-logo-v28'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -302,7 +306,7 @@ async function renderEmergencyTemplatePng(variant, fallbackInput = {}, template 
     const glyphSvg = renderLogoGlyphSvg({ role: slot.role, event, theme, size: slot.size })
     if (!glyphSvg) continue
     composites.push({
-      input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size),
+      input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size, { frame: true }),
       left: slot.left,
       top: slot.top
     })
@@ -415,7 +419,7 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
         const glyphSvg = renderLogoGlyphSvg({ role: slot.role, event, theme, size: slot.size })
         if (glyphSvg) {
           composites.push({
-            input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size),
+            input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size, { frame: true }),
             left: slot.left,
             top: slot.top
           })
@@ -2224,6 +2228,38 @@ function applyCachedLogoResult(value, attempt, { targetUrl, key, fallbackColor }
   }
 }
 
+// Mean luminance of a logo's opaque pixels. Light transparent PNG marks can
+// vanish on the cream ticket-stub body, so framed slots choose a contrasting
+// backing from this signal. Returns 0..255, or null when undecidable.
+async function opaqueMeanLuminance(buffer) {
+  try {
+    const img = sharp(buffer, { density: 96 }).resize({
+      width: 48,
+      height: 48,
+      fit: 'contain',
+      background: { r: 0, g: 0, b: 0, alpha: 0 }
+    })
+    const { data, info } = await img.raw().toBuffer({ resolveWithObject: true })
+    const ch = info.channels
+    let sum = 0
+    let aSum = 0
+    for (let i = 0; i < data.length; i += ch) {
+      const r = data[i]
+      const g = data[i + 1]
+      const b = data[i + 2]
+      const a = ch >= 4 ? data[i + 3] : 255
+      if (a < 16) continue
+      const lum = (0.299 * r) + (0.587 * g) + (0.114 * b)
+      sum += lum * (a / 255)
+      aSum += a / 255
+    }
+    if (aSum < 1) return null
+    return sum / aSum
+  } catch (_) {
+    return null
+  }
+}
+
 async function resizeCompositionBuffer(buffer, size = 210, options = {}) {
   const canvasSize = Math.max(24, Math.round(Number(size) || 210))
   const framed = options.frame === true
@@ -2241,8 +2277,13 @@ async function resizeCompositionBuffer(buffer, size = 210, options = {}) {
     .toBuffer()
   const radius = Math.max(5, Math.round(canvasSize * 0.12))
   const stroke = Math.max(2, Math.round(canvasSize * 0.035))
+  // Contrast-safe plate: dark backing for light marks, cream for dark marks.
+  const lum = await opaqueMeanLuminance(logo)
+  const lightLogo = lum !== null && lum >= 168
+  const plateFill = lightLogo ? 'rgba(15,23,42,0.96)' : 'rgba(248,242,223,0.96)'
+  const plateStroke = lightLogo ? 'rgba(248,242,223,0.92)' : '#ffffff'
   const frameSvg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${canvasSize}" height="${canvasSize}" viewBox="0 0 ${canvasSize} ${canvasSize}">
-    <rect x="${Math.round(stroke / 2)}" y="${Math.round(stroke / 2)}" width="${canvasSize - stroke}" height="${canvasSize - stroke}" rx="${radius}" fill="rgba(248,242,223,0.96)" stroke="#ffffff" stroke-width="${stroke}"/>
+    <rect x="${Math.round(stroke / 2)}" y="${Math.round(stroke / 2)}" width="${canvasSize - stroke}" height="${canvasSize - stroke}" rx="${radius}" fill="${plateFill}" stroke="${plateStroke}" stroke-width="${stroke}"/>
   </svg>`)
   return sharp({
     create: {
@@ -2512,7 +2553,7 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
       const glyphSvg = renderLogoGlyphSvg({ role: slot.role, event, theme, size: slot.size })
       if (glyphSvg) {
         composites.push({
-          input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size),
+          input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size, { frame: true }),
           left: slot.left,
           top: slot.top
         })
@@ -3118,7 +3159,9 @@ function resolveSportsPosterTemplateFromConfig(config = {}, req = null) {
   const urlReqTemplate = String(q.reqTemplate || '').trim()
   const urlEntSource = String(q.entSource || '').trim()
   const urlEntHash = String(q.entHash || '').trim()
-  if (urlEntSource) {
+  const urlVerifiableSource = urlEntSource === ENTITLEMENT_SOURCE.OWNER_OVERRIDE ||
+    urlEntSource === ENTITLEMENT_SOURCE.ADMIN_OVERRIDE
+  if (urlVerifiableSource && urlEntHash) {
     const urlVerified = verifyStampedSportsPosterEntitlement({
       requestedTemplate: urlReqTemplate,
       stampedSource: urlEntSource,

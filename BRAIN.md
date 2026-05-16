@@ -13,6 +13,13 @@
   - Throwaway Contabo container/image and `/tmp/pvtkrrx-sharp-proof` were removed after proof.
 - Current production guardrail: Coolify auto-deploy remains disabled. Do not re-enable it until a controlled Coolify deployment of this hardened Dockerfile boots and live routes are rechecked.
 
+## Live Sports Artwork Incident - 2026-05-16
+
+- Coolify app UUID `w14jewmw5ubscrxh8zzfhq7d` is currently tracking branch `integrate/sportcult-category-contract` (verified from Coolify DB), not `main`. Do not assume `main` is the live branch during this incident.
+- Live owner entitlement env is durably present at the Coolify resource level: `PVTKRRX_OWNER_EMAILS=kepners@gmail.com` exists in the running container and an encrypted runtime env row exists for app id 9. This fixes the empty-owner-allowlist cause of admin/owner poster styles falling back to `ticket-stub`.
+- The next artwork deploy from this branch must carry raster cache/render version `20260516-contrast-safe-logo-v28`, which adds contrast-safe logo plates for white/light logos and restricts URL-forwarded entitlement stamps to owner/admin overrides only.
+- Acceptance bar: after deploy, the running container `SOURCE_COMMIT` must equal the pushed commit, live artwork headers must report cache/render version `20260516-contrast-safe-logo-v28`, and owner/admin style override logs must continue showing the requested non-ticket template instead of `ticket-stub`.
+
 ## Live Topology (verified 2026-04-30)
 
 **There is exactly one PVTKRRX runtime serving real users**: the Coolify Docker container. The systemd `pvtkrrx.service` that used to coexist on `/opt/pvtkrrx` has been stopped + disabled + masked on 2026-04-30 because it was a redundant second runtime that real users never hit. Do not bring it back without explicit need.

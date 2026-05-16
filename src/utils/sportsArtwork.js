@@ -9,9 +9,13 @@ const {
   resolveSportsPosterTemplate
 } = require('./sportsPosterTemplates')
 const { resolveSportBackdrop } = require('./sportBackdrops')
-const { verifyStampedSportsPosterEntitlement, resolveServerAdminPosterTemplate } = require('./entitlement')
+const {
+  ENTITLEMENT_SOURCE,
+  verifyStampedSportsPosterEntitlement,
+  resolveServerAdminPosterTemplate
+} = require('./entitlement')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260515-parser-clean-initials-v27'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260516-contrast-safe-logo-v28'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
@@ -160,9 +164,12 @@ function appendEntitlementStampParams(url, input = {}) {
   const requestedTemplate = String(input?.sportsPosterTemplate || config?.sportsPosterTemplate || '').trim()
   const stampedSource = String(input?.entitlementSource || config?.entitlementSource || '').trim()
   const stampedHash = String(input?.entitlementOwnerEmailHash || config?.entitlementOwnerEmailHash || '').trim()
+  const urlVerifiableSource = stampedSource === ENTITLEMENT_SOURCE.OWNER_OVERRIDE ||
+    stampedSource === ENTITLEMENT_SOURCE.ADMIN_OVERRIDE
+  if (!urlVerifiableSource || !stampedHash) return
   if (requestedTemplate) url.searchParams.set('reqTemplate', requestedTemplate)
-  if (stampedSource) url.searchParams.set('entSource', stampedSource)
-  if (stampedHash) url.searchParams.set('entHash', stampedHash)
+  url.searchParams.set('entSource', stampedSource)
+  url.searchParams.set('entHash', stampedHash)
 }
 
 function resolveSportsArtworkLayoutFamily(input = {}) {
