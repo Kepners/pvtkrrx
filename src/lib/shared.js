@@ -2399,9 +2399,9 @@ async function loadTorrentPlaybackState(qbit, hash, targetPath, additionalStorag
       chosenFile,
       files
     )
-    if (Number.isFinite(pieceVerifiedReadableBytes)) {
-      readableBytes = Math.max(0, Math.min(diskSize, pieceVerifiedReadableBytes))
-    }
+    readableBytes = Number.isFinite(pieceVerifiedReadableBytes)
+      ? Math.max(0, Math.min(diskSize, pieceVerifiedReadableBytes))
+      : 0
   }
   return {
     torrent,
