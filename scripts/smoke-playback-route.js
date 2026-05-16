@@ -133,6 +133,7 @@ async function run() {
   const packedHash = 'd1287d13bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
   const readyPackedHash = 'e1287d13cccccccccccccccccccccccccccccccc'
   const targetedHash = 'f1287d13eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+  const unverifiedHash = 'a1287d13ffffffffffffffffffffffffffffffff'
   const newlyQueuedTorrents = new Set()
   const addFileCalls = []
   const resumeCalls = []
@@ -167,6 +168,16 @@ async function run() {
     download_path: runtimeDir,
     content_path: ''
   }
+  const unverifiedTorrent = {
+    hash: unverifiedHash,
+    name: 'UFC.328.Main.Event.1080p',
+    progress: 0.9,
+    seq_dl: true,
+    f_l_piece_prio: false,
+    save_path: runtimeDir,
+    download_path: runtimeDir,
+    content_path: ''
+  }
   const file = {
     name: 'UFC.Fight.Night.270.Main.Card.1080p.mp4',
     size: payload.length,
@@ -179,6 +190,13 @@ async function run() {
     progress: 0.25,
     index: 0,
     piece_range: [0, 5]
+  }
+  const unverifiedFile = {
+    name: 'buffering/UFC.328.Main.Event.1080p.mkv',
+    size: 100 * 1024 * 1024,
+    progress: 0.9,
+    index: 0,
+    piece_range: [0, 19]
   }
   const packedTorrent = {
     hash: packedHash,
@@ -273,6 +291,7 @@ async function run() {
   fs.writeFileSync(path.join(runtimeDir, file.name), payload)
   fs.mkdirSync(path.join(runtimeDir, 'buffering'), { recursive: true })
   fs.writeFileSync(path.join(runtimeDir, incompleteFile.name), partialPayload)
+  fs.writeFileSync(path.join(runtimeDir, unverifiedFile.name), Buffer.alloc(96 * 1024 * 1024, 8))
   fs.mkdirSync(path.join(runtimeDir, 'Release'), { recursive: true })
   fs.writeFileSync(path.join(runtimeDir, 'Release', 'release.rar'), archivePayload)
   fs.mkdirSync(path.join(runtimeDir, 'Series'), { recursive: true })
@@ -320,14 +339,14 @@ async function run() {
       size: 100 * 1024 * 1024,
       progress: 0.01,
       index: 0,
-      piece_range: [0, 2400]
+      piece_range: [0, 19]
     },
     {
       name: 'Extras/behind-the-scenes.nfo',
       size: 800_000,
       progress: 0,
       index: 1,
-      piece_range: [2401, 2560]
+      piece_range: [20, 20]
     }
   ]
   fs.writeFileSync(path.join(runtimeDir, newQueuedFiles[0].name), Buffer.alloc(64 * 1024 * 1024, 9))
@@ -336,6 +355,7 @@ async function run() {
     torrent,
     inferredTorrent,
     incompleteTorrent,
+    unverifiedTorrent,
     packedTorrent,
     readyPackedTorrent,
     targetedTorrent,
@@ -346,6 +366,7 @@ async function run() {
     if (normalized === hash) return [torrent]
     if (normalized === inferredHash) return [inferredTorrent]
     if (normalized === incompleteHash) return [incompleteTorrent]
+    if (normalized === unverifiedHash) return [unverifiedTorrent]
     if (normalized === packedHash) return [packedTorrent]
     if (normalized === readyPackedHash) return [readyPackedTorrent]
     if (normalized === targetedHash) return [targetedTorrent]
@@ -357,6 +378,7 @@ async function run() {
     if (normalized === hash) return [file]
     if (normalized === inferredHash) return [file]
     if (normalized === incompleteHash) return [incompleteFile]
+    if (normalized === unverifiedHash) return [unverifiedFile]
     if (normalized === packedHash) return packedFiles
     if (normalized === readyPackedHash) return readyPackedFiles
     if (normalized === targetedHash) return targetedFiles
@@ -366,6 +388,9 @@ async function run() {
   QBitClient.prototype.properties = async (inputHash) => {
     const normalized = String(inputHash || '').toLowerCase()
     if (normalized === incompleteHash) {
+      return { piece_size: 5 * 1024 * 1024 }
+    }
+    if (normalized === unverifiedHash) {
       return { piece_size: 5 * 1024 * 1024 }
     }
     if (normalized === newQueuedHash) {
@@ -383,6 +408,7 @@ async function run() {
       }
       return states
     }
+    if (normalized === unverifiedHash) return []
     if (normalized === newQueuedHash) return Array.from({ length: 20 }, (_value, index) => index < 6 ? 2 : 0)
     return []
   }
@@ -456,6 +482,7 @@ async function run() {
     }, process.env.ENCRYPTION_SECRET))
     const playbackToken = encodePlaybackStateToken({ h: hash })
     const incompletePlaybackToken = encodePlaybackStateToken({ h: incompleteHash })
+    const unverifiedPlaybackToken = encodePlaybackStateToken({ h: unverifiedHash })
     const inferredPlaybackToken = encodePlaybackStateToken({ h: '', l: 'https://tracker.example/existing-without-hash.torrent' })
     const legacyAviPlaybackToken = encodePlaybackStateToken({ h: '', l: 'https://tracker.example/legacy-avi.torrent' })
     const newQueuedPlaybackToken = encodePlaybackStateToken({ h: '', l: 'https://tracker.example/new-queued.torrent' })
@@ -509,6 +536,10 @@ async function run() {
     const coldIncompleteResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(incompletePlaybackToken)}`)
     assert.equal(coldIncompleteResponse.status, 503, 'incomplete playback should not redirect into /file before the selected file has a real contiguous head buffer')
     assert.equal(String(coldIncompleteResponse.headers.location || ''), '', 'cold incomplete playback should not hand Stremio a premature file URL')
+
+    const unverifiedResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(unverifiedPlaybackToken)}`)
+    assert.equal(unverifiedResponse.status, 503, 'incomplete playback should fail closed when qBit cannot prove the contiguous head pieces')
+    assert.equal(String(unverifiedResponse.headers.location || ''), '', 'unverified incomplete playback should not redirect based on progress percent alone')
 
     incompletePieceStates = [2, 2, 2, 2, 2, 2]
     const incompleteResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(incompletePlaybackToken)}`)
