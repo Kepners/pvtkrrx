@@ -751,8 +751,13 @@ async function run() {
     seeders: 26
   })
   assert.equal(compactNbaProfile.event_class, 'team_vs_team', 'compact NBA playoff torrent profile should produce team-vs-team artwork inputs')
-  assert.equal(compactNbaProfile.home_team, 'Philadelphia 76ers', 'compact NBA playoff torrent profile should carry the expanded first team')
-  assert.equal(compactNbaProfile.away_team, 'New York Knicks', 'compact NBA playoff torrent profile should carry the expanded second team')
+  // SPORTS_TITLE_PARSER_SPEC §7 row 10 / AT-SEPARATOR-UNHANDLED: the `@`
+  // separator uses the US away@home convention, so for `76ers@Knicks` the
+  // first side (76ers) is AWAY and the second (Knicks) is HOME. The profile is
+  // now produced by parseSportsTitleContract which implements this correction;
+  // both nicknames must still expand to SportsMeta-canonical names.
+  assert.equal(compactNbaProfile.home_team, 'New York Knicks', 'compact NBA playoff profile: @ separator makes the second side HOME (expanded)')
+  assert.equal(compactNbaProfile.away_team, 'Philadelphia 76ers', 'compact NBA playoff profile: @ separator makes the first side AWAY (expanded)')
   const nbaPlayoffsResolution = await resolveSportsMetaIdentity(
     client,
     availability('NBA Playoffs 2026 / 1st Round / West / Game 4 / 26 04 2026 / {San Antonio Spurs @ Portland Trail Blazers m4rtyr', {

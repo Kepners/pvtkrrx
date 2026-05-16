@@ -1,7 +1,7 @@
 const { parse: parseMediaTitle } = require('./parser')
 const { getMappedLeagueEntry, mapLeague } = require('./leagueMap')
 const { normalizeSportKey, resolveSportHint } = require('./sportsRules')
-const { parseSportsTitle, parseSportsEventTitle } = require('./sportsTitleParser')
+const { parseSportsTitle, parseSportsEventTitle, parseSportsTitleContract } = require('./sportsTitleParser')
 const { classifySportsEvent } = require('./sportsEventClassifier')
 const { mapSportsCultCategory } = require('../config/sportsCultCategoryMap')
 
@@ -210,6 +210,25 @@ function confidenceScore(profile = {}) {
   return Math.max(0, Math.min(1, Number(score.toFixed(2))))
 }
 
+// Run the SPORTS_TITLE_PARSER_SPEC §7 contract parser defensively. It is the
+// binding acceptance oracle and the PRIMARY source for user-visible fields.
+// It already never throws (always returns an object), but wrap anyway so a
+// future change can never take the catalog down — legacy parsers remain the
+// safe fallback per-field.
+function runContractParserSafe(rawTitle, options = {}) {
+  try {
+    const contract = parseSportsTitleContract(rawTitle, {
+      sportHint: options.sportHint || options.explicitHint || '',
+      categoryNames: Array.isArray(options.categoryNames) ? options.categoryNames : [],
+      indexer: options.indexer || '',
+      pubDate: options.pubDate || ''
+    })
+    return (contract && typeof contract === 'object') ? contract : null
+  } catch (_err) {
+    return null
+  }
+}
+
 function parseSportsTorrentProfile(itemOrTitle = '', options = {}) {
   const rawTitle = typeof itemOrTitle === 'string'
     ? itemOrTitle
@@ -218,31 +237,104 @@ function parseSportsTorrentProfile(itemOrTitle = '', options = {}) {
   const parsedMatchup = options.parsedSportsEvent || parseSportsTitle(rawTitle, pubDate) || null
   const parsedEvent = options.parsedEvent || (!parsedMatchup ? parseSportsEventTitle(rawTitle, pubDate) : null)
   const media = parseMediaTitle(rawTitle)
-  const date = parsedMatchup?.date || parsedEvent?.date || extractDate(rawTitle, pubDate)
-  const league = resolveLeagueName(parsedMatchup?.league || parsedEvent?.league || options.league || '', rawTitle)
-  const sport = normalizeSportKey(resolveSportHint({
+
+  // PRIMARY parse: the §7 contract. Legacy parsers are per-field fallback.
+  const contract = runContractParserSafe(rawTitle, {
+    sportHint: options.sportHint || '',
+    explicitHint: options.sportHint || '',
+    categoryNames: Array.isArray(options.categoryNames)
+      ? options.categoryNames
+      : (Array.isArray(itemOrTitle?.categoryNames) ? itemOrTitle.categoryNames : []),
+    indexer: options.indexer || (typeof itemOrTitle === 'object' ? itemOrTitle?.indexer : '') || '',
+    pubDate
+  })
+  const contractIsEvent = contract && contract.contentType === 'event'
+
+  // Date: contract is PRIMARY (it implements DD-MM day-first, 2-digit year,
+  // US M/D, slash, wrong-date guard, and the title->pubDate fallback chain).
+  const date = contract?.date || parsedMatchup?.date || parsedEvent?.date || extractDate(rawTitle, pubDate)
+
+  // Sport: contract derives this from the Prowlarr sportHint/category oracle
+  // (§6) and never returns empty (known or "Others"). Keep legacy resolution
+  // as the fallback path.
+  const legacySport = normalizeSportKey(resolveSportHint({
     explicitHint: options.sportHint || '',
     categoryHint: options.categoryHint || '',
     title: rawTitle
-  })) || normalizeSportKey(getMappedLeagueEntry(league)?.sportKey || '')
-  const session = parsedEvent ? extractSession(rawTitle) : extractSession(rawTitle)
+  })) || normalizeSportKey(getMappedLeagueEntry(resolveLeagueName(parsedMatchup?.league || parsedEvent?.league || options.league || '', rawTitle))?.sportKey || '')
+  const contractSport = contract?.sport && contract.sport !== 'Others'
+    ? normalizeSportKey(contract.sport) || contract.sport
+    : ''
+  const sport = contractSport || legacySport || (contract?.sport === 'Others' ? 'Others' : null)
+
+  // Competition/league: contract canonicalises via leagueMap and applies the
+  // club-identity override (clubs are ground truth, §5). Fall back to legacy
+  // league resolution when the contract has no competition.
+  const legacyLeague = resolveLeagueName(parsedMatchup?.league || parsedEvent?.league || options.league || '', rawTitle)
+  const league = (contractIsEvent && contract?.competition)
+    ? contract.competition
+    : (legacyLeague || (contractIsEvent ? contract?.competition : '') || '')
+
+  // Teams/event: for real fixtures the contract owns home/away + the combined
+  // event string (single string for combat/single-event; reversed-side and
+  // round-noise defects are handled inside the contract). Documentaries carry
+  // a single title and NO teams; an ANCILLARY clip that still wraps a real
+  // "A vs B" fixture (e.g. a full-match replay) keeps its teams as metadata
+  // (the consumer keys head-to-head vs generic art off content_type).
+  const contractTeamsAllowed = contract && contract.contentType !== 'documentary'
+  const contractHome = contractTeamsAllowed && contract?.home ? titleCase(contract.home) : null
+  const contractAway = contractTeamsAllowed && contract?.away ? titleCase(contract.away) : null
+  const legacyHome = parsedMatchup?.homeTeam ? titleCase(parsedMatchup.homeTeam) : null
+  const legacyAway = parsedMatchup?.awayTeam ? titleCase(parsedMatchup.awayTeam) : null
+  const home_team = (contractHome && contractAway) ? contractHome : (contractHome || legacyHome)
+  const away_team = (contractHome && contractAway) ? contractAway : (contractAway || legacyAway)
+
+  let event = null
+  if (contract && contract.contentType !== 'event') {
+    // documentary / ancillary -> single title, no head-to-head poster
+    event = contract.title ? titleCase(contract.title) : (parsedEvent?.eventName ? titleCase(parsedEvent.eventName) : null)
+  } else if (!(home_team && away_team)) {
+    // single-event / combat -> the contract's single event string wins
+    event = contract?.event
+      ? titleCase(contract.event)
+      : (parsedMatchup ? null : (parsedEvent?.eventName ? titleCase(parsedEvent.eventName) : null))
+  }
+
+  // Round / session / language: contract is PRIMARY, legacy extractors fill
+  // any gap so we never regress a field the old path used to surface.
+  const round = (contractIsEvent && (contract?.round || contract?.gameNumber))
+    ? titleCase(String(contract.gameNumber || contract.round))
+    : extractRound(rawTitle)
+  const session = (contractIsEvent && contract?.session)
+    ? contract.session
+    : extractSession(rawTitle)
+  const language = (contract?.language ? normalizeLanguage(contract.language) : null) || normalizeLanguage(media.languages)
+  const seasonLabel = contract?.season || null
+
   const profile = {
     raw_title: rawTitle,
     sport: sport || null,
     league: league || null,
+    competition: league || null,
+    content_type: contract?.contentType || 'event',
     season: extractSeason(rawTitle, date),
+    season_label: seasonLabel,
     date: date || null,
-    event: parsedMatchup ? null : (parsedEvent?.eventName ? titleCase(parsedEvent.eventName) : null),
-    home_team: parsedMatchup?.homeTeam ? titleCase(parsedMatchup.homeTeam) : null,
-    away_team: parsedMatchup?.awayTeam ? titleCase(parsedMatchup.awayTeam) : null,
-    round: extractRound(rawTitle),
+    event,
+    home_team,
+    away_team,
+    round,
     session,
+    venue: (contractIsEvent && contract?.venue) ? contract.venue : null,
+    game_number: (contractIsEvent && contract?.gameNumber) ? contract.gameNumber : null,
+    tv_channel: contract?.tvChannel || null,
     broadcast: extractBroadcast(rawTitle),
-    resolution: media.quality || null,
+    resolution: (contract?.quality || media.quality) || null,
     source: media.source || null,
     codec: normalizeCodec(media.codec),
     audio: normalizeAudio(media.audio, rawTitle),
-    language: normalizeLanguage(media.languages),
+    language,
+    format: (contractIsEvent && contract?.format) ? contract.format : null,
     release_group: extractReleaseGroup(rawTitle)
   }
   profile.event_class = classifySportsEvent({

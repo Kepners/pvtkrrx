@@ -1151,6 +1151,8 @@ const RUBBISH_TOKENS = new Set([
   // broadcaster forms ("Sky Sports","Fox Sports") are stripped by the
   // format/tvChannel pass and the trailing-noise regex below.
   'cbs', 'espn', 'espn+', 'espnplus', 'nbc', 'nbcsn',
+  'nbcsba', 'nbcsca', 'nbcsbay', 'nbcsphi', 'nbcsch', 'nbcswa', 'nbcsne',
+  'snla', 'snp', 'sny', 'sntx', 'sndet', 'arid', 'card', 'masn', 'attsn',
   'tnt', 'bbc', 'itv', 'kayo', 'fubo', 'peacock',
   'talksport', 'bein', 'beinsport', 'eurosport', 'tsn', 'sportsnet',
   'f1tv', 'nesn', 'msg', 'redbull', 'atvp',
@@ -1375,6 +1377,11 @@ function captureGameNumber(raw) {
   if (m) return `${m[1].toUpperCase()} Game ${m[2]}`
   m = raw.match(/\bGame\s*(\d{1,2})\b/i)
   if (m) return `Game ${m[1]}`
+  // Cricket / generic match number: "M30", "Match 30" (not a team token).
+  m = raw.match(/\bM(\d{1,3})\b/)
+  if (m) return `Match ${m[1]}`
+  m = raw.match(/\bMatch\s*(\d{1,3})\b/i)
+  if (m) return `Match ${m[1]}`
   return ''
 }
 
@@ -1479,8 +1486,28 @@ function isSideNoiseToken(t) {
   if (/^(?:19|20)\d{2}$/.test(t)) return true
   if (/^\d{1,4}$/.test(t)) return true
   if (/^(?:r\d{1,2}|g\d{1,2}|gm\d{1,2}|r\d{1,2}g(?:m)?\d{1,2}|mw\d{1,2}|gw\d{1,2}|wd\d{1,2})$/i.test(t)) return true
-  if (/^(?:game|round|week|matchweek|mw|gw|leg|qf|sf|semifinals?|quarterfinals?|finals?|prelims?|main|card|event|full|playoffs?|playoff|rs|regular|season|pre|post|press|conference|singles|doubles|women|men|mens|womens)$/i.test(t)) return true
+  // Cricket / generic match-number token "M30" (belongs in gameNumber).
+  if (/^m\d{1,3}$/i.test(t)) return true
+  // Codec / container fragments left after splitting "H 264" / "x 265".
+  if (/^(?:264|265|hevc|avc|av1|aac|ac3|dts|h264|h265|x264|x265|ddp\d?|dd\d?)$/i.test(t)) return true
+  // Standalone "Sport"/"Sports" residual from multi-word broadcaster names
+  // ("Kayo Sport", "Sky Sports") whose lead token was already stripped.
+  if (/^sports?$/i.test(t)) return true
+  // Conference / bracket codes (NBA/NHL playoffs): ECSF/WCSF/ECF/WCF/ECQF/
+  // WCQF/ECR1/WCR1/ECR/WCR. Same leak class as LEADING-ROUND-NOISE-DESTROYS-TEAM
+  // — must never become part of a team name.
+  if (/^(?:e|w)c(?:sf|qf|f|r\d?|sr|fr)$/i.test(t)) return true
+  if (/^(?:game|round|week|matchweek|mw|gw|leg|qf|sf|semi|semis|semifinals?|quarter|quarters|quarterfinals?|finals?|prelims?|main|card|event|full|playoffs?|playoff|rs|regular|season|pre|post|press|conference|singles|doubles|women|men|mens|womens)$/i.test(t)) return true
   if (/^(?:slash|the|of|round\d{1,2}|game\d{1,2})$/i.test(t)) return true
+  // Ancillary / clip-type words and the match keyword — never part of a team
+  // name (a team side ends here): Match / Replay / Highlights / Recap /
+  // Coverage / Preview / Review / Reaction / Analysis / Buildup.
+  if (/^(?:match|replays?|highlights?|recaps?|recapping|coverage|previews?|reviews?|reaction|analysis|buildup|magazine)$/i.test(t)) return true
+  // Broadcast region suffix tokens ("Sky Sports NZ", "ESPN UK"). Kept narrow
+  // to unambiguous codes so real words/initials are not eaten.
+  if (/^(?:nz|uk|usa|aus)$/i.test(t)) return true
+  // Scene-group shape: letters glued to a 3+ digit run (Jinx8004, Z3R0 etc.).
+  if (/^[a-z]{2,}\d{3,}$/i.test(t)) return true
   return false
 }
 
@@ -1490,7 +1517,11 @@ function isLeadingVenueNoise(t) {
   const low = String(t || '').toLowerCase().replace(/,$/, '')
   if (VENUE_DICT.has(low)) return true
   // tournament-city tokens that appear right after a tennis/golf league code
-  return /^(?:roma|rome|paris|madrid|miami|monte|carlo|indian|wells|cincinnati|montreal|toronto|dubai|doha|stuttgart|berlin|prague|italy|spain|france)$/i.test(low.replace(/,$/, ''))
+  if (/^(?:roma|rome|paris|madrid|miami|monte|carlo|indian|wells|cincinnati|montreal|toronto|dubai|doha|stuttgart|berlin|prague|italy|spain|france)$/i.test(low)) return true
+  // Tournament-TYPE words after the city ("Madrid Open", "… Masters"). Only
+  // reached for racket/individual sports (venueTrimEligible gate in cleanSide)
+  // so team-sport names like "… Open Cup" are untouched.
+  return /^(?:open|masters|classic|championships?|cup|international|invitational|challenger|tour|series|grand|slam|trophy)$/i.test(low)
 }
 
 // Strip every noise class so a side never carries broadcaster / round / year /
@@ -1498,11 +1529,18 @@ function isLeadingVenueNoise(t) {
 // `trimLeadingVenue` removes leading tournament-city/venue noise (home side).
 function cleanSide(tokens, sport, ctx, trimLeadingVenue = false) {
   let work = [...tokens]
+  // Leading tournament-city trimming only applies to individual / racket
+  // sports where the real shape is "LEAGUE City PlayerName" (tennis/golf/…).
+  // For team sports a leading city IS part of the club name (Miami Marlins,
+  // San Francisco Giants) and must never be stripped.
+  const sportLow = String(sport || '').toLowerCase()
+  const venueTrimEligible = /(?:tennis|golf|badminton|squash|table[\s-]*tennis|snooker|darts|athletics|swimming|cycling|skiing)/.test(sportLow)
   // Trim leading noise tokens (round/date/year/season/venue) before the name.
   if (trimLeadingVenue) {
     while (work.length > 1) {
       const head = String(work[0] || '').trim()
-      if (isSideNoiseToken(head) || isLeadingVenueNoise(head)) { work.shift(); continue }
+      if (isSideNoiseToken(head)) { work.shift(); continue }
+      if (venueTrimEligible && isLeadingVenueNoise(head)) { work.shift(); continue }
       break
     }
   }
@@ -1516,9 +1554,26 @@ function cleanSide(tokens, sport, ctx, trimLeadingVenue = false) {
   let label = normalizeSegment(kept.join(' '))
   // Drop trailing competition / sport noise
   label = label.replace(/\b(?:premier league|super league|championship|playoffs?|regular season)\b/gi, ' ')
+  // Strip a trailing lone codec/separator remnant ("... Indians H" from
+  // "H 264", "... v" from a stray separator). Only when it is the final
+  // single letter and the side still has a real multi-char name before it.
+  label = label.replace(/\s+(?:[hxv])$/i, '')
+  // Strip a trailing ambiguous-broadcaster word ("... Indians Sky" from
+  // "Sky Sports" after Sports was removed) — but ONLY when the side has 3+
+  // tokens. A 2-token side like "Chicago Sky" / "Miami Heat" is the team
+  // itself (no real club is 3+ tokens ending in sky/fox), so it is untouched.
+  if (label.split(/\s+/).filter(Boolean).length >= 3) {
+    label = label.replace(/\s+(?:sky|fox|bt|tnt|nbc|cbs|abc|tsn|bein)$/i, '')
+  }
   label = normalizeSegment(label)
   const canon = canonicalizeClub(label, { sport, context: ctx })
-  return titleCase(canon)
+  // Expand known team nicknames/abbreviations to the SportsMeta-canonical name
+  // using the proven legacy alias map (76ers->Philadelphia 76ers,
+  // Knicks->New York Knicks, ...). canonicalizeClub only covers tricodes;
+  // this keeps downstream SportsMeta lookups working without regressing the
+  // existing team-vs-team pipeline.
+  const aliased = normalizeKnownSportsTeamAlias(canon)
+  return titleCase(aliased || canon)
 }
 
 function parseSportsTitleContract(rawTitle, options = {}) {
@@ -1573,7 +1628,12 @@ function parseSportsTitleContract(rawTitle, options = {}) {
   if (/\bRS\b/.test(raw) || /\bregular\s+season\b/i.test(raw)) out.season = 'Regular Season'
   if (/\bplayoffs?\b/i.test(raw) && !/\bnba\s+playoffs\b/i.test(raw)) out.season = out.season || 'Playoffs'
 
-  // Documentary / ancillary: keep under sport, NO head-to-head, single title.
+  // Documentary / ancillary: keep under sport, single title, NOT rendered as
+  // head-to-head (consumer keys art/sorting off contentType). For an ANCILLARY
+  // clip that still wraps a real "A vs B" fixture (e.g. "... Full Match
+  // Replay"), surface home/away too so the catalog keeps the matchup metadata
+  // (SPEC §5: keep under sport, below fixtures — teams are still data). Pure
+  // documentaries never get teams.
   if (contentType !== 'event') {
     out.title = titleCase(
       normalizeSegment(
@@ -1583,6 +1643,20 @@ function parseSportsTitleContract(rawTitle, options = {}) {
           .replace(/\b(?:19|20)\d{2}\/\d{1,2}\/\d{1,2}\b/g, ' ')
       )
     ).trim() || raw
+    if (contentType === 'ancillary') {
+      const sepIdx = tokens.findIndex(t => CONTRACT_SEPARATORS.has(String(t).toLowerCase()))
+      if (sepIdx > 0 && sepIdx < tokens.length - 1) {
+        const sepT = String(tokens[sepIdx]).toLowerCase()
+        const a = cleanSide(tokens.slice(comp.span, sepIdx), out.sport, raw, true)
+        const b = cleanSide(tokens.slice(sepIdx + 1), out.sport, raw, false)
+        if (a && b) {
+          if (AWAY_FIRST_SEPARATORS.has(sepT)) { out.away = a; out.home = b }
+          else { out.home = a; out.away = b }
+          const ov = resolveClubCompetitionOverride(out.home, out.away)
+          if (ov) { out.competition = ov.competition; out.sport = ov.sportKey || out.sport }
+        }
+      }
+    }
     return out
   }
 
@@ -1606,8 +1680,47 @@ function parseSportsTitleContract(rawTitle, options = {}) {
     const sepTok = String(tokens[sepIndex]).toLowerCase()
     // The left side carries all leading league/date/round/venue noise — trim
     // it aggressively. The right side ends at the first metadata token.
-    const leftRaw = tokens.slice(comp.span, sepIndex)
+    let leftRaw = tokens.slice(comp.span, sepIndex)
     const rightRaw = tokens.slice(sepIndex + 1)
+    // Leading bare sport word + competition phrase that was NOT sliced
+    // (mapped competition not at token 0 because a sport word leads it, e.g.
+    // "Football FA Cup Chelsea ..."). Drop a leading sport word, then the
+    // resolved competition phrase if it sits at the new left start.
+    {
+      const SPORT_WORD_RE = /^(?:football|soccer|basketball|baseball|hockey|cricket|rugby|boxing|tennis|golf|cycling|darts|snooker|motorsport)$/i
+      while (leftRaw.length > 1 && SPORT_WORD_RE.test(String(leftRaw[0] || '').trim())) {
+        leftRaw = leftRaw.slice(1)
+      }
+      if (comp.competition && comp.span === 0) {
+        const compWords = normalizeSegment(comp.competition).toLowerCase().split(/\s+/)
+        const headWords = leftRaw.slice(0, compWords.length).map(t => String(t || '').toLowerCase())
+        if (compWords.length && headWords.join(' ') === compWords.join(' ')) {
+          leftRaw = leftRaw.slice(compWords.length)
+        } else {
+          // Try matching against the raw (unmapped) leading code token too.
+          const firstLow = String(leftRaw[0] || '').toLowerCase()
+          if (KNOWN_COMP_TOKEN_RE.test(String(leftRaw[0] || '')) && firstLow !== '') {
+            leftRaw = leftRaw.slice(1)
+          }
+        }
+      }
+    }
+    // LEADING-ROUND-NOISE-DESTROYS-TEAM (SPEC §3/§7 row 7): when the
+    // competition phrase was NOT sliced off (unmapped / multi-word like
+    // "Basketball Champions League of Americas F4 SF"), the home team begins
+    // AFTER the last leading round/bracket/stage marker. Find the latest such
+    // marker in the left side and drop everything up to and including it.
+    {
+      const ROUND_MARKER_RE = /^(?:f4|final|finals|semis?|semifinals?|quarterfinals?|sf|qf|r1|r2|r3|ro16|round|group|stage|knockout|playoffs?|playoff|game|leg|f8|finalfour)$/i
+      let lastMarker = -1
+      for (let i = 0; i < leftRaw.length; i += 1) {
+        const tk = String(leftRaw[i] || '').replace(/[(),]/g, '').trim()
+        if (ROUND_MARKER_RE.test(tk) || /^(?:round|group|game|stage|r)\d{1,2}$/i.test(tk)) lastMarker = i
+      }
+      if (lastMarker >= 0 && lastMarker < leftRaw.length - 1) {
+        leftRaw = leftRaw.slice(lastMarker + 1)
+      }
+    }
     let sideA = cleanSide(leftRaw, out.sport, raw, true)
     let sideB = cleanSide(rightRaw, out.sport, raw, false)
 
@@ -1631,9 +1744,44 @@ function parseSportsTitleContract(rawTitle, options = {}) {
     return out
   }
 
-  // No separator: single-event (motorsport / niche / tournament). Title kept.
-  const eventTokens = tokens.slice(comp.span)
-  const cleanedEvent = cleanSide(eventTokens, out.sport, raw)
+  // No separator: single-event (motorsport / niche / tournament). The event
+  // string is the residual identity (venue / race name); session and round are
+  // already captured in their own fields, so strip those words from the event
+  // name (same intent as SESSION-SHREDDED / ROUND-NOT-LIFTED — they belong in
+  // dedicated fields, not the name).
+  let eventTokens = tokens.slice(comp.span)
+  // Strip a trailing ALL-CAPS scene-group token (HEEL, FLUX, KONTRAST, MWR…).
+  // SPEC §1 default: an unknown trailing station/group token is RUBBISH. Use
+  // the original casing — a 3-8 char ALL-CAPS final token after the event
+  // identity is a release group, never the event name.
+  while (eventTokens.length > 1) {
+    const last = String(eventTokens[eventTokens.length - 1] || '').trim()
+    if (/^[A-Z][A-Z0-9]{2,7}$/.test(last) && !/^(?:USA|FP\d|R\d{1,2}|GP|UFC|WWE|AEW|NXT|MLB|NBA|NHL|NFL|MLS|IPL|EPL|UCL|UEL)$/.test(last)) {
+      eventTokens = eventTokens.slice(0, -1)
+      continue
+    }
+    break
+  }
+  let cleanedEvent = cleanSide(eventTokens, out.sport, raw)
+  if (cleanedEvent) {
+    // Strip the resolved competition phrase wherever it sits (it was not
+    // sliced when a bare sport word leads it, e.g. "Golf PGA Tour ...").
+    if (comp.competition) {
+      const compRe = new RegExp(`\\b${comp.competition.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+      cleanedEvent = cleanedEvent.replace(compRe, ' ')
+    }
+    cleanedEvent = normalizeSegment(
+      cleanedEvent
+        // leading / trailing bare sport word (Golf / Tennis / Basketball / …)
+        .replace(/^(?:golf|tennis|basketball|football|baseball|hockey|cricket|rugby|boxing|cycling|darts|snooker|motorsport|soccer)\s+/i, '')
+        .replace(/\s+(?:golf|tennis|basketball|football|baseball|hockey|cricket|rugby|boxing|cycling|darts|snooker|motorsport|soccer)$/i, '')
+        .replace(/\b(?:fp[1-3]|free\s*practice(?:\s*(?:one|two|three|[1-3]))?|practice(?:\s*[1-3](?:\s*&\s*[1-3])?)?|qualifying|qualifier|warm\s*up|warmup|sprint(?:\s*race)?|race|full\s*event|main\s*event|main\s*card|early\s*prelims?|prelims?)\b/gi, ' ')
+        .replace(/\b(?:round\s*0*\d{1,2}|round0*\d{1,2}|r0*\d{1,2}|game\s*\d{1,2}|stage\s*\d{1,2})\b/gi, ' ')
+    )
+    // Re-trim a trailing lone broadcaster word exposed after the sport-word
+    // strip ("... Open Day Sky" -> "... Open Day").
+    cleanedEvent = normalizeSegment(cleanedEvent.replace(/\s+(?:sky|fox|bt|tnt|nbc|cbs|abc|tsn|bein)$/i, ''))
+  }
   if (cleanedEvent) out.event = cleanedEvent
   else out.event = titleCase(normalizeSegment(raw))
   return out
