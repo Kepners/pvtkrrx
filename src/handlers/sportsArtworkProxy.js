@@ -38,7 +38,7 @@ const {
   resolveSportBackdropBucket
 } = require('../utils/sportBackdrops')
 const { SPORTS_ARTWORK_PROXY_VERSION } = require('../utils/sportsArtwork')
-const { verifyStampedSportsPosterEntitlement } = require('../utils/entitlement')
+const { verifyStampedSportsPosterEntitlement, resolveServerAdminPosterTemplate } = require('../utils/entitlement')
 
 const VARIANT_DIMENSIONS = {
   poster: { width: 600, height: 900 },
@@ -75,6 +75,12 @@ const inspectAssetCache = new Map()
 const inspectAssetInFlight = new Map()
 const logoFetchCache = new Map()
 const logoFetchInFlight = new Map()
+// BUG 3: memoise the SportsMeta /resolve lookup (canonicalId AND negative
+// "no match" results) so repeated artwork requests for the same event do not
+// re-hit SportsMeta per request. Negative results get a shorter TTL so a
+// later upstream ingest is still picked up reasonably soon.
+const resolveCanonicalCache = new Map()
+const resolveCanonicalInFlight = new Map()
 let runtimeRevisionCache
 
 function resolveRuntimeRevision() {
@@ -3053,14 +3059,19 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
     }
   })()
     .then((value) => {
-      const cachedValue = { ...value, cacheLayer: value.cacheLayer || 'rendered' }
-      rasterCache.set(cacheKey, { value: cachedValue, expiresAt: Date.now() + RASTER_CACHE_TTL_MS })
+      // Store the entry tagged as a memory-cache entry. The CURRENT response
+      // is the fresh render (cacheLayer='rendered'); every SUBSEQUENT serve
+      // of this key from rasterCache must report cache=memory (BUG 3: the
+      // header used to be permanently stuck on 'rendered' because the stored
+      // value carried 'rendered', masking the real hit rate).
+      const storedValue = { ...value, cacheLayer: value.cacheLayer === 'disk' || value.cacheLayer === 'postgres' ? value.cacheLayer : 'memory' }
+      rasterCache.set(cacheKey, { value: storedValue, expiresAt: Date.now() + RASTER_CACHE_TTL_MS })
       trimCache()
-      writeSportsArtworkDiskCache(cacheKey, cachedValue, {
+      writeSportsArtworkDiskCache(cacheKey, storedValue, {
         ttlMs: RASTER_CACHE_TTL_MS,
         maxEntries: RASTER_CACHE_MAX_KEYS
       }).catch(() => {})
-      return cachedValue
+      return { ...value, cacheLayer: value.cacheLayer || 'rendered' }
     })
     .finally(() => {
       rasterInFlight.delete(cacheKey)
@@ -3085,11 +3096,19 @@ function resolveSportsmetaBaseUrlFromConfig(config = {}) {
 }
 
 function resolveSportsPosterTemplateFromConfig(config = {}, req = null) {
-  // The proxy is the public/configured artwork surface. Honour the stamped
-  // entitlement on the decrypted config token; revoke instantly when the
-  // env owner list no longer covers the stamped owner-email hash. Stale
-  // ?template= query strings are ignored so a leaked URL cannot bypass
-  // the gate when the saved config was downgraded.
+  // Server-side admin override wins first. This is the OPERATOR's explicit
+  // server-wide env choice (the "Server-side admin override active" the
+  // configure page reports). The public artwork route is hit by Stremio with
+  // no config token, so without this the admin's selected style could never
+  // reach the renderer. Honouring an env-level operator choice does not
+  // weaken anti-leak (that protects against leaked *user* config URLs).
+  const serverAdminTemplate = resolveServerAdminPosterTemplate(process.env)
+  if (serverAdminTemplate) return resolveSportsPosterTemplate(serverAdminTemplate)
+
+  // Otherwise honour the stamped entitlement on the decrypted config token;
+  // revoke instantly when the env owner list no longer covers the stamped
+  // owner-email hash. Stale ?template= query strings are ignored so a leaked
+  // URL cannot bypass the gate when the saved config was downgraded.
   const requestedTemplate = String(config?.sportsPosterTemplate || '').trim()
   const stampedSource = String(config?.entitlementSource || '').trim()
   const stampedHash = String(config?.entitlementOwnerEmailHash || '').trim()
@@ -3188,7 +3207,14 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
   }
 }
 
-function buildDefaultArtworkCacheKey({ variant, template, sportSlug, league, title, date, homeTeam, awayTeam, detail, eventClass, seeders, size, rawTitle, sportsmetaBaseUrl }) {
+function buildDefaultArtworkCacheKey({ variant, template, sportSlug, league, title, date, homeTeam, awayTeam, detail, eventClass, rawTitle, sportsmetaBaseUrl }) {
+  // BUG 3 (cache hit rate): seeders/size are per-torrent and DO NOT appear on
+  // any rendered poster (verified: ticket-stub "SECTION A-12-4" is hardcoded,
+  // stubSerial/perfRow derive from teams/date only, no template reads
+  // seeders/size). Keying on them meant every torrent variant of the same
+  // logical event minted a fresh cache key -> rendered every request +
+  // re-ran the SportsMeta /resolve lookup. They are dropped from the key so
+  // sibling torrents of one event share one cached poster.
   return [
     LOCAL_ARTWORK_RENDER_VERSION,
     'default',
@@ -3202,8 +3228,6 @@ function buildDefaultArtworkCacheKey({ variant, template, sportSlug, league, tit
     (awayTeam || '').trim().toLowerCase(),
     (detail || '').trim().toLowerCase(),
     (eventClass || '').trim().toLowerCase(),
-    (seeders || '').trim().toLowerCase(),
-    (size || '').trim().toLowerCase(),
     (rawTitle || '').trim().toLowerCase(),
     (sportsmetaBaseUrl || '').trim().toLowerCase()
   ].join('|')
@@ -3232,7 +3256,53 @@ function buildCanonicalArtworkCacheKey({ variant, template, canonicalId, sportsm
   ].join('|')
 }
 
-async function resolveDefaultArtworkCanonical({
+async function resolveDefaultArtworkCanonical(args = {}) {
+  const {
+    sportsmetaBaseUrl = '',
+    sportSlug = '',
+    league = '',
+    title = '',
+    date = '',
+    homeTeam = '',
+    awayTeam = ''
+  } = args
+  const hasStructuredQuery = Boolean(date && ((homeTeam && awayTeam) || title))
+  if (!hasStructuredQuery) return null
+  const memoKey = [
+    (sportsmetaBaseUrl || '').trim().toLowerCase(),
+    (sportSlug || '').trim().toLowerCase(),
+    (league || '').trim().toLowerCase(),
+    (title || '').trim().toLowerCase(),
+    (date || '').trim().toLowerCase(),
+    (homeTeam || '').trim().toLowerCase(),
+    (awayTeam || '').trim().toLowerCase()
+  ].join('|')
+  const now = Date.now()
+  const hit = resolveCanonicalCache.get(memoKey)
+  if (hit && hit.expiresAt > now) return hit.value
+  if (resolveCanonicalInFlight.has(memoKey)) return resolveCanonicalInFlight.get(memoKey)
+
+  const pending = (async () => resolveDefaultArtworkCanonicalUncached(args))()
+    .then((value) => {
+      // Negative (no-match) results expire faster than positive ones so a
+      // later SportsMeta ingest is still picked up; positive results are as
+      // durable as the raster cache.
+      const ttl = value && value.canonicalId ? RASTER_CACHE_TTL_MS : Math.min(RASTER_CACHE_TTL_MS, 15 * 60 * 1000)
+      resolveCanonicalCache.set(memoKey, { value: value || null, expiresAt: Date.now() + ttl })
+      while (resolveCanonicalCache.size > RASTER_CACHE_MAX_KEYS) {
+        const oldest = resolveCanonicalCache.keys().next().value
+        if (!oldest) break
+        resolveCanonicalCache.delete(oldest)
+      }
+      return value || null
+    })
+    .finally(() => { resolveCanonicalInFlight.delete(memoKey) })
+
+  resolveCanonicalInFlight.set(memoKey, pending)
+  return pending
+}
+
+async function resolveDefaultArtworkCanonicalUncached({
   sportsmetaBaseUrl = '',
   sportSlug = '',
   league = '',

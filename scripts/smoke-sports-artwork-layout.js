@@ -1198,7 +1198,13 @@ async function main() {
     size: 120
   })
   assert.match(fallbackLogoSvg, /data-role="logo-fallback-svg"/, 'fallback logo SVG should be visible and auditable')
-  assert.match(fallbackLogoSvg, /LOGO PENDING/, 'fallback logo SVG should label unresolved logo data')
+  // DIRECTIVE 001: the ONLY permitted fallback is clean deterministic
+  // initials of the real entity. A "LOGO PENDING" placeholder is an explicit
+  // FAIL per the directive — assert it is gone and that real initials +
+  // a cleaned identity caption are rendered instead.
+  assert.doesNotMatch(fallbackLogoSvg, /LOGO PENDING/, 'fallback logo SVG must NOT show the forbidden "LOGO PENDING" placeholder (DIRECTIVE 001)')
+  assert.match(fallbackLogoSvg, />DS</, 'fallback logo SVG should render clean deterministic initials (Dallas Stars -> DS)')
+  assert.match(fallbackLogoSvg, />DALLAS STARS</, 'fallback logo SVG should caption the real identity, not a generic role tag')
   assert.doesNotMatch(fallbackLogoSvg, /data-role="visual-initials"/, 'fallback logo SVG should not use the old invisible initials marker')
 
   const requiredSportHints = SPORTS_DISCOVERY_CATALOGS

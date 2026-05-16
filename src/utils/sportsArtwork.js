@@ -9,7 +9,7 @@ const {
   resolveSportsPosterTemplate
 } = require('./sportsPosterTemplates')
 const { resolveSportBackdrop } = require('./sportBackdrops')
-const { verifyStampedSportsPosterEntitlement } = require('./entitlement')
+const { verifyStampedSportsPosterEntitlement, resolveServerAdminPosterTemplate } = require('./entitlement')
 
 const SPORTS_ARTWORK_PROXY_VERSION = '20260515-parser-clean-initials-v27'
 
@@ -120,6 +120,12 @@ function isWeakCanonicalId(value = '') {
 }
 
 function resolveConfiguredSportsPosterTemplate(input = {}) {
+  // Server-side admin override wins first so the URL the catalog bakes in
+  // (?template=) matches exactly what the artwork proxy will render — same
+  // operator env signal on both sides keeps cache keys consistent.
+  const serverAdminTemplate = resolveServerAdminPosterTemplate(process.env)
+  if (serverAdminTemplate) return resolveSportsPosterTemplate(serverAdminTemplate)
+
   // Honour the stamped entitlement on the encrypted config token.
   // Owner/admin sources are re-verified against the current env so revoking
   // PVTKRRX_OWNER_EMAILS instantly downgrades a leaked token. Anything

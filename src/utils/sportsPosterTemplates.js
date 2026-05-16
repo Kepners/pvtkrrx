@@ -2280,14 +2280,47 @@ function roleLabelForVisibleLogoFallback(role = '') {
   return 'SPORT'
 }
 
+// Generic catch-all sport buckets must NOT seed initials (DIRECTIVE 001):
+// "Others" -> "OTH" is a meaningless mark. When the only league signal is a
+// generic bucket, fall through to the real competition / event title so the
+// clean-initials fallback reflects the actual event identity.
+function isGenericSportBucket(value = '') {
+  return /^(others?|sport|sports|event|general|unknown|misc(?:ellaneous)?)$/i.test(normalizeSpace(value))
+}
+
 function labelForVisibleLogoFallback({ role = '', event = {} } = {}) {
   const normalized = normalizeSpace(role).toLowerCase()
   if (normalized === 'home') return normalizeSpace(event.homeTeam || event.home?.name || event.title || event.eventName)
   if (normalized === 'away') return normalizeSpace(event.awayTeam || event.away?.name || event.title || event.eventName)
   if (normalized === 'league' || normalized === 'logo' || normalized === 'leaguelogo') {
-    return normalizeSpace(event.league || event.competition || event.sport || event.title || event.eventName)
+    const league = normalizeSpace(event.league || event.competition)
+    if (league && !isGenericSportBucket(league)) return league
+    // No real competition: prefer the event/title so the mark carries real
+    // identity (e.g. "American Rodeo …" -> "AR", not the bucket sport).
+    const eventTitle = normalizeSpace(event.eventTitle || event.title || event.eventName)
+    if (eventTitle) return eventTitle
+    const sport = normalizeSpace(event.sport)
+    if (sport && !isGenericSportBucket(sport)) return sport
+    return league || sport
   }
   return normalizeSpace(event.title || event.eventName || event.league || event.competition || event.sport)
+}
+
+// Short, clean readable name for the line under the initials. Single words
+// stay whole; multi-word names are trimmed to ~16 chars so the mark reads as
+// a real identity (e.g. "AMERICAN RODEO", "WHITTAKER") not a placeholder.
+function cleanFallbackCaption(value = '', roleLabel = '') {
+  const clean = normalizeSpace(value).replace(/[^A-Za-z0-9 .'&-]+/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!clean) return roleLabel
+  const upper = clean.toUpperCase()
+  if (upper.length <= 18) return upper
+  const words = upper.split(' ')
+  let out = words[0]
+  for (let i = 1; i < words.length; i += 1) {
+    if ((out + ' ' + words[i]).length > 18) break
+    out += ' ' + words[i]
+  }
+  return out
 }
 
 function renderLogoGlyphSvg({ role = '', event = {}, theme = {}, size = 180 } = {}) {
@@ -2295,12 +2328,16 @@ function renderLogoGlyphSvg({ role = '', event = {}, theme = {}, size = 180 } = 
   const roleLabel = roleLabelForVisibleLogoFallback(role)
   const label = labelForVisibleLogoFallback({ role, event }) || roleLabel
   const initials = initialsFor(label, roleLabel.slice(0, 2))
+  // DIRECTIVE 001: the permitted fallback is clean deterministic initials of
+  // the real entity — NEVER a "LOGO PENDING" placeholder. The caption now
+  // carries a cleaned name (the actual identity) so combat/single/ancillary
+  // posters read as a real mark, not an unfinished slot.
+  const caption = cleanFallbackCaption(label, roleLabel)
   const primary = normalizeSpace(theme.homeColor || theme.accentColor || '#0f766e')
   const secondary = normalizeSpace(theme.awayColor || '#123c69')
   const accent = normalizeSpace(theme.accentColor || '#d4b76a')
-  const markSize = initials.length <= 2 ? Math.round(box * 0.32) : Math.round(box * 0.27)
-  const labelSize = Math.max(6, Math.round(box * 0.075))
-  const subSize = Math.max(5, Math.round(box * 0.052))
+  const markSize = initials.length <= 2 ? Math.round(box * 0.34) : Math.round(box * 0.29)
+  const captionSize = Math.max(6, Math.round(box * (caption.length > 12 ? 0.066 : 0.082)))
   const e = escapeXml
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg xmlns="http://www.w3.org/2000/svg" width="${box}" height="${box}" viewBox="0 0 ${box} ${box}" role="img" data-role="logo-fallback-svg" data-fallback-kind="logo-glyph" data-fallback-role="${e(roleLabel)}">
@@ -2315,10 +2352,9 @@ function renderLogoGlyphSvg({ role = '', event = {}, theme = {}, size = 180 } = 
   </defs>
   <rect x="${Math.round(box * 0.06)}" y="${Math.round(box * 0.06)}" width="${Math.round(box * 0.88)}" height="${Math.round(box * 0.88)}" rx="${Math.round(box * 0.14)}" fill="#f8f2df" stroke="#ffffff" stroke-width="${Math.max(2, Math.round(box * 0.035))}" filter="url(#fallbackShadow)"/>
   <rect x="${Math.round(box * 0.11)}" y="${Math.round(box * 0.11)}" width="${Math.round(box * 0.78)}" height="${Math.round(box * 0.78)}" rx="${Math.round(box * 0.105)}" fill="url(#fallbackBg)" stroke="${e(accent)}" stroke-width="${Math.max(1, Math.round(box * 0.018))}"/>
-  <circle cx="${Math.round(box * 0.5)}" cy="${Math.round(box * 0.48)}" r="${Math.round(box * 0.255)}" fill="rgba(5,7,13,0.28)" stroke="rgba(255,255,255,0.32)" stroke-width="${Math.max(1, Math.round(box * 0.014))}"/>
-  <text x="${Math.round(box * 0.5)}" y="${Math.round(box * 0.515)}" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="${markSize}" font-weight="900" letter-spacing="0">${e(initials)}</text>
-  <text x="${Math.round(box * 0.5)}" y="${Math.round(box * 0.785)}" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="${labelSize}" font-weight="800" letter-spacing="0">${e(roleLabel)}</text>
-  <text x="${Math.round(box * 0.5)}" y="${Math.round(box * 0.855)}" text-anchor="middle" fill="rgba(255,255,255,0.72)" font-family="Arial, Helvetica, sans-serif" font-size="${subSize}" font-weight="700" letter-spacing="0">LOGO PENDING</text>
+  <circle cx="${Math.round(box * 0.5)}" cy="${Math.round(box * 0.455)}" r="${Math.round(box * 0.27)}" fill="rgba(5,7,13,0.28)" stroke="rgba(255,255,255,0.32)" stroke-width="${Math.max(1, Math.round(box * 0.014))}"/>
+  <text x="${Math.round(box * 0.5)}" y="${Math.round(box * 0.49)}" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="${markSize}" font-weight="900" letter-spacing="0">${e(initials)}</text>
+  <text x="${Math.round(box * 0.5)}" y="${Math.round(box * 0.83)}" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="${captionSize}" font-weight="800" letter-spacing="0.5">${e(caption)}</text>
 </svg>`
 }
 
