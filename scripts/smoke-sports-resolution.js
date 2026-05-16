@@ -15,7 +15,8 @@ const { handleMeta } = require('../src/handlers/meta')
 const { handleCatalog } = require('../src/handlers/catalog')
 const {
   SPORTS_META_RESOLUTION_STATUS,
-  resolveSportsMetaIdentity
+  resolveSportsMetaIdentity,
+  verifySportsMetaResolution
 } = require('../src/utils/sportsIdentityResolution')
 const {
   SPORTS_ARTWORK_PROXY_VERSION,
@@ -649,6 +650,26 @@ async function run() {
   const compactMw35 = parseSportsTitle('EPL.2026.05.15.Manchester.United.vs.Brighton.MW35.1080p', '2026-05-15T12:00:00Z')
   assert.equal(compactMw35?.homeTeam, 'Manchester United', 'compact MW35 title should keep clean home team')
   assert.equal(compactMw35?.awayTeam, 'Brighton', 'compact MW35 title should be treated as matchweek noise, not opponent text')
+  const undatedFutureSupercars = verifySportsMetaResolution(
+    {
+      identityType: 'event',
+      params: {
+        title: 'Tasmania Super 440 Race 14',
+        sport: 'motorsport',
+        league: 'Supercars Championship',
+        event: 'Tasmania Super 440 Race 14'
+      }
+    },
+    canonicalPayload({
+      id: 'sportsmeta:event:motorsport|2027-05-22|v8-supercars|tasmania-super-440-race-14',
+      name: 'Tasmania Super 440 Race 14',
+      league: 'Supercars Championship',
+      date: '2027-05-22',
+      sport: 'motorsport'
+    })
+  )
+  assert.equal(undatedFutureSupercars.status, SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH, 'undated tracker titles must not resolve to future SportsMeta calendar rows')
+  assert.equal(undatedFutureSupercars.reason, 'future_canonical_without_title_date', 'future SportsMeta rejection should report the date-source problem')
   const spacedMatchweek = parseSportsTitle('Premier League Manchester United vs Wolverhampton Wanderers Matchweek 35', '2026-05-15T12:00:00Z')
   assert.equal(spacedMatchweek?.league, 'English Premier League', 'spaced matchweek title should keep the league')
   assert.equal(spacedMatchweek?.awayTeam, 'Wolverhampton Wanderers', 'spaced matchweek title should strip Matchweek tokens')
@@ -945,9 +966,22 @@ async function run() {
     seeders: 1
   })
   assert.equal(pgaPrefixedProfile.league, 'PGA Tour', 'Golf-prefixed PGA Tour rows should keep PGA Tour as the league')
-  assert.equal(pgaPrefixedProfile.event, 'Valero Texas Open Day', 'Golf-prefixed PGA Tour rows should preserve the event label')
+  assert.equal(pgaPrefixedProfile.event, 'Valero Texas Open', 'Golf-prefixed PGA Tour rows should preserve the clean event label')
+  assert.equal(pgaPrefixedProfile.round, 'Day 2', 'Golf-prefixed PGA Tour rows should keep day/session as detail')
+  assert.equal(pgaPrefixedProfile.date, '2026-04-03', 'Golf-prefixed PGA Tour rows should not misread Day 2 as a 2004 date')
   assert.equal(pgaPrefixedProfile.broadcast, 'Sky Sports', 'Golf-prefixed PGA Tour rows should keep Sky as broadcast metadata')
   assert.equal(pgaPrefixedProfile.event_class, 'golf_event', 'PGA Tour rows should be classified as golf-event posters')
+
+  const latePgaProfile = parseSportsTorrentProfile({
+    title: 'Golf 04 01 2025 The Sentry Day 2 PGA TOUR 720P50 EUROSPORT',
+    pubDate: '2025-01-04T12:00:00.000Z',
+    sportHint: 'golf',
+    seeders: 1
+  })
+  assert.equal(latePgaProfile.league, 'PGA Tour', 'Late PGA Tour tokens should still classify as PGA Tour')
+  assert.equal(latePgaProfile.event, 'The Sentry', 'Late PGA Tour rows should expose the event, not the raw tracker title')
+  assert.equal(latePgaProfile.round, 'Day 2', 'Late PGA Tour rows should keep day/session as detail')
+  assert.equal(latePgaProfile.date, '2025-01-04', 'Late PGA Tour rows should parse the leading DMY event date')
 
   const faCupPrefixedProfile = parseSportsTorrentProfile({
     title: 'Football FA Cup Chelsea vs Leeds United 2026 04 26 1080p WEB-DL',

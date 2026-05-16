@@ -51,7 +51,21 @@ const LEAGUE_MAP = Object.freeze({
     name: 'FA Cup',
     sportKey: 'football',
     sportsDbSport: 'Soccer',
-    aliases: ['English FA Cup', 'The FA Cup', 'Football Association Cup']
+    aliases: ['English FA Cup', 'The FA Cup', 'The Emirates FA Cup', 'Emirates FA Cup', 'Football Association Cup']
+  },
+  wsl: {
+    name: 'English Womens Super League',
+    idLeague: '4849',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['Womens Super League', "Women's Super League", 'Barclays Womens Super League', "Barclays Women's Super League", 'FA WSL', 'WSL']
+  },
+  englishnationalleague: {
+    name: 'English National League',
+    idLeague: '4590',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['National League', 'Vanarama National League', 'Conference National']
   },
   mls: {
     name: 'Major League Soccer',
@@ -222,7 +236,14 @@ const LEAGUE_MAP = Object.freeze({
     sportKey: 'motorsport',
     sportsDbSport: 'Motorsport',
     sportsDbName: 'SBK',
-    aliases: ['SBK', 'World Superbike Championship']
+    aliases: ['SBK', 'WorldSBK', 'World Superbike', 'World Superbikes', 'World Superbike Championship']
+  },
+  diamondleague: {
+    name: 'Diamond League',
+    idLeague: '5282',
+    sportKey: 'athletics',
+    sportsDbSport: 'Athletics',
+    aliases: ['World Athletics Diamond League', 'Athletics Diamond League']
   },
   wec: {
     name: 'WEC',

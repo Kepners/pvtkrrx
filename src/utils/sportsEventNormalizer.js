@@ -92,7 +92,7 @@ function titleCase(value) {
   const upperTokens = new Set([
     'AC', 'AEK', 'AFC', 'AEW', 'BIGN', 'CF', 'CPL', 'EFL', 'ELC', 'EPL', 'FA',
     'F1', 'FC', 'FEB', 'FIFA', 'GP', 'IPL', 'MLB', 'MLS', 'MMA', 'MOTOGP', 'NBA',
-    'NCAA', 'NFL', 'NHL', 'NJPW', 'OHL', 'PGA', 'PSG', 'ROH', 'SC', 'TNA', 'UCL',
+    'NCAA', 'NFL', 'NHL', 'NJPW', 'OHL', 'PFL', 'PGA', 'PSG', 'ROH', 'SC', 'TNA', 'UCL',
     'UCLA', 'UECL', 'UEFA', 'UFC', 'UEL', 'UFL', 'WC', 'WEC', 'WNBA', 'WRC', 'WWE'
   ])
   return normalizeSpace(value)
@@ -284,6 +284,20 @@ function normalizeMotorsportEvent({ league = '', eventName = '', rawTitle = '' }
     return { competition: leagueLabel, eventTitle: '', eventDetail: '' }
   }
 
+  let collapsedMotoGrandPrixPackage = false
+  if (/^motogp$/i.test(leagueLabel)) {
+    if (/^moto$/i.test(tokens[0]) && /^grand$/i.test(tokens[1]) && /^prix$/i.test(tokens[2])) {
+      tokens = tokens.slice(3)
+      collapsedMotoGrandPrixPackage = true
+    }
+    while (/^moto(?:gp|2|3)$/i.test(tokens[0] || '')) {
+      tokens = tokens.slice(1)
+    }
+    if (/^stage$/i.test(tokens[0] || '')) {
+      tokens = /^\d{1,2}$/.test(tokens[1] || '') ? tokens.slice(2) : tokens.slice(1)
+    }
+  }
+
   let detail = ''
   const tokenSession = extractMotorsportSessionFromTokens(tokens)
   if (tokenSession) {
@@ -309,14 +323,18 @@ function normalizeMotorsportEvent({ league = '', eventName = '', rawTitle = '' }
       ? `${country} ${/^gp$/i.test(suffix) ? 'GP' : 'Grand Prix'}`
       : `${country} ${suffix}`.trim()
   } else if (/^(motogp|nascar|indycar|wrc|wec|formula e)$/i.test(leagueLabel) && tokens.length >= 2) {
-    const country = normalizeCountryToken(tokens[0])
-    competition = `${leagueLabel} ${country}`.trim()
-    eventTitle = titleCase(tokens.slice(1).join(' '))
+    competition = leagueLabel
+    eventTitle = titleCase(tokens.join(' '))
+    if (/^motogp$/i.test(leagueLabel) && !collapsedMotoGrandPrixPackage) {
+      const country = normalizeCountryToken(tokens[0])
+      competition = `${leagueLabel} ${country}`.trim()
+      eventTitle = titleCase(tokens.slice(1).join(' '))
+    }
   }
 
   return {
     competition,
-    eventTitle,
+    eventTitle: eventTitle.replace(/\ble Mans\b/g, 'Le Mans'),
     eventDetail: detail
   }
 }

@@ -1261,7 +1261,10 @@ function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') 
   // Wrap long titles to up to 2 lines + auto-shrink font size to keep text
   // inside the 510px safe width (W=600 minus 45px margins each side).
   const soloLines = wrapBroadcastSoloTitle(soloTitle, 510)
-  const soloFontSize = soloLines.length > 1 ? 44 : (soloTitle.length > 16 ? 46 : 58)
+  const soloBaseFontSize = soloLines.length > 1 ? 44 : (soloTitle.length > 16 ? 46 : 58)
+  const soloLongestLine = soloLines.reduce((max, line) => Math.max(max, line.length), 0)
+  const soloFitFontSize = soloLongestLine > 0 ? Math.floor(510 / (soloLongestLine * 0.58)) : soloBaseFontSize
+  const soloFontSize = Math.max(32, Math.min(soloBaseFontSize, soloFitFontSize))
   const soloBaseY = H / 2 + 195 - (soloLines.length - 1) * Math.round(soloFontSize * 0.5)
   // Solo: dominant league wordmark (F1, UFC, ATP, etc.) replaces the sport glyph
   // so single-event posters echo the broadcast pair treatment.

@@ -23,7 +23,7 @@ const TEAM_SIDE_TRAILING_SPORT_NOISE_RE = /\b(?:4k|hockey|ice\s+hockey|basketbal
 const TEAM_SIDE_TRAILING_GAME_STATE_RE = /\b(?:make[\s-]*up\s+of|completion\s+of|continuation\s+of|resumption\s+of|postponed|suspended|rain[\s-]*delayed?|resumed|tba)\s*$/i
 
 // Known league/series tokens that start non-vs event titles
-const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|PFL|Bellator|ONE|WWE|AEW|TNA|ROH|NJPW|MotoGP|Moto\s*GP|NASCAR|IndyCar|WRC|Supercars|Supercars\s*Championship|V8SC|Bathurst|WSBK|WEC|FormulaE|Rally|Dakar|PGA|PGA\s*Tour|LPGA|LPGA\s*Tour|Masters|ATP|ATP\s*World\s*Tour|WTA|WTA\s*Tour|Wimbledon|Australian\s*Open|Roland\s*Garros|French\s*Open|US\s*Open|U\.S\.\s*Open|Davis\s*Cup|Laver\s*Cup|PDC|PDC\s*Darts|Premier\s*League\s*Darts|World\s*Championship\s*Darts|World\s*Matchplay|IPL|IPLM\d+|Indian\s*Premier\s*League|MLS|Major\s*League\s*Soccer|MLB|Major\s*League\s*Baseball|NCAA\s*Baseball|World\s*Baseball\s*Classic|NBA|NBA\s*Playoffs|EuroLeague|EasyCredit\s*BBL|Basketball\s*Champions\s*League(?:\s*of\s*Americas)?|Super\s*Rugby|MLR|Major\s*League\s*Rugby|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
+const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|PFL|Bellator|ONE|WWE|AEW|TNA|TNA\s*Wrestling|Impact\s*Wrestling|ROH|NJPW|MotoGP|Moto\s*GP|NASCAR|IndyCar|WRC|Supercars|Supercars\s*Championship|V8SC|Bathurst|WSBK|WorldSBK|World\s*Superbikes?|SBK|WEC|FormulaE|Rally|Dakar|Diamond\s*League|World\s*Athletics\s*Diamond\s*League|PGA|PGA\s*Tour|LPGA|LPGA\s*Tour|Masters|ATP|ATP\s*World\s*Tour|WTA|WTA\s*Tour|Wimbledon|Australian\s*Open|Roland\s*Garros|French\s*Open|US\s*Open|U\.S\.\s*Open|Davis\s*Cup|Laver\s*Cup|PDC|PDC\s*Darts|Premier\s*League\s*Darts|World\s*Championship\s*Darts|World\s*Matchplay|IPL|IPLM\d+|Indian\s*Premier\s*League|MLS|Major\s*League\s*Soccer|MLB|Major\s*League\s*Baseball|NCAA\s*Baseball|World\s*Baseball\s*Classic|NBA|NBA\s*Playoffs|NCAA\s*Basketball|College\s*Basketball|EuroLeague|EasyCredit\s*BBL|Basketball\s*Champions\s*League(?:\s*of\s*Americas)?|English\s*Women'?s?\s*Super\s*League|Women'?s?\s*Super\s*League|Barclays\s*Women'?s?\s*Super\s*League|FA\s*WSL|WSL|Super\s*Rugby|MLR|Major\s*League\s*Rugby|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
 
 const SESSION_PATTERNS = [
   ['Pre-Season Testing', /\bpre[\s-]*season\s+testing\b/i],
@@ -200,7 +200,7 @@ function titleCase(value = '') {
     'AC', 'AEK', 'AEW', 'AFCON', 'AFC', 'ATP', 'BIGN', 'CF', 'CPL', 'EFL',
     'ELC', 'EPL', 'FA', 'F1', 'FC', 'FEB', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA',
     'NBA', 'NCAA', 'NFL', 'NHL', 'NJPW', 'NXT', 'PDC', 'PFL', 'PGA', 'PPV',
-    'OHL', 'PSG', 'ROH', 'SC', 'TNA', 'UCL', 'UCLA', 'UECL', 'UEFA', 'UFC', 'UEL', 'UFL',
+    'OHL', 'PSG', 'ROH', 'RSM', 'SC', 'TNA', 'UCL', 'UCLA', 'UECL', 'UEFA', 'UFC', 'UEL', 'UFL',
     'WC', 'WEC', 'WNBA', 'WRC', 'WTA', 'WWE'
   ])
   return normalizeSegment(value)
@@ -1207,6 +1207,7 @@ function resolveContractDate(tokens, raw, yearToken, pubDate) {
   const parts = tokens.map(t => String(t || '').trim())
   const num = parts.map(p => (/^\d{1,4}$/.test(p) ? p : ''))
   const seasonYearRe = /^(19|20)\d{2}$/
+  const previousToken = (index) => String(parts[index - 1] || '').trim()
 
   // 0. WRONG-DATE-INTERPRETATION guard (must beat the generic ISO regex):
   // "YYYY <n> <n> YYYY" with the SAME year both sides — the inner pair is
@@ -1277,6 +1278,10 @@ function resolveContractDate(tokens, raw, yearToken, pubDate) {
   for (let i = 0; i <= num.length - 3; i += 1) {
     const a = num[i]; const b = num[i + 1]; const c = num[i + 2]
     if (!a || !b || !c) continue
+    // Avoid treating "Day 2 03 04" / "Round 2 03 04" as a 2004 date.
+    // The first number is the round/session value; the following pair is the
+    // actual day/month date and should be handled by the bare-DD-MM fallback.
+    if (/^(?:day|round|game|stage|match|race)$/i.test(previousToken(i))) continue
     if (/^\d{1,2}$/.test(a) && /^\d{1,2}$/.test(b) && /^\d{2}$/.test(c) && Number(c) <= 49) {
       const y = `20${c}`
       const d = a.padStart(2, '0'); const m = b.padStart(2, '0')
@@ -1293,6 +1298,7 @@ function resolveContractDate(tokens, raw, yearToken, pubDate) {
       const a = num[i]; const b = num[i + 1]
       if (!/^\d{1,2}$/.test(a) || !/^\d{1,2}$/.test(b)) continue
       // skip pairs that are obviously a quality token slice
+      if (/^(?:day|round|game|stage|match|race)$/i.test(previousToken(i))) continue
       const d = a.padStart(2, '0'); const m = b.padStart(2, '0')
       if (isValidDate(fallbackYear, m, d)) return { date: `${fallbackYear}-${m}-${d}`, year: fallbackYear }
     }
@@ -1335,7 +1341,7 @@ function resolveContractCompetition(tokens, sport) {
   let mapped = null
   let mappedStart = -1
   let mappedSpan = 0
-  const scanMax = Math.min(tokens.length, 8)
+  const scanMax = Math.min(tokens.length, 12)
   for (let start = 0; start < scanMax; start += 1) {
     for (let count = 1; count <= Math.min(tokens.length - start, 6); count += 1) {
       const candidate = normalizeSegment(tokens.slice(start, start + count).join(' '))
@@ -1576,6 +1582,37 @@ function cleanSide(tokens, sport, ctx, trimLeadingVenue = false) {
   return titleCase(aliased || canon)
 }
 
+function cleanGolfEventName(tokens = [], competition = '', raw = '') {
+  let eventTokens = [...(Array.isArray(tokens) ? tokens : [])]
+  const competitionTokens = normalizeSegment(competition).toLowerCase().split(/\s+/).filter(Boolean)
+  const shouldDrop = (token, index) => {
+    const t = String(token || '').trim()
+    const low = t.toLowerCase()
+    if (!t) return true
+    if (QUALITY_TOKEN_RE.test(t) || SOURCE_FORMAT_RE.test(t) || LANG_TOKEN_RE.test(t)) return true
+    if (RUBBISH_TOKENS.has(low) || TV_CHANNEL_KEEPERS.has(low)) return true
+    if (/^(?:golf)$/i.test(t)) return true
+    if (/^(?:19|20)\d{2}$/.test(t)) return true
+    if (/^\d{1,4}$/.test(t)) return true
+    if (/^(?:day|round|r|game|stage)$/i.test(t) && /^\d{1,3}$/.test(String(eventTokens[index + 1] || ''))) return true
+    if (/^(?:sky|sports|eurosport|fox|bt|tnt|nbc|cbs|abc|tsn|bein)$/i.test(t)) return true
+    return false
+  }
+
+  if (competitionTokens.length > 0) {
+    for (let i = 0; i <= eventTokens.length - competitionTokens.length; i += 1) {
+      const slice = eventTokens.slice(i, i + competitionTokens.length).map(t => String(t || '').toLowerCase())
+      if (slice.join(' ') === competitionTokens.join(' ')) {
+        eventTokens.splice(i, competitionTokens.length)
+        i -= 1
+      }
+    }
+  }
+
+  eventTokens = eventTokens.filter((token, index) => !shouldDrop(token, index))
+  return titleCase(normalizeSegment(eventTokens.join(' '))).trim()
+}
+
 function parseSportsTitleContract(rawTitle, options = {}) {
   const raw = normalizeSegment(rawTitle)
   if (!raw) {
@@ -1761,6 +1798,12 @@ function parseSportsTitleContract(rawTitle, options = {}) {
       continue
     }
     break
+  }
+  if (/^golf$/i.test(out.sport)) {
+    const golfEvent = cleanGolfEventName(eventTokens, out.competition, raw)
+    if (golfEvent) out.event = golfEvent
+    else out.event = titleCase(normalizeSegment(raw))
+    return out
   }
   let cleanedEvent = cleanSide(eventTokens, out.sport, raw)
   if (cleanedEvent) {

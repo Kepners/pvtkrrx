@@ -17,6 +17,7 @@ const {
 } = require('../utils/sportsArtwork')
 const { normalizeSportsEventMetadata } = require('../utils/sportsEventNormalizer')
 const { classifySportsEvent } = require('../utils/sportsEventClassifier')
+const { buildSportsDisplayName } = require('../utils/sportsDisplayName')
 const { getSportsAvailabilityAnchorByCanonical } = require('../utils/sportsAvailabilityStore')
 const BRAND_POSTER = BRAND_ARTWORK
 const BRAND_LOGO = BRAND_ARTWORK
@@ -181,6 +182,14 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, 
     rawTitle: displayTitle,
     source: 'sportsmeta'
   })
+  const metaDisplayName = buildSportsDisplayName({
+    title: displayTitle,
+    league: normalizedSportsEvent.competition || league,
+    sport: normalizedSportsEvent.sport || sportHint,
+    eventDetail: normalizedSportsEvent.eventDetail || '',
+    homeTeam: normalizedSportsEvent.homeTeam || canonicalEvent?.homeTeam,
+    awayTeam: normalizedSportsEvent.awayTeam || canonicalEvent?.awayTeam
+  })
   const artworkInput = {
     baseUrl: String(baseUrl || '').replace(/\/+$/, ''),
     sportsmetaBaseUrl: config?.sportsmetaBaseUrl,
@@ -224,7 +233,7 @@ function buildCanonicalSportsMetaResponse(canonical = {}, requestedId, baseUrl, 
   const meta = {
     id: requestedId,
     type: metaType,
-    name: displayTitle,
+    name: metaDisplayName,
     description: descriptionLines.join('\n'),
     overview: descriptionLines.join('\n'),
     poster,
@@ -381,6 +390,16 @@ async function handleCustomMeta(config, id, context = {}) {
         source: canonicalSportsMeta ? 'sportsmeta' : 'prowlarr'
       })
     : null
+  const metaDisplayName = isSports
+    ? buildSportsDisplayName({
+        title: displayTitle,
+        league: normalizedSportsEvent?.competition || league,
+        sport: normalizedSportsEvent?.sport || resolvedSportHint,
+        eventDetail: normalizedSportsEvent?.eventDetail || carriedEventDetail,
+        homeTeam: normalizedSportsEvent?.homeTeam || homeTeam,
+        awayTeam: normalizedSportsEvent?.awayTeam || awayTeam
+      })
+    : displayTitle
   const classifiedEventClass = isSports
     ? classifySportsEvent({
         sport: resolvedSportHint || normalizedSportsEvent?.sport || '',
@@ -467,7 +486,7 @@ async function handleCustomMeta(config, id, context = {}) {
   const meta = {
     id,
     type: String(info.y || 'movie'),
-    name: displayTitle,
+    name: metaDisplayName,
     description,
     overview: description,
     poster,

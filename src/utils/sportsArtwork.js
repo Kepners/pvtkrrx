@@ -15,7 +15,7 @@ const {
   resolveServerAdminPosterTemplate
 } = require('./entitlement')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260516-contrast-safe-logo-v28'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260516-competition-context-v30'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
@@ -124,12 +124,6 @@ function isWeakCanonicalId(value = '') {
 }
 
 function resolveConfiguredSportsPosterTemplate(input = {}) {
-  // Server-side admin override wins first so the URL the catalog bakes in
-  // (?template=) matches exactly what the artwork proxy will render — same
-  // operator env signal on both sides keeps cache keys consistent.
-  const serverAdminTemplate = resolveServerAdminPosterTemplate(process.env)
-  if (serverAdminTemplate) return resolveSportsPosterTemplate(serverAdminTemplate)
-
   // Honour the stamped entitlement on the encrypted config token.
   // Owner/admin sources are re-verified against the current env so revoking
   // PVTKRRX_OWNER_EMAILS instantly downgrades a leaked token. Anything
@@ -149,7 +143,17 @@ function resolveConfiguredSportsPosterTemplate(input = {}) {
     stampedSource,
     stampedHash
   })
-  return resolveSportsPosterTemplate(verified.resolvedTemplate || 'ticket-stub')
+  if (verified.allowed && verified.resolvedTemplate) {
+    return resolveSportsPosterTemplate(verified.resolvedTemplate)
+  }
+
+  // Server-side admin override remains a fallback for public/no-token artwork.
+  // A verified owner/admin config must win so changing layout in configure does
+  // not require reinstalling the Stremio addon.
+  const serverAdminTemplate = resolveServerAdminPosterTemplate(process.env)
+  if (serverAdminTemplate) return resolveSportsPosterTemplate(serverAdminTemplate)
+
+  return resolveSportsPosterTemplate('ticket-stub')
 }
 
 // The artwork proxy route carries NO config token (Stremio hits it directly).

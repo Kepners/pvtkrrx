@@ -83,7 +83,7 @@ function titleCase(value) {
       const upper = part.toUpperCase()
       if (upper === 'SMACKDOWN') return 'SmackDown'
       if (upper === 'WRESTLEMANIA') return 'WrestleMania'
-      if (['AAC', 'AV1', 'BIGN', 'CPL', 'DDP', 'ELC', 'FA', 'F1', 'FC', 'FEB', 'GP', 'HD', 'IPL', 'MLB', 'MLS', 'MMA', 'NBA', 'NCAA', 'NFL', 'NHL', 'OHL', 'PGA', 'RAW', 'UFC', 'UFL', 'WRC', 'WWE', 'NXT'].includes(upper)) {
+      if (['AAC', 'AV1', 'BIGN', 'CPL', 'DDP', 'ELC', 'FA', 'F1', 'FC', 'FEB', 'GP', 'HD', 'IPL', 'MLB', 'MLS', 'MMA', 'NBA', 'NCAA', 'NFL', 'NHL', 'OHL', 'PFL', 'PGA', 'RAW', 'RSM', 'UFC', 'UFL', 'WRC', 'WWE', 'NXT'].includes(upper)) {
         return upper
       }
       if (upper === 'MOTOGP') return 'MotoGP'

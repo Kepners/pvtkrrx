@@ -195,14 +195,15 @@ function assertRuntimeMotorsportPoster(fixture) {
   assert.equal(artwork.layoutFamily, 'SINGLE_EVENT_MOTORSPORT', `${fixture.slug} rendered layoutFamily`)
   assert.match(artwork.svg, /data-layout-family="SINGLE_EVENT_MOTORSPORT"/, `${fixture.slug} family marker`)
   assert.match(artwork.svg, /data-role="motorsport-identity-box"/, `${fixture.slug} identity box marker`)
-  assert.match(artwork.svg, /data-role="motorsport-identity"/, `${fixture.slug} identity glyph marker`)
+  assert.match(artwork.svg, /data-icon-kind="[^"]+"/, `${fixture.slug} identity kind marker`)
+  assert.doesNotMatch(artwork.svg, /data-role="motorsport-identity"/, `${fixture.slug} runtime should not render removed synthetic motorsport glyph`)
   assert.match(artwork.svg, /data-role="event-title-box"/, `${fixture.slug} title box marker`)
   assert.match(artwork.svg, /data-role="event-title"/, `${fixture.slug} event-title text marker`)
   assert.match(artwork.svg, /data-role="sport-label"/, `${fixture.slug} sport-label marker`)
   assertNoForbiddenMarkers(`${fixture.slug} runtime`, artwork.svg, fixture)
 
   const layoutLabel = artwork.svg.match(/data-layout-family="SINGLE_EVENT_MOTORSPORT"[\s\S]*?data-league-label="([^"]+)"/)?.[1]
-  const layoutIcon = artwork.svg.match(/data-role="motorsport-identity"[^>]*data-icon-kind="([^"]+)"/)?.[1]
+  const layoutIcon = artwork.svg.match(/data-icon-kind="([^"]+)"/)?.[1]
   assert.equal(layoutLabel, fixture.expectedLabel, `${fixture.slug} runtime league label`)
   assert.equal(layoutIcon, fixture.expectedIcon, `${fixture.slug} runtime icon kind`)
 
