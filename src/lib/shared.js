@@ -2156,6 +2156,78 @@ function getReadableBytes(fileEntry, torrent, diskBytes) {
   return Math.max(0, Math.min(diskBytes, estimated))
 }
 
+function getTorrentFileOffset(files, fileEntry, targetPath = '') {
+  const list = Array.isArray(files) ? files : []
+  if (!fileEntry || list.length === 0) return null
+
+  const activeFileIndex = Number.isInteger(fileEntry?.index) ? fileEntry.index : null
+  const targetPathKey = normalizeTorrentPath(fileEntry?.name || targetPath)
+  let offset = 0
+
+  for (const entry of list) {
+    const entryIndex = Number.isInteger(entry?.index) ? entry.index : null
+    const entryPathKey = normalizeTorrentPath(entry?.name || '')
+    const matched = (activeFileIndex !== null && entryIndex === activeFileIndex) ||
+      (activeFileIndex === null && targetPathKey && entryPathKey === targetPathKey)
+
+    if (matched) return offset
+    offset += Math.max(0, Number(entry?.size || 0))
+  }
+
+  return null
+}
+
+function getPieceVerifiedReadableBytes(fileEntry, files, pieceSize, pieceStates) {
+  const fileSize = Math.max(0, Number(fileEntry?.size || 0))
+  if (!fileSize) return 0
+  if (!Number.isFinite(pieceSize) || pieceSize <= 0) return null
+  if (!Array.isArray(pieceStates) || pieceStates.length === 0) return null
+
+  const filePieceRange = Array.isArray(fileEntry?.piece_range) ? fileEntry.piece_range : null
+  if (!filePieceRange || filePieceRange.length < 2) return null
+
+  const fileOffset = getTorrentFileOffset(files, fileEntry)
+  if (!Number.isFinite(fileOffset) || fileOffset < 0) return null
+
+  const filePieceStart = Number(filePieceRange[0])
+  const filePieceEnd = Number(filePieceRange[1])
+  if (!Number.isFinite(filePieceStart) || !Number.isFinite(filePieceEnd)) return null
+
+  const firstPiece = Math.max(filePieceStart, Math.floor(fileOffset / pieceSize))
+  if (firstPiece < filePieceStart || firstPiece > filePieceEnd) return 0
+  if (Number(pieceStates[firstPiece]) !== 2) return 0
+
+  let lastDownloadedPiece = firstPiece
+  while (
+    lastDownloadedPiece + 1 <= filePieceEnd &&
+    Number(pieceStates[lastDownloadedPiece + 1]) === 2
+  ) {
+    lastDownloadedPiece += 1
+  }
+
+  const fileEndInTorrent = fileOffset + fileSize - 1
+  const availableEndInTorrent = Math.min(fileEndInTorrent, ((lastDownloadedPiece + 1) * pieceSize) - 1)
+  if (availableEndInTorrent < fileOffset) return 0
+  return Math.max(0, Math.min(fileSize, availableEndInTorrent - fileOffset + 1))
+}
+
+async function getPieceVerifiedReadableBytesFromQbit(qbit, torrentHash, fileEntry, files) {
+  try {
+    const [properties, states] = await Promise.all([
+      qbit.properties(torrentHash),
+      qbit.pieceStates(torrentHash)
+    ])
+    return getPieceVerifiedReadableBytes(
+      fileEntry,
+      files,
+      Math.max(0, Number(properties?.piece_size || 0)),
+      Array.isArray(states) ? states.map(value => Number(value)) : null
+    )
+  } catch (_) {
+    return null
+  }
+}
+
 function getPlaybackReadyByteThreshold(fileEntry) {
   const size = Number(fileEntry?.size || 0)
   if (!size) return 0
@@ -2318,7 +2390,19 @@ async function loadTorrentPlaybackState(qbit, hash, targetPath, additionalStorag
   const resolvedFileStat = await statPlayableFile(resolvedFilePath)
   const fileExists = Boolean(resolvedFileStat)
   const diskSize = fileExists ? Number(resolvedFileStat.size || 0) : 0
-  const readableBytes = chosenFile?.extracted ? diskSize : getReadableBytes(chosenFile, torrent, diskSize)
+  const complete = Number(torrent?.progress || 0) >= 0.999 || Number(chosenFile?.progress || 0) >= 0.999
+  let readableBytes = chosenFile?.extracted ? diskSize : getReadableBytes(chosenFile, torrent, diskSize)
+  if (!chosenFile?.extracted && !complete && fileExists && chosenFile?.name) {
+    const pieceVerifiedReadableBytes = await getPieceVerifiedReadableBytesFromQbit(
+      qbit,
+      String(torrent?.hash || hash || '').toLowerCase(),
+      chosenFile,
+      files
+    )
+    if (Number.isFinite(pieceVerifiedReadableBytes)) {
+      readableBytes = Math.max(0, Math.min(diskSize, pieceVerifiedReadableBytes))
+    }
+  }
   return {
     torrent,
     files,
@@ -2764,6 +2848,7 @@ module.exports = {
   findTorrentFileByPath,
   resolveTorrentFilePath,
   getReadableBytes,
+  getPieceVerifiedReadableBytes,
   getPlaybackReadyByteThreshold,
   isPlaybackReady,
   primeTorrentForStreaming,
