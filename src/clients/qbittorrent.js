@@ -210,6 +210,36 @@ class QBitClient {
     })
   }
 
+  async resume(hashes) {
+    const value = Array.isArray(hashes) ? hashes.join('|') : String(hashes || '')
+    try {
+      return await this.request('/api/v2/torrents/resume', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `hashes=${encodeURIComponent(value)}`,
+        expect: 'text'
+      })
+    } catch (err) {
+      if (!/HTTP (404|405)\b/.test(String(err?.message || ''))) throw err
+      return this.request('/api/v2/torrents/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `hashes=${encodeURIComponent(value)}`,
+        expect: 'text'
+      })
+    }
+  }
+
+  async topPriority(hashes) {
+    const value = Array.isArray(hashes) ? hashes.join('|') : String(hashes || '')
+    return this.request('/api/v2/torrents/topPrio', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `hashes=${encodeURIComponent(value)}`,
+      expect: 'text'
+    })
+  }
+
   async setFilePriority(hash, fileIds, priority = 7) {
     const ids = Array.isArray(fileIds) ? fileIds.join('|') : String(fileIds || '')
     return this.request('/api/v2/torrents/filePrio', {
@@ -237,7 +267,7 @@ class QBitClient {
     params.set('urls', String(magnetOrUrl || ''))
     if (options.sequentialDownload === true) params.set('sequentialDownload', 'true')
     if (options.firstLastPiecePrio === true) params.set('firstLastPiecePrio', 'true')
-    if (options.paused === true) params.set('paused', 'true')
+    if (typeof options.paused === 'boolean') params.set('paused', options.paused ? 'true' : 'false')
 
     return this.request('/api/v2/torrents/add', {
       method: 'POST',
@@ -261,7 +291,7 @@ class QBitClient {
     )
     if (options.sequentialDownload === true) form.append('sequentialDownload', 'true')
     if (options.firstLastPiecePrio === true) form.append('firstLastPiecePrio', 'true')
-    if (options.paused === true) form.append('paused', 'true')
+    if (typeof options.paused === 'boolean') form.append('paused', options.paused ? 'true' : 'false')
 
     return this.request('/api/v2/torrents/add', {
       method: 'POST',

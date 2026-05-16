@@ -66,6 +66,7 @@ There is no per-route catalog filtering. The Library catalog queries qBittorrent
 - Config loaded from disk (`local-config.json`)
 - Built-in `/file` route serves bytes with HTTP Range support
 - Built-in `/playback` route queues torrents via tracker link, polls qBit, and 302-redirects to `/file` when ready
+- Playback priming resumes the selected incomplete torrent, moves it to the top of qBittorrent's queue when queueing is enabled, keeps sequential download on, and sets only the chosen playable video/archive files to high file priority
 - Tracker `/playback` streams emitted for on-tracker content
 - Completed packed RAR releases start background extraction when possible; the extracted direct video is the supported path once ready, and the source stays hidden while extraction is pending or unavailable unless the experimental native archive override is enabled
 - `proxyHeaders` with Basic Auth included on seedbox/buffering streams when `fileServerAuth` is configured
@@ -94,6 +95,7 @@ There is no per-route catalog filtering. The Library catalog queries qBittorrent
   - the configure page can save the server config locally and reuse it across reboots
   - remote configure sessions must present the self-host password before they can use localhost/private Prowlarr or qBittorrent URLs
   - `npm run server:setup` can auto-discover existing Prowlarr/qBittorrent configs, prompt only for the missing values, and automatically hand off to the full bootstrap when those providers are missing before optionally installing a Linux `systemd` service for auto-start on boot
+  - tracker playback uses the same qBittorrent priming as PC Local: selected incomplete torrents are resumed, moved to the top of the queue where supported, and narrowed to the selected playable file
 - Hosted `Remote Seedbox` on the public relay must not auto-fill or carry over `127.0.0.1` / `localhost` / private-LAN backend URLs. Those private targets are only valid for same-box self-host server configs after server-admin authentication.
 - Tracker `/playback` streams are **suppressed** at stream emission time (not just blocked at the route)
 - If `fileServerAuth` is configured, tracker playback is also suppressed on any non-local route because Stremio cannot forward `proxyHeaders` through a redirect chain

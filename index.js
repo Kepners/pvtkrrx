@@ -2666,6 +2666,15 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
       return true
     }
 
+    const primeStateForPlayback = async (state) => {
+      if (!state?.torrent) return
+      if (!primedTorrent || (!primedFile && state.file)) {
+        await primeTorrentForStreaming(qbit, state.torrent, state.file, state.files)
+        primedTorrent = true
+        if (state.file) primedFile = true
+      }
+    }
+
     if (!trackedHash && info.l && !isMagnetLink(info.l)) {
       try {
         trackerPayload = await fetchTorrentPayload(info.l)
@@ -2687,11 +2696,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
     if (trackedHash) {
       const existing = await loadTorrentPlaybackState(qbit, trackedHash, targetPathHint, req.config.additionalStorageRoots)
       if (existing?.torrent) {
-        if (!primedTorrent || (!primedFile && existing.file)) {
-          await primeTorrentForStreaming(qbit, existing.torrent, existing.file, existing.files)
-          primedTorrent = true
-          if (existing.file) primedFile = true
-        }
+        await primeStateForPlayback(existing)
         if (!existing.file && existing.packedArchive && existing.archiveReady) {
           return res.status(422).json({
             error: 'Packed archive release detected (RAR). Reopen the stream list and use the ready RAR stream.'
@@ -2746,7 +2751,8 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
         if (isMagnetLink(info.l)) {
           await qbit.add(info.l, {
             sequentialDownload: true,
-            firstLastPiecePrio: STREAM_PRIORITIZE_LAST_PIECES
+            firstLastPiecePrio: STREAM_PRIORITIZE_LAST_PIECES,
+            paused: false
           })
         } else {
           if (!trackerPayload) {
@@ -2765,7 +2771,8 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
           }
           await qbit.addTorrentFile(trackerPayload.bytes, trackerPayload.fileName, {
             sequentialDownload: true,
-            firstLastPiecePrio: STREAM_PRIORITIZE_LAST_PIECES
+            firstLastPiecePrio: STREAM_PRIORITIZE_LAST_PIECES,
+            paused: false
           })
           if (trackerInspection.packedOnly) {
             return res.status(422).json({
@@ -2776,6 +2783,25 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
       } catch (addErr) {
         // qBit may reject duplicate/stale URLs; continue probing torrent list.
         console.warn(`[playback-route] add rejected: ${redactSensitiveText(addErr.message)}`)
+      }
+    }
+
+    if (trackedHash && !hasTorrent) {
+      try {
+        const addedState = await loadTorrentPlaybackState(qbit, trackedHash, targetPathHint, req.config.additionalStorageRoots)
+        if (addedState?.torrent) {
+          await primeStateForPlayback(addedState)
+          hasTorrent = true
+          lastProgress = Number(addedState.file?.progress || addedState.torrent.progress || 0)
+          maxAvailability = Math.max(maxAvailability, Number(addedState.torrent?.availability || 0))
+          maxSeedersSeen = Math.max(maxSeedersSeen, Number(addedState.torrent?.num_seeds || 0))
+          maxPeersSeen = Math.max(maxPeersSeen, Number(addedState.torrent?.num_leechs || 0))
+          if (tryRedirectToFileRoute(addedState, addedState.ready ? 'added torrent ready' : 'added torrent primed')) {
+            return
+          }
+        }
+      } catch (err) {
+        console.warn(`[playback-route] immediate prime failed: ${redactSensitiveText(err.message)}`)
       }
     }
 
@@ -2801,11 +2827,7 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
         trackedHash = ''
         continue
       }
-      if (!primedTorrent || (!primedFile && state.file)) {
-        await primeTorrentForStreaming(qbit, state.torrent, state.file, state.files)
-        primedTorrent = true
-        if (state.file) primedFile = true
-      }
+      await primeStateForPlayback(state)
       if (!state.file) {
         if (state.packedArchive && state.archiveReady) {
           return res.status(422).json({

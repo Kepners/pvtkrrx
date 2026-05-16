@@ -85,6 +85,10 @@ const STREAM_PRIORITIZE_LAST_PIECES = String(
   process.env.STREAM_PRIORITIZE_LAST_PIECES ||
   (SELF_HOST_SERVER_MODE ? 'false' : 'true')
 ).trim().toLowerCase() !== 'false'
+const STREAM_PLAYBACK_TOP_PRIORITY = String(
+  process.env.STREAM_PLAYBACK_TOP_PRIORITY ||
+  'true'
+).trim().toLowerCase() !== 'false'
 const WATCHED_DELETE_THRESHOLD = Math.max(0.5, Math.min(0.99, parseFloat(process.env.PVTKRRX_WATCHED_DELETE_THRESHOLD || '0.95')))
 const WATCHED_DELETE_GRACE_MS = Math.max(0, parseInt(process.env.PVTKRRX_WATCHED_DELETE_GRACE_MS || '180000', 10))
 // Pairing should be hash-first and stable: desktop publishes LAN endpoint, hosted token hash resolves it.
@@ -2176,6 +2180,24 @@ async function primeTorrentForStreaming(qbit, torrent, videoFile, allFiles = nul
   const archiveFiles = findPackedArchiveFiles(files)
   const archiveMode = archiveFiles.length > 0 && (!videoFile?.name || isArchiveFileName(videoFile.name))
 
+  if (!playbackComplete) {
+    try {
+      await qbit.resume(hash)
+    } catch (err) {
+      console.warn(`[streaming-prime] resume failed ${hash.slice(0, 8)}: ${err.message}`)
+    }
+
+    if (STREAM_PLAYBACK_TOP_PRIORITY) {
+      try {
+        await qbit.topPriority(hash)
+      } catch (err) {
+        if (!/HTTP 409\b/.test(String(err?.message || ''))) {
+          console.warn(`[streaming-prime] top priority failed ${hash.slice(0, 8)}: ${err.message}`)
+        }
+      }
+    }
+  }
+
   if (!seqEnabled) {
     try {
       await qbit.toggleSequentialDownload(hash)
@@ -2603,6 +2625,7 @@ module.exports = {
   STREAM_READY_START_FRACTION,
   STREAM_READY_MIN_BYTES,
   STREAM_PRIORITIZE_LAST_PIECES,
+  STREAM_PLAYBACK_TOP_PRIORITY,
   WATCHED_DELETE_THRESHOLD,
   WATCHED_DELETE_GRACE_MS,
   LAN_PAIR_TTL_SECONDS,
