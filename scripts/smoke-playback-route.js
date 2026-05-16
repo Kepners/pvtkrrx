@@ -26,6 +26,10 @@ const ORIGINALS = {
   files: QBitClient.prototype.files,
   properties: QBitClient.prototype.properties,
   pieceStates: QBitClient.prototype.pieceStates,
+  add: QBitClient.prototype.add,
+  addTorrentFile: QBitClient.prototype.addTorrentFile,
+  resume: QBitClient.prototype.resume,
+  topPriority: QBitClient.prototype.topPriority,
   setFilePriority: QBitClient.prototype.setFilePriority,
   toggleSequentialDownload: QBitClient.prototype.toggleSequentialDownload,
   toggleFirstLastPiecePrio: QBitClient.prototype.toggleFirstLastPiecePrio,
@@ -38,6 +42,10 @@ function restoreMocks() {
   QBitClient.prototype.files = ORIGINALS.files
   QBitClient.prototype.properties = ORIGINALS.properties
   QBitClient.prototype.pieceStates = ORIGINALS.pieceStates
+  QBitClient.prototype.add = ORIGINALS.add
+  QBitClient.prototype.addTorrentFile = ORIGINALS.addTorrentFile
+  QBitClient.prototype.resume = ORIGINALS.resume
+  QBitClient.prototype.topPriority = ORIGINALS.topPriority
   QBitClient.prototype.setFilePriority = ORIGINALS.setFilePriority
   QBitClient.prototype.toggleSequentialDownload = ORIGINALS.toggleSequentialDownload
   QBitClient.prototype.toggleFirstLastPiecePrio = ORIGINALS.toggleFirstLastPiecePrio
@@ -125,6 +133,10 @@ async function run() {
   const packedHash = 'd1287d13bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
   const readyPackedHash = 'e1287d13cccccccccccccccccccccccccccccccc'
   const targetedHash = 'f1287d13eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
+  const newlyQueuedTorrents = new Set()
+  const addFileCalls = []
+  const resumeCalls = []
+  const topPriorityCalls = []
   const priorityCalls = []
   const firstLastToggleCalls = []
   const sequentialToggleCalls = []
@@ -282,13 +294,52 @@ async function run() {
   const legacyAviPayload = buildTorrentPayload([
     { path: 'Legacy/Movie.Name.2026.DVDRip.XviD.avi', length: 900_000_000 }
   ])
+  const newQueuedPayload = buildTorrentPayload([
+    { path: 'Movie.Name.2026.1080p.WEB-DL.x264.mkv', length: 12_000_000_000 },
+    { path: 'Extras/behind-the-scenes.mkv', length: 800_000_000 }
+  ])
   const inferredHash = String(inspectTorrentPayload(inferredPayload).infoHash || '').toLowerCase()
+  const newQueuedHash = String(inspectTorrentPayload(newQueuedPayload).infoHash || '').toLowerCase()
   const inferredTorrent = {
     ...torrent,
     hash: inferredHash
   }
+  const newQueuedTorrent = {
+    hash: newQueuedHash,
+    name: 'Movie.Name.2026.1080p.WEB-DL.x264',
+    progress: 0.01,
+    seq_dl: false,
+    f_l_piece_prio: false,
+    save_path: runtimeDir,
+    download_path: runtimeDir,
+    content_path: ''
+  }
+  const newQueuedFiles = [
+    {
+      name: 'Movie.Name.2026.1080p.WEB-DL.x264.mkv',
+      size: 12_000_000_000,
+      progress: 0.01,
+      index: 0,
+      piece_range: [0, 2400]
+    },
+    {
+      name: 'Extras/behind-the-scenes.mkv',
+      size: 800_000_000,
+      progress: 0,
+      index: 1,
+      piece_range: [2401, 2560]
+    }
+  ]
 
-  QBitClient.prototype.torrents = async () => [torrent, inferredTorrent, incompleteTorrent, packedTorrent, readyPackedTorrent, targetedTorrent]
+  QBitClient.prototype.torrents = async () => [
+    torrent,
+    inferredTorrent,
+    incompleteTorrent,
+    packedTorrent,
+    readyPackedTorrent,
+    targetedTorrent,
+    ...(newlyQueuedTorrents.has(newQueuedHash) ? [newQueuedTorrent] : [])
+  ]
   QBitClient.prototype.torrentsByHashes = async (inputHash) => {
     const normalized = String(inputHash || '').toLowerCase()
     if (normalized === hash) return [torrent]
@@ -297,6 +348,7 @@ async function run() {
     if (normalized === packedHash) return [packedTorrent]
     if (normalized === readyPackedHash) return [readyPackedTorrent]
     if (normalized === targetedHash) return [targetedTorrent]
+    if (normalized === newQueuedHash && newlyQueuedTorrents.has(newQueuedHash)) return [newQueuedTorrent]
     return []
   }
   QBitClient.prototype.files = async (inputHash) => {
@@ -307,11 +359,15 @@ async function run() {
     if (normalized === packedHash) return packedFiles
     if (normalized === readyPackedHash) return readyPackedFiles
     if (normalized === targetedHash) return targetedFiles
+    if (normalized === newQueuedHash && newlyQueuedTorrents.has(newQueuedHash)) return newQueuedFiles
     return []
   }
   QBitClient.prototype.properties = async (inputHash) => {
     const normalized = String(inputHash || '').toLowerCase()
     if (normalized === incompleteHash) {
+      return { piece_size: 5 * 1024 * 1024 }
+    }
+    if (normalized === newQueuedHash) {
       return { piece_size: 5 * 1024 * 1024 }
     }
     return { piece_size: payload.length || 1 }
@@ -326,7 +382,26 @@ async function run() {
       }
       return states
     }
+    if (normalized === newQueuedHash) return [2, 0, 0, 0, 0, 0]
     return []
+  }
+  QBitClient.prototype.add = async (_link, options = {}) => {
+    addFileCalls.push({ kind: 'magnet', options: { ...options } })
+    return 'Ok.'
+  }
+  QBitClient.prototype.addTorrentFile = async (bytes, fileName, options = {}) => {
+    const addedHash = String(inspectTorrentPayload(bytes).infoHash || '').toLowerCase()
+    addFileCalls.push({ kind: 'file', fileName, hash: addedHash, options: { ...options } })
+    if (addedHash === newQueuedHash) newlyQueuedTorrents.add(addedHash)
+    return 'Ok.'
+  }
+  QBitClient.prototype.resume = async (inputHash) => {
+    resumeCalls.push(String(inputHash || '').toLowerCase())
+    return 'Ok.'
+  }
+  QBitClient.prototype.topPriority = async (inputHash) => {
+    topPriorityCalls.push(String(inputHash || '').toLowerCase())
+    return 'Ok.'
   }
   QBitClient.prototype.setFilePriority = async (_hash, ids, priority) => {
     priorityCalls.push({ ids: [...ids], priority })
@@ -346,6 +421,11 @@ async function run() {
     }
     if (/legacy-avi\.torrent/i.test(String(url || ''))) {
       return createFetchResponse(legacyAviPayload)
+    }
+    if (/new-queued\.torrent/i.test(String(url || ''))) {
+      return createFetchResponse(newQueuedPayload, {
+        'content-disposition': 'attachment; filename="new-queued.torrent"'
+      })
     }
     throw new Error(`unexpected fetch ${String(url || '')}`)
   }
@@ -377,6 +457,7 @@ async function run() {
     const incompletePlaybackToken = encodePlaybackStateToken({ h: incompleteHash })
     const inferredPlaybackToken = encodePlaybackStateToken({ h: '', l: 'https://tracker.example/existing-without-hash.torrent' })
     const legacyAviPlaybackToken = encodePlaybackStateToken({ h: '', l: 'https://tracker.example/legacy-avi.torrent' })
+    const newQueuedPlaybackToken = encodePlaybackStateToken({ h: '', l: 'https://tracker.example/new-queued.torrent' })
     const packedPlaybackToken = encodePlaybackStateToken({ h: packedHash })
     const readyPackedPlaybackToken = encodePlaybackStateToken({ h: readyPackedHash })
     const targetedPlaybackToken = encodePlaybackStateToken({ h: targetedHash, p: targetedFiles[1].name })
@@ -400,6 +481,29 @@ async function run() {
     const legacyAviResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(legacyAviPlaybackToken)}`)
     assert.equal(legacyAviResponse.status, 422, 'AVI-only tracker playback should fail fast before qBit queueing instead of handing Stremio a source that never starts')
     assert.match(String(legacyAviResponse.text || ''), /Legacy AVI\/XviD source detected/i)
+
+    const newQueuedResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(newQueuedPlaybackToken)}`)
+    assert.equal(newQueuedResponse.status, 302, 'brand-new tracker playback should add the torrent and redirect into /file as soon as qBit exposes the video file')
+    assert.match(String(newQueuedResponse.headers.location || ''), new RegExp(`/${configToken}/file/`), 'newly queued playback should target the shared file route')
+    assert.deepEqual(
+      addFileCalls.filter(call => call.hash === newQueuedHash).map(call => call.options),
+      [{
+        sequentialDownload: true,
+        firstLastPiecePrio: true,
+        paused: false
+      }],
+      'new tracker torrents should be added as active sequential playback jobs'
+    )
+    assert.ok(resumeCalls.includes(newQueuedHash), 'new tracker torrents should be explicitly resumed for playback')
+    assert.ok(topPriorityCalls.includes(newQueuedHash), 'new tracker torrents should be promoted to the top of the qBit queue for playback')
+    assert.deepEqual(
+      priorityCalls.slice(-2),
+      [
+        { ids: [1], priority: 0 },
+        { ids: [0], priority: 7 }
+      ],
+      'new tracker torrents should prioritize the selected video file and demote unrelated files'
+    )
 
     const incompleteResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(incompletePlaybackToken)}`)
     assert.equal(incompleteResponse.status, 302, 'incomplete playback should redirect into the shared file route instead of timing out inside /playback')
