@@ -11,6 +11,7 @@
     "server:legacy-setup": "node scripts/server-setup.js",
     "server:install-service": "node scripts/install-systemd-service.js",
     "smoke:parity": "node scripts/smoke-parity-helpers.js",
+    "smoke:sports-parser": "node scripts/smoke-sports-title-parser.js",
     "smoke:sports-resolution": "node scripts/smoke-sports-resolution.js",
     "smoke:sports": "node scripts/smoke-sports-resolution.js && node scripts/smoke-sport-backdrops.js",
     "smoke:sport-backdrops": "node scripts/smoke-sport-backdrops.js",
