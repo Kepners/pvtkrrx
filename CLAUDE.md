@@ -63,7 +63,7 @@
 - `pvt.kepners.co.uk` is **the user's own personal server hostname** — used only by the owner to reach their own private data. It must NEVER appear in shipped manifests, logo URLs, brand artwork, install links, or any artifact a third party will see.
 - If you find `pvt.kepners.co.uk` (or `kepners.co.uk` in any subdomain form) inside a manifest's `logo`, `background`, `addonCatalogs`, `behaviorHints.configurationURL`, or any user-facing string, treat it as a bug and replace with `https://www.pvtkrrx.cc`.
 - The Contabo systemd `.env` MUST set `PVTKRRX_PUBLIC_BASE_URL=https://www.pvtkrrx.cc` and `PVTKRRX_PLAYBACK_BASE_URL=https://www.pvtkrrx.cc`. `pvt.kepners.co.uk` may stay in `PVTKRRX_ALLOWED_WEB_ORIGINS` so the owner can browse via their personal hostname, but it never participates in manifest URL construction.
-- Audit before every release: `curl -s https://www.pvtkrrx.cc/manifest.json | grep -i kepners` must return nothing. Same for every served `/local/manifest.json`, `/configure`, and any signed-install token output.
+- Audit before every release: `curl -s https://www.pvtkrrx.cc/manifest.json | grep -iE 'kepners\.co\.uk|pvt\.kepners'` must return nothing. Same for every served `/local/manifest.json`, `/configure`, and any signed-install token output. NOTE: do **not** grep the bare substring `kepners` — the locked addon ID `com.kepners.pvtkrrx.bootstrap` legitimately contains it (see Bootstrap Manifest lock below). The leak we gate on is the personal **hostname** `kepners.co.uk` / `pvt.kepners.co.uk`, never the reverse-DNS app identifier.
 
 ### Bootstrap Manifest Name/Description Lock
 - Root `/manifest.json` is only the configure-first bootstrap entry (`com.kepners.pvtkrrx.bootstrap`). It must expose no catalogs, streams, or types.
