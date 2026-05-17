@@ -132,6 +132,7 @@ The desktop popup, configure UI, and public guide should use `LAN Bridge` for th
 4. External `fileServerUrl` is optional and mainly used when the local runtime cannot read the file directly.
 5. Hosted runtime fails fast rather than buffering or serving local-only playback.
 6. Completed local playback now correctly checks torrent completion state before redirecting to `/file`.
+7. The byte-serving base for `/file`/`/playback` is request-reachable, not the brand host (v1.2.0). On the hosted relay it keeps the env-configured base (the relay serves completed playback via an external `fileServerUrl`, never the built-in route). On self-host / PC-Local / native it honours a *dedicated* playback origin, but when the configured base is just the canonical brand/manifest host it resolves to the origin the client actually reached the runtime at — so a self-host box always serves its own completed files instead of redirecting to a relay that has no access to its disk. Branding/manifest URLs still resolve via `getPublicBaseUrl` (Canonical Hostname Lock unchanged).
 
 ### Sports And Library
 

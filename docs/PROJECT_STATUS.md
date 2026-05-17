@@ -4,7 +4,20 @@ Updated: 2026-05-17
 
 ## Current Stage
 
-PVTKRRX is on the `1.1.74` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The current release repairs sports poster/title normalization while preserving the `1.1.73` seedbox progressive playback hardening.
+PVTKRRX is on the `1.2.0` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. `1.2.0` carries the self-host playback-base fix (shipped interim as `1.1.76`, root-caused and proven) on top of the `1.1.75` parity-clean release and the `1.1.74` sports poster/title normalization and `1.1.73` seedbox progressive playback hardening.
+
+Status: `1.2.0` is confirmed working by the user — both completed self-host files AND **progressive streaming while the torrent is still downloading** play in Stremio — and by live evidence on the native runtime. The "wouldn't play / end-portion-before-start" behavior described while correcting an earlier writeup was the ORIGINAL pre-fix break, not a current regression — live qBit flags on the reported torrent (`8db099b3`) are correct (`seq_dl=true`, `f_l_piece_prio=false`).
+
+Hardening follow-up (not a blocker, tracked): qBittorrent exposes only toggle endpoints for sequential / first-last piece priority (no idempotent set). `primeTorrentForStreaming` flips based on a torrent snapshot that can be stale, so state can drift. Live evidence it can drift: torrent `01a0a2d8` (UFC) sits at `f_l_piece_prio=true` despite `STREAM_PRIORITIZE_LAST_PIECES=false` and add-time `firstLastPiecePrio=false`. Planned: re-read fresh qBit state immediately before each toggle and only toggle when fresh-actual != desired (verify-after-add). Scoped as a separate change with its own smoke proof.
+
+## 2026-05-17: v1.2.0 self-host playback works (playback-base fix)
+
+- Release scope: the milestone where self-host completed-file AND progressive (download-in-progress) playback works in Stremio. Carries the playback-base fix proven and shipped interim as `1.1.76`, promoted to the `1.2.0` line.
+- Root cause fixed: `getPlaybackBaseUrl` returned the env-configured base unconditionally. The Canonical Hostname Lock requires self-host installs to set `PVTKRRX_PUBLIC_BASE_URL` / `PVTKRRX_PLAYBACK_BASE_URL` to the brand host, which routes to the shared hosted relay (no qBittorrent / no disk for a self-host box). Every self-host box advertised a playback/file URL that resolved to a runtime that could not serve its files.
+- Fix: byte-serving base decoupled from branding. Hosted relay keeps its env base; self-host / PC-Local / native honour a dedicated playback origin but, when the configured base is just the brand host, resolve to the origin the client actually reached the runtime at. `getPublicBaseUrl` (manifest/brand) untouched — Hostname Lock intact. Smoke regression gate added in `scripts/smoke-playback-route.js`.
+- Proof: `smoke:playback` (new gate + dedicated-origin test), `smoke:selfhost`, `smoke:guards`, `smoke:security`, `smoke:config`, `npm run dist:win`; live-proven on the deployed native runtime with the box's real env; user-confirmed end-to-end including streaming while downloading.
+- Behaviour origin commit: `864877d7cf12ee31313b5bac1cce50006079a91c` (interim `1.1.76`). The `v1.2.0` / `v1.2.0-selfhost` tags target the `1.2.0` release commit which carries that fix.
+- Tracked follow-up (not a blocker): qBit sequential / first-last toggle-vs-stale-snapshot hardening (see Current Stage). Evidence: torrent `01a0a2d8` `f_l_piece_prio=true` against intent.
 
 ## 2026-05-17: v1.1.74 sports poster parser/layout correction
 

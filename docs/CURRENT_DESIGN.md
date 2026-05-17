@@ -313,9 +313,18 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 - Current release numbering is app-aligned across surfaces:
   - desktop/latest release tag: `vX.Y.Z`
   - self-host/seedbox release tag: `vX.Y.Z-selfhost`
-- For app version `1.1.57`, the current tags are `v1.1.57` and `v1.1.57-selfhost`.
+- For app version `1.2.0`, the current tags are `v1.2.0` and `v1.2.0-selfhost`.
 - Legacy `v1.12.x-selfhost` tags were an old self-host-only counter. They remain published only so older pinned installer commands keep working. Do not create new `v1.12.x-selfhost` tags, and do not use them as the preferred install/update target.
 - A self-host tag and its paired desktop tag must resolve to the same Git revision before the release is described as synchronized.
+
+## Playback / File-Serving Base (canonical, v1.2.0)
+
+- Branding/manifest URLs resolve via `getPublicBaseUrl` and remain on the canonical brand host per the Canonical Hostname Lock. This is unchanged.
+- The **byte-serving** base for `/file` and `/playback` resolves via `getPlaybackBaseUrl` and is deliberately decoupled from branding:
+  - On the hosted relay runtime it keeps the env-configured base; the relay never serves the built-in file route (it redirects to an external `fileServerUrl`).
+  - On self-host / PC-Local / native runtimes a *dedicated* playback origin (distinct from the brand host — e.g. control over a tunnel, direct LAN bytes, the box's own domain) is intentional and is honoured.
+  - But when the configured playback base is just the canonical brand/manifest host, that origin routes to the shared hosted relay, which cannot serve a self-host box's disk. In that case the runtime resolves to the origin the client actually reached it at — the only origin guaranteed to return to the box that holds the file.
+- This is why a fully-downloaded self-host file plays through completion instead of stalling after the buffered head. A smoke regression gate fails the build if a non-relay runtime ever emits the brand host as its playback base.
 
 ## Security Rules
 

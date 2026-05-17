@@ -87,7 +87,7 @@ Self-hosted server mode can use private or localhost Prowlarr/qBittorrent URLs a
 
 ## Release Tags
 
-Release numbering is app-aligned. The Windows/desktop release uses `vX.Y.Z`; the paired self-host/seedbox release uses `vX.Y.Z-selfhost`. For example, app version `1.1.44` is released as `v1.1.44` and `v1.1.44-selfhost`.
+Release numbering is app-aligned. The Windows/desktop release uses `vX.Y.Z`; the paired self-host/seedbox release uses `vX.Y.Z-selfhost`. For example, app version `1.2.0` is released as `v1.2.0` and `v1.2.0-selfhost`.
 
 Older `v1.12.x-selfhost` tags are legacy compatibility tags from the previous self-host-only counter. They are kept so pinned installer commands do not break, but new installs and updates should use the app-aligned self-host tag.
 
