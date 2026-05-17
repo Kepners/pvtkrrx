@@ -1673,12 +1673,66 @@ function getPublicBaseUrl(req) {
   return `${protocol}://${req.get('host')}`
 }
 
+function getRequestReachableBaseUrl(req) {
+  if (!req || typeof req.get !== 'function') return ''
+  const forwardedProto = String(req.headers?.['x-forwarded-proto'] || '').split(',')[0].trim()
+  const protocol = forwardedProto || req.protocol || 'http'
+  const forwardedHost = String(req.headers?.['x-forwarded-host'] || '').split(',')[0].trim()
+  const host = forwardedHost || req.get('host') || ''
+  if (!host) return ''
+  return normalizeBaseUrl(`${protocol}://${host}`)
+}
+
+// Playback/file BYTE-SERVING base — deliberately NOT the brand/manifest host.
+// Branding stays on getPublicBaseUrl per the Canonical Hostname Lock; this
+// must resolve to the runtime that actually holds the file on disk.
+//
+// Bug this fixes for EVERY self-host install: the Hostname Lock requires
+// PVTKRRX_PUBLIC_BASE_URL / PVTKRRX_PLAYBACK_BASE_URL = https://www.pvtkrrx.cc,
+// but that origin routes to the shared hosted-relay container, which has no
+// qBittorrent and no access to a self-host box's disk. Emitting it as the
+// /file base sent Stremio's completed-file request to the wrong runtime —
+// the buffered head played, then the finished file never served.
 function getPlaybackBaseUrl(req) {
   const configured = parseUrlCandidate(process.env.PVTKRRX_PLAYBACK_BASE_URL || '')
-  if (configured && (configured.protocol === 'http:' || configured.protocol === 'https:')) {
-    return normalizeBaseUrl(configured.origin)
+  const configuredBase = (configured && (configured.protocol === 'http:' || configured.protocol === 'https:'))
+    ? normalizeBaseUrl(configured.origin)
+    : ''
+
+  // The hosted relay legitimately IS the canonical brand host and never
+  // serves the built-in /file route (it redirects to an external File
+  // Server URL), so its env-configured base is correct there.
+  if (IS_HOSTED_RELAY_RUNTIME) {
+    return configuredBase || getPublicBaseUrl(req)
   }
-  return getPublicBaseUrl(req)
+
+  // Self-host / PC-Local / native.
+  //
+  // A configured playback base that is a DEDICATED playback origin (distinct
+  // from the brand/manifest host) is an intentional design — e.g. control
+  // over a tunnel, byte-serving direct over LAN, or the box's own domain.
+  // Honour it.
+  //
+  // But the Canonical Hostname Lock forces self-host installs to set
+  // PVTKRRX_PUBLIC_BASE_URL / PVTKRRX_PLAYBACK_BASE_URL = https://www.pvtkrrx.cc.
+  // When the playback base is just that shared brand host, it routes to the
+  // hosted-relay container which has no qBittorrent/disk for this box. In
+  // that case ignore it and use the origin the client actually reached this
+  // runtime at — the only origin guaranteed to come back here.
+  const publicBrand = parseUrlCandidate(process.env.PVTKRRX_PUBLIC_BASE_URL || '')
+  const publicBrandBase = (publicBrand && (publicBrand.protocol === 'http:' || publicBrand.protocol === 'https:'))
+    ? normalizeBaseUrl(publicBrand.origin)
+    : ''
+  const configuredIsBrandHost = Boolean(
+    configuredBase && publicBrandBase &&
+    normalizeOrigin(configuredBase) === normalizeOrigin(publicBrandBase)
+  )
+  if (configuredBase && !configuredIsBrandHost) {
+    return configuredBase
+  }
+  const requestBase = getRequestReachableBaseUrl(req)
+  if (requestBase) return requestBase
+  return configuredBase || getPublicBaseUrl(req)
 }
 
 function getConfigIssues(config, options = {}) {

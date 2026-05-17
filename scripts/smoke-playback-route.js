@@ -17,7 +17,7 @@ const { encrypt } = require('../src/utils/crypto')
 const { encodePlaybackStateToken, encodeFileStateToken } = require('../src/utils/opaqueState')
 const { QBitClient } = require('../src/clients/qbittorrent')
 const { inspectTorrentPayload } = require('../src/utils/torrentPayload')
-const { isPlaybackReady } = require('../src/lib/shared')
+const { isPlaybackReady, getPlaybackBaseUrl } = require('../src/lib/shared')
 const app = require('../index')
 
 const ORIGINALS = {
@@ -168,8 +168,59 @@ async function assertQbitAddSerializesExplicitPlaybackFlags() {
   }
 }
 
+// Regression gate: a self-host / non-hosted-relay runtime must NEVER hand
+// Stremio a playback/file base on the brand host (which routes to the shared
+// hosted-relay container that has no qBittorrent/disk for this box). It must
+// resolve to the origin the client actually reached this runtime at.
+function assertPlaybackBaseNeverEmitsBrandHostOnSelfHost() {
+  const savedPlayback = process.env.PVTKRRX_PLAYBACK_BASE_URL
+  const savedPublic = process.env.PVTKRRX_PUBLIC_BASE_URL
+  const makeReq = (host, proto = 'https') => ({
+    protocol: proto,
+    headers: { 'x-forwarded-proto': proto },
+    get(name) { return String(name).toLowerCase() === 'host' ? host : '' }
+  })
+  try {
+    // Hostname-Lock value is set, but the request arrived on the box's own host.
+    process.env.PVTKRRX_PUBLIC_BASE_URL = 'https://www.pvtkrrx.cc'
+    process.env.PVTKRRX_PLAYBACK_BASE_URL = 'https://www.pvtkrrx.cc'
+    const onOwnHost = getPlaybackBaseUrl(makeReq('box.example.com'))
+    assert.equal(
+      onOwnHost,
+      'https://box.example.com',
+      `self-host playback base must be the request-reachable origin, not the brand host (got ${onOwnHost})`
+    )
+    assert.ok(
+      !/pvtkrrx\.cc/i.test(onOwnHost),
+      'self-host playback base must not leak the hosted-relay brand host'
+    )
+
+    // An explicit configured base that genuinely points back here is honoured.
+    process.env.PVTKRRX_PLAYBACK_BASE_URL = 'https://box.example.com'
+    assert.equal(
+      getPlaybackBaseUrl(makeReq('box.example.com')),
+      'https://box.example.com',
+      'an explicit playback base matching the request origin must be honoured'
+    )
+
+    // No usable request host -> fall back to configured base (no crash).
+    process.env.PVTKRRX_PLAYBACK_BASE_URL = 'https://box.example.com'
+    assert.equal(
+      getPlaybackBaseUrl({ headers: {}, get() { return '' } }),
+      'https://box.example.com',
+      'missing request host should fall back to the configured base'
+    )
+  } finally {
+    if (savedPlayback === undefined) delete process.env.PVTKRRX_PLAYBACK_BASE_URL
+    else process.env.PVTKRRX_PLAYBACK_BASE_URL = savedPlayback
+    if (savedPublic === undefined) delete process.env.PVTKRRX_PUBLIC_BASE_URL
+    else process.env.PVTKRRX_PUBLIC_BASE_URL = savedPublic
+  }
+}
+
 async function run() {
   await assertQbitAddSerializesExplicitPlaybackFlags()
+  assertPlaybackBaseNeverEmitsBrandHostOnSelfHost()
 
   const originalPublicBaseUrl = process.env.PVTKRRX_PUBLIC_BASE_URL
   const originalPlaybackBaseUrl = process.env.PVTKRRX_PLAYBACK_BASE_URL
