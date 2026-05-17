@@ -923,7 +923,8 @@ async function assertTeamBadgeArtworkProxy() {
           eventClass: 'combat_event'
         },
         expectedClass: 'combat_event',
-        expectedTemplate: 'ticket-stub'
+        expectedTemplate: 'ticket-stub',
+        expectedLayoutFamily: 'TICKET_STUB'
       },
       {
         slug: 'public-template-tennis-no-logo',
@@ -962,6 +963,9 @@ async function assertTeamBadgeArtworkProxy() {
       assert.match(response.headers['x-pvtkrrx-artwork-source'], /^pvtkrrx-(?:template-glyph|public-template)$/, `${testCase.slug} should use public/glyph template art`)
       assert.equal(response.headers['x-pvtkrrx-sports-event-class'], testCase.expectedClass, `${testCase.slug} classification`)
       assert.equal(response.headers['x-pvtkrrx-artwork-template'], testCase.expectedTemplate, `${testCase.slug} selected template`)
+      if (testCase.expectedLayoutFamily) {
+        assert.equal(response.headers['x-pvtkrrx-artwork-layout-family'], testCase.expectedLayoutFamily, `${testCase.slug} layout family`)
+      }
       assert.doesNotMatch(response.headers['x-pvtkrrx-artwork-source'], /generated-card|team-badge|emergency-svg|emergency-legacy/, `${testCase.slug} should not use old generated or emergency art`)
       assert.deepEqual(pngDimensions(response.body), dimensions.poster, `${testCase.slug} poster dimensions`)
       fs.writeFileSync(path.join(PREVIEW_DIR, `${testCase.slug}.png`), response.body)

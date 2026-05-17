@@ -238,6 +238,13 @@ const LEAGUE_MAP = Object.freeze({
     sportsDbName: 'SBK',
     aliases: ['SBK', 'WorldSBK', 'World Superbike', 'World Superbikes', 'World Superbike Championship']
   },
+  bsb: {
+    name: 'British Superbikes',
+    idLeague: '',
+    sportKey: 'motorsport',
+    sportsDbSport: 'Motorsport',
+    aliases: ['BSB', 'British Superbike', 'British Superbikes', 'British Superbike Championship']
+  },
   diamondleague: {
     name: 'Diamond League',
     idLeague: '5282',

@@ -19,6 +19,9 @@ const { parseSportsTitleContract } = require('../src/utils/sportsTitleParser')
 const eq = (want) => (got) =>
   String(got || '').trim().toLowerCase() === String(want || '').trim().toLowerCase()
 
+const noReleaseNoise = (got) =>
+  !/\b(?:h264|h265|x264|x265|fbb|megust[ae]?|afg|epworks|mwr)\b/i.test(String(got || ''))
+
 const CASES = [
   // ---------------- §7 ACCEPTANCE MATRIX (17 rows) ----------------
   {
@@ -38,6 +41,31 @@ const CASES = [
     }
   },
   {
+    id: '1b Combat MVP MMA no split/release leak',
+    raw: 'MVP MMA 1 Rousey vs Carano 1080p H264-FBB',
+    opts: { sportHint: 'mma', categoryNames: ['MMA'], pubDate: '2026-05-17T00:00:00Z' },
+    expect: {
+      sport: eq('mma'),
+      event: (v) => /rousey\s+vs\s+carano/i.test(v) && noReleaseNoise(v),
+      home: (v) => !v,
+      away: (v) => !v,
+      quality: eq('1080p')
+    }
+  },
+  {
+    id: '1c Combat ONE Fight Night no duplicate/release leak',
+    raw: 'ONE Championship One Fight Night 43 H264-FBB 1080p',
+    opts: { sportHint: 'mma', categoryNames: ['MMA'], pubDate: '2026-05-17T00:00:00Z' },
+    expect: {
+      sport: eq('mma'),
+      competition: eq('ONE Championship'),
+      event: (v) => eq('Fight Night')(v) && noReleaseNoise(v),
+      round: eq('Night 43'),
+      home: (v) => !v,
+      away: (v) => !v
+    }
+  },
+  {
     id: '2 Motorsport',
     raw: 'IndyCar NTT 2026 Indy500 Practice 1 & 2 14 05 720pEN60fps FS1',
     opts: { sportHint: 'motorsport', pubDate: '2026-05-14T00:00:00Z' },
@@ -50,6 +78,28 @@ const CASES = [
       date: eq('2026-05-14'),
       quality: (v) => /720p/i.test(v),
       language: eq('EN')
+    }
+  },
+  {
+    id: '2b Motorsport BSB Race One not ONE Championship',
+    raw: 'BSB Donington Park GP Race One 1080p H264-FBB',
+    opts: { sportHint: 'motorsport', categoryNames: ['Motorsport'], pubDate: '2026-05-17T00:00:00Z' },
+    expect: {
+      sport: eq('motorsport'),
+      competition: eq('British Superbikes'),
+      event: (v) => eq('Donington Park GP')(v) && noReleaseNoise(v),
+      session: eq('Race One')
+    }
+  },
+  {
+    id: '2c Motorsport Formula E no scene-group leak',
+    raw: 'Formula E 2026 Monaco E Prix EPWorks 1080p',
+    opts: { sportHint: 'motorsport', categoryNames: ['Formula E'], pubDate: '2026-05-17T00:00:00Z' },
+    expect: {
+      sport: eq('motorsport'),
+      competition: eq('Formula E'),
+      event: (v) => eq('Monaco E Prix')(v) && noReleaseNoise(v),
+      venue: eq('Monaco')
     }
   },
   {

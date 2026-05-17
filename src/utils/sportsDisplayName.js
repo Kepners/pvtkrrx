@@ -50,9 +50,19 @@ function buildSportsDisplayName(input = {}) {
   const rawTitle = normalizeSpace(input.title || input.eventTitle || input.name)
   const eventDetail = normalizeSpace(input.eventDetail || input.round || input.session || input.gameNumber)
   const isHeadToHead = Boolean(input.homeTeam && input.awayTeam) || /\b(?:vs|v|at)\b/i.test(rawTitle)
-  const title = eventDetail && rawTitle && !isHeadToHead && !new RegExp(`\\b${eventDetail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(rawTitle)
-    ? `${rawTitle} ${eventDetail}`
-    : rawTitle
+  let title = rawTitle
+  if (eventDetail && rawTitle && !isHeadToHead && !new RegExp(`\\b${eventDetail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(rawTitle)) {
+    const titleWords = rawTitle.split(/\s+/).filter(Boolean)
+    const detailWords = eventDetail.split(/\s+/).filter(Boolean)
+    const lastTitleWord = titleWords[titleWords.length - 1] || ''
+    const firstDetailWord = detailWords[0] || ''
+    if (lastTitleWord && firstDetailWord && lastTitleWord.toLowerCase() === firstDetailWord.toLowerCase()) {
+      const remainder = detailWords.slice(1).join(' ')
+      title = remainder ? `${rawTitle} ${remainder}` : rawTitle
+    } else {
+      title = `${rawTitle} ${eventDetail}`
+    }
+  }
   const competition = normalizeSpace(input.competition || input.league)
   const sport = humanizeSportLabel(input.sportHint || input.sport)
   const label = competition || sport

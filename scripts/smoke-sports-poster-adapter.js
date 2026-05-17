@@ -6,6 +6,7 @@ const { buildPaidTemplateMatchup, cleanDisplayText } = require('../src/utils/spo
 const { classifySportsEvent } = require('../src/utils/sportsEventClassifier')
 const { normalizeSportsEventMetadata } = require('../src/utils/sportsEventNormalizer')
 const { containsSportsReleaseNoise } = require('../src/utils/sportsReleaseNoise')
+const { parseSportsTorrentProfile } = require('../src/utils/sportsTorrentProfile')
 
 const BAD_TEXT_RE = /\b(?:SPOR|BASK|undefined|null|unknown|n\/a)\b/i
 
@@ -54,11 +55,12 @@ const CASES = [
     }
   },
   {
-    // Boxing 1v1 product — no card wrapper, two fighters IS the event.
-    // Should still render head-to-head.
-    slug: 'combat-boxing-head-to-head',
+    // Combat is contract-locked as one event string; fighter names may be in
+    // the title, but they are not the poster layout driver.
+    slug: 'combat-boxing-solo',
     expectedClass: 'combat_event',
-    expectedFormat: 'single',
+    expectedFormat: 'solo',
+    allowEmptySession: true,
     input: {
       sportHint: 'boxing',
       competition: 'Boxing',
@@ -84,6 +86,20 @@ const CASES = [
       eventDetail: 'Main Event',
       homeTeam: 'Makhachev',
       awayTeam: 'Oliveira'
+    }
+  },
+  {
+    slug: 'combat-mvp-mma-stale-pair-solo',
+    expectedClass: 'combat_event',
+    expectedFormat: 'solo',
+    allowEmptySession: true,
+    input: {
+      sportHint: 'mma',
+      competition: 'MMA',
+      rawTitle: 'MVP MMA 1 Rousey vs Carano 1080p H264-FBB',
+      eventTitle: 'MVP MMA Rousey vs Carano',
+      homeTeam: 'MVP MMA Rousey',
+      awayTeam: 'Carano'
     }
   },
   {
@@ -188,7 +204,11 @@ for (const testCase of CASES) {
   if (testCase.expectedEventShort) assert.equal(data.event_short, testCase.expectedEventShort, `${testCase.slug} event_short`)
   if (testCase.expectedSession) assert.equal(data.session, testCase.expectedSession, `${testCase.slug} session`)
   assert.ok(data.event_short && data.event_short.length <= 38, `${testCase.slug} event_short bounded`)
-  assert.ok(data.session && data.session.length <= 42, `${testCase.slug} session bounded`)
+  if (testCase.allowEmptySession) {
+    assert.ok(typeof data.session === 'string' && data.session.length <= 42, `${testCase.slug} session bounded`)
+  } else {
+    assert.ok(data.session && data.session.length <= 42, `${testCase.slug} session bounded`)
+  }
   assert.ok(data.home?.name && data.away?.name, `${testCase.slug} sides populated for template compatibility`)
   assert.notEqual(data.home.short, data.away.short, `${testCase.slug} short codes must be distinct`)
   assert.notEqual(data.home.initials, data.away.initials, `${testCase.slug} initials must be distinct`)
@@ -207,4 +227,53 @@ assert.doesNotMatch(cleanedMashed, /720p|60fps/i, 'cleanDisplayText strips mashe
 const cleanedFps = cleanDisplayText('Premier League Match 1080pES60fps', 'Event')
 assert.doesNotMatch(cleanedFps, /1080p|60fps/i, 'cleanDisplayText strips quality+language combinations')
 
-console.log(`Sports poster adapter smoke passed. cases=${CASES.length}`)
+const PROFILE_CASES = [
+  {
+    slug: 'profile-mvp-mma-no-legacy-sides',
+    title: 'MVP MMA 1 Rousey vs Carano 1080p H264-FBB',
+    sportHint: 'mma',
+    categoryNames: ['MMA'],
+    expected: {
+      sport: 'mma',
+      eventClass: 'combat_event',
+      event: /rousey\s+vs\s+carano/i,
+      forbiddenEvent: /\b(?:h264|fbb)\b/i
+    }
+  },
+  {
+    slug: 'profile-bsb-motorsport-not-one',
+    title: 'BSB Donington Park GP Race One 1080p H264-FBB',
+    sportHint: 'motorsport',
+    categoryNames: ['Motorsport'],
+    expected: {
+      sport: 'motorsport',
+      league: 'British Superbikes',
+      eventClass: 'motorsport_event',
+      event: /donington park gp/i,
+      session: 'Race One',
+      forbiddenEvent: /\b(?:h264|fbb|one championship)\b/i
+    }
+  }
+]
+
+for (const testCase of PROFILE_CASES) {
+  const profile = parseSportsTorrentProfile({
+    title: testCase.title,
+    sportHint: testCase.sportHint,
+    categoryNames: testCase.categoryNames,
+    pubDate: '2026-05-17T00:00:00Z'
+  }, {
+    sportHint: testCase.sportHint,
+    categoryNames: testCase.categoryNames
+  })
+  assert.equal(profile.sport, testCase.expected.sport, `${testCase.slug} sport`)
+  if (testCase.expected.league) assert.equal(profile.league, testCase.expected.league, `${testCase.slug} league`)
+  assert.equal(profile.event_class, testCase.expected.eventClass, `${testCase.slug} event_class`)
+  assert.match(profile.event || '', testCase.expected.event, `${testCase.slug} event`)
+  if (testCase.expected.session) assert.equal(profile.session, testCase.expected.session, `${testCase.slug} session`)
+  assert.equal(profile.home_team, null, `${testCase.slug} home_team omitted`)
+  assert.equal(profile.away_team, null, `${testCase.slug} away_team omitted`)
+  assert.doesNotMatch(profile.event || '', testCase.expected.forbiddenEvent, `${testCase.slug} event noise stripped`)
+}
+
+console.log(`Sports poster adapter smoke passed. cases=${CASES.length} profileCases=${PROFILE_CASES.length}`)

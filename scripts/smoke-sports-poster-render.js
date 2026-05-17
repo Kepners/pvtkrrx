@@ -42,10 +42,8 @@ const TEAM_EVENT = {
   eventClass: 'team_vs_team'
 }
 
-// Boxing 1v1 — still renders head-to-head because the fight IS the event,
-// no card wrapper. UFC/PFL/Bellator etc. are CARD events and render solo
-// F1-style (see feedback_ufc_card_layout.md), so they do not belong in this
-// "single = head-to-head" fixture.
+// Combat renders event-first. Fighter names may remain in the title, but they
+// must not drive a two-crest / VS layout.
 const SINGLE_EVENT = {
   sport: 'Boxing',
   sportHint: 'boxing',
@@ -143,8 +141,8 @@ async function main() {
 
   for (const template of SPORTS_POSTER_TEMPLATES) {
     const expectations = template === 'broadcast'
-      ? { noHomeAwayLabels: true, requireBroadcastMarkers: true }
-      : { noHomeAwayLabels: true, requireHeadToHead: true }
+      ? { noFakeVersus: true, noHomeAwayLabels: true, requireBroadcastMarkers: true }
+      : { noFakeVersus: true, noHomeAwayLabels: true }
     await assertRendered({
       template,
       event: SINGLE_EVENT,

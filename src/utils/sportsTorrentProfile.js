@@ -83,7 +83,7 @@ function titleCase(value) {
       const upper = part.toUpperCase()
       if (upper === 'SMACKDOWN') return 'SmackDown'
       if (upper === 'WRESTLEMANIA') return 'WrestleMania'
-      if (['AAC', 'AV1', 'BIGN', 'CPL', 'DDP', 'ELC', 'FA', 'F1', 'FC', 'FEB', 'GP', 'HD', 'IPL', 'MLB', 'MLS', 'MMA', 'NBA', 'NCAA', 'NFL', 'NHL', 'OHL', 'PFL', 'PGA', 'RAW', 'RSM', 'UFC', 'UFL', 'WRC', 'WWE', 'NXT'].includes(upper)) {
+      if (['AAC', 'AV1', 'BIGN', 'BSB', 'CPL', 'DDP', 'ELC', 'FA', 'F1', 'FC', 'FEB', 'GP', 'HD', 'IPL', 'MLB', 'MLS', 'MMA', 'NBA', 'NCAA', 'NFL', 'NHL', 'OHL', 'PFL', 'PGA', 'RAW', 'RSM', 'UFC', 'UFL', 'WRC', 'WWE', 'NXT'].includes(upper)) {
         return upper
       }
       if (upper === 'MOTOGP') return 'MotoGP'
@@ -174,6 +174,14 @@ function normalizeLanguage(languages = '') {
   if (/\bDE\b/i.test(text)) return 'German'
   if (/\bMULTI\b/i.test(text)) return 'Multi'
   return null
+}
+
+function isCombatProfileSport(value = '') {
+  return /^(?:boxing|mma|fighting|kickboxing)$/i.test(String(value || '').trim())
+}
+
+function isCombatCompetition(value = '') {
+  return /\b(?:ufc|pfl|bellator|one\s*championship|one\s*fc|cage\s*warriors|bkfc|glory|rizin|lfa|boxing|mma|fight\s*night)\b/i.test(String(value || ''))
 }
 
 function resolveLeagueName(parsedLeague = '', rawTitle = '') {
@@ -281,18 +289,29 @@ function parseSportsTorrentProfile(itemOrTitle = '', options = {}) {
   // a single title and NO teams; an ANCILLARY clip that still wraps a real
   // "A vs B" fixture (e.g. a full-match replay) keeps its teams as metadata
   // (the consumer keys head-to-head vs generic art off content_type).
-  const contractTeamsAllowed = contract && contract.contentType !== 'documentary'
+  const profileForbidsTeams = Boolean(
+    (contract && contract.contentType !== 'event') ||
+    isCombatProfileSport(contract?.sport) ||
+    isCombatProfileSport(sport) ||
+    isCombatCompetition(contract?.competition || league)
+  )
+  const contractTeamsAllowed = Boolean(contract && !profileForbidsTeams)
+  const legacyTeamsAllowed = !profileForbidsTeams
   const contractHome = contractTeamsAllowed && contract?.home ? titleCase(contract.home) : null
   const contractAway = contractTeamsAllowed && contract?.away ? titleCase(contract.away) : null
   const legacyHome = parsedMatchup?.homeTeam ? titleCase(parsedMatchup.homeTeam) : null
   const legacyAway = parsedMatchup?.awayTeam ? titleCase(parsedMatchup.awayTeam) : null
-  const home_team = (contractHome && contractAway) ? contractHome : (contractHome || legacyHome)
-  const away_team = (contractHome && contractAway) ? contractAway : (contractAway || legacyAway)
+  const home_team = (contractHome && contractAway) ? contractHome : (contractHome || (legacyTeamsAllowed ? legacyHome : null))
+  const away_team = (contractHome && contractAway) ? contractAway : (contractAway || (legacyTeamsAllowed ? legacyAway : null))
 
   let event = null
   if (contract && contract.contentType !== 'event') {
     // documentary / ancillary -> single title, no head-to-head poster
     event = contract.title ? titleCase(contract.title) : (parsedEvent?.eventName ? titleCase(parsedEvent.eventName) : null)
+  } else if (profileForbidsTeams) {
+    event = contract?.event
+      ? titleCase(contract.event)
+      : (parsedMatchup?.eventName ? titleCase(parsedMatchup.eventName) : (parsedEvent?.eventName ? titleCase(parsedEvent.eventName) : null))
   } else if (!(home_team && away_team)) {
     // single-event / combat -> the contract's single event string wins
     event = contract?.event

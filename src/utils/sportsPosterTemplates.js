@@ -40,6 +40,7 @@ const {
   hasActualPair,
   isCompetitorVsCompetitorEvent
 } = require('./sportsPosterClassifier')
+const { stripSportsReleaseNoise } = require('./sportsReleaseNoise')
 
 const LEAGUE_CODE_ALIASES = Object.freeze({
   'english premier league': 'EPL',
@@ -71,6 +72,8 @@ const LEAGUE_CODE_ALIASES = Object.freeze({
   'formula one': 'F1',
   f1: 'F1',
   wrc: 'WRC',
+  bsb: 'BSB',
+  'british superbikes': 'BSB',
   wimbledon: 'ATP',
   snooker: 'SNOOKER',
   'world championship': 'WC',
@@ -146,6 +149,8 @@ function layoutFamilyForSportsPosterRender(value, event = {}) {
   const paired = hasActualPair(event)
   const classifiedClass = classifySportsPosterEvent(event)
   const explicitEventClass = normalizeSpace(event.eventClass || event.posterClass)
+  const eventClass = explicitEventClass || classifiedClass
+  if (eventClass === 'combat_event') return layoutFamilyForSportsPosterTemplate(template)
   const teamLayoutAllowed = paired && (
     classifiedClass === 'team_vs_team' ||
     (explicitEventClass === 'team_vs_team' && classifiedClass !== 'tournament_event')
@@ -153,7 +158,6 @@ function layoutFamilyForSportsPosterRender(value, event = {}) {
   if (explicit === 'TEAM_VS_TEAM' && teamLayoutAllowed) return 'TEAM_VS_TEAM'
   if (explicit === 'COMPETITOR_VS_COMPETITOR') return 'COMPETITOR_VS_COMPETITOR'
   if (explicit === 'SINGLE_EVENT_MOTORSPORT') return 'SINGLE_EVENT_MOTORSPORT'
-  const eventClass = explicitEventClass || classifiedClass
   if (eventClass === 'team_vs_team' && teamLayoutAllowed) return 'TEAM_VS_TEAM'
   if ((eventClass === 'tournament_event' || eventClass === 'generic_event') && teamLayoutAllowed) return 'TEAM_VS_TEAM'
   if (isCompetitorVsCompetitorEvent({ ...event, eventClass })) return 'COMPETITOR_VS_COMPETITOR'
@@ -351,7 +355,7 @@ function sportIconFor(event = {}, facts = {}) {
   const text = `${event.sport_icon || ''} ${event.sportIcon || ''} ${facts.sport || ''} ${facts.league || ''} ${facts.detail || ''} ${facts.title || ''}`.toLowerCase()
   if (isFormulaOneText(text)) return 'f1'
   if (/moto\s*gp|motogp/.test(text)) return 'motogp'
-  if (/motor|wrc|rally|nascar|indycar|wec|formula\s*e|supercars|v8sc|grand prix/.test(text)) return 'motorsport'
+  if (/motor|wrc|rally|nascar|indycar|wec|formula\s*e|supercars|v8sc|wsbk|bsb|british\s*superbikes?|grand prix/.test(text)) return 'motorsport'
   if (/golf|pga|lpga|masters|ryder|liv/.test(text)) return 'golf'
   if (/darts|pdc|world matchplay/.test(text)) return 'darts'
   if (/cycling|tour de france|giro|vuelta|stage|time trial|road race/.test(text)) return 'cycling'
@@ -445,9 +449,10 @@ function templateData(event = {}, theme = {}, mode = '') {
   const eventClass = event.eventClass || event.posterClass || classifiedClass
   const data = buildPaidTemplateMatchup(event, eventClass)
   const requestedMode = normalizeKey(mode)
-  const eventFormat = ['matchup', 'single', 'solo'].includes(requestedMode)
+  const eventFormatCandidate = ['matchup', 'single', 'solo'].includes(requestedMode)
     ? requestedMode
     : data.event_format
+  const eventFormat = eventClass === 'combat_event' ? 'solo' : eventFormatCandidate
   // Audit fix G1.3/G1.4: when the source supplies a real driver/competitor
   // pair (e.g. UFC with Makhachev vs Oliveira, tennis with Alcaraz vs Sinner),
   // per-template renderers must show the head-to-head — not the event-only
@@ -481,10 +486,8 @@ function templateData(event = {}, theme = {}, mode = '') {
   // headline. Suppress matchup layout even when test data supplies a fake
   // headline pair.
   const wrestlingNeverPair = eventClass === 'wrestling_event'
-  // UFC/MMA card events render F1-style: event mark dominant, headline fight
-  // as a subtitle line. The fighter pair from the title becomes the subtitle,
-  // not the layout driver. Pure boxing fights without a card wrapper still
-  // get head-to-head. (See feedback_ufc_card_layout.md.)
+  // Combat events render event-first. Fighter names can appear in the title,
+  // but they are not a two-crest layout driver.
   const mmaCardNeverPair = eventClass === 'combat_event' && eventFormat === 'solo'
   const hasMatchup = !motorsportNeverPair && !teamWithoutPair && !wrestlingNeverPair && !mmaCardNeverPair && (
     eventFormat === 'matchup' || eventFormat === 'single' || (eventFormat === 'solo' && hasRealPair)
@@ -1446,7 +1449,7 @@ const MOTORSPORT_LEAGUE_RULES = [
   { pattern: /\b(?:formula\s*1|formula\s*one|formula1|f1)\b/i, label: 'FORMULA 1', sport: 'Formula 1', icon: 'f1' },
   { pattern: /\bnascar\b/i, label: 'NASCAR', sport: 'NASCAR', icon: 'nascar-oval' },
   { pattern: /\b(?:indycar|indy\s*car|indy\s*500)\b/i, label: 'INDYCAR', sport: 'IndyCar', icon: 'indycar-oval' },
-  { pattern: /\b(?:wec|world\s+endurance|formula\s*e|supercars?|v8sc)\b/i, label: 'MOTORSPORT', sport: 'Motorsport', icon: 'motorsport-helmet' },
+  { pattern: /\b(?:wec|world\s+endurance|formula\s*e|supercars?|v8sc|wsbk|bsb|british\s*superbikes?)\b/i, label: 'MOTORSPORT', sport: 'Motorsport', icon: 'motorsport-helmet' },
   { pattern: /\b(?:motorsport|motor\s+racing|grand\s+prix|race\s+series)\b/i, label: 'MOTORSPORT', sport: 'Motorsport', icon: 'motorsport-helmet' }
 ]
 
@@ -1582,11 +1585,26 @@ function _legacyMotorsportGlyphMarkup(iconKind, cx, cy, size, paper, accent) {
   return `<g data-role="motorsport-identity" data-icon-kind="${iconKind}">${ring}${inner}</g>`
 }
 
-const MOTORSPORT_LEAGUE_PREFIX_RE = /^\s*(?:formula\s*1|formula\s*one|formula1|f1|motogp|moto\s*gp|wrc|world\s+rally(?:\s+championship)?|nascar|indycar|indy\s*car|wec|formula\s*e|supercars?|v8sc|motorsport)\b[\s\-:.]*/i
-const RELEASE_NOISE_TAIL_RE = /\b(?:1080p|2160p|720p|web[\-._\s]?dl|web[\-._\s]?rip|web|hdtv|x264|x265|h264|h265|hevc|av1|repack|proper|aac|ddp\d?(?:\.\d)?|multi|english|fps\d+|mkv|mp4)\b/gi
+const MOTORSPORT_LEAGUE_PREFIX_RE = /^\s*(?:formula\s*1|formula\s*one|formula1|f1|motogp|moto\s*gp|wrc|world\s+rally(?:\s+championship)?|nascar|indycar|indy\s*car|wec|formula\s*e|supercars?|v8sc|wsbk|bsb|british\s*superbikes?|motorsport)\b[\s\-:.]*/i
+const RELEASE_NOISE_TAIL_RE = /\b(?:1080p|2160p|720p|web[\-._\s]?dl|web[\-._\s]?rip|web|hdtv|x264|x265|h264|h265|hevc|av1|repack|proper|aac|ddp\d?(?:\.\d)?|multi|english|fps\d+|mkv|mp4|fbb|megust[ae]?|afg|epworks|mwr|z3r0|kontrast|flux|verum|ntb|ctrlhd|deflate|organic|tgx)\b/gi
 
 function stripMotorsportLeaguePrefix(value = '') {
-  return normalizeSpace(String(value || '').replace(/[._]+/g, ' ').replace(MOTORSPORT_LEAGUE_PREFIX_RE, '').replace(RELEASE_NOISE_TAIL_RE, ' '))
+  return normalizeSpace(stripSportsReleaseNoise(String(value || '').replace(/[._]+/g, ' '))
+    .replace(MOTORSPORT_LEAGUE_PREFIX_RE, '')
+    .replace(RELEASE_NOISE_TAIL_RE, ' '))
+}
+
+function stripMotorsportTitleMetadata(value = '', event = {}, m = {}) {
+  let clean = normalizeSpace(value)
+  const session = normalizeSpace(event.session || event.eventDetail || m.session || m.round || '')
+  if (session) {
+    clean = clean.replace(new RegExp(`\\b${session.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i'), ' ')
+  }
+  return normalizeSpace(clean
+    .replace(/\b(?:19|20)\d{2}\b/g, ' ')
+    .replace(/\b(?:round\s*0*\d{1,2}|round0*\d{1,2}|r0*\d{1,2}|stage\s*\d{1,2}|day\s*\d{1,2})\b/gi, ' ')
+    .replace(/\b(?:practice(?:\s*(?:one|two|three|[1-3]))?|qualifying|qualifier|warm\s*up|warmup|sprint(?:\s*race)?|race(?:\s*(?:one|two|three|four|five|\d{1,2}))?)\b/gi, ' ')
+    .replace(/\b(?:en|eng|english|multi)\b/gi, ' '))
 }
 
 function pickMotorsportEventTitle(event = {}, m = {}, label = '') {
@@ -1602,28 +1620,30 @@ function pickMotorsportEventTitle(event = {}, m = {}, label = '') {
     }
     return ''
   }
-  // Prefer a clean rawTitle stripped of motorsport league prefix when the
-  // normalized eventTitle came back single-token or shorter — the upstream
-  // motorsport normalizer drops digits like "Daytona 500" -> "Daytona" and
-  // mangles "Long Beach Grand Prix" -> "Beach Grand Prix".
-  const fromRaw = stripMotorsportLeaguePrefix(event.rawTitle || '')
+  const fromRaw = stripMotorsportTitleMetadata(stripMotorsportLeaguePrefix(event.rawTitle || ''), event, m)
+  const fromEventShort = fromCandidates([
+    event.eventShort,
+    event.event_short,
+    m.event_short
+  ].map(stripMotorsportLeaguePrefix))
   const fromNormalized = fromCandidates([
     event.eventTitle,
     event.event_title,
     event.title,
-    m.event,
-    m.event_short,
-    event.eventShort,
-    event.event_short
-  ])
-  if (fromRaw) {
+    m.event
+  ].map(stripMotorsportLeaguePrefix))
+  if (/^(?:gear\s*up|preview|recap|highlights?|qualifying|practice|sprint|race)$/i.test(fromNormalized) && fromEventShort) {
+    return fromEventShort
+  }
+  if (fromRaw && fromNormalized) {
     const rawWords = fromRaw.split(/\s+/).filter(Boolean)
     const normWords = fromNormalized.split(/\s+/).filter(Boolean)
-    if (!fromNormalized) return fromRaw
     if (rawWords.length > normWords.length) return fromRaw
     if (rawWords.length === normWords.length && fromRaw.length > fromNormalized.length) return fromRaw
   }
   if (fromNormalized) return fromNormalized
+  if (fromEventShort) return fromEventShort
+  if (fromRaw) return fromRaw
   return fromCandidates([event.competition, event.league, m.league])
 }
 

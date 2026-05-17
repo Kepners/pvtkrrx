@@ -4,7 +4,17 @@ Updated: 2026-05-17
 
 ## Current Stage
 
-PVTKRRX is moving to the `1.1.73` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The current release priority is hardening seedbox progressive playback so qBittorrent is forced head-first: sequential download on, first+last piece priority off, and selected playable files promoted ahead of unrelated files.
+PVTKRRX is moving to the `1.1.74` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The current release priority is repairing sports poster/title normalization while preserving the `1.1.73` seedbox progressive playback hardening.
+
+## 2026-05-17: v1.1.74 sports poster parser/layout correction
+
+- Release scope: repair the sports poster/title path that let legacy parser fields override the MD contract, causing combat events to render as fake two-crest matchups and noisy motorsport releases to expose scene/codec tokens.
+- Root cause addressed: `parseSportsTorrentProfile()` rehydrated legacy `home_team`/`away_team` after the contract parser intentionally emitted a single combat `event`, and the motorsport poster title picker preferred longer raw release names over structured event fields.
+- Fix included: combat/MMA/boxing events now remain single-event poster data even when stale home/away values exist, release noise such as `H264-FBB`, `X265-MEGUSTA`, `EPWorks`, `AFG`, and `MWR` is stripped from event display text, BSB/British Superbikes is recognized as motorsport, and combat is blocked from `COMPETITOR_VS_COMPETITOR` layout selection.
+- Regression proof added: screenshot-derived parser/profile/poster fixtures for MVP MMA, ONE Fight Night, BSB Donington Park, Formula E Monaco, and noisy `Others` releases.
+- Local proof passed: `npm run smoke:sports-parser`, `npm run smoke:sports-poster-adapter`, `npm run smoke:sports-poster-classifier`, `npm run smoke:sports-poster-render`, `npm run smoke:sports-single-event-motorsport`, `npm run smoke:sports-artwork`, `npm run smoke:sports-competitor-vs-competitor`, `npm run smoke:sports-template-families`, `npm run smoke:free-tier-artwork`, and `npm run dist:win`.
+- Windows release assets rebuilt locally for `1.1.74`: `PVTKRRX Setup 1.1.74.exe`, `PVTKRRX 1.1.74.exe`, `PVTKRRX Setup 1.1.74.exe.blockmap`, and `latest.yml`.
+- Remaining caveat: `npm run smoke:sports-team-vs-team` still fails on a team-poster geometry assertion (`epl-manchester-city-arsenal` composite slot coordinates). That failure is outside this combat/motorsport parser fix and should be handled separately before claiming the full sports template suite is green.
 
 ## 2026-05-17: v1.1.73 seedbox qBittorrent flag hardening
 

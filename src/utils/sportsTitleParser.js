@@ -1,4 +1,5 @@
 const { getMappedLeagueEntry } = require('./leagueMap')
+const { stripSportsReleaseNoise } = require('./sportsReleaseNoise')
 
 const QUALITY_RE = /^(?:(?:2160p|1080p|1080i|720p|576p|540p|480p|sd|hd|fhd|uhd)(?:[a-z]{1,4})?(?:\d{2,3}(?:fps)?)?|\d{2,3}fps)$/i
 const SOURCE_RE = /^(?:hdtv|pdtv|sdtv|webrip|webdl|web-dl|web|bluray|bdrip|dvdrip|satfeed|iptv|repack|proper|complete|espn(?:p|plus|\+)?|f1tv|fs1|nesn|msg|usan?|nbcsn|nbcsba|nbcsca|sportsnet|sn|sny|snla|snp|bally|bein(?:sport)?\d*|eurosport|skynz|kayo|fubo|newvision|tnt|fox|bbc|itv|cbs|abc|peacock|atvp?|apple|bign|flo(?:hockey|sports?))$/i
@@ -23,7 +24,7 @@ const TEAM_SIDE_TRAILING_SPORT_NOISE_RE = /\b(?:4k|hockey|ice\s+hockey|basketbal
 const TEAM_SIDE_TRAILING_GAME_STATE_RE = /\b(?:make[\s-]*up\s+of|completion\s+of|continuation\s+of|resumption\s+of|postponed|suspended|rain[\s-]*delayed?|resumed|tba)\s*$/i
 
 // Known league/series tokens that start non-vs event titles
-const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|PFL|Bellator|ONE|WWE|AEW|TNA|TNA\s*Wrestling|Impact\s*Wrestling|ROH|NJPW|MotoGP|Moto\s*GP|NASCAR|IndyCar|WRC|Supercars|Supercars\s*Championship|V8SC|Bathurst|WSBK|WorldSBK|World\s*Superbikes?|SBK|WEC|FormulaE|Rally|Dakar|Diamond\s*League|World\s*Athletics\s*Diamond\s*League|PGA|PGA\s*Tour|LPGA|LPGA\s*Tour|Masters|ATP|ATP\s*World\s*Tour|WTA|WTA\s*Tour|Wimbledon|Australian\s*Open|Roland\s*Garros|French\s*Open|US\s*Open|U\.S\.\s*Open|Davis\s*Cup|Laver\s*Cup|PDC|PDC\s*Darts|Premier\s*League\s*Darts|World\s*Championship\s*Darts|World\s*Matchplay|IPL|IPLM\d+|Indian\s*Premier\s*League|MLS|Major\s*League\s*Soccer|MLB|Major\s*League\s*Baseball|NCAA\s*Baseball|World\s*Baseball\s*Classic|NBA|NBA\s*Playoffs|NCAA\s*Basketball|College\s*Basketball|EuroLeague|EasyCredit\s*BBL|Basketball\s*Champions\s*League(?:\s*of\s*Americas)?|English\s*Women'?s?\s*Super\s*League|Women'?s?\s*Super\s*League|Barclays\s*Women'?s?\s*Super\s*League|FA\s*WSL|WSL|Super\s*Rugby|MLR|Major\s*League\s*Rugby|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
+const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|PFL|Bellator|ONE|WWE|AEW|TNA|TNA\s*Wrestling|Impact\s*Wrestling|ROH|NJPW|MotoGP|Moto\s*GP|NASCAR|IndyCar|WRC|Supercars|Supercars\s*Championship|V8SC|Bathurst|WSBK|WorldSBK|World\s*Superbikes?|SBK|BSB|British\s*Superbikes?|WEC|FormulaE|Rally|Dakar|Diamond\s*League|World\s*Athletics\s*Diamond\s*League|PGA|PGA\s*Tour|LPGA|LPGA\s*Tour|Masters|ATP|ATP\s*World\s*Tour|WTA|WTA\s*Tour|Wimbledon|Australian\s*Open|Roland\s*Garros|French\s*Open|US\s*Open|U\.S\.\s*Open|Davis\s*Cup|Laver\s*Cup|PDC|PDC\s*Darts|Premier\s*League\s*Darts|World\s*Championship\s*Darts|World\s*Matchplay|IPL|IPLM\d+|Indian\s*Premier\s*League|MLS|Major\s*League\s*Soccer|MLB|Major\s*League\s*Baseball|NCAA\s*Baseball|World\s*Baseball\s*Classic|NBA|NBA\s*Playoffs|NCAA\s*Basketball|College\s*Basketball|EuroLeague|EasyCredit\s*BBL|Basketball\s*Champions\s*League(?:\s*of\s*Americas)?|English\s*Women'?s?\s*Super\s*League|Women'?s?\s*Super\s*League|Barclays\s*Women'?s?\s*Super\s*League|FA\s*WSL|WSL|Super\s*Rugby|MLR|Major\s*League\s*Rugby|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
 
 const SESSION_PATTERNS = [
   ['Pre-Season Testing', /\bpre[\s-]*season\s+testing\b/i],
@@ -1145,6 +1146,7 @@ const RUBBISH_TOKENS = new Set([
   'fs1', 'fs2', 'stan', 'skyf1', 'mwr', 'z3r0', 'kontrast', 'flux',
   'verum', 'm4rtyr', 'thecig', 'billie', 'mgp', 'ntb', 'ctrlhd', 'deflate',
   'organic', 'tgx', 'nf', 'blackdevil', 'nva', 'bravesvsn', 'group',
+  'fbb', 'megust', 'megusta', 'afg', 'epworks',
   // generic broadcasters that are NOT client-named tvChannel keepers.
   // NOTE: bare ambiguous team words ('sky','fox','heat','magic') are NOT
   // listed — "Chicago Sky"/"Miami Heat" are real teams. Multi-word
@@ -1168,6 +1170,7 @@ const TV_CHANNEL_KEEPERS = new Map([
 
 const QUALITY_TOKEN_RE = /^(?:2160p|1080p|1080i|720p|576p|540p|480p|sd|hd|fhd|uhd)(?:[a-z]{1,4})?(?:\d{2,3}(?:fps)?)?$|^\d{2,3}fps$/i
 const SOURCE_FORMAT_RE = /^(?:web|web-?dl|dl|webrip|hdtv|pdtv|bluray|bdrip|dvdrip|repack|proper|complete|h264|h265|x264|x265|hevc|avc|av1|dsnp|ddp\d?)$/i
+const RELEASE_COMPOUND_TOKEN_RE = /^(?:x|h)?26[45][\s._-]*[a-z0-9]{2,20}$|^(?:x264|x265|h264|h265)[\s._-]+[a-z0-9]{2,20}$/i
 const LANG_TOKEN_RE = /^(?:en|eng|english|es|spa|spanish|fr|fre|french|de|ger|german|it|ita|italian|pt|por|portuguese|multi)$/i
 // Documentaries / docuseries (episodic markers). Studio shows are ANCILLARY.
 const DOC_MARKERS_RE = /\b(?:s\d{1,2}(?:e\d{1,3})?|drive to survive|the impossible|the .+? story|: a .+? story)\b/i
@@ -1330,7 +1333,7 @@ function isCombatSport(sport) {
 
 // Known competition-code shapes that may lead an unmapped title. A bare
 // city/team word ("Indiana") is NOT a competition.
-const KNOWN_COMP_TOKEN_RE = /^(?:UECL|UEL|UCL|UEFA|EPL|EFL|ELC|MLB|MLS|NBA|NHL|NFL|UFC|PFL|AEW|WWE|TNA|ROH|NJPW|AFL|NRL|RSL|WSL|UWCL|WSBK|WRC|WEC|BTCC|IPL|BBL|PDC|BDO|ATP|WTA|PGA|LPGA|F1|NCAA)$/i
+const KNOWN_COMP_TOKEN_RE = /^(?:UECL|UEL|UCL|UEFA|EPL|EFL|ELC|MLB|MLS|NBA|NHL|NFL|UFC|PFL|AEW|WWE|TNA|ROH|NJPW|AFL|NRL|RSL|WSL|UWCL|WSBK|WRC|WEC|BTCC|BSB|IPL|BBL|PDC|BDO|ATP|WTA|PGA|LPGA|F1|NCAA)$/i
 
 // Resolve the competition label + (optionally) corrected sport. Title token is
 // NOT authoritative — leagueMap canonicalises it; club identity overrides it.
@@ -1342,10 +1345,14 @@ function resolveContractCompetition(tokens, sport) {
   let mappedStart = -1
   let mappedSpan = 0
   const scanMax = Math.min(tokens.length, 12)
+  const sportLow = String(sport || '').trim().toLowerCase()
   for (let start = 0; start < scanMax; start += 1) {
     for (let count = 1; count <= Math.min(tokens.length - start, 6); count += 1) {
       const candidate = normalizeSegment(tokens.slice(start, start + count).join(' '))
       const entry = getMappedLeagueEntry(candidate)
+      const entrySport = String(entry?.sportKey || '').trim().toLowerCase()
+      const sameSport = !entrySport || !sportLow || sportLow === 'others' || entrySport === sportLow
+      if (entry && !sameSport) continue
       if (entry && (!mapped || count > mappedSpan)) {
         mapped = entry; mappedStart = start; mappedSpan = count
       }
@@ -1396,6 +1403,8 @@ function captureSession(raw) {
   // Multi-part practice: "Practice 1 & 2"
   const multi = raw.match(/\bPractice\s*(\d)\s*&\s*(\d)\b/i)
   if (multi) return `Practice ${multi[1]} & ${multi[2]}`
+  const numberedRace = raw.match(/\bRace\s*(one|two|three|four|five|\d{1,2})\b/i)
+  if (numberedRace) return `Race ${titleCase(numberedRace[1])}`
   for (const [label, pattern] of [
     ['Full Event', /\bfull\s*event\b/i],
     ['Main Event', /\bmain\s*event\b/i],
@@ -1488,6 +1497,7 @@ function isSideNoiseToken(t) {
   if (CONTRACT_SEPARATORS.has(low)) return true
   if (RUBBISH_TOKENS.has(low) || TV_CHANNEL_KEEPERS.has(low)) return true
   if (QUALITY_TOKEN_RE.test(t) || SOURCE_FORMAT_RE.test(t)) return true
+  if (RELEASE_COMPOUND_TOKEN_RE.test(t) || stripSportsReleaseNoise(t) === '') return true
   if (LANG_TOKEN_RE.test(t) && low !== 'it') return true
   if (/^(?:19|20)\d{2}$/.test(t)) return true
   if (/^\d{1,4}$/.test(t)) return true
@@ -1701,12 +1711,22 @@ function parseSportsTitleContract(rawTitle, options = {}) {
   const sepIndex = tokens.findIndex(t => CONTRACT_SEPARATORS.has(String(t).toLowerCase()))
   if (isCombatSport(out.sport) || (/^(?:ufc|pfl|bellator|one)$/i.test(out.competition) && sepIndex > 0)) {
     if (sepIndex > 0 && sepIndex < tokens.length - 1) {
-      const before = cleanSide(tokens.slice(0, sepIndex), out.sport, raw)
+      let beforeTokens = tokens.slice(comp.span, sepIndex)
+      const compFirst = normalizeSegment(out.competition).split(/\s+/)[0] || ''
+      if (compFirst && beforeTokens.length > 1 && String(beforeTokens[0] || '').toLowerCase() === compFirst.toLowerCase()) {
+        beforeTokens = beforeTokens.slice(1)
+      }
+      const before = cleanSide(beforeTokens, out.sport, raw)
       const after = cleanSide(tokens.slice(sepIndex + 1), out.sport, raw)
       if (before && after) out.event = `${before} vs ${after}`
     }
     if (!out.event) {
-      out.event = cleanSide(tokens, out.sport, raw) || raw
+      let eventTokens = tokens.slice(comp.span)
+      const compFirst = normalizeSegment(out.competition).split(/\s+/)[0] || ''
+      if (compFirst && eventTokens.length > 1 && String(eventTokens[0] || '').toLowerCase() === compFirst.toLowerCase()) {
+        eventTokens = eventTokens.slice(1)
+      }
+      out.event = cleanSide(eventTokens, out.sport, raw) || raw
     }
     if (!out.competition && /^(?:boxing)$/i.test(out.sport)) out.competition = 'Boxing'
     return out
@@ -1818,7 +1838,7 @@ function parseSportsTitleContract(rawTitle, options = {}) {
         // leading / trailing bare sport word (Golf / Tennis / Basketball / …)
         .replace(/^(?:golf|tennis|basketball|football|baseball|hockey|cricket|rugby|boxing|cycling|darts|snooker|motorsport|soccer)\s+/i, '')
         .replace(/\s+(?:golf|tennis|basketball|football|baseball|hockey|cricket|rugby|boxing|cycling|darts|snooker|motorsport|soccer)$/i, '')
-        .replace(/\b(?:fp[1-3]|free\s*practice(?:\s*(?:one|two|three|[1-3]))?|practice(?:\s*[1-3](?:\s*&\s*[1-3])?)?|qualifying|qualifier|warm\s*up|warmup|sprint(?:\s*race)?|race|full\s*event|main\s*event|main\s*card|early\s*prelims?|prelims?)\b/gi, ' ')
+        .replace(/\b(?:fp[1-3]|free\s*practice(?:\s*(?:one|two|three|[1-3]))?|practice(?:\s*[1-3](?:\s*&\s*[1-3])?)?|qualifying|qualifier|warm\s*up|warmup|sprint(?:\s*race)?|race(?:\s*(?:one|two|three|four|five|\d{1,2}))?|full\s*event|main\s*event|main\s*card|early\s*prelims?|prelims?)\b/gi, ' ')
         .replace(/\b(?:round\s*0*\d{1,2}|round0*\d{1,2}|r0*\d{1,2}|game\s*\d{1,2}|stage\s*\d{1,2})\b/gi, ' ')
     )
     // Re-trim a trailing lone broadcaster word exposed after the sport-word

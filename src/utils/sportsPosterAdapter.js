@@ -39,6 +39,8 @@ const LEAGUE_CODES = Object.freeze({
   nascar: 'NASCAR',
   indycar: 'INDY',
   wrc: 'WRC',
+  bsb: 'BSB',
+  'british superbikes': 'BSB',
   wec: 'WEC',
   'formula e': 'FE',
   snooker: 'SNOOKER',
@@ -100,7 +102,7 @@ function titleCase(value = '') {
     .filter(Boolean)
     .map((part, index) => {
       const upper = part.toUpperCase()
-      if (['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'F1', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'NBA', 'NFL', 'NHL', 'NXT', 'PDC', 'PFL', 'PGA', 'RAW', 'TBA', 'UFC', 'UEFA', 'WC', 'WEC', 'WRC', 'WTA', 'WWE'].includes(upper)) return upper
+      if (['AEW', 'AFCON', 'ATP', 'BSB', 'EFL', 'EPL', 'FA', 'F1', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'NBA', 'NFL', 'NHL', 'NXT', 'PDC', 'PFL', 'PGA', 'RAW', 'TBA', 'UFC', 'UEFA', 'WC', 'WEC', 'WRC', 'WTA', 'WWE'].includes(upper)) return upper
       if (upper === 'MOTOGP') return 'MotoGP'
       if (upper === 'SMACKDOWN') return 'SmackDown'
       if (upper === 'WRESTLEMANIA') return 'WrestleMania'
@@ -242,7 +244,7 @@ function sportIconFor(input = {}) {
   ].filter(Boolean).join(' ')).toLowerCase()
   if (/\b(?:formula\s*1|formula\s*one|formula1|f1)\b/.test(text)) return 'f1'
   if (/\b(?:motogp|moto\s*gp)\b/.test(text)) return 'motogp'
-  if (/\b(?:motor|wrc|rally|grand prix|nascar|indycar|wec|formula e|supercars|v8sc)\b/.test(text)) return 'motorsport'
+  if (/\b(?:motor|wrc|rally|grand prix|nascar|indycar|wec|formula e|supercars|v8sc|wsbk|bsb|british superbikes?)\b/.test(text)) return 'motorsport'
   if (/golf|pga|lpga|masters|ryder cup|liv golf|open championship/.test(text)) return 'golf'
   if (/darts|pdc|world matchplay|premier league darts/.test(text)) return 'darts'
   if (/cycling|tour de france|giro|vuelta|stage|time trial|road race|paris roubaix|tour of flanders/.test(text)) return 'cycling'
@@ -265,12 +267,9 @@ function sportIconFor(input = {}) {
   return 'soccer'
 }
 
-// UFC, PFL, Bellator, ONE Championship etc. are MULTI-FIGHT CARDS with a
-// headline bout — like F1 events. They render as single-event posters with the
-// event mark dominant and the headline fight as a subtitle line, never as a
-// head-to-head matchup. Pure boxing fights without a card wrapper still render
-// as head-to-head. (See feedback_ufc_card_layout.md.)
-const MMA_CARD_EVENT_RE = /\b(?:ufc|pfl|bellator|one\s*championship|cage\s*warriors|fight\s*night)\b/i
+// Combat is contract-locked as a single event string. Fighter names may remain
+// in the event title/subtitle, but they are never the poster layout driver.
+const MMA_CARD_EVENT_RE = /\b(?:ufc|pfl|bellator|one\s*championship|one\s*fc|cage\s*warriors|fight\s*night|mma|mvp\s*mma|bkfc|glory|rizin|lfa|main\s*card|prelims?)\b/i
 
 function isMmaCardEvent(input = {}) {
   const text = [
@@ -285,12 +284,9 @@ function isMmaCardEvent(input = {}) {
 function eventFormatFor(classification, input = {}) {
   if (classification === 'team_vs_team') return 'matchup'
   if (classification === 'tennis_or_snooker_match') return 'single'
-  if (classification === 'combat_event' && isMmaCardEvent(input)) {
-    return 'solo'
-  }
+  if (classification === 'combat_event') return 'solo'
   if (
-    (classification === 'combat_event' ||
-     classification === 'darts_event' ||
+    (classification === 'darts_event' ||
      classification === 'racket_event') &&
     hasActualPair(input)
   ) {
@@ -360,7 +356,7 @@ function eventShortFor(input = {}, classification = '') {
     // normalizer leftovers like eventShort="Brazil" with competition="MotoGP
     // Brazil". Otherwise use the explicit eventShort even when long.
     const cleanedCompetition = stripReleaseTitleNoise(input.competition)
-    const explicitShort = [input.eventShort, input.event_short, input.eventName]
+    const explicitShort = [input.eventShort, input.event_short, input.eventName, input.eventTitle, input.title]
       .map(stripReleaseTitleNoise)
       .find((value) => value && value.length >= 3)
     const competitionFullyContains = explicitShort && cleanedCompetition &&
@@ -402,10 +398,9 @@ function eventShortFor(input = {}, classification = '') {
 }
 
 function sessionFor(input = {}, classification = '', eventShort = '') {
-  // UFC/MMA card events render F1-style with the headline fight already in
-  // eventTitle; auto-composing "Fighter A v Fighter B" as session here would
-  // duplicate the headline. Skip the auto-pair fallback for those.
-  const skipAutoPair = classification === 'combat_event' && isMmaCardEvent(input)
+  // Combat events render event-first; auto-composing "Fighter A v Fighter B"
+  // as a session duplicates the title and can trigger fake paired layouts.
+  const skipAutoPair = classification === 'combat_event'
   const raw = pickFirst(
     input.session,
     input.eventDetail,
@@ -447,7 +442,7 @@ function blankIfPlaceholder(value = '') {
 const RELEASE_TITLE_NOISE_RE = /\b(?:gear\s*up|saturday\s*highlights|sunday\s*highlights|friday\s*highlights|highlights|recap|preview|qualifying\s*recap|race\s*recap)\b/gi
 
 function stripReleaseTitleNoise(value = '') {
-  return normalizeSpace(String(value || '').replace(RELEASE_TITLE_NOISE_RE, ' '))
+  return normalizeSpace(stripSportsReleaseNoise(String(value || '')).replace(RELEASE_TITLE_NOISE_RE, ' '))
 }
 
 function buildPaidTemplateMatchup(normalizedEvent = {}, classification = '') {

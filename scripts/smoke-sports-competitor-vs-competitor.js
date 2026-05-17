@@ -44,17 +44,6 @@ const FIXTURES = [
     expectedTwo: 'Carlos Alcaraz'
   },
   {
-    slug: 'ufc-makhachev-oliveira',
-    rawTitle: 'Islam Makhachev vs Charles Oliveira UFC',
-    sportHint: 'mma',
-    competition: 'UFC',
-    expectedClass: 'combat_event',
-    expectedSport: /mma/i,
-    expectedLabel: /^(?:UFC|MMA)$/,
-    expectedOne: 'Islam Makhachev',
-    expectedTwo: 'Charles Oliveira'
-  },
-  {
     slug: 'darts-littler-van-gerwen',
     rawTitle: 'Luke Littler vs Michael van Gerwen Darts',
     sportHint: 'darts',
@@ -88,6 +77,13 @@ const NEGATIVES = [
     sportHint: 'motorsport',
     competition: 'WRC',
     expectedNotClass: 'team_vs_team'
+  },
+  {
+    slug: 'ufc-makhachev-oliveira-combat-solo',
+    rawTitle: 'Islam Makhachev vs Charles Oliveira UFC',
+    sportHint: 'mma',
+    competition: 'UFC',
+    expectedClass: 'combat_event'
   }
 ]
 
