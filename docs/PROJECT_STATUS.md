@@ -4,7 +4,7 @@ Updated: 2026-05-17
 
 ## Current Stage
 
-PVTKRRX is moving to the `1.1.74` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The current release priority is repairing sports poster/title normalization while preserving the `1.1.73` seedbox progressive playback hardening.
+PVTKRRX is on the `1.1.74` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The current release repairs sports poster/title normalization while preserving the `1.1.73` seedbox progressive playback hardening.
 
 ## 2026-05-17: v1.1.74 sports poster parser/layout correction
 
@@ -13,7 +13,11 @@ PVTKRRX is moving to the `1.1.74` release line. Release numbering remains app-al
 - Fix included: combat/MMA/boxing events now remain single-event poster data even when stale home/away values exist, release noise such as `H264-FBB`, `X265-MEGUSTA`, `EPWorks`, `AFG`, and `MWR` is stripped from event display text, BSB/British Superbikes is recognized as motorsport, and combat is blocked from `COMPETITOR_VS_COMPETITOR` layout selection.
 - Regression proof added: screenshot-derived parser/profile/poster fixtures for MVP MMA, ONE Fight Night, BSB Donington Park, Formula E Monaco, and noisy `Others` releases.
 - Local proof passed: `npm run smoke:sports-parser`, `npm run smoke:sports-poster-adapter`, `npm run smoke:sports-poster-classifier`, `npm run smoke:sports-poster-render`, `npm run smoke:sports-single-event-motorsport`, `npm run smoke:sports-artwork`, `npm run smoke:sports-competitor-vs-competitor`, `npm run smoke:sports-template-families`, `npm run smoke:free-tier-artwork`, and `npm run dist:win`.
-- Windows release assets rebuilt locally for `1.1.74`: `PVTKRRX Setup 1.1.74.exe`, `PVTKRRX 1.1.74.exe`, `PVTKRRX Setup 1.1.74.exe.blockmap`, and `latest.yml`.
+- Source/release state: `Kepners/pvtkrrx` `main` points at `b2043bc388192eb820fbd3aeeb7b54d3ce3ced38` (`Fix sports poster parser fallbacks`); GitHub releases `v1.1.74` and `v1.1.74-selfhost` both target that commit.
+- Windows release assets published under `v1.1.74`: `PVTKRRX-Setup-1.1.74.exe`, `PVTKRRX.1.1.74.exe`, `PVTKRRX-Setup-1.1.74.exe.blockmap`, `latest.yml`, and `install-selfhost.sh`.
+- Coolify proof: application id `9` / uuid `w14jewmw5ubscrxh8zzfhq7d` tracks `main` with `application_settings.is_auto_deploy_enabled=true`; deployment queue rows `747` and `748` finished for `b2043bc388192eb820fbd3aeeb7b54d3ce3ced38`; running public container `w14jewmw5ubscrxh8zzfhq7d-173525225846` uses image `w14jewmw5ubscrxh8zzfhq7d:b2043bc388192eb820fbd3aeeb7b54d3ce3ced38` with `SOURCE_COMMIT=b2043bc388192eb820fbd3aeeb7b54d3ce3ced38` and `COOLIFY_BRANCH=main`.
+- Native self-host runtime parity: `/opt/pvtkrrx` was refreshed to `b2043bc388192eb820fbd3aeeb7b54d3ce3ced38`, `/opt/pvtkrrx/REVISION` was written with that commit, `pvtkrrx.service` restarted `active`, package version reports `1.1.74`, backup is `/opt/pvtkrrx-backups/20260517T173644Z-release-1.1.74-b2043bc`, and the temp-copy remote self-host smoke printed `Smoke self-host server passed`.
+- Live proof: `https://www.pvtkrrx.cc/version-status.json?bust=final174` and `https://pvt.kepners.co.uk/version-status.json?bust=final174` both returned `currentVersion=1.1.74`, `latestVersion=1.1.74`, `updateAvailable=false`; `/download/windows/setup?bust=deploy174` redirects to `v1.1.74/PVTKRRX-Setup-1.1.74.exe`; `/download/windows/portable?bust=final174` redirects to `v1.1.74/PVTKRRX.1.1.74.exe`; public bootstrap and hosted self-host manifests both report version `1.1.74`.
 - Remaining caveat: `npm run smoke:sports-team-vs-team` still fails on a team-poster geometry assertion (`epl-manchester-city-arsenal` composite slot coordinates). That failure is outside this combat/motorsport parser fix and should be handled separately before claiming the full sports template suite is green.
 
 ## 2026-05-17: v1.1.73 seedbox qBittorrent flag hardening
