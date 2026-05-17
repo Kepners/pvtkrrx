@@ -66,7 +66,7 @@ There is no per-route catalog filtering. The Library catalog queries qBittorrent
 - Config loaded from disk (`local-config.json`)
 - Built-in `/file` route serves bytes with HTTP Range support
 - Built-in `/playback` route queues torrents via tracker link, polls qBit, and 302-redirects to `/file` when ready
-- Playback priming resumes the selected incomplete torrent, moves it to the top of qBittorrent's queue when queueing is enabled, keeps sequential download on, and sets only the chosen playable video/archive files to high file priority
+- Playback priming resumes the selected incomplete torrent, moves it to the top of qBittorrent's queue when queueing is enabled, keeps sequential download on, explicitly disables first+last piece priority unless opted in, and sets only the chosen playable video/archive files to high file priority
 - Tracker `/playback` streams emitted for on-tracker content
 - Completed packed RAR releases start background extraction when possible; the extracted direct video is the supported path once ready, and the source stays hidden while extraction is pending or unavailable unless the experimental native archive override is enabled
 - `proxyHeaders` with Basic Auth included on seedbox/buffering streams when `fileServerAuth` is configured

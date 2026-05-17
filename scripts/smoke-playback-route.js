@@ -125,7 +125,52 @@ function createFetchResponse(bytes, headers = {}) {
   }
 }
 
+async function assertQbitAddSerializesExplicitPlaybackFlags() {
+  const requests = []
+  global.fetch = async (url, options = {}) => {
+    requests.push({ url: String(url || ''), options })
+    return {
+      ok: true,
+      status: 200,
+      headers: { get: () => '' },
+      async text() { return 'Ok.' },
+      async json() { return {} }
+    }
+  }
+
+  try {
+    const qbit = new QBitClient('http://127.0.0.1:8080', '', '')
+    await qbit.add('magnet:?xt=urn:btih:explicitflagssmoke', {
+      sequentialDownload: true,
+      firstLastPiecePrio: false,
+      paused: false
+    })
+
+    assert.equal(requests[0]?.url, 'http://127.0.0.1:8080/api/v2/torrents/add')
+    const params = new URLSearchParams(String(requests[0]?.options?.body || ''))
+    assert.equal(params.get('sequentialDownload'), 'true')
+    assert.equal(params.get('firstLastPiecePrio'), 'false')
+    assert.equal(params.get('paused'), 'false')
+
+    await qbit.addTorrentFile(Buffer.from('torrent-bytes'), 'smoke.torrent', {
+      sequentialDownload: true,
+      firstLastPiecePrio: false,
+      paused: false
+    })
+
+    assert.equal(requests[1]?.url, 'http://127.0.0.1:8080/api/v2/torrents/add')
+    const form = requests[1]?.options?.body
+    assert.equal(form?.get('sequentialDownload'), 'true')
+    assert.equal(form?.get('firstLastPiecePrio'), 'false')
+    assert.equal(form?.get('paused'), 'false')
+  } finally {
+    global.fetch = ORIGINALS.fetch
+  }
+}
+
 async function run() {
+  await assertQbitAddSerializesExplicitPlaybackFlags()
+
   const originalPublicBaseUrl = process.env.PVTKRRX_PUBLIC_BASE_URL
   const originalPlaybackBaseUrl = process.env.PVTKRRX_PLAYBACK_BASE_URL
   const hash = 'c1287d13aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'

@@ -4,7 +4,15 @@ Updated: 2026-05-17
 
 ## Current Stage
 
-PVTKRRX is moving to the `1.1.70` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The current release priority is unifying the live public Coolify branch back onto `main`, restoring Coolify auto-deploy, and shipping the sports parser/artwork fixes with fresh Windows desktop artifacts.
+PVTKRRX is moving to the `1.1.73` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The current release priority is hardening seedbox progressive playback so qBittorrent is forced head-first: sequential download on, first+last piece priority off, and selected playable files promoted ahead of unrelated files.
+
+## 2026-05-17: v1.1.73 seedbox qBittorrent flag hardening
+
+- Release scope: harden the qBittorrent Web API add path after live seedbox proof showed qBittorrent pulling tail pieces before playback started.
+- Root cause addressed: the playback runtime already passed `firstLastPiecePrio=false`, but the low-level qBittorrent client only serialized true boolean flags, so a false value was omitted from `/api/v2/torrents/add`.
+- Fix included: qBittorrent magnet/URL adds and uploaded `.torrent` adds now serialize both `sequentialDownload=true` and `firstLastPiecePrio=false` when playback requests those booleans.
+- Regression proof added: `npm run smoke:playback` now asserts the actual qBittorrent add payloads include explicit false first/last priority for both add surfaces.
+- User-facing test note: existing torrents that already downloaded tail pieces keep those bytes on disk; clean proof requires removing/re-adding the torrent after installing this revision or confirming the existing torrent has `Download first and last pieces first` unticked.
 
 ## 2026-05-17: v1.1.70 main unification and sports artwork release
 

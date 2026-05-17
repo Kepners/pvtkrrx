@@ -265,8 +265,12 @@ class QBitClient {
   async add(magnetOrUrl, options = {}) {
     const params = new URLSearchParams()
     params.set('urls', String(magnetOrUrl || ''))
-    if (options.sequentialDownload === true) params.set('sequentialDownload', 'true')
-    if (options.firstLastPiecePrio === true) params.set('firstLastPiecePrio', 'true')
+    if (typeof options.sequentialDownload === 'boolean') {
+      params.set('sequentialDownload', options.sequentialDownload ? 'true' : 'false')
+    }
+    if (typeof options.firstLastPiecePrio === 'boolean') {
+      params.set('firstLastPiecePrio', options.firstLastPiecePrio ? 'true' : 'false')
+    }
     if (typeof options.paused === 'boolean') params.set('paused', options.paused ? 'true' : 'false')
 
     return this.request('/api/v2/torrents/add', {
@@ -289,8 +293,12 @@ class QBitClient {
       new Blob([payload], { type: 'application/x-bittorrent' }),
       String(fileName || 'download.torrent')
     )
-    if (options.sequentialDownload === true) form.append('sequentialDownload', 'true')
-    if (options.firstLastPiecePrio === true) form.append('firstLastPiecePrio', 'true')
+    if (typeof options.sequentialDownload === 'boolean') {
+      form.append('sequentialDownload', options.sequentialDownload ? 'true' : 'false')
+    }
+    if (typeof options.firstLastPiecePrio === 'boolean') {
+      form.append('firstLastPiecePrio', options.firstLastPiecePrio ? 'true' : 'false')
+    }
     if (typeof options.paused === 'boolean') form.append('paused', options.paused ? 'true' : 'false')
 
     return this.request('/api/v2/torrents/add', {
