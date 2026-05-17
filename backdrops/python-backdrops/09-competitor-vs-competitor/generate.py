@@ -68,15 +68,6 @@ FIXTURES = {
         "competitor_two": "Carlos Alcaraz",
         "date": "2026-04-30",
     },
-    "ufc-makhachev-oliveira": {
-        "title": "Islam Makhachev vs Charles Oliveira UFC",
-        "sport": "MMA",
-        "league": "UFC",
-        "league_code": "UFC",
-        "competitor_one": "Islam Makhachev",
-        "competitor_two": "Charles Oliveira",
-        "date": "2026-04-30",
-    },
     "darts-littler-van-gerwen": {
         "title": "Luke Littler vs Michael van Gerwen Darts",
         "sport": "Darts",

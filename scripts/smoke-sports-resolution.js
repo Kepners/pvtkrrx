@@ -102,8 +102,16 @@ async function run() {
   }
   assert.ok(sportsSearchCalls.length > 0, 'sports catalog smoke should exercise Prowlarr sports searches')
   assert.ok(
-    sportsSearchCalls.every((call) => call.cats === '5060' && call.useCategories === true),
-    'sports catalog/prewarm search path should keep every Prowlarr call constrained to Torznab category 5060'
+    sportsSearchCalls.every((call) => call.cats === '5060'),
+    'sports catalog/prewarm search path should keep Torznab sports category 5060 threaded through every call'
+  )
+  assert.ok(
+    sportsSearchCalls.some((call) => call.useCategories === true),
+    'sports catalog should first attempt the category-constrained sports search'
+  )
+  assert.ok(
+    sportsSearchCalls.some((call) => call.useCategories === false),
+    'sports catalog should broaden the fallback search when the constrained pass is sparse'
   )
 
   const burnsId = 'sportsmeta:event:mma|2026-04-18|ufc|ufc-fight-night-273-burns|malott'
@@ -1016,8 +1024,9 @@ async function run() {
   })
   assert.equal(ufcProfile.sport, 'mma', 'UFC rows should classify as MMA')
   assert.equal(ufcProfile.league, 'UFC', 'UFC rows should keep UFC as league')
-  assert.equal(ufcProfile.home_team, 'Burns', 'UFC rows should preserve the first fighter')
-  assert.equal(ufcProfile.away_team, 'Malott', 'UFC rows should preserve the second fighter')
+  assert.equal(ufcProfile.home_team, null, 'UFC rows should not expose the first fighter as a team side')
+  assert.equal(ufcProfile.away_team, null, 'UFC rows should not expose the second fighter as a team side')
+  assert.match(ufcProfile.event || '', /Burns\s+vs\s+Malott/i, 'UFC rows should preserve the fighter pair in the solo event title')
   assert.equal(ufcProfile.session, 'Main Card', 'UFC rows should expose main card as session metadata')
   assert.equal(ufcProfile.event_class, 'combat_event', 'UFC rows should be classified as combat-event posters')
 

@@ -311,6 +311,10 @@ function assertNegativeSelection(testCase) {
 
 async function main() {
   const generated = runGenerator()
+  assert.ok(
+    !generated.results.some((item) => /ufc|mma/i.test(`${item.slug || ''} ${item.leagueLabel || ''} ${item.sport || ''}`)),
+    'default competitor-vs-competitor generator fixtures must not include UFC/MMA combat-card proofs'
+  )
   const fixtures = []
   for (const fixture of FIXTURES) {
     fixtures.push(await assertGeneratedFixture(fixture))

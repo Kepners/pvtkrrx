@@ -202,7 +202,7 @@ function loadLocalEnv() {
 // Keep Node/server console output on the same redaction policy Electron already uses.
 installConsoleRedaction(console)
 
-if (!process.env.ENCRYPTION_SECRET && process.env.NODE_ENV !== 'production') {
+if (!process.env.ENCRYPTION_SECRET && process.env.NODE_ENV !== 'production' && !IS_HOSTED_RELAY_RUNTIME) {
   process.env.ENCRYPTION_SECRET = 'pvtkrrx-local-dev-secret-change-me'
   console.warn('[PVTKRRX] ENCRYPTION_SECRET missing; using local development fallback secret.')
 }

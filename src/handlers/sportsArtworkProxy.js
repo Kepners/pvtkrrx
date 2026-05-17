@@ -3516,10 +3516,21 @@ async function resolveDefaultArtworkCanonical(args = {}) {
     title = '',
     date = '',
     homeTeam = '',
-    awayTeam = ''
+    awayTeam = '',
+    fallbackInput = {}
   } = args
   const hasStructuredQuery = Boolean(date && ((homeTeam && awayTeam) || title))
   if (!hasStructuredQuery) return null
+  const fallbackKey = [
+    fallbackInput.sport,
+    fallbackInput.competition || fallbackInput.league,
+    fallbackInput.eventTitle || fallbackInput.title,
+    fallbackInput.date,
+    fallbackInput.homeTeam,
+    fallbackInput.awayTeam,
+    fallbackInput.eventClass,
+    fallbackInput.rawTitle
+  ].map((part) => leagueSlugFor(part)).join('~')
   const memoKey = [
     (sportsmetaBaseUrl || '').trim().toLowerCase(),
     (sportSlug || '').trim().toLowerCase(),
@@ -3527,7 +3538,8 @@ async function resolveDefaultArtworkCanonical(args = {}) {
     (title || '').trim().toLowerCase(),
     (date || '').trim().toLowerCase(),
     (homeTeam || '').trim().toLowerCase(),
-    (awayTeam || '').trim().toLowerCase()
+    (awayTeam || '').trim().toLowerCase(),
+    fallbackKey
   ].join('|')
   const now = Date.now()
   const hit = resolveCanonicalCache.get(memoKey)

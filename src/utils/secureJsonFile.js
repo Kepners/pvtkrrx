@@ -15,7 +15,8 @@ function resolveSecureJsonSecret(explicitSecret = '') {
   ).trim()
   if (envSecret) return envSecret
 
-  if (process.env.NODE_ENV !== 'production') {
+  const hostedRelayRuntime = /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_HOSTED_RELAY || '').trim())
+  if (process.env.NODE_ENV !== 'production' && !hostedRelayRuntime) {
     return 'pvtkrrx-local-dev-secret-change-me'
   }
   return ''

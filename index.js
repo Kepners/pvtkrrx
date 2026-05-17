@@ -107,6 +107,129 @@ app.use(express.json({
   }
 }))
 
+const SHUTDOWN_GRACE_MS = Math.max(1000, parseInt(process.env.PVTKRRX_SHUTDOWN_GRACE_MS || '25000', 10))
+let activeServerState = null
+let processHandlersInstalled = false
+
+function safeLogMessage(value) {
+  return redactSensitiveText(String(value?.stack || value?.message || value || 'unknown error'))
+}
+
+function pipeReadStreamToResponse(filePath, options, res, context = 'file') {
+  const stream = fs.createReadStream(filePath, options)
+  let settled = false
+
+  stream.on('error', (err) => {
+    if (settled) return
+    settled = true
+    console.error(`[${context}] read stream failed:`, safeLogMessage(err))
+    if (!res.headersSent) {
+      try {
+        res.removeHeader('Content-Length')
+        res.removeHeader('Content-Range')
+      } catch (_) {}
+      return res.status(500).json({ error: 'File stream failed' })
+    }
+    try {
+      res.destroy(err)
+    } catch (_) {}
+  })
+
+  res.on('close', () => {
+    if (!res.writableEnded) {
+      try {
+        stream.destroy()
+      } catch (_) {}
+    }
+  })
+
+  stream.pipe(res)
+  return stream
+}
+
+function trackServerSockets(server, sockets) {
+  if (!server || !sockets) return
+  server.on('connection', (socket) => {
+    sockets.add(socket)
+    socket.on('close', () => sockets.delete(socket))
+  })
+}
+
+function closeServer(server, label, logger) {
+  if (!server || !server.listening) return Promise.resolve()
+  return new Promise((resolve) => {
+    server.close((err) => {
+      if (err) logger.warn(`[shutdown] ${label} close failed:`, err.message)
+      resolve()
+    })
+  })
+}
+
+async function shutdownLocalServers(state, reason = 'shutdown', options = {}) {
+  if (!state) return
+  if (state.shutdownPromise) return state.shutdownPromise
+
+  const logger = createRedactingLogger(options.logger || state.logger || console)
+  const graceMs = Math.max(1000, Number(options.graceMs || SHUTDOWN_GRACE_MS))
+  state.shuttingDown = true
+  logger.warn(`[shutdown] ${reason}; draining local servers for up to ${graceMs}ms`)
+
+  const closePromise = Promise.all([
+    closeServer(state.httpServer, 'HTTP server', logger),
+    closeServer(state.httpsServer, 'HTTPS server', logger)
+  ])
+
+  let timeout = null
+  const timeoutPromise = new Promise((resolve) => {
+    timeout = setTimeout(() => {
+      for (const socket of [...(state.httpSockets || []), ...(state.httpsSockets || [])]) {
+        try {
+          socket.destroy()
+        } catch (_) {}
+      }
+      resolve()
+    }, graceMs)
+    if (typeof timeout.unref === 'function') timeout.unref()
+  })
+
+  state.shutdownPromise = Promise.race([closePromise, timeoutPromise]).finally(() => {
+    if (timeout) clearTimeout(timeout)
+    try {
+      if (state.lanAlias && typeof state.lanAlias.stop === 'function') state.lanAlias.stop()
+    } catch (err) {
+      logger.warn('[shutdown] mDNS alias cleanup failed:', err.message)
+    }
+  })
+
+  return state.shutdownPromise
+}
+
+function installProcessHandlers(logger = console) {
+  if (processHandlersInstalled) return
+  processHandlersInstalled = true
+  const runtimeLogger = createRedactingLogger(logger)
+
+  const shutdownAndExit = (reason, exitCode, err = null) => {
+    if (err) runtimeLogger.error(`[runtime] ${reason}:`, safeLogMessage(err))
+    const state = activeServerState
+    Promise.resolve(shutdownLocalServers(state, reason, {
+      logger: runtimeLogger,
+      graceMs: exitCode === 0 ? SHUTDOWN_GRACE_MS : Math.min(SHUTDOWN_GRACE_MS, 5000)
+    }))
+      .catch((shutdownErr) => {
+        runtimeLogger.error('[runtime] shutdown failed:', safeLogMessage(shutdownErr))
+      })
+      .finally(() => {
+        process.exit(exitCode)
+      })
+  }
+
+  process.on('SIGTERM', () => shutdownAndExit('SIGTERM', 0))
+  process.on('SIGINT', () => shutdownAndExit('SIGINT', 0))
+  process.on('uncaughtException', (err) => shutdownAndExit('uncaughtException', 1, err))
+  process.on('unhandledRejection', (reason) => shutdownAndExit('unhandledRejection', 1, reason))
+}
+
 function getSportsArtworkBaseUrl(req) {
   const requestBaseUrl = getPublicBaseUrl(req)
   const configAlias = String(req.params?.config || '').trim().toLowerCase()
@@ -2575,12 +2698,12 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
       res.status(206)
       res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`)
       res.setHeader('Content-Length', String(end - start + 1))
-      fs.createReadStream(resolvedFilePath, { start, end }).pipe(res)
+      pipeReadStreamToResponse(resolvedFilePath, { start, end }, res, 'file-route')
     } else {
       if (isComplete) {
         res.status(200)
         res.setHeader('Content-Length', String(fileSize))
-        fs.createReadStream(resolvedFilePath).pipe(res)
+        pipeReadStreamToResponse(resolvedFilePath, undefined, res, 'file-route')
       } else {
         if (maxReadable <= 0) {
           const hasReadableBytes = await waitForFileState(() => Boolean(fileExists && resolvedFilePath && (isComplete || readableBytes > 0)))
@@ -2595,7 +2718,7 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
         res.status(206)
         res.setHeader('Content-Range', `bytes 0-${end}/${fileSize}`)
         res.setHeader('Content-Length', String(maxReadable))
-        fs.createReadStream(resolvedFilePath, { start: 0, end }).pipe(res)
+        pipeReadStreamToResponse(resolvedFilePath, { start: 0, end }, res, 'file-route')
       }
     }
   } catch (err) {
@@ -2909,6 +3032,27 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
   }
 })
 
+// Express terminal error handler.
+app.use((err, req, res, next) => {
+  const status = Number(err?.status || err?.statusCode || 0)
+  const responseStatus = status >= 400 && status < 600
+    ? status
+    : (err?.type === 'entity.parse.failed' ? 400 : 500)
+  const requestPath = `${req.method || 'REQUEST'} ${req.originalUrl || req.url || ''}`.trim()
+  console.error(`[express] ${requestPath} failed:`, safeLogMessage(err))
+
+  if (res.headersSent) return next(err)
+
+  if (responseStatus === 400 && err?.type === 'entity.parse.failed') {
+    return res.status(400).json({ error: 'Invalid JSON body' })
+  }
+
+  const message = responseStatus < 500
+    ? String(err?.message || 'Request failed')
+    : 'Internal server error'
+  return res.status(responseStatus).json({ error: message })
+})
+
 // ─── Local dev server ───────────────────────────────────────
 function startLocalServers(options = {}) {
   const exitOnHttpError = options.exitOnHttpError !== false
@@ -2925,8 +3069,15 @@ function startLocalServers(options = {}) {
     httpsReady: Promise.resolve(null),
     port,
     httpsPort,
-    lanAlias: null
+    lanAlias: null,
+    logger,
+    httpSockets: new Set(),
+    httpsSockets: new Set(),
+    shuttingDown: false,
+    shutdownPromise: null
   }
+  activeServerState = state
+  installProcessHandlers(logger)
 
   logger.log(`[boot] starting local runtime port=${port} httpsPort=${httpsPort}`)
 
@@ -2962,6 +3113,7 @@ function startLocalServers(options = {}) {
   // HTTP
   const httpServer = http.createServer(app)
   state.httpServer = httpServer
+  trackServerSockets(httpServer, state.httpSockets)
   httpServer.listen(port, () => {
     logger.log(`PVTKRRX HTTP  → http://localhost:${port}`)
     logger.log(`Configure:      http://localhost:${port}/configure`)
@@ -3011,6 +3163,7 @@ function startLocalServers(options = {}) {
       })
       const httpsServer = https.createServer({ key: pems.private, cert: pems.cert }, app)
       state.httpsServer = httpsServer
+      trackServerSockets(httpsServer, state.httpsSockets)
       await new Promise((resolve, reject) => {
         const onListening = () => {
           httpsServer.off('error', onError)
@@ -3044,3 +3197,4 @@ if (require.main === module) {
 
 module.exports = app
 module.exports.startLocalServers = startLocalServers
+module.exports.shutdownLocalServers = shutdownLocalServers

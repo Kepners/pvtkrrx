@@ -52,6 +52,7 @@ const prowlarrSearchCache = new Map()
 const prowlarrSearchInFlight = new Map()
 const PROWLARR_SEARCH_CACHE_TTL_MS = Math.max(15000, parseInt(process.env.PVTKRRX_PROWLARR_CACHE_MS || '120000', 10))
 const PROWLARR_SEARCH_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_PROWLARR_SEARCH_TIMEOUT_MS || '7000', 10))
+const CINEMETA_CACHE_MAX_KEYS = Math.max(50, parseInt(process.env.PVTKRRX_CINEMETA_CACHE_MAX_KEYS || '500', 10))
 const PROWLARR_SEARCH_CACHE_MAX_KEYS = Math.max(50, parseInt(process.env.PVTKRRX_PROWLARR_CACHE_MAX_KEYS || '500', 10))
 const SPORTS_SEED_CONCURRENCY = Math.max(1, parseInt(process.env.PVTKRRX_SPORTS_SEED_CONCURRENCY || '2', 10))
 const SPORTS_SEED_QUERY_TIMEOUT_MS = Math.max(
@@ -306,6 +307,17 @@ function cacheKey(type, imdbId) {
   return `${type}:${String(imdbId || '').trim()}`
 }
 
+function trimCinemetaCache(now = Date.now()) {
+  for (const [key, entry] of cinemetaCache) {
+    if (!entry?.expiresAt || entry.expiresAt <= now) cinemetaCache.delete(key)
+  }
+  while (cinemetaCache.size > CINEMETA_CACHE_MAX_KEYS) {
+    const oldestKey = cinemetaCache.keys().next().value
+    if (!oldestKey) break
+    cinemetaCache.delete(oldestKey)
+  }
+}
+
 async function getCinemetaCached(type, imdbId) {
   const key = cacheKey(type, imdbId)
   const now = Date.now()
@@ -325,6 +337,7 @@ async function getCinemetaCached(type, imdbId) {
     meta,
     expiresAt: now + (meta ? 6 * 60 * 60 * 1000 : 60 * 60 * 1000)
   })
+  trimCinemetaCache(now)
   return meta
 }
 
@@ -422,7 +435,7 @@ async function searchSportsCatalogItems(config, torznab, query, limit) {
     query,
     SPORT_CATS,
     'search',
-    { useCategories: true }
+    { useCategories: false }
   )
   return mergeUniqueProwlarrItems(strictItems, broadItems)
 }

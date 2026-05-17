@@ -289,11 +289,14 @@ function parseSportsTorrentProfile(itemOrTitle = '', options = {}) {
   // a single title and NO teams; an ANCILLARY clip that still wraps a real
   // "A vs B" fixture (e.g. a full-match replay) keeps its teams as metadata
   // (the consumer keys head-to-head vs generic art off content_type).
-  const profileForbidsTeams = Boolean(
-    (contract && contract.contentType !== 'event') ||
+  const isCombatProfile = Boolean(
     isCombatProfileSport(contract?.sport) ||
     isCombatProfileSport(sport) ||
     isCombatCompetition(contract?.competition || league)
+  )
+  const profileForbidsTeams = Boolean(
+    (contract && contract.contentType === 'documentary') ||
+    isCombatProfile
   )
   const contractTeamsAllowed = Boolean(contract && !profileForbidsTeams)
   const legacyTeamsAllowed = !profileForbidsTeams
@@ -308,7 +311,7 @@ function parseSportsTorrentProfile(itemOrTitle = '', options = {}) {
   if (contract && contract.contentType !== 'event') {
     // documentary / ancillary -> single title, no head-to-head poster
     event = contract.title ? titleCase(contract.title) : (parsedEvent?.eventName ? titleCase(parsedEvent.eventName) : null)
-  } else if (profileForbidsTeams) {
+  } else if (isCombatProfile || profileForbidsTeams) {
     event = contract?.event
       ? titleCase(contract.event)
       : (parsedMatchup?.eventName ? titleCase(parsedMatchup.eventName) : (parsedEvent?.eventName ? titleCase(parsedEvent.eventName) : null))

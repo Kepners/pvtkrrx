@@ -41,6 +41,10 @@ const STREAM_SPORTS_SUPPLEMENTAL_BUDGET_MS = Math.max(2500, parseInt(process.env
 const STREAM_SPORTS_RESPONSE_TIMEOUT_MS = Math.max(5000, parseInt(process.env.PVTKRRX_STREAM_SPORTS_RESPONSE_TIMEOUT_MS || '14000', 10))
 const TRACKER_LINK_INSPECTION_TIMEOUT_MS = Math.max(1000, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_TIMEOUT_MS || '2500', 10))
 const TRACKER_LINK_INSPECTION_CACHE_MS = Math.max(60 * 1000, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_CACHE_MS || String(10 * 60 * 1000), 10))
+const TRACKER_LINK_INSPECTION_CACHE_MAX_KEYS = Math.max(
+  50,
+  parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_CACHE_MAX_KEYS || '1000', 10)
+)
 const STREAM_EPISODE_IMDB_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(
   process.env.PVTKRRX_STREAM_EPISODE_IMDB_FALLBACK_TIMEOUT_MS || '3000',
   10
@@ -54,6 +58,17 @@ const LOOSE_TEAM_NOISE = new Set([
   'sport', 'live', 'full', 'replay', 'highlights', 'extended', 'main', 'card', 'prelims', 'early'
 ])
 const trackerLinkInspectionCache = new Map()
+
+function trimTrackerLinkInspectionCache(now = Date.now()) {
+  for (const [key, entry] of trackerLinkInspectionCache) {
+    if (!entry?.expiresAt || entry.expiresAt <= now) trackerLinkInspectionCache.delete(key)
+  }
+  while (trackerLinkInspectionCache.size > TRACKER_LINK_INSPECTION_CACHE_MAX_KEYS) {
+    const oldestKey = trackerLinkInspectionCache.keys().next().value
+    if (!oldestKey) break
+    trackerLinkInspectionCache.delete(oldestKey)
+  }
+}
 
 function buildFileUrl(config, configToken, playbackBaseUrl, hash, torrent, fileName, options = {}) {
   return buildPlaybackFileUrl(config, configToken, playbackBaseUrl, hash, torrent, fileName, options)
@@ -199,12 +214,14 @@ async function inspectTrackerLink(link) {
     expiresAt: now + TRACKER_LINK_INSPECTION_CACHE_MS,
     promise
   })
+  trimTrackerLinkInspectionCache(now)
 
   const result = await promise
   trackerLinkInspectionCache.set(target, {
     expiresAt: Date.now() + TRACKER_LINK_INSPECTION_CACHE_MS,
     promise: Promise.resolve(result)
   })
+  trimTrackerLinkInspectionCache()
   return result
 }
 

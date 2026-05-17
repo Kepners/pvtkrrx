@@ -64,6 +64,7 @@ RUN npm ci --omit=dev --include=optional \
 COPY . .
 
 # Coolify routes inbound traffic to port 3000 by default for Node services.
+ENV NODE_ENV=production
 ENV PORT=3000
 ENV PVTKRRX_HOSTED_RELAY=true
 # Expand libuv's worker thread pool from the default 4 to 16. Paired with
