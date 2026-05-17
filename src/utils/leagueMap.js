@@ -51,7 +51,21 @@ const LEAGUE_MAP = Object.freeze({
     name: 'FA Cup',
     sportKey: 'football',
     sportsDbSport: 'Soccer',
-    aliases: ['English FA Cup', 'The FA Cup', 'Football Association Cup']
+    aliases: ['English FA Cup', 'The FA Cup', 'The Emirates FA Cup', 'Emirates FA Cup', 'Football Association Cup']
+  },
+  wsl: {
+    name: 'English Womens Super League',
+    idLeague: '4849',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['Womens Super League', "Women's Super League", 'Barclays Womens Super League', "Barclays Women's Super League", 'FA WSL', 'WSL']
+  },
+  englishnationalleague: {
+    name: 'English National League',
+    idLeague: '4590',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['National League', 'Vanarama National League', 'Conference National']
   },
   mls: {
     name: 'Major League Soccer',
@@ -222,7 +236,14 @@ const LEAGUE_MAP = Object.freeze({
     sportKey: 'motorsport',
     sportsDbSport: 'Motorsport',
     sportsDbName: 'SBK',
-    aliases: ['SBK', 'World Superbike Championship']
+    aliases: ['SBK', 'WorldSBK', 'World Superbike', 'World Superbikes', 'World Superbike Championship']
+  },
+  diamondleague: {
+    name: 'Diamond League',
+    idLeague: '5282',
+    sportKey: 'athletics',
+    sportsDbSport: 'Athletics',
+    aliases: ['World Athletics Diamond League', 'Athletics Diamond League']
   },
   wec: {
     name: 'WEC',
@@ -460,6 +481,121 @@ const LEAGUE_MAP = Object.freeze({
     sportKey: 'american-football',
     sportsDbSport: 'American Football',
     aliases: ['Canadian Football League']
+  },
+
+  // ---- SPORTS_TITLE_PARSER_SPEC.md §5 required leagueMap additions ----
+  wsl: {
+    name: "Women's Super League",
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['WSL', 'FA WSL', 'Barclays Womens Super League', "Women's Super League", 'Womens Super League']
+  },
+  afl: {
+    name: 'AFL',
+    sportKey: 'australian-football',
+    sportsDbSport: 'Australian Football',
+    aliases: ['Australian Football League', 'Aussie Rules']
+  },
+  uecl: {
+    name: 'UEFA Europa Conference League',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['UECL', 'Europa Conference League', 'Conference League', 'UEFA Conference League']
+  },
+  giro: {
+    name: "Giro d'Italia",
+    sportKey: 'cycling',
+    sportsDbSport: 'Cycling',
+    aliases: ['Giro', 'Giro Italia', 'Tour of Italy']
+  },
+  btcc: {
+    name: 'BTCC',
+    sportKey: 'motorsport',
+    sportsDbSport: 'Motorsport',
+    aliases: ['British Touring Car Championship', 'British Touring Cars']
+  },
+  stanleycup: {
+    name: 'Stanley Cup',
+    idLeague: '4380',
+    sportKey: 'hockey',
+    sportsDbSport: 'Ice Hockey',
+    aliases: ['SC', 'NHL Stanley Cup', 'Stanley Cup Playoffs', 'Stanley Cup Final']
+  },
+  euroleague: {
+    name: 'EuroLeague',
+    idLeague: '4546',
+    sportKey: 'basketball',
+    sportsDbSport: 'Basketball',
+    aliases: ['Turkish Airlines EuroLeague', 'Euro League Basketball']
+  },
+  rsl: {
+    name: 'Roshn Saudi League',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['RSL', 'Saudi Pro League', 'Saudi Professional League', 'SPL Saudi']
+  },
+  jupilerproleague: {
+    name: 'Jupiler Pro League',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['Belgian Pro League', 'Belgian First Division A', 'Pro League Belgium']
+  },
+  ekstraklasa: {
+    name: 'Ekstraklasa',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['Polish Ekstraklasa', 'PKO BP Ekstraklasa']
+  },
+  ligaportugal: {
+    name: 'Liga Portugal',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['Primeira Liga', 'Liga Portugal Betclic', 'Portuguese Primeira Liga', 'Primeira']
+  },
+  bundesliga2: {
+    name: '2. Bundesliga',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['2.Bundesliga', '2 Bundesliga', 'Zweite Bundesliga', 'German 2. Bundesliga']
+  },
+  eredivisie: {
+    name: 'Eredivisie',
+    idLeague: '4337',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['Dutch Eredivisie', 'Holland Eredivisie']
+  },
+  segundadivision: {
+    name: 'Segunda División',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['Segunda Division', 'LaLiga 2', 'Spanish Segunda Division', 'La Liga 2']
+  },
+  scottishpremiership: {
+    name: 'Scottish Premiership',
+    idLeague: '4330',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['SPFL', 'Scottish Premier League', 'Scottish Premiership Football']
+  },
+  nrlleague: {
+    name: 'NRL',
+    idLeague: '4416',
+    sportKey: 'rugby-league',
+    sportsDbSport: 'Rugby',
+    aliases: ['National Rugby League', 'Australian National Rugby League']
+  },
+  uefaeuropaconference: {
+    name: 'UEFA Europa & Conference League',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['UEFA Europa and Conference League', 'Europa & Conference League']
+  },
+  womensworldcupqualifier: {
+    name: "Women's FIFA World Cup Qualifier",
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    aliases: ['Womens World Cup Qualifier', "Women's World Cup Qualifiers", 'FIFA Women World Cup Qualifier']
   }
 })
 

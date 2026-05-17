@@ -28,7 +28,7 @@ const {
   renderLogoGlyphSvg,
   renderSportsPosterTemplateSvg
 } = require('../utils/sportsPosterTemplates')
-const { classifySportsEvent } = require('../utils/sportsEventClassifier')
+const { classifySportsEvent, hasActualPair } = require('../utils/sportsEventClassifier')
 const {
   readSportsArtworkDiskCache,
   writeSportsArtworkDiskCache
@@ -38,7 +38,11 @@ const {
   resolveSportBackdropBucket
 } = require('../utils/sportBackdrops')
 const { SPORTS_ARTWORK_PROXY_VERSION } = require('../utils/sportsArtwork')
-const { verifyStampedSportsPosterEntitlement } = require('../utils/entitlement')
+const {
+  ENTITLEMENT_SOURCE,
+  verifyStampedSportsPosterEntitlement,
+  resolveServerAdminPosterTemplate
+} = require('../utils/entitlement')
 
 const VARIANT_DIMENSIONS = {
   poster: { width: 600, height: 900 },
@@ -48,7 +52,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260514-team-logo-overrides-v24'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260516-competition-context-v30'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -75,6 +79,12 @@ const inspectAssetCache = new Map()
 const inspectAssetInFlight = new Map()
 const logoFetchCache = new Map()
 const logoFetchInFlight = new Map()
+// BUG 3: memoise the SportsMeta /resolve lookup (canonicalId AND negative
+// "no match" results) so repeated artwork requests for the same event do not
+// re-hit SportsMeta per request. Negative results get a shorter TTL so a
+// later upstream ingest is still picked up reasonably soon.
+const resolveCanonicalCache = new Map()
+const resolveCanonicalInFlight = new Map()
 let runtimeRevisionCache
 
 function resolveRuntimeRevision() {
@@ -291,13 +301,12 @@ async function renderEmergencyTemplatePng(variant, fallbackInput = {}, template 
   const fallbackSlots = skipGeneratedSlots ? [] : (artwork.slots || [])
   const composites = []
   for (const slot of fallbackSlots) {
-    // User directive 2026-05-11: glyph fallback removed. renderLogoGlyphSvg
-    // now returns null. If the real-logo pipeline didn't fill this slot,
-    // the slot is intentionally left empty rather than painted with initials.
+    // Visible fallback is intentionally plain: it marks unresolved logo data
+    // without pretending a league mark is a team badge.
     const glyphSvg = renderLogoGlyphSvg({ role: slot.role, event, theme, size: slot.size })
     if (!glyphSvg) continue
     composites.push({
-      input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size),
+      input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size, { frame: true }),
       left: slot.left,
       top: slot.top
     })
@@ -379,10 +388,10 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
     const realHomeLogo = logoContext?.homeBadge || null
     const realAwayLogo = logoContext?.awayBadge || null
     const realLogoForSlot = (role = '') => {
-      if (role === 'home') return realHomeLogo || realLeagueLogo
-      if (role === 'away') return realAwayLogo || realLeagueLogo
-      if (['league', 'leagueLogo', 'logo'].includes(role)) return realLeagueLogo || realHomeLogo || realAwayLogo
-      return realLeagueLogo || realHomeLogo || realAwayLogo
+      if (role === 'home') return realHomeLogo
+      if (role === 'away') return realAwayLogo
+      if (['league', 'leagueLogo', 'logo'].includes(role)) return realLeagueLogo
+      return realLeagueLogo
     }
     const composites = []
     const logoSlots = []
@@ -390,7 +399,7 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
       const realLogo = realLogoForSlot(slot.role)
       if (realLogo?.buffer) {
         composites.push({
-          input: await resizeCompositionBuffer(realLogo.buffer, slot.size),
+          input: await resizeCompositionBuffer(realLogo.buffer, slot.size, { frame: true }),
           left: slot.left,
           top: slot.top
         })
@@ -405,29 +414,34 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
           size: slot.size
         })
       } else {
-        // User directive 2026-05-11: glyph fallback removed.
-        // renderLogoGlyphSvg now returns null. The slot is intentionally
-        // skipped (no composite added) — no painted initials, no sport-icon
-        // emblem. logoSlots still records the slot so audit headers report
-        // why this slot is empty and which team needs SportsDB seeding.
+        // Visible fallback is intentionally plain: it marks unresolved logo
+        // data without pretending a league mark is a team badge.
         const glyphSvg = renderLogoGlyphSvg({ role: slot.role, event, theme, size: slot.size })
         if (glyphSvg) {
           composites.push({
-            input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size),
+            input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size, { frame: true }),
             left: slot.left,
             top: slot.top
           })
+          logoSlots.push({
+            role: slot.role,
+            logoKind: 'fallback-glyph',
+            logoFallbackReason,
+            left: slot.left,
+            top: slot.top,
+            size: slot.size
+          })
         } else {
           console.warn(`[sports-poster] LOGO_MISSING_NO_GLYPH variant=${variant} template=${normalizedTemplate} role=${slot.role} reason=${logoFallbackReason} title=${sourceTitleForAudit(fallbackInput)}`)
+          logoSlots.push({
+            role: slot.role,
+            logoKind: 'missing-no-glyph',
+            logoFallbackReason,
+            left: slot.left,
+            top: slot.top,
+            size: slot.size
+          })
         }
-        logoSlots.push({
-          role: slot.role,
-          logoKind: 'missing-no-glyph',
-          logoFallbackReason,
-          left: slot.left,
-          top: slot.top,
-          size: slot.size
-        })
       }
     }
     if (artwork.overlay) {
@@ -903,16 +917,37 @@ const LEAGUE_SLUG_ALIASES = Object.freeze({
   'epl': 'english-premier-league',
   'premier league': 'english-premier-league',
   'champions league': 'uefa-champions-league',
+  'uefa champions league': 'uefa-champions-league',
+  'ucl': 'uefa-champions-league',
   'europa league': 'uefa-europa-league',
+  'uefa europa league': 'uefa-europa-league',
   'fa cup': 'fa-cup',
+  'the fa cup': 'fa-cup',
+  'the emirates fa cup': 'fa-cup',
+  'emirates fa cup': 'fa-cup',
+  'english womens super league': 'english-womens-super-league',
+  'english women super league': 'english-womens-super-league',
+  'womens super league': 'english-womens-super-league',
+  "women's super league": 'english-womens-super-league',
+  'barclays womens super league': 'english-womens-super-league',
+  "barclays women's super league": 'english-womens-super-league',
+  'fa wsl': 'english-womens-super-league',
+  'wsl': 'english-womens-super-league',
   'mls': 'major-league-soccer',
   'major league soccer': 'major-league-soccer',
   'american major league soccer': 'major-league-soccer',
+  'ncaa basketball': 'ncaa-basketball',
+  'college basketball': 'ncaa-basketball',
   'atp': 'atp-world-tour',
   'wta': 'wta-tour',
   'ufc': 'ufc',
   'nba': 'nba',
   'wnba': 'wnba',
+  'women basketball league': 'wnba',
+  'womens basketball league': 'wnba',
+  "women's basketball league": 'wnba',
+  'womens national basketball association': 'wnba',
+  "women's national basketball association": 'wnba',
   'nfl': 'nfl',
   'nhl': 'nhl',
   'mlb': 'mlb',
@@ -932,9 +967,36 @@ const LEAGUE_SLUG_ALIASES = Object.freeze({
   'australian football league': 'afl'
 })
 
+const GENERIC_LEAGUE_SLUGS = new Set([
+  'sport',
+  'sports',
+  'general',
+  'other',
+  'football',
+  'soccer',
+  'basketball',
+  'baseball',
+  'hockey',
+  'ice-hockey',
+  'motorsport',
+  'athletics',
+  'golf',
+  'fighting',
+  'boxing',
+  'mma',
+  'wrestling',
+  'rugby',
+  'tennis'
+])
+
 function normalizedLeagueSlug(value = '') {
   const raw = String(value || '').toLowerCase().trim()
   return LEAGUE_SLUG_ALIASES[raw] || leagueSlugFor(value)
+}
+
+function isGenericLeagueSlug(value = '') {
+  const slug = normalizedLeagueSlug(value)
+  return !slug || GENERIC_LEAGUE_SLUGS.has(slug)
 }
 
 function deriveLeagueCanonicalId(sport = '', league = '') {
@@ -1071,22 +1133,37 @@ async function rasterizeLogoUrlForVariant(cdnUrl = '', variant = 'logo', inspect
   const sourceUrl = normalizeSpace(cdnUrl)
   if (!sourceUrl) return null
   try {
-    const response = await fetch(sourceUrl, {
-      headers: { accept: 'image/png,image/jpeg,image/webp,image/*' },
-      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
-    })
-    if (!response.ok) return null
-    const upstreamContentType = String(response.headers.get('content-type') || '').toLowerCase()
-    if (!/^image\/(png|jpeg|jpg|webp)/i.test(upstreamContentType)) return null
-    const sourceBuffer = Buffer.from(await response.arrayBuffer())
+    let sourceBuffer
+    let upstreamContentType = ''
+    if (sourceUrl === 'pvtkrrx://logo/ufc-red') {
+      sourceBuffer = Buffer.from(renderUfcRedLogoSvg(640))
+      upstreamContentType = 'image/svg+xml'
+    } else {
+      const response = await fetch(sourceUrl, {
+        headers: { accept: 'image/png,image/jpeg,image/webp,image/svg+xml,image/*' },
+        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+      })
+      if (!response.ok) return null
+      upstreamContentType = String(response.headers.get('content-type') || '').toLowerCase()
+      if (!/^image\/(png|jpeg|jpg|webp|svg\+xml)/i.test(upstreamContentType)) return null
+      sourceBuffer = Buffer.from(await response.arrayBuffer())
+    }
     const dims = VARIANT_DIMENSIONS[variant] || VARIANT_DIMENSIONS.logo
-    const png = await sharp(sourceBuffer, { density: 192 })
-      .resize({
+    const logoSize = Math.round(Math.min(dims.width, dims.height) * 0.86)
+    const logo = await resizeCompositionBuffer(sourceBuffer, logoSize, { frame: true })
+    const png = await sharp({
+      create: {
         width: dims.width,
         height: dims.height,
-        fit: 'contain',
+        channels: 4,
         background: { r: 0, g: 0, b: 0, alpha: 0 }
-      })
+      }
+    })
+      .composite([{
+        input: logo,
+        left: Math.round((dims.width - logoSize) / 2),
+        top: Math.round((dims.height - logoSize) / 2)
+      }])
       .png({ compressionLevel: 9, adaptiveFiltering: true })
       .toBuffer()
     return {
@@ -1133,27 +1210,79 @@ async function tryRealLogoVariantPng({ canonicalId = '', sportsmetaBaseUrl = '',
 const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
   {
     sport: 'football',
+    pattern: /\b(?:scottish\s+women'?s?\s+premier\s+league|swpl)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://upload.wikimedia.org/wikipedia/commons/c/cc/SWPL_Logo_Brandmarque_Colour.png']
+  },
+  {
+    sport: 'football',
     pattern: /\b(?:uefa\s+champions\s+league|champions\s+league|ucl)\b/i,
     canonicalIds: ['sportsmeta:league:football|uefa-champions-league'],
-    searchTerms: ['UEFA Champions League']
+    searchTerms: ['UEFA Champions League'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/facv1u1742998896.png']
+  },
+  {
+    sport: 'football',
+    pattern: /\b(?:uefa\s+conference\s+league|conference\s+league|uecl)\b/i,
+    canonicalIds: ['sportsmeta:league:football|uefa-conference-league'],
+    searchTerms: ['UEFA Conference League'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/ymfo5j1718775759.png']
+  },
+  {
+    sport: 'football',
+    pattern: /\b(?:uefa\s+europa\s+(?:and|&)\s+conference\s+league|europa\s+(?:and|&)\s+conference\s+league)\b/i,
+    canonicalIds: ['sportsmeta:league:football|uefa-europa-league'],
+    searchTerms: ['UEFA Europa League'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/mlsr7d1718774547.png']
   },
   {
     sport: 'football',
     pattern: /\b(?:uefa\s+europa\s+league|europa\s+league|uel)\b/i,
     canonicalIds: ['sportsmeta:league:football|uefa-europa-league'],
-    searchTerms: ['UEFA Europa League']
+    searchTerms: ['UEFA Europa League'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/mlsr7d1718774547.png']
   },
   {
     sport: 'football',
-    pattern: /\b(?:english\s+premier\s+league|premier\s+league|epl)\b/i,
+    pattern: /^(?!.*\bscottish\b)(?!.*\bwomen'?s?\b).*\b(?:english\s+premier\s+league|premier\s+league|epl)\b/i,
     canonicalIds: ['sportsmeta:league:football|english-premier-league'],
     searchTerms: ['English Premier League']
   },
   {
     sport: 'football',
+    pattern: /\b(?:spanish\s+la\s+liga|la\s*liga|laliga)\b/i,
+    canonicalIds: ['sportsmeta:league:football|spanish-la-liga'],
+    searchTerms: ['Spanish La Liga'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/ja4it51687628717.png']
+  },
+  {
+    sport: 'football',
+    pattern: /\b(?:german\s+bundesliga|bundesliga)\b/i,
+    canonicalIds: ['sportsmeta:league:football|german-bundesliga'],
+    searchTerms: ['German Bundesliga'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/teqh1b1679952008.png']
+  },
+  {
+    sport: 'football',
     pattern: /\bfa\s+cup\b/i,
     canonicalIds: [],
-    searchTerms: ['FA Cup']
+    searchTerms: ['FA Cup'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/vk7isd1598802862.png']
+  },
+  {
+    sport: 'football',
+    pattern: /\b(?:barclays\s+women'?s?\s+super\s+league|english\s+women'?s?\s+super\s+league|women'?s?\s+super\s+league|fa\s+wsl|wsl)\b/i,
+    canonicalIds: ['sportsmeta:league:football|english-womens-super-league'],
+    searchTerms: ['English Womens Super League'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/lpsm6p1751723311.png']
+  },
+  {
+    sport: 'football',
+    pattern: /\b(?:english\s+national\s+league|national\s+league|conference\s+national|vanarama\s+national\s+league)\b/i,
+    canonicalIds: ['sportsmeta:league:football|english-national-league'],
+    searchTerms: ['English National League'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/5mq9v01752167973.png']
   },
   {
     sport: 'football',
@@ -1170,10 +1299,17 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
   },
   {
     sport: 'basketball',
-    pattern: /\b(?:wnba|women\'?s\s+national\s+basketball\s+association)\b/i,
+    pattern: /\b(?:wnba|women'?s?\s+(?:national\s+)?basketball\s+(?:association|league))\b/i,
     canonicalIds: ['sportsmeta:league:basketball|wnba'],
     searchTerms: ['WNBA'],
     directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/logo/3fv4p01573154525.png']
+  },
+  {
+    sport: 'basketball',
+    pattern: /\b(?:ncaa\s+basketball|college\s+basketball)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://commons.wikimedia.org/wiki/Special:Redirect/file/NCAA_Basketball_wordmark_color.svg']
   },
   {
     sport: 'baseball',
@@ -1216,17 +1352,38 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
   },
   {
     sport: 'motorsport',
-    pattern: /\b(?:wsbk|wssp|wwcr|world\s+super\s*bike|world\s*sbk|superbike\s+world\s+championship|sbk)\b/i,
+    pattern: /\b(?:v8\s*supercars?|v8sc|supercars?(?:\s+championship)?)\b/i,
+    canonicalIds: ['sportsmeta:league:motorsport|v8-supercars'],
+    searchTerms: ['V8 Supercars', 'Supercars Championship'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/64f67s1770108650.png']
+  },
+  {
+    sport: 'motorsport',
+    pattern: /\b(?:wsbk|wssp|wwcr|world\s+super\s*bikes?|world\s*superbikes?|world\s*sbk|superbike\s+world\s+championship|sbk)\b/i,
     canonicalIds: [],
     searchTerms: [],
     directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/g2j9rc1649703609.png']
+  },
+  {
+    sport: 'athletics',
+    pattern: /\b(?:world\s+athletics\s+diamond\s+league|diamond\s+league)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/7d5xlh1650475438.png']
   },
   {
     sport: 'mma',
     pattern: /\bufc\b/i,
     canonicalIds: ['sportsmeta:league:mma|ufc'],
     searchTerms: ['UFC'],
-    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/bewnz31717531281.png']
+    directLogoUrls: ['pvtkrrx://logo/ufc-red']
+  },
+  {
+    sport: 'boxing',
+    pattern: /\bboxing\b/i,
+    canonicalIds: ['sportsmeta:league:boxing|boxing'],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/logo/xtssst1473774665.png']
   },
   // Tennis — SportsMeta does not index tennis as a sport slug, so every tennis
   // tournament has to lean on TheSportsDB CDN league badges. ATP/WTA badges
@@ -1347,6 +1504,20 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
     canonicalIds: [],
     searchTerms: [],
     directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/0gmkgj1555600537.png']
+  },
+  {
+    sport: 'wrestling',
+    pattern: /\b(?:wwe|world\s+wrestling\s+entertainment)\b/i,
+    canonicalIds: ['sportsmeta:league:wrestling|wwe'],
+    searchTerms: [],
+    directLogoUrls: ['https://commons.wikimedia.org/wiki/Special:Redirect/file/WWE_official_logo.svg']
+  },
+  {
+    sport: 'wrestling',
+    pattern: /\b(?:tna|tna\s+wrestling|impact\s+wrestling|total\s+nonstop\s+action)\b/i,
+    canonicalIds: ['sportsmeta:league:wrestling|tna-wrestling'],
+    searchTerms: [],
+    directLogoUrls: ['https://commons.wikimedia.org/wiki/Special:Redirect/file/TNA_Wrestling_%282024%29_Logo.svg']
   }
 ])
 
@@ -1384,11 +1555,28 @@ const DEFAULT_TEAM_LOGO_ALIASES = Object.freeze([
 ])
 
 const DIRECT_LEAGUE_LOGO_OVERRIDES = Object.freeze([
+  { sport: 'football', league: 'Scottish Womens Premier League', pattern: /\b(?:scottish\s+women'?s?\s+premier\s+league|swpl)\b/i, urls: ['https://upload.wikimedia.org/wikipedia/commons/c/cc/SWPL_Logo_Brandmarque_Colour.png'] },
+  { sport: 'football', league: 'Spanish La Liga', pattern: /\b(?:spanish\s+la\s+liga|la\s*liga|laliga)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/ja4it51687628717.png'] },
+  { sport: 'football', league: 'German Bundesliga', pattern: /\b(?:german\s+bundesliga|bundesliga)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/teqh1b1679952008.png'] },
+  { sport: 'football', league: 'UEFA Champions League', pattern: /\b(?:uefa\s+champions\s+league|champions\s+league|ucl)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/facv1u1742998896.png'] },
+  { sport: 'football', league: 'UEFA Conference League', pattern: /\b(?:uefa\s+conference\s+league|conference\s+league|uecl)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/ymfo5j1718775759.png'] },
+  { sport: 'football', league: 'UEFA Europa League', pattern: /\b(?:uefa\s+europa\s+(?:and|&)\s+conference\s+league|europa\s+(?:and|&)\s+conference\s+league|uefa\s+europa\s+league|europa\s+league|uel)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/mlsr7d1718774547.png'] },
+  { sport: 'football', league: 'FA Cup', pattern: /\b(?:the\s+emirates\s+fa\s+cup|emirates\s+fa\s+cup|fa\s+cup)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/vk7isd1598802862.png'] },
+  { sport: 'football', league: 'English Womens Super League', pattern: /\b(?:barclays\s+women'?s?\s+super\s+league|english\s+women'?s?\s+super\s+league|women'?s?\s+super\s+league|fa\s+wsl|wsl)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/lpsm6p1751723311.png'] },
+  { sport: 'football', league: 'English National League', pattern: /\b(?:english\s+national\s+league|national\s+league|conference\s+national|vanarama\s+national\s+league)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/5mq9v01752167973.png'] },
+  { sport: 'football', league: 'Scottish Premiership', pattern: /\b(?:scottish\s+premiership|scottish\s+premier\s+league|cinch\s+premiership|celtic|motherwell|falkirk|heart\s+of\s+midlothian|hibernian|rangers)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/72d3zc1688333496.png'] },
   { sport: 'football', league: 'Major League Soccer', pattern: /\b(?:major\s+league\s+soccer|mls)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/dqo6r91549878326.png'] },
-  { sport: 'basketball', league: 'WNBA', pattern: /\b(?:wnba|women\'?s\s+national\s+basketball\s+association)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/3fv4p01573154525.png'] },
-  { sport: 'mma', league: 'UFC', pattern: /\bufc\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/bewnz31717531281.png'] },
+  { sport: 'basketball', league: 'WNBA', pattern: /\b(?:wnba|women'?s?\s+(?:national\s+)?basketball\s+(?:association|league))\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/3fv4p01573154525.png'] },
+  { sport: 'basketball', league: 'NCAA Basketball', pattern: /\b(?:ncaa\s+basketball|college\s+basketball)\b/i, urls: ['https://commons.wikimedia.org/wiki/Special:Redirect/file/NCAA_Basketball_wordmark_color.svg'] },
+  { sport: 'mma', league: 'UFC', pattern: /\bufc\b/i, urls: ['pvtkrrx://logo/ufc-red'] },
+  { sport: 'boxing', league: 'Boxing', pattern: /\bboxing\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/xtssst1473774665.png'] },
+  { sport: 'wrestling', league: 'WWE', pattern: /\b(?:wwe|world\s+wrestling\s+entertainment)\b/i, urls: ['https://commons.wikimedia.org/wiki/Special:Redirect/file/WWE_official_logo.svg'] },
+  { sport: 'wrestling', league: 'TNA Wrestling', pattern: /\b(?:tna|tna\s+wrestling|impact\s+wrestling|total\s+nonstop\s+action)\b/i, urls: ['https://commons.wikimedia.org/wiki/Special:Redirect/file/TNA_Wrestling_%282024%29_Logo.svg'] },
   { sport: 'motorsport', league: 'IndyCar Series', pattern: /\b(?:indy\s*car|indycar|ntt\s+indycar|indianapolis\s+500|indy\s*500)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/mkv0xb1641916982.png'] },
   { sport: 'motorsport', league: 'WRC', pattern: /\b(?:wrc|world\s+rally\s+championship)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/5f36o51544372922.png'] },
+  { sport: 'motorsport', league: 'Supercars Championship', pattern: /\b(?:v8\s*supercars?|v8sc|supercars?(?:\s+championship)?)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/64f67s1770108650.png'] },
+  { sport: 'motorsport', league: 'World Superbikes', pattern: /\b(?:wsbk|wssp|wwcr|world\s+super\s*bikes?|world\s*superbikes?|world\s*sbk|superbike\s+world\s+championship|sbk)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/g2j9rc1649703609.png'] },
+  { sport: 'athletics', league: 'Diamond League', pattern: /\b(?:world\s+athletics\s+diamond\s+league|diamond\s+league)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/7d5xlh1650475438.png'] },
   { sport: 'rugby', league: 'AFL', pattern: /\b(?:afl|first\s+crack|aussie\s+rules|australian\s+football|australian\s+rules\s+football)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/wvx4721525519372.png'] },
   { sport: 'australian-rules-football', league: 'AFL', pattern: /\b(?:afl|first\s+crack|aussie\s+rules|australian\s+football|australian\s+rules\s+football)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/wvx4721525519372.png'] }
 ])
@@ -1427,6 +1615,53 @@ const DIRECT_TEAM_LOGO_OVERRIDES = Object.freeze([
     ['hockey', 'NHL', 'Vegas Golden Knights', ['golden knights', 'knights', 'vgk'], 'https://a.espncdn.com/i/teamlogos/nhl/500/vgk.png'],
     ['hockey', 'NHL', 'Washington Capitals', ['capitals', 'caps', 'wsh'], 'https://a.espncdn.com/i/teamlogos/nhl/500/wsh.png'],
     ['hockey', 'NHL', 'Winnipeg Jets', ['jets', 'wpg'], 'https://a.espncdn.com/i/teamlogos/nhl/500/wpg.png'],
+    ['football', '', 'Ajax Amsterdam', ['ajax', 'aja'], 'https://a.espncdn.com/i/teamlogos/soccer/500/139.png'],
+    ['football', '', 'Arsenal', ['arsenal', 'ars'], 'https://a.espncdn.com/i/teamlogos/soccer/500/359.png'],
+    ['football', '', 'AS Monaco', ['monaco', 'asm', 'mon'], 'https://a.espncdn.com/i/teamlogos/soccer/500/174.png'],
+    ['football', '', 'Atalanta', ['atalanta', 'ata'], 'https://a.espncdn.com/i/teamlogos/soccer/500/105.png'],
+    ['football', '', 'Athletic Club', ['athletic bilbao', 'bilbao', 'athletic', 'ath'], 'https://a.espncdn.com/i/teamlogos/soccer/500/93.png'],
+    ['football', '', 'Atletico Madrid', ['atletico madrid', 'atletico', 'atleti', 'atm'], 'https://a.espncdn.com/i/teamlogos/soccer/500/1068.png'],
+    ['football', '', 'Barcelona', ['barcelona', 'barca', 'fcb', 'bar'], 'https://a.espncdn.com/i/teamlogos/soccer/500/83.png'],
+    ['football', '', 'Bayer Leverkusen', ['leverkusen', 'bayer 04', 'b04'], 'https://a.espncdn.com/i/teamlogos/soccer/500/131.png'],
+    ['football', '', 'Bayern Munich', ['bayern', 'bayern munich', 'mun'], 'https://a.espncdn.com/i/teamlogos/soccer/500/132.png'],
+    ['football', '', 'Benfica', ['sl benfica', 'benfica', 'slb'], 'https://a.espncdn.com/i/teamlogos/soccer/500/1929.png'],
+    ['football', '', 'Bodo/Glimt', ['bodo glimt', 'bodo', 'glimt'], 'https://a.espncdn.com/i/teamlogos/soccer/500/2980.png'],
+    ['football', '', 'Borussia Dortmund', ['dortmund', 'bvb', 'borussia dortmund'], 'https://a.espncdn.com/i/teamlogos/soccer/500/124.png'],
+    ['football', '', 'Chelsea', ['chelsea', 'che'], 'https://a.espncdn.com/i/teamlogos/soccer/500/363.png'],
+    ['football', '', 'Club Brugge', ['brugge', 'club brugge', 'bru'], 'https://a.espncdn.com/i/teamlogos/soccer/500/570.png'],
+    ['football', '', 'Eintracht Frankfurt', ['frankfurt', 'eintracht frankfurt', 'sge'], 'https://a.espncdn.com/i/teamlogos/soccer/500/125.png'],
+    ['football', '', 'FC Copenhagen', ['copenhagen', 'kobenhavn', 'fc copenhagen', 'f c copenhagen', 'kbh'], 'https://a.espncdn.com/i/teamlogos/soccer/500/909.png'],
+    ['football', '', 'FK Qarabag', ['qarabag', 'fk qarabag', 'qar'], 'https://a.espncdn.com/i/teamlogos/soccer/500/10414.png'],
+    ['football', '', 'Galatasaray', ['galatasaray', 'gal'], 'https://a.espncdn.com/i/teamlogos/soccer/500/432.png'],
+    ['football', '', 'Internazionale', ['internazionale', 'inter milan', 'inter', 'int'], 'https://a.espncdn.com/i/teamlogos/soccer/500/110.png'],
+    ['football', '', 'Juventus', ['juventus', 'juve', 'juv'], 'https://a.espncdn.com/i/teamlogos/soccer/500/111.png'],
+    ['football', '', 'Kairat Almaty', ['kairat', 'kairat almaty', 'kai'], 'https://a.espncdn.com/i/teamlogos/soccer/500/2528.png'],
+    ['football', '', 'Liverpool', ['liverpool', 'liv'], 'https://a.espncdn.com/i/teamlogos/soccer/500/364.png'],
+    ['football', '', 'Manchester City', ['manchester city', 'man city', 'mancity', 'mnc'], 'https://a.espncdn.com/i/teamlogos/soccer/500/382.png'],
+    ['football', '', 'Maccabi Haifa', ['maccabi haifa', 'haifa', 'mh'], 'https://a.espncdn.com/i/teamlogos/soccer/500/611.png'],
+    ['football', '', 'Maccabi Tel Aviv', ['maccabi tel aviv', 'maccabi tel-aviv', 'maccabi tel-aviv fc', 'mta'], 'https://a.espncdn.com/i/teamlogos/soccer/500/524.png'],
+    ['football', '', 'Marseille', ['marseille', 'olympique marseille', 'om', 'olm'], 'https://a.espncdn.com/i/teamlogos/soccer/500/176.png'],
+    ['football', '', 'Napoli', ['napoli', 'nap'], 'https://a.espncdn.com/i/teamlogos/soccer/500/114.png'],
+    ['football', '', 'Newcastle United', ['newcastle', 'newcastle united', 'new'], 'https://a.espncdn.com/i/teamlogos/soccer/500/361.png'],
+    ['football', '', 'Nottingham Forest', ['nottingham forest', 'forest', 'nfo'], 'https://a.espncdn.com/i/teamlogos/soccer/500/393.png'],
+    ['football', '', 'Olympiacos', ['olympiacos', 'olympiakos', 'oly'], 'https://a.espncdn.com/i/teamlogos/soccer/500/435.png'],
+    ['football', '', 'Pafos', ['pafos', 'paf'], 'https://a.espncdn.com/i/teamlogos/soccer/500/22281.png'],
+    ['football', '', 'Panathinaikos', ['panathinaikos', 'panathinaikos fc', 'pao', 'pan'], 'https://a.espncdn.com/i/teamlogos/soccer/500/443.png'],
+    ['football', '', 'Paris Saint-Germain', ['paris saint germain', 'paris st germain', 'psg', 'paris sg'], 'https://a.espncdn.com/i/teamlogos/soccer/500/160.png'],
+    ['football', '', 'FC Porto', ['porto', 'fc porto', 'por'], 'https://a.espncdn.com/i/teamlogos/soccer/500/437.png'],
+    ['football', '', 'PSV Eindhoven', ['psv', 'psv eindhoven'], 'https://a.espncdn.com/i/teamlogos/soccer/500/148.png'],
+    ['football', '', 'Racing Genk', ['racing genk', 'krc genk', 'genk'], 'https://a.espncdn.com/i/teamlogos/soccer/500/938.png'],
+    ['football', '', 'Real Madrid', ['real madrid', 'rma'], 'https://a.espncdn.com/i/teamlogos/soccer/500/86.png'],
+    ['football', '', 'Real Betis', ['real betis', 'betis', 'bet'], 'https://a.espncdn.com/i/teamlogos/soccer/500/244.png'],
+    ['football', '', 'RC Celta Vigo', ['celta vigo', 'celta de vigo', 'celta', 'vig'], 'https://a.espncdn.com/i/teamlogos/soccer/500/85.png'],
+    ['football', '', 'SC Freiburg', ['freiburg', 'sc freiburg', 'frb'], 'https://a.espncdn.com/i/teamlogos/soccer/500/126.png'],
+    ['football', '', 'Slavia Prague', ['slavia prague', 'slavia', 'slp'], 'https://a.espncdn.com/i/teamlogos/soccer/500/494.png'],
+    ['football', '', 'Sporting CP', ['sporting cp', 'sporting lisbon', 'scp'], 'https://a.espncdn.com/i/teamlogos/soccer/500/2250.png'],
+    ['football', '', 'Tottenham Hotspur', ['tottenham', 'tottenham hotspur', 'spurs', 'tot'], 'https://a.espncdn.com/i/teamlogos/soccer/500/367.png'],
+    ['football', '', 'Union St.-Gilloise', ['union saint gilloise', 'union st gilloise', 'union sg', 'usg'], 'https://a.espncdn.com/i/teamlogos/soccer/500/5807.png'],
+    ['football', '', 'FC Midtjylland', ['midtjylland', 'fc midtjylland', 'mid'], 'https://a.espncdn.com/i/teamlogos/soccer/500/572.png'],
+    ['football', '', 'VfB Stuttgart', ['stuttgart', 'vfb stuttgart'], 'https://a.espncdn.com/i/teamlogos/soccer/500/134.png'],
+    ['football', '', 'Villarreal', ['villarreal', 'vil'], 'https://a.espncdn.com/i/teamlogos/soccer/500/102.png'],
     ['football', 'MLS', 'Atlanta United FC', ['atlanta united', 'atl'], 'https://a.espncdn.com/i/teamlogos/soccer/500/18418.png'],
     ['football', 'MLS', 'Austin FC', ['atx'], 'https://a.espncdn.com/i/teamlogos/soccer/500/20906.png'],
     ['football', 'MLS', 'CF Montreal', ['club de foot montreal', 'cf montreal', 'montreal impact', 'mtl'], 'https://a.espncdn.com/i/teamlogos/soccer/500/9720.png'],
@@ -1458,6 +1693,16 @@ const DIRECT_TEAM_LOGO_OVERRIDES = Object.freeze([
     ['football', 'MLS', 'St. Louis CITY SC', ['st louis city sc', 'st. louis city sc', 'st louis city', 'stl'], 'https://a.espncdn.com/i/teamlogos/soccer/500/21812.png'],
     ['football', 'MLS', 'Toronto FC', ['toronto', 'tor'], 'https://a.espncdn.com/i/teamlogos/soccer/500/7318.png'],
     ['football', 'MLS', 'Vancouver Whitecaps', ['vancouver whitecaps', 'whitecaps', 'van'], 'https://a.espncdn.com/i/teamlogos/soccer/500/9727.png'],
+    ['football', 'English Womens Super League', 'Aston Villa WFC', ['aston villa women', 'aston villa wfc', 'aston women', 'aston villa'], 'https://r2.thesportsdb.com/images/media/team/badge/lqfz1c1721821650.png'],
+    ['football', 'English Womens Super League', 'Brighton WFC', ['brighton women', 'brighton wfc', "women's brighton", 'brighton'], 'https://r2.thesportsdb.com/images/media/team/badge/zn0x7h1605371909.png'],
+    ['football', 'English Womens Super League', 'London City Lionesses', ['london city lionesses', 'london city', 'lionesses'], 'https://r2.thesportsdb.com/images/media/team/badge/524gpk1761707917.png'],
+    ['football', 'English Womens Super League', 'Tottenham Women', ['tottenham women', 'tottenham wfc', "women's tottenham", 'tottenham'], 'https://r2.thesportsdb.com/images/media/team/badge/3dhd0j1605371995.png'],
+    ['basketball', 'NCAA Basketball', 'Minnesota Golden Gophers', ['minnesota golden gophers', 'minnesota gophers', 'golden gophers', 'minnesota'], 'https://a.espncdn.com/i/teamlogos/ncaa/500/135.png'],
+    ['basketball', 'NCAA Basketball', 'Nebraska Cornhuskers', ['nebraska cornhuskers', 'cornhuskers', 'huskers', 'nebraska'], 'https://a.espncdn.com/i/teamlogos/ncaa/500/158.png'],
+    ['american-football', 'NCAA Football', 'Minnesota Golden Gophers', ['minnesota golden gophers', 'minnesota gophers', 'golden gophers', 'minnesota'], 'https://a.espncdn.com/i/teamlogos/ncaa/500/135.png'],
+    ['american-football', 'NCAA Football', 'Nebraska Cornhuskers', ['nebraska cornhuskers', 'cornhuskers', 'huskers', 'nebraska'], 'https://a.espncdn.com/i/teamlogos/ncaa/500/158.png'],
+    ['basketball', '', 'Maccabi Haifa', ['maccabi haifa', 'haifa', 'mh'], 'https://upload.wikimedia.org/wikipedia/en/4/4c/Maccabi_Haifa_B.C_logo.png'],
+    ['basketball', '', 'Maccabi Tel Aviv', ['maccabi tel aviv', 'maccabi tel-aviv', 'maccabi tel-aviv bc', 'mta'], 'https://upload.wikimedia.org/wikipedia/en/thumb/6/6b/Maccabi_Tel_Aviv_BC_logo.svg/250px-Maccabi_Tel_Aviv_BC_logo.svg.png'],
     ['basketball', 'WNBA', 'Atlanta Dream', ['dream', 'atl'], 'https://a.espncdn.com/i/teamlogos/wnba/500/atl.png'],
     ['basketball', 'WNBA', 'Chicago Sky', ['sky', 'chicago', 'chi'], 'https://a.espncdn.com/i/teamlogos/wnba/500/chi.png'],
     ['basketball', 'WNBA', 'Connecticut Sun', ['sun', 'con'], 'https://a.espncdn.com/i/teamlogos/wnba/500/con.png'],
@@ -1482,6 +1727,7 @@ function sportMatchesLogoRule(ruleSport = '', sport = '') {
   if (!rule || !value) return true
   if (rule === value) return true
   if (['sports', 'sport', 'general', 'other'].includes(value)) return true
+  if ((rule === 'boxing' || rule === 'fighting') && (value === 'boxing' || value === 'fighting')) return true
   if (rule === 'badminton' && value === 'tennis') return true
   if (rule === 'hockey' && value === 'ice-hockey') return true
   if (rule === 'american-football' && value === 'football') return false
@@ -1505,6 +1751,7 @@ function defaultLogoLookupText(fallbackInput = {}) {
 function buildDefaultLogoRequests(fallbackInput = {}) {
   const sport = normalizeSpace(fallbackInput.sport)
   const text = defaultLogoLookupText(fallbackInput)
+  const inputLeagueSlug = normalizedLeagueSlug(fallbackInput.competition || fallbackInput.league)
   const requests = []
   const seen = new Set()
   const addInspect = (canonicalId) => {
@@ -1535,6 +1782,10 @@ function buildDefaultLogoRequests(fallbackInput = {}) {
 
   for (const rule of DEFAULT_LEAGUE_LOGO_RULES) {
     if (!sportMatchesLogoRule(rule.sport, sport)) continue
+    const ruleLeagueSlug = Array.isArray(rule.canonicalIds)
+      ? rule.canonicalIds.map((id) => String(id || '').match(/^sportsmeta:league:[^|]+\|(.+)$/i)?.[1]).find(Boolean)
+      : ''
+    if (ruleLeagueSlug && inputLeagueSlug && ruleLeagueSlug !== inputLeagueSlug && !isGenericLeagueSlug(inputLeagueSlug)) continue
     if (!rule.pattern.test(text)) continue
     for (const directUrl of rule.directLogoUrls || []) addDirect(directUrl)
     for (const canonicalId of rule.canonicalIds || []) addInspect(canonicalId)
@@ -1558,13 +1809,16 @@ function directLogoInputMatches({ ruleSport = '', ruleLeague = '', sport = '', l
   if (!sportMatchesLogoRule(ruleSport, sport)) return false
   const ruleLeagueSlug = normalizedLeagueSlug(ruleLeague)
   const leagueSlug = normalizedLeagueSlug(league)
-  if (ruleLeagueSlug && leagueSlug && ruleLeagueSlug === leagueSlug) return true
+  if (ruleLeagueSlug && leagueSlug) {
+    if (ruleLeagueSlug === leagueSlug) return true
+    if (!isGenericLeagueSlug(leagueSlug)) return false
+  }
   return pattern ? pattern.test(normalizeSpace(text)) : false
 }
 
 function directLeagueLogoUrlsForInput(input = {}) {
   const sport = normalizeSpace(input.sport)
-  const league = normalizeSpace(input.league || input.competition)
+  const league = normalizeSpace(input.competition || input.league)
   const text = normalizeSpace([
     input.sport,
     input.league,
@@ -1617,23 +1871,20 @@ function directLeagueLogoUrlsForCanonicalId(canonicalId = '') {
   return []
 }
 
-function directTeamLogoUrlFor({ sport = '', league = '', team = '', text = '' } = {}) {
+function directTeamLogoUrlFor({ sport = '', league = '', team = '' } = {}) {
   const sportSlug = resolveSportSlug(sport)
   const leagueSlug = normalizedLeagueSlug(league)
   const teamSlug = leagueSlugFor(team)
-  const haystack = leagueSlugFor([team, text].filter(Boolean).join(' '))
-  if (!sportSlug || (!teamSlug && !haystack)) return ''
+  if (!sportSlug || !teamSlug) return ''
 
   for (const rule of DIRECT_TEAM_LOGO_OVERRIDES) {
     if (resolveSportSlug(rule.sport) !== sportSlug) continue
     const ruleLeagueSlug = normalizedLeagueSlug(rule.league)
-    if (ruleLeagueSlug && leagueSlug && ruleLeagueSlug !== leagueSlug) continue
-    const aliases = [rule.team, ...(rule.aliases || [])].map(leagueSlugFor).filter(Boolean)
-    if (teamSlug) {
-      if (aliases.includes(teamSlug) || aliases.some((alias) => slugContainsToken(teamSlug, alias))) return rule.url
-      continue
+    if (ruleLeagueSlug) {
+      if (!leagueSlug || ruleLeagueSlug !== leagueSlug) continue
     }
-    if (haystack && aliases.some((alias) => slugContainsToken(haystack, alias))) return rule.url
+    const aliases = [rule.team, ...(rule.aliases || [])].map(leagueSlugFor).filter(Boolean)
+    if (aliases.includes(teamSlug) || aliases.some((alias) => slugContainsToken(teamSlug, alias))) return rule.url
   }
   return ''
 }
@@ -1848,7 +2099,7 @@ async function fetchLogoCandidateFromUrls({ urls = [], key = '', role = '', size
   }
 }
 
-async function resolveDefaultLogoImage({ sportsmetaBaseUrl = '', fallbackInput = {}, size = 260 } = {}) {
+async function resolveDefaultLogoImage({ sportsmetaBaseUrl = '', fallbackInput = {}, size = 260, preferLeagueLogo = false } = {}) {
   const requests = buildDefaultLogoRequests(fallbackInput)
   const logoLookupAttempts = []
   const teamLogo = await resolveDefaultTeamLogoImages({ sportsmetaBaseUrl, fallbackInput, size })
@@ -1908,8 +2159,12 @@ async function resolveDefaultLogoImage({ sportsmetaBaseUrl = '', fallbackInput =
       break
     }
   }
-  const matchupLogo = await buildMatchupLogoPair(teamLogo.homeBadge, teamLogo.awayBadge, Math.max(size, 260))
-  const image = matchupLogo || teamLogo.homeBadge || teamLogo.awayBadge || leagueLogo || null
+  const matchupLogo = preferLeagueLogo
+    ? null
+    : await buildMatchupLogoPair(teamLogo.homeBadge, teamLogo.awayBadge, Math.max(size, 260))
+  const image = preferLeagueLogo
+    ? (leagueLogo || matchupLogo || null)
+    : (matchupLogo || teamLogo.homeBadge || teamLogo.awayBadge || leagueLogo || null)
   return {
     image,
     homeBadge: teamLogo.homeBadge,
@@ -1924,7 +2179,7 @@ async function renderLogoImageVariantPng(image, variant = 'logo') {
   if (!image?.buffer) return null
   const dims = VARIANT_DIMENSIONS[variant] || VARIANT_DIMENSIONS.logo
   const logoSize = Math.round(Math.min(dims.width, dims.height) * 0.82)
-  const logo = await resizeCompositionBuffer(image.buffer, logoSize)
+  const logo = await resizeCompositionBuffer(image.buffer, logoSize, { frame: true })
   return sharp({
     create: {
       width: dims.width,
@@ -1973,6 +2228,16 @@ async function fetchCompositionImage(url = '', size = 210, options = {}) {
   }
 }
 
+function renderUfcRedLogoSvg(size = 320) {
+  const width = Math.max(160, Math.round(Number(size) || 320))
+  const height = Math.round(width * 0.42)
+  const fontSize = Math.round(width * 0.34)
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img">
+    <rect width="${width}" height="${height}" fill="none"/>
+    <text x="${Math.round(width / 2)}" y="${Math.round(height * 0.76)}" text-anchor="middle" font-family="Arial Black, Impact, Arial, sans-serif" font-size="${fontSize}" font-weight="900" font-style="italic" fill="#D20A0A" letter-spacing="0">UFC</text>
+  </svg>`
+}
+
 async function fetchLogoCandidate({ url = '', key = '', role = '', size = 210, fallbackColor = '#0f766e' } = {}) {
   const targetUrl = normalizeSpace(url)
   const attempt = {
@@ -2013,6 +2278,21 @@ async function fetchLogoCandidate({ url = '', key = '', role = '', size = 210, f
         color: null
       }
       try {
+        if (targetUrl === 'pvtkrrx://logo/ufc-red') {
+          const sourceBuf = Buffer.from(renderUfcRedLogoSvg(Math.max(320, size * 2)))
+          value.status = 200
+          value.contentType = 'image/svg+xml'
+          value.source = 'pvtkrrx-direct-logo'
+          value.assetClass = 'logo'
+          value.delivery = 'svg'
+          value.buffer = await sharp(sourceBuf, { density: 192 })
+            .resize({ width: size, height: size, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+            .png()
+            .toBuffer()
+          value.color = '#D20A0A'
+          value.result = 'real_logo'
+          return value
+        }
         const response = await fetch(targetUrl, {
           headers: { accept: 'image/png,image/jpeg,image/webp,image/svg+xml,image/*' },
           signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
@@ -2094,9 +2374,75 @@ function applyCachedLogoResult(value, attempt, { targetUrl, key, fallbackColor }
   }
 }
 
-async function resizeCompositionBuffer(buffer, size = 210) {
-  return sharp(buffer, { density: 192 })
-    .resize({ width: size, height: size, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+// Mean luminance of a logo's opaque pixels. Light transparent PNG marks can
+// vanish on the cream ticket-stub body, so framed slots choose a contrasting
+// backing from this signal. Returns 0..255, or null when undecidable.
+async function opaqueMeanLuminance(buffer) {
+  try {
+    const img = sharp(buffer, { density: 96 }).resize({
+      width: 48,
+      height: 48,
+      fit: 'contain',
+      background: { r: 0, g: 0, b: 0, alpha: 0 }
+    })
+    const { data, info } = await img.raw().toBuffer({ resolveWithObject: true })
+    const ch = info.channels
+    let sum = 0
+    let aSum = 0
+    for (let i = 0; i < data.length; i += ch) {
+      const r = data[i]
+      const g = data[i + 1]
+      const b = data[i + 2]
+      const a = ch >= 4 ? data[i + 3] : 255
+      if (a < 16) continue
+      const lum = (0.299 * r) + (0.587 * g) + (0.114 * b)
+      sum += lum * (a / 255)
+      aSum += a / 255
+    }
+    if (aSum < 1) return null
+    return sum / aSum
+  } catch (_) {
+    return null
+  }
+}
+
+async function resizeCompositionBuffer(buffer, size = 210, options = {}) {
+  const canvasSize = Math.max(24, Math.round(Number(size) || 210))
+  const framed = options.frame === true
+  if (!framed) {
+    return sharp(buffer, { density: 192 })
+      .resize({ width: canvasSize, height: canvasSize, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+      .png()
+      .toBuffer()
+  }
+  const pad = Math.max(3, Math.round(canvasSize * 0.08))
+  const innerSize = Math.max(12, canvasSize - pad * 2)
+  const logo = await sharp(buffer, { density: 192 })
+    .resize({ width: innerSize, height: innerSize, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer()
+  const radius = Math.max(5, Math.round(canvasSize * 0.12))
+  const stroke = Math.max(2, Math.round(canvasSize * 0.035))
+  // Contrast-safe plate: dark backing for light marks, cream for dark marks.
+  const lum = await opaqueMeanLuminance(logo)
+  const lightLogo = lum !== null && lum >= 168
+  const plateFill = lightLogo ? 'rgba(15,23,42,0.96)' : 'rgba(248,242,223,0.96)'
+  const plateStroke = lightLogo ? 'rgba(248,242,223,0.92)' : '#ffffff'
+  const frameSvg = Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${canvasSize}" height="${canvasSize}" viewBox="0 0 ${canvasSize} ${canvasSize}">
+    <rect x="${Math.round(stroke / 2)}" y="${Math.round(stroke / 2)}" width="${canvasSize - stroke}" height="${canvasSize - stroke}" rx="${radius}" fill="${plateFill}" stroke="${plateStroke}" stroke-width="${stroke}"/>
+  </svg>`)
+  return sharp({
+    create: {
+      width: canvasSize,
+      height: canvasSize,
+      channels: 4,
+      background: { r: 0, g: 0, b: 0, alpha: 0 }
+    }
+  })
+    .composite([
+      { input: frameSvg, left: 0, top: 0 },
+      { input: logo, left: pad, top: pad }
+    ])
     .png()
     .toBuffer()
 }
@@ -2186,9 +2532,9 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     assetAwayKey = 'homeBadge'
   }
 
-  const hasMatchup = Boolean(event.homeTeam && event.awayTeam)
   const eventClass = classifySportsEvent(event)
   event.eventClass = eventClass
+  const hasMatchup = eventClass === 'team_vs_team' && hasActualPair(event)
 
   if (!canonical?.event?.id) {
     // Solo-event league fallback: SportsCult RSS surfaces show-style fixtures
@@ -2250,6 +2596,7 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     requestedTitle,
     event.title,
     event.name,
+    event.sport,
     event.league,
     event.homeTeam,
     event.awayTeam
@@ -2269,6 +2616,7 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
   const directLeagueLogoUrls = directLeagueLogoUrlsForInput({
     sport: event.sport,
     league: event.league,
+    competition: event.league,
     title: directLookupText
   })
 
@@ -2297,15 +2645,6 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
   const leagueLogo = candidateResults[2]?.image || null
   const eventIdentity = candidateResults[3]?.image || candidateResults[4]?.image || null
   const matchupLogo = await buildMatchupLogoPair(homeBadge, awayBadge, Math.max(logoSize, leagueLogoSize))
-  if (!homeBadge && !awayBadge && !leagueLogo && !eventIdentity) {
-    return {
-      buffer: null,
-      logoKind: 'fallback-glyph',
-      logoFallbackReason: `no_real_logo_resolved:${summarizeLogoAttempts(logoLookupAttempts)}`,
-      logoLookupAttempts
-    }
-  }
-
   const theme = {
     homeColor: homeBadge?.color || leagueLogo?.color || eventIdentity?.color || colorForLabel(event.homeTeam || event.sport, '#0f766e'),
     awayColor: awayBadge?.color || colorForLabel(event.awayTeam || event.league || event.sport, '#123c69'),
@@ -2343,8 +2682,8 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
   const artworkSlots = artwork.slots || []
   const hasTeamSpecificSlots = artworkSlots.some((slot) => slot.role === 'home' || slot.role === 'away')
   const selectLogoForSlot = (role = '') => {
-    if (role === 'home') return homeBadge || leagueLogo || eventIdentity
-    if (role === 'away') return awayBadge || leagueLogo || eventIdentity
+    if (role === 'home') return homeBadge
+    if (role === 'away') return awayBadge
     // The league slot must show the league/event identity. Falling back to a
     // team badge here puts (e.g.) the Arsenal crest in the UCL header slot,
     // which the user has explicitly flagged as wrong. Prefer leagueLogo, then
@@ -2359,6 +2698,14 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
   for (const slot of artworkSlots) {
     const image = selectLogoForSlot(slot.role)
     if (!image?.buffer) {
+      const glyphSvg = renderLogoGlyphSvg({ role: slot.role, event, theme, size: slot.size })
+      if (glyphSvg) {
+        composites.push({
+          input: await resizeCompositionBuffer(Buffer.from(glyphSvg), slot.size, { frame: true }),
+          left: slot.left,
+          top: slot.top
+        })
+      }
       logoSlots.push({
         role: slot.role,
         logoKind: 'fallback-glyph',
@@ -2370,7 +2717,7 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
       continue
     }
     composites.push({
-      input: await resizeCompositionBuffer(image.buffer, slot.size),
+      input: await resizeCompositionBuffer(image.buffer, slot.size, { frame: true }),
       left: slot.left,
       top: slot.top
     })
@@ -2390,15 +2737,6 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
   }
 
   const realLogoSlots = logoSlots.filter((slot) => slot.logoKind && !['fallback-glyph', 'missing-no-glyph'].includes(slot.logoKind))
-  if (realLogoSlots.length === 0) {
-    return {
-      buffer: null,
-      logoKind: 'fallback-glyph',
-      logoFallbackReason: `no_real_logo_visible:${summarizeLogoAttempts(logoLookupAttempts)}`,
-      logoLookupAttempts,
-      logoSlots
-    }
-  }
   const fallbackLogoSlots = logoSlots.filter((slot) => slot.logoKind === 'fallback-glyph')
 
   const buffer = await sharp(Buffer.from(artwork.svg))
@@ -2414,7 +2752,9 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     logoKind: preferredLogoKind(realLogoSlots.map((slot) => slot.logoKind)),
     logoSourceUrl: realLogoSlots[0]?.logoSourceUrl || '',
     logoSourceUrls: Array.from(new Set(realLogoSlots.flatMap((slot) => slot.logoSourceUrls || slot.logoSourceUrl || []).filter(Boolean))),
-    logoFallbackReason: fallbackLogoSlots.length ? `fallback_slots=${fallbackLogoSlots.map((slot) => slot.role || 'logo').join(',')}` : '',
+    logoFallbackReason: fallbackLogoSlots.length
+      ? `fallback_slots=${fallbackLogoSlots.map((slot) => slot.role || 'logo').join(',')}`
+      : '',
     logoRealCount: realLogoSlots.length,
     logoFallbackCount: fallbackLogoSlots.length,
     logoSlots,
@@ -2543,7 +2883,7 @@ async function renderLayoutFallback({ variant, fallbackInput = {}, teamPosterCon
     })
     if (defaultLogo?.image?.buffer) {
       defaultLogoContext = {
-        leagueLogo: defaultLogo.leagueLogo || defaultLogo.image,
+        leagueLogo: defaultLogo.leagueLogo || null,
         homeBadge: defaultLogo.homeBadge || null,
         awayBadge: defaultLogo.awayBadge || null,
         logoLookupAttempts: defaultLogo.logoLookupAttempts || []
@@ -2624,6 +2964,41 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
       // the same /asset/poster route — those must score as fallback.
       const upstreamLooksReal = isSportsMetaRealRaster(contentType, headers)
       if (/^image\/(png|jpeg|jpg|webp)/i.test(contentType)) {
+        if (variant === 'logo' && teamPosterContext?.canonicalId) {
+          const realLogo = await tryRealLogoVariantPng({
+            canonicalId: teamPosterContext.canonicalId,
+            sportsmetaBaseUrl: teamPosterContext.sportsmetaBaseUrl,
+            variant: 'logo'
+          })
+          if (realLogo?.buffer) {
+            return {
+              buffer: realLogo.buffer,
+              contentType: 'image/png',
+              selectedArtworkSource: 'pvtkrrx-cdn-logo',
+              selectedTemplate: normalizeSportsPosterTemplate(template),
+              layoutFamily: layoutFamilyForSportsPosterRender(template, fallbackInput),
+              eventClass: fallbackEventClass,
+              fallbackReason: 'sportsmeta_logo_raster_replaced_with_cdn',
+              logoKind: realLogo.logoKind || 'real-league',
+              logoSourceUrl: realLogo.sourceUrl,
+              logoSourceUrls: [realLogo.sourceUrl],
+              logoFallbackReason: '',
+              logoRealCount: 1,
+              logoFallbackCount: 0,
+              logoSlots: [],
+              logoLookupAttempts: [{
+                role: 'logo',
+                kind: realLogo.logoKind || 'real-league',
+                url: realLogo.sourceUrl,
+                status: 200,
+                result: 'real_logo'
+              }],
+              realLogoLookupAttempted: true,
+              httpStatus: status,
+              upstreamContentType: contentType
+            }
+          }
+        }
         const dimensions = await readRasterDimensions(buffer)
         if (!isExpectedRasterLayout(variant, dimensions) && shouldRenderLocalFallbackForSvg(variant)) {
           return renderLayoutFallback({
@@ -2711,7 +3086,8 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
           const defaultLogo = await resolveDefaultLogoImage({
             sportsmetaBaseUrl: teamPosterContext?.sportsmetaBaseUrl,
             fallbackInput,
-            size: 420
+            size: 420,
+            preferLeagueLogo: true
           })
           if (defaultLogo?.image?.buffer) {
             const logoPng = await renderLogoImageVariantPng(defaultLogo.image, 'logo')
@@ -2827,7 +3203,8 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
         const defaultLogo = await resolveDefaultLogoImage({
           sportsmetaBaseUrl: teamPosterContext?.sportsmetaBaseUrl,
           fallbackInput,
-          size: 420
+          size: 420,
+          preferLeagueLogo: true
         })
         if (defaultLogo?.image?.buffer) {
           const logoPng = await renderLogoImageVariantPng(defaultLogo.image, 'logo')
@@ -2908,14 +3285,19 @@ async function loadRaster(cacheKey, upstreamUrl, variant, fallbackInput = {}, te
     }
   })()
     .then((value) => {
-      const cachedValue = { ...value, cacheLayer: value.cacheLayer || 'rendered' }
-      rasterCache.set(cacheKey, { value: cachedValue, expiresAt: Date.now() + RASTER_CACHE_TTL_MS })
+      // Store the entry tagged as a memory-cache entry. The CURRENT response
+      // is the fresh render (cacheLayer='rendered'); every SUBSEQUENT serve
+      // of this key from rasterCache must report cache=memory (BUG 3: the
+      // header used to be permanently stuck on 'rendered' because the stored
+      // value carried 'rendered', masking the real hit rate).
+      const storedValue = { ...value, cacheLayer: value.cacheLayer === 'disk' || value.cacheLayer === 'postgres' ? value.cacheLayer : 'memory' }
+      rasterCache.set(cacheKey, { value: storedValue, expiresAt: Date.now() + RASTER_CACHE_TTL_MS })
       trimCache()
-      writeSportsArtworkDiskCache(cacheKey, cachedValue, {
+      writeSportsArtworkDiskCache(cacheKey, storedValue, {
         ttlMs: RASTER_CACHE_TTL_MS,
         maxEntries: RASTER_CACHE_MAX_KEYS
       }).catch(() => {})
-      return cachedValue
+      return { ...value, cacheLayer: value.cacheLayer || 'rendered' }
     })
     .finally(() => {
       rasterInFlight.delete(cacheKey)
@@ -2940,11 +3322,35 @@ function resolveSportsmetaBaseUrlFromConfig(config = {}) {
 }
 
 function resolveSportsPosterTemplateFromConfig(config = {}, req = null) {
-  // The proxy is the public/configured artwork surface. Honour the stamped
-  // entitlement on the decrypted config token; revoke instantly when the
-  // env owner list no longer covers the stamped owner-email hash. Stale
-  // ?template= query strings are ignored so a leaked URL cannot bypass
-  // the gate when the saved config was downgraded.
+  // (1) URL-forwarded stamped entitlement. The configured catalog/meta
+  // handler decrypted the user's token and forwarded the stamp
+  // (entSource/entHash + reqTemplate) on the artwork URL because this route
+  // has no token of its own. Re-run the SAME verification the catalog ran,
+  // against the LIVE env owner/admin list — a leaked URL with a non-owner
+  // (or absent) stamp still verifies to NONE -> ticket-stub, so the public
+  // free-tier lock is intact; only a genuine env-verifiable owner/admin
+  // stamp unlocks the selected style. This is what makes a fresh configured
+  // install that selected broadcast/glitch/etc. actually render it.
+  const q = req && typeof req.query === 'object' ? req.query : {}
+  const urlReqTemplate = String(q.reqTemplate || '').trim()
+  const urlEntSource = String(q.entSource || '').trim()
+  const urlEntHash = String(q.entHash || '').trim()
+  const urlVerifiableSource = urlEntSource === ENTITLEMENT_SOURCE.OWNER_OVERRIDE ||
+    urlEntSource === ENTITLEMENT_SOURCE.ADMIN_OVERRIDE
+  if (urlVerifiableSource && urlEntHash) {
+    const urlVerified = verifyStampedSportsPosterEntitlement({
+      requestedTemplate: urlReqTemplate,
+      stampedSource: urlEntSource,
+      stampedHash: urlEntHash
+    })
+    if (urlVerified.allowed && urlVerified.resolvedTemplate) {
+      return resolveSportsPosterTemplate(urlVerified.resolvedTemplate)
+    }
+  }
+
+  // (2) Otherwise honour the stamped entitlement on the decrypted config
+  // token (when this handler IS given one); revoke instantly when the env
+  // owner list no longer covers the stamped owner-email hash.
   const requestedTemplate = String(config?.sportsPosterTemplate || '').trim()
   const stampedSource = String(config?.entitlementSource || '').trim()
   const stampedHash = String(config?.entitlementOwnerEmailHash || '').trim()
@@ -2953,7 +3359,17 @@ function resolveSportsPosterTemplateFromConfig(config = {}, req = null) {
     stampedSource,
     stampedHash
   })
-  return resolveSportsPosterTemplate(verified.resolvedTemplate || 'ticket-stub')
+  if (verified.allowed && verified.resolvedTemplate) {
+    return resolveSportsPosterTemplate(verified.resolvedTemplate)
+  }
+
+  // (3) Server-side admin override remains a fallback for public/no-token
+  // artwork. Verified owner/admin config must win so the owner can change
+  // layout without reinstalling the Stremio addon.
+  const serverAdminTemplate = resolveServerAdminPosterTemplate(process.env)
+  if (serverAdminTemplate) return resolveSportsPosterTemplate(serverAdminTemplate)
+
+  return resolveSportsPosterTemplate('ticket-stub')
 }
 
 function redactUrl(value) {
@@ -2984,6 +3400,7 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
     const logoRealCount = Number(result.logoRealCount || 0)
     const logoFallbackCount = Number(result.logoFallbackCount || 0)
     const logoLookupAttempts = Array.isArray(result.logoLookupAttempts) ? result.logoLookupAttempts : []
+    const logoSlots = Array.isArray(result.logoSlots) ? result.logoSlots : []
     res.setHeader('Content-Type', contentType || 'image/png')
     res.setHeader('Content-Length', String(buffer.length))
     res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000, stale-if-error=2592000')
@@ -3012,6 +3429,16 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
       res.setHeader('X-PVTKRRX-Artwork-Logo-Source-Urls', logoSourceUrls.map(redactUrl).join(' | '))
       res.setHeader('X-PVTKRRX-Logo-Source-Urls', logoSourceUrls.map(redactUrl).join(' | '))
     }
+    if (logoSlots.length) {
+      const slotSummary = logoSlots
+        .map((slot) => [
+          slot.role || 'logo',
+          slot.logoKind || 'unknown',
+          redactUrl(slot.logoSourceUrl || slot.logoFallbackReason || '')
+        ].join(':'))
+        .join(' | ')
+      res.setHeader('X-PVTKRRX-Logo-Slots', slotSummary.slice(0, 3800))
+    }
     if (logoLookupAttempts.length) {
       res.setHeader('X-PVTKRRX-Logo-Lookup-Attempts', summarizeLogoAttempts(logoLookupAttempts))
     }
@@ -3032,7 +3459,14 @@ async function sendArtwork(res, { cacheKey, upstreamUrl, variant, fallbackInput,
   }
 }
 
-function buildDefaultArtworkCacheKey({ variant, template, sportSlug, league, title, date, homeTeam, awayTeam, detail, eventClass, seeders, size, rawTitle, sportsmetaBaseUrl }) {
+function buildDefaultArtworkCacheKey({ variant, template, sportSlug, league, title, date, homeTeam, awayTeam, detail, eventClass, rawTitle, sportsmetaBaseUrl }) {
+  // BUG 3 (cache hit rate): seeders/size are per-torrent and DO NOT appear on
+  // any rendered poster (verified: ticket-stub "SECTION A-12-4" is hardcoded,
+  // stubSerial/perfRow derive from teams/date only, no template reads
+  // seeders/size). Keying on them meant every torrent variant of the same
+  // logical event minted a fresh cache key -> rendered every request +
+  // re-ran the SportsMeta /resolve lookup. They are dropped from the key so
+  // sibling torrents of one event share one cached poster.
   return [
     LOCAL_ARTWORK_RENDER_VERSION,
     'default',
@@ -3046,8 +3480,6 @@ function buildDefaultArtworkCacheKey({ variant, template, sportSlug, league, tit
     (awayTeam || '').trim().toLowerCase(),
     (detail || '').trim().toLowerCase(),
     (eventClass || '').trim().toLowerCase(),
-    (seeders || '').trim().toLowerCase(),
-    (size || '').trim().toLowerCase(),
     (rawTitle || '').trim().toLowerCase(),
     (sportsmetaBaseUrl || '').trim().toLowerCase()
   ].join('|')
@@ -3076,7 +3508,53 @@ function buildCanonicalArtworkCacheKey({ variant, template, canonicalId, sportsm
   ].join('|')
 }
 
-async function resolveDefaultArtworkCanonical({
+async function resolveDefaultArtworkCanonical(args = {}) {
+  const {
+    sportsmetaBaseUrl = '',
+    sportSlug = '',
+    league = '',
+    title = '',
+    date = '',
+    homeTeam = '',
+    awayTeam = ''
+  } = args
+  const hasStructuredQuery = Boolean(date && ((homeTeam && awayTeam) || title))
+  if (!hasStructuredQuery) return null
+  const memoKey = [
+    (sportsmetaBaseUrl || '').trim().toLowerCase(),
+    (sportSlug || '').trim().toLowerCase(),
+    (league || '').trim().toLowerCase(),
+    (title || '').trim().toLowerCase(),
+    (date || '').trim().toLowerCase(),
+    (homeTeam || '').trim().toLowerCase(),
+    (awayTeam || '').trim().toLowerCase()
+  ].join('|')
+  const now = Date.now()
+  const hit = resolveCanonicalCache.get(memoKey)
+  if (hit && hit.expiresAt > now) return hit.value
+  if (resolveCanonicalInFlight.has(memoKey)) return resolveCanonicalInFlight.get(memoKey)
+
+  const pending = (async () => resolveDefaultArtworkCanonicalUncached(args))()
+    .then((value) => {
+      // Negative (no-match) results expire faster than positive ones so a
+      // later SportsMeta ingest is still picked up; positive results are as
+      // durable as the raster cache.
+      const ttl = value && value.canonicalId ? RASTER_CACHE_TTL_MS : Math.min(RASTER_CACHE_TTL_MS, 15 * 60 * 1000)
+      resolveCanonicalCache.set(memoKey, { value: value || null, expiresAt: Date.now() + ttl })
+      while (resolveCanonicalCache.size > RASTER_CACHE_MAX_KEYS) {
+        const oldest = resolveCanonicalCache.keys().next().value
+        if (!oldest) break
+        resolveCanonicalCache.delete(oldest)
+      }
+      return value || null
+    })
+    .finally(() => { resolveCanonicalInFlight.delete(memoKey) })
+
+  resolveCanonicalInFlight.set(memoKey, pending)
+  return pending
+}
+
+async function resolveDefaultArtworkCanonicalUncached({
   sportsmetaBaseUrl = '',
   sportSlug = '',
   league = '',

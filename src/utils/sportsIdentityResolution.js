@@ -250,6 +250,34 @@ function daysBetweenDates(left = '', right = '') {
   return Math.abs(Math.round((leftMs - rightMs) / 86400000))
 }
 
+function currentUtcDateString() {
+  return new Date().toISOString().slice(0, 10)
+}
+
+function dateIsAfter(left = '', right = '') {
+  const a = normalizeSpace(left).slice(0, 10)
+  const b = normalizeSpace(right).slice(0, 10)
+  if (!/^(?:19|20)\d{2}-\d{2}-\d{2}$/.test(a) || !/^(?:19|20)\d{2}-\d{2}-\d{2}$/.test(b)) return false
+  return a > b
+}
+
+function trackerTitleCarriesDate(title = '', isoDate = '') {
+  const date = normalizeSpace(isoDate).slice(0, 10)
+  if (!/^(?:19|20)\d{2}-\d{2}-\d{2}$/.test(date)) return false
+  const [year, month, day] = date.split('-')
+  const yy = year.slice(2)
+  const text = ` ${normalizeSpace(String(title || '').replace(/[._/\\-]+/g, ' '))} `
+  const patterns = [
+    `${year} ${month} ${day}`,
+    `${day} ${month} ${year}`,
+    `${day} ${month} ${yy}`,
+    `${year}${month}${day}`,
+    `${day}${month}${year}`,
+    `${day}${month}${yy}`
+  ]
+  return patterns.some((pattern) => text.includes(` ${pattern} `))
+}
+
 function datesMatchForIdentity(identityType = '', requestedDate = '', candidateDate = '') {
   const requested = normalizeSpace(requestedDate).slice(0, 10)
   const candidate = normalizeSpace(candidateDate).slice(0, 10)
@@ -1000,6 +1028,17 @@ function verifySportsMetaResolution(query = {}, canonical = {}) {
     return {
       status: SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH,
       reason: 'date_mismatch'
+    }
+  }
+
+  if (
+    canonicalDate &&
+    dateIsAfter(canonicalDate, currentUtcDateString()) &&
+    !trackerTitleCarriesDate(params.title || params.event || '', canonicalDate)
+  ) {
+    return {
+      status: SPORTS_META_RESOLUTION_STATUS.WEAK_MATCH,
+      reason: 'future_canonical_without_title_date'
     }
   }
 

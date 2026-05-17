@@ -1333,7 +1333,8 @@ async function persistAccountHostedTakeoverConfig(config = {}) {
 }
 
 async function loadAccountHostedTakeoverConfig(config = {}) {
-  if (resolveHostedProfile(config) !== 'hybrid') return null
+  const hostedProfile = resolveHostedProfile(config)
+  if (hostedProfile !== 'hybrid' && hostedProfile !== 'online') return null
 
   const secret = String(process.env.ENCRYPTION_SECRET || '').trim()
   if (!secret) return null
@@ -1346,6 +1347,28 @@ async function loadAccountHostedTakeoverConfig(config = {}) {
 
   try {
     const takeoverConfig = normalizeAddonConfig(decrypt(takeoverToken, secret))
+    if (hostedProfile === 'online') {
+      return normalizeAddonConfig({
+        ...takeoverConfig,
+        routeProfile: 'online',
+        lanPairEnabled: false,
+        lanPairRequired: false,
+        stremioUserId: normalizeStremioUserId(config?.stremioUserId || takeoverConfig?.stremioUserId),
+        accountUserId: String(config?.accountUserId || user?.id || '').trim(),
+        accountProvider: String(
+          config?.accountProvider ||
+          takeoverConfig?.accountProvider ||
+          user?.authProvider ||
+          'stremio-authkey'
+        ).trim(),
+        accountLinkedAt: Number(
+          config?.accountLinkedAt ||
+          takeoverConfig?.accountLinkedAt ||
+          user?.stremio?.linkedAt ||
+          Date.now()
+        )
+      })
+    }
     return normalizeAddonConfig({
       ...takeoverConfig,
       routeProfile: 'hybrid',
@@ -2505,8 +2528,23 @@ async function withConfig(req, res, next) {
   if (!secret) return res.status(500).json({ error: 'ENCRYPTION_SECRET not configured' })
 
   try {
-    req.config = normalizeAddonConfig(decrypt(req.params.config, secret))
-    req.cloudTakeoverConfig = await loadAccountHostedTakeoverConfig(req.config)
+    const tokenConfig = normalizeAddonConfig(decrypt(req.params.config, secret))
+    req.config = tokenConfig
+    req.cloudTakeoverConfig = await loadAccountHostedTakeoverConfig(tokenConfig)
+    if (req.cloudTakeoverConfig && resolveHostedProfile(tokenConfig) === 'online') {
+      const merged = {
+        ...tokenConfig,
+        sportsPosterTemplate: req.cloudTakeoverConfig.sportsPosterTemplate || tokenConfig.sportsPosterTemplate,
+        entitlementSource: req.cloudTakeoverConfig.entitlementSource || tokenConfig.entitlementSource
+      }
+      if (req.cloudTakeoverConfig.entitlementOwnerEmailHash) {
+        merged.entitlementOwnerEmailHash = req.cloudTakeoverConfig.entitlementOwnerEmailHash
+      } else {
+        delete merged.entitlementOwnerEmailHash
+      }
+      req.config = normalizeAddonConfig(merged)
+      res.setHeader('X-PVTKRRX-Account-Config-Refresh', 'sports-poster')
+    }
     req.configIssues = getConfigIssues(req.cloudTakeoverConfig || req.config, {
       requestBaseUrl: getPublicBaseUrl(req)
     })

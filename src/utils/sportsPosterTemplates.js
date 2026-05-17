@@ -428,7 +428,7 @@ function eventFacts(event = {}) {
 // Names that look like placeholder fallbacks rather than real
 // competitor/team names. Used to suppress fake-matchup rendering on
 // solo events that only have generic event labels.
-const FORBIDDEN_PAIR_NAMES = new Set(['', 'home', 'away', 'team', 'event', 'session', 'fighter', 'player', 'competitor', 'tba', 'tbd', 'unknown', 'n/a', 'na', 'sports', 'sport'])
+const FORBIDDEN_PAIR_NAMES = new Set(['', 'home', 'away', 'team', 'event', 'session', 'fighter', 'player', 'competitor', 'tba', 'tbd', 'unknown', 'n/a', 'na', 'sports', 'sport', 'league', 'matchweek', 'mw', 'gw', 'md', 'wd', 'wsm'])
 
 function pickRealSide(...candidates) {
   for (const candidate of candidates) {
@@ -1261,7 +1261,10 @@ function renderBroadcast(event = {}, variant = 'poster', theme = {}, mode = '') 
   // Wrap long titles to up to 2 lines + auto-shrink font size to keep text
   // inside the 510px safe width (W=600 minus 45px margins each side).
   const soloLines = wrapBroadcastSoloTitle(soloTitle, 510)
-  const soloFontSize = soloLines.length > 1 ? 44 : (soloTitle.length > 16 ? 46 : 58)
+  const soloBaseFontSize = soloLines.length > 1 ? 44 : (soloTitle.length > 16 ? 46 : 58)
+  const soloLongestLine = soloLines.reduce((max, line) => Math.max(max, line.length), 0)
+  const soloFitFontSize = soloLongestLine > 0 ? Math.floor(510 / (soloLongestLine * 0.58)) : soloBaseFontSize
+  const soloFontSize = Math.max(32, Math.min(soloBaseFontSize, soloFitFontSize))
   const soloBaseY = H / 2 + 195 - (soloLines.length - 1) * Math.round(soloFontSize * 0.5)
   // Solo: dominant league wordmark (F1, UFC, ATP, etc.) replaces the sport glyph
   // so single-event posters echo the broadcast pair treatment.
@@ -2272,14 +2275,90 @@ function sportGlyphMarkup(icon = 'sports', size = 256) {
   return sportGlyph(mapped, size / 2, size / 2, size * 0.78, '#ffffff', 1, Math.max(4, Math.round(size * 0.02)))
 }
 
-function renderLogoGlyphSvg() {
-  // User directive 2026-05-11: glyph fallback (text initials + sport-icon
-  // glyphs) is REMOVED from templates entirely. Real team and league logos
-  // come from SportsMeta (which fetches from TheSportsDB). When a real logo
-  // cannot be resolved for a slot, the slot is now skipped — never painted
-  // with a fake "WHU" / "AFC" / sport-emblem placeholder.
-  // Callers must check for null and skip the composite when this returns null.
-  return null
+function roleLabelForVisibleLogoFallback(role = '') {
+  const normalized = normalizeSpace(role).toLowerCase()
+  if (normalized === 'home') return 'HOME'
+  if (normalized === 'away') return 'AWAY'
+  if (normalized === 'league' || normalized === 'logo' || normalized === 'leaguelogo') return 'LEAGUE'
+  return 'SPORT'
+}
+
+// Generic catch-all sport buckets must NOT seed initials (DIRECTIVE 001):
+// "Others" -> "OTH" is a meaningless mark. When the only league signal is a
+// generic bucket, fall through to the real competition / event title so the
+// clean-initials fallback reflects the actual event identity.
+function isGenericSportBucket(value = '') {
+  return /^(others?|sport|sports|event|general|unknown|misc(?:ellaneous)?)$/i.test(normalizeSpace(value))
+}
+
+function labelForVisibleLogoFallback({ role = '', event = {} } = {}) {
+  const normalized = normalizeSpace(role).toLowerCase()
+  if (normalized === 'home') return normalizeSpace(event.homeTeam || event.home?.name || event.title || event.eventName)
+  if (normalized === 'away') return normalizeSpace(event.awayTeam || event.away?.name || event.title || event.eventName)
+  if (normalized === 'league' || normalized === 'logo' || normalized === 'leaguelogo') {
+    const league = normalizeSpace(event.league || event.competition)
+    if (league && !isGenericSportBucket(league)) return league
+    // No real competition: prefer the event/title so the mark carries real
+    // identity (e.g. "American Rodeo …" -> "AR", not the bucket sport).
+    const eventTitle = normalizeSpace(event.eventTitle || event.title || event.eventName)
+    if (eventTitle) return eventTitle
+    const sport = normalizeSpace(event.sport)
+    if (sport && !isGenericSportBucket(sport)) return sport
+    return league || sport
+  }
+  return normalizeSpace(event.title || event.eventName || event.league || event.competition || event.sport)
+}
+
+// Short, clean readable name for the line under the initials. Single words
+// stay whole; multi-word names are trimmed to ~16 chars so the mark reads as
+// a real identity (e.g. "AMERICAN RODEO", "WHITTAKER") not a placeholder.
+function cleanFallbackCaption(value = '', roleLabel = '') {
+  const clean = normalizeSpace(value).replace(/[^A-Za-z0-9 .'&-]+/g, ' ').replace(/\s+/g, ' ').trim()
+  if (!clean) return roleLabel
+  const upper = clean.toUpperCase()
+  if (upper.length <= 18) return upper
+  const words = upper.split(' ')
+  let out = words[0]
+  for (let i = 1; i < words.length; i += 1) {
+    if ((out + ' ' + words[i]).length > 18) break
+    out += ' ' + words[i]
+  }
+  return out
+}
+
+function renderLogoGlyphSvg({ role = '', event = {}, theme = {}, size = 180 } = {}) {
+  const box = Math.max(48, Math.round(Number(size) || 180))
+  const roleLabel = roleLabelForVisibleLogoFallback(role)
+  const label = labelForVisibleLogoFallback({ role, event }) || roleLabel
+  const initials = initialsFor(label, roleLabel.slice(0, 2))
+  // DIRECTIVE 001: the permitted fallback is clean deterministic initials of
+  // the real entity — NEVER a "LOGO PENDING" placeholder. The caption now
+  // carries a cleaned name (the actual identity) so combat/single/ancillary
+  // posters read as a real mark, not an unfinished slot.
+  const caption = cleanFallbackCaption(label, roleLabel)
+  const primary = normalizeSpace(theme.homeColor || theme.accentColor || '#0f766e')
+  const secondary = normalizeSpace(theme.awayColor || '#123c69')
+  const accent = normalizeSpace(theme.accentColor || '#d4b76a')
+  const markSize = initials.length <= 2 ? Math.round(box * 0.34) : Math.round(box * 0.29)
+  const captionSize = Math.max(6, Math.round(box * (caption.length > 12 ? 0.066 : 0.082)))
+  const e = escapeXml
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${box}" height="${box}" viewBox="0 0 ${box} ${box}" role="img" data-role="logo-fallback-svg" data-fallback-kind="logo-glyph" data-fallback-role="${e(roleLabel)}">
+  <defs>
+    <linearGradient id="fallbackBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="${e(primary)}"/>
+      <stop offset="100%" stop-color="${e(secondary)}"/>
+    </linearGradient>
+    <filter id="fallbackShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="${Math.max(1, Math.round(box * 0.035))}" stdDeviation="${Math.max(1, Math.round(box * 0.045))}" flood-color="#000000" flood-opacity="0.32"/>
+    </filter>
+  </defs>
+  <rect x="${Math.round(box * 0.06)}" y="${Math.round(box * 0.06)}" width="${Math.round(box * 0.88)}" height="${Math.round(box * 0.88)}" rx="${Math.round(box * 0.14)}" fill="#f8f2df" stroke="#ffffff" stroke-width="${Math.max(2, Math.round(box * 0.035))}" filter="url(#fallbackShadow)"/>
+  <rect x="${Math.round(box * 0.11)}" y="${Math.round(box * 0.11)}" width="${Math.round(box * 0.78)}" height="${Math.round(box * 0.78)}" rx="${Math.round(box * 0.105)}" fill="url(#fallbackBg)" stroke="${e(accent)}" stroke-width="${Math.max(1, Math.round(box * 0.018))}"/>
+  <circle cx="${Math.round(box * 0.5)}" cy="${Math.round(box * 0.455)}" r="${Math.round(box * 0.27)}" fill="rgba(5,7,13,0.28)" stroke="rgba(255,255,255,0.32)" stroke-width="${Math.max(1, Math.round(box * 0.014))}"/>
+  <text x="${Math.round(box * 0.5)}" y="${Math.round(box * 0.49)}" text-anchor="middle" dominant-baseline="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="${markSize}" font-weight="900" letter-spacing="0">${e(initials)}</text>
+  <text x="${Math.round(box * 0.5)}" y="${Math.round(box * 0.83)}" text-anchor="middle" fill="#ffffff" font-family="Arial, Helvetica, sans-serif" font-size="${captionSize}" font-weight="800" letter-spacing="0.5">${e(caption)}</text>
+</svg>`
 }
 
 module.exports = {

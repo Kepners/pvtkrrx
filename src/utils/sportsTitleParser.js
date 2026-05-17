@@ -6,16 +6,16 @@ const CODEC_RE = /^(?:x264|x265|h264|h265|hevc|avc|av1)(?:-.+)?$/i
 const RELEASE_GROUP_RE = /^[A-Z0-9]+-[A-Za-z0-9]+$/
 const HLG_HDR_RE = /^(?:hlg|hdr10?\+?|dovi?|dv|10bit|8bit)$/i
 const GENERIC_SPORT_PREFIX_RE = /^(?:football|soccer|basketball|baseball|cricket|rugby|mma|boxing|wrestling|darts|golf|motorsport|motor|tennis|hockey|ice|american|uefa)$/i
-const LEADING_TEAM_NOISE_RE = /^(?:game|games|match|matches|week|round|heat|session|fight|night|grand|prix|qualifying|practice|sprint|race|main|card|prelims?|early|cup|bowl|super|opening|closing|ceremony|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|championship|conference|title|event|world|wimbledon|australian|roland|garros|open|us|east|west|western|eastern|centre|center|court|heavyweight|middleweight|welterweight|lightweight|rs|qf|sf|wcqf|ecqf|wcsf|ecsf|wcf|ecf|f\d*|r\d+|m\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
+const LEADING_TEAM_NOISE_RE = /^(?:game|games|match|matches|week|round|matchweek|mw|gw|md|wd|wsm|heat|session|fight|night|grand|prix|qualifying|practice|sprint|race|main|card|prelims?|early|cup|bowl|super|opening|closing|ceremony|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|championship|conference|title|event|world|wimbledon|australian|roland|garros|open|us|east|west|western|eastern|centre|center|court|heavyweight|middleweight|welterweight|lightweight|rs|qf|sf|wcqf|ecqf|wcsf|ecsf|wcf|ecf|f\d*|r\d+|m\d+|gm\d+|g\d+|mw\d+|gw\d+|md\d+|wd\d+|\d+(?:st|nd|rd|th))$/i
 const ROMAN_NUMERAL_RE = /^(?=[ivxlcdm]+$)m{0,4}(cm|cd|d?c{0,3})(xc|xl|l?x{0,3})(ix|iv|v?i{0,3})$/i
 const TEAM_BROADCAST_RE = /\b(?:nbc|nbcsn|espn(?:2|p|plus|\+)?|f1tv|nesn|msg|usan?|yes(?:\s*network)?|sky(?:\s*sports?)?|bt(?:\s*sport)?|tnt(?:\s*sports?)?|fox(?:\s*sports?)?|cbs|abc|itv(?:4)?|tsn|sportsnet|sn|bally|bein(?:\s*sports?)?\d*|canal\+?|dazn|eurosport|skynz|kayo(?:\s*sports?)?|fubo|newvision|bign|big\s*ten(?:\s*network)?|flo(?:hockey|sports?))\b/gi
 const TEAM_LANGUAGE_RE = /\b(?:en|english|spanish|french|german|italian|portuguese)\b/gi
 const TEAM_PRESENTATION_RE = /\b(?:condensed(?:\s*game)?|extended(?:\s*highlights?)?|highlights?|replay)\b/gi
-const TEAM_TAIL_NOISE_RE = /^(?:game|games|round|matchday|main|card|pre|post|episode|show|event|fight|full|review|preview|highlights?|replay|coverage|studio|apple|tv|fubo|beinsport\d*|skynz|z3r0|nva|bign|flo(?:hockey|sports?)|wrestlemania|east|west|western|eastern|conference|centre|center|court|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|rs|qf|sf|wcqf|ecqf|wcsf|ecsf|wcf|ecf|f\d*|r\d+|m\d+|gm\d+|g\d+|\d+(?:st|nd|rd|th))$/i
+const TEAM_TAIL_NOISE_RE = /^(?:game|games|round|matchday|matchweek|mw|gw|md|wd|wsm|main|card|pre|post|episode|show|event|fight|full|review|preview|highlights?|replay|coverage|studio|apple|tv|fubo|beinsport\d*|skynz|z3r0|nva|bign|flo(?:hockey|sports?)|wrestlemania|east|west|western|eastern|conference|centre|center|court|playoffs?|postseason|finals?|semi(?:final)?|quarter(?:final)?|rs|qf|sf|wcqf|ecqf|wcsf|ecsf|wcf|ecf|f\d*|r\d+|m\d+|gm\d+|g\d+|mw\d+|gw\d+|md\d+|wd\d+|\d+(?:st|nd|rd|th))$/i
 const EVENT_SOURCE_NOISE_RE = /^(?:apple|tv|atvp?|fubo|skynz|kayo|z3r0|nva|espn(?:p|plus|\+)?|f1tv|fs1|nesn|msg|usan?|nbc(?:sn|sba|sca)?|sny|snla|snp|sky|sports|fox|bbc|itv|cbs|abc|tnt|peacock|eurosport|nordic|bign|flo(?:hockey|sports?))$/i
-const TEAM_SIDE_LEADING_COMPETITION_RE = /^(?:(?:english\s+)?premier\s+league|efl\s+championship|efl|elc|championship|uefa\s+champions\s+league|champions\s+league|uefa\s+conference\s+league|conference\s+league|uecl|ucl|uefa\s+europa\s+league|europa\s+league|uel|copa\s+libertadores|copa\s+sudamericana|copa\s+america|kings?\s+cup|basketball\s+champions\s+league(?:\s+of\s+americas)?|primera\s+feb|ncaa\s+(?:women\s+)?softball(?:\s+(?:qf|sf|quarter\s*final|semi\s*final))?|ncaa\s+(?:women\s+)?basketball|ncaa\s+football|wnba\s+(?:pre?s|preseason)|turkish\s+league|rsl|afl|cpl|ufl|ohl|final\s+four|four|f4|league|l\d+)\b/i
-const TEAM_SIDE_EXACT_COMPETITION_RE = /^(?:(?:english\s+)?premier\s+league|efl\s+championship|efl|elc|championship|uefa\s+champions\s+league|champions\s+league|uefa\s+conference\s+league|conference\s+league|uecl|ucl|uefa\s+europa\s+league|europa\s+league|uel|copa\s+libertadores|copa\s+sudamericana|copa\s+america|kings?\s+cup|basketball\s+champions\s+league(?:\s+of\s+americas)?|primera\s+feb|ncaa\s+(?:women\s+)?softball(?:\s+(?:qf|sf|quarter\s*final|semi\s*final))?|ncaa\s+(?:women\s+)?basketball|ncaa\s+football|wnba\s+(?:pre?s|preseason)|turkish\s+league|rsl|afl|cpl|ufl|ohl|final\s+four|four|f4|league|l\d+)$/i
-const TEAM_SIDE_SEASON_NOISE_RE = /^(?:(?:19|20)\d{2}(?:[/-]\d{2})?|pre?s|preseason|playoffs?|quarter\s*final|semi\s*final|qf|sf|(?:\d{1,2}(?:st|nd|rd|th)?\s+)?leg|first\s+leg|second\s+leg|full\s+match|post\s+match|pre\s+show|pre\s+match|game\s*\d+|round\s*\d+|r\d+|g\d+|gm\d+|f\d+|\d{1,2}(?:st|nd|rd|th)?|\d{1,2})\b/i
+const TEAM_SIDE_LEADING_COMPETITION_RE = /^(?:(?:english\s+)?premier\s+league|women'?s?\s+super\s+league|wsl|wsm|scottish\s+women'?s?\s+premier\s+league|women'?s?\s+(?:national\s+)?basketball\s+(?:association|league)|efl\s+championship|efl|elc|championship|uefa\s+champions\s+league|champions\s+league|uefa\s+conference\s+league|conference\s+league|uecl|ucl|uefa\s+europa\s+league|europa\s+league|uel|copa\s+libertadores|copa\s+sudamericana|copa\s+america|kings?\s+cup|basketball\s+champions\s+league(?:\s+of\s+americas)?|primera\s+feb|ncaa\s+(?:women\s+)?softball(?:\s+(?:qf|sf|quarter\s*final|semi\s*final))?|ncaa\s+(?:women\s+)?basketball|ncaa\s+football|wnba\s+(?:pre?s|preseason)|turkish\s+league|rsl|afl|cpl|ufl|ohl|final\s+four|four|f4|league|l\d+)\b/i
+const TEAM_SIDE_EXACT_COMPETITION_RE = /^(?:(?:english\s+)?premier\s+league|women'?s?\s+super\s+league|wsl|wsm|scottish\s+women'?s?\s+premier\s+league|women'?s?\s+(?:national\s+)?basketball\s+(?:association|league)|efl\s+championship|efl|elc|championship|uefa\s+champions\s+league|champions\s+league|uefa\s+conference\s+league|conference\s+league|uecl|ucl|uefa\s+europa\s+league|europa\s+league|uel|copa\s+libertadores|copa\s+sudamericana|copa\s+america|kings?\s+cup|basketball\s+champions\s+league(?:\s+of\s+americas)?|primera\s+feb|ncaa\s+(?:women\s+)?softball(?:\s+(?:qf|sf|quarter\s*final|semi\s*final))?|ncaa\s+(?:women\s+)?basketball|ncaa\s+football|wnba\s+(?:pre?s|preseason)|turkish\s+league|rsl|afl|cpl|ufl|ohl|final\s+four|four|f4|league|l\d+)$/i
+const TEAM_SIDE_SEASON_NOISE_RE = /^(?:(?:19|20)\d{2}(?:[/-]\d{2})?|pre?s|preseason|playoffs?|quarter\s*final|semi\s*final|qf|sf|(?:\d{1,2}(?:st|nd|rd|th)?\s+)?leg|first\s+leg|second\s+leg|full\s+match|post\s+match|pre\s+show|pre\s+match|game\s*\d+|round\s*\d+|matchweek\s*\d*|mw\s*\d+|gw\s*\d+|md\s*\d+|wd\s*\d+|r\d+|g\d+|gm\d+|f\d+|\d{1,2}(?:st|nd|rd|th)?|\d{1,2})\b/i
 const TEAM_SIDE_TRAILING_SPORT_NOISE_RE = /\b(?:4k|hockey|ice\s+hockey|basketball|football|baseball|softball|soccer|rugby)\s*$/i
 // Game-state injections appear between team name and "vs" in MLB rescheduled
 // games and a few other sports: "Colorado Rockies Makeup of vs New York Mets".
@@ -23,7 +23,7 @@ const TEAM_SIDE_TRAILING_SPORT_NOISE_RE = /\b(?:4k|hockey|ice\s+hockey|basketbal
 const TEAM_SIDE_TRAILING_GAME_STATE_RE = /\b(?:make[\s-]*up\s+of|completion\s+of|continuation\s+of|resumption\s+of|postponed|suspended|rain[\s-]*delayed?|resumed|tba)\s*$/i
 
 // Known league/series tokens that start non-vs event titles
-const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|PFL|Bellator|ONE|WWE|AEW|TNA|ROH|NJPW|MotoGP|Moto\s*GP|NASCAR|IndyCar|WRC|Supercars|Supercars\s*Championship|V8SC|Bathurst|WSBK|WEC|FormulaE|Rally|Dakar|PGA|PGA\s*Tour|LPGA|LPGA\s*Tour|Masters|ATP|ATP\s*World\s*Tour|WTA|WTA\s*Tour|Wimbledon|Australian\s*Open|Roland\s*Garros|French\s*Open|US\s*Open|U\.S\.\s*Open|Davis\s*Cup|Laver\s*Cup|PDC|PDC\s*Darts|Premier\s*League\s*Darts|World\s*Championship\s*Darts|World\s*Matchplay|IPL|IPLM\d+|Indian\s*Premier\s*League|MLS|Major\s*League\s*Soccer|MLB|Major\s*League\s*Baseball|NCAA\s*Baseball|World\s*Baseball\s*Classic|NBA|NBA\s*Playoffs|EuroLeague|EasyCredit\s*BBL|Basketball\s*Champions\s*League(?:\s*of\s*Americas)?|Super\s*Rugby|MLR|Major\s*League\s*Rugby|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
+const EVENT_LEAGUE_RE = /^(?:Formula1|F1|UFC|PFL|Bellator|ONE|WWE|AEW|TNA|TNA\s*Wrestling|Impact\s*Wrestling|ROH|NJPW|MotoGP|Moto\s*GP|NASCAR|IndyCar|WRC|Supercars|Supercars\s*Championship|V8SC|Bathurst|WSBK|WorldSBK|World\s*Superbikes?|SBK|WEC|FormulaE|Rally|Dakar|Diamond\s*League|World\s*Athletics\s*Diamond\s*League|PGA|PGA\s*Tour|LPGA|LPGA\s*Tour|Masters|ATP|ATP\s*World\s*Tour|WTA|WTA\s*Tour|Wimbledon|Australian\s*Open|Roland\s*Garros|French\s*Open|US\s*Open|U\.S\.\s*Open|Davis\s*Cup|Laver\s*Cup|PDC|PDC\s*Darts|Premier\s*League\s*Darts|World\s*Championship\s*Darts|World\s*Matchplay|IPL|IPLM\d+|Indian\s*Premier\s*League|MLS|Major\s*League\s*Soccer|MLB|Major\s*League\s*Baseball|NCAA\s*Baseball|World\s*Baseball\s*Classic|NBA|NBA\s*Playoffs|NCAA\s*Basketball|College\s*Basketball|EuroLeague|EasyCredit\s*BBL|Basketball\s*Champions\s*League(?:\s*of\s*Americas)?|English\s*Women'?s?\s*Super\s*League|Women'?s?\s*Super\s*League|Barclays\s*Women'?s?\s*Super\s*League|FA\s*WSL|WSL|Super\s*Rugby|MLR|Major\s*League\s*Rugby|Tour\s*de\s*France|Giro|Vuelta|TDF)$/i
 
 const SESSION_PATTERNS = [
   ['Pre-Season Testing', /\bpre[\s-]*season\s+testing\b/i],
@@ -200,7 +200,7 @@ function titleCase(value = '') {
     'AC', 'AEK', 'AEW', 'AFCON', 'AFC', 'ATP', 'BIGN', 'CF', 'CPL', 'EFL',
     'ELC', 'EPL', 'FA', 'F1', 'FC', 'FEB', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA',
     'NBA', 'NCAA', 'NFL', 'NHL', 'NJPW', 'NXT', 'PDC', 'PFL', 'PGA', 'PPV',
-    'OHL', 'PSG', 'ROH', 'SC', 'TNA', 'UCL', 'UCLA', 'UECL', 'UEFA', 'UFC', 'UEL', 'UFL',
+    'OHL', 'PSG', 'ROH', 'RSM', 'SC', 'TNA', 'UCL', 'UCLA', 'UECL', 'UEFA', 'UFC', 'UEL', 'UFL',
     'WC', 'WEC', 'WNBA', 'WRC', 'WTA', 'WWE'
   ])
   return normalizeSegment(value)
@@ -505,7 +505,13 @@ function trimLeadingTeamNoise(tokens) {
       parts.shift()
       continue
     }
-    if (/^(?:east|west)$/i.test(token)) {
+    // Directional tokens (East/West/Eastern/Western) lead real club names
+    // ("West Ham", "Western Bulldogs", "Eastern Suburbs"). Only strip them
+    // when the NEXT token is itself round/season noise (i.e. a conference
+    // qualifier like "Western Conference Round 2"), never when a real team
+    // word follows. Without this, AFL "... Port Adelaide V Western Bulldogs"
+    // loses "Western" (GARBLED-OPPONENT, DIRECTIVE 001).
+    if (/^(?:east|west|eastern|western)$/i.test(token)) {
       const nextIsRoundNoise = Boolean(
         LEADING_TEAM_NOISE_RE.test(next) ||
         GENERIC_SPORT_PREFIX_RE.test(next) ||
@@ -540,6 +546,9 @@ function normalizeTeamLabel(value, options = {}) {
       .replace(TEAM_BROADCAST_RE, ' ')
       .replace(TEAM_LANGUAGE_RE, ' ')
       .replace(TEAM_PRESENTATION_RE, ' ')
+      .replace(/\b(?:matchweek|mw|gw|md|wd)\s*\d+\b/gi, ' ')
+      .replace(/\b(?:mw|gw|md|wd)\b/gi, ' ')
+      .replace(/\bwsm\b/gi, ' ')
       .replace(/\b(?:mlb|nba(?:\s+playoffs?)?|nfl|nhl|mls|ipl|pga(?:\s+tour)?|motogp|ufc|mma|pfl|bellator|atp|wta|pdc|darts?|wc|world\s+championship|snooker|tennis|boxing)\b$/gi, ' ')
       .replace(/\b(?:r\d+|gm\d+|g\d+|\d{2,3}fps|fps)\b/gi, ' ')
   ))
@@ -795,24 +804,28 @@ function parseFlexibleMatchupTitle(title, fallbackDate = '') {
   const trailingDate = (!useLeadingDate && !preSeparatorDate)
     ? findTrailingDateSpan(afterSeparator, dateHint, fallbackDate)
     : null
+  const trailingLeague = trailingDate && trailingDate.nextIndex < afterSeparator.length
+    ? findLeadingLeagueSpan(afterSeparator.slice(trailingDate.nextIndex))
+    : null
 
   const awayTeamTokens = trailingDate
     ? afterSeparator.slice(0, trailingDate.startIndex)
     : afterSeparator
   const date = (useLeadingDate ? leadingDate?.date : '') || preSeparatorDate?.date || trailingDate?.date || extractFallbackDate(fallbackDate)
 
-  const teamAliasContext = { league: leadingLeague?.league || '', raw }
+  const resolvedLeague = leadingLeague?.league || trailingLeague?.league || ''
+  const teamAliasContext = { league: resolvedLeague, raw }
   const homeTeam = normalizeTeamTokens(homeTeamTokens, teamAliasContext)
   const awayTeam = normalizeTeamTokens(awayTeamTokens, teamAliasContext)
   if (!homeTeam || !awayTeam) return null
   const eventShort = leadingLeague?.league && /^\d{1,4}$/.test(String(preTeamTokens[0] || '').trim())
     ? `${leadingLeague.league} ${preTeamTokens[0]}`
-    : (leadingLeague?.league || `${homeTeam} vs ${awayTeam}`)
+    : (resolvedLeague || `${homeTeam} vs ${awayTeam}`)
 
   const eventYear = date ? date.slice(0, 4) : extractFallbackYear(raw || fallbackDate)
 
   return {
-    league: leadingLeague?.league || '',
+    league: resolvedLeague,
     ...(date ? { date } : {}),
     ...(eventYear ? { eventYear } : {}),
     homeTeam,
@@ -1104,9 +1117,723 @@ function parseSportsEventTitle(title, fallbackDate = '') {
   }
 }
 
+/* ============================================================================
+ * CONTRACT PARSER — SPORTS_TITLE_PARSER_SPEC.md §1/§1a/§7
+ *
+ * `parseSportsTitleContract(rawTitle, options)` emits the client-defined schema
+ * and is the binding acceptance oracle (scripts/smoke-sports-title-parser.js).
+ *
+ * It does NOT replace parseSportsTitle / parseSportsEventTitle (those remain
+ * for the ~20 existing consumers); it is an additive, schema-complete path.
+ *
+ * options:
+ *   sportHint     - Prowlarr-derived sport key (the sport oracle, §6)
+ *   categoryNames - Prowlarr category names (fallback sport derivation)
+ *   indexer       - indexer name
+ *   pubDate       - torrent made date (date fallback, §5)
+ * ========================================================================== */
+
+const { canonicalizeClub, resolveClubCompetitionOverride } = require('./clubIdentity')
+const { sportKeyFromCategoryName } = require('./sportsCategoryHint')
+
+const CONTRACT_SEPARATORS = new Set(['vs', 'v', 'versus', 'at', '@'])
+// `at` / `@` use the US convention: first side is AWAY, second is HOME.
+const AWAY_FIRST_SEPARATORS = new Set(['at', '@'])
+
+const RUBBISH_TOKENS = new Set([
+  // scene groups / stations the client explicitly called rubbish
+  'fs1', 'fs2', 'stan', 'skyf1', 'mwr', 'z3r0', 'kontrast', 'flux',
+  'verum', 'm4rtyr', 'thecig', 'billie', 'mgp', 'ntb', 'ctrlhd', 'deflate',
+  'organic', 'tgx', 'nf', 'blackdevil', 'nva', 'bravesvsn', 'group',
+  // generic broadcasters that are NOT client-named tvChannel keepers.
+  // NOTE: bare ambiguous team words ('sky','fox','heat','magic') are NOT
+  // listed — "Chicago Sky"/"Miami Heat" are real teams. Multi-word
+  // broadcaster forms ("Sky Sports","Fox Sports") are stripped by the
+  // format/tvChannel pass and the trailing-noise regex below.
+  'cbs', 'espn', 'espn+', 'espnplus', 'nbc', 'nbcsn',
+  'nbcsba', 'nbcsca', 'nbcsbay', 'nbcsphi', 'nbcsch', 'nbcswa', 'nbcsne',
+  'snla', 'snp', 'sny', 'sntx', 'sndet', 'arid', 'card', 'masn', 'attsn',
+  'tnt', 'bbc', 'itv', 'kayo', 'fubo', 'peacock',
+  'talksport', 'bein', 'beinsport', 'eurosport', 'tsn', 'sportsnet',
+  'f1tv', 'nesn', 'msg', 'redbull', 'atvp',
+  'dsnp', 'webrip', 'web', 'web-dl', 'webdl', 'hdtv', 'bluray'
+])
+
+// Client-named tvChannel keepers ONLY (spec §1 HARD RULE — do NOT generalise).
+const TV_CHANNEL_KEEPERS = new Map([
+  ['dazn', 'DAZN'],
+  ['probox', 'ProBox'],
+  ['probox tv', 'ProBox']
+])
+
+const QUALITY_TOKEN_RE = /^(?:2160p|1080p|1080i|720p|576p|540p|480p|sd|hd|fhd|uhd)(?:[a-z]{1,4})?(?:\d{2,3}(?:fps)?)?$|^\d{2,3}fps$/i
+const SOURCE_FORMAT_RE = /^(?:web|web-?dl|dl|webrip|hdtv|pdtv|bluray|bdrip|dvdrip|repack|proper|complete|h264|h265|x264|x265|hevc|avc|av1|dsnp|ddp\d?)$/i
+const LANG_TOKEN_RE = /^(?:en|eng|english|es|spa|spanish|fr|fre|french|de|ger|german|it|ita|italian|pt|por|portuguese|multi)$/i
+// Documentaries / docuseries (episodic markers). Studio shows are ANCILLARY.
+const DOC_MARKERS_RE = /\b(?:s\d{1,2}(?:e\d{1,3})?|drive to survive|the impossible|the .+? story|: a .+? story)\b/i
+// Studio / recap / replay / coverage / press shows -> ancillary (spec §5).
+const ANCILLARY_RE = /\b(?:press conference|pre[\s-]*(?:&|and)[\s-]*post|after the flag|gear up|highlights?|coverage|recap|recapping|replay|all games|preview|review|post[\s-]*event|pre[\s-]*event|build[\s-]*up|reaction|analysis|the verdict|magazine show|inside the nba|afl 360|studio show)\b/i
+
+function langLabel(token = '') {
+  const t = String(token || '').toLowerCase()
+  if (/^en|eng|english$/.test(t)) return 'EN'
+  if (/^es|spa|spanish$/.test(t)) return 'ES'
+  if (/^fr|fre|french$/.test(t)) return 'FR'
+  if (/^de|ger|german$/.test(t)) return 'DE'
+  if (/^it|ita|italian$/.test(t)) return 'IT'
+  if (/^pt|por|portuguese$/.test(t)) return 'PT'
+  if (t === 'multi') return 'MULTI'
+  return token
+}
+
+// Split keeping `@` as its own token, expanding pipe and bracket delimiters.
+function contractTokens(raw) {
+  return String(raw || '')
+    .replace(/([A-Za-z0-9])@([A-Za-z0-9])/g, '$1 @ $2')
+    .replace(/[()[\]{}|]/g, ' ')
+    .replace(/&/g, ' & ')
+    .replace(/([0-9])\/([0-9])/g, '$1 __SLASH__ $2')
+    .replace(/[._:;]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(t => (t === '__SLASH__' ? '/' : t))
+}
+
+// Pull every date the title can yield, preferring DD MM (day-first, spec §5)
+// and guarding the WRONG-DATE-INTERPRETATION case.
+function resolveContractDate(tokens, raw, yearToken, pubDate) {
+  const parts = tokens.map(t => String(t || '').trim())
+  const num = parts.map(p => (/^\d{1,4}$/.test(p) ? p : ''))
+  const seasonYearRe = /^(19|20)\d{2}$/
+  const previousToken = (index) => String(parts[index - 1] || '').trim()
+
+  // 0. WRONG-DATE-INTERPRETATION guard (must beat the generic ISO regex):
+  // "YYYY <n> <n> YYYY" with the SAME year both sides — the inner pair is
+  // DD MM bound to that year. Prefer day-first. Guards "2026 12 05 2026"
+  // -> 2026-05-12 (not Dec 5).
+  for (let i = 0; i <= num.length - 4; i += 1) {
+    const y1 = num[i]; const a = num[i + 1]; const b = num[i + 2]; const y2 = num[i + 3]
+    if (seasonYearRe.test(y1) && seasonYearRe.test(y2) && y1 === y2 &&
+      /^\d{1,2}$/.test(a) && /^\d{1,2}$/.test(b)) {
+      const d = a.padStart(2, '0'); const m = b.padStart(2, '0')
+      if (isValidDate(y1, m, d)) return { date: `${y1}-${m}-${d}`, year: y1 }
+      const d2 = b.padStart(2, '0'); const m2 = a.padStart(2, '0')
+      if (isValidDate(y1, m2, d2)) return { date: `${y1}-${m2}-${d2}`, year: y1 }
+    }
+  }
+
+  // 1. ISO YYYY MM DD (also slash form 2026/05/10 -> 2026 / 05 / 10)
+  const isoFromSlash = raw.match(/\b((?:19|20)\d{2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{1,2})\b/)
+  if (isoFromSlash) {
+    const y = isoFromSlash[1]
+    const m = isoFromSlash[2].padStart(2, '0')
+    const d = isoFromSlash[3].padStart(2, '0')
+    if (isValidDate(y, m, d)) return { date: `${y}-${m}-${d}`, year: y }
+  }
+  const iso = raw.match(/\b((?:19|20)\d{2})[._\s/-](\d{1,2})[._\s/-](\d{1,2})\b/)
+  if (iso) {
+    const y = iso[1]
+    const m = iso[2].padStart(2, '0')
+    const d = iso[3].padStart(2, '0')
+    if (isValidDate(y, m, d)) return { date: `${y}-${m}-${d}`, year: y }
+  }
+
+  // 2. US M/D/YYYY or M/D/YY (slash) — must check before generic DD MM
+  const usSlashLong = raw.match(/\b(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*((?:19|20)\d{2})\b/)
+  if (usSlashLong) {
+    const m = usSlashLong[1].padStart(2, '0')
+    const d = usSlashLong[2].padStart(2, '0')
+    const y = usSlashLong[3]
+    if (isValidDate(y, m, d)) return { date: `${y}-${m}-${d}`, year: y }
+  }
+  const usSlashShort = raw.match(/\b(\d{1,2})\s*\/\s*(\d{1,2})\s*\/\s*(\d{2})\b/)
+  if (usSlashShort) {
+    const m = usSlashShort[1].padStart(2, '0')
+    const d = usSlashShort[2].padStart(2, '0')
+    const y = `20${usSlashShort[3]}`
+    if (isValidDate(y, m, d)) return { date: `${y}-${m}-${d}`, year: y }
+  }
+
+  // 3. DD MM YYYY token triple (day-first preferred)
+  for (let i = 0; i <= num.length - 3; i += 1) {
+    const a = num[i]; const b = num[i + 1]; const c = num[i + 2]
+    if (!a || !b || !c) continue
+    if (/^(19|20)\d{2}$/.test(c) && /^\d{1,2}$/.test(a) && /^\d{1,2}$/.test(b)) {
+      const d = a.padStart(2, '0'); const m = b.padStart(2, '0')
+      if (isValidDate(c, m, d)) return { date: `${c}-${m}-${d}`, year: c }
+    }
+    if (/^(19|20)\d{2}$/.test(a) && /^\d{1,2}$/.test(b) && /^\d{1,2}$/.test(c)) {
+      // ISO-ish leading year: prefer DD-MM read of (b,c) — guards
+      // "2026 12 05 2026" -> 2026-05-12 (not Dec 5).
+      const dd = c.padStart(2, '0'); const mm = b.padStart(2, '0')
+      if (isValidDate(a, mm, dd)) return { date: `${a}-${mm}-${dd}`, year: a }
+      const mm2 = c.padStart(2, '0'); const dd2 = b.padStart(2, '0')
+      if (isValidDate(a, mm2, dd2)) return { date: `${a}-${mm2}-${dd2}`, year: a }
+    }
+  }
+
+  // 4. DD MM YY (2-digit year) e.g. 01 05 26 -> 2026-05-01
+  for (let i = 0; i <= num.length - 3; i += 1) {
+    const a = num[i]; const b = num[i + 1]; const c = num[i + 2]
+    if (!a || !b || !c) continue
+    // Avoid treating "Day 2 03 04" / "Round 2 03 04" as a 2004 date.
+    // The first number is the round/session value; the following pair is the
+    // actual day/month date and should be handled by the bare-DD-MM fallback.
+    if (/^(?:day|round|game|stage|match|race)$/i.test(previousToken(i))) continue
+    if (/^\d{1,2}$/.test(a) && /^\d{1,2}$/.test(b) && /^\d{2}$/.test(c) && Number(c) <= 49) {
+      const y = `20${c}`
+      const d = a.padStart(2, '0'); const m = b.padStart(2, '0')
+      if (isValidDate(y, m, d)) return { date: `${y}-${m}-${d}`, year: y }
+    }
+  }
+
+  // 5. Bare DD MM — day-first; year from title year token else pubDate
+  const yearFromToken = /^(19|20)\d{2}$/.test(String(yearToken || '')) ? String(yearToken) : ''
+  const pub = String(pubDate || '').match(/^((?:19|20)\d{2})-(\d{2})-(\d{2})/)
+  const fallbackYear = yearFromToken || (pub ? pub[1] : '')
+  if (fallbackYear) {
+    for (let i = 0; i < num.length - 1; i += 1) {
+      const a = num[i]; const b = num[i + 1]
+      if (!/^\d{1,2}$/.test(a) || !/^\d{1,2}$/.test(b)) continue
+      // skip pairs that are obviously a quality token slice
+      if (/^(?:day|round|game|stage|match|race)$/i.test(previousToken(i))) continue
+      const d = a.padStart(2, '0'); const m = b.padStart(2, '0')
+      if (isValidDate(fallbackYear, m, d)) return { date: `${fallbackYear}-${m}-${d}`, year: fallbackYear }
+    }
+  }
+
+  // 6. torrent pubDate fallback (date never empty, spec §5)
+  if (pub) return { date: `${pub[1]}-${pub[2]}-${pub[3]}`, year: pub[1] }
+  if (yearFromToken) return { date: '', year: yearFromToken }
+  return { date: '', year: '' }
+}
+
+function detectContractSport(rawTitle, options = {}) {
+  const explicit = String(options.sportHint || '').trim().toLowerCase()
+  if (explicit && explicit !== 'others') return explicit
+  const names = Array.isArray(options.categoryNames) ? options.categoryNames : []
+  for (const n of names) {
+    const s = sportKeyFromCategoryName(n)
+    if (s) return s
+  }
+  const idxr = sportKeyFromCategoryName(options.indexer || '')
+  if (idxr) return idxr
+  if (explicit === 'others') return 'Others'
+  return 'Others'
+}
+
+function isCombatSport(sport) {
+  return /^(?:boxing|mma)$/i.test(String(sport || ''))
+}
+
+// Known competition-code shapes that may lead an unmapped title. A bare
+// city/team word ("Indiana") is NOT a competition.
+const KNOWN_COMP_TOKEN_RE = /^(?:UECL|UEL|UCL|UEFA|EPL|EFL|ELC|MLB|MLS|NBA|NHL|NFL|UFC|PFL|AEW|WWE|TNA|ROH|NJPW|AFL|NRL|RSL|WSL|UWCL|WSBK|WRC|WEC|BTCC|IPL|BBL|PDC|BDO|ATP|WTA|PGA|LPGA|F1|NCAA)$/i
+
+// Resolve the competition label + (optionally) corrected sport. Title token is
+// NOT authoritative — leagueMap canonicalises it; club identity overrides it.
+// Returns `span` only when the matched competition is at the title start so
+// callers can slice it off the home side.
+function resolveContractCompetition(tokens, sport) {
+  // Longest leagueMap hit anywhere in the first ~8 tokens.
+  let mapped = null
+  let mappedStart = -1
+  let mappedSpan = 0
+  const scanMax = Math.min(tokens.length, 12)
+  for (let start = 0; start < scanMax; start += 1) {
+    for (let count = 1; count <= Math.min(tokens.length - start, 6); count += 1) {
+      const candidate = normalizeSegment(tokens.slice(start, start + count).join(' '))
+      const entry = getMappedLeagueEntry(candidate)
+      if (entry && (!mapped || count > mappedSpan)) {
+        mapped = entry; mappedStart = start; mappedSpan = count
+      }
+    }
+  }
+  if (mapped) {
+    return {
+      competition: mapped.name,
+      sportKey: mapped.sportKey || sport,
+      span: mappedStart === 0 ? mappedSpan : 0
+    }
+  }
+  // Unmapped: keep a leading competition-code phrase (e.g. UECL, AFL) but
+  // never a plain city/team word.
+  const first = String(tokens[0] || '').trim()
+  if (KNOWN_COMP_TOKEN_RE.test(first)) {
+    // Allow a multi-word leading code phrase like "American Rodeo"
+    let span = 1
+    const second = String(tokens[1] || '').trim()
+    if (/^[A-Z][a-z]+$/.test(second) && /^[A-Z]/.test(first) && !/^\d/.test(second)) {
+      // keep single-word unless clearly a comp phrase; default span 1
+    }
+    return { competition: first, sportKey: sport, span }
+  }
+  return { competition: '', sportKey: sport, span: 0 }
+}
+
+function captureGameNumber(raw) {
+  // R2G3 / R2 G3 / R2 GM3 / Round 10 Game 1 / Game 5 / QF Game 4
+  let m = raw.match(/\b(R\d{1,2})\s*(?:G|GM)\s*(\d{1,2})\b/i)
+  if (m) return `${m[1].toUpperCase()} G${m[2]}`
+  m = raw.match(/\bRound\s*(\d{1,2})\s*Game\s*(\d{1,2})\b/i)
+  if (m) return `Round ${m[1]} Game ${m[2]}`
+  m = raw.match(/\b(QF|SF)\s*Game\s*(\d{1,2})\b/i)
+  if (m) return `${m[1].toUpperCase()} Game ${m[2]}`
+  m = raw.match(/\bGame\s*(\d{1,2})\b/i)
+  if (m) return `Game ${m[1]}`
+  // Cricket / generic match number: "M30", "Match 30" (not a team token).
+  m = raw.match(/\bM(\d{1,3})\b/)
+  if (m) return `Match ${m[1]}`
+  m = raw.match(/\bMatch\s*(\d{1,3})\b/i)
+  if (m) return `Match ${m[1]}`
+  return ''
+}
+
+function captureSession(raw) {
+  const detail = extractPosterSessionAndRound([], raw)
+  // Multi-part practice: "Practice 1 & 2"
+  const multi = raw.match(/\bPractice\s*(\d)\s*&\s*(\d)\b/i)
+  if (multi) return `Practice ${multi[1]} & ${multi[2]}`
+  for (const [label, pattern] of [
+    ['Full Event', /\bfull\s*event\b/i],
+    ['Main Event', /\bmain\s*event\b/i],
+    ['Main Card', /\bmain\s*card\b/i],
+    ['Early Prelims', /\bearly\s*prelims?\b/i],
+    ['Prelims', /\bprelims?\b/i]
+  ]) {
+    if (pattern.test(raw)) return label
+  }
+  return detail.session || ''
+}
+
+function captureRound(raw) {
+  const detail = extractPosterSessionAndRound([], raw)
+  // Named races (Indy500 etc.)
+  const named = raw.match(/\b(Indy\s*500|Indy500|Daytona\s*500|Bathurst\s*1000|Le\s*Mans)\b/i)
+  if (named) return named[1].replace(/\s+/g, '')
+  // Round05 / Round 05 / R06
+  const roundCompact = raw.match(/\bRound\s*0*(\d{1,2})\b/i)
+  if (roundCompact) return `Round${roundCompact[1].padStart(2, '0')}`
+  const rCode = raw.match(/\bR0*(\d{1,2})\b/i)
+  if (rCode && !/\bR\d{1,2}\s*(?:G|GM)/i.test(raw)) return `R${rCode[1].padStart(2, '0')}`
+  if (/\bsuper\s*qualifier\b/i.test(raw)) return 'Super Qualifier'
+  // Knockout rounds incl. glued forms ("Semifinals","Quarterfinal") that the
+  // \b-anchored ROUND_PATTERNS miss.
+  if (/\b(?:quarter[\s-]*finals?|qf)\b/i.test(raw)) return 'Quarter Final'
+  if (/\b(?:semi[\s-]*finals?|sf)\b/i.test(raw)) return 'Semi Final'
+  if (detail.round && /^(quarter final|semi final|final)$/i.test(detail.round)) return detail.round
+  if (/\bfinals?\b/i.test(raw) && !/\b(?:semi|quarter)/i.test(raw)) return 'Final'
+  return detail.round || ''
+}
+
+const VENUE_DICT = new Set([
+  'indianapolis', 'long beach', 'czech republic', 'spain catalunya', 'catalunya',
+  'france', 'monaco', 'silverstone', 'monza', 'spa', 'suzuka', 'austin',
+  'melbourne', 'st tite', 'zhengzhou', 'rome', 'st andrews'
+])
+
+function captureVenue(tokens, raw, sport) {
+  const joined = normalizeSegment(tokens.join(' ')).toLowerCase()
+  for (const v of VENUE_DICT) {
+    if (joined.includes(v)) {
+      return v.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+    }
+  }
+  // Motorsport: IndyCar named-circuit shortcut
+  if (/motorsport/i.test(sport) && /\bIndy\s*500|Indy500\b/i.test(raw)) return 'Indianapolis'
+  return ''
+}
+
+function captureFormatQualityLanguage(tokens) {
+  let quality = ''
+  let language = ''
+  const formatParts = []
+  for (const tok of tokens) {
+    const t = String(tok || '').trim()
+    if (!t) continue
+    if (QUALITY_TOKEN_RE.test(t)) {
+      // Split "720pEN60fps" into quality + language
+      const m = t.match(/^(\d{3,4}[ip]|sd|hd|fhd|uhd)([a-z]{2,4})?(\d{2,3}fps)?$/i)
+      if (m) {
+        quality = `${m[1]}${m[3] ? m[3] : ''}`
+        if (m[2] && LANG_TOKEN_RE.test(m[2])) language = langLabel(m[2])
+      } else {
+        quality = t
+      }
+      continue
+    }
+    if (SOURCE_FORMAT_RE.test(t)) { formatParts.push(t.toUpperCase().replace('WEBDL', 'WEB DL')); continue }
+    if (LANG_TOKEN_RE.test(t) && !language) { language = langLabel(t); continue }
+  }
+  return {
+    quality,
+    language,
+    format: formatParts.length ? formatParts.join(' ').replace(/\bWEB DL\b/g, 'WEB DL') : ''
+  }
+}
+
+function captureTvChannel(raw) {
+  const lower = ` ${raw.toLowerCase()} `
+  for (const [needle, label] of TV_CHANNEL_KEEPERS) {
+    if (new RegExp(`\\b${needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(lower)) return label
+  }
+  return ''
+}
+
+function isSideNoiseToken(t) {
+  const low = String(t || '').toLowerCase()
+  if (!low) return true
+  if (CONTRACT_SEPARATORS.has(low)) return true
+  if (RUBBISH_TOKENS.has(low) || TV_CHANNEL_KEEPERS.has(low)) return true
+  if (QUALITY_TOKEN_RE.test(t) || SOURCE_FORMAT_RE.test(t)) return true
+  if (LANG_TOKEN_RE.test(t) && low !== 'it') return true
+  if (/^(?:19|20)\d{2}$/.test(t)) return true
+  if (/^\d{1,4}$/.test(t)) return true
+  if (/^(?:r\d{1,2}|g\d{1,2}|gm\d{1,2}|r\d{1,2}g(?:m)?\d{1,2}|mw\d{1,2}|gw\d{1,2}|wd\d{1,2})$/i.test(t)) return true
+  // Cricket / generic match-number token "M30" (belongs in gameNumber).
+  if (/^m\d{1,3}$/i.test(t)) return true
+  // Codec / container fragments left after splitting "H 264" / "x 265".
+  if (/^(?:264|265|hevc|avc|av1|aac|ac3|dts|h264|h265|x264|x265|ddp\d?|dd\d?)$/i.test(t)) return true
+  // Standalone "Sport"/"Sports" residual from multi-word broadcaster names
+  // ("Kayo Sport", "Sky Sports") whose lead token was already stripped.
+  if (/^sports?$/i.test(t)) return true
+  // Conference / bracket codes (NBA/NHL playoffs): ECSF/WCSF/ECF/WCF/ECQF/
+  // WCQF/ECR1/WCR1/ECR/WCR. Same leak class as LEADING-ROUND-NOISE-DESTROYS-TEAM
+  // — must never become part of a team name.
+  if (/^(?:e|w)c(?:sf|qf|f|r\d?|sr|fr)$/i.test(t)) return true
+  if (/^(?:game|round|week|matchweek|mw|gw|leg|qf|sf|semi|semis|semifinals?|quarter|quarters|quarterfinals?|finals?|prelims?|main|card|event|full|playoffs?|playoff|rs|regular|season|pre|post|press|conference|singles|doubles|women|men|mens|womens)$/i.test(t)) return true
+  if (/^(?:slash|the|of|round\d{1,2}|game\d{1,2})$/i.test(t)) return true
+  // Ancillary / clip-type words and the match keyword — never part of a team
+  // name (a team side ends here): Match / Replay / Highlights / Recap /
+  // Coverage / Preview / Review / Reaction / Analysis / Buildup.
+  if (/^(?:match|replays?|highlights?|recaps?|recapping|coverage|previews?|reviews?|reaction|analysis|buildup|magazine)$/i.test(t)) return true
+  // Broadcast region suffix tokens ("Sky Sports NZ", "ESPN UK"). Kept narrow
+  // to unambiguous codes so real words/initials are not eaten.
+  if (/^(?:nz|uk|usa|aus)$/i.test(t)) return true
+  // Scene-group shape: letters glued to a 3+ digit run (Jinx8004, Z3R0 etc.).
+  if (/^[a-z]{2,}\d{3,}$/i.test(t)) return true
+  return false
+}
+
+// Venue words that can lead the home side (tennis tournament city, motorsport
+// circuit) and must be trimmed before the player/team name.
+function isLeadingVenueNoise(t) {
+  const low = String(t || '').toLowerCase().replace(/,$/, '')
+  if (VENUE_DICT.has(low)) return true
+  // tournament-city tokens that appear right after a tennis/golf league code
+  if (/^(?:roma|rome|paris|madrid|miami|monte|carlo|indian|wells|cincinnati|montreal|toronto|dubai|doha|stuttgart|berlin|prague|italy|spain|france)$/i.test(low)) return true
+  // Tournament-TYPE words after the city ("Madrid Open", "… Masters"). Only
+  // reached for racket/individual sports (venueTrimEligible gate in cleanSide)
+  // so team-sport names like "… Open Cup" are untouched.
+  return /^(?:open|masters|classic|championships?|cup|international|invitational|challenger|tour|series|grand|slam|trophy)$/i.test(low)
+}
+
+// Strip every noise class so a side never carries broadcaster / round / year /
+// sponsor / scene-group tokens (spec invariant: no leaks).
+// `trimLeadingVenue` removes leading tournament-city/venue noise (home side).
+function cleanSide(tokens, sport, ctx, trimLeadingVenue = false) {
+  let work = [...tokens]
+  // Leading tournament-city trimming only applies to individual / racket
+  // sports where the real shape is "LEAGUE City PlayerName" (tennis/golf/…).
+  // For team sports a leading city IS part of the club name (Miami Marlins,
+  // San Francisco Giants) and must never be stripped.
+  const sportLow = String(sport || '').toLowerCase()
+  const venueTrimEligible = /(?:tennis|golf|badminton|squash|table[\s-]*tennis|snooker|darts|athletics|swimming|cycling|skiing)/.test(sportLow)
+  // Trim leading noise tokens (round/date/year/season/venue) before the name.
+  if (trimLeadingVenue) {
+    while (work.length > 1) {
+      const head = String(work[0] || '').trim()
+      if (isSideNoiseToken(head)) { work.shift(); continue }
+      if (venueTrimEligible && isLeadingVenueNoise(head)) { work.shift(); continue }
+      break
+    }
+  }
+  const kept = []
+  for (const tok of work) {
+    const t = String(tok || '').replace(/,$/, '').trim()
+    if (!t) continue
+    if (isSideNoiseToken(t)) continue
+    kept.push(t)
+  }
+  let label = normalizeSegment(kept.join(' '))
+  // Drop trailing competition / sport noise
+  label = label.replace(/\b(?:premier league|super league|championship|playoffs?|regular season)\b/gi, ' ')
+  // Strip a trailing lone codec/separator remnant ("... Indians H" from
+  // "H 264", "... v" from a stray separator). Only when it is the final
+  // single letter and the side still has a real multi-char name before it.
+  label = label.replace(/\s+(?:[hxv])$/i, '')
+  // Strip a trailing ambiguous-broadcaster word ("... Indians Sky" from
+  // "Sky Sports" after Sports was removed) — but ONLY when the side has 3+
+  // tokens. A 2-token side like "Chicago Sky" / "Miami Heat" is the team
+  // itself (no real club is 3+ tokens ending in sky/fox), so it is untouched.
+  if (label.split(/\s+/).filter(Boolean).length >= 3) {
+    label = label.replace(/\s+(?:sky|fox|bt|tnt|nbc|cbs|abc|tsn|bein)$/i, '')
+  }
+  label = normalizeSegment(label)
+  const canon = canonicalizeClub(label, { sport, context: ctx })
+  // Expand known team nicknames/abbreviations to the SportsMeta-canonical name
+  // using the proven legacy alias map (76ers->Philadelphia 76ers,
+  // Knicks->New York Knicks, ...). canonicalizeClub only covers tricodes;
+  // this keeps downstream SportsMeta lookups working without regressing the
+  // existing team-vs-team pipeline.
+  const aliased = normalizeKnownSportsTeamAlias(canon)
+  return titleCase(aliased || canon)
+}
+
+function cleanGolfEventName(tokens = [], competition = '', raw = '') {
+  let eventTokens = [...(Array.isArray(tokens) ? tokens : [])]
+  const competitionTokens = normalizeSegment(competition).toLowerCase().split(/\s+/).filter(Boolean)
+  const shouldDrop = (token, index) => {
+    const t = String(token || '').trim()
+    const low = t.toLowerCase()
+    if (!t) return true
+    if (QUALITY_TOKEN_RE.test(t) || SOURCE_FORMAT_RE.test(t) || LANG_TOKEN_RE.test(t)) return true
+    if (RUBBISH_TOKENS.has(low) || TV_CHANNEL_KEEPERS.has(low)) return true
+    if (/^(?:golf)$/i.test(t)) return true
+    if (/^(?:19|20)\d{2}$/.test(t)) return true
+    if (/^\d{1,4}$/.test(t)) return true
+    if (/^(?:day|round|r|game|stage)$/i.test(t) && /^\d{1,3}$/.test(String(eventTokens[index + 1] || ''))) return true
+    if (/^(?:sky|sports|eurosport|fox|bt|tnt|nbc|cbs|abc|tsn|bein)$/i.test(t)) return true
+    return false
+  }
+
+  if (competitionTokens.length > 0) {
+    for (let i = 0; i <= eventTokens.length - competitionTokens.length; i += 1) {
+      const slice = eventTokens.slice(i, i + competitionTokens.length).map(t => String(t || '').toLowerCase())
+      if (slice.join(' ') === competitionTokens.join(' ')) {
+        eventTokens.splice(i, competitionTokens.length)
+        i -= 1
+      }
+    }
+  }
+
+  eventTokens = eventTokens.filter((token, index) => !shouldDrop(token, index))
+  return titleCase(normalizeSegment(eventTokens.join(' '))).trim()
+}
+
+function parseSportsTitleContract(rawTitle, options = {}) {
+  const raw = normalizeSegment(rawTitle)
+  if (!raw) {
+    return {
+      sport: 'Others', competition: '', contentType: 'event',
+      date: '', year: '', raw: String(rawTitle || '')
+    }
+  }
+
+  const tokens = contractTokens(rawTitle)
+  const sport = detectContractSport(rawTitle, options)
+
+  // contentType: documentary / ancillary / event
+  let contentType = 'event'
+  if (DOC_MARKERS_RE.test(raw)) contentType = 'documentary'
+  else if (ANCILLARY_RE.test(raw)) contentType = 'ancillary'
+
+  const yearTok = (tokens.find(t => /^(19|20)\d{2}$/.test(String(t).trim())) || '')
+  const { date, year } = resolveContractDate(tokens, raw, yearTok, options.pubDate)
+
+  // Competition (leagueMap-canonical; club identity may override)
+  const comp = resolveContractCompetition(tokens, sport)
+
+  const out = {
+    sport: comp.sportKey || sport || 'Others',
+    competition: comp.competition || '',
+    contentType,
+    date: date || '',
+    year: year || (date ? date.slice(0, 4) : ''),
+    raw: String(rawTitle || '')
+  }
+
+  const gameNumber = captureGameNumber(raw)
+  const round = captureRound(raw)
+  const session = captureSession(raw)
+  const venue = captureVenue(tokens, raw, out.sport)
+  const fql = captureFormatQualityLanguage(tokens)
+  const tvChannel = captureTvChannel(raw)
+
+  if (gameNumber) out.gameNumber = gameNumber
+  if (round) out.round = round
+  if (session) out.session = session
+  if (venue) out.venue = venue
+  if (fql.quality) out.quality = fql.quality
+  if (fql.format) out.format = fql.format
+  if (fql.language) out.language = fql.language
+  if (tvChannel) out.tvChannel = tvChannel
+
+  // Regular Season qualifier
+  if (/\bRS\b/.test(raw) || /\bregular\s+season\b/i.test(raw)) out.season = 'Regular Season'
+  if (/\bplayoffs?\b/i.test(raw) && !/\bnba\s+playoffs\b/i.test(raw)) out.season = out.season || 'Playoffs'
+
+  // Documentary / ancillary: keep under sport, single title, NOT rendered as
+  // head-to-head (consumer keys art/sorting off contentType). For an ANCILLARY
+  // clip that still wraps a real "A vs B" fixture (e.g. "... Full Match
+  // Replay"), surface home/away too so the catalog keeps the matchup metadata
+  // (SPEC §5: keep under sport, below fixtures — teams are still data). Pure
+  // documentaries never get teams.
+  if (contentType !== 'event') {
+    out.title = titleCase(
+      normalizeSegment(
+        raw
+          .replace(DOC_MARKERS_RE, m => m)
+          .replace(/\b(?:1080p|720p|2160p|web ?-?dl|webrip|hdtv|x264|x265|h264|h265|hevc|dsnp|ddp\d?(?: \d)?)\b/gi, ' ')
+          .replace(/\b(?:19|20)\d{2}\/\d{1,2}\/\d{1,2}\b/g, ' ')
+      )
+    ).trim() || raw
+    if (contentType === 'ancillary') {
+      const sepIdx = tokens.findIndex(t => CONTRACT_SEPARATORS.has(String(t).toLowerCase()))
+      if (sepIdx > 0 && sepIdx < tokens.length - 1) {
+        const sepT = String(tokens[sepIdx]).toLowerCase()
+        const a = cleanSide(tokens.slice(comp.span, sepIdx), out.sport, raw, true)
+        const b = cleanSide(tokens.slice(sepIdx + 1), out.sport, raw, false)
+        if (a && b) {
+          if (AWAY_FIRST_SEPARATORS.has(sepT)) { out.away = a; out.home = b }
+          else { out.home = a; out.away = b }
+          const ov = resolveClubCompetitionOverride(out.home, out.away)
+          if (ov) { out.competition = ov.competition; out.sport = ov.sportKey || out.sport }
+        }
+      }
+    }
+    return out
+  }
+
+  // Combat (boxing / MMA / UFC): single `event` string, NO home/away.
+  const sepIndex = tokens.findIndex(t => CONTRACT_SEPARATORS.has(String(t).toLowerCase()))
+  if (isCombatSport(out.sport) || (/^(?:ufc|pfl|bellator|one)$/i.test(out.competition) && sepIndex > 0)) {
+    if (sepIndex > 0 && sepIndex < tokens.length - 1) {
+      const before = cleanSide(tokens.slice(0, sepIndex), out.sport, raw)
+      const after = cleanSide(tokens.slice(sepIndex + 1), out.sport, raw)
+      if (before && after) out.event = `${before} vs ${after}`
+    }
+    if (!out.event) {
+      out.event = cleanSide(tokens, out.sport, raw) || raw
+    }
+    if (!out.competition && /^(?:boxing)$/i.test(out.sport)) out.competition = 'Boxing'
+    return out
+  }
+
+  // Team / player vs team (or at/@ away-first) path.
+  if (sepIndex > 0 && sepIndex < tokens.length - 1) {
+    const sepTok = String(tokens[sepIndex]).toLowerCase()
+    // The left side carries all leading league/date/round/venue noise — trim
+    // it aggressively. The right side ends at the first metadata token.
+    let leftRaw = tokens.slice(comp.span, sepIndex)
+    const rightRaw = tokens.slice(sepIndex + 1)
+    // Leading bare sport word + competition phrase that was NOT sliced
+    // (mapped competition not at token 0 because a sport word leads it, e.g.
+    // "Football FA Cup Chelsea ..."). Drop a leading sport word, then the
+    // resolved competition phrase if it sits at the new left start.
+    {
+      const SPORT_WORD_RE = /^(?:football|soccer|basketball|baseball|hockey|cricket|rugby|boxing|tennis|golf|cycling|darts|snooker|motorsport)$/i
+      while (leftRaw.length > 1 && SPORT_WORD_RE.test(String(leftRaw[0] || '').trim())) {
+        leftRaw = leftRaw.slice(1)
+      }
+      if (comp.competition && comp.span === 0) {
+        const compWords = normalizeSegment(comp.competition).toLowerCase().split(/\s+/)
+        const headWords = leftRaw.slice(0, compWords.length).map(t => String(t || '').toLowerCase())
+        if (compWords.length && headWords.join(' ') === compWords.join(' ')) {
+          leftRaw = leftRaw.slice(compWords.length)
+        } else {
+          // Try matching against the raw (unmapped) leading code token too.
+          const firstLow = String(leftRaw[0] || '').toLowerCase()
+          if (KNOWN_COMP_TOKEN_RE.test(String(leftRaw[0] || '')) && firstLow !== '') {
+            leftRaw = leftRaw.slice(1)
+          }
+        }
+      }
+    }
+    // LEADING-ROUND-NOISE-DESTROYS-TEAM (SPEC §3/§7 row 7): when the
+    // competition phrase was NOT sliced off (unmapped / multi-word like
+    // "Basketball Champions League of Americas F4 SF"), the home team begins
+    // AFTER the last leading round/bracket/stage marker. Find the latest such
+    // marker in the left side and drop everything up to and including it.
+    {
+      const ROUND_MARKER_RE = /^(?:f4|final|finals|semis?|semifinals?|quarterfinals?|sf|qf|r1|r2|r3|ro16|round|group|stage|knockout|playoffs?|playoff|game|leg|f8|finalfour)$/i
+      let lastMarker = -1
+      for (let i = 0; i < leftRaw.length; i += 1) {
+        const tk = String(leftRaw[i] || '').replace(/[(),]/g, '').trim()
+        if (ROUND_MARKER_RE.test(tk) || /^(?:round|group|game|stage|r)\d{1,2}$/i.test(tk)) lastMarker = i
+      }
+      if (lastMarker >= 0 && lastMarker < leftRaw.length - 1) {
+        leftRaw = leftRaw.slice(lastMarker + 1)
+      }
+    }
+    let sideA = cleanSide(leftRaw, out.sport, raw, true)
+    let sideB = cleanSide(rightRaw, out.sport, raw, false)
+
+    let home; let away
+    if (AWAY_FIRST_SEPARATORS.has(sepTok)) {
+      away = sideA; home = sideB
+    } else {
+      home = sideA; away = sideB
+    }
+
+    // Club identity competition override (clubs are ground truth, §5)
+    const override = resolveClubCompetitionOverride(home, away)
+    if (override) {
+      out.competition = override.competition
+      out.sport = override.sportKey || out.sport
+    }
+
+    if (home) out.home = home
+    if (away) out.away = away
+    if (home && away) out.event = `${home} vs ${away}`
+    return out
+  }
+
+  // No separator: single-event (motorsport / niche / tournament). The event
+  // string is the residual identity (venue / race name); session and round are
+  // already captured in their own fields, so strip those words from the event
+  // name (same intent as SESSION-SHREDDED / ROUND-NOT-LIFTED — they belong in
+  // dedicated fields, not the name).
+  let eventTokens = tokens.slice(comp.span)
+  // Strip a trailing ALL-CAPS scene-group token (HEEL, FLUX, KONTRAST, MWR…).
+  // SPEC §1 default: an unknown trailing station/group token is RUBBISH. Use
+  // the original casing — a 3-8 char ALL-CAPS final token after the event
+  // identity is a release group, never the event name.
+  while (eventTokens.length > 1) {
+    const last = String(eventTokens[eventTokens.length - 1] || '').trim()
+    if (/^[A-Z][A-Z0-9]{2,7}$/.test(last) && !/^(?:USA|FP\d|R\d{1,2}|GP|UFC|WWE|AEW|NXT|MLB|NBA|NHL|NFL|MLS|IPL|EPL|UCL|UEL)$/.test(last)) {
+      eventTokens = eventTokens.slice(0, -1)
+      continue
+    }
+    break
+  }
+  if (/^golf$/i.test(out.sport)) {
+    const golfEvent = cleanGolfEventName(eventTokens, out.competition, raw)
+    if (golfEvent) out.event = golfEvent
+    else out.event = titleCase(normalizeSegment(raw))
+    return out
+  }
+  let cleanedEvent = cleanSide(eventTokens, out.sport, raw)
+  if (cleanedEvent) {
+    // Strip the resolved competition phrase wherever it sits (it was not
+    // sliced when a bare sport word leads it, e.g. "Golf PGA Tour ...").
+    if (comp.competition) {
+      const compRe = new RegExp(`\\b${comp.competition.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+      cleanedEvent = cleanedEvent.replace(compRe, ' ')
+    }
+    cleanedEvent = normalizeSegment(
+      cleanedEvent
+        // leading / trailing bare sport word (Golf / Tennis / Basketball / …)
+        .replace(/^(?:golf|tennis|basketball|football|baseball|hockey|cricket|rugby|boxing|cycling|darts|snooker|motorsport|soccer)\s+/i, '')
+        .replace(/\s+(?:golf|tennis|basketball|football|baseball|hockey|cricket|rugby|boxing|cycling|darts|snooker|motorsport|soccer)$/i, '')
+        .replace(/\b(?:fp[1-3]|free\s*practice(?:\s*(?:one|two|three|[1-3]))?|practice(?:\s*[1-3](?:\s*&\s*[1-3])?)?|qualifying|qualifier|warm\s*up|warmup|sprint(?:\s*race)?|race|full\s*event|main\s*event|main\s*card|early\s*prelims?|prelims?)\b/gi, ' ')
+        .replace(/\b(?:round\s*0*\d{1,2}|round0*\d{1,2}|r0*\d{1,2}|game\s*\d{1,2}|stage\s*\d{1,2})\b/gi, ' ')
+    )
+    // Re-trim a trailing lone broadcaster word exposed after the sport-word
+    // strip ("... Open Day Sky" -> "... Open Day").
+    cleanedEvent = normalizeSegment(cleanedEvent.replace(/\s+(?:sky|fox|bt|tnt|nbc|cbs|abc|tsn|bein)$/i, ''))
+  }
+  if (cleanedEvent) out.event = cleanedEvent
+  else out.event = titleCase(normalizeSegment(raw))
+  return out
+}
+
 module.exports = {
   parseSportsTitle,
   parseSportsEventTitle,
+  parseSportsTitleContract,
   normalizeKnownSportsTeamAlias,
   stripCompetitionSideNoise
 }

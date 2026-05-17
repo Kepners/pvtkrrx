@@ -1,5 +1,23 @@
 # PVTKRRX Brain
 
+## 2026-05-17: Main branch and Coolify auto-deploy restored for 1.1.70
+
+- Scope: unify the live public Coolify branch back onto GitHub `main`, restore Coolify auto-deploy, and issue the next app-aligned release revision for hosted/cloud plus Windows desktop testing.
+- Coolify control-plane state changed:
+  - App id `9`, uuid `w14jewmw5ubscrxh8zzfhq7d`, now has `git_branch=main`.
+  - `application_settings.is_auto_deploy_enabled=true`.
+  - Verified directly in the Coolify DB after the update.
+- Release target:
+  - App/package version bumped to `1.1.70`.
+  - `main` must include the current live sports/parser/artwork fixes from `integrate/sportcult-category-contract` plus the existing `1.1.69` playback release-line work.
+  - Windows EXE artifacts must be rebuilt for `1.1.70` before calling this revision complete.
+- Acceptance bar before closing:
+  - `origin/main` points at the final `1.1.70` release commit.
+  - Coolify builds and serves that same commit on `https://www.pvtkrrx.cc`.
+  - GitHub releases/tags `v1.1.70` and `v1.1.70-selfhost` resolve to the same commit.
+  - The desktop release has setup/portable EXE assets for `1.1.70`.
+  - Live manifest/version/artwork probes prove the public container is not still serving the old feature-branch image.
+
 ## 2026-05-16: Partial Playback Buffer Handoff Hotfix Deployed
 
 - Scope: repair Stremio playback startup for partially downloaded qBittorrent files. This changed both active PVTKRRX server surfaces: the native `/opt/pvtkrrx` `pvtkrrx.service` runtime used by `pvt.kepners.co.uk` and `/selfhost/*`, and the public Coolify container for `www.pvtkrrx.cc`. It did not change DNS, Caddy route files, qBittorrent credentials, Prowlarr credentials/indexers, SportsMeta, Stripe, Mailcow, or download paths.
@@ -50,7 +68,7 @@ There are currently two PVTKRRX server surfaces on Contabo. Keep them separate w
 
 | Surface | Where | Watches |
 |---|---|---|
-| `https://www.pvtkrrx.cc` except `/selfhost/*` | Coolify Docker container `w14jewmw5ubscrxh8zzfhq7d-...`, bound to internal `pvtkrrx:3000`, fronted by Caddy reverse_proxy | GitHub `Kepners/pvtkrrx` branch `integrate/sportcult-category-contract` as of the 2026-05-16 playback deploy |
+| `https://www.pvtkrrx.cc` except `/selfhost/*` | Coolify Docker container `w14jewmw5ubscrxh8zzfhq7d-...`, bound to internal `pvtkrrx:3000`, fronted by Caddy reverse_proxy | GitHub `Kepners/pvtkrrx` branch `main` as of the 2026-05-17 branch unification |
 | `https://www.pvtkrrx.cc/selfhost/*`, `https://pvtkrrx.cc/selfhost/*`, and `https://pvt.kepners.co.uk/*` | Native systemd `pvtkrrx.service`, working directory `/opt/pvtkrrx`, port `7000`, fronted by Caddy `host.docker.internal:7000` | Manual tarball/rsync-style deploy into `/opt/pvtkrrx`, currently on `main` hotfix commit `b5b4b748611e343aa89e2ae6b3c3ae66a083e244` |
 | `https://sportsmeta.pvtkrrx.cc` | systemd `sportsmeta.service` (no Docker, no Coolify), source at `/opt/sportsmeta/app` | manual rsync deploy |
 
@@ -68,7 +86,7 @@ Do not rename this manifest to `PVTKRR Setup`, `PVTKRR Server Setup`, `PVTKRR De
 
 To deploy code to real users:
 1. Push to `Kepners/pvtkrrx` branch `main`.
-2. Coolify auto-detects the new SHA but does **not** auto-deploy from a webhook — it only auto-deploys via its UI / API / artisan dispatch path. Trigger via the UI at `https://coolify.buildsales.homes`, or programmatically via the artisan tinker pattern documented below.
+2. Coolify auto-deploy is enabled for this app. A `main` push should queue a webhook deployment automatically; the UI/API/artisan dispatch path below remains the manual fallback.
 3. Wait for the new container (`docker ps --format '{{.Names}}\t{{.Image}}'` should show the new SHA in the image tag).
 4. Bust any downstream caches (PVTKRRX raster cache + Caddy `Cache-Control: max-age` window).
 

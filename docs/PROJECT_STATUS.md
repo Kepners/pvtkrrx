@@ -1,10 +1,20 @@
 # PVTKRRX Project Status
 
-Updated: 2026-05-16
+Updated: 2026-05-17
 
 ## Current Stage
 
-PVTKRRX is synchronized on the `1.1.69` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The current release priority was the seedbox/playback fix: selected torrents are resumed, moved to top qBittorrent queue priority when supported, kept sequential, and selected files are prioritized before playback waits.
+PVTKRRX is moving to the `1.1.70` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. The current release priority is unifying the live public Coolify branch back onto `main`, restoring Coolify auto-deploy, and shipping the sports parser/artwork fixes with fresh Windows desktop artifacts.
+
+## 2026-05-17: v1.1.70 main unification and sports artwork release
+
+- Release scope: merge the live `integrate/sportcult-category-contract` parser/sports-artwork work back into `main`, preserve the `1.1.69` playback release-line fixes, and publish a new Windows testable revision.
+- Coolify control-plane state: public app id `9` / uuid `w14jewmw5ubscrxh8zzfhq7d` now tracks `main`, and `application_settings.is_auto_deploy_enabled=true` was verified directly in the Coolify DB.
+- Sports/parser fixes included: SPORTS_TITLE_PARSER_SPEC §7 parser contract, live catalog wiring, competition/logo resolution hardening, owner/admin poster style forwarding, contrast-safe logo plates, and sports poster cache/render version `20260516-competition-context-v30`.
+- Playback fixes included: selected torrent prioritization plus contiguous-piece buffer readiness proof from the `1.1.69` release line.
+- Windows release assets rebuilt locally for `1.1.70`: `PVTKRRX Setup 1.1.70.exe`, `PVTKRRX 1.1.70.exe`, `PVTKRRX Setup 1.1.70.exe.blockmap`, and `latest.yml`.
+- Local proof before push/release: `npm run smoke:sports-parser`, `npm run smoke:sports-resolution`, `npm run smoke:playback`, `npm run smoke:sports-artwork`, `npm run smoke:config`, `npm run smoke:selfhost`, `npm run smoke:entitlement`, `npm run smoke:free-tier-artwork`, `npm run smoke:pipeline`, `npm run smoke:security`, `npm run smoke:guards`, `npm run smoke:win-installer-path`, and `npm run dist:win` passed.
+- Required post-push proof: `origin/main`, GitHub releases `v1.1.70` and `v1.1.70-selfhost`, Windows release assets, and the live Coolify container must all resolve to the same final revision before the release is called complete.
 
 ## 2026-05-16: v1.1.69 seedbox playback priority release
 

@@ -37,8 +37,13 @@ const {
 } = require('../utils/sportsArtwork')
 const { normalizeSportsEventMetadata } = require('../utils/sportsEventNormalizer')
 const { classifySportsEvent } = require('../utils/sportsEventClassifier')
+const { buildSportsDisplayName } = require('../utils/sportsDisplayName')
 const { buildMetaPlaceholder } = require('../utils/metaPlaceholder')
 const { applyHostedServiceOverrides } = require('../utils/hostedServiceOverrides')
+
+function normalizeSpace(value) {
+  return String(value || '').replace(/\s+/g, ' ').trim()
+}
 
 const BRAND_POSTER = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.svg'
 const cinemeta = new CinemetaClient()
@@ -606,7 +611,9 @@ function sportsIdentityGroupEventDate(group = {}) {
 function sportsCatalogDateBucket(eventDate, today = currentUtcDateString()) {
   const date = normalizeIsoDate(eventDate)
   if (!date) return 1
-  return date >= today ? 0 : 2
+  if (date === today) return 0
+  if (date < today) return 2
+  return 3
 }
 
 function compareSportsIdentityGroupFreshness(a = {}, b = {}, today = currentUtcDateString()) {
@@ -617,7 +624,7 @@ function compareSportsIdentityGroupFreshness(a = {}, b = {}, today = currentUtcD
   if (aBucket !== bBucket) return aBucket - bBucket
   if (!aDate || !bDate) return 0
 
-  if (aBucket === 0) {
+  if (aBucket === 0 || aBucket === 3) {
     return aDate.localeCompare(bDate)
   }
   return bDate.localeCompare(aDate)
@@ -634,6 +641,7 @@ function normalizeSportsCatalogItems(items = []) {
       sportHint: item?.sportHint,
       league: effectiveLeague
     })
+    const profileLeague = sportsProfile?.league || sportsProfile?.competition || ''
     const eventClass = sportsProfile?.event_class || classifySportsEvent({
       sportHint: sportsProfile?.sport || item?.sportHint,
       sport: sportsProfile?.sport,
@@ -677,9 +685,9 @@ function normalizeSportsCatalogItems(items = []) {
         sportHint: item?.sportHint,
         today: currentUtcDateString()
       }),
-      mappedLeague: mapLeague(effectiveLeague) || '',
+      mappedLeague: mapLeague(profileLeague || effectiveLeague) || profileLeague || '',
       sportHint: resolveSportHint({
-        explicitHint: item?.sportHint,
+        explicitHint: sportsProfile?.sport || item?.sportHint,
         categoryHint: sportHintFromLeagueCode(effectiveLeague),
         title: item?.title
       })
@@ -832,6 +840,33 @@ function getSportsVariantTag(title) {
   return 'main'
 }
 
+function sportsProfileEventTitle(profile = {}) {
+  const event = normalizeSpace(profile?.event || '')
+  if (event) return event
+  const home = normalizeSpace(profile?.home_team || '')
+  const away = normalizeSpace(profile?.away_team || '')
+  return home && away ? `${home} vs ${away}` : ''
+}
+
+function sportsProfileEventDetail(profile = {}) {
+  return normalizeSpace(profile?.session || profile?.round || profile?.game_number || '')
+}
+
+function appendSportsEventDetail(title = '', detail = '') {
+  const cleanTitleValue = normalizeSpace(title)
+  const cleanDetail = normalizeSpace(detail)
+  if (!cleanTitleValue || !cleanDetail) return cleanTitleValue
+  const detailRe = new RegExp(`\\b${cleanDetail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i')
+  return detailRe.test(cleanTitleValue) ? cleanTitleValue : `${cleanTitleValue} ${cleanDetail}`
+}
+
+function sportsProfileDisplayTitle(profile = {}) {
+  const title = sportsProfileEventTitle(profile)
+  if (!title) return ''
+  const isHeadToHead = Boolean(profile?.home_team && profile?.away_team)
+  return isHeadToHead ? title : appendSportsEventDetail(title, sportsProfileEventDetail(profile))
+}
+
 function groupSportsAvailabilityItems(items, query = '') {
   const groups = new Map()
   for (const item of items || []) {
@@ -839,7 +874,7 @@ function groupSportsAvailabilityItems(items, query = '') {
     const displaySportsEvent = canonicalizeSportsMatchupOrder(parsedSportsEvent, query)
     const parsedEvent = item?.parsedEvent || null
     const itemMappedLeague = item?.mappedLeague || ''
-    const fallbackDisplayTitle = normalizeSportsEventTitle(item.title, displaySportsEvent, parsedEvent) || cleanTitle(item.title) || String(item.title || '').trim()
+    const fallbackDisplayTitle = sportsProfileDisplayTitle(item?.sportsProfile) || normalizeSportsEventTitle(item.title, displaySportsEvent, parsedEvent) || cleanTitle(item.title) || String(item.title || '').trim()
     if (!fallbackDisplayTitle) continue
     const availabilityKey = sportsEventKey({ title: item.title, parsedSportsEvent, parsedEvent })
     const hasStructuredKey = (parsedSportsEvent?.league && parsedSportsEvent?.date && parsedSportsEvent?.homeTeam && parsedSportsEvent?.awayTeam) ||
@@ -1300,16 +1335,19 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
     const parsedSportsEvent = group.parsedSportsEvent || availability?.parsedSportsEvent || null
     const displaySportsEvent = group.displaySportsEvent || parsedSportsEvent || null
     const parsedEvent = group.parsedEvent || availability?.parsedEvent || null
-    const effectiveLeagueCode = parsedSportsEvent?.league || displaySportsEvent?.league || parsedEvent?.league || ''
+    const profileLeague = availability?.sportsProfile?.league || availability?.sportsProfile?.competition || ''
+    const effectiveLeagueCode = profileLeague || parsedSportsEvent?.league || displaySportsEvent?.league || parsedEvent?.league || ''
     const fallbackLeague = normalizeLeagueLabel(group.mappedLeague || availability?.mappedLeague || mapLeague(effectiveLeagueCode) || effectiveLeagueCode)
-    const fallbackDisplayTitle = group.fallbackDisplayTitle || normalizeSportsEventTitle(availability?.title, displaySportsEvent, parsedEvent) || cleanTitle(availability?.title) || availability?.title
+    const profileEventTitle = sportsProfileEventTitle(availability?.sportsProfile)
+    const profileEventDetail = sportsProfileEventDetail(availability?.sportsProfile)
+    const fallbackDisplayTitle = group.fallbackDisplayTitle || sportsProfileDisplayTitle(availability?.sportsProfile) || normalizeSportsEventTitle(availability?.title, displaySportsEvent, parsedEvent) || cleanTitle(availability?.title) || availability?.title
     const displayTitle = canonicalEvent?.name || canonicalEvent?.title || fallbackDisplayTitle
     const resolvedSportHint = resolveSportHint({
-      explicitHint: canonicalEvent?.sport || (effectiveLeagueCode ? (sportHintFromLeagueCode(effectiveLeagueCode) || availability?.sportHint) : availability?.sportHint),
+      explicitHint: canonicalEvent?.sport || availability?.sportsProfile?.sport || (effectiveLeagueCode ? (sportHintFromLeagueCode(effectiveLeagueCode) || availability?.sportHint) : availability?.sportHint),
       categoryHint: requestedSportHint,
       title: canonicalEvent?.title || availability?.title || displayTitle
     })
-    const eventDate = String(canonicalEvent?.date || sportsArtwork?.eventDate || parsedSportsEvent?.date || parsedEvent?.date || '').trim()
+    const eventDate = String(canonicalEvent?.date || sportsArtwork?.eventDate || availability?.sportsProfile?.date || parsedSportsEvent?.date || parsedEvent?.date || '').trim()
     const league = String(canonicalEvent?.league || sportsArtwork?.league || fallbackLeague || parsedSportsEvent?.league || parsedEvent?.league || '').trim()
     const fallbackHomeTeam = displaySportsEvent?.homeTeam || parsedSportsEvent?.homeTeam || ''
     const fallbackAwayTeam = displaySportsEvent?.awayTeam || parsedSportsEvent?.awayTeam || ''
@@ -1322,12 +1360,21 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       parsedEvent,
       sportHint: resolvedSportHint,
       competition: league,
-      eventTitle: displayTitle,
+      eventTitle: canonicalEvent?.name || canonicalEvent?.title ? displayTitle : (profileEventTitle || displayTitle),
+      eventDetail: profileEventDetail,
       date: eventDate,
       seeders: availability.seeders,
       size: formatSize(availability.size),
       rawTitle: availability?.title || '',
       source: canonicalIdentity ? 'sportsmeta' : 'prowlarr'
+    })
+    const catalogDisplayName = buildSportsDisplayName({
+      title: displayTitle,
+      league: normalizedSportsEvent.competition || league,
+      sport: normalizedSportsEvent.sport || resolvedSportHint,
+      eventDetail: normalizedSportsEvent.eventDetail || profileEventDetail,
+      homeTeam: normalizedSportsEvent.homeTeam || fallbackHomeTeam,
+      awayTeam: normalizedSportsEvent.awayTeam || fallbackAwayTeam
     })
     const descriptionParts = [
       `${availability.seeders} seeders`,
@@ -1417,6 +1464,8 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
       setSportsAvailabilityCanonicalAnchor(canonicalCatalogId, availabilityAnchorKey)
     }
 
+    const catalogDescription = descriptionLines.join('\n') || descriptionParts.join(' | ')
+
     return {
       id: (
         sportsMetaResolution.status === SPORTS_META_RESOLUTION_STATUS.RESOLVED &&
@@ -1449,8 +1498,9 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
             compact: 'sports'
           }),
       type: mediaType,
-      name: displayTitle,
-      description: descriptionLines.join('\n') || descriptionParts.join(' | '),
+      name: catalogDisplayName,
+      description: catalogDescription,
+      overview: catalogDescription,
       poster: catalogPosterUrl,
       background: landscapeUrl || backgroundUrl || undefined,
       logo: logoUrl || undefined,

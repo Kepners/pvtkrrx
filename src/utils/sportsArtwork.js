@@ -9,9 +9,13 @@ const {
   resolveSportsPosterTemplate
 } = require('./sportsPosterTemplates')
 const { resolveSportBackdrop } = require('./sportBackdrops')
-const { verifyStampedSportsPosterEntitlement } = require('./entitlement')
+const {
+  ENTITLEMENT_SOURCE,
+  verifyStampedSportsPosterEntitlement,
+  resolveServerAdminPosterTemplate
+} = require('./entitlement')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260514-team-logo-overrides-v24'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260516-competition-context-v30'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
@@ -139,7 +143,37 @@ function resolveConfiguredSportsPosterTemplate(input = {}) {
     stampedSource,
     stampedHash
   })
-  return resolveSportsPosterTemplate(verified.resolvedTemplate || 'ticket-stub')
+  if (verified.allowed && verified.resolvedTemplate) {
+    return resolveSportsPosterTemplate(verified.resolvedTemplate)
+  }
+
+  // Server-side admin override remains a fallback for public/no-token artwork.
+  // A verified owner/admin config must win so changing layout in configure does
+  // not require reinstalling the Stremio addon.
+  const serverAdminTemplate = resolveServerAdminPosterTemplate(process.env)
+  if (serverAdminTemplate) return resolveSportsPosterTemplate(serverAdminTemplate)
+
+  return resolveSportsPosterTemplate('ticket-stub')
+}
+
+// The artwork proxy route carries NO config token (Stremio hits it directly).
+// To make a configured owner/admin's selected style actually reach the
+// renderer, the catalog forwards the STAMPED entitlement fields on the URL.
+// The proxy re-runs verifyStampedSportsPosterEntitlement against the LIVE env
+// owner/admin list, so a leaked URL with a non-owner stamp still degrades to
+// ticket-stub (anti-leak preserved) — only a genuine, env-verifiable owner/
+// admin stamp unlocks the selected style.
+function appendEntitlementStampParams(url, input = {}) {
+  const config = input && typeof input.config === 'object' ? input.config : null
+  const requestedTemplate = String(input?.sportsPosterTemplate || config?.sportsPosterTemplate || '').trim()
+  const stampedSource = String(input?.entitlementSource || config?.entitlementSource || '').trim()
+  const stampedHash = String(input?.entitlementOwnerEmailHash || config?.entitlementOwnerEmailHash || '').trim()
+  const urlVerifiableSource = stampedSource === ENTITLEMENT_SOURCE.OWNER_OVERRIDE ||
+    stampedSource === ENTITLEMENT_SOURCE.ADMIN_OVERRIDE
+  if (!urlVerifiableSource || !stampedHash) return
+  if (requestedTemplate) url.searchParams.set('reqTemplate', requestedTemplate)
+  url.searchParams.set('entSource', stampedSource)
+  url.searchParams.set('entHash', stampedHash)
 }
 
 function resolveSportsArtworkLayoutFamily(input = {}) {
@@ -178,6 +212,7 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
       if (input?.source) url.searchParams.set('source', normalizeSpace(input.source))
     }
     url.searchParams.set('template', resolveConfiguredSportsPosterTemplate(input))
+    appendEntitlementStampParams(url, input)
     url.searchParams.set('v', SPORTS_ARTWORK_PROXY_VERSION)
     return url.toString()
   }
@@ -196,6 +231,7 @@ function buildPvtkrrxRasterUrl(variant, input = {}) {
   if (input?.size) url.searchParams.set('size', normalizeSpace(input.size))
   if (input?.source) url.searchParams.set('source', normalizeSpace(input.source))
   url.searchParams.set('template', resolveConfiguredSportsPosterTemplate(input))
+  appendEntitlementStampParams(url, input)
   url.searchParams.set('v', SPORTS_ARTWORK_PROXY_VERSION)
   return url.toString()
 }

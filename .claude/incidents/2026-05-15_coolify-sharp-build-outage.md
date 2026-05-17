@@ -3,7 +3,7 @@
 **Date:** 2026-05-15
 **Severity:** P1 — total public outage (no logo, no playback, manifest 502)
 **Duration:** ~ from Codex push of `49f6ae0`/`2d391ae` to recovery (recovery container up 2026-05-15)
-**Status:** ✅ SERVICE RESTORED (on cached known-good image) — ⚠️ Coolify build pipeline still broken
+**Status:** ✅ RESOLVED 2026-05-16 — Coolify build pipeline FIXED (hardened Dockerfile), controlled deploy of `da6bdb4` live & healthy. Auto-deploy still disabled by choice (see Follow-up #2).
 
 ## Symptoms
 - `https://www.pvtkrrx.cc/manifest.json` and `/configure` → **HTTP 502**.
@@ -46,8 +46,21 @@
 - Live public check after cleanup: recovery container `pvtkrrx-recovery` still served `https://www.pvtkrrx.cc/manifest.json` with `HTTP 200` in `0.098056s`.
 - Important caveat: this proves the Dockerfile fix locally and on the Contabo Docker daemon. It does **not** prove a real Coolify deployment yet. Auto-deploy remains disabled until a controlled Coolify deploy of this fix is run and verified.
 
-## Follow-up workstream (open)
-1. Run a controlled Coolify deployment of the hardened Dockerfile, verify the resulting app image boots, then re-enable auto-deploy only after that live Coolify image is healthy.
-2. Re-enable `is_auto_deploy_enabled` only after (1) is proven.
-3. Then re-run DIRECTIVE 001 audit gate for Codex's sports-logo work before it ships.
-4. Deferred product bugs (now triageable, backend alive): wrong-torrent selection (dead/0-seed pick), event year not shown on poster/metadata — fold into DIRECTIVE 001 scope.
+## RESOLUTION — controlled Coolify deploy SUCCEEDED (2026-05-16)
+
+**The Coolify build pipeline is FIXED. The hardened Dockerfile resolves the sharp/libvips break through Coolify itself.**
+
+- Client-authorised test deploy of branch `integrate/sportcult-category-contract` HEAD `da6bdb4` (parser contract `d761c01` + Codex playback fix `9cc94b7` + consumer migration `da6bdb4`).
+- Pointed Coolify app id 9 (`w14jewmw5ubscrxh8zzfhq7d`) `git_branch` → `integrate/sportcult-category-contract`, triggered ONE controlled deploy (deployment_uuid `01KRRV6W7N53SFDZCVFXAVXC1J`) via the same `queue_application_deployment(...)` path the UI uses.
+- **Coolify build log proof:** `npm ci --include=optional` + `npm rebuild sharp` + all native assertions passed → `rebuilt dependencies successfully` / `sharp ok 0.34.5 8.17.3`. The 2026-05-15 broken-build symptom did NOT recur. Image built + tagged `w14jewmw5ubscrxh8zzfhq7d:da6bdb4787a032db376f9a08218840d0fc8d8b4c`.
+- **Rolling update completed:** new container `w14jewmw5ubscrxh8zzfhq7d-165144371361` Created→Started→old removed. Site never 502 (rolling update kept the prior container serving until the new one took the `pvtkrrx` network alias). The trailing deployment-queue status `cancelled-by-user` was a benign post-rollout bookkeeping race AFTER "Rolling update completed" — not a build/deploy failure.
+- **`pvtkrrx-recovery` retired by Coolify's rolling update** (it shared the compose project; "Removing old containers" took it down once the new healthy container was up). No leftover recovery/orphan containers.
+- **Live verification:** `https://www.pvtkrrx.cc/manifest.json` → HTTP 200 (×3 consistent), valid bootstrap `com.kepners.pvtkrrx.bootstrap` v1.1.68 name `PVTKRR`; `/configure` → 302; hostname lock CLEAN (no `kepners.co.uk` host leak; only the addon-ID namespace `com.kepners.*`); container `SOURCE_COMMIT=da6bdb4787a...`, `COOLIFY_BRANCH=integrate/sportcult-category-contract`, RestartCount=0, Running=true, serving real users.
+- **Parser fix observable live** (run inside the deployed container): `Football FA Cup Chelsea vs Leeds United` → home=`Chelsea` away=`Leeds United` league=`FA Cup` date=`2026-04-26` (was: home=`Football FA Cup Chelsea`); `EPL 2026 Celtic vs Rangers` → league=`Scottish Premiership` (club-identity override) date=`2026-05-10`; `NBA Playoffs ECSF 76ers@Knicks` → home=`New York Knicks` away=`Philadelphia 76ers` date=`2026-05-04`; IndyCar single-event now emits `date=2026-05-14` (was empty — the "no year on poster" symptom).
+
+## Follow-up workstream (status)
+1. ✅ DONE — controlled Coolify deploy of hardened Dockerfile run and verified healthy live (above).
+2. ✅ RESTORED 2026-05-17 — after the live branch was unified back to `main`, the Coolify app was updated to `git_branch=main` and `is_auto_deploy_enabled=true`; the next `main` push is expected to queue the normal webhook deployment.
+3. OPEN — re-run DIRECTIVE 001 audit gate for Codex's sports-logo work before it ships (independent of this parser deploy; SportsMeta upstream artwork gaps still resolve to clean deterministic initials per DIR-001).
+4. OPEN — deferred product bugs: wrong-torrent selection partly addressed by Codex's `9cc94b7` playback-priority fix (now live); event-year-on-poster for single-event motorsport is a cosmetic edge the §7 oracle does not gate (out of this deploy's scope, fold into DIR-001).
+5. KNOWN non-blocking: `smoke-sports-single-event-motorsport` (`motogp-brazil-gear-up identity glyph marker`) still fails — verified byte-identical to pre-change baseline, not a regression from this work.

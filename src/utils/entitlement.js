@@ -318,6 +318,27 @@ function isSelfHostModeEnabled(env = process.env) {
   return /^(1|true|yes|on)$/i.test(String(env.PVTKRRX_SELF_HOST_MODE || '').trim())
 }
 
+// Server-side admin poster-style override.
+//
+// This is the OPERATOR's deliberate, server-wide choice — set via a server
+// env var the configure page surfaces as "Server-side admin override active".
+// It is NOT a per-user config token, so honouring it on the public artwork
+// proxy does not weaken the anti-leak protection (that protection exists to
+// stop a *leaked user URL* from unlocking premium styles; it has no bearing
+// on what the server operator chose to render for everyone).
+//
+// Returns a valid normalized template, or '' when no/invalid override set.
+function resolveServerAdminPosterTemplate(env = process.env) {
+  const raw = String(
+    env.PVTKRRX_SPORTS_POSTER_ADMIN_OVERRIDE ||
+    env.PVTKRRX_SPORTS_POSTER_TEMPLATE ||
+    ''
+  ).trim()
+  if (!raw) return ''
+  const normalized = normalizeSportsPosterTemplate(raw)
+  return VALID_TEMPLATES.has(normalized) ? normalized : ''
+}
+
 function envOwnerHashes(env = process.env) {
   const out = new Set()
   for (const email of getOwnerEmails(env)) {
@@ -364,5 +385,6 @@ module.exports = {
   isAdminStremioUserId,
   resolveSportsPosterEntitlement,
   verifyStampedSportsPosterEntitlement,
+  resolveServerAdminPosterTemplate,
   clampSportsPosterTemplate
 }

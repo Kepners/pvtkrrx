@@ -18,6 +18,7 @@ const {
   handleCanonicalSportsArtwork,
   handleDefaultSportsArtwork
 } = require('../src/handlers/sportsArtworkProxy')
+const { renderLogoGlyphSvg } = require('../src/utils/sportsPosterTemplates')
 const { SPORTS_DISCOVERY_CATALOGS } = require('../src/config/sportsCatalogs')
 const { normalizeSportsEventMetadata } = require('../src/utils/sportsEventNormalizer')
 
@@ -606,7 +607,8 @@ async function assertTeamBadgeArtworkProxy() {
       if (
         url.hostname === 'a.espncdn.com' ||
         url.hostname === 'r2.thesportsdb.com' ||
-        url.hostname === 'www.thesportsdb.com'
+        url.hostname === 'www.thesportsdb.com' ||
+        url.hostname === 'upload.wikimedia.org'
       ) {
         return new Response(await teamBadgePng('#0f172a', '#38bdf8'), {
           status: 200,
@@ -965,6 +967,35 @@ async function assertTeamBadgeArtworkProxy() {
       fs.writeFileSync(path.join(PREVIEW_DIR, `${testCase.slug}.png`), response.body)
     }
 
+    const fakeOpponentResponse = makeMockResponse()
+    await handleDefaultSportsArtwork(
+      {
+        params: {
+          variant: 'poster',
+          sport: 'football.png'
+        },
+        query: {
+          league: 'English Premier League',
+          title: 'Arsenal vs Womens Super League',
+          date: '2026-05-10',
+          home: 'Arsenal',
+          away: 'Womens Super League',
+          eventClass: 'team_vs_team'
+        }
+      },
+      fakeOpponentResponse,
+      {
+        sportsmetaBaseUrl: 'https://sportsmeta.test'
+      }
+    )
+    assert.equal(fakeOpponentResponse.statusCode, 200, 'league-as-opponent fallback should return 200')
+    assert.equal(fakeOpponentResponse.headers['content-type'], 'image/png', 'league-as-opponent fallback should return PNG')
+    assert.equal(fakeOpponentResponse.headers['x-pvtkrrx-artwork-logo-kind'], 'fallback-glyph', 'league-as-opponent fallback should not promote a team badge to a league/event logo')
+    assert.equal(Number(fakeOpponentResponse.headers['x-pvtkrrx-logo-real-count'] || 0), 0, 'league-as-opponent fallback should not paint real logos from the full title haystack')
+    assert.ok(Number(fakeOpponentResponse.headers['x-pvtkrrx-logo-fallback-count'] || 0) >= 1, 'league-as-opponent fallback should paint visible fallback initials')
+    assert.doesNotMatch(String(fakeOpponentResponse.headers['x-pvtkrrx-logo-slots'] || ''), /real-team/i, 'league-as-opponent slots should not contain team crest assignments')
+    assert.deepEqual(pngDimensions(fakeOpponentResponse.body), dimensions.poster, 'league-as-opponent fallback dimensions')
+
     const directLogoCases = [
       {
         slug: 'direct-nhl-team-logos',
@@ -980,6 +1011,36 @@ async function assertTeamBadgeArtworkProxy() {
         expectedSources: [/\/nhl\/500\/det\.png/i, /\/nhl\/500\/fla\.png/i]
       },
       {
+        slug: 'direct-nhl-user-screenshot-logos',
+        sport: 'hockey.png',
+        query: {
+          league: 'NHL',
+          title: 'Ottawa Senators vs Toronto Maple Leafs',
+          date: '2026-04-15',
+          home: 'Ottawa Senators',
+          away: 'Toronto Maple Leafs',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/nhl\/500\/ott\.png/i, /\/nhl\/500\/tor\.png/i],
+        expectedSlots: [/home:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/nhl\/500\/ott\.png/i, /away:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/nhl\/500\/tor\.png/i],
+        unexpectedSlots: [/home:real-league/i, /away:real-league/i, /home:real-team:https:\/\/r2\.thesportsdb\.com\/images\/media\/league\/badge\/4cem2k1619616539\.png/i, /away:real-team:https:\/\/r2\.thesportsdb\.com\/images\/media\/league\/badge\/4cem2k1619616539\.png/i]
+      },
+      {
+        slug: 'direct-nhl-blackhawks-sharks-logos',
+        sport: 'hockey.png',
+        query: {
+          league: 'NHL',
+          title: 'Chicago Blackhawks vs San Jose Sharks',
+          date: '2026-04-15',
+          home: 'Chicago Blackhawks',
+          away: 'San Jose Sharks',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/nhl\/500\/chi\.png/i, /\/nhl\/500\/sj\.png/i],
+        expectedSlots: [/home:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/nhl\/500\/chi\.png/i, /away:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/nhl\/500\/sj\.png/i],
+        unexpectedSlots: [/home:real-league/i, /away:real-league/i, /home:real-team:https:\/\/r2\.thesportsdb\.com\/images\/media\/league\/badge\/4cem2k1619616539\.png/i, /away:real-team:https:\/\/r2\.thesportsdb\.com\/images\/media\/league\/badge\/4cem2k1619616539\.png/i]
+      },
+      {
         slug: 'direct-mls-team-logos',
         sport: 'football.png',
         query: {
@@ -991,6 +1052,36 @@ async function assertTeamBadgeArtworkProxy() {
           eventClass: 'team_vs_team'
         },
         expectedSources: [/\/soccer\/500\/182\.png/i, /\/soccer\/500\/21812\.png/i]
+      },
+      {
+        slug: 'direct-champions-league-team-logos',
+        sport: 'football.png',
+        query: {
+          league: 'UEFA Champions League',
+          title: 'Arsenal vs Real Madrid',
+          date: '2026-04-29',
+          home: 'Arsenal',
+          away: 'Real Madrid',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/soccer\/500\/359\.png/i, /\/soccer\/500\/86\.png/i],
+        expectedSlots: [/home:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/soccer\/500\/359\.png/i, /away:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/soccer\/500\/86\.png/i],
+        unexpectedSlots: [/home:real-league/i, /away:real-league/i]
+      },
+      {
+        slug: 'direct-champions-league-accented-team-logos',
+        sport: 'football.png',
+        query: {
+          league: 'Champions League',
+          title: 'Atletico Madrid vs Paris Saint-Germain',
+          date: '2026-04-29',
+          home: 'Atletico Madrid',
+          away: 'Paris Saint-Germain',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/soccer\/500\/1068\.png/i, /\/soccer\/500\/160\.png/i],
+        expectedSlots: [/home:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/soccer\/500\/1068\.png/i, /away:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/soccer\/500\/160\.png/i],
+        unexpectedSlots: [/home:real-league/i, /away:real-league/i]
       },
       {
         slug: 'direct-wnba-team-logos',
@@ -1006,6 +1097,32 @@ async function assertTeamBadgeArtworkProxy() {
         expectedSources: [/\/wnba\/500\/gs\.png/i, /\/wnba\/500\/chi\.png/i]
       },
       {
+        slug: 'direct-womens-basketball-league-team-logos',
+        sport: 'basketball.png',
+        query: {
+          league: 'Women Basketball League',
+          title: 'Los Angeles Sparks vs Phoenix Mercury',
+          date: '2026-05-14',
+          home: 'Los Angeles Sparks',
+          away: 'Phoenix Mercury',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/wnba\/500\/la\.png/i, /\/wnba\/500\/phx\.png/i],
+        expectedSlots: [/home:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/wnba\/500\/la\.png/i, /away:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/wnba\/500\/phx\.png/i],
+        unexpectedSlots: [/home:real-league/i, /away:real-league/i]
+      },
+      {
+        slug: 'direct-womens-basketball-league-logo',
+        sport: 'basketball.png',
+        query: {
+          league: 'Women Basketball League',
+          title: 'WNBA Tip Off',
+          date: '2026-05-14',
+          eventClass: 'tournament_event'
+        },
+        expectedSources: [/league\/logo\/3fv4p01573154525\.png/i]
+      },
+      {
         slug: 'direct-ufc-red-league-logo',
         sport: 'mma.png',
         query: {
@@ -1015,7 +1132,19 @@ async function assertTeamBadgeArtworkProxy() {
           date: '2026-05-09',
           eventClass: 'combat_event'
         },
-        expectedSources: [/bewnz31717531281\.png/i]
+        expectedSources: [/pvtkrrx:\/\/logo\/ufc-red/i]
+      },
+      {
+        slug: 'direct-scottish-womens-premier-logo',
+        sport: 'football.png',
+        query: {
+          league: 'Scottish Womens Premier League',
+          title: 'Scottish Womens Premier League 2025/26 Show',
+          date: '2026-04-26',
+          eventClass: 'tournament_event'
+        },
+        expectedSources: [/SWPL_Logo_Brandmarque_Colour\.png/i],
+        unexpectedSources: [/english-premier-league|premier-league/i]
       }
     ]
 
@@ -1042,6 +1171,16 @@ async function assertTeamBadgeArtworkProxy() {
       for (const expectedSource of testCase.expectedSources) {
         assert.match(sourceUrls, expectedSource, `${testCase.slug} should expose ${expectedSource}`)
       }
+      for (const unexpectedSource of testCase.unexpectedSources || []) {
+        assert.doesNotMatch(sourceUrls, unexpectedSource, `${testCase.slug} should not expose ${unexpectedSource}`)
+      }
+      const slotSummary = String(response.headers['x-pvtkrrx-logo-slots'] || '')
+      for (const expectedSlot of testCase.expectedSlots || []) {
+        assert.match(slotSummary, expectedSlot, `${testCase.slug} should expose slot ${expectedSlot}`)
+      }
+      for (const unexpectedSlot of testCase.unexpectedSlots || []) {
+        assert.doesNotMatch(slotSummary, unexpectedSlot, `${testCase.slug} should not expose slot ${unexpectedSlot}`)
+      }
       assert.deepEqual(pngDimensions(response.body), dimensions.poster, `${testCase.slug} poster dimensions`)
       fs.writeFileSync(path.join(PREVIEW_DIR, `${testCase.slug}.png`), response.body)
     }
@@ -1052,6 +1191,21 @@ async function assertTeamBadgeArtworkProxy() {
 
 async function main() {
   fs.mkdirSync(PREVIEW_DIR, { recursive: true })
+
+  const fallbackLogoSvg = renderLogoGlyphSvg({
+    role: 'home',
+    event: { sport: 'Basketball', league: 'WNBA', homeTeam: 'Dallas Stars' },
+    size: 120
+  })
+  assert.match(fallbackLogoSvg, /data-role="logo-fallback-svg"/, 'fallback logo SVG should be visible and auditable')
+  // DIRECTIVE 001: the ONLY permitted fallback is clean deterministic
+  // initials of the real entity. A "LOGO PENDING" placeholder is an explicit
+  // FAIL per the directive — assert it is gone and that real initials +
+  // a cleaned identity caption are rendered instead.
+  assert.doesNotMatch(fallbackLogoSvg, /LOGO PENDING/, 'fallback logo SVG must NOT show the forbidden "LOGO PENDING" placeholder (DIRECTIVE 001)')
+  assert.match(fallbackLogoSvg, />DS</, 'fallback logo SVG should render clean deterministic initials (Dallas Stars -> DS)')
+  assert.match(fallbackLogoSvg, />DALLAS STARS</, 'fallback logo SVG should caption the real identity, not a generic role tag')
+  assert.doesNotMatch(fallbackLogoSvg, /data-role="visual-initials"/, 'fallback logo SVG should not use the old invisible initials marker')
 
   const requiredSportHints = SPORTS_DISCOVERY_CATALOGS
     .map((catalog) => catalog.sportHint)
