@@ -146,7 +146,7 @@ async function run() {
   const partialPayload = Buffer.alloc(30 * 1024 * 1024, 7)
   const archivePayload = Buffer.from('smoke rar bytes', 'utf8')
   const extractedPayload = Buffer.from('smoke extracted bytes', 'utf8')
-  let incompletePieceStates = [2, 2, 0, 0, 2, 2]
+  let incompletePieceStates = [2, 2, 0, 0, 0, 0]
   let promoteIncompleteSeekWindow = false
   const torrent = {
     hash,
@@ -163,7 +163,7 @@ async function run() {
     name: 'Formula1.2026.Japanese.Grand.Prix.Qualifying.1080p',
     progress: 0.25,
     seq_dl: true,
-    f_l_piece_prio: false,
+    f_l_piece_prio: true,
     save_path: runtimeDir,
     download_path: runtimeDir,
     content_path: ''
@@ -517,7 +517,7 @@ async function run() {
       addFileCalls.filter(call => call.hash === newQueuedHash).map(call => call.options),
       [{
         sequentialDownload: true,
-        firstLastPiecePrio: true,
+        firstLastPiecePrio: false,
         paused: false
       }],
       'new tracker torrents should be added as active sequential playback jobs'
@@ -548,8 +548,8 @@ async function run() {
         }
       }
     )
-    assert.equal(coldIncompleteTailResponse.status, 206, 'shared file route should serve a proven tail range when qBit has first/last pieces before the full head threshold')
-    assert.match(String(coldIncompleteTailResponse.headers['content-range'] || ''), /^bytes 26214400-\d+\/31457280$/)
+    assert.equal(coldIncompleteTailResponse.status, 503, 'shared file route should not encourage tail-first playback when qBit has not reached the seek range sequentially')
+    assert.match(String(coldIncompleteTailResponse.text || ''), /Requested byte range not available yet/i)
 
     const unverifiedResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(unverifiedPlaybackToken)}`)
     assert.equal(unverifiedResponse.status, 302, 'incomplete playback may still enter /file when qBit exposes the target path but cannot prove pieces yet')
@@ -596,6 +596,10 @@ async function run() {
       sequentialToggleCountBeforeUnavailableSeek,
       'seek retries should not toggle sequential download back off when qBit is already in sequential mode'
     )
+    assert.ok(
+      firstLastToggleCalls.includes(incompleteHash),
+      'progressive playback should turn off qBit first/last-piece priority so new playback stays head-first'
+    )
 
     const packedResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(packedPlaybackToken)}`)
     assert.equal(packedResponse.status, 422, 'incomplete packed archives should fail fast with a truthful packed-release message instead of stalling')
@@ -605,8 +609,8 @@ async function run() {
       { ids: [1, 2], priority: 7 }
     ], 'packed playback should demote the sample clip and prioritize the archive bundle when priming archive-only torrents')
     assert.ok(
-      firstLastToggleCalls.includes(hash) || firstLastToggleCalls.includes(packedHash),
-      'progressive playback should enable first/last piece priority so Stremio stays on the player while probing both ends of the file'
+      !firstLastToggleCalls.includes(newQueuedHash),
+      'new progressive playback should not enable qBit first/last-piece priority by default'
     )
 
     const readyPackedResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(readyPackedPlaybackToken)}`)

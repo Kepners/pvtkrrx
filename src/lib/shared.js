@@ -83,7 +83,7 @@ const STREAM_READY_START_FRACTION = parseStartFraction(
 const STREAM_READY_MIN_BYTES = parseByteCount(process.env.STREAM_READY_MIN_BYTES || '24MB', 24 * 1024 * 1024)
 const STREAM_PRIORITIZE_LAST_PIECES = String(
   process.env.STREAM_PRIORITIZE_LAST_PIECES ||
-  (SELF_HOST_SERVER_MODE ? 'false' : 'true')
+  'false'
 ).trim().toLowerCase() !== 'false'
 const STREAM_PLAYBACK_TOP_PRIORITY = String(
   process.env.STREAM_PLAYBACK_TOP_PRIORITY ||
