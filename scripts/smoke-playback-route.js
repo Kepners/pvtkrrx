@@ -534,12 +534,28 @@ async function run() {
     )
 
     const coldIncompleteResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(incompletePlaybackToken)}`)
-    assert.equal(coldIncompleteResponse.status, 503, 'incomplete playback should not redirect into /file before the selected file has a real contiguous head buffer')
-    assert.equal(String(coldIncompleteResponse.headers.location || ''), '', 'cold incomplete playback should not hand Stremio a premature file URL')
+    assert.equal(coldIncompleteResponse.status, 302, 'incomplete playback should hand Stremio to /file as soon as qBit exposes the target file path')
+    assert.match(String(coldIncompleteResponse.headers.location || ''), new RegExp(`/${configToken}/file/`), 'cold incomplete playback should let the shared file route handle byte-range readiness')
+    const coldIncompleteFileResponse = await request(server.address().port, String(coldIncompleteResponse.headers.location || ''))
+    assert.equal(coldIncompleteFileResponse.status, 206, 'shared file route should serve the proven contiguous head range even before the old readiness threshold is reached')
+    assert.match(String(coldIncompleteFileResponse.headers['content-range'] || ''), /^bytes 0-\d+\/31457280$/)
+    const coldIncompleteTailResponse = await request(
+      server.address().port,
+      String(coldIncompleteResponse.headers.location || ''),
+      {
+        headers: {
+          Range: 'bytes=26214400-31457279'
+        }
+      }
+    )
+    assert.equal(coldIncompleteTailResponse.status, 206, 'shared file route should serve a proven tail range when qBit has first/last pieces before the full head threshold')
+    assert.match(String(coldIncompleteTailResponse.headers['content-range'] || ''), /^bytes 26214400-\d+\/31457280$/)
 
     const unverifiedResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(unverifiedPlaybackToken)}`)
-    assert.equal(unverifiedResponse.status, 503, 'incomplete playback should fail closed when qBit cannot prove the contiguous head pieces')
-    assert.equal(String(unverifiedResponse.headers.location || ''), '', 'unverified incomplete playback should not redirect based on progress percent alone')
+    assert.equal(unverifiedResponse.status, 302, 'incomplete playback may still enter /file when qBit exposes the target path but cannot prove pieces yet')
+    assert.match(String(unverifiedResponse.headers.location || ''), new RegExp(`/${configToken}/file/`), 'unverified incomplete playback should still use the shared file route for range-level proof')
+    const unverifiedFileResponse = await request(server.address().port, String(unverifiedResponse.headers.location || ''))
+    assert.equal(unverifiedFileResponse.status, 425, 'shared file route should fail closed if qBit cannot prove any readable bytes for the requested file')
 
     incompletePieceStates = [2, 2, 2, 2, 2, 2]
     const incompleteResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(incompletePlaybackToken)}`)

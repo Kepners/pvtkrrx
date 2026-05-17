@@ -2660,11 +2660,13 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
       if (!fileUrl) return false
 
       const canBufferViaBuiltinFileRoute = fileUrl.startsWith(builtinFileUrlPrefix)
-      if (!complete && !canBufferViaBuiltinFileRoute) return false
-      if (!complete && state.ready !== true) return false
+      if (!complete) {
+        if (!canBufferViaBuiltinFileRoute) return false
+        if (!state.fileExists || !state.resolvedFilePath) return false
+      }
 
       console.log(
-        `[playback-route] ${reason} -> redirect file${complete ? '' : ' (buffering via /file)'}`
+        `[playback-route] ${reason} -> redirect file${complete ? '' : ` (buffering via /file, ready=${state.ready === true})`}`
       )
       res.redirect(302, fileUrl)
       return true
