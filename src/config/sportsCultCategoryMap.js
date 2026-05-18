@@ -85,6 +85,8 @@ const RAW_MAP = [
   // Motorsport
   ['Formula1', 'motorsport', 'motorsport', 'motorsport_event', 'solo', 'Formula 1'],
   ['MotoGP', 'motorsport', 'motorsport', 'motorsport_event', 'solo', 'MotoGP'],
+  ['Moto2', 'motorsport', 'motorsport', 'motorsport_event', 'solo', 'Moto2'],
+  ['Moto3', 'motorsport', 'motorsport', 'motorsport_event', 'solo', 'Moto3'],
   ['NASCAR', 'motorsport', 'motorsport', 'motorsport_event', 'solo', 'NASCAR'],
   ['IndyCar', 'motorsport', 'motorsport', 'motorsport_event', 'solo', 'IndyCar'],
   ['WRCRally', 'motorsport', 'motorsport', 'motorsport_event', 'solo', 'WRC'],
@@ -233,6 +235,8 @@ const ALIASES = [
   ['formula 1', 'Formula1'],
   ['f1', 'Formula1'],
   ['moto gp', 'MotoGP'],
+  ['moto 2', 'Moto2'],
+  ['moto 3', 'Moto3'],
   ['ufc fight night', 'UFC'],
   ['euro qualifiers', 'International Soccer'],
   ['fifa world cup', 'International Soccer'],

@@ -1447,7 +1447,16 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
         } else {
           const percent = Math.max(0, Math.min(99, Math.floor(videoProgress * 100)))
           const bufferingUrl = buildBufferingStreamUrl(playbackBaseUrl, configToken, fileUrl, matched.hash, videoFile.name)
-          return buildOnBufferingStream(item, bufferingUrl, videoFile.name, videoFile.size, config, parsed, percent, streamSourceOptions)
+          const bufferingItem = {
+            ...item,
+            downloadSpeed: matched.dlspeed,
+            eta: matched.eta
+          }
+          return buildOnBufferingStream(bufferingItem, bufferingUrl, videoFile.name, videoFile.size, config, parsed, percent, {
+            ...streamSourceOptions,
+            downloadSpeed: matched.dlspeed,
+            eta: matched.eta
+          })
         }
       } catch (e) {
         // File listing failed, skip this stream
@@ -1616,7 +1625,16 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
         } else {
           const percent = Math.max(0, Math.min(99, Math.floor(videoProgress * 100)))
           const bufferingUrl = buildBufferingStreamUrl(playbackBaseUrl, configToken, fileUrl, matched.hash, videoFile.name)
-          streams.push(buildOnBufferingStream(item, bufferingUrl, videoFile.name, videoFile.size, effectiveConfig, parsed, percent, streamSourceOptions))
+          const bufferingItem = {
+            ...item,
+            downloadSpeed: matched.dlspeed,
+            eta: matched.eta
+          }
+          streams.push(buildOnBufferingStream(bufferingItem, bufferingUrl, videoFile.name, videoFile.size, effectiveConfig, parsed, percent, {
+            ...streamSourceOptions,
+            downloadSpeed: matched.dlspeed,
+            eta: matched.eta
+          }))
         }
       }
     } catch (e) {

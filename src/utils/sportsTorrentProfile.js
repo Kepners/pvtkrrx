@@ -87,6 +87,8 @@ function titleCase(value) {
         return upper
       }
       if (upper === 'MOTOGP') return 'MotoGP'
+      if (upper === 'MOTO2') return 'Moto2'
+      if (upper === 'MOTO3') return 'Moto3'
       return part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()
     })
     .join(' ')

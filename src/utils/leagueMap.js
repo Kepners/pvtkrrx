@@ -189,7 +189,20 @@ const LEAGUE_MAP = Object.freeze({
     name: 'MotoGP',
     idLeague: '4407',
     sportKey: 'motorsport',
-    sportsDbSport: 'Motorsport'
+    sportsDbSport: 'Motorsport',
+    aliases: ['Moto GP', 'Moto Grand Prix']
+  },
+  moto2: {
+    name: 'Moto2',
+    sportKey: 'motorsport',
+    sportsDbSport: 'Motorsport',
+    aliases: ['Moto 2']
+  },
+  moto3: {
+    name: 'Moto3',
+    sportKey: 'motorsport',
+    sportsDbSport: 'Motorsport',
+    aliases: ['Moto 3']
   },
   nascar: {
     name: 'NASCAR',

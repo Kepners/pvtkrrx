@@ -275,7 +275,7 @@ function sportHintFromLeagueCode(value) {
   if (code === 'nba') return 'basketball'
   if (code === 'nfl') return 'american-football'
   if (code === 'ufc') return 'mma'
-  if (['f1', 'formula1', 'motogp', 'nascar', 'indycar', 'wrc', 'supercars', 'v8sc', 'wsbk', 'wec', 'formulae'].includes(code)) return 'motorsport'
+  if (['f1', 'formula1', 'motogp', 'moto2', 'moto3', 'nascar', 'indycar', 'wrc', 'supercars', 'v8sc', 'wsbk', 'wec', 'formulae'].includes(code)) return 'motorsport'
   if (['pdc', 'bdo'].includes(code)) return 'darts'
   if (['pga', 'lpga', 'masters'].includes(code)) return 'golf'
   if (['mlb'].includes(code)) return 'baseball'
@@ -616,6 +616,7 @@ function sportsIdentityGroupEventDate(group = {}) {
   return normalizeIsoDate(
     canonicalEvent.date ||
     sportsArtwork.eventDate ||
+    group?.bestAvailability?.sportsProfile?.date ||
     parsedSportsEvent?.date ||
     parsedEvent?.date
   )
@@ -646,7 +647,7 @@ function compareSportsIdentityGroupFreshness(a = {}, b = {}, today = currentUtcD
 function normalizeSportsCatalogItems(items = []) {
   return (Array.isArray(items) ? items : []).map((item) => {
     const parsedSportsEvent = parseSportsTitle(item?.title || '', item?.pubDate || item?.publishDate || '')
-    const parsedEvent = !parsedSportsEvent ? parseSportsEventTitle(item?.title || '') : null
+    const parsedEvent = !parsedSportsEvent ? parseSportsEventTitle(item?.title || '', item?.pubDate || item?.publishDate || '') : null
     const effectiveLeague = parsedSportsEvent?.league || parsedEvent?.league || ''
     const sportsProfile = parseSportsTorrentProfile(item, {
       parsedSportsEvent,
@@ -767,7 +768,7 @@ function normalizeSportsEventTitle(title, parsedSportsEvent = null, parsedEvent 
 
   if (parsedEvent?.league && parsedEvent?.eventName) {
     const leagueDisplay = mapLeague(parsedEvent.league) || parsedEvent.league
-    return `${leagueDisplay} ${parsedEvent.eventName}`.trim()
+    return appendSportsEventDetail(`${leagueDisplay} ${parsedEvent.eventName}`.trim(), parsedEvent.session || parsedEvent.round || '')
   }
 
   const presentationCleaned = cleanTitle(title)
@@ -797,14 +798,15 @@ function sportsEventKey(input) {
 
   // Non-vs event: use league + event name as grouping key
   const parsedEvent = input && typeof input === 'object'
-    ? (input.parsedEvent || parseSportsEventTitle(input.title || ''))
+    ? (input.parsedEvent || parseSportsEventTitle(input.title || '', input.publishDate || input.pubDate || ''))
     : parseSportsEventTitle(input)
 
   if (parsedEvent?.league && parsedEvent?.eventName) {
     const parts = [
       normalizeSportsKeyPart(parsedEvent.league),
       parsedEvent.date ? String(parsedEvent.date).slice(0, 10) : '',
-      normalizeSportsKeyPart(parsedEvent.eventName)
+      normalizeSportsKeyPart(parsedEvent.eventName),
+      normalizeSportsKeyPart(parsedEvent.session || parsedEvent.round || '')
     ].filter(Boolean)
     return parts.join('-')
   }
@@ -889,7 +891,12 @@ function groupSportsAvailabilityItems(items, query = '') {
     const itemMappedLeague = item?.mappedLeague || ''
     const fallbackDisplayTitle = sportsProfileDisplayTitle(item?.sportsProfile) || normalizeSportsEventTitle(item.title, displaySportsEvent, parsedEvent) || cleanTitle(item.title) || String(item.title || '').trim()
     if (!fallbackDisplayTitle) continue
-    const availabilityKey = sportsEventKey({ title: item.title, parsedSportsEvent, parsedEvent })
+    const availabilityKey = sportsEventKey({
+      title: item.title,
+      pubDate: item.pubDate || item.publishDate || '',
+      parsedSportsEvent,
+      parsedEvent
+    })
     const hasStructuredKey = (parsedSportsEvent?.league && parsedSportsEvent?.date && parsedSportsEvent?.homeTeam && parsedSportsEvent?.awayTeam) ||
       (parsedEvent?.league && parsedEvent?.eventName)
     const key = hasStructuredKey

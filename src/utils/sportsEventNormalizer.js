@@ -77,7 +77,7 @@ const SESSION_WORDS = new Set([
   'fp3'
 ])
 
-const MATCHUP_PREFIX_NOISE_RE = /\b(?:english\s+premier\s+league|major\s+league\s+soccer|premier\s+league|women'?s?\s+super\s+league|scottish\s+women'?s?\s+premier\s+league|women'?s?\s+(?:national\s+)?basketball\s+(?:association|league)|champions\s+league|europa\s+league|conference\s+league|uefa\s+nations\s+league|fifa\s+world\s+cup|world\s+cup\s+qualifiers?|euro\s+qualifiers?|european\s+championship|copa\s+america|afcon|asian\s+cup|conmebol\s+qualifiers?|concacaf\s+qualifiers?|international\s+friendlies?|fa\s+cup|la\s+liga|serie\s+a|bundesliga|college\s+football|world\s+series|stanley\s+cup|super\s+league\s+rugby|super\s+league|six\s+nations|premiership\s+rugby|rugby\s+championship|rugby\s+league|test\s+cricket|indian\s+premier\s+league|the\s+ashes|world\s+championship|world\s+matchplay|fight\s+night|main\s+card|main\s+event|regular\s+season|formula\s+1|formula\s+e|pga\s+tour|tour\s+de\s+france|giro\s+d['’]?italia|vuelta\s+a\s+espana|australian\s+open|roland\s+garros|us\s+open|nhl|mlb|nba|nfl|mls|epl|ipl|odi|t20|atp|wta|pdc|ufc|pfl|wwe|aew|pga|lpga|motogp|nascar|indycar|wrc|wec|bkfc|wc|wsl|wsm|football|baseball|hockey|basketball|cricket|rugby|tennis|boxing|mma|wrestling|darts|golf|motorsport|playoffs?|postseason|finals?|prelims?|heavyweight|matchroom|queensberry|masters|wimbledon|classics|rs)\b/gi
+const MATCHUP_PREFIX_NOISE_RE = /\b(?:english\s+premier\s+league|major\s+league\s+soccer|premier\s+league|women'?s?\s+super\s+league|scottish\s+women'?s?\s+premier\s+league|women'?s?\s+(?:national\s+)?basketball\s+(?:association|league)|champions\s+league|europa\s+league|conference\s+league|uefa\s+nations\s+league|fifa\s+world\s+cup|world\s+cup\s+qualifiers?|euro\s+qualifiers?|european\s+championship|copa\s+america|afcon|asian\s+cup|conmebol\s+qualifiers?|concacaf\s+qualifiers?|international\s+friendlies?|fa\s+cup|la\s+liga|serie\s+a|bundesliga|college\s+football|world\s+series|stanley\s+cup|super\s+league\s+rugby|super\s+league|six\s+nations|premiership\s+rugby|rugby\s+championship|rugby\s+league|test\s+cricket|indian\s+premier\s+league|the\s+ashes|world\s+championship|world\s+matchplay|fight\s+night|main\s+card|main\s+event|regular\s+season|formula\s+1|formula\s+e|pga\s+tour|tour\s+de\s+france|giro\s+d['’]?italia|vuelta\s+a\s+espana|australian\s+open|roland\s+garros|us\s+open|nhl|mlb|nba|nfl|mls|epl|ipl|odi|t20|atp|wta|pdc|ufc|pfl|wwe|aew|pga|lpga|motogp|moto\s*gp|moto2|moto\s*2|moto3|moto\s*3|nascar|indycar|wrc|wec|bkfc|wc|wsl|wsm|football|baseball|hockey|basketball|cricket|rugby|tennis|boxing|mma|wrestling|darts|golf|motorsport|playoffs?|postseason|finals?|prelims?|heavyweight|matchroom|queensberry|masters|wimbledon|classics|rs)\b/gi
 const MATCHUP_SIDE_EXTRA_NOISE_RE = /\b(?:efl\s+championship|efl|elc|cpl|ufl|ohl|kings?\s+cup|primera\s+feb|ncaa\s+(?:women\s+)?softball|matchweek\s*\d*|mw\s*\d+|gw\s*\d+|md\s*\d+|wd\s*\d+|qf|sf|bign|big\s*ten(?:\s*network)?|flo(?:hockey|sports?))\b/gi
 const MATCHUP_SIDE_EXTRA_NOISE_TEST_RE = /\b(?:efl\s+championship|efl|elc|cpl|ufl|ohl|kings?\s+cup|primera\s+feb|ncaa\s+(?:women\s+)?softball|matchweek\s*\d*|mw\s*\d+|gw\s*\d+|md\s*\d+|wd\s*\d+|qf|sf|bign|big\s*ten(?:\s*network)?|flo(?:hockey|sports?))\b/i
 
@@ -91,7 +91,7 @@ function normalizeSpace(value) {
 function titleCase(value) {
   const upperTokens = new Set([
     'AC', 'AEK', 'AFC', 'AEW', 'BIGN', 'CF', 'CPL', 'EFL', 'ELC', 'EPL', 'FA',
-    'F1', 'FC', 'FEB', 'FIFA', 'GP', 'IPL', 'MLB', 'MLS', 'MMA', 'MOTOGP', 'NBA',
+    'F1', 'FC', 'FEB', 'FIFA', 'GP', 'IPL', 'MLB', 'MLS', 'MMA', 'MOTOGP', 'MOTO2', 'MOTO3', 'NBA',
     'NCAA', 'NFL', 'NHL', 'NJPW', 'OHL', 'PFL', 'PGA', 'PSG', 'ROH', 'SC', 'TNA', 'UCL',
     'UCLA', 'UECL', 'UEFA', 'UFC', 'UEL', 'UFL', 'WC', 'WEC', 'WNBA', 'WRC', 'WWE'
   ])
@@ -101,7 +101,10 @@ function titleCase(value) {
     .map((part, index) => {
       const upper = part.toUpperCase()
       if (upperTokens.has(upper)) {
-        return upper === 'MOTOGP' ? 'MotoGP' : upper
+        if (upper === 'MOTOGP') return 'MotoGP'
+        if (upper === 'MOTO2') return 'Moto2'
+        if (upper === 'MOTO3') return 'Moto3'
+        return upper
       }
       const lower = part.toLowerCase()
       if (index > 0 && ['van', 'von', 'de', 'del', 'der', 'den', 'da', 'di', 'du', 'la', 'le'].includes(lower)) {
@@ -285,7 +288,7 @@ function normalizeMotorsportEvent({ league = '', eventName = '', rawTitle = '' }
   }
 
   let collapsedMotoGrandPrixPackage = false
-  if (/^motogp$/i.test(leagueLabel)) {
+  if (/^moto(?:gp|2|3)$/i.test(leagueLabel)) {
     if (/^moto$/i.test(tokens[0]) && /^grand$/i.test(tokens[1]) && /^prix$/i.test(tokens[2])) {
       tokens = tokens.slice(3)
       collapsedMotoGrandPrixPackage = true
@@ -322,10 +325,10 @@ function normalizeMotorsportEvent({ league = '', eventName = '', rawTitle = '' }
     eventTitle = /^(gp|grand prix)$/i.test(suffix)
       ? `${country} ${/^gp$/i.test(suffix) ? 'GP' : 'Grand Prix'}`
       : `${country} ${suffix}`.trim()
-  } else if (/^(motogp|nascar|indycar|wrc|wec|formula e)$/i.test(leagueLabel) && tokens.length >= 2) {
+  } else if (/^(motogp|moto2|moto3|nascar|indycar|wrc|wec|formula e)$/i.test(leagueLabel) && tokens.length >= 2) {
     competition = leagueLabel
     eventTitle = titleCase(tokens.join(' '))
-    if (/^motogp$/i.test(leagueLabel) && !collapsedMotoGrandPrixPackage) {
+    if (/^moto(?:gp|2|3)$/i.test(leagueLabel) && !collapsedMotoGrandPrixPackage) {
       const country = normalizeCountryToken(tokens[0])
       competition = `${leagueLabel} ${country}`.trim()
       eventTitle = titleCase(tokens.slice(1).join(' '))
@@ -515,7 +518,7 @@ function normalizeSportsEventMetadata(input = {}) {
     eventTitle = canonicalParsed.eventTitle
   }
 
-  if (sportKey === 'motorsport' && (parsedEvent?.eventName || /motogp|formula|f1|grand prix|race/i.test(rawTitle))) {
+  if (sportKey === 'motorsport' && (parsedEvent?.eventName || /motogp|moto\s*gp|moto\s*2|moto2|moto\s*3|moto3|formula|f1|grand prix|race/i.test(rawTitle))) {
     const motorsport = normalizeMotorsportEvent({
       league: rawLeague || parsedEvent?.league || '',
       eventName: parsedEvent?.eventName || input.eventTitle || eventTitle,

@@ -68,6 +68,10 @@ const LEAGUE_CODE_ALIASES = Object.freeze({
   wwe: 'WWE',
   motogp: 'MotoGP',
   'moto gp': 'MotoGP',
+  moto2: 'Moto2',
+  'moto 2': 'Moto2',
+  moto3: 'Moto3',
+  'moto 3': 'Moto3',
   'formula 1': 'F1',
   'formula one': 'F1',
   f1: 'F1',
@@ -354,7 +358,7 @@ function isFormulaOneText(text = '') {
 function sportIconFor(event = {}, facts = {}) {
   const text = `${event.sport_icon || ''} ${event.sportIcon || ''} ${facts.sport || ''} ${facts.league || ''} ${facts.detail || ''} ${facts.title || ''}`.toLowerCase()
   if (isFormulaOneText(text)) return 'f1'
-  if (/moto\s*gp|motogp/.test(text)) return 'motogp'
+  if (/moto\s*gp|motogp|moto\s*2|moto2|moto\s*3|moto3/.test(text)) return 'motogp'
   if (/motor|wrc|rally|nascar|indycar|wec|formula\s*e|supercars|v8sc|wsbk|bsb|british\s*superbikes?|grand prix/.test(text)) return 'motorsport'
   if (/golf|pga|lpga|masters|ryder|liv/.test(text)) return 'golf'
   if (/darts|pdc|world matchplay/.test(text)) return 'darts'
@@ -385,6 +389,8 @@ function broadcastLabelFor(event = {}, facts = {}) {
   if (raw) return raw
   const text = normalizeSpace(`${facts.league || ''} ${facts.sport || ''} ${facts.title || ''}`)
   if (/\b(?:moto\s*gp|motogp)\b/i.test(text)) return 'MotoGP'
+  if (/\b(?:moto\s*2|moto2)\b/i.test(text)) return 'Moto2'
+  if (/\b(?:moto\s*3|moto3)\b/i.test(text)) return 'Moto3'
   if (/\bwrc\b|\brally\b/i.test(text)) return 'WRC'
   if (isFormulaOneText(text)) return 'Formula 1'
   const code = leagueCodeFor(event, facts.league)
@@ -644,7 +650,7 @@ const FONTS_EDITORIAL = `.serif { font-family: 'Playfair Display', Georgia, seri
 .sans { font-family: 'Inter', system-ui, sans-serif; }`
 
 const BROADCAST_PLACEHOLDER_RE = /^(?:tba|tbd|n\/?a|na|unknown|undefined|null|event|session|sports event|sport event|matchup|tournament|golf event|darts event)$/i
-const BROADCAST_ALLOWED_LABELS = new Set(['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'FE', 'FIFA', 'F1', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'MotoGP', 'NBA', 'NFL', 'NHL', 'PDC', 'PFL', 'PGA', 'UCL', 'UEL', 'UFC', 'UEFA', 'WEC', 'WRC', 'WTA', 'WWE'])
+const BROADCAST_ALLOWED_LABELS = new Set(['AEW', 'AFCON', 'ATP', 'EFL', 'EPL', 'FA', 'FE', 'FIFA', 'F1', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'MotoGP', 'Moto2', 'Moto3', 'NBA', 'NFL', 'NHL', 'PDC', 'PFL', 'PGA', 'UCL', 'UEL', 'UFC', 'UEFA', 'WEC', 'WRC', 'WTA', 'WWE'])
 
 function cleanBroadcastText(value = '') {
   const clean = normalizeSpace(value)
@@ -674,6 +680,8 @@ function broadcastLabelCase(value = '') {
   if (!clean) return ''
   const upper = clean.toUpperCase()
   if (upper === 'MOTOGP') return 'MotoGP'
+  if (upper === 'MOTO2') return 'Moto2'
+  if (upper === 'MOTO3') return 'Moto3'
   return upper
 }
 
@@ -699,6 +707,8 @@ function broadcastLabelForRender(event = {}, m = {}) {
   ].filter(Boolean).join(' '))
 
   if (/\b(?:moto\s*gp|motogp)\b/i.test(text)) return 'MotoGP'
+  if (/\b(?:moto\s*2|moto2)\b/i.test(text)) return 'Moto2'
+  if (/\b(?:moto\s*3|moto3)\b/i.test(text)) return 'Moto3'
   if (/\bwrc\b|\brally\b/i.test(text)) return 'WRC'
   if (isFormulaOneText(text)) return 'F1'
   if (/\bsnooker\b|\bworld\s+championship\b|\bcrucible\b/i.test(text)) return 'SNOOKER'
@@ -729,7 +739,7 @@ function broadcastPaletteFor(event = {}, m = {}, label = '') {
     m.sport_icon
   ].filter(Boolean).join(' ')).toLowerCase()
 
-  if (/moto\s*gp|motogp|wrc|rally|motor|motorsport|f1|formula/.test(text)) {
+  if (/moto\s*gp|motogp|moto\s*2|moto2|moto\s*3|moto3|wrc|rally|motor|motorsport|f1|formula/.test(text)) {
     return {
       key: 'motorsport',
       bg0: '#140506',
@@ -1445,6 +1455,8 @@ function renderCompetitorVsCompetitor(event = {}, variant = 'poster', theme = {}
 
 const MOTORSPORT_LEAGUE_RULES = [
   { pattern: /\b(?:moto\s*gp|motogp)\b/i, label: 'MOTOGP', sport: 'MotoGP', icon: 'motogp-bike' },
+  { pattern: /\b(?:moto\s*2|moto2)\b/i, label: 'MOTO2', sport: 'Moto2', icon: 'motogp-bike' },
+  { pattern: /\b(?:moto\s*3|moto3)\b/i, label: 'MOTO3', sport: 'Moto3', icon: 'motogp-bike' },
   { pattern: /\b(?:wrc|world\s+rally(?:\s+championship)?|rally)\b/i, label: 'WRC', sport: 'WRC', icon: 'wrc-rally' },
   { pattern: /\b(?:formula\s*1|formula\s*one|formula1|f1)\b/i, label: 'FORMULA 1', sport: 'Formula 1', icon: 'f1' },
   { pattern: /\bnascar\b/i, label: 'NASCAR', sport: 'NASCAR', icon: 'nascar-oval' },
@@ -1585,7 +1597,7 @@ function _legacyMotorsportGlyphMarkup(iconKind, cx, cy, size, paper, accent) {
   return `<g data-role="motorsport-identity" data-icon-kind="${iconKind}">${ring}${inner}</g>`
 }
 
-const MOTORSPORT_LEAGUE_PREFIX_RE = /^\s*(?:formula\s*1|formula\s*one|formula1|f1|motogp|moto\s*gp|wrc|world\s+rally(?:\s+championship)?|nascar|indycar|indy\s*car|wec|formula\s*e|supercars?|v8sc|wsbk|bsb|british\s*superbikes?|motorsport)\b[\s\-:.]*/i
+const MOTORSPORT_LEAGUE_PREFIX_RE = /^\s*(?:formula\s*1|formula\s*one|formula1|f1|motogp|moto\s*gp|moto2|moto\s*2|moto3|moto\s*3|wrc|world\s+rally(?:\s+championship)?|nascar|indycar|indy\s*car|wec|formula\s*e|supercars?|v8sc|wsbk|bsb|british\s*superbikes?|motorsport)\b[\s\-:.]*/i
 const RELEASE_NOISE_TAIL_RE = /\b(?:1080p|2160p|720p|web[\-._\s]?dl|web[\-._\s]?rip|web|hdtv|x264|x265|h264|h265|hevc|av1|repack|proper|aac|ddp\d?(?:\.\d)?|multi|english|fps\d+|mkv|mp4|fbb|megust[ae]?|afg|epworks|mwr|z3r0|kontrast|flux|verum|ntb|ctrlhd|deflate|organic|tgx)\b/gi
 
 function stripMotorsportLeaguePrefix(value = '') {

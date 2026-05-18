@@ -161,6 +161,8 @@ const COMPETITION_MARK_RULES = [
   { pattern: /\bformula\s*1\b|\bf1\b/i, label: 'F1' },
   { pattern: /\bformula\s*e\b/i, label: 'FE' },
   { pattern: /\bmotogp\b|\bmoto\s*gp\b/i, label: 'MotoGP' },
+  { pattern: /\bmoto2\b|\bmoto\s*2\b/i, label: 'Moto2' },
+  { pattern: /\bmoto3\b|\bmoto\s*3\b/i, label: 'Moto3' },
   { pattern: /\bwrc\b|world\s+rally/i, label: 'WRC' },
   { pattern: /\bnascar\b/i, label: 'NASCAR' },
   { pattern: /\bindy\s*car\b|\bindycar\b/i, label: 'INDYCAR' },
@@ -220,8 +222,8 @@ function isFormulaOneMark(mark = '', competition = '', title = '') {
 }
 
 function isMotoGpMark(mark = '', competition = '', title = '') {
-  return /^motogp$/i.test(normalizeSpace(mark)) ||
-    /\bmoto\s*gp\b|\bmotogp\b/i.test(`${competition} ${title}`)
+  return /^moto(?:gp|2|3)$/i.test(normalizeSpace(mark)) ||
+    /\bmoto\s*gp\b|\bmotogp\b|\bmoto\s*2\b|\bmoto2\b|\bmoto\s*3\b|\bmoto3\b/i.test(`${competition} ${title}`)
 }
 
 function resolveMotorsportBrandKind(normalized = {}) {
@@ -236,7 +238,7 @@ function resolveMotorsportBrandKind(normalized = {}) {
 
 function resolveSurfaceKind({ sport = '', competition = '', title = '', detail = '' } = {}) {
   const haystack = normalizeSpace([sport, competition, title, detail].filter(Boolean).join(' ')).toLowerCase()
-  if (/\b(?:formula\s*1|formula\s*one|f1|motogp|moto\s*gp|wrc|rally|nascar|indycar|grand prix|gp)\b/i.test(haystack)) return 'circuit'
+  if (/\b(?:formula\s*1|formula\s*one|f1|motogp|moto\s*gp|moto2|moto\s*2|moto3|moto\s*3|wrc|rally|nascar|indycar|grand prix|gp)\b/i.test(haystack)) return 'circuit'
   if (/\b(?:american football|nfl|super bowl|gridiron)\b/i.test(haystack)) return 'gridiron'
   if (/\b(?:football|soccer|premier league|epl|fa cup|mls|la liga|serie a|bundesliga|champions league|europa league)\b/i.test(haystack)) return 'football-pitch'
   if (/\b(?:rugby|six nations|urc|super league|nrl)\b/i.test(haystack)) return 'rugby-pitch'
@@ -797,13 +799,20 @@ function renderMotorsportBrandCardSvg({ layout, kind, variant, base, accent, tex
   const { width, height } = layout.dimensions
   const normalized = layout.normalized
   const brand = kind === 'motogp' ? 'motogp' : 'formula-one'
-  const mark = kind === 'motogp' ? 'MotoGP' : 'F1'
+  const mark = kind === 'motogp'
+    ? resolveCompetitionMark({
+      sport: normalized.sport,
+      competition: normalized.competition,
+      title: normalized.eventTitle,
+      detail: normalized.eventDetail
+    })
+    : 'F1'
   const isPoster = variant === 'poster'
   const isBackground = variant === 'background'
   const cx = Math.round(width / 2)
   const title = normalizeSpace(normalized.eventTitle || normalized.competition || mark)
   const session = normalizeSpace(normalized.eventDetail || '')
-  const competition = normalizeSpace(normalized.competition || (kind === 'motogp' ? 'MotoGP' : 'Formula 1'))
+  const competition = normalizeSpace(normalized.competition || (kind === 'motogp' ? mark : 'Formula 1'))
   const footer = buildFooter(normalized)
   const titleLines = wrapText(title, width * (isPoster ? 0.82 : 0.58), isPoster ? 42 : isBackground ? 82 : 58, isPoster ? 2 : 1)
   const markFontSize = kind === 'motogp'

@@ -633,8 +633,8 @@ async function run() {
     assert.equal(coldIncompleteResponse.status, 302, 'incomplete playback should hand Stremio to /file as soon as qBit exposes the target file path')
     assert.match(String(coldIncompleteResponse.headers.location || ''), new RegExp(`/${configToken}/file/`), 'cold incomplete playback should let the shared file route handle byte-range readiness')
     const coldIncompleteFileResponse = await request(server.address().port, String(coldIncompleteResponse.headers.location || ''))
-    assert.equal(coldIncompleteFileResponse.status, 206, 'shared file route should serve the proven contiguous head range even before the old readiness threshold is reached')
-    assert.match(String(coldIncompleteFileResponse.headers['content-range'] || ''), /^bytes 0-\d+\/31457280$/)
+    assert.equal(coldIncompleteFileResponse.status, 425, 'shared file route should not hand Stremio a tiny non-playable head chunk before the startup buffer is ready')
+    assert.match(String(coldIncompleteFileResponse.text || ''), /continuous start buffer/i)
     const coldIncompleteTailResponse = await request(
       server.address().port,
       String(coldIncompleteResponse.headers.location || ''),

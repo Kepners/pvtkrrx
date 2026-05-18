@@ -7,6 +7,10 @@ const ARCHIVE_EXT_RE = /\.(?:rar|r\d{2,3}|zip|7z|001)$/i
 const RAR_EXT_RE = /\.(?:rar|r\d{2,3}|part\d{1,3}\.rar)$/i
 const ARCHIVE_VIDEO_INCLUDE_PATTERNS = ['/\\.(mkv|mp4|avi|wmv|ts|m4v)$/i']
 const LEGACY_AVI_TITLE_RE = /(?:^|[ ._\-[\]()])(?:xvid|divx)(?:$|[ ._\-[\]()])|\.avi(?:$|[ ._\-[\]()])/i
+const SLOW_DOWNLOAD_BYTES_PER_SEC = Math.max(
+  1,
+  parseInt(process.env.PVTKRRX_SLOW_DOWNLOAD_BYTES_PER_SEC || String(1024 * 1024), 10)
+)
 
 function formatSize(bytes) {
   if (!bytes || bytes <= 0) return '0 B'
@@ -14,6 +18,71 @@ function formatSize(bytes) {
   if (bytes >= 1e9) return (bytes / 1e9).toFixed(1) + ' GB'
   if (bytes >= 1e6) return (bytes / 1e6).toFixed(1) + ' MB'
   return (bytes / 1e3).toFixed(0) + ' KB'
+}
+
+function formatByteRate(bytesPerSecond) {
+  const bytes = Number(bytesPerSecond)
+  if (!Number.isFinite(bytes) || bytes < 0) return ''
+  if (bytes === 0) return '0 B/s'
+  const units = ['B/s', 'KiB/s', 'MiB/s', 'GiB/s']
+  let value = bytes
+  let unitIndex = 0
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024
+    unitIndex += 1
+  }
+  const precision = value >= 10 || unitIndex === 0 ? 0 : 1
+  return `${value.toFixed(precision)} ${units[unitIndex]}`
+}
+
+function formatDuration(seconds) {
+  const totalSeconds = Math.max(0, Math.floor(Number(seconds || 0)))
+  if (!Number.isFinite(totalSeconds) || totalSeconds <= 0) return ''
+  if (totalSeconds >= 3600) {
+    const hours = Math.floor(totalSeconds / 3600)
+    const minutes = Math.floor((totalSeconds % 3600) / 60)
+    return minutes > 0 ? `${hours}h ${minutes}m` : `${hours}h`
+  }
+  if (totalSeconds >= 60) return `${Math.ceil(totalSeconds / 60)}m`
+  return '<1m'
+}
+
+function resolveDownloadTelemetry(mode, options = {}, progressPercent = null) {
+  if (mode !== 'buffering') {
+    return {
+      label: '',
+      state: '',
+      speedBytes: 0,
+      etaSeconds: 0,
+      slow: false,
+      stalled: false
+    }
+  }
+
+  const rawSpeed = options.downloadSpeed ?? options.dlSpeed ?? options.dlspeed
+  const speedBytes = Number(rawSpeed)
+  const hasSpeed = Number.isFinite(speedBytes) && speedBytes >= 0
+  const etaSeconds = Number(options.eta ?? options.downloadEta ?? options.downloadEtaSeconds ?? 0)
+  const hasEta = Number.isFinite(etaSeconds) && etaSeconds > 0 && etaSeconds < 8640000
+  const stalled = hasSpeed && speedBytes <= 0
+  const slow = hasSpeed && speedBytes > 0 && speedBytes < SLOW_DOWNLOAD_BYTES_PER_SEC
+  const state = stalled ? 'stalled' : slow ? 'slow' : hasSpeed ? 'active' : 'waiting'
+  const progress = Number.isFinite(Number(progressPercent))
+    ? Math.max(0, Math.min(99, Math.floor(Number(progressPercent))))
+    : null
+  const parts = [`Download: ${state}`]
+  if (progress !== null) parts.push(`${progress}%`)
+  if (hasSpeed) parts.push(formatByteRate(speedBytes))
+  if (hasEta) parts.push(`ETA ${formatDuration(etaSeconds)}`)
+
+  return {
+    label: parts.filter(Boolean).join(' | '),
+    state,
+    speedBytes: hasSpeed ? Math.max(0, Math.floor(speedBytes)) : 0,
+    etaSeconds: hasEta ? Math.floor(etaSeconds) : 0,
+    slow,
+    stalled
+  }
 }
 
 function truncateTitle(title, maxLen = 92) {
@@ -111,6 +180,7 @@ function buildDescription(item, parsed, mode, progressPercent = null, fileName =
   ]).join(' • ')
 
   const modeLabel = buildStateLabel(mode, options, progressPercent)
+  const downloadTelemetry = resolveDownloadTelemetry(mode, options, progressPercent)
 
   const peerLabel = formatPeerLabel(item.seeders, mode)
   const stats = uniqueNonEmpty([
@@ -131,8 +201,9 @@ function buildDescription(item, parsed, mode, progressPercent = null, fileName =
   ]).join(' | ')
 
   const detailLine = uniqueNonEmpty([tech, source]).join(' | ')
-  if (!title) return detailLine ? `${detailLine}\n${enrichedStats}` : enrichedStats
-  return detailLine ? `${title}\n${detailLine}\n${enrichedStats}` : `${title}\n${enrichedStats}`
+  const tail = uniqueNonEmpty([enrichedStats, downloadTelemetry.label]).join('\n')
+  if (!title) return detailLine ? `${detailLine}\n${tail}` : tail
+  return detailLine ? `${title}\n${detailLine}\n${tail}` : `${title}\n${tail}`
 }
 
 function buildOnSeedboxStream(item, fileUrl, fileName, videoSize, config, parsed, options = {}) {
@@ -172,9 +243,15 @@ function buildOnSeedboxStream(item, fileUrl, fileName, videoSize, config, parsed
 
 function buildOnBufferingStream(item, fileUrl, fileName, videoSize, config, parsed, progressPercent, options = {}) {
   const containerLabel = detectContainerLabel(fileName, parsed?.container, parsed?.titleHint, parsed?.title)
+  const telemetryOptions = {
+    ...options,
+    downloadSpeed: options.downloadSpeed ?? item?.downloadSpeed ?? item?.dlSpeed ?? item?.dlspeed,
+    eta: options.eta ?? item?.eta ?? item?.downloadEta
+  }
+  const downloadTelemetry = resolveDownloadTelemetry('buffering', telemetryOptions, progressPercent)
   const stream = {
-    name: buildStreamName(parsed, 'buffering', fileName, options),
-    description: buildDescription(item, parsed, 'buffering', progressPercent, fileName, options),
+    name: buildStreamName(parsed, 'buffering', fileName, telemetryOptions),
+    description: buildDescription(item, parsed, 'buffering', progressPercent, fileName, telemetryOptions),
     url: fileUrl,
     thumbnail: PVTKRRX_LOGO_URL,
     behaviorHints: {
@@ -188,8 +265,13 @@ function buildOnBufferingStream(item, fileUrl, fileName, videoSize, config, pars
       sourceSize: Math.max(0, Number(videoSize || item?.size || 0)),
       sourceMode: 'buffering',
       sourceContainer: containerLabel.toLowerCase(),
-      sourceOrigin: String(options.sourceOrigin || ''),
-      sourceOriginLabel: String(options.sourceLabel || '')
+      sourceOrigin: String(telemetryOptions.sourceOrigin || ''),
+      sourceOriginLabel: String(telemetryOptions.sourceLabel || ''),
+      sourceDownloadState: downloadTelemetry.state,
+      sourceDownloadSpeed: downloadTelemetry.speedBytes,
+      sourceDownloadEta: downloadTelemetry.etaSeconds,
+      sourceDownloadSlow: downloadTelemetry.slow,
+      sourceDownloadStalled: downloadTelemetry.stalled
     }
   }
 
@@ -597,6 +679,8 @@ function sortStreams(streams) {
 
 module.exports = {
   formatSize,
+  formatByteRate,
+  formatDuration,
   buildOnSeedboxStream,
   buildOnBufferingStream,
   buildOnArchiveStream,

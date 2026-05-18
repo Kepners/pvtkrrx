@@ -87,7 +87,7 @@ function sportKeyFromCategoryName(name) {
   if (/mma|ufc|bellator|fight sports|ultimate diskk|kickboxing|muay thai/.test(text)) return 'mma'
   if (/boxing/.test(text)) return 'boxing'
   if (/wrestling|grapling/.test(text)) return 'wrestling'
-  if (/formula1|motogp|nascar|indycar|wsbk|btcc|wrc|automotoracing|motorsport/.test(text)) return 'motorsport'
+  if (/formula1|motogp|moto2|moto3|moto 2|moto 3|nascar|indycar|wsbk|btcc|wrc|automotoracing|motorsport/.test(text)) return 'motorsport'
   if (/darts|premier league darts/.test(text)) return 'darts'
   if (/cycling|tourdefrance|lavuelta|giro/.test(text)) return 'cycling'
   if (/nrl|rugby league/.test(text)) return 'rugby-league'

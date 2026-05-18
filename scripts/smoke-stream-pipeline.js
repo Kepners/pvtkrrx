@@ -356,7 +356,7 @@ async function run() {
     await withScenario(async () => {
       delete process.env.PVTKRRX_HOSTED_RELAY
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent().hash, link: '' })]
-      QBitClient.prototype.torrents = async () => [matchedTorrent()]
+      QBitClient.prototype.torrents = async () => [matchedTorrent({ dlspeed: 524288, eta: 540 })]
       QBitClient.prototype.files = async () => [matchedFile()]
       CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
     }, async () => {
@@ -427,7 +427,7 @@ async function run() {
     await withScenario(async () => {
       delete process.env.PVTKRRX_HOSTED_RELAY
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent().hash, link: '' })]
-      QBitClient.prototype.torrents = async () => [matchedTorrent()]
+      QBitClient.prototype.torrents = async () => [matchedTorrent({ dlspeed: 524288, eta: 540 })]
       QBitClient.prototype.files = async () => [matchedFile()]
       CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
     }, async () => {
@@ -478,7 +478,7 @@ async function run() {
     await withScenario(async () => {
       delete process.env.PVTKRRX_HOSTED_RELAY
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent().hash, link: '' })]
-      QBitClient.prototype.torrents = async () => [matchedTorrent()]
+      QBitClient.prototype.torrents = async () => [matchedTorrent({ dlspeed: 524288, eta: 540 })]
       QBitClient.prototype.files = async () => [matchedFile()]
       CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
     }, async () => {
@@ -503,8 +503,12 @@ async function run() {
       assert.match(String(result.streams[0]?.name || ''), /⏳/, '#4b buffering stream should show the buffering badge')
       assert.match(String(result.streams[0]?.name || ''), /🎬MKV/, '#4b buffering stream should show the detected file format badge')
       assert.match(String(result.streams[0]?.description || ''), /Buffering/i, '#4b buffering stream description should say buffering')
+      assert.match(String(result.streams[0]?.description || ''), /Download: slow \| 25% \| 512 KiB\/s \| ETA 9m/i, '#4b buffering stream description should expose live qBit speed and ETA')
       assert.match(String(result.streams[0]?.description || ''), /Source: Host PC/i, '#4b buffering stream description should say the host PC is serving the stream')
       assert.match(String(result.streams[0]?.description || ''), /Format: MKV/i, '#4b buffering stream description should surface the file format')
+      assert.equal(String(result.streams[0]?.behaviorHints?.sourceDownloadState || ''), 'slow', '#4b buffering stream should expose slow-download state')
+      assert.equal(Number(result.streams[0]?.behaviorHints?.sourceDownloadSpeed || 0), 524288, '#4b buffering stream should expose download speed')
+      assert.equal(Number(result.streams[0]?.behaviorHints?.sourceDownloadEta || 0), 540, '#4b buffering stream should expose download ETA')
     })
 
     await withScenario(async () => {

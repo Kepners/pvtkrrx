@@ -856,6 +856,11 @@ async function run() {
   assert.equal(motogpShortTitle?.league, 'MotoGP', 'motorsport parser should accept short league + location titles')
   assert.equal(motogpShortTitle?.eventName, 'Spain Jerez', 'short MotoGP titles should retain the searchable location')
 
+  const moto3OthersTitle = parseSportsEventTitle('Others: Moto3 Spain Catalunya English-mwr Practice', '2026-05-18T12:00:00.000Z')
+  assert.equal(moto3OthersTitle?.league, 'Moto3', 'Moto3 rows prefixed by Others should still parse as a motorsport league')
+  assert.equal(moto3OthersTitle?.eventName, 'Spain Catalunya', 'Moto3 parser should strip Others and release/language noise from event names')
+  assert.equal(moto3OthersTitle?.session, 'Practice', 'Moto3 parser should preserve bare practice sessions')
+
   const motoGpResolution = await resolveSportsMetaIdentity(
     client,
     availability('MotoGP Spain Jerez', {
@@ -879,6 +884,19 @@ async function run() {
   assert.equal(motogpTntProfile.broadcast, 'TNT', 'Prowlarr MotoGP rows should keep broadcast separately')
   assert.equal(motogpTntProfile.release_group, 'MWR', 'Prowlarr MotoGP rows should keep the real release group')
   assert.equal(motogpTntProfile.event_class, 'motorsport_event', 'MotoGP rows should be classified as event/session posters, not team matchups')
+
+  const moto3OthersProfile = parseSportsTorrentProfile({
+    title: 'Others: Moto3 Spain Catalunya English-mwr Practice',
+    pubDate: '2026-05-18T12:00:00.000Z',
+    sportHint: 'others',
+    categoryNames: ['Others'],
+    seeders: 4
+  })
+  assert.equal(moto3OthersProfile.sport, 'motorsport', 'Others-prefixed Moto3 rows should be promoted to motorsport')
+  assert.equal(moto3OthersProfile.league, 'Moto3', 'Others-prefixed Moto3 rows should keep Moto3 as the league')
+  assert.equal(moto3OthersProfile.event, 'Spain Catalunya', 'Others-prefixed Moto3 rows should not leak the Others prefix into the display event')
+  assert.equal(moto3OthersProfile.session, 'Practice', 'Others-prefixed Moto3 rows should keep the practice session for grouping and sorting')
+  assert.equal(moto3OthersProfile.clean_name, 'Moto3 2026-05-18 Spain Catalunya Practice', 'Moto3 clean names should sort/display without release noise')
 
   const mlbRsProfile = parseSportsTorrentProfile({
     title: 'MLB 26 04 2026 RS Miami Marlins vs San Francisco Giants 720p60 EN NBCSBA',

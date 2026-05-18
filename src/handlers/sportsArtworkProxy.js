@@ -1338,6 +1338,18 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
   },
   {
     sport: 'motorsport',
+    pattern: /\b(?:moto\s*2|moto2)\b/i,
+    canonicalIds: ['sportsmeta:league:motorsport|moto2'],
+    searchTerms: ['Moto2']
+  },
+  {
+    sport: 'motorsport',
+    pattern: /\b(?:moto\s*3|moto3)\b/i,
+    canonicalIds: ['sportsmeta:league:motorsport|moto3'],
+    searchTerms: ['Moto3']
+  },
+  {
+    sport: 'motorsport',
     pattern: /\b(?:indy\s*car|indycar|ntt\s+indycar|indianapolis\s+500|indy\s*500)\b/i,
     canonicalIds: ['sportsmeta:league:motorsport|indycar-series'],
     searchTerms: ['IndyCar Series'],

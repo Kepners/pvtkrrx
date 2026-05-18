@@ -3,8 +3,8 @@ const SPORTS_DISCOVERY_CATALOGS = Object.freeze([
     id: 'pvtkrrx-sports',
     name: 'All Sports',
     sportHint: '',
-    detailOptions: ['Premier League', 'FA Cup', 'MLS', 'Formula 1', 'MotoGP', 'UFC', 'NBA', 'NBA Playoffs', 'NFL', 'MLB', 'IPL', 'PGA Tour', 'WWE', 'PDC'],
-    seedTerms: ['Premier League', 'FA Cup', 'MLS', 'Formula 1', 'MotoGP', 'UFC', 'NBA', 'NBA Playoffs', 'NFL', 'MLB', 'Indian Premier League', 'PGA Tour']
+    detailOptions: ['Premier League', 'FA Cup', 'MLS', 'Formula 1', 'MotoGP', 'Moto2', 'Moto3', 'UFC', 'NBA', 'NBA Playoffs', 'NFL', 'MLB', 'IPL', 'PGA Tour', 'WWE', 'PDC'],
+    seedTerms: ['Premier League', 'FA Cup', 'MLS', 'Formula 1', 'MotoGP', 'Moto2', 'Moto3', 'UFC', 'NBA', 'NBA Playoffs', 'NFL', 'MLB', 'Indian Premier League', 'PGA Tour']
   },
   {
     id: 'pvtkrrx-sports-football',
@@ -17,8 +17,8 @@ const SPORTS_DISCOVERY_CATALOGS = Object.freeze([
     id: 'pvtkrrx-sports-motorsport',
     name: 'Motorsport',
     sportHint: 'motorsport',
-    detailOptions: ['Formula 1', 'MotoGP', 'NASCAR', 'IndyCar', 'WRC', 'Supercars', 'WEC', 'Formula E'],
-    seedTerms: ['Formula 1', 'MotoGP', 'NASCAR', 'Supercars']
+    detailOptions: ['Formula 1', 'MotoGP', 'Moto2', 'Moto3', 'NASCAR', 'IndyCar', 'WRC', 'Supercars', 'WEC', 'Formula E'],
+    seedTerms: ['Formula 1', 'MotoGP', 'Moto2', 'Moto3', 'NASCAR', 'Supercars']
   },
   {
     id: 'pvtkrrx-sports-mma',

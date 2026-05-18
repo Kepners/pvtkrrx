@@ -34,7 +34,7 @@ const {
   IS_HOSTED_RELAY_RUNTIME, SELF_HOST_SERVER_MODE, EXPRESS_TRUST_PROXY_SETTING, DEFAULT_LOCAL_HOSTNAME,
   STREAM_WAIT_TIMEOUT_MS, STREAM_WAIT_INTERVAL_MS,
   STREAM_RANGE_WAIT_TIMEOUT_MS, STREAM_RANGE_WAIT_INTERVAL_MS,
-  STREAM_READY_START_FRACTION, STREAM_PRIORITIZE_LAST_PIECES,
+  STREAM_READY_START_FRACTION, STREAM_READY_MIN_BYTES, STREAM_PRIORITIZE_LAST_PIECES,
   WATCHED_DELETE_THRESHOLD, WATCHED_DELETE_GRACE_MS,
   LAN_PAIR_TTL_SECONDS, LAN_PAIR_BIND_PUBLIC_IP, LAN_PAIR_LOCK_HOST,
   SECRET_CONFIG_FIELDS, SENSITIVE_WEB_ORIGINS, manifest,
@@ -2633,8 +2633,27 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
     const ext = path.extname(resolvedFilePath).toLowerCase()
     const mime = { '.mp4': 'video/mp4', '.mkv': 'video/x-matroska', '.avi': 'video/x-msvideo', '.wmv': 'video/x-ms-wmv', '.ts': 'video/mp2t', '.m4v': 'video/x-m4v' }
     const contentType = mime[ext] || 'application/octet-stream'
+    const range = req.headers.range
+    const initialRequest = !range || /^bytes=0(?:-|$)/i.test(String(range || '').trim())
+    const initialReady = () => Boolean(isComplete || isPlaybackReady(file, readableBytes))
 
-    if (!isComplete && readableBytes <= 0) {
+    if (!isComplete && initialRequest && !initialReady()) {
+      const hasInitialBuffer = await waitForFileState(() => Boolean(fileExists && resolvedFilePath && initialReady()))
+      if (!hasInitialBuffer) {
+        const requiredBytes = Math.min(
+          fileSize,
+          Math.max(1, STREAM_READY_MIN_BYTES, Math.floor(fileSize * STREAM_READY_START_FRACTION))
+        )
+        console.warn(
+          `[file-route] initial buffer not ready hash=${torrentHash.slice(0, 8)} ` +
+          `readable=${readableBytes} required=${requiredBytes} progress=${Math.round(Number(file?.progress || torrent.progress || 0) * 100)}%`
+        )
+        return res.status(425).json({
+          error: 'Download active - waiting for continuous start buffer',
+          progress: Number(file?.progress || torrent.progress || 0)
+        })
+      }
+    } else if (!isComplete && readableBytes <= 0) {
       const hasReadableBytes = await waitForFileState(() => Boolean(fileExists && resolvedFilePath && (isComplete || readableBytes > 0)))
       if (!hasReadableBytes) {
         return res.status(425).json({
@@ -2644,7 +2663,6 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
       }
     }
 
-    const range = req.headers.range
     res.setHeader('Accept-Ranges', 'bytes')
     res.setHeader('Content-Type', contentType)
     res.setHeader('Cache-Control', 'no-store')

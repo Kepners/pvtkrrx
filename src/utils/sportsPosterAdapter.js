@@ -36,6 +36,10 @@ const LEAGUE_CODES = Object.freeze({
   f1: 'F1',
   motogp: 'MotoGP',
   'moto gp': 'MotoGP',
+  moto2: 'Moto2',
+  'moto 2': 'Moto2',
+  moto3: 'Moto3',
+  'moto 3': 'Moto3',
   nascar: 'NASCAR',
   indycar: 'INDY',
   wrc: 'WRC',
@@ -104,6 +108,8 @@ function titleCase(value = '') {
       const upper = part.toUpperCase()
       if (['AEW', 'AFCON', 'ATP', 'BSB', 'EFL', 'EPL', 'FA', 'F1', 'FIFA', 'FP1', 'FP2', 'FP3', 'GP', 'IPL', 'LIV', 'MLB', 'MLS', 'MMA', 'NBA', 'NFL', 'NHL', 'NXT', 'PDC', 'PFL', 'PGA', 'RAW', 'TBA', 'UFC', 'UEFA', 'WC', 'WEC', 'WRC', 'WTA', 'WWE'].includes(upper)) return upper
       if (upper === 'MOTOGP') return 'MotoGP'
+      if (upper === 'MOTO2') return 'Moto2'
+      if (upper === 'MOTO3') return 'Moto3'
       if (upper === 'SMACKDOWN') return 'SmackDown'
       if (upper === 'WRESTLEMANIA') return 'WrestleMania'
       if (index > 0 && /^(?:van|von|de|del|da|dos|du)$/i.test(part)) return part.toLowerCase()
@@ -224,6 +230,8 @@ function leagueCodeFor(league = '', sport = '') {
   if (LEAGUE_CODES[normalized]) return LEAGUE_CODES[normalized]
   if (/^formula\s*1\b/i.test(league)) return 'F1'
   if (/^moto\s*gp\b/i.test(league)) return 'MotoGP'
+  if (/^moto\s*2\b/i.test(league)) return 'Moto2'
+  if (/^moto\s*3\b/i.test(league)) return 'Moto3'
   // Composite leagues like "MotoGP Brazil" or "WRC Spain" carry the round
   // venue as a suffix. Match the first token so we still return the recognised
   // abbreviation (MotoGP / WRC / NBA / etc.) rather than a 2-letter acronym.
@@ -243,7 +251,7 @@ function sportIconFor(input = {}) {
     input.rawTitle
   ].filter(Boolean).join(' ')).toLowerCase()
   if (/\b(?:formula\s*1|formula\s*one|formula1|f1)\b/.test(text)) return 'f1'
-  if (/\b(?:motogp|moto\s*gp)\b/.test(text)) return 'motogp'
+  if (/\b(?:motogp|moto\s*gp|moto2|moto\s*2|moto3|moto\s*3)\b/.test(text)) return 'motogp'
   if (/\b(?:motor|wrc|rally|grand prix|nascar|indycar|wec|formula e|supercars|v8sc|wsbk|bsb|british superbikes?)\b/.test(text)) return 'motorsport'
   if (/golf|pga|lpga|masters|ryder cup|liv golf|open championship/.test(text)) return 'golf'
   if (/darts|pdc|world matchplay|premier league darts/.test(text)) return 'darts'
