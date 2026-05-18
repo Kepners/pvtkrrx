@@ -1,5 +1,19 @@
 # PVTKRRX Brain
 
+## 2026-05-18: Stremio retest issues queued for full review
+
+- User retested `1.2.1` in Stremio/qBittorrent and asked to record issues for tomorrow rather than investigate immediately.
+- Captured handover: `.claude/sessions/2026-05-18_stremio-regression-review-handover.md`.
+- Issues recorded:
+  - Sports poster style selector shows `Brutalist`, but Stremio artwork still appears to use the old ticket-stub/broadcast style.
+  - Stream/source selection panel has a large delay and shows skeleton rows.
+  - Player view has no useful PVTKRR loading/download data.
+  - qBittorrent appears to download scattered pieces rather than the start first.
+  - A torrent near full download still does not play.
+  - Need PVTKRR-side structured logs/diagnostic UI.
+  - Need research Stremio Desktop/Android TV developer or debug logging options.
+- Do not claim a root cause yet. Tomorrow's first step is evidence capture: route token, exact torrent hash/title, qBit flags/piece states, `/playback` and `/file` statuses, artwork URL/template/cache keys, and route timing logs.
+
 ## 2026-05-17: Main branch and Coolify auto-deploy restored for 1.1.70
 
 - Scope: unify the live public Coolify branch back onto GitHub `main`, restore Coolify auto-deploy, and issue the next app-aligned release revision for hosted/cloud plus Windows desktop testing.
