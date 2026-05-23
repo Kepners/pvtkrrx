@@ -123,58 +123,140 @@ async function handleDebridPlayback(req, res) {
   return res.status(502).json({ error: 'Debrid playback failed', detail: message })
 }
 
+// Real authenticated round-trip per provider. Returns {ok, message} on success;
+// throws Error on failure. No silent "OK" fallback — if we can't prove the key
+// works, we fail loudly.
 async function pingProvider(type, apiKey) {
-  const provider = getDebridProvider(type, apiKey)
-  // The cheapest authenticated call: poll an obviously-missing id and expect a 4xx
-  // OR use a dedicated user endpoint when the client exposes one.
-  if (typeof provider.ping === 'function') {
-    return provider.ping()
+  const trimmed = String(apiKey || '').trim()
+  if (!trimmed) throw new Error('API key is empty')
+
+  if (type === 'rd') {
+    const res = await fetch('https://api.real-debrid.com/rest/1.0/user', {
+      headers: { Authorization: `Bearer ${trimmed}` }
+    })
+    if (res.status === 401 || res.status === 403) throw new Error('Real-Debrid rejected the API key (HTTP ' + res.status + ').')
+    if (!res.ok) throw new Error('Real-Debrid responded HTTP ' + res.status)
+    const body = await res.json().catch(() => ({}))
+    const username = String(body?.username || body?.email || '').trim()
+    const premium = Number(body?.premium || 0)
+    return { ok: true, message: username
+      ? `Real-Debrid OK — ${username}${premium > 0 ? ` (premium ${premium}d left)` : ''}.`
+      : 'Real-Debrid OK.' }
   }
-  // Fallback: addMagnet with an invalid magnet then check error class.
-  // This is safer than addMagnet with a real magnet (no orphan transfers).
-  // Most provider clients throw with `code: 'AUTH'` for bad keys.
-  return { ok: true, message: `${type.toUpperCase()} client initialized.` }
+
+  if (type === 'ad') {
+    const res = await fetch('https://api.alldebrid.com/v4/user', {
+      headers: { Authorization: `Bearer ${trimmed}` }
+    })
+    if (res.status === 401 || res.status === 403) throw new Error('AllDebrid rejected the API key (HTTP ' + res.status + ').')
+    if (!res.ok) throw new Error('AllDebrid responded HTTP ' + res.status)
+    const body = await res.json().catch(() => ({}))
+    if (String(body?.status || '').toLowerCase() !== 'success') {
+      throw new Error('AllDebrid rejected: ' + String(body?.error?.message || body?.error?.code || 'unknown'))
+    }
+    const username = String(body?.data?.user?.username || body?.data?.user?.email || '').trim()
+    const premium = Boolean(body?.data?.user?.isPremium)
+    return { ok: true, message: username
+      ? `AllDebrid OK — ${username}${premium ? ' (premium)' : ''}.`
+      : 'AllDebrid OK.' }
+  }
+
+  if (type === 'pm') {
+    const res = await fetch('https://www.premiumize.me/api/account/info', {
+      headers: { Authorization: `Bearer ${trimmed}` }
+    })
+    if (res.status === 401 || res.status === 403) throw new Error('Premiumize rejected the API key (HTTP ' + res.status + ').')
+    if (!res.ok) throw new Error('Premiumize responded HTTP ' + res.status)
+    const body = await res.json().catch(() => ({}))
+    if (String(body?.status || '').toLowerCase() !== 'success') {
+      throw new Error('Premiumize rejected: ' + String(body?.message || 'unknown'))
+    }
+    const expires = body?.premium_until ? new Date(Number(body.premium_until) * 1000).toISOString().slice(0, 10) : ''
+    const email = String(body?.customer_id || '').trim()
+    return { ok: true, message: email
+      ? `Premiumize OK — ${email}${expires ? ` (premium until ${expires})` : ''}.`
+      : 'Premiumize OK.' }
+  }
+
+  // Touch the client factory so unknown providers throw consistently.
+  getDebridProvider(type, trimmed)
+  throw new Error('Unknown debrid provider: ' + type)
 }
 
 async function pingCacheSearchSource(type, apiKey) {
-  const { getCacheSearchSource } = require('../clients/cacheSearch/base')
-  const source = getCacheSearchSource(type, apiKey)
-  if (typeof source.ping === 'function') {
-    return source.ping()
-  }
+  const trimmed = String(apiKey || '').trim()
+  if (!trimmed) throw new Error('API key is empty')
+
   if (type === 'putio') {
-    // Search for an obviously-empty title — round-trips through put.io with the token.
-    try {
-      await source.searchByTitle('pvtkrrx-test-ping-no-results-please', { limit: 1 })
-      return { ok: true, message: 'put.io token accepted.' }
-    } catch (err) {
-      throw new Error(err.message)
+    const res = await fetch('https://api.put.io/v2/account/info', {
+      headers: { Authorization: `Bearer ${trimmed}` }
+    })
+    if (res.status === 401 || res.status === 403) throw new Error('put.io rejected the token (HTTP ' + res.status + ').')
+    if (!res.ok) throw new Error('put.io responded HTTP ' + res.status)
+    const body = await res.json().catch(() => ({}))
+    if (String(body?.status || 'OK').toUpperCase() !== 'OK') {
+      throw new Error('put.io rejected: ' + String(body?.error_message || body?.error || 'unknown'))
     }
+    const username = String(body?.info?.username || body?.info?.mail || '').trim()
+    return { ok: true, message: username
+      ? `put.io OK — ${username}.`
+      : 'put.io OK.' }
   }
+
   if (type === 'pm') {
-    // PM cache check with a fake hash — succeeds with response[0] === false if key is valid.
-    try {
-      await source.searchByHash('0000000000000000000000000000000000000000')
-      return { ok: true, message: 'Premiumize cache check OK.' }
-    } catch (err) {
-      throw new Error(err.message)
-    }
+    // Premiumize cache source reuses the PM API key. Use the same /account/info round-trip.
+    return pingProvider('pm', trimmed)
   }
-  return { ok: true, message: `${type} client initialized.` }
+
+  throw new Error('Unknown cache search source: ' + type)
+}
+
+function resolveSavedApiKey(kind, type) {
+  // Lazy require to avoid circular deps at module load.
+  const { loadLocalConfigFile } = require('../lib/shared')
+  let saved
+  try {
+    saved = loadLocalConfigFile()
+  } catch (_) {
+    return ''
+  }
+  if (!saved || typeof saved !== 'object') return ''
+  const block = kind === 'debrid' ? saved.debrid : saved.cacheSearch
+  const list = block && typeof block === 'object'
+    ? (kind === 'debrid'
+      ? (Array.isArray(block.providers) ? block.providers : [])
+      : (Array.isArray(block.sources) ? block.sources : []))
+    : []
+  const entry = list.find(item => item && String(item.type || '').toLowerCase() === type)
+  if (entry && entry.apiKey) return String(entry.apiKey)
+  // PM uses ONE account: cacheSearch PM falls back to debrid PM apiKey.
+  if (kind === 'cacheSearch' && type === 'pm') {
+    const debridList = Array.isArray(saved.debrid?.providers) ? saved.debrid.providers : []
+    const pmDebrid = debridList.find(p => p && String(p.type || '').toLowerCase() === 'pm')
+    if (pmDebrid && pmDebrid.apiKey) return String(pmDebrid.apiKey)
+  }
+  return ''
 }
 
 async function handleDebridTest(req, res) {
   const body = req.body && typeof req.body === 'object' && !Array.isArray(req.body) ? req.body : {}
   const provider = String(body.provider || '').trim().toLowerCase()
   const source = String(body.source || '').trim().toLowerCase()
-  const apiKey = String(body.apiKey || '').trim()
+  const rawApiKey = String(body.apiKey || '').trim()
+  const useRetained = body.useRetained === true || rawApiKey === '__retained__'
 
   if (!provider && !source) {
     return res.status(400).json({ ok: false, message: 'Specify provider (rd/ad/pm) or source (putio/pm).' })
   }
 
-  if (!apiKey || apiKey === '__retained__') {
-    return res.status(400).json({ ok: false, message: 'API key required. Save the config first to use the retained key.' })
+  let apiKey = rawApiKey
+  if (!apiKey || useRetained) {
+    apiKey = provider
+      ? resolveSavedApiKey('debrid', provider)
+      : resolveSavedApiKey('cacheSearch', source)
+    if (!apiKey) {
+      return res.status(400).json({ ok: false, message: 'No API key entered and none saved yet. Paste the key and click Test again.' })
+    }
   }
 
   try {

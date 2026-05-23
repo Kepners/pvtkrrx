@@ -2865,8 +2865,9 @@
 
         <label style="display:flex;align-items:flex-start;gap:0.6rem;margin-top:1rem;">
           <input type="checkbox" id="debridPreferOverSeedbox" checked style="width:auto;transform:scale(1.15);margin-top:0.15rem;">
-          <span>Prefer debrid over seedbox for movies/TV. Sports content always uses debrid when available (never qBit).</span>
+          <span>Prefer debrid streams above qBit in the list. (qBit always remains as backup either way.)</span>
         </label>
+        <p class="hint" id="debridAutoSaveStatus" style="margin-top:0.8rem;"></p>
       </div>
 
       <!-- v1.3 Cache search sources (optional). COPY DRAFT — pending docs/copy.md approval. -->
@@ -2896,6 +2897,7 @@
           </label>
           <p class="hint" style="margin-top:0.3rem;">Uses the Premiumize API key configured above. Premiumize is the only debrid with a working cache-by-hash check, so it doubles as a search source.</p>
         </div>
+        <p class="hint" id="cacheSearchAutoSaveStatus" style="margin-top:0.8rem;"></p>
       </div>
 
       <div class="service-card" id="serviceCard-storage" data-service-visible="pc lan">
@@ -5547,7 +5549,7 @@
     }
 
     function getAllowedServiceTabs(target = getInstallTarget()) {
-      return ['prowlarr', 'qbit', 'storage', 'files', 'options'].filter((name) => {
+      return ['prowlarr', 'qbit', 'debrid', 'cacheSearch', 'storage', 'files', 'options'].filter((name) => {
         const button = document.querySelector(`[data-service-tab="${name}"]`);
         return targetAllows(button, target);
       });
@@ -5574,6 +5576,10 @@
         hint.textContent = 'Prowlarr settings are open.';
       } else if (next === 'qbit') {
         hint.textContent = 'qBittorrent settings are open.';
+      } else if (next === 'debrid') {
+        hint.textContent = 'Debrid providers are open. Optional — adds debrid streams above qBit when linked.';
+      } else if (next === 'cacheSearch') {
+        hint.textContent = 'Cache search sources are open. Optional — surfaces instant-ready hits at the top of the list.';
       } else if (next === 'storage') {
         hint.textContent = 'Fallback local storage roots are open.';
       } else if (next === 'files') {
@@ -5984,14 +5990,26 @@
     });
     ['rd', 'ad', 'pm'].forEach((type) => {
       const Cap = type.charAt(0).toUpperCase() + type.slice(1);
-      const el = document.getElementById(`debrid${Cap}ApiKey`);
-      if (el) el.addEventListener('input', () => markDebridFieldDirty(type));
+      const keyEl = document.getElementById(`debrid${Cap}ApiKey`);
+      if (keyEl) {
+        keyEl.addEventListener('input', () => { markDebridFieldDirty(type); scheduleDebridAutoSave(); });
+        keyEl.addEventListener('change', scheduleDebridAutoSave);
+      }
+      const enabledEl = document.getElementById(`debrid${Cap}Enabled`);
+      if (enabledEl) enabledEl.addEventListener('change', scheduleDebridAutoSave);
     });
-    ['putio'].forEach((type) => {
+    ['putio', 'pm'].forEach((type) => {
       const Cap = type.charAt(0).toUpperCase() + type.slice(1);
-      const el = document.getElementById(`cacheSearch${Cap}ApiKey`);
-      if (el) el.addEventListener('input', () => markCacheSearchFieldDirty(type));
+      const keyEl = document.getElementById(`cacheSearch${Cap}ApiKey`);
+      if (keyEl) {
+        keyEl.addEventListener('input', () => { markCacheSearchFieldDirty(type); scheduleDebridAutoSave(); });
+        keyEl.addEventListener('change', scheduleDebridAutoSave);
+      }
+      const enabledEl = document.getElementById(`cacheSearch${Cap}Enabled`);
+      if (enabledEl) enabledEl.addEventListener('change', scheduleDebridAutoSave);
     });
+    const preferDebridEl = document.getElementById('debridPreferOverSeedbox');
+    if (preferDebridEl) preferDebridEl.addEventListener('change', scheduleDebridAutoSave);
     const sportsPosterTemplateSelect = document.getElementById('sportsPosterTemplate');
     if (sportsPosterTemplateSelect) {
       sportsPosterTemplateSelect.addEventListener('change', scheduleSportsPosterTemplateAutoSave);
@@ -7144,6 +7162,85 @@
       if (!el) return;
       el.className = 'simple-flow-status ' + (type || 'info');
       el.textContent = msg;
+    }
+
+    // v1.3 debrid + cacheSearch auto-save. Fires 800ms after the last field change,
+    // POSTs the FULL current config to the same endpoint install() uses so the saved
+    // disk-config picks up the new debrid/cacheSearch block immediately. Shows inline
+    // status in the Debrid + Cache Search panels so the user knows their paste landed.
+    let debridAutoSaveTimer = null;
+    let debridAutoSaveSeq = 0;
+
+    function setDebridSaveStatus(text, type) {
+      ['debridAutoSaveStatus', 'cacheSearchAutoSaveStatus'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.className = 'status ' + (type || 'info');
+        el.textContent = text || '';
+      });
+    }
+
+    async function performDebridAutoSave() {
+      const mySeq = ++debridAutoSaveSeq;
+      let config;
+      try {
+        config = getConfig();
+      } catch (err) {
+        setDebridSaveStatus('Auto-save skipped: ' + err.message, 'err');
+        return;
+      }
+
+      // Strip ephemeral install fields the save endpoint doesn't need; keep the full
+      // config so saved Prowlarr/qBit/etc. fields aren't accidentally wiped.
+      const installMode = getInstallMode();
+      let endpoint;
+      let payload = config;
+
+      if (installMode === 'local') {
+        endpoint = '/local-config';
+      } else if (serverRuntime.selfHostServerMode) {
+        endpoint = '/server-config';
+        payload = routeParity.stripRemoteSeedboxLanFields(config, { keepRelayUrl: true });
+        if (!(await ensureSelfHostAdminAccess('auto-save debrid settings'))) {
+          setDebridSaveStatus('Auto-save needs the self-host password. Paste it then try again.', 'err');
+          return;
+        }
+      } else {
+        // Hosted Remote Seedbox without a self-host runtime — auto-save not applicable here.
+        // The user generates a fresh hosted install token via the main install() flow instead.
+        setDebridSaveStatus('On Remote Seedbox route, click Generate Install Link to apply changes.', 'info');
+        return;
+      }
+
+      setDebridSaveStatus('Saving…', 'info');
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: buildJsonHeaders(),
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (mySeq !== debridAutoSaveSeq) return; // a newer save already fired
+        if (!res.ok || data.error) {
+          setDebridSaveStatus('Save failed: ' + (data.error || ('HTTP ' + res.status)), 'err');
+          return;
+        }
+        updateSavedSecretState(data.savedSecrets || {});
+        const stamp = new Date().toLocaleTimeString();
+        setDebridSaveStatus('Saved at ' + stamp + '.', 'ok');
+      } catch (err) {
+        if (mySeq !== debridAutoSaveSeq) return;
+        setDebridSaveStatus('Save failed: ' + err.message, 'err');
+      }
+    }
+
+    function scheduleDebridAutoSave() {
+      if (debridAutoSaveTimer) clearTimeout(debridAutoSaveTimer);
+      setDebridSaveStatus('Pending save…', 'info');
+      debridAutoSaveTimer = setTimeout(() => {
+        debridAutoSaveTimer = null;
+        performDebridAutoSave();
+      }, 800);
     }
 
     function scheduleSportsPosterTemplateAutoSave() {

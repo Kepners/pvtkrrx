@@ -149,7 +149,14 @@ async function applyV13Routing(result, ctx = {}) {
   const debridConfig = config.debrid || { providers: [], preferDebridOverSeedbox: true }
   const cacheConfig = config.cacheSearch || { sources: [] }
   const enabledDebrid = (debridConfig.providers || []).filter(p => p && p.enabled && String(p.apiKey || '').trim())
-  const enabledCache = (cacheConfig.sources || []).filter(s => s && s.enabled && String(s.apiKey || '').trim())
+  // PM uses ONE account: cacheSearch PM source shares the debrid PM apiKey when its own apiKey is blank.
+  const pmDebridKey = (enabledDebrid.find(p => p.type === 'pm')?.apiKey || '').trim()
+  const enabledCache = (cacheConfig.sources || [])
+    .filter(s => s && s.enabled)
+    .map(s => (s.type === 'pm' && !String(s.apiKey || '').trim() && pmDebridKey)
+      ? { ...s, apiKey: pmDebridKey }
+      : s)
+    .filter(s => String(s.apiKey || '').trim())
   const hasDebrid = enabledDebrid.length > 0
   const preferDebrid = debridConfig.preferDebridOverSeedbox !== false
 
