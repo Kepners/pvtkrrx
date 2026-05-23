@@ -63,11 +63,12 @@ If you don't have Premiumize configured, NZB results are skipped (no Usenet fall
 
 ## Routing rules
 
-| Content | If debrid configured | If only qBit configured |
+Same behaviour for movies, TV, AND sports. PVTKRR's v1.3 router is purely additive — qBit is **always** kept as the backup and never removed from the stream list.
+
+| Content | Debrid linked | Debrid NOT linked |
 |---|---|---|
-| Movies / TV | Debrid first (default), qBit fallback. Toggle "Prefer debrid over seedbox" off to flip. | qBit only (v1.2 behavior). |
-| Sports (`sportsmeta:*`) | **Debrid only** — qBit is never used for sports. | **Empty streams** — no qBit fallback for sports. |
-| NZB results | Premiumize only (RD/AD skip). | Empty (no qBit fallback for Usenet). |
+| Movies / TV / Sports | Debrid stream ADDED above each existing qBit stream (default). Original qBit stream stays underneath as backup. Toggle "Prefer debrid over seedbox" off to put qBit first instead. | qBit only (v1.2 behavior unchanged). |
+| NZB results | Routed to Premiumize when PM is configured (RD/AD skip — neither supports NZB). | Skipped (no qBit fallback for Usenet). |
 | Cached items (via cache search) | `⚡ READY` prefix, top of list. | Same — cache search runs independently of debrid. |
 
 ## Verifying

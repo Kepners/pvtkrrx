@@ -1,16 +1,15 @@
 # PVTKRRX v1.3 — Debrid + Cache Search + Newznab
 
-**Released:** 2026-05-23
-**Type:** Feature release (additive, fully backward-compatible with v1.2)
+**Released:** 2026-05-23 (v1.3.0) → patched 2026-05-24 (v1.3.1 — additive routing fix)
+**Type:** Feature release (purely additive, fully backward-compatible with v1.2)
 
 ## What's new
 
-### Debrid playback (optional)
-Configure one or more debrid services (Real-Debrid, AllDebrid, Premiumize) in the new **Debrid** tab on the Configure page. When configured, PVTKRR will route torrent/NZB downloads through your debrid account so you get instant playback for cached items and faster downloads for the rest — no need to wait on a seedbox finishing the download.
+### Debrid playback (optional, ADDITIVE)
+Configure one or more debrid services (Real-Debrid, AllDebrid, Premiumize) in the new **Debrid** tab on the Configure page. When configured, PVTKRR ADDS a debrid playback stream alongside each existing qBittorrent stream — debrid for instant cached playback, qBit still there underneath as the always-on backup.
 
-- **Coexists with qBittorrent.** Your existing seedbox setup keeps working. Debrid is added as an option, not a replacement.
-- **Sports route through debrid only.** Sports streams (`sportsmeta:*` IDs) use debrid when configured. If no debrid is enabled, sports streams return empty — debrid is the only currently supported path for live/scheduled sports.
-- **Movies/TV: debrid first by default.** Toggle the "Prefer debrid over seedbox" option to flip this.
+- **qBittorrent is always kept.** Same behaviour for movies, TV, and sports — debrid streams are ADDED above existing qBit streams when debrid is linked. qBit is never removed from the stream list. If debrid isn't configured, the stream list is identical to v1.2.
+- **Per-install toggle.** "Prefer debrid over seedbox" controls order (debrid-first vs. qBit-first when both apply). Default: debrid first.
 - **Real-Debrid May 2026 filter mitigation.** A built-in sanitizer strips known filter keywords (WEB-DL, AMZN, etc.) from the magnet display name before submission to RD. This is a partial mitigation — RD's filter also reads internal torrent file paths which PVTKRR cannot modify.
 
 ### Cache search (optional)

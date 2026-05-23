@@ -4,12 +4,18 @@ Updated: 2026-05-23
 
 ## Current Stage
 
-PVTKRRX is on the `1.3.0` release line. v1.3 adds optional Debrid (Real-Debrid, AllDebrid, Premiumize) + Cache Search (put.io, Premiumize cache check) + Newznab (Usenet) support. Coexists with the existing qBittorrent flow — installs without any debrid/cache config are unchanged from v1.2.
+PVTKRRX is on the `1.3.1` release line. v1.3 adds optional Debrid (Real-Debrid, AllDebrid, Premiumize) + Cache Search (put.io, Premiumize cache check) + Newznab (Usenet) support — all purely additive: qBittorrent streams always remain in the list, debrid streams are ADDED above them when configured. Installs without any debrid/cache config are unchanged from v1.2.
+
+## 2026-05-24: v1.3.1 additive routing fix
+
+- Fix scope: the v1.3.0 router applied a "sports = debrid only" rule that removed qBit streams for sports when debrid was linked, and returned empty sports streams when debrid was configured but no provider enabled. Owner correction: that was never the desired behaviour. **qBit must always remain** for every content type (movies, TV, sports). Debrid is purely ADDITIVE — it ADDS streams above qBit, never removes them.
+- Router (`src/utils/streamRouter.js`): removed sports-specific branches. Same routing for all content. When debrid linked: debrid streams ADDED above existing qBit streams (qBit stays underneath). When debrid not linked: stream list unchanged (v1.2 passthrough). The `preferDebridOverSeedbox` toggle still controls order (debrid-first vs qBit-first when both apply).
+- Smoke updated: `smoke:debrid-routing` now has 15 checks verifying additive behaviour across movies, TV, sports — qBit always kept, debrid stacked above when linked.
 
 ## 2026-05-23: v1.3.0 debrid + cache search + Newznab
 
 - Release scope: optional debrid provider layer (RD/AD/PM), optional cache search sources (put.io, PM cache check), Newznab Usenet support routed to Premiumize, new `/playback/debrid` add-and-poll handler, new `/configure/debrid/test` ping endpoint.
-- Routing rules: sports content (`sportsmeta:*`, `pvtkrrx:sm:*`) uses debrid only — no qBit fallback. Movies/TV prefer debrid by default with qBit fallback (toggleable). Backward compat preserved: installs with no debrid/cache configured behave exactly like v1.2.
+- Routing rules (corrected in 1.3.1): purely additive. qBit always stays in the stream list. Debrid streams are ADDED above qBit when debrid is linked. Backward compat preserved: installs with no debrid/cache configured behave exactly like v1.2.
 - RD May 2026 filter mitigation: filename sanitizer strips known release-group keywords from the magnet `dn=` before submission. Partial mitigation only.
 - New Configure UI: Debrid + Cache Search tabs added to the existing service-tabs row. API keys masked after save, "Test connection" buttons per provider/source.
 - Encrypted install-config schema extended: `debrid.{providers,preferOrder,preferDebridOverSeedbox}` + `cacheSearch.{sources,preferOrder}` blocks ride the same AES-256-GCM token as the existing fields. v1.2 tokens deserialize cleanly to empty defaults.

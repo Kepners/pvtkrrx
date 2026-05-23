@@ -6,7 +6,7 @@ process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'debrid-routing
 process.env.PVTKRRX_OPAQUE_STATE_SECRET = process.env.PVTKRRX_OPAQUE_STATE_SECRET || process.env.ENCRYPTION_SECRET
 
 const { applyV13Routing, _buildMagnetFromHash, _tryExtractDebridMetaFromStreamUrl, _buildDebridPlaybackUrl } = require('../src/utils/streamRouter')
-const { encodePlaybackStateToken, decodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT, DEBRID_PROTOCOL_USENET } = require('../src/utils/opaqueState')
+const { encodePlaybackStateToken, decodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT } = require('../src/utils/opaqueState')
 
 const PLAYBACK_BASE = 'https://example.test'
 const CONFIG_TOKEN = 'cfgtoken123'
@@ -18,6 +18,11 @@ function check(label, fn) {
     checks++
     console.log(`  PASS ${label}`)
   })
+}
+
+function makeQbitStream(label = 'On Seedbox', title = 'sample 1080p') {
+  const token = encodePlaybackStateToken({ h: SAMPLE_HASH, l: '', p: 'm.mkv' })
+  return { name: label, title, url: `${PLAYBACK_BASE}/${CONFIG_TOKEN}/playback/${token}` }
 }
 
 async function run() {
@@ -65,52 +70,21 @@ async function run() {
     assert.equal(decoded.providers[0].apiKey, 'k1')
   })
 
-  await check('sports + v1.3-configured but no ENABLED debrid → empty streams (sports rule)', async () => {
-    const baseResult = {
-      streams: [
-        { name: 'qBit', title: 'football match', url: `${PLAYBACK_BASE}/${CONFIG_TOKEN}/playback/${encodePlaybackStateToken({ h: SAMPLE_HASH, l: '', p: 'm.mkv' })}` }
-      ]
-    }
+  await check('SPORTS + no debrid → qBit streams pass through UNCHANGED (qBit is the backup)', async () => {
+    const baseResult = { streams: [makeQbitStream('On Seedbox', 'football 1080p')] }
     const result = await applyV13Routing(baseResult, {
-      // User has v1.3 config (RD with apiKey) but provider is disabled → still triggers v1.3 sports rule.
-      config: {
-        debrid: { providers: [{ type: 'rd', apiKey: 'somekey', enabled: false }] },
-        cacheSearch: { sources: [] }
-      },
-      addonUrl: PLAYBACK_BASE,
-      playbackBaseUrl: PLAYBACK_BASE,
-      configToken: CONFIG_TOKEN,
-      id: 'sportsmeta:premier-league:2026-05-23:arsenal-vs-chelsea'
-    })
-    assert.deepEqual(result.streams, [])
-  })
-
-  await check('sports + no v1.3 config at all → BACKWARD COMPAT (existing streams pass through)', async () => {
-    const baseResult = {
-      streams: [
-        { name: 'qBit', title: 'football match', url: `${PLAYBACK_BASE}/${CONFIG_TOKEN}/playback/${encodePlaybackStateToken({ h: SAMPLE_HASH, l: '', p: 'm.mkv' })}` }
-      ]
-    }
-    const result = await applyV13Routing(baseResult, {
-      // No debrid providers, no cache search sources — pure v1.2 install.
       config: { debrid: { providers: [] }, cacheSearch: { sources: [] } },
       addonUrl: PLAYBACK_BASE,
       playbackBaseUrl: PLAYBACK_BASE,
       configToken: CONFIG_TOKEN,
       id: 'sportsmeta:premier-league:2026-05-23:arsenal-vs-chelsea'
     })
-    // Pure v1.2 install: passthrough. No streams removed.
     assert.equal(result.streams.length, 1)
-    assert.equal(result.streams[0].name, 'qBit')
+    assert.equal(result.streams[0].name, 'On Seedbox')
   })
 
-  await check('sports + debrid configured → existing qBit stream replaced by debrid variant', async () => {
-    const token = encodePlaybackStateToken({ h: SAMPLE_HASH, l: '', p: 'm.mkv' })
-    const baseResult = {
-      streams: [
-        { name: 'On Seedbox', title: 'football 1080p', url: `${PLAYBACK_BASE}/${CONFIG_TOKEN}/playback/${token}` }
-      ]
-    }
+  await check('SPORTS + debrid linked → debrid ADDED above qBit, qBit STAYS as backup', async () => {
+    const baseResult = { streams: [makeQbitStream('On Seedbox', 'football 1080p')] }
     const result = await applyV13Routing(baseResult, {
       config: {
         debrid: { providers: [{ type: 'rd', apiKey: 'k1', enabled: true }], preferDebridOverSeedbox: true },
@@ -121,19 +95,30 @@ async function run() {
       configToken: CONFIG_TOKEN,
       id: 'sportsmeta:premier-league:2026-05-23:arsenal-vs-chelsea'
     })
-    // qBit stream replaced; only debrid stream emitted
-    assert.equal(result.streams.length, 1)
-    assert.match(result.streams[0].url, /\/playback\/debrid\//)
+    // ADDITIVE: 2 streams — debrid first, original qBit kept below as fallback
+    assert.equal(result.streams.length, 2, 'should have both debrid and qBit streams')
+    assert.match(result.streams[0].url, /\/playback\/debrid\//, 'debrid first')
     assert.match(result.streams[0].name, /^⬇ RD/)
+    assert.equal(result.streams[1].name, 'On Seedbox', 'qBit backup kept underneath')
+    assert.doesNotMatch(result.streams[1].url, /\/playback\/debrid\//)
   })
 
-  await check('movie + debrid + preferDebridOverSeedbox=true → debrid stream added BEFORE qBit', async () => {
-    const token = encodePlaybackStateToken({ h: SAMPLE_HASH, l: '', p: 'm.mkv' })
-    const baseResult = {
-      streams: [
-        { name: 'On Seedbox', title: 'Movie 1080p', url: `${PLAYBACK_BASE}/${CONFIG_TOKEN}/playback/${token}` }
-      ]
-    }
+  await check('MOVIE + no debrid → qBit unchanged (v1.2 passthrough)', async () => {
+    const baseResult = { streams: [makeQbitStream('On Seedbox', 'movie 1080p')], cacheMaxAge: 60 }
+    const result = await applyV13Routing(baseResult, {
+      config: { debrid: { providers: [] }, cacheSearch: { sources: [] } },
+      addonUrl: PLAYBACK_BASE,
+      playbackBaseUrl: PLAYBACK_BASE,
+      configToken: CONFIG_TOKEN,
+      id: 'tt12345678'
+    })
+    assert.equal(result.streams.length, 1)
+    assert.equal(result.streams[0].name, 'On Seedbox')
+    assert.equal(result.cacheMaxAge, 60)
+  })
+
+  await check('MOVIE + debrid linked → debrid ADDED above qBit, qBit STAYS', async () => {
+    const baseResult = { streams: [makeQbitStream('On Seedbox', 'movie 1080p')] }
     const result = await applyV13Routing(baseResult, {
       config: {
         debrid: { providers: [{ type: 'rd', apiKey: 'k1', enabled: true }], preferDebridOverSeedbox: true },
@@ -146,17 +131,11 @@ async function run() {
     })
     assert.equal(result.streams.length, 2)
     assert.match(result.streams[0].url, /\/playback\/debrid\//, 'debrid first')
-    assert.match(result.streams[1].url, /\/playback\/[^/]+$/, 'qBit second (no /debrid/ in path)')
-    assert.doesNotMatch(result.streams[1].url, /\/playback\/debrid\//)
+    assert.equal(result.streams[1].name, 'On Seedbox', 'qBit kept as fallback')
   })
 
-  await check('movie + debrid + preferDebridOverSeedbox=false → qBit BEFORE debrid', async () => {
-    const token = encodePlaybackStateToken({ h: SAMPLE_HASH, l: '', p: 'm.mkv' })
-    const baseResult = {
-      streams: [
-        { name: 'On Seedbox', title: 'Movie 1080p', url: `${PLAYBACK_BASE}/${CONFIG_TOKEN}/playback/${token}` }
-      ]
-    }
+  await check('preferDebridOverSeedbox=false → qBit FIRST, debrid added below', async () => {
+    const baseResult = { streams: [makeQbitStream('On Seedbox', 'movie 1080p')] }
     const result = await applyV13Routing(baseResult, {
       config: {
         debrid: { providers: [{ type: 'rd', apiKey: 'k1', enabled: true }], preferDebridOverSeedbox: false },
@@ -168,17 +147,43 @@ async function run() {
       id: 'tt12345678'
     })
     assert.equal(result.streams.length, 2)
-    assert.doesNotMatch(result.streams[0].url, /\/playback\/debrid\//, 'qBit first')
+    assert.equal(result.streams[0].name, 'On Seedbox', 'qBit first')
     assert.match(result.streams[1].url, /\/playback\/debrid\//, 'debrid second')
   })
 
-  await check('install without debrid OR cacheSearch is unchanged (backward compat)', async () => {
+  await check('TV episode + debrid + multiple qBit streams → debrid added for each, qBit ALL preserved', async () => {
+    const baseResult = {
+      streams: [
+        makeQbitStream('On Seedbox 1080p', 'S01E05 1080p'),
+        makeQbitStream('On Seedbox 720p', 'S01E05 720p')
+      ]
+    }
+    // Add a second hash variant so dedup doesn't collapse
+    const token2 = encodePlaybackStateToken({ h: '1111111111111111111111111111111111111111', l: '', p: 'ep2.mkv' })
+    baseResult.streams[1].url = `${PLAYBACK_BASE}/${CONFIG_TOKEN}/playback/${token2}`
+
+    const result = await applyV13Routing(baseResult, {
+      config: {
+        debrid: { providers: [{ type: 'pm', apiKey: 'pmkey', enabled: true }], preferDebridOverSeedbox: true },
+        cacheSearch: { sources: [] }
+      },
+      addonUrl: PLAYBACK_BASE,
+      playbackBaseUrl: PLAYBACK_BASE,
+      configToken: CONFIG_TOKEN,
+      id: 'tt12345678:1:5'
+    })
+    // 2 debrid + 2 qBit = 4 total (additive, qBit ALL kept)
+    assert.equal(result.streams.length, 4)
+    assert.match(result.streams[0].url, /\/playback\/debrid\//)
+    assert.match(result.streams[1].url, /\/playback\/debrid\//)
+    assert.match(result.streams[2].name, /Seedbox/, 'first qBit kept')
+    assert.match(result.streams[3].name, /Seedbox/, 'second qBit kept')
+  })
+
+  await check('install without ANY v1.3 config is unchanged (backward compat)', async () => {
     const token = encodePlaybackStateToken({ h: SAMPLE_HASH, l: '', p: 'm.mkv' })
     const url = `${PLAYBACK_BASE}/${CONFIG_TOKEN}/playback/${token}`
-    const baseResult = {
-      streams: [{ name: 'On Seedbox', title: 'Movie', url }],
-      cacheMaxAge: 60
-    }
+    const baseResult = { streams: [{ name: 'On Seedbox', title: 'Movie', url }], cacheMaxAge: 60 }
     const result = await applyV13Routing(baseResult, {
       config: { debrid: { providers: [] }, cacheSearch: { sources: [] } },
       addonUrl: PLAYBACK_BASE,
@@ -191,11 +196,8 @@ async function run() {
     assert.equal(result.cacheMaxAge, 60)
   })
 
-  await check('disabled debrid providers are NOT used', async () => {
-    const token = encodePlaybackStateToken({ h: SAMPLE_HASH, l: '', p: 'm.mkv' })
-    const baseResult = {
-      streams: [{ name: 'On Seedbox', url: `${PLAYBACK_BASE}/${CONFIG_TOKEN}/playback/${token}` }]
-    }
+  await check('disabled debrid providers are NOT used (qBit-only behavior preserved)', async () => {
+    const baseResult = { streams: [makeQbitStream()] }
     const result = await applyV13Routing(baseResult, {
       config: {
         debrid: { providers: [{ type: 'rd', apiKey: 'k1', enabled: false }] },
@@ -206,12 +208,11 @@ async function run() {
       configToken: CONFIG_TOKEN,
       id: 'tt12345678'
     })
-    // No debrid variants because the only provider is disabled
     assert.equal(result.streams.length, 1)
     assert.doesNotMatch(result.streams[0].url, /\/playback\/debrid\//)
   })
 
-  await check('sports + debrid + empty existing streams → still empty (no fabricated streams)', async () => {
+  await check('SPORTS + debrid + empty existing streams → still empty (no debrid streams to derive)', async () => {
     const result = await applyV13Routing(
       { streams: [] },
       {

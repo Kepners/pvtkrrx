@@ -2,14 +2,17 @@
 
 // v1.3 stream routing post-processor.
 //
-// Sits between handleStream's qBit-flavored output and the Stremio response.
-// Reads config.debrid + config.cacheSearch and rewrites the stream list
-// per the routing rules:
-//   - Sports (sportsmeta:* / pvtkrrx:sm:*): debrid only — never qBit.
-//     If no debrid configured, returns empty streams.
-//   - Movies/TV: debrid first (preferDebridOverSeedbox=true default),
-//     qBit kept as fallback.
-//   - Cache search hits (put.io + PM) prepended as ⚡ READY streams.
+// PURELY ADDITIVE. We ADD debrid + cache streams to the existing v1.2 output.
+// qBit streams are NEVER removed — they always stay as the underlying backup.
+//
+// Behaviour, uniform across movies, TV, and sports:
+//   - Debrid linked (at least one enabled provider with apiKey):
+//       Cache hits (⚡ READY) prepend the list, then ⬇ debrid playback
+//       variants are ADDED above the existing qBit streams. qBit stays in
+//       place underneath as the always-on fallback.
+//   - Debrid NOT linked:
+//       Existing qBit stream list passes through untouched (v1.2 behavior).
+//       Cache hits still prepend if a cache source is configured.
 //
 // Implementation note: existing streams carry encrypted playback tokens that
 // embed {h: hash, l: link, p: path}. The router decodes those to derive the
@@ -18,11 +21,6 @@
 const { decodePlaybackStateToken, encodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT } = require('./opaqueState')
 const { searchAllSources } = require('./debridCache')
 const { redactSensitiveText } = require('./logRedaction')
-
-function isSportsId(id) {
-  const s = String(id || '')
-  return s.startsWith('sportsmeta:') || s.startsWith('pvtkrrx:sm:')
-}
 
 function buildMagnetFromHash(hash, name) {
   const h = String(hash || '').toLowerCase().trim()
@@ -148,8 +146,6 @@ async function applyV13Routing(result, ctx = {}) {
   const config = ctx.config && typeof ctx.config === 'object' ? ctx.config : {}
   const playbackBaseUrl = String(ctx.playbackBaseUrl || ctx.addonUrl || '').replace(/\/+$/, '')
   const configToken = String(ctx.configToken || '').trim()
-  const id = String(ctx.id || '')
-  const isSports = isSportsId(id)
   const debridConfig = config.debrid || { providers: [], preferDebridOverSeedbox: true }
   const cacheConfig = config.cacheSearch || { sources: [] }
   const enabledDebrid = (debridConfig.providers || []).filter(p => p && p.enabled && String(p.apiKey || '').trim())
@@ -158,18 +154,9 @@ async function applyV13Routing(result, ctx = {}) {
   const preferDebrid = debridConfig.preferDebridOverSeedbox !== false
 
   // Backward compat: install has NOT opted into v1.3 (no debrid + no cache search
-  // sources configured). Pass through with v1.2 behavior — sports keep working
-  // via qBit, no routing changes at all.
-  const hasAnyV13ProviderConfigured = (debridConfig.providers || []).some(p => p && String(p.apiKey || '').trim()) ||
-    (cacheConfig.sources || []).some(s => s && String(s.apiKey || '').trim())
-  if (!hasDebrid && enabledCache.length === 0 && !hasAnyV13ProviderConfigured) {
+  // configured). Pass through with v1.2 behavior — no routing changes at all.
+  if (!hasDebrid && enabledCache.length === 0) {
     return result
-  }
-
-  // v1.3 sports rule: user has opted into v1.3 routing but has no ENABLED debrid
-  // provider → sports streams are empty (no qBit fallback for sports per the brief).
-  if (isSports && !hasDebrid) {
-    return { ...result, streams: [], cacheMaxAge: result.cacheMaxAge ?? 30 }
   }
 
   const existing = Array.isArray(result.streams) ? result.streams : []
@@ -217,12 +204,10 @@ async function applyV13Routing(result, ctx = {}) {
     ? await buildCacheSearchStreams({ title: queryTitle }, enabledCache, playbackBaseUrl, providersForDebrid)
     : []
 
-  // Sports + debrid: drop the qBit-flavored existing streams; only debrid + ready.
-  let baseStreams = existing
-  if (isSports && hasDebrid) {
-    baseStreams = []
-  }
-
+  // qBit ALWAYS remains as the backup, for every content type (movies, TV,
+  // sports). Debrid is purely additive — when configured it appears ABOVE
+  // qBit; when not configured the original qBit list flows through untouched.
+  const baseStreams = existing
   const finalStreams = preferDebrid
     ? [...cacheStreams, ...debridStreams, ...baseStreams]
     : [...cacheStreams, ...baseStreams, ...debridStreams]
