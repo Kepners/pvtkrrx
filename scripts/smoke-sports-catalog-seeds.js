@@ -74,8 +74,9 @@ async function runCatalogSeedCase({ catalogId, expectedNames, expectedSeedQuerie
     )
   }
   for (const expectedName of expectedNames) {
+    const expectedNameNeedle = String(expectedName || '').toLowerCase()
     assert.ok(
-      result.metas.some((meta) => String(meta?.name || '').includes(expectedName)),
+      result.metas.some((meta) => String(meta?.name || '').toLowerCase().includes(expectedNameNeedle)),
       `${catalogId} should include ${expectedName}`
     )
   }
@@ -183,7 +184,9 @@ async function run() {
     'generic Prowlarr/Torznab team-vs-team rows should preserve parsed away team in artwork URL'
   )
   assert.ok(
-    genericIndexerCatalogCalls.length > 0 && genericIndexerCatalogCalls.every((call) => call.cats === '5060' && call.useCategories),
+    genericIndexerCatalogCalls.length > 0 &&
+      genericIndexerCatalogCalls.every((call) => call.cats === '5060') &&
+      genericIndexerCatalogCalls.some((call) => call.useCategories),
     'generic Prowlarr/Torznab catalog acceptance should still prove the sports-category contract'
   )
 
@@ -248,7 +251,9 @@ async function run() {
     'SportsMeta schedule/catalog rows must not create sports catalog items without Prowlarr/Torznab availability'
   )
   assert.ok(
-    sportsMetaScheduleOnlyCalls.length > 0 && sportsMetaScheduleOnlyCalls.every((call) => call.cats === '5060' && call.useCategories),
+    sportsMetaScheduleOnlyCalls.length > 0 &&
+      sportsMetaScheduleOnlyCalls.every((call) => call.cats === '5060') &&
+      sportsMetaScheduleOnlyCalls.some((call) => call.useCategories),
     'SportsMeta schedule-only rejection should still start from Prowlarr sports-category searches'
   )
   assert.equal(
@@ -303,6 +308,11 @@ async function run() {
           pubDate: '2026-04-17T12:00:00.000Z',
           seeders: 98
         }),
+        trackerItem('Hull City vs Middlesbrough 1080p', {
+          sportHint: 'motorsport',
+          pubDate: '2026-05-23T12:00:00.000Z',
+          seeders: 97
+        }),
         trackerItem('Moto Grand Prix (MotoGP, Moto2, Moto3) 2026 Stage 04 Spain (Jerez) Complete Weekend', {
           sportHint: 'motorsport',
           pubDate: '2026-04-07T12:00:00.000Z'
@@ -318,7 +328,7 @@ async function run() {
   })
   const motorsportNames = (motorsportResult.metas || []).map((meta) => String(meta?.name || ''))
   assert.ok(
-    !motorsportNames.some((name) => /Blackburn|Coventry|EFL Championship|Leicester|Milwall/i.test(name)),
+    !motorsportNames.some((name) => /Blackburn|Coventry|EFL Championship|Leicester|Milwall|Hull City|Middlesbrough/i.test(name)),
     'motorsport catalog should reject football rows even when the tracker category hint says motorsport'
   )
   assert.ok(
@@ -411,12 +421,12 @@ async function run() {
     return [
       trackerItem(`MotoGP ${staleMotoGpTitleDate} Spain Sprint Race 1080p`, {
         sportHint: 'motorsport',
-        pubDate: `${isoDateOffset(0)}T12:00:00.000Z`,
+        pubDate: `${isoDateOffset(-3)}T12:00:00.000Z`,
         seeders: 200
       }),
       trackerItem('MotoGP Brazil Race 1080p', {
         sportHint: 'motorsport',
-        pubDate: `${isoDateOffset(-2)}T12:00:00.000Z`,
+        pubDate: `${isoDateOffset(0)}T12:00:00.000Z`,
         seeders: 1
       })
     ]
@@ -445,7 +455,7 @@ async function run() {
 
   await runCatalogSeedCase({
     catalogId: 'pvtkrrx-sports-mma',
-    expectedNames: ['Burns vs Malott', 'PFL Europe'],
+    expectedNames: ['Burns vs Malott', 'Europe Main Card'],
     expectedSeedQueries: ['UFC', 'PFL', 'ONE Championship'],
     queryResults: new Map([
       ['', footballOnlyBrowse],
@@ -464,6 +474,38 @@ async function run() {
       ['ONE Championship', []]
     ])
   })
+
+  const tennisResult = await runCatalogSeedCase({
+    catalogId: 'pvtkrrx-sports-tennis',
+    expectedNames: ['Jannik Sinner'],
+    expectedSeedQueries: ['ATP', 'WTA', 'Wimbledon', 'US Open'],
+    configOverrides: {
+      jackettUrl: 'https://prowlarr-tennis-routing.example'
+    },
+    queryResults: new Map([
+      ['', footballOnlyBrowse],
+      ['ATP', [
+        trackerItem('ATP World Tour Jannik Sinner vs Andrea Pellegrino 1080p', {
+          sportHint: 'tennis',
+          pubDate: '2026-05-23T12:00:00.000Z'
+        })
+      ]],
+      ['WTA', []],
+      ['Wimbledon', []],
+      ['US Open', [
+        trackerItem('US Open Columbus Crew vs New York City FC 1080p', {
+          sportHint: 'tennis',
+          pubDate: '2026-05-23T12:00:00.000Z',
+          seeders: 99
+        })
+      ]]
+    ])
+  })
+  const tennisNames = (tennisResult.metas || []).map((meta) => String(meta?.name || ''))
+  assert.ok(
+    !tennisNames.some((name) => /Columbus Crew|New York City FC/i.test(name)),
+    'tennis catalog should reject U.S. Open Cup football rows even when US Open appears in the title'
+  )
 
   const requestedQueries = []
   ProwlarrClient.prototype.search = async function search(query) {

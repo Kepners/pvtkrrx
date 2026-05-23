@@ -387,9 +387,10 @@ async function renderTemplateFallbackArtwork(variant, fallbackInput = {}, templa
     const realLeagueLogo = logoContext?.leagueLogo || logoContext?.logo || null
     const realHomeLogo = logoContext?.homeBadge || null
     const realAwayLogo = logoContext?.awayBadge || null
+    const leagueFallbackForCompetitors = ['tennis_or_snooker_match', 'combat_event', 'darts_event'].includes(eventClass)
     const realLogoForSlot = (role = '') => {
-      if (role === 'home') return realHomeLogo
-      if (role === 'away') return realAwayLogo
+      if (role === 'home') return realHomeLogo || (leagueFallbackForCompetitors ? realLeagueLogo : null)
+      if (role === 'away') return realAwayLogo || (leagueFallbackForCompetitors ? realLeagueLogo : null)
       if (['league', 'leagueLogo', 'logo'].includes(role)) return realLeagueLogo
       return realLeagueLogo
     }
@@ -488,6 +489,10 @@ function escapeXml(value) {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+}
+
+function escapeRegExp(value) {
+  return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function normalizeSpace(value) {
@@ -925,6 +930,8 @@ const LEAGUE_SLUG_ALIASES = Object.freeze({
   'the fa cup': 'fa-cup',
   'the emirates fa cup': 'fa-cup',
   'emirates fa cup': 'fa-cup',
+  'us open cup': 'us-open-cup',
+  'u.s. open cup': 'us-open-cup',
   'english womens super league': 'english-womens-super-league',
   'english women super league': 'english-womens-super-league',
   'womens super league': 'english-womens-super-league',
@@ -939,9 +946,15 @@ const LEAGUE_SLUG_ALIASES = Object.freeze({
   'ncaa basketball': 'ncaa-basketball',
   'college basketball': 'ncaa-basketball',
   'atp': 'atp-world-tour',
+  'atp world tour': 'atp-world-tour',
   'wta': 'wta-tour',
+  'wta tour': 'wta-tour',
   'ufc': 'ufc',
+  'bkfc': 'bkfc',
+  'bare knuckle fighting championship': 'bkfc',
+  'bare knuckle boxing': 'bkfc',
   'nba': 'nba',
+  'nba playoffs': 'nba',
   'wnba': 'wnba',
   'women basketball league': 'wnba',
   'womens basketball league': 'wnba',
@@ -949,8 +962,16 @@ const LEAGUE_SLUG_ALIASES = Object.freeze({
   'womens national basketball association': 'wnba',
   "women's national basketball association": 'wnba',
   'nfl': 'nfl',
+  'nfl playoffs': 'nfl',
+  'ufl': 'ufl',
   'nhl': 'nhl',
   'mlb': 'mlb',
+  'euroleague': 'euroleague-basketball',
+  'euroleague basketball': 'euroleague-basketball',
+  'turkish airlines euroleague': 'euroleague-basketball',
+  'easycredit bbl': 'german-bbl',
+  'easycredit bbl germany': 'german-bbl',
+  'basketball bundesliga': 'german-bbl',
   'motogp': 'moto-gp',
   'moto gp': 'moto-gp',
   'f1': 'formula-1',
@@ -963,8 +984,30 @@ const LEAGUE_SLUG_ALIASES = Object.freeze({
   'indy 500': 'indycar-series',
   'wrc': 'wrc',
   'world rally championship': 'wrc',
+  'pdc': 'pdc-darts',
+  'pdc darts': 'pdc-darts',
+  'professional darts corporation': 'pdc-darts',
+  'world darts championship': 'pdc-darts',
+  'premier league darts': 'pdc-darts',
+  'tour de france': 'tour-de-france',
+  'tdf': 'tour-de-france',
+  'tour de france femmes': 'tour-de-france-femmes',
+  'tour de france femmes avec zwift': 'tour-de-france-femmes',
+  'uci world tour': 'uci-world-tour',
+  'uci worldtour': 'uci-world-tour',
+  'uci womens world tour': 'uci-womens-world-tour',
+  "uci women's world tour": 'uci-womens-world-tour',
   'afl': 'afl',
-  'australian football league': 'afl'
+  'australian football league': 'afl',
+  'nrl': 'australian-national-rugby-league',
+  'national rugby league': 'australian-national-rugby-league',
+  'australian national rugby league': 'australian-national-rugby-league',
+  'english rugby league super league': 'english-rugby-league-super-league',
+  'super league rugby': 'english-rugby-league-super-league',
+  'rugby super league': 'english-rugby-league-super-league',
+  'european rugby challenge cup': 'european-rugby-challenge-cup',
+  'epcr challenge cup': 'european-rugby-challenge-cup',
+  'challenge cup': 'european-rugby-challenge-cup'
 })
 
 const GENERIC_LEAGUE_SLUGS = new Set([
@@ -1133,21 +1176,14 @@ async function rasterizeLogoUrlForVariant(cdnUrl = '', variant = 'logo', inspect
   const sourceUrl = normalizeSpace(cdnUrl)
   if (!sourceUrl) return null
   try {
-    let sourceBuffer
-    let upstreamContentType = ''
-    if (sourceUrl === 'pvtkrrx://logo/ufc-red') {
-      sourceBuffer = Buffer.from(renderUfcRedLogoSvg(640))
-      upstreamContentType = 'image/svg+xml'
-    } else {
-      const response = await fetch(sourceUrl, {
-        headers: { accept: 'image/png,image/jpeg,image/webp,image/svg+xml,image/*' },
-        signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
-      })
-      if (!response.ok) return null
-      upstreamContentType = String(response.headers.get('content-type') || '').toLowerCase()
-      if (!/^image\/(png|jpeg|jpg|webp|svg\+xml)/i.test(upstreamContentType)) return null
-      sourceBuffer = Buffer.from(await response.arrayBuffer())
-    }
+    const response = await fetch(sourceUrl, {
+      headers: { accept: 'image/png,image/jpeg,image/webp,image/svg+xml,image/*' },
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+    })
+    if (!response.ok) return null
+    const upstreamContentType = String(response.headers.get('content-type') || '').toLowerCase()
+    if (!/^image\/(png|jpeg|jpg|webp|svg\+xml)/i.test(upstreamContentType)) return null
+    const sourceBuffer = Buffer.from(await response.arrayBuffer())
     const dims = VARIANT_DIMENSIONS[variant] || VARIANT_DIMENSIONS.logo
     const logoSize = Math.round(Math.min(dims.width, dims.height) * 0.86)
     const logo = await resizeCompositionBuffer(sourceBuffer, logoSize, { frame: true })
@@ -1306,6 +1342,20 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
   },
   {
     sport: 'basketball',
+    pattern: /\b(?:euro\s*league|euroleague|turkish\s+airlines\s+euroleague)\b/i,
+    canonicalIds: ['sportsmeta:league:basketball|euroleague-basketball'],
+    searchTerms: ['EuroLeague Basketball'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/logo/l8hhxs1554397545.png']
+  },
+  {
+    sport: 'basketball',
+    pattern: /\b(?:easy\s*credit\s+bbl|easycredit\s+bbl|basketball\s+bundesliga|german\s+bbl)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/logo/0hbbhr1612007167.png']
+  },
+  {
+    sport: 'basketball',
     pattern: /\b(?:ncaa\s+basketball|college\s+basketball)\b/i,
     canonicalIds: [],
     searchTerms: [],
@@ -1328,7 +1378,15 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
     sport: 'american-football',
     pattern: /\bnfl\b/i,
     canonicalIds: ['sportsmeta:league:american-football|nfl'],
-    searchTerms: ['NFL']
+    searchTerms: ['NFL'],
+    directLogoUrls: ['https://a.espncdn.com/i/teamlogos/leagues/500/nfl.png']
+  },
+  {
+    sport: 'motorsport',
+    pattern: /\b(?:formula\s*1|formula\s*one|formula1|\bf1\b)\b/i,
+    canonicalIds: ['sportsmeta:league:motorsport|formula-1'],
+    searchTerms: ['Formula 1'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/logo/jiqa741556460666.png']
   },
   {
     sport: 'motorsport',
@@ -1388,14 +1446,14 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
     pattern: /\bufc\b/i,
     canonicalIds: ['sportsmeta:league:mma|ufc'],
     searchTerms: ['UFC'],
-    directLogoUrls: ['pvtkrrx://logo/ufc-red']
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/logo/1gp4vo1722604906.png']
   },
   {
     sport: 'boxing',
-    pattern: /\bboxing\b/i,
-    canonicalIds: ['sportsmeta:league:boxing|boxing'],
+    pattern: /\b(?:boxing|bkfc|bare\s+knuckle)\b/i,
+    canonicalIds: ['sportsmeta:league:fighting|bkfc', 'sportsmeta:league:boxing|boxing'],
     searchTerms: [],
-    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/logo/xtssst1473774665.png']
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/logo/wbatgb1564344282.png', 'https://r2.thesportsdb.com/images/media/league/logo/xtssst1473774665.png']
   },
   // Tennis — SportsMeta does not index tennis as a sport slug, so every tennis
   // tournament has to lean on TheSportsDB CDN league badges. ATP/WTA badges
@@ -1459,7 +1517,29 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
     sport: 'cricket',
     pattern: /\b(?:ipl|indian\s+premier\s+league)\b/i,
     canonicalIds: ['sportsmeta:league:cricket|indian-premier-league'],
-    searchTerms: ['Indian Premier League']
+    searchTerms: ['Indian Premier League'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/logo/kvmd941551037675.png']
+  },
+  {
+    sport: 'cycling',
+    pattern: /\b(?:tour\s+de\s+france\s+femmes|tour\s+france\s+femmes)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://upload.wikimedia.org/wikipedia/commons/9/90/Tour_de_France_Femmes_logo.svg']
+  },
+  {
+    sport: 'cycling',
+    pattern: /\b(?:tour\s+de\s+france|tdf|tour\s+france)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://upload.wikimedia.org/wikipedia/commons/e/eb/Tour_de_France_logo.svg']
+  },
+  {
+    sport: 'cycling',
+    pattern: /\b(?:uci\s+world\s*tour|cycling)\b/i,
+    canonicalIds: ['sportsmeta:league:cycling|uci-world-tour'],
+    searchTerms: ['UCI World Tour'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/logo/7fhxtz1555353394.png']
   },
   {
     sport: 'golf',
@@ -1490,6 +1570,27 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
     canonicalIds: [],
     searchTerms: [],
     directLogoUrls: ['https://www.thesportsdb.com/images/media/league/badge/g5ocbs1777721333.png']
+  },
+  {
+    sport: 'rugby',
+    pattern: /\b(?:challenge\s+cup|epcr\s+challenge\s+cup|european\s+rugby\s+challenge\s+cup)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/logo/dwmh511716589311.png']
+  },
+  {
+    sport: 'rugby',
+    pattern: /\b(?:english\s+rugby\s+league\s+super\s+league|super\s+league\s+rugby|rugby\s+super\s+league)\b/i,
+    canonicalIds: [],
+    searchTerms: [],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/logo/3389z61641840924.png']
+  },
+  {
+    sport: 'darts',
+    pattern: /\b(?:pdc|darts?|world\s+darts\s+championship|us\s+darts\s+masters|poland\s+darts\s+masters|world\s+cup\s+darts)\b/i,
+    canonicalIds: ['sportsmeta:league:darts|pdc-darts'],
+    searchTerms: ['PDC Darts'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/logo/mnkcyf1555604592.png']
   },
   {
     sport: 'badminton',
@@ -1579,19 +1680,37 @@ const DIRECT_LEAGUE_LOGO_OVERRIDES = Object.freeze([
   { sport: 'football', league: 'Scottish Premiership', pattern: /\b(?:scottish\s+premiership|scottish\s+premier\s+league|cinch\s+premiership|celtic|motherwell|falkirk|heart\s+of\s+midlothian|hibernian|rangers)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/72d3zc1688333496.png'] },
   { sport: 'football', league: 'Major League Soccer', pattern: /\b(?:major\s+league\s+soccer|mls)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/dqo6r91549878326.png'] },
   { sport: 'basketball', league: 'WNBA', pattern: /\b(?:wnba|women'?s?\s+(?:national\s+)?basketball\s+(?:association|league))\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/3fv4p01573154525.png'] },
+  { sport: 'basketball', league: 'NBA', pattern: /\b(?:nba|nba\s+playoffs?)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/ypuryw1421971236.png'] },
+  { sport: 'basketball', league: 'EuroLeague Basketball', pattern: /\b(?:euro\s*league|euroleague|turkish\s+airlines\s+euroleague)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/l8hhxs1554397545.png'] },
+  { sport: 'basketball', league: 'EasyCredit BBL', pattern: /\b(?:easy\s*credit\s+bbl|easycredit\s+bbl|basketball\s+bundesliga|german\s+bbl)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/0hbbhr1612007167.png'] },
   { sport: 'basketball', league: 'NCAA Basketball', pattern: /\b(?:ncaa\s+basketball|college\s+basketball)\b/i, urls: ['https://commons.wikimedia.org/wiki/Special:Redirect/file/NCAA_Basketball_wordmark_color.svg'] },
-  { sport: 'mma', league: 'UFC', pattern: /\bufc\b/i, urls: ['pvtkrrx://logo/ufc-red'] },
+  { sport: 'american-football', league: 'NFL', pattern: /\bnfl\b/i, urls: ['https://a.espncdn.com/i/teamlogos/leagues/500/nfl.png'] },
+  { sport: 'mma', league: 'UFC', pattern: /\bufc\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/1gp4vo1722604906.png'] },
+  { sport: 'boxing', league: 'BKFC', pattern: /\b(?:bkfc|bare\s+knuckle)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/wbatgb1564344282.png'] },
   { sport: 'boxing', league: 'Boxing', pattern: /\bboxing\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/xtssst1473774665.png'] },
   { sport: 'wrestling', league: 'WWE', pattern: /\b(?:wwe|world\s+wrestling\s+entertainment)\b/i, urls: ['https://commons.wikimedia.org/wiki/Special:Redirect/file/WWE_official_logo.svg'] },
   { sport: 'wrestling', league: 'TNA Wrestling', pattern: /\b(?:tna|tna\s+wrestling|impact\s+wrestling|total\s+nonstop\s+action)\b/i, urls: ['https://commons.wikimedia.org/wiki/Special:Redirect/file/TNA_Wrestling_%282024%29_Logo.svg'] },
+  { sport: 'motorsport', league: 'Formula 1', pattern: /\b(?:formula\s*1|formula\s*one|formula1|\bf1\b)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/jiqa741556460666.png'] },
   { sport: 'motorsport', league: 'IndyCar Series', pattern: /\b(?:indy\s*car|indycar|ntt\s+indycar|indianapolis\s+500|indy\s*500)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/mkv0xb1641916982.png'] },
   { sport: 'motorsport', league: 'WRC', pattern: /\b(?:wrc|world\s+rally\s+championship)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/5f36o51544372922.png'] },
   { sport: 'motorsport', league: 'Supercars Championship', pattern: /\b(?:v8\s*supercars?|v8sc|supercars?(?:\s+championship)?)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/64f67s1770108650.png'] },
   { sport: 'motorsport', league: 'World Superbikes', pattern: /\b(?:wsbk|wssp|wwcr|world\s+super\s*bikes?|world\s*superbikes?|world\s*sbk|superbike\s+world\s+championship|sbk)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/g2j9rc1649703609.png'] },
   { sport: 'athletics', league: 'Diamond League', pattern: /\b(?:world\s+athletics\s+diamond\s+league|diamond\s+league)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/7d5xlh1650475438.png'] },
+  { sport: 'cycling', league: 'Tour de France Femmes', pattern: /\b(?:tour\s+de\s+france\s+femmes|tour\s+france\s+femmes)\b/i, urls: ['https://upload.wikimedia.org/wikipedia/commons/9/90/Tour_de_France_Femmes_logo.svg'] },
+  { sport: 'cycling', league: 'Tour de France', pattern: /\b(?:tour\s+de\s+france|tdf|tour\s+france)\b/i, urls: ['https://upload.wikimedia.org/wikipedia/commons/e/eb/Tour_de_France_logo.svg'] },
+  { sport: 'cycling', league: 'UCI World Tour', pattern: /\b(?:uci\s+world\s*tour|cycling)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/7fhxtz1555353394.png'] },
   { sport: 'rugby', league: 'AFL', pattern: /\b(?:afl|first\s+crack|aussie\s+rules|australian\s+football|australian\s+rules\s+football)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/wvx4721525519372.png'] },
+  { sport: 'rugby', league: 'NRL', pattern: /\b(?:nrl|national\s+rugby\s+league|midweek\s+tackle)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/xryyuy1422583450.png'] },
+  { sport: 'rugby', league: 'European Rugby Challenge Cup', pattern: /\b(?:challenge\s+cup|epcr\s+challenge\s+cup|european\s+rugby\s+challenge\s+cup)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/dwmh511716589311.png'] },
+  { sport: 'rugby', league: 'English Rugby League Super League', pattern: /\b(?:english\s+rugby\s+league\s+super\s+league|super\s+league\s+rugby|rugby\s+super\s+league)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/3389z61641840924.png'] },
+  { sport: 'darts', league: 'PDC Darts', pattern: /\b(?:pdc|darts?|world\s+darts\s+championship|us\s+darts\s+masters|poland\s+darts\s+masters|world\s+cup\s+darts)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/mnkcyf1555604592.png'] },
+  { sport: 'basketball', league: 'AFL', pattern: /\b(?:afl|aussie\s+rules|australian\s+football|australian\s+rules\s+football)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/wvx4721525519372.png'] },
+  { sport: 'australian-football', league: 'AFL', pattern: /\b(?:afl|aussie\s+rules|australian\s+football|australian\s+rules\s+football)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/wvx4721525519372.png'] },
   { sport: 'australian-rules-football', league: 'AFL', pattern: /\b(?:afl|first\s+crack|aussie\s+rules|australian\s+football|australian\s+rules\s+football)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/wvx4721525519372.png'] }
 ])
+
+const AFL_GOLD_COAST_SUNS_LOGO_URL = 'https://www.goldcoastfc.com.au/resources/v5.48.18/i/svg-output/icons.svg#icn-aflc-gcfc'
+const AFL_NORTH_MELBOURNE_LOGO_URL = 'https://www.nmfc.com.au/resources/v5.48.18/i/svg-output/icons.svg#icn-aflc-nmfc'
 
 const DIRECT_TEAM_LOGO_OVERRIDES = Object.freeze([
   ...[
@@ -1627,6 +1746,18 @@ const DIRECT_TEAM_LOGO_OVERRIDES = Object.freeze([
     ['hockey', 'NHL', 'Vegas Golden Knights', ['golden knights', 'knights', 'vgk'], 'https://a.espncdn.com/i/teamlogos/nhl/500/vgk.png'],
     ['hockey', 'NHL', 'Washington Capitals', ['capitals', 'caps', 'wsh'], 'https://a.espncdn.com/i/teamlogos/nhl/500/wsh.png'],
     ['hockey', 'NHL', 'Winnipeg Jets', ['jets', 'wpg'], 'https://a.espncdn.com/i/teamlogos/nhl/500/wpg.png'],
+    ['american-football', 'NFL', 'AFC', ['afc', 'pro bowl games afc'], 'https://a.espncdn.com/i/teamlogos/nfl/500/afc.png'],
+    ['american-football', 'NFL', 'NFC', ['nfc', 'pro bowl games nfc'], 'https://a.espncdn.com/i/teamlogos/nfl/500/nfc.png'],
+    ['american-football', 'NFL', 'Buffalo Bills', ['bills', 'buf'], 'https://a.espncdn.com/i/teamlogos/nfl/500/buf.png'],
+    ['american-football', 'NFL', 'Denver Broncos', ['broncos', 'den'], 'https://a.espncdn.com/i/teamlogos/nfl/500/den.png'],
+    ['american-football', 'NFL', 'Kansas City Chiefs', ['chiefs', 'kc'], 'https://a.espncdn.com/i/teamlogos/nfl/500/kc.png'],
+    ['american-football', 'NFL', 'Los Angeles Rams', ['la rams', 'rams', 'lar'], 'https://a.espncdn.com/i/teamlogos/nfl/500/lar.png'],
+    ['american-football', 'NFL', 'New England Patriots', ['patriots', 'new england', 'ne'], 'https://a.espncdn.com/i/teamlogos/nfl/500/ne.png'],
+    ['american-football', 'NFL', 'Seattle Seahawks', ['seahawks', 'sea'], 'https://a.espncdn.com/i/teamlogos/nfl/500/sea.png'],
+    ['american-football', 'UFL', 'DC Defenders', ['dc defenders', 'defenders'], 'https://r2.thesportsdb.com/images/media/team/badge/53u2201676895966.png'],
+    ['american-football', 'UFL', 'Houston Gamblers', ['houston gamblers', 'gamblers'], 'https://r2.thesportsdb.com/images/media/team/badge/bt36gy1770671084.png'],
+    ['american-football', 'UFL', 'Louisville Kings', ['louisville kings', 'kings'], 'https://r2.thesportsdb.com/images/media/team/badge/4ysomp1770670283.png'],
+    ['american-football', 'UFL', 'Orlando Storm', ['orlando storm', 'storm'], 'https://r2.thesportsdb.com/images/media/team/badge/pbiyq21770670499.png'],
     ['football', '', 'Ajax Amsterdam', ['ajax', 'aja'], 'https://a.espncdn.com/i/teamlogos/soccer/500/139.png'],
     ['football', '', 'Arsenal', ['arsenal', 'ars'], 'https://a.espncdn.com/i/teamlogos/soccer/500/359.png'],
     ['football', '', 'AS Monaco', ['monaco', 'asm', 'mon'], 'https://a.espncdn.com/i/teamlogos/soccer/500/174.png'],
@@ -1667,6 +1798,18 @@ const DIRECT_TEAM_LOGO_OVERRIDES = Object.freeze([
     ['football', '', 'Real Betis', ['real betis', 'betis', 'bet'], 'https://a.espncdn.com/i/teamlogos/soccer/500/244.png'],
     ['football', '', 'RC Celta Vigo', ['celta vigo', 'celta de vigo', 'celta', 'vig'], 'https://a.espncdn.com/i/teamlogos/soccer/500/85.png'],
     ['football', '', 'SC Freiburg', ['freiburg', 'sc freiburg', 'frb'], 'https://a.espncdn.com/i/teamlogos/soccer/500/126.png'],
+    ['football', '', 'Corinthians', ['corinthians', 'cor'], 'https://a.espncdn.com/i/teamlogos/soccer/500/874.png'],
+    ['football', '', 'Cusco FC', ['cusco', 'cusco fc', 'cus'], 'https://a.espncdn.com/i/teamlogos/soccer/500/11995.png'],
+    ['football', '', 'Hull City', ['hull city', 'hull', 'hul'], 'https://a.espncdn.com/i/teamlogos/soccer/500/306.png'],
+    ['football', '', 'Independiente Medellin', ['independiente medellin', 'independiente medellin fc', 'dim'], 'https://a.espncdn.com/i/teamlogos/soccer/500/2690.png'],
+    ['football', '', 'Kilmarnock', ['kilmarnock', 'kil'], 'https://a.espncdn.com/i/teamlogos/soccer/500/260.png'],
+    ['football', '', 'Lens', ['rc lens', 'lens', 'rcl'], 'https://a.espncdn.com/i/teamlogos/soccer/500/175.png'],
+    ['football', '', 'Livingston', ['livingston', 'liv'], 'https://a.espncdn.com/i/teamlogos/soccer/500/259.png'],
+    ['football', '', 'Middlesbrough', ['middlesbrough', 'boro', 'mid'], 'https://a.espncdn.com/i/teamlogos/soccer/500/369.png'],
+    ['football', '', 'Nice', ['ogc nice', 'nice'], 'https://a.espncdn.com/i/teamlogos/soccer/500/2502.png'],
+    ['football', '', 'Partick Thistle', ['partick thistle', 'partick', 'pt'], 'https://a.espncdn.com/i/teamlogos/soccer/500/247.png'],
+    ['football', '', 'Penarol', ['penarol', 'pen'], 'https://a.espncdn.com/i/teamlogos/soccer/500/2683.png'],
+    ['football', '', 'St Mirren', ['st mirren', 'st. mirren', 'stm'], 'https://a.espncdn.com/i/teamlogos/soccer/500/250.png'],
     ['football', '', 'Slavia Prague', ['slavia prague', 'slavia', 'slp'], 'https://a.espncdn.com/i/teamlogos/soccer/500/494.png'],
     ['football', '', 'Sporting CP', ['sporting cp', 'sporting lisbon', 'scp'], 'https://a.espncdn.com/i/teamlogos/soccer/500/2250.png'],
     ['football', '', 'Tottenham Hotspur', ['tottenham', 'tottenham hotspur', 'spurs', 'tot'], 'https://a.espncdn.com/i/teamlogos/soccer/500/367.png'],
@@ -1674,37 +1817,37 @@ const DIRECT_TEAM_LOGO_OVERRIDES = Object.freeze([
     ['football', '', 'FC Midtjylland', ['midtjylland', 'fc midtjylland', 'mid'], 'https://a.espncdn.com/i/teamlogos/soccer/500/572.png'],
     ['football', '', 'VfB Stuttgart', ['stuttgart', 'vfb stuttgart'], 'https://a.espncdn.com/i/teamlogos/soccer/500/134.png'],
     ['football', '', 'Villarreal', ['villarreal', 'vil'], 'https://a.espncdn.com/i/teamlogos/soccer/500/102.png'],
-    ['football', 'MLS', 'Atlanta United FC', ['atlanta united', 'atl'], 'https://a.espncdn.com/i/teamlogos/soccer/500/18418.png'],
-    ['football', 'MLS', 'Austin FC', ['atx'], 'https://a.espncdn.com/i/teamlogos/soccer/500/20906.png'],
-    ['football', 'MLS', 'CF Montreal', ['club de foot montreal', 'cf montreal', 'montreal impact', 'mtl'], 'https://a.espncdn.com/i/teamlogos/soccer/500/9720.png'],
-    ['football', 'MLS', 'Charlotte FC', ['clt'], 'https://a.espncdn.com/i/teamlogos/soccer/500/21300.png'],
-    ['football', 'MLS', 'Chicago Fire FC', ['chicago fire', 'cff', 'chi'], 'https://a.espncdn.com/i/teamlogos/soccer/500/182.png'],
-    ['football', 'MLS', 'Colorado Rapids', ['rapids', 'col'], 'https://a.espncdn.com/i/teamlogos/soccer/500/184.png'],
-    ['football', 'MLS', 'Columbus Crew', ['crew', 'clb'], 'https://a.espncdn.com/i/teamlogos/soccer/500/183.png'],
-    ['football', 'MLS', 'D.C. United', ['dc united', 'd c united', 'dc'], 'https://a.espncdn.com/i/teamlogos/soccer/500/193.png'],
-    ['football', 'MLS', 'FC Cincinnati', ['cincinnati', 'cin'], 'https://a.espncdn.com/i/teamlogos/soccer/500/18267.png'],
-    ['football', 'MLS', 'FC Dallas', ['dallas', 'dal'], 'https://a.espncdn.com/i/teamlogos/soccer/500/185.png'],
-    ['football', 'MLS', 'Houston Dynamo FC', ['houston dynamo', 'hou'], 'https://a.espncdn.com/i/teamlogos/soccer/500/6077.png'],
-    ['football', 'MLS', 'Inter Miami CF', ['inter miami', 'miami', 'mia'], 'https://a.espncdn.com/i/teamlogos/soccer/500/20232.png'],
-    ['football', 'MLS', 'LA Galaxy', ['los angeles galaxy', 'galaxy'], 'https://a.espncdn.com/i/teamlogos/soccer/500/187.png'],
-    ['football', 'MLS', 'LAFC', ['los angeles fc', 'lafc'], 'https://a.espncdn.com/i/teamlogos/soccer/500/18966.png'],
+    ['football', '', 'Atlanta United FC', ['atlanta united', 'atl'], 'https://a.espncdn.com/i/teamlogos/soccer/500/18418.png'],
+    ['football', '', 'Austin FC', ['atx'], 'https://a.espncdn.com/i/teamlogos/soccer/500/20906.png'],
+    ['football', '', 'CF Montreal', ['club de foot montreal', 'cf montreal', 'montreal impact', 'mtl'], 'https://a.espncdn.com/i/teamlogos/soccer/500/9720.png'],
+    ['football', '', 'Charlotte FC', ['clt'], 'https://a.espncdn.com/i/teamlogos/soccer/500/21300.png'],
+    ['football', '', 'Chicago Fire FC', ['chicago fire', 'cff', 'chi'], 'https://a.espncdn.com/i/teamlogos/soccer/500/182.png'],
+    ['football', '', 'Colorado Rapids', ['rapids', 'col'], 'https://a.espncdn.com/i/teamlogos/soccer/500/184.png'],
+    ['football', '', 'Columbus Crew', ['crew', 'clb'], 'https://a.espncdn.com/i/teamlogos/soccer/500/183.png'],
+    ['football', '', 'D.C. United', ['dc united', 'd c united', 'dc'], 'https://a.espncdn.com/i/teamlogos/soccer/500/193.png'],
+    ['football', '', 'FC Cincinnati', ['cincinnati', 'cin'], 'https://a.espncdn.com/i/teamlogos/soccer/500/18267.png'],
+    ['football', '', 'FC Dallas', ['dallas', 'dal'], 'https://a.espncdn.com/i/teamlogos/soccer/500/185.png'],
+    ['football', '', 'Houston Dynamo FC', ['houston dynamo', 'hou'], 'https://a.espncdn.com/i/teamlogos/soccer/500/6077.png'],
+    ['football', '', 'Inter Miami CF', ['inter miami', 'miami', 'mia'], 'https://a.espncdn.com/i/teamlogos/soccer/500/20232.png'],
+    ['football', '', 'LA Galaxy', ['los angeles galaxy', 'galaxy'], 'https://a.espncdn.com/i/teamlogos/soccer/500/187.png'],
+    ['football', '', 'LAFC', ['los angeles fc', 'lafc'], 'https://a.espncdn.com/i/teamlogos/soccer/500/18966.png'],
     ['football', '', 'Louisville City FC', ['loucity', 'louisville city'], 'https://a.espncdn.com/i/teamlogos/soccer/500/17832.png'],
-    ['football', 'MLS', 'Minnesota United FC', ['minnesota united', 'min'], 'https://a.espncdn.com/i/teamlogos/soccer/500/17362.png'],
-    ['football', 'MLS', 'Nashville SC', ['nashville', 'nsh'], 'https://a.espncdn.com/i/teamlogos/soccer/500/18986.png'],
-    ['football', 'MLS', 'New England Revolution', ['revolution', 'revs', 'ne'], 'https://a.espncdn.com/i/teamlogos/soccer/500/189.png'],
-    ['football', 'MLS', 'New York City FC', ['nycfc', 'nyc'], 'https://a.espncdn.com/i/teamlogos/soccer/500/17606.png'],
-    ['football', 'MLS', 'New York Red Bulls', ['red bull new york', 'ny red bulls', 'rbny'], 'https://a.espncdn.com/i/teamlogos/soccer/500/190.png'],
-    ['football', 'MLS', 'Orlando City SC', ['orlando city', 'orl'], 'https://a.espncdn.com/i/teamlogos/soccer/500/12011.png'],
-    ['football', 'MLS', 'Philadelphia Union', ['union', 'phi'], 'https://a.espncdn.com/i/teamlogos/soccer/500/10739.png'],
-    ['football', 'MLS', 'Portland Timbers', ['timbers', 'por'], 'https://a.espncdn.com/i/teamlogos/soccer/500/9723.png'],
-    ['football', 'MLS', 'Real Salt Lake', ['rsl', 'salt lake', 'slc'], 'https://a.espncdn.com/i/teamlogos/soccer/500/4771.png'],
-    ['football', 'MLS', 'San Diego FC', ['sdfc', 'sd'], 'https://a.espncdn.com/i/teamlogos/soccer/500/22529.png'],
-    ['football', 'MLS', 'San Jose Earthquakes', ['earthquakes', 'quakes', 'sj'], 'https://a.espncdn.com/i/teamlogos/soccer/500/191.png'],
-    ['football', 'MLS', 'Seattle Sounders FC', ['seattle sounders', 'sounders', 'sea'], 'https://a.espncdn.com/i/teamlogos/soccer/500/9726.png'],
-    ['football', 'MLS', 'Sporting Kansas City', ['sporting kc', 'sporting kansas city', 'skc'], 'https://a.espncdn.com/i/teamlogos/soccer/500/186.png'],
-    ['football', 'MLS', 'St. Louis CITY SC', ['st louis city sc', 'st. louis city sc', 'st louis city', 'stl'], 'https://a.espncdn.com/i/teamlogos/soccer/500/21812.png'],
-    ['football', 'MLS', 'Toronto FC', ['toronto', 'tor'], 'https://a.espncdn.com/i/teamlogos/soccer/500/7318.png'],
-    ['football', 'MLS', 'Vancouver Whitecaps', ['vancouver whitecaps', 'whitecaps', 'van'], 'https://a.espncdn.com/i/teamlogos/soccer/500/9727.png'],
+    ['football', '', 'Minnesota United FC', ['minnesota united', 'min'], 'https://a.espncdn.com/i/teamlogos/soccer/500/17362.png'],
+    ['football', '', 'Nashville SC', ['nashville', 'nsh'], 'https://a.espncdn.com/i/teamlogos/soccer/500/18986.png'],
+    ['football', '', 'New England Revolution', ['revolution', 'revs', 'ne'], 'https://a.espncdn.com/i/teamlogos/soccer/500/189.png'],
+    ['football', '', 'New York City FC', ['nycfc', 'nyc'], 'https://a.espncdn.com/i/teamlogos/soccer/500/17606.png'],
+    ['football', '', 'New York Red Bulls', ['red bull new york', 'ny red bulls', 'rbny'], 'https://a.espncdn.com/i/teamlogos/soccer/500/190.png'],
+    ['football', '', 'Orlando City SC', ['orlando city', 'orl'], 'https://a.espncdn.com/i/teamlogos/soccer/500/12011.png'],
+    ['football', '', 'Philadelphia Union', ['union', 'phi'], 'https://a.espncdn.com/i/teamlogos/soccer/500/10739.png'],
+    ['football', '', 'Portland Timbers', ['timbers', 'por'], 'https://a.espncdn.com/i/teamlogos/soccer/500/9723.png'],
+    ['football', '', 'Real Salt Lake', ['rsl', 'salt lake', 'slc'], 'https://a.espncdn.com/i/teamlogos/soccer/500/4771.png'],
+    ['football', '', 'San Diego FC', ['sdfc', 'sd'], 'https://a.espncdn.com/i/teamlogos/soccer/500/22529.png'],
+    ['football', '', 'San Jose Earthquakes', ['earthquakes', 'quakes', 'sj'], 'https://a.espncdn.com/i/teamlogos/soccer/500/191.png'],
+    ['football', '', 'Seattle Sounders FC', ['seattle sounders', 'sounders', 'sea'], 'https://a.espncdn.com/i/teamlogos/soccer/500/9726.png'],
+    ['football', '', 'Sporting Kansas City', ['sporting kc', 'sporting kansas city', 'skc'], 'https://a.espncdn.com/i/teamlogos/soccer/500/186.png'],
+    ['football', '', 'St. Louis CITY SC', ['st louis city sc', 'st. louis city sc', 'st louis city', 'stl'], 'https://a.espncdn.com/i/teamlogos/soccer/500/21812.png'],
+    ['football', '', 'Toronto FC', ['toronto', 'tor'], 'https://a.espncdn.com/i/teamlogos/soccer/500/7318.png'],
+    ['football', '', 'Vancouver Whitecaps', ['vancouver whitecaps', 'whitecaps', 'van'], 'https://a.espncdn.com/i/teamlogos/soccer/500/9727.png'],
     ['football', 'English Womens Super League', 'Aston Villa WFC', ['aston villa women', 'aston villa wfc', 'aston women', 'aston villa'], 'https://r2.thesportsdb.com/images/media/team/badge/lqfz1c1721821650.png'],
     ['football', 'English Womens Super League', 'Brighton WFC', ['brighton women', 'brighton wfc', "women's brighton", 'brighton'], 'https://r2.thesportsdb.com/images/media/team/badge/zn0x7h1605371909.png'],
     ['football', 'English Womens Super League', 'London City Lionesses', ['london city lionesses', 'london city', 'lionesses'], 'https://r2.thesportsdb.com/images/media/team/badge/524gpk1761707917.png'],
@@ -1713,6 +1856,14 @@ const DIRECT_TEAM_LOGO_OVERRIDES = Object.freeze([
     ['basketball', 'NCAA Basketball', 'Nebraska Cornhuskers', ['nebraska cornhuskers', 'cornhuskers', 'huskers', 'nebraska'], 'https://a.espncdn.com/i/teamlogos/ncaa/500/158.png'],
     ['american-football', 'NCAA Football', 'Minnesota Golden Gophers', ['minnesota golden gophers', 'minnesota gophers', 'golden gophers', 'minnesota'], 'https://a.espncdn.com/i/teamlogos/ncaa/500/135.png'],
     ['american-football', 'NCAA Football', 'Nebraska Cornhuskers', ['nebraska cornhuskers', 'cornhuskers', 'huskers', 'nebraska'], 'https://a.espncdn.com/i/teamlogos/ncaa/500/158.png'],
+    ['basketball', 'EasyCredit BBL', 'ALBA Berlin', ['alba berlin', 'alba'], 'https://r2.thesportsdb.com/images/media/team/badge/58osvu1545866407.png'],
+    ['basketball', 'EasyCredit BBL', 'Bamberg Baskets', ['bamberg baskets', 'bamberg basket', 'bamberg', 'bma 365 bamberg basket'], 'https://r2.thesportsdb.com/images/media/team/badge/rs1gjz1714562746.png'],
+    ['basketball', 'EasyCredit BBL', 'Rasta Vechta', ['rasta vechta', 'vechta'], 'https://r2.thesportsdb.com/images/media/team/badge/ukssyu1714562769.png'],
+    ['basketball', 'EasyCredit BBL', 'Ulm', ['ulm', 'ratiopharm ulm'], 'https://r2.thesportsdb.com/images/media/team/badge/0t59iu1677678278.png'],
+    ['basketball', 'EuroLeague Basketball', 'Fenerbahce Basketbol', ['fenerbahce', 'fenerbahce basketbol', 'fenerbahce beko'], 'https://r2.thesportsdb.com/images/media/team/badge/u6j0qb1758794065.png'],
+    ['basketball', 'EuroLeague Basketball', 'Olympiacos BC', ['olympiacos', 'olympiacos bc'], 'https://r2.thesportsdb.com/images/media/team/badge/4s5lug1676581220.png'],
+    ['basketball', 'EuroLeague Basketball', 'Real Madrid Baloncesto', ['real madrid baloncesto', 'real madrid basket', 'real madrid basketball'], 'https://r2.thesportsdb.com/images/media/team/badge/g4ev2c1522175902.png'],
+    ['basketball', 'EuroLeague Basketball', 'Valencia Basket', ['valencia basket', 'valencia'], 'https://r2.thesportsdb.com/images/media/team/badge/9qyc231536398868.png'],
     ['basketball', '', 'Maccabi Haifa', ['maccabi haifa', 'haifa', 'mh'], 'https://upload.wikimedia.org/wikipedia/en/4/4c/Maccabi_Haifa_B.C_logo.png'],
     ['basketball', '', 'Maccabi Tel Aviv', ['maccabi tel aviv', 'maccabi tel-aviv', 'maccabi tel-aviv bc', 'mta'], 'https://upload.wikimedia.org/wikipedia/en/thumb/6/6b/Maccabi_Tel_Aviv_BC_logo.svg/250px-Maccabi_Tel_Aviv_BC_logo.svg.png'],
     ['basketball', 'WNBA', 'Atlanta Dream', ['dream', 'atl'], 'https://a.espncdn.com/i/teamlogos/wnba/500/atl.png'],
@@ -1729,7 +1880,20 @@ const DIRECT_TEAM_LOGO_OVERRIDES = Object.freeze([
     ['basketball', 'WNBA', 'Portland Fire', ['fire', 'por'], 'https://a.espncdn.com/i/teamlogos/wnba/500/por.png'],
     ['basketball', 'WNBA', 'Seattle Storm', ['storm', 'sea'], 'https://a.espncdn.com/i/teamlogos/wnba/500/sea.png'],
     ['basketball', 'WNBA', 'Toronto Tempo', ['tempo', 'tor'], 'https://a.espncdn.com/i/teamlogos/wnba/500/tor.png'],
-    ['basketball', 'WNBA', 'Washington Mystics', ['mystics', 'wsh'], 'https://a.espncdn.com/i/teamlogos/wnba/500/wsh.png']
+    ['basketball', 'WNBA', 'Washington Mystics', ['mystics', 'wsh'], 'https://a.espncdn.com/i/teamlogos/wnba/500/wsh.png'],
+    ['basketball', 'AFL', 'Gold Coast Suns', ['gold coast suns', 'gcs'], AFL_GOLD_COAST_SUNS_LOGO_URL],
+    ['basketball', 'AFL', 'North Melbourne', ['north melbourne', 'north melbourne kangaroos', 'kangaroos', 'nm'], AFL_NORTH_MELBOURNE_LOGO_URL],
+    ['cricket', 'Indian Premier League', 'Royal Challengers Bangalore', ['royal challengers bangalore', 'royal challengers bengaluru', 'royal challengers', 'rcb'], 'https://r2.thesportsdb.com/images/media/team/badge/kynj5v1588331757.png'],
+    ['rugby', 'AFL', 'Gold Coast Suns', ['gold coast suns', 'gcs'], AFL_GOLD_COAST_SUNS_LOGO_URL],
+    ['rugby', 'AFL', 'North Melbourne', ['north melbourne', 'north melbourne kangaroos', 'kangaroos', 'nm'], AFL_NORTH_MELBOURNE_LOGO_URL],
+    ['australian-football', 'AFL', 'Gold Coast Suns', ['gold coast suns', 'gcs'], AFL_GOLD_COAST_SUNS_LOGO_URL],
+    ['australian-football', 'AFL', 'North Melbourne', ['north melbourne', 'north melbourne kangaroos', 'kangaroos', 'nm'], AFL_NORTH_MELBOURNE_LOGO_URL],
+    ['australian-rules-football', 'AFL', 'Gold Coast Suns', ['gold coast suns', 'gcs'], AFL_GOLD_COAST_SUNS_LOGO_URL],
+    ['australian-rules-football', 'AFL', 'North Melbourne', ['north melbourne', 'north melbourne kangaroos', 'kangaroos', 'nm'], AFL_NORTH_MELBOURNE_LOGO_URL],
+    ['rugby', 'European Rugby Challenge Cup', 'Challenge Cup', ['challenge cup', 'epcr challenge cup'], 'https://r2.thesportsdb.com/images/media/league/logo/dwmh511716589311.png'],
+    ['rugby', 'European Rugby Challenge Cup', 'Ulster', ['ulster', 'ulster incl', 'ulster rugby'], 'https://r2.thesportsdb.com/images/media/team/badge/j8usvw1716743144.png'],
+    ['rugby', 'NRL', 'Canterbury Bankstown Bulldogs', ['canterbury bankstown bulldogs', 'canterbury bulldogs', 'bulldogs', 'bull'], 'https://r2.thesportsdb.com/images/media/team/badge/ggzq4e1768487178.png'],
+    ['rugby', 'NRL', 'Melbourne Storm', ['melbourne storm', 'storm', 'sto'], 'https://r2.thesportsdb.com/images/media/team/badge/hpdn401646347751.png']
   ].map(([sport, league, team, aliases, url]) => ({ sport, league, team, aliases, url }))
 ])
 
@@ -1738,6 +1902,7 @@ function sportMatchesLogoRule(ruleSport = '', sport = '') {
   const value = normalizeSpace(sport).toLowerCase()
   if (!rule || !value) return true
   if (rule === value) return true
+  if (resolveSportSlug(rule) && resolveSportSlug(rule) === resolveSportSlug(value)) return true
   if (['sports', 'sport', 'general', 'other'].includes(value)) return true
   if ((rule === 'boxing' || rule === 'fighting') && (value === 'boxing' || value === 'fighting')) return true
   if (rule === 'badminton' && value === 'tennis') return true
@@ -1797,7 +1962,13 @@ function buildDefaultLogoRequests(fallbackInput = {}) {
     const ruleLeagueSlug = Array.isArray(rule.canonicalIds)
       ? rule.canonicalIds.map((id) => String(id || '').match(/^sportsmeta:league:[^|]+\|(.+)$/i)?.[1]).find(Boolean)
       : ''
-    if (ruleLeagueSlug && inputLeagueSlug && ruleLeagueSlug !== inputLeagueSlug && !isGenericLeagueSlug(inputLeagueSlug)) continue
+    if (
+      ruleLeagueSlug &&
+      inputLeagueSlug &&
+      ruleLeagueSlug !== inputLeagueSlug &&
+      !isGenericLeagueSlug(inputLeagueSlug) &&
+      !slugContainsToken(inputLeagueSlug, ruleLeagueSlug)
+    ) continue
     if (!rule.pattern.test(text)) continue
     for (const directUrl of rule.directLogoUrls || []) addDirect(directUrl)
     for (const canonicalId of rule.canonicalIds || []) addInspect(canonicalId)
@@ -1823,6 +1994,7 @@ function directLogoInputMatches({ ruleSport = '', ruleLeague = '', sport = '', l
   const leagueSlug = normalizedLeagueSlug(league)
   if (ruleLeagueSlug && leagueSlug) {
     if (ruleLeagueSlug === leagueSlug) return true
+    if (slugContainsToken(leagueSlug, ruleLeagueSlug)) return true
     if (!isGenericLeagueSlug(leagueSlug)) return false
   }
   return pattern ? pattern.test(normalizeSpace(text)) : false
@@ -1892,11 +2064,19 @@ function directTeamLogoUrlFor({ sport = '', league = '', team = '' } = {}) {
   for (const rule of DIRECT_TEAM_LOGO_OVERRIDES) {
     if (resolveSportSlug(rule.sport) !== sportSlug) continue
     const ruleLeagueSlug = normalizedLeagueSlug(rule.league)
-    if (ruleLeagueSlug) {
-      if (!leagueSlug || ruleLeagueSlug !== leagueSlug) continue
-    }
+    if (
+      ruleLeagueSlug &&
+      leagueSlug &&
+      !isGenericLeagueSlug(leagueSlug) &&
+      ruleLeagueSlug !== leagueSlug &&
+      !slugContainsToken(leagueSlug, ruleLeagueSlug) &&
+      !slugContainsToken(ruleLeagueSlug, leagueSlug)
+    ) continue
     const aliases = [rule.team, ...(rule.aliases || [])].map(leagueSlugFor).filter(Boolean)
-    if (aliases.includes(teamSlug) || aliases.some((alias) => slugContainsToken(teamSlug, alias))) return rule.url
+    if (
+      aliases.includes(teamSlug) ||
+      aliases.some((alias) => alias.length >= 4 && slugContainsToken(teamSlug, alias))
+    ) return rule.url
   }
   return ''
 }
@@ -1914,11 +2094,19 @@ function teamLogoSearchTerms({ sport = '', league = '', team = '', text = '' } =
   add(team)
 
   const sportSlug = resolveSportSlug(sport)
-  const leagueSlug = leagueSlugFor(league)
+  const leagueSlug = normalizedLeagueSlug(league)
   const haystack = normalizeSpace([team, text].filter(Boolean).join(' '))
   for (const alias of DEFAULT_TEAM_LOGO_ALIASES) {
     if (resolveSportSlug(alias.sport) !== sportSlug) continue
-    if (leagueSlugFor(alias.league) && leagueSlug && leagueSlugFor(alias.league) !== leagueSlug) continue
+    const aliasLeagueSlug = normalizedLeagueSlug(alias.league)
+    if (
+      aliasLeagueSlug &&
+      leagueSlug &&
+      !isGenericLeagueSlug(leagueSlug) &&
+      aliasLeagueSlug !== leagueSlug &&
+      !slugContainsToken(leagueSlug, aliasLeagueSlug) &&
+      !slugContainsToken(aliasLeagueSlug, leagueSlug)
+    ) continue
     const allTerms = [alias.team, ...(alias.aliases || [])]
     if (allTerms.some((term) => slugContainsToken(haystack, term))) add(alias.team)
   }
@@ -1966,9 +2154,11 @@ async function searchSportsMetaLogoSourceUrl({ sportsmetaBaseUrl = '', sport = '
 async function searchSportsMetaTeamBadgeSourceUrl({ sportsmetaBaseUrl = '', sport = '', league = '', team = '', role = '', text = '' } = {}) {
   const base = getPublicSportsMetaBaseUrl(sportsmetaBaseUrl)
   const sportSlug = resolveSportSlug(sport)
-  const leagueSlug = leagueSlugFor(league)
+  const normalizedInputLeagueSlug = normalizedLeagueSlug(league)
+  const leagueSlug = isGenericLeagueSlug(normalizedInputLeagueSlug) ? '' : normalizedInputLeagueSlug
   const terms = teamLogoSearchTerms({ sport, league, team, text: '' })
   if (!base || !sportSlug || terms.length === 0) return null
+  let relaxedMatch = null
   for (const term of terms) {
     try {
       const url = `${base}/catalog/movie/sportsmeta-${encodeURIComponent(sportSlug)}/search=${encodeURIComponent(term)}.json`
@@ -1984,15 +2174,21 @@ async function searchSportsMetaTeamBadgeSourceUrl({ sportsmetaBaseUrl = '', spor
         const id = normalizeSpace(meta?.id)
         const parsed = parseSportsMetaEventId(id)
         if (!parsed || parsed.sport !== sportSlug) continue
-        if (leagueSlug && parsed.league !== leagueSlug) continue
+        const leagueMatches = !leagueSlug ||
+          parsed.league === leagueSlug ||
+          slugContainsToken(parsed.league, leagueSlug) ||
+          slugContainsToken(leagueSlug, parsed.league)
         const side = targetSlugs.includes(parsed.home) ? 'homeBadge' : targetSlugs.includes(parsed.away) ? 'awayBadge' : ''
         if (!side) continue
         const sourceUrl = await loadInspectAssetSourceUrl({ canonicalId: id, sportsmetaBaseUrl, variant: side })
-        if (sourceUrl) return { sourceUrl, canonicalId: id, variant: side, search: term, role }
+        if (!sourceUrl) continue
+        const result = { sourceUrl, canonicalId: id, variant: side, search: term, role }
+        if (leagueMatches) return result
+        if (!relaxedMatch) relaxedMatch = result
       }
     } catch (_) {}
   }
-  return null
+  return relaxedMatch
 }
 
 async function resolveDefaultTeamLogoImage({ sportsmetaBaseUrl = '', fallbackInput = {}, role = '', team = '', size = 260 } = {}) {
@@ -2083,6 +2279,27 @@ function uniqueLogoUrls(urls = []) {
       seen.add(url)
       return true
     })
+}
+
+function standaloneSvgSymbolBuffer(sourceBuf, targetUrl = '') {
+  let symbolId = ''
+  try {
+    symbolId = decodeURIComponent(new URL(targetUrl).hash.replace(/^#/, ''))
+  } catch (_) {
+    symbolId = ''
+  }
+  if (!symbolId) return sourceBuf
+  const svg = sourceBuf.toString('utf8')
+  const symbolRe = /<symbol\b([^>]*)>([\s\S]*?)<\/symbol>/gi
+  const idRe = new RegExp(`\\bid=["']${escapeRegExp(symbolId)}["']`, 'i')
+  for (const match of svg.matchAll(symbolRe)) {
+    const attrs = match[1] || ''
+    if (!idRe.test(attrs)) continue
+    const viewBox = attrs.match(/\bviewBox=["']([^"']+)["']/i)?.[1] || '0 0 512 512'
+    const body = match[2] || ''
+    return Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="${escapeXml(viewBox)}">${body}</svg>`)
+  }
+  return sourceBuf
 }
 
 async function fetchLogoCandidateFromUrls({ urls = [], key = '', role = '', size = 210, fallbackColor = '#0f766e' } = {}) {
@@ -2240,16 +2457,6 @@ async function fetchCompositionImage(url = '', size = 210, options = {}) {
   }
 }
 
-function renderUfcRedLogoSvg(size = 320) {
-  const width = Math.max(160, Math.round(Number(size) || 320))
-  const height = Math.round(width * 0.42)
-  const fontSize = Math.round(width * 0.34)
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" role="img">
-    <rect width="${width}" height="${height}" fill="none"/>
-    <text x="${Math.round(width / 2)}" y="${Math.round(height * 0.76)}" text-anchor="middle" font-family="Arial Black, Impact, Arial, sans-serif" font-size="${fontSize}" font-weight="900" font-style="italic" fill="#D20A0A" letter-spacing="0">UFC</text>
-  </svg>`
-}
-
 async function fetchLogoCandidate({ url = '', key = '', role = '', size = 210, fallbackColor = '#0f766e' } = {}) {
   const targetUrl = normalizeSpace(url)
   const attempt = {
@@ -2290,21 +2497,6 @@ async function fetchLogoCandidate({ url = '', key = '', role = '', size = 210, f
         color: null
       }
       try {
-        if (targetUrl === 'pvtkrrx://logo/ufc-red') {
-          const sourceBuf = Buffer.from(renderUfcRedLogoSvg(Math.max(320, size * 2)))
-          value.status = 200
-          value.contentType = 'image/svg+xml'
-          value.source = 'pvtkrrx-direct-logo'
-          value.assetClass = 'logo'
-          value.delivery = 'svg'
-          value.buffer = await sharp(sourceBuf, { density: 192 })
-            .resize({ width: size, height: size, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-            .png()
-            .toBuffer()
-          value.color = '#D20A0A'
-          value.result = 'real_logo'
-          return value
-        }
         const response = await fetch(targetUrl, {
           headers: { accept: 'image/png,image/jpeg,image/webp,image/svg+xml,image/*' },
           signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
@@ -2330,7 +2522,10 @@ async function fetchLogoCandidate({ url = '', key = '', role = '', size = 210, f
           return value
         }
 
-        const sourceBuf = Buffer.from(await response.arrayBuffer())
+        const fetchedBuf = Buffer.from(await response.arrayBuffer())
+        const sourceBuf = /^image\/svg\+xml/i.test(value.contentType)
+          ? standaloneSvgSymbolBuffer(fetchedBuf, targetUrl)
+          : fetchedBuf
         value.buffer = await sharp(sourceBuf, { density: 192 })
           .resize({ width: size, height: size, fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
           .png()
@@ -2693,9 +2888,10 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
 
   const artworkSlots = artwork.slots || []
   const hasTeamSpecificSlots = artworkSlots.some((slot) => slot.role === 'home' || slot.role === 'away')
+  const leagueFallbackForCompetitors = ['tennis_or_snooker_match', 'combat_event', 'darts_event'].includes(eventClass)
   const selectLogoForSlot = (role = '') => {
-    if (role === 'home') return homeBadge
-    if (role === 'away') return awayBadge
+    if (role === 'home') return homeBadge || (leagueFallbackForCompetitors ? (leagueLogo || eventIdentity || null) : null)
+    if (role === 'away') return awayBadge || (leagueFallbackForCompetitors ? (leagueLogo || eventIdentity || null) : null)
     // The league slot must show the league/event identity. Falling back to a
     // team badge here puts (e.g.) the Arsenal crest in the UCL header slot,
     // which the user has explicitly flagged as wrong. Prefer leagueLogo, then

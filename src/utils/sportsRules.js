@@ -34,7 +34,11 @@ function normalizeSportKey(value) {
     ['wec', 'motorsport'],
     ['formula e', 'motorsport'],
     ['formulae', 'motorsport'],
+    ['american football', 'american-football'],
+    ['gridiron football', 'american-football'],
     ['nfl', 'american-football'],
+    ['ufl', 'american-football'],
+    ['united football league', 'american-football'],
     ['ncaa football', 'american-football'],
     ['soccer', 'football'],
     ['epl', 'football'],
@@ -65,6 +69,8 @@ function normalizeSportKey(value) {
 }
 
 const NBA_TEAM_PATTERN = /\b(?:atlanta\s+hawks|hawks|boston\s+celtics|celtics|brooklyn\s+nets|nets|charlotte\s+hornets|hornets|chicago\s+bulls|bulls|cleveland\s+cavaliers|cavs?|dallas\s+mavericks|mavs?|denver\s+nuggets|nuggets|detroit\s+pistons|pistons|golden\s+state\s+warriors|warriors|houston\s+rockets|rockets|indiana\s+pacers|pacers|la\s+clippers|los\s+angeles\s+clippers|clippers|los\s+angeles\s+lakers|la\s+lakers|lakers|memphis\s+grizzlies|grizzlies|miami\s+heat|milwaukee\s+bucks|bucks|minnesota\s+timberwolves|timberwolves|new\s+orleans\s+pelicans|pelicans|new\s+york\s+knicks|knicks|oklahoma\s+city\s+thunder|okc\s+thunder|thunder|orlando\s+magic|magic|philadelphia\s+76ers|76ers|sixers|phoenix\s+suns|suns|portland\s+trail\s+blazers|trail\s+blazers|blazers|sacramento\s+kings|kings|san\s+antonio\s+spurs|spurs|toronto\s+raptors|raptors|utah\s+jazz|jazz|washington\s+wizards|wizards)\b/i
+const MLS_TEAM_PATTERN = /\b(?:atlanta\s+united|columbus\s+crew|colorado\s+rapids|houston\s+dynamo|new\s+york\s+city\s+fc|nycfc|orlando\s+city|san\s+jose\s+earthquakes|st\.?\s+louis\s+city)\b/i
+const UFL_TEAM_PATTERN = /\b(?:dc\s+defenders|houston\s+gamblers|louisville\s+kings|orlando\s+storm)\b/i
 const SNOOKER_PLAYER_PATTERN = /\b(?:john\s+higgins|shaun\s+murphy|ronnie\s+o['\s._-]*sullivan|judd\s+trump|mark\s+selby|mark\s+allen|neil\s+robertson|kyren\s+wilson|ding\s+junhui|mark\s+williams|stephen\s+maguire|jack\s+lisowski)\b/i
 
 function detectStrongSportHintFromTitle(title) {
@@ -105,6 +111,8 @@ function resolveSportHint(input = {}) {
   const category = normalizeSportKey(input.categoryHint)
   const preferredNonTitle = explicit || category
 
+  if (strongTitle === 'tennis' && explicit === 'football' && MLS_TEAM_PATTERN.test(String(input.title || ''))) return explicit
+  if (strongTitle === 'basketball' && explicit === 'american-football' && UFL_TEAM_PATTERN.test(String(input.title || ''))) return explicit
   if (strongTitle && preferredNonTitle && strongTitle !== preferredNonTitle) return strongTitle
   if (explicit) return explicit
 

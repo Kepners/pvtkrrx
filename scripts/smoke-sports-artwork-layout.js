@@ -608,7 +608,9 @@ async function assertTeamBadgeArtworkProxy() {
         url.hostname === 'a.espncdn.com' ||
         url.hostname === 'r2.thesportsdb.com' ||
         url.hostname === 'www.thesportsdb.com' ||
-        url.hostname === 'upload.wikimedia.org'
+        url.hostname === 'upload.wikimedia.org' ||
+        url.hostname === 'www.goldcoastfc.com.au' ||
+        url.hostname === 'www.nmfc.com.au'
       ) {
         return new Response(await teamBadgePng('#0f172a', '#38bdf8'), {
           status: 200,
@@ -1127,7 +1129,20 @@ async function assertTeamBadgeArtworkProxy() {
         expectedSources: [/league\/logo\/3fv4p01573154525\.png/i]
       },
       {
-        slug: 'direct-ufc-red-league-logo',
+        slug: 'direct-afl-row-in-basketball-user-screenshot-logos',
+        sport: 'basketball.png',
+        query: {
+          league: 'AFL',
+          title: 'Gold Coast Suns vs North Melbourne',
+          date: '2026-05-23',
+          home: 'Gold Coast Suns',
+          away: 'North Melbourne',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/icons\.svg#icn-aflc-gcfc/i, /icons\.svg#icn-aflc-nmfc/i]
+      },
+      {
+        slug: 'direct-ufc-real-league-logo',
         sport: 'mma.png',
         query: {
           league: 'UFC',
@@ -1136,7 +1151,151 @@ async function assertTeamBadgeArtworkProxy() {
           date: '2026-05-09',
           eventClass: 'combat_event'
         },
-        expectedSources: [/pvtkrrx:\/\/logo\/ufc-red/i]
+        expectedSources: [/league\/logo\/1gp4vo1722604906\.png/i],
+        unexpectedSources: [/pvtkrrx:\/\/logo\/ufc-red/i]
+      },
+      {
+        slug: 'direct-formula-1-league-logo',
+        sport: 'motorsport.png',
+        query: {
+          league: 'Formula 1',
+          title: 'Canadian Grand Prix',
+          detail: 'Sprint Qualifying',
+          date: '2026-05-23',
+          eventClass: 'motorsport_event'
+        },
+        expectedSources: [/league\/logo\/jiqa741556460666\.png/i]
+      },
+      {
+        slug: 'direct-nfl-user-screenshot-logos',
+        sport: 'american-football.png',
+        query: {
+          league: 'NFL',
+          title: 'New England Patriots vs Seattle Seahawks',
+          date: '2026-05-23',
+          home: 'New England Patriots',
+          away: 'Seattle Seahawks',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/nfl\/500\/ne\.png/i, /\/nfl\/500\/sea\.png/i],
+        expectedSlots: [/home:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/nfl\/500\/ne\.png/i, /away:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/nfl\/500\/sea\.png/i],
+        unexpectedSlots: [/fallback/i]
+      },
+      {
+        slug: 'direct-ufl-user-screenshot-logos',
+        sport: 'american-football.png',
+        query: {
+          league: 'UFL',
+          title: 'Louisville Kings vs Houston Gamblers',
+          date: '2026-05-23',
+          home: 'Louisville Kings',
+          away: 'Houston Gamblers',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/team\/badge\/4ysomp1770670283\.png/i, /team\/badge\/bt36gy1770671084\.png/i]
+      },
+      {
+        slug: 'direct-euroleague-user-screenshot-logos',
+        sport: 'basketball.png',
+        query: {
+          league: 'EuroLeague Basketball',
+          title: 'Valencia Basket vs Real Madrid Baloncesto',
+          date: '2026-05-23',
+          home: 'Valencia Basket',
+          away: 'Real Madrid Baloncesto',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/team\/badge\/9qyc231536398868\.png/i, /team\/badge\/g4ev2c1522175902\.png/i]
+      },
+      {
+        slug: 'direct-bbl-user-screenshot-logos',
+        sport: 'basketball.png',
+        query: {
+          league: 'EasyCredit BBL',
+          title: 'Ratiopharm Ulm vs Bamberg Baskets',
+          date: '2026-05-23',
+          home: 'Ratiopharm Ulm',
+          away: 'Bamberg Baskets',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/team\/badge\/0t59iu1677678278\.png/i, /team\/badge\/rs1gjz1714562746\.png/i]
+      },
+      {
+        slug: 'direct-nba-playoffs-compilation-logo',
+        sport: 'basketball.png',
+        query: {
+          league: 'NBA Playoffs',
+          title: 'NBA Playoffs 22 05 2026 All Games',
+          date: '2026-05-22',
+          eventClass: 'tournament_event'
+        },
+        expectedSources: [/league\/logo\/ypuryw1421971236\.png/i]
+      },
+      {
+        slug: 'direct-cricket-rcb-user-screenshot-logo',
+        sport: 'cricket.png',
+        query: {
+          league: 'Indian Premier League',
+          title: 'Royal Challengers Bengaluru vs Sunrisers Hyderabad',
+          date: '2026-05-23',
+          home: 'Royal Challengers Bengaluru',
+          away: 'Sunrisers Hyderabad',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/team\/badge\/kynj5v1588331757\.png/i]
+      },
+      {
+        slug: 'direct-rugby-nrl-user-screenshot-logos',
+        sport: 'rugby.png',
+        query: {
+          league: 'NRL',
+          title: 'Bulldogs vs Storm',
+          date: '2026-05-23',
+          home: 'Bulldogs',
+          away: 'Storm',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/team\/badge\/ggzq4e1768487178\.png/i, /team\/badge\/hpdn401646347751\.png/i]
+      },
+      {
+        slug: 'direct-rugby-challenge-cup-user-screenshot-logos',
+        sport: 'rugby.png',
+        query: {
+          league: 'Challenge Cup',
+          title: 'Challenge Cup vs Ulster Incl',
+          date: '2026-05-23',
+          home: 'Challenge Cup',
+          away: 'Ulster Incl',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/league\/logo\/dwmh511716589311\.png/i, /team\/badge\/j8usvw1716743144\.png/i]
+      },
+      {
+        slug: 'direct-us-open-cup-football-logos',
+        sport: 'football.png',
+        query: {
+          league: 'U.S. Open Cup',
+          title: 'Columbus Crew vs New York City FC',
+          date: '2026-05-23',
+          home: 'Columbus Crew',
+          away: 'New York City FC',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/soccer\/500\/183\.png/i, /\/soccer\/500\/17606\.png/i]
+      },
+      {
+        slug: 'direct-atp-competitor-league-logo-fallback',
+        sport: 'tennis.png',
+        query: {
+          league: 'ATP World Tour',
+          title: 'Jannik Sinner vs Andrea Pellegrino',
+          date: '2026-05-23',
+          home: 'Jannik Sinner',
+          away: 'Andrea Pellegrino',
+          eventClass: 'tennis_or_snooker_match'
+        },
+        expectedSources: [/league\/badge\/q7aej51769857150\.png/i],
+        unexpectedSlots: [/fallback-glyph/i]
       },
       {
         slug: 'direct-scottish-womens-premier-logo',
@@ -1149,6 +1308,58 @@ async function assertTeamBadgeArtworkProxy() {
         },
         expectedSources: [/SWPL_Logo_Brandmarque_Colour\.png/i],
         unexpectedSources: [/english-premier-league|premier-league/i]
+      },
+      {
+        slug: 'direct-bkfc-user-screenshot-logo',
+        sport: 'boxing.png',
+        query: {
+          league: 'BKFC',
+          title: 'Larrimore vs Palm Desert Herring',
+          detail: 'Main Event',
+          date: '2026-05-23',
+          eventClass: 'combat_event'
+        },
+        expectedSources: [/league\/logo\/wbatgb1564344282\.png/i],
+        unexpectedSlots: [/fallback-glyph/i]
+      },
+      {
+        slug: 'direct-tour-de-france-user-screenshot-logo',
+        sport: 'cycling.png',
+        query: {
+          league: 'Tour de France',
+          title: 'Tour France Stage 21',
+          detail: 'Stage 21',
+          date: '2026-05-23',
+          eventClass: 'generic_event'
+        },
+        expectedSources: [/Tour_de_France_logo\.svg/i],
+        unexpectedSlots: [/fallback-glyph/i]
+      },
+      {
+        slug: 'direct-tour-de-france-femmes-user-screenshot-logo',
+        sport: 'cycling.png',
+        query: {
+          league: 'Tour de France Femmes',
+          title: 'Tour France Femmes Avec Zwift Stage 04',
+          detail: 'Stage 04',
+          date: '2026-05-23',
+          eventClass: 'generic_event'
+        },
+        expectedSources: [/Tour_de_France_Femmes_logo\.svg/i],
+        unexpectedSlots: [/fallback-glyph/i]
+      },
+      {
+        slug: 'direct-pdc-darts-user-screenshot-logo',
+        sport: 'darts.png',
+        query: {
+          league: 'PDC Darts',
+          title: 'World Cup Darts Last Session',
+          detail: 'Final',
+          date: '2026-05-23',
+          eventClass: 'darts_event'
+        },
+        expectedSources: [/league\/logo\/mnkcyf1555604592\.png/i],
+        unexpectedSlots: [/fallback-glyph/i]
       }
     ]
 

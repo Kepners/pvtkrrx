@@ -1048,6 +1048,17 @@ async function run() {
   assert.equal(ufcProfile.session, 'Main Card', 'UFC rows should expose main card as session metadata')
   assert.equal(ufcProfile.event_class, 'combat_event', 'UFC rows should be classified as combat-event posters')
 
+  const badMotorsportFootballProfile = parseSportsTorrentProfile({
+    title: 'Hull City vs Middlesbrough',
+    pubDate: '2026-05-22T12:00:00.000Z',
+    sportHint: 'motorsport',
+    categoryNames: ['MotorSport'],
+    seeders: 11
+  })
+  assert.equal(badMotorsportFootballProfile.sport, 'football', 'club identity should override a bad motorsport category for Hull City vs Middlesbrough')
+  assert.equal(badMotorsportFootballProfile.league, 'EFL Championship', 'Hull City vs Middlesbrough should resolve to EFL Championship')
+  assert.equal(badMotorsportFootballProfile.event_class, 'team_vs_team', 'Hull City vs Middlesbrough should render as a team-vs-team football poster')
+
   const wimbledonProfile = parseSportsTorrentProfile({
     title: 'Wimbledon 2025 07 06 Day 7 Court #2 1080p BBC',
     pubDate: '2025-07-06T12:00:00.000Z',
@@ -1071,6 +1082,17 @@ async function run() {
   assert.equal(atpProfile.away_team, 'Alcaraz', 'ATP rows should preserve the second player')
   assert.equal(atpProfile.round, 'Final', 'ATP rows should expose final as round metadata')
   assert.equal(atpProfile.event_class, 'tennis_or_snooker_match', 'ATP rows should be classified as tennis/snooker posters')
+
+  const usOpenCupProfile = parseSportsTorrentProfile({
+    title: 'US Open Columbus Crew vs New York City FC 1080p',
+    pubDate: '2026-05-22T12:00:00.000Z',
+    sportHint: 'tennis',
+    seeders: 8
+  })
+  assert.equal(usOpenCupProfile.sport, 'football', 'MLS clubs should override tennis US Open routing')
+  assert.equal(usOpenCupProfile.league, 'U.S. Open Cup', 'US Open MLS rows should resolve to U.S. Open Cup')
+  assert.equal(usOpenCupProfile.home_team, 'Columbus Crew', 'US Open MLS rows should preserve the home club')
+  assert.equal(usOpenCupProfile.away_team, 'New York City FC', 'US Open MLS rows should preserve the away club')
 
   const wtaProfile = parseSportsTorrentProfile({
     title: 'WTA Rome 2026 Swiatek vs Gauff Semi Final 720p WEB',

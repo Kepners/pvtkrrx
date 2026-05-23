@@ -100,7 +100,30 @@ const CLUB_ALIASES = new Map([
   ['kilmarnock', 'Kilmarnock'],
   ['st mirren', 'St Mirren'],
   ['st johnstone', 'St Johnstone'],
+  ['livingston', 'Livingston'],
   ['ross county', 'Ross County'],
+
+  // --- EFL Championship (club override for bad tracker sport hints) ---
+  ['hull', 'Hull City'],
+  ['hull city', 'Hull City'],
+  ['middlesbrough', 'Middlesbrough'],
+  ['boro', 'Middlesbrough'],
+
+  // --- MLS / U.S. Open Cup (avoid tennis "US Open" misrouting) ---
+  ['atlanta united', 'Atlanta United FC'],
+  ['atlanta united fc', 'Atlanta United FC'],
+  ['columbus crew', 'Columbus Crew'],
+  ['colorado rapids', 'Colorado Rapids'],
+  ['houston dynamo', 'Houston Dynamo FC'],
+  ['houston dynamo fc', 'Houston Dynamo FC'],
+  ['new york city fc', 'New York City FC'],
+  ['nycfc', 'New York City FC'],
+  ['orlando city', 'Orlando City SC'],
+  ['orlando city sc', 'Orlando City SC'],
+  ['san jose earthquakes', 'San Jose Earthquakes'],
+  ['st louis city', 'St. Louis CITY SC'],
+  ['st louis city sc', 'St. Louis CITY SC'],
+  ['st. louis city sc', 'St. Louis CITY SC'],
 
   // --- NBA tricodes (Batch 15) ---
   ['atl', 'Atlanta Hawks'],
@@ -150,7 +173,18 @@ const CLUB_COMPETITION = new Map([
   ['kilmarnock', { competition: 'Scottish Premiership', sportKey: 'football' }],
   ['st mirren', { competition: 'Scottish Premiership', sportKey: 'football' }],
   ['st johnstone', { competition: 'Scottish Premiership', sportKey: 'football' }],
-  ['ross county', { competition: 'Scottish Premiership', sportKey: 'football' }]
+  ['livingston', { competition: 'Scottish Premiership', sportKey: 'football' }],
+  ['ross county', { competition: 'Scottish Premiership', sportKey: 'football' }],
+  ['hull city', { competition: 'EFL Championship', sportKey: 'football' }],
+  ['middlesbrough', { competition: 'EFL Championship', sportKey: 'football' }],
+  ['atlanta united fc', { competition: 'U.S. Open Cup', sportKey: 'football' }],
+  ['columbus crew', { competition: 'U.S. Open Cup', sportKey: 'football' }],
+  ['colorado rapids', { competition: 'U.S. Open Cup', sportKey: 'football' }],
+  ['houston dynamo fc', { competition: 'U.S. Open Cup', sportKey: 'football' }],
+  ['new york city fc', { competition: 'U.S. Open Cup', sportKey: 'football' }],
+  ['orlando city sc', { competition: 'U.S. Open Cup', sportKey: 'football' }],
+  ['san jose earthquakes', { competition: 'U.S. Open Cup', sportKey: 'football' }],
+  ['st louis city sc', { competition: 'U.S. Open Cup', sportKey: 'football' }]
 ])
 
 // Canonicalize a single side label. Strips sponsor prefixes, collapses
