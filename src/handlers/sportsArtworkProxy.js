@@ -52,7 +52,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260516-competition-context-v30'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260523-logo-routing-v31'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
