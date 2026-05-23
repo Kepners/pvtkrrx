@@ -1,5 +1,59 @@
 # PVTKRRX Brain
 
+## 2026-05-23: Sports poster logo/routing fixes deployed live
+
+- Scope: public PVTKRRX Coolify container for `https://www.pvtkrrx.cc` sports
+  artwork/catalog routing. No DNS, Caddy route, SportsMeta service, Stripe,
+  Prowlarr, qBittorrent, or Windows EXE release was changed.
+- Source state:
+  - `main` now points to `e3a41dffe010c9e4369b37866d76c9f9f6ad0167`.
+  - Fix commits:
+    - `4b82347055467668df35f25bf31e9a092cf5929d` fixed sports logo lookup and
+      sport routing for reported poster cases.
+    - `6513154f015caecbd22d837488fa965b9ada17b2` bumped the public artwork URL
+      cache version to `20260523-logo-routing-v31`.
+    - `e3a41dffe010c9e4369b37866d76c9f9f6ad0167` bumped the server-side render
+      cache key to the same `20260523-logo-routing-v31`.
+- Product change:
+  - Real league/team logo lookup now covers the reported Darts/PDC, UFC,
+    Formula 1, NFL/UFL, basketball, cricket, rugby, football, tennis, boxing,
+    and cycling fallback gaps.
+  - `Hull City vs Middlesbrough` is forced into football/EFL Championship
+    identity rather than motorsport.
+  - U.S. Open Cup soccer rows are protected from tennis routing.
+  - UFC no longer uses fake red text; it uses the SportsMeta/SportsDB UFC logo.
+- Deploy proof:
+  - Coolify webhook deployments for the final commit finished: rows `835` and
+    `836` both `finished` for commit `e3a41dffe010c9e4369b37866d76c9f9f6ad0167`.
+  - Running public container:
+    `w14jewmw5ubscrxh8zzfhq7d-190757571145`,
+    image `w14jewmw5ubscrxh8zzfhq7d:e3a41dffe010c9e4369b37866d76c9f9f6ad0167`.
+  - Container env verifies `SOURCE_COMMIT=e3a41dffe010c9e4369b37866d76c9f9f6ad0167`
+    and `COOLIFY_BRANCH=main`.
+  - `https://www.pvtkrrx.cc/health` returned `HTTP 200`.
+  - Live Darts/PDC artwork returned `HTTP 200 image/png`,
+    `X-PVTKRRX-Revision=e3a41dffe010c9e4369b37866d76c9f9f6ad0167`,
+    `X-PVTKRRX-Artwork-Cache-Version=20260523-logo-routing-v31`,
+    `X-PVTKRRX-Artwork-Render-Version=20260523-logo-routing-v31`,
+    `X-PVTKRRX-Logo-Real-Count=2`, `X-PVTKRRX-Logo-Fallback-Count=0`,
+    and real logo source `https://r2.thesportsdb.com/images/media/league/logo/mnkcyf1555604592.png`.
+  - Live UFC artwork returned the same final revision/cache headers with real
+    UFC logo source `https://r2.thesportsdb.com/images/media/league/logo/1gp4vo1722604906.png`.
+  - Live Hull City vs Middlesbrough football artwork returned the final
+    revision/cache headers and real team logo sources for Hull City and
+    Middlesbrough.
+- Weak points:
+  - Public Coolify currently has `PVTKRRX_SPORTS_POSTER_ADMIN_OVERRIDE=broadcast`,
+    so live public artwork requests render as `broadcast` even when a request asks
+    for `ticket-stub`. This was an existing environment setting and was not
+    changed in this deploy.
+  - The shared logo lookup path is fixed, but a full visual proof across every
+    paid/member template (`editorial`, `broadcast`, `sportsbook`,
+    `trading-card`, `brutalist`, `ticket-stub`, `glitch`) was not run against
+    the live member-entitled surface in this deploy.
+  - Stremio clients may still need a catalog refresh/restart to pick up the new
+    `v=20260523-logo-routing-v31` artwork URLs.
+
 ## 2026-05-18: Stremio retest issues queued for full review
 
 - User retested `1.2.1` in Stremio/qBittorrent and asked to record issues for tomorrow rather than investigate immediately.
