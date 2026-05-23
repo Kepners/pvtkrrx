@@ -1,10 +1,22 @@
 # PVTKRRX Project Status
 
-Updated: 2026-05-17
+Updated: 2026-05-23
 
 ## Current Stage
 
-PVTKRRX is on the `1.2.0` release line. Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. `1.2.0` carries the self-host playback-base fix (shipped interim as `1.1.76`, root-caused and proven) on top of the `1.1.75` parity-clean release and the `1.1.74` sports poster/title normalization and `1.1.73` seedbox progressive playback hardening.
+PVTKRRX is on the `1.3.0` release line. v1.3 adds optional Debrid (Real-Debrid, AllDebrid, Premiumize) + Cache Search (put.io, Premiumize cache check) + Newznab (Usenet) support. Coexists with the existing qBittorrent flow — installs without any debrid/cache config are unchanged from v1.2.
+
+## 2026-05-23: v1.3.0 debrid + cache search + Newznab
+
+- Release scope: optional debrid provider layer (RD/AD/PM), optional cache search sources (put.io, PM cache check), Newznab Usenet support routed to Premiumize, new `/playback/debrid` add-and-poll handler, new `/configure/debrid/test` ping endpoint.
+- Routing rules: sports content (`sportsmeta:*`, `pvtkrrx:sm:*`) uses debrid only — no qBit fallback. Movies/TV prefer debrid by default with qBit fallback (toggleable). Backward compat preserved: installs with no debrid/cache configured behave exactly like v1.2.
+- RD May 2026 filter mitigation: filename sanitizer strips known release-group keywords from the magnet `dn=` before submission. Partial mitigation only.
+- New Configure UI: Debrid + Cache Search tabs added to the existing service-tabs row. API keys masked after save, "Test connection" buttons per provider/source.
+- Encrypted install-config schema extended: `debrid.{providers,preferOrder,preferDebridOverSeedbox}` + `cacheSearch.{sources,preferOrder}` blocks ride the same AES-256-GCM token as the existing fields. v1.2 tokens deserialize cleanly to empty defaults.
+- New smoke suites: `smoke:debrid` (Codex provider mocks), `smoke:rd-sanitizer`, `smoke:debrid-config` (schema round-trip), `smoke:debrid-routing` (routing rules). All bundled into `smoke:debrid-all`.
+- Existing smokes all green: `smoke:config`, `smoke:guards`, `smoke:pipeline`, `smoke:lan-pair`, `smoke:stremio-link`, `smoke:security`, `smoke:parity`, `smoke:selfhost`, `smoke:playback`, `smoke:provider-discovery`, `smoke:desktop`. Codex unit tests (`__tests__/debrid/*`, `__tests__/cacheSearch/*`, `__tests__/prowlarr/newznab.test.js`) all PASS.
+
+## Previous: v1.2.0 release line Release numbering remains app-aligned: desktop/latest is `vX.Y.Z`, self-host/seedbox is `vX.Y.Z-selfhost`, and legacy `v1.12.x-selfhost` tags are compatibility history only. `1.2.0` carries the self-host playback-base fix (shipped interim as `1.1.76`, root-caused and proven) on top of the `1.1.75` parity-clean release and the `1.1.74` sports poster/title normalization and `1.1.73` seedbox progressive playback hardening.
 
 Status: `1.2.0` is confirmed working by the user — both completed self-host files AND **progressive streaming while the torrent is still downloading** play in Stremio — and by live evidence on the native runtime. The "wouldn't play / end-portion-before-start" behavior described while correcting an earlier writeup was the ORIGINAL pre-fix break, not a current regression — live qBit flags on the reported torrent (`8db099b3`) are correct (`seq_dl=true`, `f_l_piece_prio=false`).
 

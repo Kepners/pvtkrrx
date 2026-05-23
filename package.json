@@ -1,6 +1,6 @@
 {
   "name": "pvtkrrx",
-  "version": "1.2.1",
+  "version": "1.3.0",
   "description": "PVTKRRX — Stream from your private tracker seedbox through Stremio",
   "main": "index.js",
   "scripts": {
@@ -47,6 +47,11 @@
     "smoke:desktop": "node scripts/smoke-desktop-provision.js",
     "smoke:win-installer-path": "node scripts/smoke-win-installer-path.js",
     "smoke:provider-discovery": "node scripts/smoke-provider-discovery.js",
+    "smoke:debrid": "node scripts/smoke-debrid.js",
+    "smoke:rd-sanitizer": "node scripts/smoke-rd-sanitizer.js",
+    "smoke:debrid-config": "node scripts/smoke-debrid-config.js",
+    "smoke:debrid-routing": "node scripts/smoke-debrid-routing.js",
+    "smoke:debrid-all": "node scripts/smoke-debrid.js && node scripts/smoke-rd-sanitizer.js && node scripts/smoke-debrid-config.js && node scripts/smoke-debrid-routing.js",
     "probe:sports-item": "node scripts/probe-sports-item.js",
     "desktop:dev": "electron electron/main.js",
     "dist:win": "node scripts/build-win.js"

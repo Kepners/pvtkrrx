@@ -22,6 +22,7 @@ const { fetchTorrentPayload, inspectTorrentPayload } = require('../utils/torrent
 const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
 const { applyHostedServiceOverrides } = require('../utils/hostedServiceOverrides')
 const { getMappedLeagueEntry } = require('../utils/leagueMap')
+const { applyV13Routing } = require('../utils/streamRouter')
 
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '10000', 10))
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '12000', 10))
@@ -398,6 +399,7 @@ function appendNoticeStreams(streams, noticeCounts, addonUrl) {
 const { settleWithTimeout } = require('../utils/timeout')
 
 async function handleStream(config, type, id, addonUrl, configToken, playbackBaseUrl = addonUrl) {
+  let baseResult = { streams: [] }
   try {
     const effectiveConfig = applyHostedServiceOverrides(config && typeof config === 'object' ? config : {})
     if (id.startsWith('sportsmeta:')) {
@@ -409,10 +411,8 @@ async function handleStream(config, type, id, addonUrl, configToken, playbackBas
       if (result.timedOut) {
         console.warn(`[stream] sportsmeta response budget exceeded id=${id} timeoutMs=${STREAM_SPORTS_RESPONSE_TIMEOUT_MS}`)
       }
-      return result.value
-    }
-
-    if (id.startsWith('pvtkrrx:')) {
+      baseResult = result.value
+    } else if (id.startsWith('pvtkrrx:')) {
       const decoded = decodeCustomId(id)
       if (isSportsStreamInfo(decoded)) {
         const result = await settleWithTimeout(
@@ -423,19 +423,32 @@ async function handleStream(config, type, id, addonUrl, configToken, playbackBas
         if (result.timedOut) {
           console.warn(`[stream] custom sports response budget exceeded id=${id} timeoutMs=${STREAM_SPORTS_RESPONSE_TIMEOUT_MS}`)
         }
-        return result.value
+        baseResult = result.value
+      } else {
+        baseResult = await handleDecodedCustomStream(effectiveConfig, decoded, addonUrl, configToken, playbackBaseUrl)
       }
-      return await handleDecodedCustomStream(effectiveConfig, decoded, addonUrl, configToken, playbackBaseUrl)
+    } else if (id.startsWith('tt')) {
+      baseResult = await handleImdbStream(effectiveConfig, type, id, addonUrl, configToken, playbackBaseUrl)
     }
-
-    if (id.startsWith('tt')) {
-      return await handleImdbStream(effectiveConfig, type, id, addonUrl, configToken, playbackBaseUrl)
-    }
-
-    return { streams: [] }
   } catch (err) {
     console.error(`[stream] ERROR type=${type} id=${id}: ${err.message}`)
-    return { streams: [] }
+    baseResult = { streams: [] }
+  }
+
+  // v1.3 debrid + cache search routing post-processor.
+  // No-op for installs without debrid/cacheSearch configured (returns existing baseResult unchanged).
+  try {
+    return await applyV13Routing(baseResult, {
+      config,
+      addonUrl,
+      playbackBaseUrl,
+      configToken,
+      id,
+      type
+    })
+  } catch (err) {
+    console.error(`[stream-router] post-processor error type=${type} id=${id}: ${err.message}`)
+    return baseResult
   }
 }
 

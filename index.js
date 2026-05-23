@@ -19,6 +19,7 @@ const {
 } = require('./src/utils/qbitAutomation')
 const { getBrowserConfig, trackEvent } = require('./src/utils/analytics')
 const { scheduleSportsCatalogPrewarm } = require('./src/utils/sportsCatalogPrewarm')
+const { handleDebridPlayback, handleDebridTest } = require('./src/handlers/playbackDebrid')
 
 // Legacy direct TheSportsDB paths (sports-image cache, 15-min autofill job,
 // /sports/image proxy, and the experimental internal SportsMeta handler) were
@@ -2025,6 +2026,22 @@ app.get('/local/install', requireLocalNetworkRoute, (req, res) => {
 </html>`)
 })
 
+// ─── POST /configure/debrid/test — v1.3 debrid + cache search ping ──
+app.post('/configure/debrid/test', requireCsrfToken, async (req, res) => {
+  const clientIp = getClientIp(req)
+  const limit = rateLimiters.testConnection.consume(clientIp || 'unknown')
+  if (!limit.allowed) {
+    res.setHeader('Retry-After', String(limit.retryAfterSeconds))
+    return res.status(429).json({ ok: false, message: 'too many requests' })
+  }
+  try {
+    await handleDebridTest(req, res)
+  } catch (err) {
+    console.warn('[debrid-test] handler error:', redactSensitiveText(err.message))
+    if (!res.headersSent) res.status(500).json({ ok: false, message: 'Internal error' })
+  }
+})
+
 // ─── POST /test-connection — validate credentials ──────────
 app.post('/test-connection', requireCsrfToken, async (req, res) => {
   const clientIp = getClientIp(req)
@@ -2742,6 +2759,27 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
   } catch (err) {
     console.error('[file] Error:', redactSensitiveText(err.message))
     if (!res.headersSent) res.status(500).json({ error: 'File serve failed' })
+  }
+})
+
+// ─── v1.3 Debrid playback endpoint — add-and-poll, 302 to provider direct URL ──
+// Token is self-contained: carries provider creds, magnet/nzb, fileIdx.
+// Hosted relay rule: this handler MUST NOT proxy bytes. The 302 sends client direct to the debrid provider.
+app.get('/playback/debrid/:token', async (req, res) => {
+  try {
+    await handleDebridPlayback(req, res)
+  } catch (err) {
+    console.warn('[playback-debrid] handler error:', redactSensitiveText(err.message))
+    if (!res.headersSent) res.status(500).json({ error: 'Debrid playback failed' })
+  }
+})
+app.get('/:config/playback/debrid/:token', async (req, res) => {
+  // Same handler regardless of config prefix — the debrid token is self-contained.
+  try {
+    await handleDebridPlayback(req, res)
+  } catch (err) {
+    console.warn('[playback-debrid] handler error:', redactSensitiveText(err.message))
+    if (!res.headersSent) res.status(500).json({ error: 'Debrid playback failed' })
   }
 })
 

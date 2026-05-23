@@ -2762,6 +2762,8 @@
       <div class="service-tabs">
         <button type="button" class="service-tab active" data-service-tab="prowlarr" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('prowlarr')">Prowlarr</button>
         <button type="button" class="service-tab" data-service-tab="qbit" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('qbit')">qBittorrent</button>
+        <button type="button" class="service-tab" data-service-tab="debrid" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('debrid')">Debrid</button>
+        <button type="button" class="service-tab" data-service-tab="cacheSearch" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('cacheSearch')">Cache Search</button>
         <button type="button" class="service-tab" data-service-tab="storage" data-service-visible="pc lan" onclick="setActiveServiceTab('storage')">Storage</button>
         <button type="button" class="service-tab mode-hidden" data-service-tab="files" data-service-visible="lan seedbox" onclick="setActiveServiceTab('files')">File Server</button>
         <button type="button" class="service-tab" data-service-tab="options" data-service-visible="pc lan seedbox" onclick="setActiveServiceTab('options')">Settings</button>
@@ -2811,6 +2813,89 @@
           <a class="secondary-link is-disabled" id="openQbitLink" href="#" aria-disabled="true" target="_blank" rel="noopener noreferrer">Open qBittorrent</a>
         </div>
         <p class="hint">The link becomes active when the saved URL is public, or when this browser can reach the private qBittorrent host from the server or same network.</p>
+      </div>
+
+      <!-- v1.3 Debrid providers (optional). COPY DRAFT — pending docs/copy.md approval. -->
+      <div class="service-card" id="serviceCard-debrid" data-service-visible="pc lan seedbox">
+        <h2>Debrid providers (optional)</h2>
+        <p class="hint">Add a debrid service to skip the wait. Real-Debrid is currently filtering some scene releases (May 2026); Premiumize and AllDebrid are unaffected.</p>
+
+        <div class="debrid-provider-row" data-debrid-provider="rd" style="border:1px solid var(--surface-border,#333);border-radius:6px;padding:0.9rem;margin-top:0.8rem;">
+          <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;">
+            <input type="checkbox" id="debridRdEnabled" data-debrid-enabled="rd" style="width:auto;transform:scale(1.15);">
+            <span>Real-Debrid</span>
+            <a class="secondary-link" href="https://real-debrid.com/apitoken" target="_blank" rel="noopener noreferrer" style="margin-left:auto;font-size:0.85em;">Get API key</a>
+          </label>
+          <label for="debridRdApiKey" style="margin-top:0.5rem;">API key</label>
+          <input type="password" id="debridRdApiKey" data-debrid-apikey="rd" placeholder="Real-Debrid API key" autocomplete="off">
+          <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.5rem;">
+            <button type="button" class="secondary-link" onclick="testDebridProvider('rd')">Test connection</button>
+            <span class="status" id="debridRdStatus"></span>
+          </div>
+        </div>
+
+        <div class="debrid-provider-row" data-debrid-provider="ad" style="border:1px solid var(--surface-border,#333);border-radius:6px;padding:0.9rem;margin-top:0.6rem;">
+          <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;">
+            <input type="checkbox" id="debridAdEnabled" data-debrid-enabled="ad" style="width:auto;transform:scale(1.15);">
+            <span>AllDebrid</span>
+            <a class="secondary-link" href="https://alldebrid.com/apikeys/" target="_blank" rel="noopener noreferrer" style="margin-left:auto;font-size:0.85em;">Get API key</a>
+          </label>
+          <label for="debridAdApiKey" style="margin-top:0.5rem;">API key</label>
+          <input type="password" id="debridAdApiKey" data-debrid-apikey="ad" placeholder="AllDebrid API key" autocomplete="off">
+          <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.5rem;">
+            <button type="button" class="secondary-link" onclick="testDebridProvider('ad')">Test connection</button>
+            <span class="status" id="debridAdStatus"></span>
+          </div>
+        </div>
+
+        <div class="debrid-provider-row" data-debrid-provider="pm" style="border:1px solid var(--surface-border,#333);border-radius:6px;padding:0.9rem;margin-top:0.6rem;">
+          <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;">
+            <input type="checkbox" id="debridPmEnabled" data-debrid-enabled="pm" style="width:auto;transform:scale(1.15);">
+            <span>Premiumize</span>
+            <a class="secondary-link" href="https://www.premiumize.me/account" target="_blank" rel="noopener noreferrer" style="margin-left:auto;font-size:0.85em;">Get API key</a>
+          </label>
+          <label for="debridPmApiKey" style="margin-top:0.5rem;">API key</label>
+          <input type="password" id="debridPmApiKey" data-debrid-apikey="pm" placeholder="Premiumize API key" autocomplete="off">
+          <p class="hint" style="margin-top:0.3rem;">Premiumize also supports NZB and instant cache check — recommended if you use Newznab indexers.</p>
+          <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.5rem;">
+            <button type="button" class="secondary-link" onclick="testDebridProvider('pm')">Test connection</button>
+            <span class="status" id="debridPmStatus"></span>
+          </div>
+        </div>
+
+        <label style="display:flex;align-items:flex-start;gap:0.6rem;margin-top:1rem;">
+          <input type="checkbox" id="debridPreferOverSeedbox" checked style="width:auto;transform:scale(1.15);margin-top:0.15rem;">
+          <span>Prefer debrid over seedbox for movies/TV. Sports content always uses debrid when available (never qBit).</span>
+        </label>
+      </div>
+
+      <!-- v1.3 Cache search sources (optional). COPY DRAFT — pending docs/copy.md approval. -->
+      <div class="service-card" id="serviceCard-cacheSearch" data-service-visible="pc lan seedbox">
+        <h2>Cache search sources (optional)</h2>
+        <p class="hint">Cache search returns instant-playable hits before any download is queued. PVTKRR checks these alongside debrid cache.</p>
+
+        <div class="debrid-provider-row" data-cache-source="putio" style="border:1px solid var(--surface-border,#333);border-radius:6px;padding:0.9rem;margin-top:0.8rem;">
+          <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;">
+            <input type="checkbox" id="cacheSearchPutioEnabled" data-cache-enabled="putio" style="width:auto;transform:scale(1.15);">
+            <span>put.io</span>
+            <a class="secondary-link" href="https://app.put.io/oauth" target="_blank" rel="noopener noreferrer" style="margin-left:auto;font-size:0.85em;">Get token</a>
+          </label>
+          <label for="cacheSearchPutioApiKey" style="margin-top:0.5rem;">Personal app token</label>
+          <input type="password" id="cacheSearchPutioApiKey" data-cache-apikey="putio" placeholder="put.io personal app token" autocomplete="off">
+          <p class="hint" style="margin-top:0.3rem;">Token: generate at app.put.io/oauth (one-click). Searches your account and friend-shared files for instant playback.</p>
+          <div style="display:flex;gap:0.5rem;align-items:center;margin-top:0.5rem;">
+            <button type="button" class="secondary-link" onclick="testCacheSearchSource('putio')">Test connection</button>
+            <span class="status" id="cacheSearchPutioStatus"></span>
+          </div>
+        </div>
+
+        <div class="debrid-provider-row" data-cache-source="pm" style="border:1px solid var(--surface-border,#333);border-radius:6px;padding:0.9rem;margin-top:0.6rem;">
+          <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;">
+            <input type="checkbox" id="cacheSearchPmEnabled" data-cache-enabled="pm" style="width:auto;transform:scale(1.15);">
+            <span>Premiumize cache check</span>
+          </label>
+          <p class="hint" style="margin-top:0.3rem;">Uses the Premiumize API key configured above. Premiumize is the only debrid with a working cache-by-hash check, so it doubles as a search source.</p>
+        </div>
       </div>
 
       <div class="service-card" id="serviceCard-storage" data-service-visible="pc lan">
@@ -3103,13 +3188,17 @@
       qbitUsername: false,
       qbitPassword: false,
       fileServerAuth: false,
-      lanPairKey: false
+      lanPairKey: false,
+      debrid: { rd: false, ad: false, pm: false },
+      cacheSearch: { putio: false, pm: false }
     };
     const secretFieldDirty = {
       jackettApiKey: false,
       qbitUsername: false,
       qbitPassword: false,
-      fileServerAuth: false
+      fileServerAuth: false,
+      debrid: { rd: false, ad: false, pm: false },
+      cacheSearch: { putio: false, pm: false }
     };
     let stremioAuthKeyPollTimer = null;
     let stremioAuthKeyPollUntil = 0;
@@ -3599,13 +3688,27 @@
 
     function resetSecretFieldDirty() {
       Object.keys(secretFieldDirty).forEach((key) => {
-        secretFieldDirty[key] = false;
+        if (key === 'debrid' || key === 'cacheSearch') {
+          Object.keys(secretFieldDirty[key]).forEach((sub) => {
+            secretFieldDirty[key][sub] = false;
+          });
+        } else {
+          secretFieldDirty[key] = false;
+        }
       });
     }
 
     function updateSavedSecretState(flags = {}) {
+      const safeFlags = flags && typeof flags === 'object' ? flags : {};
       Object.keys(savedSecretState).forEach((key) => {
-        savedSecretState[key] = Boolean(flags && flags[key]);
+        if (key === 'debrid' || key === 'cacheSearch') {
+          const nested = safeFlags[key] && typeof safeFlags[key] === 'object' ? safeFlags[key] : {};
+          Object.keys(savedSecretState[key]).forEach((sub) => {
+            savedSecretState[key][sub] = Boolean(nested[sub]);
+          });
+        } else {
+          savedSecretState[key] = Boolean(safeFlags[key]);
+        }
       });
       const placeholders = {
         jackettApiKey: 'Saved securely on this host. Leave blank to keep.',
@@ -3618,21 +3721,60 @@
         if (!el) return;
         el.placeholder = savedSecretState[field] ? placeholder : '';
       });
+      const debridInputMap = { rd: 'debridRdApiKey', ad: 'debridAdApiKey', pm: 'debridPmApiKey' };
+      Object.entries(debridInputMap).forEach(([type, id]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.placeholder = savedSecretState.debrid[type] ? 'Saved securely. Leave blank to keep.' : el.placeholder;
+      });
+      const cacheInputMap = { putio: 'cacheSearchPutioApiKey' };
+      Object.entries(cacheInputMap).forEach(([type, id]) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.placeholder = savedSecretState.cacheSearch[type] ? 'Saved securely. Leave blank to keep.' : el.placeholder;
+      });
       resetSecretFieldDirty();
     }
 
     function markSecretFieldDirty(field) {
       if (Object.prototype.hasOwnProperty.call(secretFieldDirty, field)) {
+        if (typeof secretFieldDirty[field] === 'object') return;
         secretFieldDirty[field] = true;
       }
     }
 
+    function markDebridFieldDirty(type) {
+      if (Object.prototype.hasOwnProperty.call(secretFieldDirty.debrid, type)) {
+        secretFieldDirty.debrid[type] = true;
+      }
+    }
+
+    function markCacheSearchFieldDirty(type) {
+      if (Object.prototype.hasOwnProperty.call(secretFieldDirty.cacheSearch, type)) {
+        secretFieldDirty.cacheSearch[type] = true;
+      }
+    }
+
     function getRetainedSecretFields() {
+      const debridRetain = {};
+      ['rd', 'ad', 'pm'].forEach((type) => {
+        const input = document.getElementById(`debrid${type.charAt(0).toUpperCase()}${type.slice(1)}ApiKey`);
+        const value = input ? String(input.value || '').trim() : '';
+        debridRetain[type] = savedSecretState.debrid[type] && !secretFieldDirty.debrid[type] && !value;
+      });
+      const cacheRetain = {};
+      ['putio'].forEach((type) => {
+        const input = document.getElementById(`cacheSearch${type.charAt(0).toUpperCase()}${type.slice(1)}ApiKey`);
+        const value = input ? String(input.value || '').trim() : '';
+        cacheRetain[type] = savedSecretState.cacheSearch[type] && !secretFieldDirty.cacheSearch[type] && !value;
+      });
       return {
         jackettApiKey: savedSecretState.jackettApiKey && !secretFieldDirty.jackettApiKey && !String(document.getElementById('jackettApiKey').value || '').trim(),
         qbitUsername: savedSecretState.qbitUsername && !secretFieldDirty.qbitUsername && !String(document.getElementById('qbitUsername').value || '').trim(),
         qbitPassword: savedSecretState.qbitPassword && !secretFieldDirty.qbitPassword && !String(document.getElementById('qbitPassword').value || '').trim(),
-        fileServerAuth: savedSecretState.fileServerAuth && !secretFieldDirty.fileServerAuth && !String(document.getElementById('fileServerAuth').value || '').trim()
+        fileServerAuth: savedSecretState.fileServerAuth && !secretFieldDirty.fileServerAuth && !String(document.getElementById('fileServerAuth').value || '').trim(),
+        debrid: debridRetain,
+        cacheSearch: cacheRetain
       };
     }
 
@@ -5840,6 +5982,16 @@
     document.getElementById('fileServerAuth').addEventListener('input', function() {
       markSecretFieldDirty('fileServerAuth');
     });
+    ['rd', 'ad', 'pm'].forEach((type) => {
+      const Cap = type.charAt(0).toUpperCase() + type.slice(1);
+      const el = document.getElementById(`debrid${Cap}ApiKey`);
+      if (el) el.addEventListener('input', () => markDebridFieldDirty(type));
+    });
+    ['putio'].forEach((type) => {
+      const Cap = type.charAt(0).toUpperCase() + type.slice(1);
+      const el = document.getElementById(`cacheSearch${Cap}ApiKey`);
+      if (el) el.addEventListener('input', () => markCacheSearchFieldDirty(type));
+    });
     const sportsPosterTemplateSelect = document.getElementById('sportsPosterTemplate');
     if (sportsPosterTemplateSelect) {
       sportsPosterTemplateSelect.addEventListener('change', scheduleSportsPosterTemplateAutoSave);
@@ -6504,6 +6656,40 @@
         .filter((value, index, list) => list.indexOf(value) === index);
     }
 
+    function buildDebridConfigFromUi() {
+      const providers = [];
+      ['rd', 'ad', 'pm'].forEach((type) => {
+        const Cap = type.charAt(0).toUpperCase() + type.slice(1);
+        const enabled = Boolean(document.getElementById(`debrid${Cap}Enabled`)?.checked);
+        const apiKey = String(document.getElementById(`debrid${Cap}ApiKey`)?.value || '').trim();
+        if (enabled || apiKey) {
+          providers.push({ type, apiKey, enabled });
+        }
+      });
+      return {
+        providers,
+        preferOrder: ['rd', 'ad', 'pm'],
+        preferDebridOverSeedbox: Boolean(document.getElementById('debridPreferOverSeedbox')?.checked)
+      };
+    }
+
+    function buildCacheSearchConfigFromUi() {
+      const sources = [];
+      ['putio', 'pm'].forEach((type) => {
+        const Cap = type.charAt(0).toUpperCase() + type.slice(1);
+        const enabled = Boolean(document.getElementById(`cacheSearch${Cap}Enabled`)?.checked);
+        const apiKeyEl = document.getElementById(`cacheSearch${Cap}ApiKey`);
+        const apiKey = apiKeyEl ? String(apiKeyEl.value || '').trim() : '';
+        if (enabled || apiKey) {
+          sources.push({ type, apiKey, enabled });
+        }
+      });
+      return {
+        sources,
+        preferOrder: ['putio', 'pm']
+      };
+    }
+
     function getConfig() {
       const installTarget = getInstallTarget();
       const fileServerUrlInput = document.getElementById('fileServerUrl').value.trim();
@@ -6541,7 +6727,9 @@
             : 'hybrid',
         lanPairId: lanPair.pairId,
         lanPairKey: lanPair.pairKey,
-        lanPairRelayUrl: normalizeRelayUrl(lanPair.relayUrl)
+        lanPairRelayUrl: normalizeRelayUrl(lanPair.relayUrl),
+        debrid: buildDebridConfigFromUi(),
+        cacheSearch: buildCacheSearchConfigFromUi()
       };
       base.retainSecretFields = retainSecretFields;
       const sourceConfigToken = getConfigTokenFromPath();
@@ -6599,6 +6787,118 @@
       applyProviderPreset(document.getElementById('provider').value, { applyMapping: false });
       updateServiceLaunchLinks();
       updateBackendHostNotes();
+      applyDebridConfigToUi(config.debrid);
+      applyCacheSearchConfigToUi(config.cacheSearch);
+    }
+
+    function applyDebridConfigToUi(debridConfig) {
+      const providers = Array.isArray(debridConfig?.providers) ? debridConfig.providers : [];
+      ['rd', 'ad', 'pm'].forEach((type) => {
+        const Cap = type.charAt(0).toUpperCase() + type.slice(1);
+        const entry = providers.find((p) => p && p.type === type) || null;
+        const enabledEl = document.getElementById(`debrid${Cap}Enabled`);
+        if (enabledEl) enabledEl.checked = Boolean(entry?.enabled);
+        const apiKeyEl = document.getElementById(`debrid${Cap}ApiKey`);
+        if (apiKeyEl) apiKeyEl.value = '';
+      });
+      const preferEl = document.getElementById('debridPreferOverSeedbox');
+      if (preferEl) {
+        preferEl.checked = debridConfig?.preferDebridOverSeedbox !== false;
+      }
+    }
+
+    function applyCacheSearchConfigToUi(cacheConfig) {
+      const sources = Array.isArray(cacheConfig?.sources) ? cacheConfig.sources : [];
+      ['putio', 'pm'].forEach((type) => {
+        const Cap = type.charAt(0).toUpperCase() + type.slice(1);
+        const entry = sources.find((s) => s && s.type === type) || null;
+        const enabledEl = document.getElementById(`cacheSearch${Cap}Enabled`);
+        if (enabledEl) enabledEl.checked = Boolean(entry?.enabled);
+        const apiKeyEl = document.getElementById(`cacheSearch${Cap}ApiKey`);
+        if (apiKeyEl) apiKeyEl.value = '';
+      });
+    }
+
+    async function testDebridProvider(type) {
+      const Cap = type.charAt(0).toUpperCase() + type.slice(1);
+      const statusEl = document.getElementById(`debrid${Cap}Status`);
+      const apiKeyEl = document.getElementById(`debrid${Cap}ApiKey`);
+      if (!statusEl) return;
+      let apiKey = apiKeyEl ? String(apiKeyEl.value || '').trim() : '';
+      if (!apiKey && savedSecretState.debrid[type]) {
+        apiKey = '__retained__';
+      }
+      if (!apiKey) {
+        statusEl.className = 'status err';
+        statusEl.textContent = 'Enter an API key first.';
+        return;
+      }
+      statusEl.className = 'status info';
+      statusEl.textContent = 'Testing...';
+      try {
+        const csrfToken = getCookieValue('pvtkrrx_csrf') || '';
+        const res = await fetch('/configure/debrid/test', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-PVTKRRX-CSRF': csrfToken
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({ provider: type, apiKey, useRetained: apiKey === '__retained__' })
+        });
+        const json = await res.json().catch(() => ({}));
+        if (res.ok && json.ok) {
+          statusEl.className = 'status ok';
+          statusEl.textContent = json.message || 'Connection OK.';
+        } else {
+          statusEl.className = 'status err';
+          statusEl.textContent = json.message || json.error || `Failed (HTTP ${res.status}).`;
+        }
+      } catch (err) {
+        statusEl.className = 'status err';
+        statusEl.textContent = `Network error: ${err.message}`;
+      }
+    }
+
+    async function testCacheSearchSource(type) {
+      const Cap = type.charAt(0).toUpperCase() + type.slice(1);
+      const statusEl = document.getElementById(`cacheSearch${Cap}Status`);
+      const apiKeyEl = document.getElementById(`cacheSearch${Cap}ApiKey`);
+      if (!statusEl) return;
+      let apiKey = apiKeyEl ? String(apiKeyEl.value || '').trim() : '';
+      if (!apiKey && savedSecretState.cacheSearch[type]) {
+        apiKey = '__retained__';
+      }
+      if (!apiKey && type !== 'pm') {
+        statusEl.className = 'status err';
+        statusEl.textContent = 'Enter a token first.';
+        return;
+      }
+      statusEl.className = 'status info';
+      statusEl.textContent = 'Testing...';
+      try {
+        const csrfToken = getCookieValue('pvtkrrx_csrf') || '';
+        const res = await fetch('/configure/debrid/test', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-PVTKRRX-CSRF': csrfToken
+          },
+          credentials: 'same-origin',
+          body: JSON.stringify({ source: type, apiKey, useRetained: apiKey === '__retained__' })
+        });
+        const json = await res.json().catch(() => ({}));
+        if (res.ok && json.ok) {
+          statusEl.className = 'status ok';
+          statusEl.textContent = json.message || 'Connection OK.';
+        } else {
+          statusEl.className = 'status err';
+          statusEl.textContent = json.message || json.error || `Failed (HTTP ${res.status}).`;
+        }
+      } catch (err) {
+        statusEl.className = 'status err';
+        statusEl.textContent = `Network error: ${err.message}`;
+      }
     }
 
     function getConfigTokenFromPath() {

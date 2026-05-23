@@ -3,6 +3,9 @@ const { encrypt, decrypt } = require('./crypto')
 const TOKEN_VERSION = 1
 const DEFAULT_PLAYBACK_TTL_SECONDS = 24 * 60 * 60
 const DEFAULT_FILE_TTL_SECONDS = 24 * 60 * 60
+const DEFAULT_DEBRID_TTL_SECONDS = 24 * 60 * 60
+const DEBRID_PROTOCOL_TORRENT = 'torrent'
+const DEBRID_PROTOCOL_USENET = 'usenet'
 
 function parseBoundedInt(value, fallback, min, max) {
   const parsed = Number.parseInt(String(value || ''), 10)
@@ -131,9 +134,71 @@ function decodeFileStateToken(token) {
   return sanitizeFilePayload(decodeOpaqueToken(token, 'file'))
 }
 
+function sanitizeDebridPayload(input) {
+  const protocol = String(input?.protocol || '').trim().toLowerCase()
+  if (protocol !== DEBRID_PROTOCOL_TORRENT && protocol !== DEBRID_PROTOCOL_USENET) {
+    throw new Error('Debrid token must specify torrent or usenet protocol')
+  }
+  const src = String(input?.src || '').trim()
+  if (!src) throw new Error('Debrid token must include source URL or magnet')
+  if (src.length > 8192) throw new Error('Debrid token source too long')
+  if (protocol === DEBRID_PROTOCOL_TORRENT) {
+    if (!/^magnet:/i.test(src)) throw new Error('Torrent debrid token must carry a magnet URI')
+  } else {
+    try {
+      const parsed = new URL(src)
+      if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+        throw new Error('Usenet debrid token must carry an HTTPS NZB URL')
+      }
+    } catch (_) {
+      throw new Error('Usenet debrid token has invalid NZB URL')
+    }
+  }
+  const fileIdx = Number.parseInt(String(input?.fileIdx ?? 0), 10)
+  const providers = Array.isArray(input?.providers) ? input.providers : []
+  const sanitizedProviders = []
+  for (const provider of providers) {
+    if (!provider || typeof provider !== 'object') continue
+    const type = String(provider.type || '').trim().toLowerCase()
+    if (type !== 'rd' && type !== 'ad' && type !== 'pm') continue
+    const apiKey = String(provider.apiKey || '').trim()
+    if (!apiKey) continue
+    sanitizedProviders.push({ type, apiKey })
+  }
+  if (!sanitizedProviders.length) {
+    throw new Error('Debrid token must reference at least one configured provider')
+  }
+  return {
+    protocol,
+    src,
+    fileIdx: Number.isFinite(fileIdx) && fileIdx >= 0 ? fileIdx : 0,
+    providers: sanitizedProviders,
+    name: String(input?.name || '').slice(0, 512)
+  }
+}
+
+function encodeDebridPlaybackToken(input) {
+  const payload = sanitizeDebridPayload(input || {})
+  const ttl = parseBoundedInt(
+    process.env.PVTKRRX_DEBRID_STATE_TTL_SECONDS,
+    DEFAULT_DEBRID_TTL_SECONDS,
+    60,
+    7 * 24 * 60 * 60
+  )
+  return encodeOpaqueToken('debrid', payload, ttl)
+}
+
+function decodeDebridPlaybackToken(token) {
+  return sanitizeDebridPayload(decodeOpaqueToken(token, 'debrid'))
+}
+
 module.exports = {
   encodePlaybackStateToken,
   decodePlaybackStateToken,
   encodeFileStateToken,
-  decodeFileStateToken
+  decodeFileStateToken,
+  encodeDebridPlaybackToken,
+  decodeDebridPlaybackToken,
+  DEBRID_PROTOCOL_TORRENT,
+  DEBRID_PROTOCOL_USENET
 }

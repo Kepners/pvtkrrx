@@ -127,6 +127,13 @@ const SECRET_CONFIG_FIELDS = Object.freeze([
   'fileServerAuth',
   'sportsPosterMemberToken'
 ])
+// v1.3 debrid + cache search providers. The whole encrypted install-config token already
+// carries these apiKeys under AES-256-GCM, so the nested apiKey fields don't need a
+// separate encryption envelope — they piggyback on the parent token's secret.
+const DEBRID_PROVIDER_TYPES = Object.freeze(['rd', 'ad', 'pm'])
+const CACHE_SEARCH_SOURCE_TYPES = Object.freeze(['putio', 'pm'])
+const DEFAULT_DEBRID_PREFER_ORDER = Object.freeze(['rd', 'ad', 'pm'])
+const DEFAULT_CACHE_SEARCH_PREFER_ORDER = Object.freeze(['putio', 'pm'])
 const watchedDeleteTimers = new Map()
 const watchedDeleteInFlight = new Set()
 const rateLimiters = {
@@ -1061,7 +1068,9 @@ function stripLegacySportsMetadataConfigFields(config = {}) {
 function normalizeAddonConfig(config = {}, options = {}) {
   const normalized = {
     ...stripLegacySportsMetadataConfigFields(config),
-    additionalStorageRoots: normalizeLocalStorageRoots(config.additionalStorageRoots)
+    additionalStorageRoots: normalizeLocalStorageRoots(config.additionalStorageRoots),
+    debrid: normalizeDebridConfig(config.debrid),
+    cacheSearch: normalizeCacheSearchConfig(config.cacheSearch)
   }
   // Sports-Posters entitlement gate.
   // Save path: caller passes options.entitlement (resolved from the
@@ -1161,12 +1170,179 @@ function normalizeAddonConfig(config = {}, options = {}) {
   })
 }
 
+function normalizeDebridProviderEntry(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const type = String(raw.type || '').trim().toLowerCase()
+  if (!DEBRID_PROVIDER_TYPES.includes(type)) return null
+  return {
+    type,
+    apiKey: String(raw.apiKey || '').trim(),
+    enabled: raw.enabled === true
+  }
+}
+
+function normalizeCacheSearchSourceEntry(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const type = String(raw.type || '').trim().toLowerCase()
+  if (!CACHE_SEARCH_SOURCE_TYPES.includes(type)) return null
+  return {
+    type,
+    apiKey: String(raw.apiKey || '').trim(),
+    enabled: raw.enabled === true
+  }
+}
+
+function normalizeDebridConfig(value) {
+  const fallback = {
+    providers: [],
+    preferOrder: [...DEFAULT_DEBRID_PREFER_ORDER],
+    preferDebridOverSeedbox: true
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return fallback
+
+  const seen = new Set()
+  const providers = []
+  const rawProviders = Array.isArray(value.providers) ? value.providers : []
+  for (const raw of rawProviders) {
+    const entry = normalizeDebridProviderEntry(raw)
+    if (!entry || seen.has(entry.type)) continue
+    seen.add(entry.type)
+    providers.push(entry)
+  }
+
+  const preferOrder = []
+  const rawOrder = Array.isArray(value.preferOrder) ? value.preferOrder : []
+  for (const raw of rawOrder) {
+    const type = String(raw || '').trim().toLowerCase()
+    if (DEBRID_PROVIDER_TYPES.includes(type) && !preferOrder.includes(type)) {
+      preferOrder.push(type)
+    }
+  }
+  for (const type of DEFAULT_DEBRID_PREFER_ORDER) {
+    if (!preferOrder.includes(type)) preferOrder.push(type)
+  }
+
+  return {
+    providers,
+    preferOrder,
+    preferDebridOverSeedbox: value.preferDebridOverSeedbox !== false
+  }
+}
+
+function normalizeCacheSearchConfig(value) {
+  const fallback = {
+    sources: [],
+    preferOrder: [...DEFAULT_CACHE_SEARCH_PREFER_ORDER]
+  }
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return fallback
+
+  const seen = new Set()
+  const sources = []
+  const rawSources = Array.isArray(value.sources) ? value.sources : []
+  for (const raw of rawSources) {
+    const entry = normalizeCacheSearchSourceEntry(raw)
+    if (!entry || seen.has(entry.type)) continue
+    seen.add(entry.type)
+    sources.push(entry)
+  }
+
+  const preferOrder = []
+  const rawOrder = Array.isArray(value.preferOrder) ? value.preferOrder : []
+  for (const raw of rawOrder) {
+    const type = String(raw || '').trim().toLowerCase()
+    if (CACHE_SEARCH_SOURCE_TYPES.includes(type) && !preferOrder.includes(type)) {
+      preferOrder.push(type)
+    }
+  }
+  for (const type of DEFAULT_CACHE_SEARCH_PREFER_ORDER) {
+    if (!preferOrder.includes(type)) preferOrder.push(type)
+  }
+
+  return { sources, preferOrder }
+}
+
+function redactDebridApiKeys(value) {
+  const normalized = normalizeDebridConfig(value)
+  return {
+    providers: normalized.providers.map(p => ({
+      type: p.type,
+      enabled: p.enabled
+    })),
+    preferOrder: [...normalized.preferOrder],
+    preferDebridOverSeedbox: normalized.preferDebridOverSeedbox
+  }
+}
+
+function redactCacheSearchApiKeys(value) {
+  const normalized = normalizeCacheSearchConfig(value)
+  return {
+    sources: normalized.sources.map(s => ({
+      type: s.type,
+      enabled: s.enabled
+    })),
+    preferOrder: [...normalized.preferOrder]
+  }
+}
+
+function savedDebridProviderFlags(value) {
+  const out = {}
+  for (const type of DEBRID_PROVIDER_TYPES) out[type] = false
+  const normalized = normalizeDebridConfig(value)
+  for (const p of normalized.providers) {
+    if (p.apiKey) out[p.type] = true
+  }
+  return out
+}
+
+function savedCacheSearchSourceFlags(value) {
+  const out = {}
+  for (const type of CACHE_SEARCH_SOURCE_TYPES) out[type] = false
+  const normalized = normalizeCacheSearchConfig(value)
+  for (const s of normalized.sources) {
+    if (s.apiKey) out[s.type] = true
+  }
+  return out
+}
+
+function mergeRetainedDebridSecrets(incoming, existing, retainFlags) {
+  const next = normalizeDebridConfig(incoming)
+  const prev = normalizeDebridConfig(existing)
+  const flags = retainFlags && typeof retainFlags === 'object' ? retainFlags : {}
+  for (const provider of next.providers) {
+    if (provider.apiKey) continue
+    if (flags[provider.type] !== true) continue
+    const previous = prev.providers.find(p => p.type === provider.type)
+    if (previous && previous.apiKey) provider.apiKey = previous.apiKey
+  }
+  return next
+}
+
+function mergeRetainedCacheSearchSecrets(incoming, existing, retainFlags) {
+  const next = normalizeCacheSearchConfig(incoming)
+  const prev = normalizeCacheSearchConfig(existing)
+  const flags = retainFlags && typeof retainFlags === 'object' ? retainFlags : {}
+  for (const source of next.sources) {
+    if (source.apiKey) continue
+    if (flags[source.type] !== true) continue
+    const previous = prev.sources.find(s => s.type === source.type)
+    if (previous && previous.apiKey) source.apiKey = previous.apiKey
+  }
+  return next
+}
+
 function normalizeRetainedSecretFields(value) {
   const out = {}
   if (!value || typeof value !== 'object' || Array.isArray(value)) return out
   for (const field of SECRET_CONFIG_FIELDS) {
     out[field] = value[field] === true
   }
+  // v1.3: nested per-provider retention flags ride alongside the flat ones.
+  out.debrid = value.debrid && typeof value.debrid === 'object' && !Array.isArray(value.debrid)
+    ? { ...value.debrid }
+    : {}
+  out.cacheSearch = value.cacheSearch && typeof value.cacheSearch === 'object' && !Array.isArray(value.cacheSearch)
+    ? { ...value.cacheSearch }
+    : {}
   return out
 }
 
@@ -1202,6 +1378,10 @@ function mergeRetainedSecrets(config = {}, existingConfig = null) {
   if (!String(next.entitlementOwnerEmailHash || '').trim() && String(existing.entitlementOwnerEmailHash || '').trim()) {
     next.entitlementOwnerEmailHash = existing.entitlementOwnerEmailHash
   }
+
+  // v1.3: preserve per-provider apiKeys when the UI flags them as retained.
+  next.debrid = mergeRetainedDebridSecrets(next.debrid, existing.debrid, retain.debrid)
+  next.cacheSearch = mergeRetainedCacheSearchSecrets(next.cacheSearch, existing.cacheSearch, retain.cacheSearch)
 
   return next
 }
@@ -1406,7 +1586,9 @@ function buildConfigReadback(config = {}) {
     qbitPassword: Boolean(String(safe.qbitPassword || '').trim()),
     fileServerAuth: Boolean(String(safe.fileServerAuth || '').trim()),
     sportsPosterMemberToken: false,
-    lanPairKey: Boolean(String(safe.lanPairKey || '').trim())
+    lanPairKey: Boolean(String(safe.lanPairKey || '').trim()),
+    debrid: savedDebridProviderFlags(safe.debrid),
+    cacheSearch: savedCacheSearchSourceFlags(safe.cacheSearch)
   }
 
   // Re-verify the stamped entitlement so the frontend reflects the
@@ -1426,9 +1608,16 @@ function buildConfigReadback(config = {}) {
   delete safe.retainSecretFields
   delete safe.entitlementOwnerEmailHash
 
+  const redactedDebrid = redactDebridApiKeys(safe.debrid)
+  const redactedCacheSearch = redactCacheSearchApiKeys(safe.cacheSearch)
+  delete safe.debrid
+  delete safe.cacheSearch
+
   return {
     ...safe,
     savedSecrets,
+    debrid: redactedDebrid,
+    cacheSearch: redactedCacheSearch,
     sportsPosterTemplate: verifiedEntitlement.resolvedTemplate,
     entitlement: {
       source: verifiedEntitlement.source,
@@ -2822,6 +3011,10 @@ module.exports = {
   SENSITIVE_WEB_ORIGINS,
   CSRF_COOKIE_NAME,
   SECRET_CONFIG_FIELDS,
+  DEBRID_PROVIDER_TYPES,
+  CACHE_SEARCH_SOURCE_TYPES,
+  DEFAULT_DEBRID_PREFER_ORDER,
+  DEFAULT_CACHE_SEARCH_PREFER_ORDER,
   DEFAULT_LOCAL_HOSTNAME,
 
   // Functions
@@ -2876,6 +3069,12 @@ module.exports = {
   buildLanPairEndpoints,
   ensureLanPairConfig,
   normalizeAddonConfig,
+  normalizeDebridConfig,
+  normalizeCacheSearchConfig,
+  redactDebridApiKeys,
+  redactCacheSearchApiKeys,
+  savedDebridProviderFlags,
+  savedCacheSearchSourceFlags,
   normalizeRetainedSecretFields,
   stripEphemeralConfigFields,
   mergeRetainedSecrets,
