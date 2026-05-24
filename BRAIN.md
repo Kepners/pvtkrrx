@@ -1,5 +1,79 @@
 # PVTKRRX Brain
 
+## 2026-05-24: Debrid torrent-file upload and poster entitlement fix deployed
+
+- Scope: PVTKRRX public Coolify container and native `/opt/pvtkrrx` Contabo
+  self-host runtime. No DNS, Caddy route, SportsMeta service, Prowlarr,
+  qBittorrent credentials/state, Stripe, Mailcow, or Windows EXE assets were
+  changed.
+- Source state:
+  - Behavior commit `3a210b95ae1d6c10379a072c35b31850cbebbcf7` was pushed to
+    `Kepners/pvtkrrx` `main`.
+  - Commit message: `fix debrid torrent uploads and poster entitlements`.
+- Product fixes:
+  - Sports/private-tracker torrent download URLs are no longer discarded for
+    debrid. PVTKRRX fetches the `.torrent` server-side and uploads the torrent
+    bytes to Premiumize, Real-Debrid, or AllDebrid when the provider supports
+    torrent-file upload.
+  - Premiumize single-file transfers now resolve playback through `file_id` and
+    `/api/item/details` when `/transfer/list` has no direct `link`.
+  - Free/public sports posters stay on `ticket-stub` even while the public
+    Coolify env still has `PVTKRRX_SPORTS_POSTER_ADMIN_OVERRIDE=broadcast`.
+    Owner/admin and paid/manual-grant styles use stamped entitlement data; paid
+    stamps are HMAC-signed so forged plain `?template=` URLs fall back to
+    Ticket Stub.
+  - Entitled poster style changes in Configure now auto-save through
+    `/local-config` or `/server-config`; config load only refreshes status text.
+- Local proof before deploy:
+  - PASS: `node scripts/__tests__/debrid/premiumize.test.js`
+  - PASS: `node scripts/__tests__/debrid/realdebrid.test.js`
+  - PASS: `node scripts/__tests__/debrid/alldebrid.test.js`
+  - PASS: `npm run smoke:debrid-all`
+  - PASS: `node scripts/smoke-entitlement.js`
+  - PASS: `node scripts/smoke-free-tier-artwork.js`
+  - PASS: `node scripts/smoke-config-flow.js`
+  - PASS: `node scripts/smoke-sports-artwork-layout.js`
+  - PASS: `npm run smoke:playback`
+  - PASS: `npm run smoke:pipeline`
+  - PASS: `node scripts/smoke-selfhost-server.js`
+- Public Coolify proof:
+  - Deployment queue row `879` finished for commit
+    `3a210b95ae1d6c10379a072c35b31850cbebbcf7`.
+  - Running public container after deploy:
+    `w14jewmw5ubscrxh8zzfhq7d-225652088376`, image
+    `w14jewmw5ubscrxh8zzfhq7d:3a210b95ae1d6c10379a072c35b31850cbebbcf7`.
+  - Container env verified `SOURCE_COMMIT=3a210b95ae1d6c10379a072c35b31850cbebbcf7`,
+    `COOLIFY_BRANCH=main`, and existing
+    `PVTKRRX_SPORTS_POSTER_ADMIN_OVERRIDE=broadcast`.
+  - `https://www.pvtkrrx.cc/health?format=json&probe=3a210b9` returned `HTTP 200`.
+  - Live forged `template=glitch` and `template=broadcast` public artwork probes
+    returned `HTTP 200 image/png`, `X-PVTKRRX-Revision=3a210b95...`,
+    `X-PVTKRRX-Artwork-Template=ticket-stub`, and upstream SportsMeta URLs with
+    `template=ticket-stub`.
+- Native Contabo proof:
+  - Source-only backup before extraction:
+    `/opt/pvtkrrx-backups/20260524T230430Z-pre-1.3.3-3a210b9-source.tgz`,
+    SHA-256 `c57e5c3914d6691a560510e833a2c60c4ea48caa03fa3ea343614a75c66ff357`.
+  - Local git archive SHA-256 matched on server before extraction:
+    `d00e6ab2fda8beeadda1e6af13a05dd598abe436184a3a0c4287d7e1d9cdcacb`.
+  - `/opt/pvtkrrx/REVISION` contains
+    `3a210b95ae1d6c10379a072c35b31850cbebbcf7`.
+  - `pvtkrrx.service` restarted and verified `active`; package version is
+    `1.3.3`; startup logs show qBittorrent and Prowlarr warmup ready.
+  - Native local health `http://127.0.0.1:7000/health?format=json&probe=3a210b9-native`
+    returned `HTTP 200`.
+  - Native public `https://pvt.kepners.co.uk/...template=broadcast...` artwork
+    probe returned `HTTP 200`, `X-PVTKRRX-Revision=3a210b95...`,
+    `X-PVTKRRX-Artwork-Template=ticket-stub`, and upstream SportsMeta URL with
+    `template=ticket-stub`.
+- Weak points:
+  - The live proof covers the debrid upload code path through local mocks, not a
+    real Premiumize/Real-Debrid/AllDebrid account transfer.
+  - Paid/manual-grant poster stamping is proven locally; live public probes prove
+    forged/free premium template requests are blocked.
+  - Stremio clients may need a catalog refresh/reinstall to pick up newly saved
+    poster/debrid config.
+
 ## 2026-05-23: Sports poster logo/routing fixes deployed live
 
 - Scope: public PVTKRRX Coolify container for `https://www.pvtkrrx.cc` sports
