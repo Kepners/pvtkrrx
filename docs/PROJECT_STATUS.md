@@ -1,10 +1,18 @@
 # PVTKRRX Project Status
 
-Updated: 2026-05-23
+Updated: 2026-05-24
 
 ## Current Stage
 
-PVTKRRX is on the `1.3.1` release line. v1.3 adds optional Debrid (Real-Debrid, AllDebrid, Premiumize) + Cache Search (put.io, Premiumize cache check) + Newznab (Usenet) support — all purely additive: qBittorrent streams always remain in the list, debrid streams are ADDED above them when configured. Installs without any debrid/cache config are unchanged from v1.2.
+PVTKRRX is on the `1.3.3` release line. v1.3 adds optional Debrid (Real-Debrid, AllDebrid, Premiumize) + Cache Search (put.io, Premiumize cache check) + Newznab (Usenet) support — all purely additive: qBittorrent streams always remain in the list, debrid streams are ADDED above them when configured. Installs without any debrid/cache config are unchanged from v1.2.
+
+## 2026-05-24: v1.3.3 torrent-file debrid and poster entitlement repair
+
+- Debrid torrent source fix: sports/private-tracker torrent download URLs are preserved and uploaded to debrid providers as `.torrent` bytes instead of being discarded and rebuilt as bare magnets. Premiumize uses `/api/transfer/create` multipart `src`; Real-Debrid uses `PUT /torrents/addTorrent`; AllDebrid uses `/v4/magnet/upload/file`.
+- Premiumize playback fix: single-file Premiumize transfers now resolve via `file_id` and `/api/item/details` when `/transfer/list` does not expose a direct `link`.
+- Poster entitlement fix: free/public users stay on `ticket-stub` even if the server env has `PVTKRRX_SPORTS_POSTER_ADMIN_OVERRIDE=broadcast`; owner/admin and paid/manual-grant selections are carried to the artwork proxy by stamped entitlement data, with paid stamps HMAC-signed so forged plain `?template=` URLs fall back to Ticket Stub.
+- Configure UI fix: changing the entitled sports poster style now auto-saves through `/local-config` or `/server-config`; loading saved config only refreshes the status text and does not immediately re-save.
+- Local proof before deploy: `node scripts/__tests__/debrid/premiumize.test.js`, `node scripts/__tests__/debrid/realdebrid.test.js`, `node scripts/__tests__/debrid/alldebrid.test.js`, `npm run smoke:debrid-all`, `node scripts/smoke-entitlement.js`, `node scripts/smoke-free-tier-artwork.js`, `node scripts/smoke-config-flow.js`, `node scripts/smoke-sports-artwork-layout.js`, `npm run smoke:playback`, `npm run smoke:pipeline`, and `node scripts/smoke-selfhost-server.js` all pass locally.
 
 ## 2026-05-24: v1.3.1 additive routing fix
 

@@ -13,6 +13,13 @@ const FREE_SPORTS_POSTER_TEMPLATE = 'ticket-stub'
 // only when PVTKRRX_SELF_HOST_MODE is on, so a leaked self-host token cannot
 // be replayed against a non-self-host runtime.
 const SELF_HOST_ADMIN_HASH = 'self-host-admin'
+const SPORTS_POSTER_ENTITLEMENT_STAMP_VERSION = 'v1'
+const SPORTS_POSTER_ENTITLEMENT_QUERY_PARAMS = new Set([
+  'reqTemplate',
+  'entSource',
+  'entHash',
+  'entSig'
+])
 
 const ENTITLEMENT_SOURCE = Object.freeze({
   OWNER_OVERRIDE: 'owner_override',
@@ -366,11 +373,99 @@ function clampSportsPosterTemplate(requested, entitlement) {
   return allowed.has(normalized) ? normalized : FREE_SPORTS_POSTER_TEMPLATE
 }
 
+function getSportsPosterEntitlementStampSecret(env = process.env) {
+  return String(
+    env.PVTKRRX_SPORTS_POSTER_ENTITLEMENT_SECRET ||
+    env.ENCRYPTION_SECRET ||
+    ''
+  ).trim()
+}
+
+function normalizeArtworkStampPath(value = '') {
+  const raw = String(value || '').trim()
+  if (!raw) return ''
+  try {
+    return new URL(raw, 'https://pvtkrrx.local').pathname || ''
+  } catch (_) {
+    return raw.split('?')[0] || ''
+  }
+}
+
+function queryEntriesForSportsPosterEntitlementStamp(query) {
+  const entries = []
+  const push = (key, value) => {
+    const name = String(key || '')
+    if (!name || SPORTS_POSTER_ENTITLEMENT_QUERY_PARAMS.has(name) || name === 'v') return
+    if (Array.isArray(value)) {
+      value.forEach((item) => push(name, item))
+      return
+    }
+    if (value === undefined || value === null) return
+    entries.push([name, String(value)])
+  }
+
+  if (query instanceof URLSearchParams) {
+    for (const [key, value] of query.entries()) push(key, value)
+  } else if (query && typeof query === 'object') {
+    for (const [key, value] of Object.entries(query)) push(key, value)
+  }
+
+  return entries.sort((a, b) => {
+    if (a[0] === b[0]) return a[1].localeCompare(b[1])
+    return a[0].localeCompare(b[0])
+  })
+}
+
+function canonicalSportsPosterEntitlementStampQuery(query) {
+  return queryEntriesForSportsPosterEntitlementStamp(query)
+    .map(([key, value]) => `${encodeURIComponent(key)}=${encodeURIComponent(value)}`)
+    .join('&')
+}
+
+function sportsPosterEntitlementStampPayload(input = {}) {
+  const requestedTemplate = String(input.requestedTemplate || '').trim()
+    ? normalizeSportsPosterTemplate(input.requestedTemplate)
+    : ''
+  return [
+    'pvtkrrx-sports-poster-entitlement',
+    SPORTS_POSTER_ENTITLEMENT_STAMP_VERSION,
+    normalizeArtworkStampPath(input.pathname || input.path || ''),
+    canonicalSportsPosterEntitlementStampQuery(input.query),
+    requestedTemplate,
+    String(input.stampedSource || '').trim(),
+    String(input.stampedHash || '').trim()
+  ].join('\n')
+}
+
+function signSportsPosterEntitlementStamp(input = {}) {
+  const secret = getSportsPosterEntitlementStampSecret(input.env && typeof input.env === 'object' ? input.env : process.env)
+  if (!secret) return ''
+  return crypto
+    .createHmac('sha256', secret)
+    .update(sportsPosterEntitlementStampPayload(input))
+    .digest('hex')
+}
+
+function verifySportsPosterEntitlementStamp(input = {}) {
+  const expected = signSportsPosterEntitlementStamp(input)
+  const actual = String(input.signature || '').trim()
+  if (!expected || !/^[a-f0-9]{64}$/i.test(actual)) return false
+  try {
+    const expectedBuffer = Buffer.from(expected, 'hex')
+    const actualBuffer = Buffer.from(actual, 'hex')
+    return expectedBuffer.length === actualBuffer.length &&
+      crypto.timingSafeEqual(expectedBuffer, actualBuffer)
+  } catch (_) {
+    return false
+  }
+}
+
 module.exports = {
   ENTITLEMENT_SOURCE,
   ALL_ENTITLEMENT_SOURCES,
   FREE_SPORTS_POSTER_TEMPLATE,
   SELF_HOST_ADMIN_HASH,
+  SPORTS_POSTER_ENTITLEMENT_STAMP_VERSION,
   isSelfHostModeEnabled,
   hashEmailForOwnerCheck,
   parseEmailList,
@@ -386,5 +481,7 @@ module.exports = {
   resolveSportsPosterEntitlement,
   verifyStampedSportsPosterEntitlement,
   resolveServerAdminPosterTemplate,
-  clampSportsPosterTemplate
+  clampSportsPosterTemplate,
+  signSportsPosterEntitlementStamp,
+  verifySportsPosterEntitlementStamp
 }

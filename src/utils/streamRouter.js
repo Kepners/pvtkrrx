@@ -175,12 +175,10 @@ async function applyV13Routing(result, ctx = {}) {
     for (const stream of existing) {
       const meta = tryExtractDebridMetaFromStreamUrl(stream?.url, playbackBaseUrl, configToken)
       if (!meta) continue
-      const magnet = meta.link && meta.link.startsWith('magnet:')
-        ? meta.link
-        : meta.hash ? buildMagnetFromHash(meta.hash, meta.name) : null
-      if (!magnet) continue
+      const torrentSource = meta.link || (meta.hash ? buildMagnetFromHash(meta.hash, meta.name) : null)
+      if (!torrentSource) continue
       const debridUrl = buildDebridPlaybackUrl(playbackBaseUrl, providersForDebrid, {
-        src: magnet,
+        src: torrentSource,
         name: stream.title || stream.name || meta.name || '',
         protocol: DEBRID_PROTOCOL_TORRENT
       })

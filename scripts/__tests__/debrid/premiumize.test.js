@@ -44,7 +44,7 @@ function transferList(transfer) {
 
 async function run() {
   const provider = new PremiumizeDebridProvider('secret-key');
-  assert.deepEqual(provider.capabilities, { magnet: true, nzb: true });
+  assert.deepEqual(provider.capabilities, { magnet: true, torrentFile: true, nzb: true });
 
   await withFetch([jsonResponse({ status: 'success', id: 'pm1', name: 'Movie.mkv' })], async (calls) => {
     const result = await provider.addMagnet('magnet:?xt=urn:btih:abc');
@@ -56,6 +56,13 @@ async function run() {
 
   await withFetch([jsonResponse({ status: 'success', id: 'nzb1', name: 'Movie.nzb' })], async () => {
     assert.deepEqual(await provider.addNzb('https://indexer.example/movie.nzb'), { addedId: 'nzb1' });
+  });
+
+  await withFetch([jsonResponse({ status: 'success', id: 'torrent1', name: 'Movie.torrent' })], async (calls) => {
+    assert.deepEqual(await provider.addTorrentFile(new Uint8Array([1, 2, 3]), 'Movie.torrent'), { addedId: 'torrent1' });
+    assert.equal(calls[0].method, 'POST');
+    assert.match(calls[0].url, /\/transfer\/create$/);
+    assert.equal(calls[0].body, '[object FormData]');
   });
 
   await withFetch([jsonResponse({ status: 'success', type: 'container', content: ['link'] })], async () => {
@@ -98,6 +105,14 @@ async function run() {
     })
   ], async () => {
     assert.equal(await provider.getStreamUrl('pm1', 1), 'https://pm.example/b.mkv');
+  });
+
+  await withFetch([
+    jsonResponse(transferList({ id: 'pm1', name: 'Movie.mkv', status: 'finished', progress: 1, file_id: 'file1', folder_id: 'folder1' })),
+    jsonResponse({ status: 'success', id: 'file1', name: 'Movie.mkv', link: 'https://pm.example/item.mkv' })
+  ], async (calls) => {
+    assert.equal(await provider.getStreamUrl('pm1', 0), 'https://pm.example/item.mkv');
+    assert.match(calls[1].url, /\/item\/details\?id=file1$/);
   });
 
   await withFetch([jsonResponse({ status: 'success' })], async (calls) => {

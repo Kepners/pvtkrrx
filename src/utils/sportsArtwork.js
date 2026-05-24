@@ -12,7 +12,7 @@ const { resolveSportBackdrop } = require('./sportBackdrops')
 const {
   ENTITLEMENT_SOURCE,
   verifyStampedSportsPosterEntitlement,
-  resolveServerAdminPosterTemplate
+  signSportsPosterEntitlementStamp
 } = require('./entitlement')
 
 const SPORTS_ARTWORK_PROXY_VERSION = '20260523-logo-routing-v31'
@@ -147,33 +147,39 @@ function resolveConfiguredSportsPosterTemplate(input = {}) {
     return resolveSportsPosterTemplate(verified.resolvedTemplate)
   }
 
-  // Server-side admin override remains a fallback for public/no-token artwork.
-  // A verified owner/admin config must win so changing layout in configure does
-  // not require reinstalling the Stremio addon.
-  const serverAdminTemplate = resolveServerAdminPosterTemplate(process.env)
-  if (serverAdminTemplate) return resolveSportsPosterTemplate(serverAdminTemplate)
-
   return resolveSportsPosterTemplate('ticket-stub')
 }
 
-// The artwork proxy route carries NO config token (Stremio hits it directly).
-// To make a configured owner/admin's selected style actually reach the
-// renderer, the catalog forwards the STAMPED entitlement fields on the URL.
-// The proxy re-runs verifyStampedSportsPosterEntitlement against the LIVE env
-// owner/admin list, so a leaked URL with a non-owner stamp still degrades to
-// ticket-stub (anti-leak preserved) — only a genuine, env-verifiable owner/
-// admin stamp unlocks the selected style.
+// The artwork proxy route carries no config token (Stremio hits it directly).
+// Catalog/meta responses forward a stamped entitlement so owner/admin/paid
+// styles reach the renderer.
+// Unsigned plain template query strings still degrade to Ticket Stub.
 function appendEntitlementStampParams(url, input = {}) {
   const config = input && typeof input.config === 'object' ? input.config : null
   const requestedTemplate = String(input?.sportsPosterTemplate || config?.sportsPosterTemplate || '').trim()
   const stampedSource = String(input?.entitlementSource || config?.entitlementSource || '').trim()
   const stampedHash = String(input?.entitlementOwnerEmailHash || config?.entitlementOwnerEmailHash || '').trim()
-  const urlVerifiableSource = stampedSource === ENTITLEMENT_SOURCE.OWNER_OVERRIDE ||
+  const verified = verifyStampedSportsPosterEntitlement({
+    requestedTemplate,
+    stampedSource,
+    stampedHash
+  })
+  if (!verified.allowed || !verified.resolvedTemplate) return
+  const needsOwnerHash = stampedSource === ENTITLEMENT_SOURCE.OWNER_OVERRIDE ||
     stampedSource === ENTITLEMENT_SOURCE.ADMIN_OVERRIDE
-  if (!urlVerifiableSource || !stampedHash) return
-  if (requestedTemplate) url.searchParams.set('reqTemplate', requestedTemplate)
+  if (needsOwnerHash && !stampedHash) return
+  const forwardedTemplate = requestedTemplate || verified.resolvedTemplate
+  url.searchParams.set('reqTemplate', forwardedTemplate)
   url.searchParams.set('entSource', stampedSource)
-  url.searchParams.set('entHash', stampedHash)
+  if (stampedHash) url.searchParams.set('entHash', stampedHash)
+  const signature = signSportsPosterEntitlementStamp({
+    pathname: url.pathname,
+    query: url.searchParams,
+    requestedTemplate: forwardedTemplate,
+    stampedSource,
+    stampedHash
+  })
+  if (signature) url.searchParams.set('entSig', signature)
 }
 
 function resolveSportsArtworkLayoutFamily(input = {}) {

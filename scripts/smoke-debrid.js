@@ -1,6 +1,8 @@
 const assert = require('node:assert/strict');
 const { createMockDebridProvider } = require('../src/clients/debrid/__mock__');
 const { UnsupportedCapabilityError } = require('../src/clients/debrid/base');
+const { handleDebridPlayback } = require('../src/handlers/playbackDebrid');
+const { encodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT } = require('../src/utils/opaqueState');
 const { createMockCacheSearchSource } = require('../src/clients/cacheSearch/__mock__');
 const {
   _clearDebridCacheMemo,
@@ -30,6 +32,40 @@ async function check(label, fn) {
   checks += 1;
 }
 
+function jsonResponse(body, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' }
+  });
+}
+
+function createMockRes() {
+  return {
+    statusCode: 200,
+    headers: {},
+    body: null,
+    redirected: null,
+    headersSent: false,
+    setHeader(name, value) {
+      this.headers[String(name).toLowerCase()] = value;
+    },
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(body) {
+      this.body = body;
+      this.headersSent = true;
+      return this;
+    },
+    redirect(status, url) {
+      this.redirected = { status, url };
+      this.headersSent = true;
+      return this;
+    }
+  };
+}
+
 async function run() {
   await check('RD addMagnet flow returns addedId and sanitizes dn', async () => {
     const rd = createMockDebridProvider({ id: 'rd' });
@@ -48,6 +84,74 @@ async function run() {
     const pm = createMockDebridProvider({ id: 'pm' });
     const result = await pm.addMagnet('magnet:?xt=urn:btih:ghi&dn=Movie%202026');
     assert.match(result.addedId, /^pm-/);
+  });
+
+  await check('PM addTorrentFile flow returns addedId', async () => {
+    const pm = createMockDebridProvider({ id: 'pm' });
+    const result = await pm.addTorrentFile(new Uint8Array([1, 2, 3]), 'sportscult.torrent');
+    assert.match(result.addedId, /^pm-torrent-/);
+    assert.equal(pm.calls[0].method, 'addTorrentFile');
+    assert.equal(pm.calls[0].fileName, 'sportscult.torrent');
+    assert.equal(pm.calls[0].byteLength, 3);
+  });
+
+  await check('HTTP torrent debrid playback fetches .torrent and uploads it to Premiumize', async () => {
+    const torrentUrl = 'https://prowlarr.example/api?t=download&id=sportscult-123&apikey=secret';
+    const token = encodeDebridPlaybackToken({
+      protocol: DEBRID_PROTOCOL_TORRENT,
+      src: torrentUrl,
+      providers: [{ type: 'pm', apiKey: 'pm-secret' }],
+      name: 'SportsCult Match'
+    });
+    const calls = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url, options = {}) => {
+      calls.push({
+        url: String(url),
+        method: options.method || 'GET',
+        body: options.body ? String(options.body) : '',
+        contentType: options.headers?.['Content-Type']
+      });
+      const target = String(url);
+      if (target === torrentUrl) {
+        return new Response(new Uint8Array([1, 2, 3]), {
+          status: 200,
+          headers: { 'content-disposition': 'attachment; filename="sportscult.torrent"' }
+        });
+      }
+      if (target.endsWith('/transfer/create')) {
+        return jsonResponse({ status: 'success', id: 'pm-transfer-1' });
+      }
+      if (target.includes('/transfer/list')) {
+        return jsonResponse({
+          status: 'success',
+          transfers: [{
+            id: 'pm-transfer-1',
+            name: 'SportsCult Match.mkv',
+            status: 'finished',
+            progress: 1,
+            file_id: 'file-1'
+          }]
+        });
+      }
+      if (target.includes('/item/details?id=file-1')) {
+        return jsonResponse({ status: 'success', id: 'file-1', link: 'https://pm.example/SportsCult.Match.mkv' });
+      }
+      throw new Error(`Unexpected fetch: ${target}`);
+    };
+
+    try {
+      const res = createMockRes();
+      await handleDebridPlayback({ params: { token } }, res);
+      assert.deepEqual(res.redirected, { status: 302, url: 'https://pm.example/SportsCult.Match.mkv' });
+      assert.equal(calls[0].url, torrentUrl);
+      assert.match(calls[1].url, /\/transfer\/create$/);
+      assert.equal(calls[1].method, 'POST');
+      assert.equal(calls[1].body, '[object FormData]');
+      assert.equal(calls[1].contentType, undefined);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   await check('PM addNzb flow returns addedId', async () => {

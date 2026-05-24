@@ -41,7 +41,7 @@ const { SPORTS_ARTWORK_PROXY_VERSION } = require('../utils/sportsArtwork')
 const {
   ENTITLEMENT_SOURCE,
   verifyStampedSportsPosterEntitlement,
-  resolveServerAdminPosterTemplate
+  verifySportsPosterEntitlementStamp
 } = require('../utils/entitlement')
 
 const VARIANT_DIMENSIONS = {
@@ -3529,6 +3529,16 @@ function resolveSportsmetaBaseUrlFromConfig(config = {}) {
   return String(config?.sportsmetaBaseUrl || '').trim()
 }
 
+function requestArtworkPath(req = null) {
+  const raw = String(req?.originalUrl || req?.url || req?.path || '').trim()
+  if (!raw) return ''
+  try {
+    return new URL(raw, 'https://pvtkrrx.local').pathname || ''
+  } catch (_) {
+    return raw.split('?')[0] || ''
+  }
+}
+
 function resolveSportsPosterTemplateFromConfig(config = {}, req = null) {
   // (1) URL-forwarded stamped entitlement. The configured catalog/meta
   // handler decrypted the user's token and forwarded the stamp
@@ -3543,9 +3553,18 @@ function resolveSportsPosterTemplateFromConfig(config = {}, req = null) {
   const urlReqTemplate = String(q.reqTemplate || '').trim()
   const urlEntSource = String(q.entSource || '').trim()
   const urlEntHash = String(q.entHash || '').trim()
+  const urlEntSig = String(q.entSig || '').trim()
   const urlVerifiableSource = urlEntSource === ENTITLEMENT_SOURCE.OWNER_OVERRIDE ||
     urlEntSource === ENTITLEMENT_SOURCE.ADMIN_OVERRIDE
-  if (urlVerifiableSource && urlEntHash) {
+  const signedUrlStamp = verifySportsPosterEntitlementStamp({
+    pathname: requestArtworkPath(req),
+    query: q,
+    requestedTemplate: urlReqTemplate,
+    stampedSource: urlEntSource,
+    stampedHash: urlEntHash,
+    signature: urlEntSig
+  })
+  if (signedUrlStamp || (urlVerifiableSource && urlEntHash)) {
     const urlVerified = verifyStampedSportsPosterEntitlement({
       requestedTemplate: urlReqTemplate,
       stampedSource: urlEntSource,
@@ -3570,12 +3589,6 @@ function resolveSportsPosterTemplateFromConfig(config = {}, req = null) {
   if (verified.allowed && verified.resolvedTemplate) {
     return resolveSportsPosterTemplate(verified.resolvedTemplate)
   }
-
-  // (3) Server-side admin override remains a fallback for public/no-token
-  // artwork. Verified owner/admin config must win so the owner can change
-  // layout without reinstalling the Stremio addon.
-  const serverAdminTemplate = resolveServerAdminPosterTemplate(process.env)
-  if (serverAdminTemplate) return resolveSportsPosterTemplate(serverAdminTemplate)
 
   return resolveSportsPosterTemplate('ticket-stub')
 }
@@ -4161,6 +4174,7 @@ module.exports = {
   SPORTS_POSTER_TEMPLATES,
   _test: {
     isSportsMetaRealLogoAsset,
+    resolveSportsPosterTemplateFromConfig,
     renderTeamBadgeArtworkPng,
     renderTemplateFallbackArtwork
   }

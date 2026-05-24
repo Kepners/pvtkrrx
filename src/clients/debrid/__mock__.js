@@ -6,8 +6,8 @@ const {
 const { sanitizeMagnet } = require('../../utils/rdFilenameSanitizer');
 
 function defaultCapabilities(id) {
-  if (id === 'pm') return { magnet: true, nzb: true };
-  return { magnet: true, nzb: false };
+  if (id === 'pm') return { magnet: true, torrentFile: true, nzb: true };
+  return { magnet: true, torrentFile: true, nzb: false };
 }
 
 function errorFromName(name, id, method) {
@@ -55,6 +55,16 @@ class MockDebridProvider {
     this._record('addMagnet', { magnet: submittedMagnet });
     const addedId = `${this.id}-${this.nextId++}`;
     this.added.set(addedId, { magnet: submittedMagnet, pollIndex: 0 });
+    return { addedId };
+  }
+
+  async addTorrentFile(bytes, fileName = 'download.torrent') {
+    this._maybeFail('addTorrentFile');
+    const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+    if (!payload || payload.length === 0) throw new Error('torrent payload is empty');
+    this._record('addTorrentFile', { byteLength: payload.length, fileName: String(fileName || '') });
+    const addedId = `${this.id}-torrent-${this.nextId++}`;
+    this.added.set(addedId, { byteLength: payload.length, fileName: String(fileName || ''), pollIndex: 0 });
     return { addedId };
   }
 

@@ -27,6 +27,18 @@ function parseJson(text, fallback = {}) {
   return JSON.parse(text);
 }
 
+function isFormDataBody(body) {
+  return typeof FormData !== 'undefined' && body instanceof FormData;
+}
+
+function normalizeTorrentPayload(bytes) {
+  const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  if (!payload || payload.length === 0) {
+    throw new Error('torrent payload is empty');
+  }
+  return payload;
+}
+
 function flattenAdTree(files) {
   const result = [];
 
@@ -65,7 +77,7 @@ class AllDebridProvider {
   constructor(apiKey) {
     this.id = 'ad';
     this.apiKey = String(apiKey || '');
-    this.capabilities = { magnet: true, nzb: false };
+    this.capabilities = { magnet: true, torrentFile: true, nzb: false };
   }
 
   async _request(endpoint, options = {}) {
@@ -73,7 +85,7 @@ class AllDebridProvider {
       method: options.method || 'GET',
       headers: {
         Authorization: `Bearer ${this.apiKey}`,
-        ...(options.body ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
+        ...(options.body && !isFormDataBody(options.body) ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
         ...(options.headers || {})
       },
       body: options.body
@@ -98,6 +110,29 @@ class AllDebridProvider {
     this._assertSuccess(body, endpoint);
 
     const entry = Array.isArray(body?.data?.magnets) ? body.data.magnets[0] : null;
+    if (!entry || entry.error) {
+      throw new ServiceApiError({ serviceId: this.id, endpoint, status: 200, body: entry || body });
+    }
+
+    return { addedId: String(entry.id) };
+  }
+
+  async addTorrentFile(bytes, fileName = 'download.torrent') {
+    const payload = normalizeTorrentPayload(bytes);
+    const endpoint = '/v4/magnet/upload/file';
+    const form = new FormData();
+    form.append(
+      'files[]',
+      new Blob([payload], { type: 'application/x-bittorrent' }),
+      String(fileName || 'download.torrent')
+    );
+    const body = await this._request(endpoint, {
+      method: 'POST',
+      body: form
+    });
+    this._assertSuccess(body, endpoint);
+
+    const entry = Array.isArray(body?.data?.files) ? body.data.files[0] : null;
     if (!entry || entry.error) {
       throw new ServiceApiError({ serviceId: this.id, endpoint, status: 200, body: entry || body });
     }

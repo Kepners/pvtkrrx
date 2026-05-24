@@ -12,6 +12,7 @@ const {
   ENTITLEMENT_SOURCE,
   resolveSportsPosterEntitlement,
   verifyStampedSportsPosterEntitlement,
+  verifySportsPosterEntitlementStamp,
   hashEmailForOwnerCheck,
   clampSportsPosterTemplate
 } = require('../src/utils/entitlement')
@@ -28,6 +29,9 @@ const {
   resolveSportsPosterAsset,
   resolveSportsArtworkLayoutFamily
 } = require('../src/utils/sportsArtwork')
+const {
+  _test: sportsArtworkProxyTest
+} = require('../src/handlers/sportsArtworkProxy')
 
 const OWNER_EMAIL = 'kepners@gmail.com'
 const ADMIN_EMAIL = 'admin@pvtkrrx.cc'
@@ -291,6 +295,73 @@ async function testApplySportsPosterEntitlementForOwnerSave() {
   })
 }
 
+async function testApplySportsPosterEntitlementForManualGrantSave() {
+  await withEnv({ PVTKRRX_OWNER_EMAILS: '', PVTKRRX_ADMIN_EMAILS: '' }, async () => {
+    const initial = normalizeAddonConfig({ sportsPosterTemplate: 'glitch' })
+    const { config: stamped, entitlement } = await applySportsPosterEntitlement(initial, {
+      requestedTemplate: 'glitch',
+      user: {
+        email: PAID_USER_EMAIL,
+        id: 'usr_paid',
+        entitlements: { sportsPosterTemplates: SPORTS_POSTER_TEMPLATES.slice() }
+      }
+    })
+    assert.equal(stamped.sportsPosterTemplate, 'glitch', 'paid manual grant save unlocks glitch')
+    assert.equal(stamped.entitlementSource, ENTITLEMENT_SOURCE.MANUAL_GRANT, 'paid save stamps manual grant source')
+    assert.equal(entitlement.source, ENTITLEMENT_SOURCE.MANUAL_GRANT, 'returned paid entitlement source')
+
+    const eventInput = {
+      baseUrl: 'https://www.pvtkrrx.cc',
+      sportsmetaBaseUrl: 'https://sportsmeta.pvtkrrx.cc',
+      sportsPosterTemplate: stamped.sportsPosterTemplate,
+      entitlementSource: stamped.entitlementSource,
+      entitlementOwnerEmailHash: stamped.entitlementOwnerEmailHash,
+      canonicalId: 'sportsmeta:event:football|2026-04-10|epl|paid-grant',
+      sportHint: 'football',
+      league: 'EPL',
+      title: 'Paid Grant',
+      date: '2026-04-10',
+      source: 'sportsmeta'
+    }
+    const poster = resolveSportsPosterAsset(eventInput)
+    const url = new URL(poster.poster)
+    assert.equal(url.searchParams.get('template'), 'glitch', 'paid URL carries selected template')
+    assert.equal(url.searchParams.get('reqTemplate'), 'glitch', 'paid URL forwards requested template')
+    assert.equal(url.searchParams.get('entSource'), ENTITLEMENT_SOURCE.MANUAL_GRANT, 'paid URL forwards entitlement source')
+    assert.match(url.searchParams.get('entSig') || '', /^[a-f0-9]{64}$/i, 'paid URL carries signed entitlement stamp')
+    assert.equal(
+      verifySportsPosterEntitlementStamp({
+        pathname: url.pathname,
+        query: url.searchParams,
+        requestedTemplate: 'glitch',
+        stampedSource: ENTITLEMENT_SOURCE.MANUAL_GRANT,
+        stampedHash: '',
+        signature: url.searchParams.get('entSig')
+      }),
+      true,
+      'paid URL signature verifies'
+    )
+    assert.equal(
+      sportsArtworkProxyTest.resolveSportsPosterTemplateFromConfig({}, {
+        originalUrl: `${url.pathname}${url.search}`,
+        query: Object.fromEntries(url.searchParams.entries())
+      }),
+      'glitch',
+      'proxy accepts signed paid stamp'
+    )
+    const forged = new URL(poster.poster)
+    forged.searchParams.delete('entSig')
+    assert.equal(
+      sportsArtworkProxyTest.resolveSportsPosterTemplateFromConfig({}, {
+        originalUrl: `${forged.pathname}${forged.search}`,
+        query: Object.fromEntries(forged.searchParams.entries())
+      }),
+      'ticket-stub',
+      'proxy rejects unsigned paid-style URL'
+    )
+  })
+}
+
 async function testApplySportsPosterEntitlementForUnpaidSave() {
   // No env owner/admin entries, no manual grant, no member token, no trial.
   await withEnv({ PVTKRRX_OWNER_EMAILS: '', PVTKRRX_ADMIN_EMAILS: '' }, async () => {
@@ -317,6 +388,35 @@ async function testApplySportsPosterEntitlementForUnpaidSave() {
     const poster = resolveSportsPosterAsset(eventInput)
     const tplFromUrl = new URL(poster.poster).searchParams.get('template')
     assert.equal(tplFromUrl, 'ticket-stub', 'URL builder still ticket-stub for unpaid')
+  })
+}
+
+async function testServerOverrideDoesNotUnlockFreeArtwork() {
+  await withEnv({
+    PVTKRRX_OWNER_EMAILS: '',
+    PVTKRRX_ADMIN_EMAILS: '',
+    PVTKRRX_SPORTS_POSTER_ADMIN_OVERRIDE: 'broadcast',
+    PVTKRRX_SPORTS_POSTER_TEMPLATE: 'broadcast'
+  }, async () => {
+    const eventInput = {
+      baseUrl: 'https://www.pvtkrrx.cc',
+      sportsmetaBaseUrl: 'https://sportsmeta.pvtkrrx.cc',
+      sportsPosterTemplate: 'broadcast',
+      entitlementSource: '',
+      entitlementOwnerEmailHash: '',
+      canonicalId: 'sportsmeta:event:football|2026-04-10|epl|free-user',
+      sportHint: 'football',
+      league: 'EPL',
+      title: 'Free User'
+    }
+    const poster = resolveSportsPosterAsset(eventInput)
+    assert.equal(poster.selectedTemplate, 'ticket-stub', 'server override must not unlock free catalog poster')
+    assert.equal(new URL(poster.poster).searchParams.get('template'), 'ticket-stub', 'server override must not leak into free poster URL')
+    assert.equal(
+      sportsArtworkProxyTest.resolveSportsPosterTemplateFromConfig({}, { query: { template: 'broadcast' } }),
+      'ticket-stub',
+      'proxy ignores unsigned plain premium template query'
+    )
   })
 }
 
@@ -440,7 +540,9 @@ async function main() {
   await testNormalizeRevokesWhenOwnerRemovedFromEnv()
   await testNormalizeHonoursOwnerWhenEnvStillContains()
   await testApplySportsPosterEntitlementForOwnerSave()
+  await testApplySportsPosterEntitlementForManualGrantSave()
   await testApplySportsPosterEntitlementForUnpaidSave()
+  await testServerOverrideDoesNotUnlockFreeArtwork()
   await testForgedOwnerStampWithoutEnvIsRejected()
   testRuntimeURLIgnoresStaleQueryAfterRevocation()
   await testReadbackExposesEntitlement()

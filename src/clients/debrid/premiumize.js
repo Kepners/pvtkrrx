@@ -25,6 +25,18 @@ function parseJson(text, fallback = {}) {
   return JSON.parse(text);
 }
 
+function isFormDataBody(body) {
+  return typeof FormData !== 'undefined' && body instanceof FormData;
+}
+
+function normalizeTorrentPayload(bytes) {
+  const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  if (!payload || payload.length === 0) {
+    throw new Error('torrent payload is empty');
+  }
+  return payload;
+}
+
 function mapPremiumizeStatus(status) {
   const value = String(status || '').toLowerCase();
   if (value === 'queued') return 'queued';
@@ -37,7 +49,7 @@ class PremiumizeDebridProvider {
   constructor(apiKey) {
     this.id = 'pm';
     this.apiKey = String(apiKey || '');
-    this.capabilities = { magnet: true, nzb: true };
+    this.capabilities = { magnet: true, torrentFile: true, nzb: true };
   }
 
   async _requestJson(endpoint, options = {}) {
@@ -48,7 +60,7 @@ class PremiumizeDebridProvider {
         method: options.method || 'GET',
         headers: {
           Authorization: `Bearer ${this.apiKey}`,
-          ...(options.body ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
+          ...(options.body && !isFormDataBody(options.body) ? { 'Content-Type': 'application/x-www-form-urlencoded' } : {}),
           ...(options.headers || {})
         },
         body: options.body
@@ -88,6 +100,23 @@ class PremiumizeDebridProvider {
 
   async addMagnet(magnet) {
     return this._addSource(magnet);
+  }
+
+  async addTorrentFile(bytes, fileName = 'download.torrent') {
+    const payload = normalizeTorrentPayload(bytes);
+    const endpoint = '/transfer/create';
+    const form = new FormData();
+    form.append(
+      'src',
+      new Blob([payload], { type: 'application/x-bittorrent' }),
+      String(fileName || 'download.torrent')
+    );
+    const body = await this._requestJson(endpoint, {
+      method: 'POST',
+      body: form
+    });
+    this._assertTransferResponse(body, endpoint);
+    return { addedId: String(body.id || '') };
   }
 
   async addNzb(nzbUrl) {
@@ -176,18 +205,32 @@ class PremiumizeDebridProvider {
     return files;
   }
 
+  async _getItemLink(fileId) {
+    const endpoint = `/item/details?id=${encodeURIComponent(String(fileId))}`;
+    const body = await this._requestJson(endpoint);
+    if (String(body?.status || '').toLowerCase() !== 'success') {
+      throw new ServiceApiError({ serviceId: this.id, endpoint, status: 200, body });
+    }
+
+    const link = String(body?.link || body?.content?.link || '');
+    if (!link) {
+      throw new ServiceApiError({ serviceId: this.id, endpoint, status: 200, body: { error: 'missing Premiumize item link', fileId } });
+    }
+    return link;
+  }
+
   async getStreamUrl(addedId, fileIdx) {
     const transfer = await this._findTransfer(addedId);
     if (!transfer) {
       throw new ServiceApiError({ serviceId: this.id, endpoint: '/transfer/list', status: 200, body: { error: 'transfer not found' } });
     }
 
-    if (transfer.file_id && !transfer.folder_id) {
+    if (transfer.file_id) {
       if ((Number(fileIdx) || 0) !== 0) {
         throw new ServiceApiError({ serviceId: this.id, endpoint: '/transfer/list', status: 200, body: { error: 'file index out of range' } });
       }
       if (transfer.link) return String(transfer.link);
-      throw new ServiceApiError({ serviceId: this.id, endpoint: '/transfer/list', status: 200, body: { error: 'single-file transfer has no link' } });
+      return this._getItemLink(transfer.file_id);
     }
 
     const files = await this._flattenFolder(transfer.folder_id);

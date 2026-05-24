@@ -25,6 +25,14 @@ function parseJson(text, fallback = {}) {
   return JSON.parse(text);
 }
 
+function normalizeTorrentPayload(bytes) {
+  const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  if (!payload || payload.length === 0) {
+    throw new Error('torrent payload is empty');
+  }
+  return payload;
+}
+
 function isRdInfringingFile(error) {
   if (!(error instanceof ServiceApiError) || error.status !== 403) return false;
   const body = error.body;
@@ -46,7 +54,7 @@ class RealDebridProvider {
   constructor(apiKey) {
     this.id = 'rd';
     this.apiKey = String(apiKey || '');
-    this.capabilities = { magnet: true, nzb: false };
+    this.capabilities = { magnet: true, torrentFile: true, nzb: false };
   }
 
   async _request(endpoint, options = {}) {
@@ -71,6 +79,23 @@ class RealDebridProvider {
       const body = await this._request('/torrents/addMagnet', {
         method: 'POST',
         body: formBody({ magnet: sanitizedMagnet })
+      });
+      return { addedId: String(body.id || '') };
+    } catch (error) {
+      if (isRdInfringingFile(error)) {
+        throw new RdInfringingFileError({ body: error.body });
+      }
+      throw error;
+    }
+  }
+
+  async addTorrentFile(bytes) {
+    const payload = normalizeTorrentPayload(bytes);
+    try {
+      const body = await this._request('/torrents/addTorrent', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/x-bittorrent' },
+        body: payload
       });
       return { addedId: String(body.id || '') };
     } catch (error) {

@@ -100,6 +100,21 @@ async function main() {
     await assertConfiguredMetaNormalizes(template)
   }
 
+  const previousAdminOverride = process.env.PVTKRRX_SPORTS_POSTER_ADMIN_OVERRIDE
+  const previousTemplateOverride = process.env.PVTKRRX_SPORTS_POSTER_TEMPLATE
+  process.env.PVTKRRX_SPORTS_POSTER_ADMIN_OVERRIDE = 'broadcast'
+  process.env.PVTKRRX_SPORTS_POSTER_TEMPLATE = 'broadcast'
+  try {
+    const poster = resolveSportsPosterAsset(sportsEventInput('broadcast'))
+    assertTicketStub(poster.selectedTemplate, 'server env override resolveSportsPosterAsset selectedTemplate')
+    assertTicketStub(new URL(poster.poster).searchParams.get('template'), 'server env override poster URL template')
+  } finally {
+    if (previousAdminOverride === undefined) delete process.env.PVTKRRX_SPORTS_POSTER_ADMIN_OVERRIDE
+    else process.env.PVTKRRX_SPORTS_POSTER_ADMIN_OVERRIDE = previousAdminOverride
+    if (previousTemplateOverride === undefined) delete process.env.PVTKRRX_SPORTS_POSTER_TEMPLATE
+    else process.env.PVTKRRX_SPORTS_POSTER_TEMPLATE = previousTemplateOverride
+  }
+
   const configureHtml = fs.readFileSync('public/configure.html', 'utf8')
   const optionValues = [...configureHtml.matchAll(/<option\s+value="([^"]+)"/gi)].map((match) => match[1])
   assert.deepEqual(

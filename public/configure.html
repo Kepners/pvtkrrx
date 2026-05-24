@@ -6793,7 +6793,7 @@
         const desired = String(config.sportsPosterTemplate || 'ticket-stub').trim() || 'ticket-stub';
         const allowed = Array.from(templateSelect.options).map((opt) => opt.value);
         templateSelect.value = allowed.includes(desired) ? desired : 'ticket-stub';
-        scheduleSportsPosterTemplateAutoSave();
+        refreshSportsPosterTemplateStatus();
       }
       if (config.localHostname) {
         const normalizedDefault = normalizeLocalHostname(defaultLocalHostname);
@@ -7170,6 +7170,8 @@
     // status in the Debrid + Cache Search panels so the user knows their paste landed.
     let debridAutoSaveTimer = null;
     let debridAutoSaveSeq = 0;
+    let sportsPosterTemplateAutoSaveTimer = null;
+    let sportsPosterTemplateAutoSaveSeq = 0;
 
     function setDebridSaveStatus(text, type) {
       ['debridAutoSaveStatus', 'cacheSearchAutoSaveStatus'].forEach((id) => {
@@ -7243,7 +7245,7 @@
       }, 800);
     }
 
-    function scheduleSportsPosterTemplateAutoSave() {
+    function refreshSportsPosterTemplateStatus(typeOverride, messageOverride) {
       const entitlement = window.__pvtkrrxSportsPosterEntitlement || null;
       const allowed = entitlement && Array.isArray(entitlement.allowedSportsPosterTemplates)
         ? entitlement.allowedSportsPosterTemplates
@@ -7260,13 +7262,83 @@
         glitch: 'Glitch'
       };
       const sourceLabel = entitlement && entitlement.source ? entitlement.source : 'none';
+      if (messageOverride) {
+        setSportsPosterTemplateStatus(typeOverride || 'info', messageOverride);
+        return;
+      }
       if (sourceLabel === 'owner_override' || sourceLabel === 'admin_override') {
-        setSportsPosterTemplateStatus('ok', 'Server-side ' + sourceLabel.replace('_', ' ') + ' active. Selected style: ' + (labels[value] || value) + '.');
+        setSportsPosterTemplateStatus('ok', 'Owner/admin entitlement active. Selected style: ' + (labels[value] || value) + '.');
       } else if (sourceLabel === 'manual_grant' || sourceLabel === 'member_token' || sourceLabel === 'trial') {
         setSportsPosterTemplateStatus('ok', 'Entitlement source: ' + sourceLabel.replace('_', ' ') + '. Selected style: ' + (labels[value] || value) + '.');
       } else {
         setSportsPosterTemplateStatus('ok', 'Included sports style: Ticket Stub. Other templates require an entitlement (owner override, admin override, manual grant, member token, or trial).');
       }
+    }
+
+    async function performSportsPosterTemplateAutoSave() {
+      const mySeq = ++sportsPosterTemplateAutoSaveSeq;
+      let config;
+      try {
+        config = getConfig();
+      } catch (err) {
+        refreshSportsPosterTemplateStatus('err', 'Auto-save skipped: ' + err.message);
+        return;
+      }
+
+      const installMode = getInstallMode();
+      let endpoint;
+      let payload = config;
+
+      if (installMode === 'local') {
+        endpoint = '/local-config';
+      } else if (serverRuntime.selfHostServerMode) {
+        endpoint = '/server-config';
+        payload = routeParity.stripRemoteSeedboxLanFields(config, { keepRelayUrl: true });
+        if (!(await ensureSelfHostAdminAccess('auto-save sports poster style'))) {
+          refreshSportsPosterTemplateStatus('err', 'Auto-save needs the self-host password. Paste it then try again.');
+          return;
+        }
+      } else {
+        refreshSportsPosterTemplateStatus('info', 'On Remote Seedbox route, click Generate Install Link to apply this style.');
+        return;
+      }
+
+      refreshSportsPosterTemplateStatus('info', 'Saving sports poster style...');
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: buildJsonHeaders(),
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json().catch(() => ({}));
+        if (mySeq !== sportsPosterTemplateAutoSaveSeq) return;
+        if (!res.ok || data.error) {
+          refreshSportsPosterTemplateStatus('err', 'Save failed: ' + (data.error || ('HTTP ' + res.status)));
+          return;
+        }
+        updateSavedSecretState(data.savedSecrets || {});
+        applySportsPosterEntitlementToUi(data.entitlement || null);
+        const select = document.getElementById('sportsPosterTemplate');
+        if (select) {
+          const savedTemplate = String(data.sportsPosterTemplate || config.sportsPosterTemplate || 'ticket-stub').trim() || 'ticket-stub';
+          const allowedAfterSave = Array.from(select.options).map((opt) => opt.value);
+          select.value = allowedAfterSave.includes(savedTemplate) ? savedTemplate : 'ticket-stub';
+        }
+        const stamp = new Date().toLocaleTimeString();
+        refreshSportsPosterTemplateStatus('ok', 'Saved sports poster style at ' + stamp + '.');
+      } catch (err) {
+        if (mySeq !== sportsPosterTemplateAutoSaveSeq) return;
+        refreshSportsPosterTemplateStatus('err', 'Save failed: ' + err.message);
+      }
+    }
+
+    function scheduleSportsPosterTemplateAutoSave() {
+      if (sportsPosterTemplateAutoSaveTimer) clearTimeout(sportsPosterTemplateAutoSaveTimer);
+      refreshSportsPosterTemplateStatus('info', 'Pending sports poster style save...');
+      sportsPosterTemplateAutoSaveTimer = setTimeout(() => {
+        sportsPosterTemplateAutoSaveTimer = null;
+        performSportsPosterTemplateAutoSave();
+      }, 800);
     }
 
     function resolveSelectedSportsPosterTemplate(fallback) {

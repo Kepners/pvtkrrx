@@ -143,7 +143,16 @@ function sanitizeDebridPayload(input) {
   if (!src) throw new Error('Debrid token must include source URL or magnet')
   if (src.length > 8192) throw new Error('Debrid token source too long')
   if (protocol === DEBRID_PROTOCOL_TORRENT) {
-    if (!/^magnet:/i.test(src)) throw new Error('Torrent debrid token must carry a magnet URI')
+    if (!/^magnet:/i.test(src)) {
+      try {
+        const parsed = new URL(src)
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          throw new Error('Torrent debrid token must carry a magnet URI or HTTP(S) torrent URL')
+        }
+      } catch (_) {
+        throw new Error('Torrent debrid token has invalid magnet URI or torrent URL')
+      }
+    }
   } else {
     try {
       const parsed = new URL(src)

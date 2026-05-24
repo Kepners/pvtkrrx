@@ -39,7 +39,7 @@ async function withFetch(responses, fn) {
 
 async function run() {
   const provider = new RealDebridProvider('secret-key');
-  assert.deepEqual(provider.capabilities, { magnet: true, nzb: false });
+  assert.deepEqual(provider.capabilities, { magnet: true, torrentFile: true, nzb: false });
 
   await withFetch([jsonResponse({ id: 'rd1', uri: 'magnet:ok' }, 201)], async (calls) => {
     const result = await provider.addMagnet('magnet:?xt=urn:btih:abc&dn=Movie%20WEB-DL%202026');
@@ -47,6 +47,13 @@ async function run() {
     assert.equal(calls[0].method, 'POST');
     assert.match(calls[0].url, /\/torrents\/addMagnet$/);
     assert.doesNotMatch(decodeURIComponent(calls[0].body), /WEB-DL/i);
+  });
+
+  await withFetch([jsonResponse({ id: 'rd-file-1', uri: 'torrent:ok' }, 201)], async (calls) => {
+    const result = await provider.addTorrentFile(new Uint8Array([1, 2, 3]), 'Movie.torrent');
+    assert.deepEqual(result, { addedId: 'rd-file-1' });
+    assert.equal(calls[0].method, 'PUT');
+    assert.match(calls[0].url, /\/torrents\/addTorrent$/);
   });
 
   await withFetch([new Response(null, { status: 204 })], async (calls) => {

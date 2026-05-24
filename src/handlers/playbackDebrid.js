@@ -3,6 +3,7 @@
 const { decodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT, DEBRID_PROTOCOL_USENET } = require('../utils/opaqueState')
 const { getDebridProvider } = require('../clients/debrid/base')
 const { redactSensitiveText } = require('../utils/logRedaction')
+const { fetchTorrentPayload } = require('../utils/torrentPayload')
 
 const POLL_INTERVAL_MS = Math.max(500, Number.parseInt(process.env.PVTKRRX_DEBRID_POLL_INTERVAL_MS || '2000', 10))
 const POLL_TIMEOUT_MS = Math.max(2000, Number.parseInt(process.env.PVTKRRX_DEBRID_POLL_TIMEOUT_MS || '30000', 10))
@@ -66,8 +67,16 @@ async function handleDebridPlayback(req, res) {
       if (payload.protocol === DEBRID_PROTOCOL_USENET) {
         const added = await provider.addNzb(payload.src)
         addedId = added.addedId
-      } else {
+      } else if (/^magnet:/i.test(payload.src)) {
         const added = await provider.addMagnet(payload.src)
+        addedId = added.addedId
+      } else {
+        if (!provider.capabilities.torrentFile || typeof provider.addTorrentFile !== 'function') {
+          console.log(`[playback-debrid] skipping ${cred.type} - does not support torrent file upload`)
+          continue
+        }
+        const torrent = await fetchTorrentPayload(payload.src)
+        const added = await provider.addTorrentFile(torrent.bytes, torrent.fileName)
         addedId = added.addedId
       }
     } catch (err) {

@@ -46,6 +46,23 @@ async function run() {
     assert.equal(meta.name, 'movie.mkv')
   })
 
+  await check('tryExtractDebridMetaFromStreamUrl preserves original torrent download URL', () => {
+    const torrentUrl = 'https://prowlarr.example/api?t=download&id=sportscult-123&apikey=secret'
+    const token = encodePlaybackStateToken({ h: SAMPLE_HASH, l: torrentUrl, p: 'match.mkv' })
+    const url = `${PLAYBACK_BASE}/${CONFIG_TOKEN}/playback/${token}`
+    const meta = _tryExtractDebridMetaFromStreamUrl(url, PLAYBACK_BASE, CONFIG_TOKEN)
+    assert.ok(meta)
+    assert.equal(meta.link, torrentUrl)
+
+    const debridUrl = _buildDebridPlaybackUrl(PLAYBACK_BASE, [{ type: 'pm', apiKey: 'pmkey' }], {
+      src: meta.link,
+      name: 'SportsCult match',
+      protocol: DEBRID_PROTOCOL_TORRENT
+    })
+    const decoded = decodeDebridPlaybackToken(debridUrl.slice(`${PLAYBACK_BASE}/playback/debrid/`.length))
+    assert.equal(decoded.src, torrentUrl)
+  })
+
   await check('tryExtractDebridMetaFromStreamUrl returns null for /file/ URLs', () => {
     const url = `${PLAYBACK_BASE}/${CONFIG_TOKEN}/file/somefiletoken`
     assert.equal(_tryExtractDebridMetaFromStreamUrl(url, PLAYBACK_BASE, CONFIG_TOKEN), null)

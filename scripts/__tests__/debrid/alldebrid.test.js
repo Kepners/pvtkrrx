@@ -58,7 +58,7 @@ function statusBody(statusCode) {
 
 async function run() {
   const provider = new AllDebridProvider('secret-key');
-  assert.deepEqual(provider.capabilities, { magnet: true, nzb: false });
+  assert.deepEqual(provider.capabilities, { magnet: true, torrentFile: true, nzb: false });
 
   await withFetch([jsonResponse({
     status: 'success',
@@ -69,6 +69,17 @@ async function run() {
     assert.equal(calls[0].method, 'POST');
     assert.match(calls[0].url, /\/v4\/magnet\/upload$/);
     assert.match(calls[0].body, /magnets%5B%5D=magnet/);
+  });
+
+  await withFetch([jsonResponse({
+    status: 'success',
+    data: { files: [{ id: 456, hash: 'abc', name: 'Movie.torrent', size: 100, ready: true }] }
+  })], async (calls) => {
+    const result = await provider.addTorrentFile(new Uint8Array([1, 2, 3]), 'Movie.torrent');
+    assert.deepEqual(result, { addedId: '456' });
+    assert.equal(calls[0].method, 'POST');
+    assert.match(calls[0].url, /\/v4\/magnet\/upload\/file$/);
+    assert.equal(calls[0].body, '[object FormData]');
   });
 
   assert.deepEqual(flattenAdTree([{
