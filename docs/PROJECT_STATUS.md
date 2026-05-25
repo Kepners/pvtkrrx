@@ -6,6 +6,8 @@ Updated: 2026-05-25
 
 PVTKRRX is on the `1.3.7` release line. v1.3 adds optional Debrid (Real-Debrid, AllDebrid, Premiumize) + Cache Search (put.io, Premiumize cache check) + Newznab (Usenet) support. v1.3.5 makes debrid the first downloader when configured: cached debrid links surface first, uncached playback clicks hand the torrent/NZB to the configured debrid provider before local/qBittorrent/seedbox fallback, and qBittorrent streams remain in the list underneath. v1.3.6 hardens sports stream search so supplemental sports lookups cannot fall back to all Prowlarr categories or emit adult tracker results. v1.3.7 applies the same category-only and adult-result guard to sports catalog search/browse/seed paths so ambiguous catalog searches such as Australian Football `On Couch` cannot show adult tracker metadata entries. Installs without any debrid/cache config are unchanged from v1.2.
 
+Detailed poster/debrid worklog: [POSTERS_AND_DEBRID_WORKLOG_2026-05.md](POSTERS_AND_DEBRID_WORKLOG_2026-05.md).
+
 ## 2026-05-25: v1.3.7 sports catalog search adult-leak hotfix
 
 - Root cause: after the v1.3.6 stream fix, the sports catalog handler still used a broad all-category Prowlarr fallback when a sports category search was sparse. The `On Couch` catalog search could therefore show adult tracker entries before the real Australian Football result.

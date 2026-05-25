@@ -2,7 +2,7 @@
 
 Private tracker and seedbox content inside Stremio.
 
-No debrid. No third-party media host. Your hardware, your trackers.
+Optional debrid downloader handoff. No third-party media host. Your hardware, your trackers.
 
 ## What This Is
 
@@ -12,6 +12,7 @@ You bring:
 
 - Prowlarr or another Torznab-compatible search service
 - qBittorrent with WebUI enabled
+- optional Real-Debrid, AllDebrid, or Premiumize credentials if you want debrid-first downloader handoff
 - Stremio
 - a Windows host, seedbox, VPS, or public playback endpoint depending on the route
 
@@ -19,10 +20,11 @@ PVTKRRX handles the bridge:
 
 1. Stremio asks PVTKRRX for movies, TV, sports, or library rows.
 2. PVTKRRX searches your configured trackers through Prowlarr.
-3. PVTKRRX checks qBittorrent for already-downloaded files.
-4. The selected route decides whether playback is served locally, through your home host, or through public seedbox endpoints.
+3. If configured, PVTKRRX checks cache/debrid sources and adds debrid playback streams above the normal qBittorrent fallback.
+4. PVTKRRX checks qBittorrent for already-downloaded files.
+5. The selected route decides whether playback is served locally, through your home host, through public seedbox endpoints, or by redirecting to the configured debrid provider.
 
-PVTKRRX does not host your media and does not replace your private tracker or seedbox setup.
+PVTKRRX does not host your media, does not replace your private tracker or seedbox setup, and is not itself a debrid provider.
 
 ## What The Website Does
 
@@ -96,6 +98,14 @@ Older `v1.12.x-selfhost` tags are legacy compatibility tags from the previous se
 Use this only when playback endpoints are intentionally public and reachable over HTTPS.
 
 The hosted public relay does not proxy video bytes and does not queue-and-buffer local-only tracker playback. It is effectively a ready-file route unless you run PVTKRRX on a playback-capable self-hosted runtime.
+
+## Optional Debrid
+
+Debrid is optional. If you configure Real-Debrid, AllDebrid, or Premiumize, PVTKRRX adds provider-backed streams above the qBittorrent/local fallback. Cached debrid hits show first. Uncached tracker links can start a provider transfer through `/playback/debrid` when you click Play.
+
+This does not make PVTKRRX a debrid service. PVTKRRX stores your provider credentials in your encrypted config, asks the provider to add/check the torrent or NZB, and redirects the client when the provider has a playable URL.
+
+For setup details see [docs/DEBRID_SETUP.md](docs/DEBRID_SETUP.md). For the implementation/proof worklog see [docs/POSTERS_AND_DEBRID_WORKLOG_2026-05.md](docs/POSTERS_AND_DEBRID_WORKLOG_2026-05.md).
 
 ## Billing And Unlocks
 

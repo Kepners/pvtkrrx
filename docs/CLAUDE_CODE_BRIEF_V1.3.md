@@ -8,6 +8,8 @@
 
 **Scope of this brief:** v1.3 only. READY (v1.4) and prefetch (v1.5) are separate briefs to be written closer to those releases.
 
+**2026-05-25 status note:** this brief is historical. The shipped v1.3.1+ behavior superseded the early "sports = debrid only" idea. Current truth: debrid streams are additive, qBittorrent/local streams remain as fallback for sports/movies/TV, and debrid is ordered first only when a provider is configured. See [POSTERS_AND_DEBRID_WORKLOG_2026-05.md](POSTERS_AND_DEBRID_WORKLOG_2026-05.md).
+
 ---
 
 ## 0. Pre-flight (do this BEFORE writing any code)
@@ -189,14 +191,7 @@ async function buildStreams(meta) {
       continue;
     }
 
-    if (isSports) {
-      // SPORTS RULE: debrid only, never qBit
-      if (hasDebrid) pendingStreams.push(toDebridPendingStream(normalized));
-      // else: skip — no qBit fallback for sports
-      continue;
-    }
-
-    // MOVIES/TV: debrid first, qBit fallback
+    // Shipped behavior for sports/movies/TV: debrid first when configured, qBit fallback preserved.
     if (hasDebrid && config.debrid.preferDebridOverSeedbox) {
       pendingStreams.push(toDebridPendingStream(normalized));
     } else if (hasQbit) {
@@ -359,7 +354,7 @@ Update `MEMORY.md` open work / queued section: mark v1.3 as shipped, queue v1.4 
 - [ ] CC-A through CC-J completed
 - [ ] All existing smokes still pass (`npm run smoke:*` matrix)
 - [ ] A movie with a PM-cached hash emits a `⚡ READY` stream playable in <3s
-- [ ] A sports meta with no debrid configured returns zero streams (rule: sports = debrid only)
+- [ ] A sports meta with no debrid configured keeps the v1.2 qBit/local fallback behavior where a qBit/local source exists
 - [ ] A movie with no debrid + qBit configured uses qBit (backward compat preserved)
 - [ ] RD `addMagnet` against a WEB-DL magnet sees sanitised `dn=` before sending
 - [ ] An NZB Prowlarr result against a PM-configured install creates a transfer; same against RD-only install is skipped (no fallback)

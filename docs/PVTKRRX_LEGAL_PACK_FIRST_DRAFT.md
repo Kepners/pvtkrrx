@@ -1,5 +1,7 @@
 # A. Product/System Boundary
 
+Draft status note, 2026-05-25: this first draft predates the v1.3 optional debrid downloader work. Treat any older "without using debrid" wording below as superseded by the current repo boundary: PVTKRRX is not a debrid service and does not host/proxy media bytes, but it can optionally hand off downloads to a user's configured Real-Debrid, AllDebrid, or Premiumize account. See [POSTERS_AND_DEBRID_WORKLOG_2026-05.md](POSTERS_AND_DEBRID_WORKLOG_2026-05.md) and [DEBRID_SETUP.md](DEBRID_SETUP.md).
+
 ## Executive Legal Boundary Summary
 
 ### What the product is
@@ -20,7 +22,7 @@ The hosted relay is not described in the live repo as a video-byte proxy. The li
 
 ### Who the product is for
 
-PVTKRRX is for users who already have, or are prepared to operate, their own Stremio-compatible media setup. In live repo truth, that means technically capable users who want to connect private trackers and qBittorrent-based storage or playback infrastructure into Stremio without using debrid and without handing media hosting to PVTKRRX.
+PVTKRRX is for users who already have, or are prepared to operate, their own Stremio-compatible media setup. In current repo truth, that means technically capable users who want to connect private trackers, optional user-supplied debrid downloader accounts, and qBittorrent-based storage or playback infrastructure into Stremio without handing media hosting to PVTKRRX.
 
 ### What the user must already have
 

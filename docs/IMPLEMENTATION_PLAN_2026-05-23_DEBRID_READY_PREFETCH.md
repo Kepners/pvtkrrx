@@ -5,6 +5,8 @@
 **Status:** PLAN ONLY — not yet actioned
 **Author:** Frank (Claude Code) on request from owner
 
+**2026-05-25 status note:** this plan is historical. The shipped v1.3.1+ routing behavior superseded the early sports-only debrid rule in this document. Current truth: debrid is an optional user-supplied downloader/cache overlay; when configured it sorts above qBittorrent/local streams, but qBittorrent/local streams remain as fallback for sports, movies, and TV. See [POSTERS_AND_DEBRID_WORKLOG_2026-05.md](POSTERS_AND_DEBRID_WORKLOG_2026-05.md).
+
 ---
 
 ## 1. Scope
@@ -463,9 +465,9 @@ The sections above (§1-§9) were the initial draft. After research and clarific
 
 ### 10.3 Stream routing rules (Claude Code integration — CC-C revised)
 
-User has stated explicitly:
-1. **Sports content (any meta with `sportsmeta:` ID prefix): ALWAYS use debrid. Never qBit.** If no debrid configured for a user, sports streams are empty for that install.
-2. **All other content (movies/TV): debrid first, qBit fallback.** qBit is the backup, not the default.
+Shipped v1.3.1+ behavior superseded the initial routing rule here:
+1. **All content:** sports, movies, and TV keep qBittorrent/local fallback streams where available. Debrid is ordered first only when configured.
+2. **Debrid-first means ordered first, not exclusive:** qBit/local remains the backup when debrid exists, not removed.
 
 Pipeline order in `src/handlers/stream.js`:
 
@@ -525,7 +527,7 @@ All in one Codex pass, per [docs/CODEX_BRIEF_V1.3_DEBRID.md](CODEX_BRIEF_V1.3_DE
 ### 10.7 Claude Code job list — final (revised from §4.2)
 
 Same as §4.2 plus:
-- **CC-C revised:** implement sports-always-debrid routing rule and debrid-first/qBit-fallback default per §10.3
+- **CC-C revised:** shipped behavior is debrid-first when configured with qBit/local fallback preserved for sports, movies, and TV
 - **CC-D revised:** `/playback/debrid` handles both magnet and NZB tokens (route by token-embedded protocol field)
 - **CC-J revised:** add `docs/DEBRID_SETUP.md` covers put.io token generation (`app.put.io/oauth`), RD filter warning, NZB indexer setup in Prowlarr
 
@@ -549,6 +551,6 @@ Same as §4.2 plus:
 | AD cache check | `/magnet/instant` assumed available | AD has NO cache check — always all-miss |
 | RD filter handling | Not addressed | RD filename sanitizer mitigates May 2026 filter (partial) |
 | Usenet support | Out of scope for v1.3 | In scope: PM via `addNzb`, Prowlarr Newznab adapter |
-| Sports routing | Implicit (same as movies/TV) | **Explicit: sports always debrid, never qBit** |
+| Sports routing | Implicit (same as movies/TV) | **Shipped correction: sports keeps qBit/local fallback; debrid is first only when configured** |
 | Default routing | Implicit (debrid coexists with qBit) | **Explicit: debrid first, qBit fallback** |
 | TorBox | Not mentioned | Considered, deferred to v1.4 (API docs blocked) |

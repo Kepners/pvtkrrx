@@ -9,7 +9,8 @@
 3. The app is **not** a third-party media host.
 4. The app is **not** a generic streaming platform.
 5. The app is a **bridge layer** between the user's own setup and Stremio.
-6. The trust message is central:
+6. Optional debrid support may be described only as **user-supplied provider handoff**. PVTKRRX can add/check/redirect through Real-Debrid, AllDebrid, or Premiumize when the user configures those credentials, but PVTKRRX does not become the debrid provider.
+7. The trust message is central:
 
    * **Your hardware, your trackers**
    * operator-controlled
@@ -21,7 +22,7 @@
 These themes should appear repeatedly across homepage, configure flow, docs, and launch copy:
 
 * Private trackers inside Stremio
-* No debrid
+* Not a debrid service; optional user-supplied debrid downloader support
 * No third-party media host
 * Your hardware, your trackers
 * Configure first
@@ -243,7 +244,7 @@ It should answer:
 * what the user needs
 * which route to start with
 * whether it hosts media
-* whether it needs debrid
+* whether it needs debrid or can optionally use a user-supplied debrid provider
 * where sports fit
 * where to start
 
@@ -279,7 +280,7 @@ unless there is plain English immediately underneath.
 Launch copy should be built around:
 
 * private trackers inside Stremio
-* no debrid
+* not a debrid service; optional user-supplied debrid downloader support
 * sports included as a real pillar
 * route choice
 * self-host / operator-controlled angle
@@ -309,7 +310,7 @@ If yes, it passes.
 **Must say**
 
 * private trackers in Stremio
-* no debrid
+* not a debrid service; optional user-supplied debrid downloader support
 * no third-party media host
 * your hardware, your trackers
 * configure first

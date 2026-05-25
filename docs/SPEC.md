@@ -1,11 +1,11 @@
 # PVTKRRX Specification
 
 > **Status:** Live product specification
-> **Updated:** 2026-04-23
+> **Updated:** 2026-05-25
 
 ## Product Statement
 
-PVTKRRX connects private tracker and seedbox infrastructure to Stremio without using debrid and without turning the hosted relay into a video proxy.
+PVTKRRX connects private tracker and seedbox infrastructure to Stremio, with optional user-supplied debrid provider handoff, without turning the hosted relay into a video proxy or a debrid provider.
 
 ## Current Product Goals
 
@@ -13,6 +13,7 @@ PVTKRRX connects private tracker and seedbox infrastructure to Stremio without u
 - Provide a same-account home-device route that can bridge hosted addon installs back to the active LAN host.
 - Provide a hosted route for public HTTPS seedbox playback.
 - Surface sports, movies, TV, and library content in one addon family.
+- Support optional debrid/cache-search handoff while preserving qBittorrent/local fallback behavior.
 - Keep tracker/file hints protected by encrypted config tokens and opaque playback state tokens.
 - Keep the local Windows desktop experience route-first and simple, with advanced/fallback tools hidden by default.
 
@@ -48,11 +49,14 @@ PVTKRRX connects private tracker and seedbox infrastructure to Stremio without u
 12. Windows desktop packaging for the local runtime.
 13. Desktop startup splash and route-aware popup guidance on Windows.
 14. Route-aware connection testing: hosted configure may test public HTTP/HTTPS service endpoints, while local configure may test loopback/LAN endpoints on the host.
+15. Optional Debrid provider configuration for Real-Debrid, AllDebrid, and Premiumize, plus optional cache search for put.io and Premiumize cache checks.
+16. `/playback/debrid` add/check/poll handoff that redirects to provider playback when ready and keeps qBittorrent/local streams as fallback.
 
 ## Non-Goals
 
 - Raw `192.168.x.x` addon install as the primary supported Stremio path.
 - Hosted relay proxying video bytes.
+- PVTKRRX acting as a debrid provider or third-party media host.
 - A standalone `.pvtk` file format.
 - Multiple independent seedbox profiles inside a single addon install.
 
@@ -64,6 +68,7 @@ PVTKRRX connects private tracker and seedbox infrastructure to Stremio without u
 - The Windows host desktop must use `PC Local`, not the hosted `LAN Bridge` route, for its own browsing/playback.
 - Local playback should prefer the built-in file server when the runtime can read the completed file.
 - Hosted `/file` and `/playback` must fail fast instead of waiting on a hosted runtime for local-only playback paths.
+- `/playback/debrid` must hand off to the configured provider and must not proxy provider media bytes through the hosted relay.
 - Hosted `Remote Seedbox` must not emit tracker `/playback` streams that depend on a disabled hosted playback path.
 - Remote tracker flows that would lose required external file-server auth must be suppressed.
 - Remote buffering URLs must only be emitted when the current file path is provable from live torrent state.

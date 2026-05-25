@@ -1,6 +1,6 @@
 # PVTKRRX Current Design
 
-Updated: 2026-04-26
+Updated: 2026-05-25
 
 ## Purpose
 
@@ -40,6 +40,7 @@ PVTKRRX is one codebase with three active runtime pieces:
    - when a real FreeDNS/domain front door is configured, the installer now disables any leftover `pvtkrrx-tunnel.service` so the old Cloudflare quick tunnel is removed from the runtime path
    - the installer prints a one-time `Configure` bootstrap URL with `#serverAdminToken=...` so the browser can load the saved self-host config automatically on first open
    - sports metadata and artwork are served by the SportsMeta companion service (`https://sportsmeta.pvtkrrx.cc`); the installer no longer pre-seeds a local TheSportsDB image cache and the previous 15-minute autofill job has been removed on 2026-04-22
+   - can store optional Debrid downloader credentials before local/qBit/seedbox settings; Debrid streams are added above qBittorrent fallback streams when configured
    - this is the independence path: after bootstrap, the runtime and config stay on the user's hardware and the hosted PVTKRRX site is no longer in the request path unless the user explicitly chooses the hosted relay
    - can install optional Linux `systemd` startup through `npm run server:setup` / `npm run server:install-service`
 3. Local runtime on the Windows host:
@@ -49,6 +50,7 @@ PVTKRRX is one codebase with three active runtime pieces:
    - reads completed files directly from the host download path when available
    - keeps its disk-backed runtime under `%APPDATA%\PVTKRRX\runtime` by default, outside the EXE install directory, so local config, account/link state, sports metadata, and cached poster bytes survive normal desktop updates and reinstall-over-the-top installs unless the runtime folder is explicitly deleted
    - can mint short-lived Stremio link sessions for the disk-backed `local` config when the request comes from the same host
+   - can use the same optional Debrid/cache-search config as self-hosted mode while still keeping local/qBittorrent playback as fallback
 4. Electron desktop wrapper:
    - launches and packages the local runtime on Windows
    - shows the startup splash and desktop shell
@@ -70,6 +72,24 @@ Canonical product truth (verified 2026-04-23):
 - Real raster sports artwork is a separate SportsMeta member product. `Sports Posters` means poster, background, logo, landscape, and other Stremio-compatible sports image fields where SportsMeta can safely resolve them. The public PVTKRRX-facing entrypoint is now `https://www.pvtkrrx.cc/sports`, styled with the main PVTKRRX site and backed by a narrow `/sports/billing/checkout` proxy that creates SportsMeta `Sports Posters` Stripe Checkout sessions. The paid half of the stack is still owned by SportsMeta, not by PVTKRRX: member tokens, entitlement enforcement, premium artwork bytes, portal/webhook handling, and member routes remain on `https://sportsmeta.pvtkrrx.cc`. PVTKRRX does not gate stream routes by billing state and does not forward member tokens through its sports catalog/meta/artwork routes.
 - So the product-level statement "SVG for everyone, real posters for paying customers" is a **stack-level truth that runs through two separate Stremio addons**, not a free/paid split inside PVTKRRX. Any doc, copy, or UI that implies PVTKRRX has an internal paid artwork tier is drift and should be read as historical intent.
 - If SportsMeta billing state changes, PVTKRRX behavior does not change. PVTKRRX stream routes are free on every install surface tested here.
+
+## Optional Debrid And Cache Search
+
+Debrid support is optional and user-supplied. PVTKRRX is not a debrid service.
+
+- Supported Debrid providers: Real-Debrid, AllDebrid, and Premiumize.
+- Supported cache-search sources: put.io and Premiumize cache check.
+- Premiumize cache check is implicitly available when a Premiumize downloader key is saved.
+- Debrid and cache-search settings live inside the encrypted install/server config and old configs without those blocks remain backward-compatible.
+- When a debrid provider is configured, PVTKRRX emits debrid playback streams above existing qBittorrent/local streams. The original qBit/local stream stays underneath as fallback.
+- Cached debrid/cache-search hits are ordered first where available.
+- Uncached tracker torrents can be handed to `/playback/debrid`, which adds/polls the configured provider and redirects to the provider URL when ready.
+- Torrent download URLs from private trackers are preserved and uploaded as torrent bytes where the provider supports it. PVTKRRX does not rebuild those sources into bare magnets unless no torrent file is available.
+- NZB/Newznab results can route through Premiumize when Premiumize is configured. Real-Debrid and AllDebrid are skipped for NZB because they do not support Usenet handoff.
+- The hosted relay must not proxy provider media bytes. Provider playback must be a redirect/handoff, not PVTKRRX-hosted streaming.
+- If no debrid/cache provider is configured, the stream list behaves like the v1.2 qBittorrent/local flow.
+
+Detailed implementation and release proof is tracked in [POSTERS_AND_DEBRID_WORKLOG_2026-05.md](POSTERS_AND_DEBRID_WORKLOG_2026-05.md).
 
 ## SportsMeta Boundary
 

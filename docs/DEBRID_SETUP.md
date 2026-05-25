@@ -2,6 +2,8 @@
 
 This guide covers how to wire each supported service into the v1.3 Debrid + Cache Search tabs on the Configure page. All services are optional. You can mix and match; for example, RD as the only debrid + put.io as the only cache source is fine.
 
+Implementation and live proof notes are tracked in [POSTERS_AND_DEBRID_WORKLOG_2026-05.md](POSTERS_AND_DEBRID_WORKLOG_2026-05.md).
+
 ## Quick decision
 
 | Want this? | Use this |

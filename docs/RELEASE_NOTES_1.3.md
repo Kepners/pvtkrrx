@@ -3,6 +3,8 @@
 **Released:** 2026-05-23 (v1.3.0) → patched 2026-05-25 (v1.3.7 — sports catalog/search adult-leak hotfix)
 **Type:** Feature release (purely additive, fully backward-compatible with v1.2)
 
+Detailed implementation and proof log: [POSTERS_AND_DEBRID_WORKLOG_2026-05.md](POSTERS_AND_DEBRID_WORKLOG_2026-05.md).
+
 ## v1.3.7 patch - sports catalog search hygiene
 
 v1.3.7 closes the remaining catalog-side leak for ambiguous sports searches such as Australian Football `On Couch`. The v1.3.6 stream handler fix blocked adult results from stream emission, but catalog search could still run an all-category Prowlarr fallback and show adult tracker entries as sports metadata results.

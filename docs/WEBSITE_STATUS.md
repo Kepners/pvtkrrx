@@ -1,6 +1,13 @@
 # PVTKRRX Website Status
 
-Updated: 2026-04-27
+Updated: 2026-05-25
+
+## 2026-05-25 Debrid Wording Update
+
+- The backend/release line now supports optional user-supplied debrid downloader handoff through Real-Debrid, AllDebrid, and Premiumize.
+- Public copy should no longer use bare "No debrid" wording as product truth. The current boundary is: PVTKRRX is not a debrid service, does not host or proxy media bytes, and can optionally hand off torrents/NZBs to the user's configured provider.
+- Detailed poster/debrid implementation and proof notes are in [POSTERS_AND_DEBRID_WORKLOG_2026-05.md](POSTERS_AND_DEBRID_WORKLOG_2026-05.md).
+- Public website code still needs a separate copy pass if visible pages contain old "No debrid" claims.
 
 ## 2026-04-27 First-Screen Clarity Deploy
 
@@ -11,7 +18,7 @@ Updated: 2026-04-27
   - clarified the first-screen setup flow as Windows host + Prowlarr + qBittorrent + Stremio
   - made `Download Windows App` the primary homepage CTA
   - renamed the route picker CTA to `Find My Setup Type`
-  - preserved the public copy rules from `docs/copy.md` around private trackers, no debrid, no third-party media host, and user-owned hardware
+  - preserved the then-current public copy rules from `docs/copy.md` around private trackers, no third-party media host, and user-owned hardware; this was superseded on 2026-05-25 by optional user-supplied debrid downloader wording
 - Other public pages reviewed and patched for mobile containment:
   - `/sports`
   - `/clockrr`
@@ -155,7 +162,7 @@ Main clarity gaps:
    - Sports
    - Movies and TV
    - Library
-   - No debrid
+   - Not a debrid service; optional user-supplied debrid downloader handoff when configured
    - Your hardware
 3. What you need
 4. Sports proof section

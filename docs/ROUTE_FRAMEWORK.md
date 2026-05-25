@@ -1,6 +1,6 @@
 # PVTKRRX Route Framework
 
-Updated: 2026-04-24
+Updated: 2026-05-25
 
 ## Purpose
 
@@ -10,6 +10,8 @@ One runtime. Three main install routes. Use the route that matches where playbac
 For the broader runtime and storage model, see `docs/CURRENT_DESIGN.md`.
 
 If you want the app to keep running without ongoing dependence on PVTKRRX infrastructure after setup, use explicit self-hosted server mode with a user-owned HTTPS origin. The hosted relay is optional convenience, not part of the self-host contract.
+
+Debrid is not a fourth route. It is an optional downloader/cache overlay on the existing routes, using the user's own Real-Debrid, AllDebrid, or Premiumize credentials.
 
 ## Hosted Base
 
@@ -44,6 +46,17 @@ Implementation note: the current user-facing `LAN Bridge` route is the code-faci
 7. `http://127.0.0.1:7000/...` remains the reliable manual install path for same-PC local use.
 8. `LAN Bridge` installs should be refreshed after meaningful pair/token/route changes because Stremio can keep stale hosted URLs.
 9. `/local/install` is a same-host/local-network helper route; a public `403` is expected.
+10. Optional Debrid/cache-search streams can be emitted on any configured route. When present, they sort above qBittorrent/local fallback streams, but the fallback streams remain in the list.
+
+## Optional Debrid Overlay
+
+- Debrid providers are configured per install/runtime, not globally.
+- Supported providers are Real-Debrid, AllDebrid, and Premiumize.
+- Cache-search sources are put.io and Premiumize cache check.
+- `/playback/debrid` handles add/check/poll handoff and redirects to the provider when ready.
+- The public hosted relay must not proxy Debrid provider media bytes.
+- If the provider is still downloading, `/playback/debrid` can return a preparing/`503` response until the provider exposes playable data.
+- If no Debrid provider is configured, route behavior falls back to the qBittorrent/local rules below.
 
 ## What Each Route Exposes
 
@@ -128,6 +141,7 @@ For playback-capable runtimes, the `In-progress unpacked video` row applies both
 |---|---|---|---|
 | `/:config/file/:info` | Serves bytes (200/206) | 307 -> local `/file` | 403 Forbidden |
 | `/:config/playback/:info` | Queue + comet poll (503 -> 302) | 307 -> local `/playback` | 403 Forbidden |
+| `/:config/playback/debrid/:token` | Provider add/check/poll -> redirect when ready | 307 -> local provider handoff when home redirect applies | Provider add/check/poll -> redirect when ready; never proxies media bytes |
 | `/:config/stream/:type/:id.json` | All stream types emitted | 307 -> local stream handler | Ready-file streams only |
 | `/:config/catalog/:type/:id.json` | All catalogs | 307 -> local catalog handler | All catalogs (direct from hosted) |
 | `/:config/meta/:type/:id.json` | All meta | 307 -> local meta handler | All meta (direct from hosted) |
