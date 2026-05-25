@@ -268,7 +268,7 @@ async function run() {
     assert.equal(result.streams[1].name, 'On Seedbox', 'qBit kept as fallback')
   })
 
-  await check('completed /file/ stream + debrid linked starts debrid before qBit fallback', async () => {
+  await check('SPORTS completed /file/ stream + PM cache miss keeps qBit file only', async () => {
     const baseResult = { streams: [makeQbitFileStream('PVTKRRX [SERVER] AUTO MKV')] }
     const result = await applyV13Routing(baseResult, {
       config: {
@@ -279,6 +279,24 @@ async function run() {
       playbackBaseUrl: PLAYBACK_BASE,
       configToken: CONFIG_TOKEN,
       id: 'sportsmeta:nba'
+    })
+    assert.equal(result.streams.length, 1)
+    assert.match(result.streams[0].url, /\/file\//, 'ready qBit file remains available')
+    assert.doesNotMatch(result.streams[0].url, /\/playback\/debrid\//)
+  })
+
+  await check('MOVIE completed /file/ stream + debrid linked still starts debrid before qBit fallback', async () => {
+    const baseResult = { streams: [makeQbitFileStream('PVTKRRX [SERVER] AUTO MKV')] }
+    const result = await applyV13Routing(baseResult, {
+      config: {
+        debrid: { providers: [{ type: 'pm', apiKey: 'pmkey', enabled: true }], preferDebridOverSeedbox: true },
+        cacheSearch: { sources: [makePmCacheMissSource()] }
+      },
+      addonUrl: PLAYBACK_BASE,
+      playbackBaseUrl: PLAYBACK_BASE,
+      configToken: CONFIG_TOKEN,
+      id: 'tt12345678',
+      type: 'movie'
     })
     assert.equal(result.streams.length, 2)
     assert.match(result.streams[0].url, /\/playback\/debrid\//, 'debrid downloader first')

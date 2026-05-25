@@ -96,6 +96,12 @@ function buildDebridPlaybackUrl(playbackBaseUrl, providers, payload) {
   }
 }
 
+function isSportsContext(ctx = {}) {
+  const type = String(ctx.type || '').trim().toLowerCase()
+  const id = String(ctx.id || '').trim().toLowerCase()
+  return type === 'sports' || id.startsWith('sportsmeta:')
+}
+
 function pickReadyStreamName(hit) {
   const source = hit.sourceId === 'putio' ? 'put.io' : hit.sourceId === 'pm' ? 'Premiumize' : hit.sourceId
   // COPY DRAFT — pending docs/copy.md approval. Brief §3 stream-prefix lock.
@@ -219,6 +225,7 @@ async function applyV13Routing(result, ctx = {}) {
   const existing = Array.isArray(result.streams) ? result.streams : []
   const providersForDebrid = enabledDebrid.map(p => ({ type: p.type, apiKey: p.apiKey }))
   const debridMetas = []
+  const sportsContext = isSportsContext(ctx)
 
   // Build debrid variants from existing streams (where we can derive a hash/magnet).
   const debridStreams = []
@@ -228,6 +235,9 @@ async function applyV13Routing(result, ctx = {}) {
       const meta = tryExtractDebridMetaFromStreamUrl(stream?.url, playbackBaseUrl, configToken)
       if (!meta) continue
       debridMetas.push(meta)
+      if (sportsContext && meta.sourceKind === 'file') {
+        continue
+      }
       const torrentSource = meta.link || (meta.hash ? buildMagnetFromHash(meta.hash, meta.name) : null)
       if (!torrentSource) continue
       const debridUrl = buildDebridPlaybackUrl(playbackBaseUrl, providersForDebrid, {
@@ -318,6 +328,7 @@ module.exports = {
   _tryExtractDebridMetaFromStreamUrl: tryExtractDebridMetaFromStreamUrl,
   _buildDebridPlaybackUrl: buildDebridPlaybackUrl,
   _buildMagnetFromHash: buildMagnetFromHash,
+  _isSportsContext: isSportsContext,
   _resolveEnabledCacheSources: resolveEnabledCacheSources,
   _prioritizeProviderForCacheSource: prioritizeProviderForCacheSource
 }
