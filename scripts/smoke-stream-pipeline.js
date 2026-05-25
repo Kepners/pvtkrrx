@@ -812,6 +812,70 @@ async function run() {
 
     await withScenario(async () => {
       delete process.env.PVTKRRX_HOSTED_RELAY
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      ProwlarrClient.prototype.search = async () => [
+        trackerItem({
+          title: 'Sports RS 2026 Home Club vs Away Club 28 03 720pEN60fps FDSN',
+          link: 'https://tracker.example/download/home-away-zero-peer.torrent',
+          infohash: '',
+          seeders: 0,
+          size: 3_600_000_000
+        })
+      ]
+      global.fetch = async () => {
+        throw new Error('zero-peer sports torrents should be suppressed before payload fetch')
+      }
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'sports',
+        customPackedId({
+          t: 'Sports RS 2026 Home Club vs Away Club 28 03 720pEN60fps FDSN',
+          n: 'Home Club vs Away Club',
+          h: '',
+          l: '',
+          p: '2026-03-28',
+          o: 'Home Club',
+          w: 'Away Club'
+        }),
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4i1 zero-peer supplemental sports torrents should not be advertised as playable')
+    })
+
+    await withScenario(async () => {
+      delete process.env.PVTKRRX_HOSTED_RELAY
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      ProwlarrClient.prototype.search = async () => []
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([]))
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'sports',
+        customPackedId({
+          t: 'Sports RS 2026 Home Club vs Away Club 28 03 720pEN60fps FDSN',
+          n: 'Home Club vs Away Club',
+          h: matchedTorrent().hash,
+          l: 'https://tracker.example/download/home-away-zero-files.torrent',
+          s: 3_600_000_000,
+          d: 7,
+          p: '2026-03-28',
+          o: 'Home Club',
+          w: 'Away Club'
+        }),
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 0, '#4i2 direct sports torrents with no playable files should be inspected and hidden even when an infohash is embedded')
+    })
+
+    await withScenario(async () => {
+      delete process.env.PVTKRRX_HOSTED_RELAY
       const payload = buildTorrentPayload([
         { path: 'Sports.RS.2026.Home.Club.vs.Away.Club.720p.mp4', length: 3_600_000_000 }
       ])

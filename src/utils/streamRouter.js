@@ -102,6 +102,50 @@ function isSportsContext(ctx = {}) {
   return type === 'sports' || id.startsWith('sportsmeta:')
 }
 
+function isReadyCacheStream(stream = {}) {
+  const name = String(stream?.name || '')
+  const mode = String(stream?.behaviorHints?.sourceMode || '').toLowerCase()
+  return /\bREADY\b/i.test(name) || mode === 'cache' || mode === 'cached' || mode === 'debrid-cache'
+}
+
+function isNoticeStream(stream = {}) {
+  return String(stream?.behaviorHints?.sourceMode || '').toLowerCase() === 'notice'
+}
+
+function sportsStreamSourceSize(stream = {}) {
+  const hints = stream?.behaviorHints || {}
+  return Math.max(0, Number(hints.sourceSize || hints.videoSize || 0))
+}
+
+function sportsStreamSeeders(stream = {}) {
+  return Math.max(0, Number(stream?.behaviorHints?.sourceSeeders || 0))
+}
+
+function isSportsIntermediateMode(stream = {}) {
+  const mode = String(stream?.behaviorHints?.sourceMode || '').toLowerCase()
+  return mode === 'tracker' || mode === 'buffering'
+}
+
+function shouldKeepSportsStream(stream = {}) {
+  if (isReadyCacheStream(stream) || isNoticeStream(stream)) return true
+
+  const mode = String(stream?.behaviorHints?.sourceMode || '').toLowerCase()
+  if (!mode) return true
+
+  const sourceSize = sportsStreamSourceSize(stream)
+  if (sourceSize <= 0) return false
+
+  if (isSportsIntermediateMode(stream)) {
+    return sportsStreamSeeders(stream) > 0
+  }
+
+  return true
+}
+
+function filterSportsStreams(streams = []) {
+  return (Array.isArray(streams) ? streams : []).filter(shouldKeepSportsStream)
+}
+
 function pickReadyStreamName(hit) {
   const source = hit.sourceId === 'putio' ? 'put.io' : hit.sourceId === 'pm' ? 'Premiumize' : hit.sourceId
   // COPY DRAFT — pending docs/copy.md approval. Brief §3 stream-prefix lock.
@@ -199,7 +243,13 @@ async function buildCacheSearchStreams(query, enabledSources, playbackBaseUrl, p
     out.push({
       name: pickReadyStreamName(hit),
       title: hit.name || 'cached',
-      url
+      url,
+      behaviorHints: {
+        notWebReady: true,
+        filename: hit.name || 'cached',
+        sourceMode: 'debrid-cache',
+        sourceSize: Math.max(0, Number(hit.sizeBytes || 0))
+      }
     })
   }
   return out
@@ -215,17 +265,23 @@ async function applyV13Routing(result, ctx = {}) {
   const enabledDebrid = (debridConfig.providers || []).filter(p => p && p.enabled && String(p.apiKey || '').trim())
   const enabledCache = resolveEnabledCacheSources(cacheConfig, enabledDebrid)
   const hasDebrid = enabledDebrid.length > 0
+  const existing = Array.isArray(result.streams) ? result.streams : []
+  const sportsContext = isSportsContext(ctx)
 
   // Backward compat: install has NOT opted into v1.3 (no debrid + no cache search
   // configured). Pass through with v1.2 behavior — no routing changes at all.
   if (!hasDebrid && enabledCache.length === 0) {
+    if (sportsContext) {
+      return {
+        ...result,
+        streams: filterSportsStreams(existing)
+      }
+    }
     return result
   }
 
-  const existing = Array.isArray(result.streams) ? result.streams : []
   const providersForDebrid = enabledDebrid.map(p => ({ type: p.type, apiKey: p.apiKey }))
   const debridMetas = []
-  const sportsContext = isSportsContext(ctx)
 
   // Build debrid variants from existing streams (where we can derive a hash/magnet).
   const debridStreams = []
@@ -309,7 +365,8 @@ async function applyV13Routing(result, ctx = {}) {
   // Dedupe by URL to prevent the same /playback/debrid token from appearing twice.
   const seen = new Set()
   const deduped = []
-  for (const s of finalStreams) {
+  const routedStreams = sportsContext ? filterSportsStreams(finalStreams) : finalStreams
+  for (const s of routedStreams) {
     const key = String(s?.url || '')
     if (!key || seen.has(key)) continue
     seen.add(key)
@@ -329,6 +386,8 @@ module.exports = {
   _buildDebridPlaybackUrl: buildDebridPlaybackUrl,
   _buildMagnetFromHash: buildMagnetFromHash,
   _isSportsContext: isSportsContext,
+  _filterSportsStreams: filterSportsStreams,
+  _shouldKeepSportsStream: shouldKeepSportsStream,
   _resolveEnabledCacheSources: resolveEnabledCacheSources,
   _prioritizeProviderForCacheSource: prioritizeProviderForCacheSource
 }

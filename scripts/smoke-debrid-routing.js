@@ -38,6 +38,16 @@ function makeQbitFileStream(label = 'On Seedbox', title = '') {
   return { name: label, title, url: `${PLAYBACK_BASE}/${CONFIG_TOKEN}/file/${token}` }
 }
 
+function withBehaviorHints(stream, behaviorHints = {}) {
+  return {
+    ...stream,
+    behaviorHints: {
+      ...(stream.behaviorHints || {}),
+      ...behaviorHints
+    }
+  }
+}
+
 function makePmCacheMissSource(apiKey = 'pmkey') {
   return {
     type: 'pm',
@@ -235,6 +245,147 @@ async function run() {
     assert.match(result.streams[0].name, /^⬇ RD/)
     assert.equal(result.streams[1].name, 'On Seedbox', 'qBit backup kept underneath')
     assert.doesNotMatch(result.streams[1].url, /\/playback\/debrid\//)
+  })
+
+  await check('SPORTS local install hides zero-peer tracker rows before playback', async () => {
+    const baseResult = {
+      streams: [withBehaviorHints(makeQbitStream('PVTKRRX [PC] 1080p', 'zero peer sports'), {
+        sourceMode: 'tracker',
+        sourceSeeders: 0,
+        sourceSize: 4_200_000_000
+      })]
+    }
+    const result = await applyV13Routing(baseResult, {
+      config: { debrid: { providers: [] }, cacheSearch: { sources: [] } },
+      addonUrl: PLAYBACK_BASE,
+      playbackBaseUrl: PLAYBACK_BASE,
+      configToken: 'local',
+      id: 'sportsmeta:nba'
+    })
+    assert.deepEqual(result.streams, [])
+  })
+
+  await check('SPORTS seedbox install hides zero-peer buffering rows before playback', async () => {
+    const baseResult = {
+      streams: [withBehaviorHints(makeQbitStream('PVTKRRX [SERVER] 1080p', 'zero peer sports'), {
+        sourceMode: 'buffering',
+        sourceSeeders: 0,
+        sourceSize: 4_200_000_000
+      })]
+    }
+    const result = await applyV13Routing(baseResult, {
+      config: { debrid: { providers: [] }, cacheSearch: { sources: [] } },
+      addonUrl: PLAYBACK_BASE,
+      playbackBaseUrl: PLAYBACK_BASE,
+      configToken: CONFIG_TOKEN,
+      id: 'sportsmeta:nba'
+    })
+    assert.deepEqual(result.streams, [])
+  })
+
+  await check('SPORTS ready seedbox files stay visible even with zero current peers', async () => {
+    const baseResult = {
+      streams: [withBehaviorHints(makeQbitFileStream('PVTKRRX [SERVER] AUTO MKV'), {
+        sourceMode: 'seedbox',
+        sourceSeeders: 0,
+        sourceSize: 4_200_000_000
+      })]
+    }
+    const result = await applyV13Routing(baseResult, {
+      config: { debrid: { providers: [] }, cacheSearch: { sources: [] } },
+      addonUrl: PLAYBACK_BASE,
+      playbackBaseUrl: PLAYBACK_BASE,
+      configToken: CONFIG_TOKEN,
+      id: 'sportsmeta:nba'
+    })
+    assert.equal(result.streams.length, 1)
+    assert.match(result.streams[0].url, /\/file\//)
+  })
+
+  await check('SPORTS PM cache hit stays visible while zero-peer intermediate rows are hidden', async () => {
+    const baseResult = {
+      streams: [withBehaviorHints(makeQbitStream('PVTKRRX [SERVER] 1080p', 'zero peer cached sports'), {
+        sourceMode: 'tracker',
+        sourceSeeders: 0,
+        sourceSize: 4_200_000_000
+      })]
+    }
+    const result = await applyV13Routing(baseResult, {
+      config: {
+        debrid: { providers: [{ type: 'pm', apiKey: 'pmkey', enabled: true }], preferDebridOverSeedbox: true },
+        cacheSearch: {
+          sources: [{
+            type: 'pm',
+            apiKey: 'pmkey',
+            enabled: true,
+            source: {
+              id: 'pm',
+              async searchByHash(infohash) {
+                assert.equal(infohash, SAMPLE_HASH)
+                return {
+                  sourceId: 'pm',
+                  name: 'cached zero peer sports',
+                  infohash,
+                  sizeBytes: 4_200_000_000,
+                  directStreamUrl: null
+                }
+              },
+              async searchByTitle() {
+                return []
+              }
+            }
+          }]
+        }
+      },
+      addonUrl: PLAYBACK_BASE,
+      playbackBaseUrl: PLAYBACK_BASE,
+      configToken: CONFIG_TOKEN,
+      id: 'sportsmeta:nba'
+    })
+    assert.equal(result.streams.length, 1)
+    assert.match(result.streams[0].name, /READY/)
+    assert.equal(result.streams[0].behaviorHints.sourceMode, 'debrid-cache')
+    _clearDebridCacheMemo()
+  })
+
+  await check('SPORTS hides zero-size intermediate rows when cache misses', async () => {
+    const baseResult = {
+      streams: [withBehaviorHints(makeQbitStream('PVTKRRX [SERVER] 1080p', 'zero file sports'), {
+        sourceMode: 'tracker',
+        sourceSeeders: 9,
+        sourceSize: 0
+      })]
+    }
+    const result = await applyV13Routing(baseResult, {
+      config: {
+        debrid: { providers: [{ type: 'pm', apiKey: 'pmkey', enabled: true }], preferDebridOverSeedbox: true },
+        cacheSearch: { sources: [makePmCacheMissSource()] }
+      },
+      addonUrl: PLAYBACK_BASE,
+      playbackBaseUrl: PLAYBACK_BASE,
+      configToken: CONFIG_TOKEN,
+      id: 'sportsmeta:nba'
+    })
+    assert.deepEqual(result.streams, [])
+  })
+
+  await check('MOVIE zero-peer routing remains unchanged by sports-only guard', async () => {
+    const baseResult = {
+      streams: [withBehaviorHints(makeQbitStream('PVTKRRX [SERVER] 1080p', 'movie'), {
+        sourceMode: 'tracker',
+        sourceSeeders: 0,
+        sourceSize: 0
+      })]
+    }
+    const result = await applyV13Routing(baseResult, {
+      config: { debrid: { providers: [] }, cacheSearch: { sources: [] } },
+      addonUrl: PLAYBACK_BASE,
+      playbackBaseUrl: PLAYBACK_BASE,
+      configToken: CONFIG_TOKEN,
+      id: 'tt12345678',
+      type: 'movie'
+    })
+    assert.equal(result.streams.length, 1)
   })
 
   await check('MOVIE + no debrid → qBit unchanged (v1.2 passthrough)', async () => {

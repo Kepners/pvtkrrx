@@ -193,6 +193,8 @@ async function inspectTrackerLink(link) {
         timeoutMs: TRACKER_LINK_INSPECTION_TIMEOUT_MS
       })
       const inspection = inspectTorrentPayload(payload.bytes)
+      const totalSizeBytes = inspection.files.reduce((sum, file) => sum + Math.max(0, Number(file?.size || 0)), 0)
+      const supportedDirectVideoBytes = inspection.supportedDirectVideoFiles.reduce((sum, file) => sum + Math.max(0, Number(file?.size || 0)), 0)
       return {
         infoHash: String(inspection.infoHash || '').toLowerCase(),
         packedOnly: Boolean(inspection.packedOnly),
@@ -201,7 +203,9 @@ async function inspectTrackerLink(link) {
         fileCount: inspection.files.length,
         archiveCount: inspection.archiveFiles.length,
         directVideoCount: inspection.directVideoFiles.length,
-        supportedDirectVideoCount: inspection.supportedDirectVideoFiles.length
+        supportedDirectVideoCount: inspection.supportedDirectVideoFiles.length,
+        totalSizeBytes,
+        supportedDirectVideoBytes
       }
     } catch (err) {
       return {
@@ -225,6 +229,18 @@ async function inspectTrackerLink(link) {
   })
   trimTrackerLinkInspectionCache()
   return result
+}
+
+function sportsSourceHasPeersAndFiles(item = {}) {
+  return Math.max(0, Number(item?.seeders || 0)) > 0 &&
+    Math.max(0, Number(item?.size || 0)) > 0
+}
+
+function trackerInspectionHasPlayableVideo(inspection = {}) {
+  if (!inspection?.inspected) return false
+  if (inspection.packedOnly || inspection.legacyAviOnly) return false
+  return Math.max(0, Number(inspection.supportedDirectVideoCount || 0)) > 0 &&
+    Math.max(0, Number(inspection.supportedDirectVideoBytes || 0)) > 0
 }
 
 function buildArchiveDisplayFilename(title) {
@@ -912,7 +928,8 @@ async function runSportsProwlarrSearch(torznab, query, useCategories, contextLab
 
 async function searchSportsProwlarrVariants(torznab, query, contextLabel) {
   const categoryItems = await runSportsProwlarrSearch(torznab, query, true, contextLabel)
-  return filterUnsafeSportsSearchItems(categoryItems, contextLabel)
+  const broadItems = await runSportsProwlarrSearch(torznab, query, false, contextLabel)
+  return filterUnsafeSportsSearchItems(mergeUniqueSourceItems(categoryItems, broadItems), contextLabel)
 }
 
 function filterUnsafeSportsSearchItems(items, contextLabel = 'Sports search') {
@@ -1007,6 +1024,7 @@ async function buildSupplementalSportsStreams({
   const streams = []
   for (const item of ordered) {
     if (streams.length + existingStreamCount >= STREAM_MAX_CANDIDATES) break
+    if (!sportsSourceHasPeersAndFiles(item)) continue
     if (!hasBudget(500)) {
       console.warn('[stream] Supplemental sports inspection budget exhausted')
       break
@@ -1019,9 +1037,11 @@ async function buildSupplementalSportsStreams({
     const knownInfoHash = String(item?.infohash || '').toLowerCase()
     const inspection = titleLooksPacked
       ? { packedOnly: true, inspected: false }
-      : knownInfoHash
-        ? { packedOnly: false, inspected: true, infoHash: knownInfoHash }
-        : await inspectTrackerLink(item.link)
+      : item.link
+        ? await inspectTrackerLink(item.link)
+        : knownInfoHash
+          ? { packedOnly: false, inspected: true, infoHash: knownInfoHash }
+          : { packedOnly: false, inspected: false }
     if (titleLooksPacked || inspection.packedOnly) {
       if (noticeCounts) noticeCounts.packedArchiveLiveUnsupported += 1
       continue
@@ -1034,6 +1054,7 @@ async function buildSupplementalSportsStreams({
       if (noticeCounts) noticeCounts.trackerLinkUnverified += 1
       continue
     }
+    if (item.link && !trackerInspectionHasPlayableVideo(inspection)) continue
     if (!trackerPlaybackEnabled) {
       recordTrackerRestrictionNotice(noticeCounts, trackerPlaybackRestriction)
       break
@@ -1582,7 +1603,11 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
   const likelyLegacyAviDirectRelease = titleLooksLegacyAvi(resolvedInfo.t)
   let directInspection = null
   let matched = infoHash ? torrents.find(t => t.hash.toLowerCase() === infoHash) : null
-  if (!matched && !infoHash && directLink && !likelyPackedDirectRelease && !likelyLegacyAviDirectRelease) {
+  const shouldInspectDirectTracker = directLink &&
+    !likelyPackedDirectRelease &&
+    !likelyLegacyAviDirectRelease &&
+    (allowSupplementalSportsResults || !infoHash)
+  if (!matched && shouldInspectDirectTracker) {
     directInspection = await inspectTrackerLink(directLink)
     if (directInspection.infoHash) {
       infoHash = String(directInspection.infoHash || '').toLowerCase()
@@ -1685,6 +1710,10 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
       noticeCounts.legacyAviSuppressed += 1
     } else if (!inspection.inspected) {
       noticeCounts.trackerLinkUnverified += 1
+    } else if (allowSupplementalSportsResults && !sportsSourceHasPeersAndFiles({ size: resolvedInfo.s, seeders: resolvedInfo.d })) {
+      // Suppress sports queue-and-buffer rows that have no peers or no source size.
+    } else if (allowSupplementalSportsResults && directLink && !trackerInspectionHasPlayableVideo(inspection)) {
+      // Suppress sports torrents whose payload has no playable video file.
     } else if (trackerPlaybackEnabled) {
       try {
         const playbackUrl = buildPlaybackRouteUrl(playbackBaseUrl, configToken, {
