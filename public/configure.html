@@ -6790,9 +6790,7 @@
       applySportsPosterEntitlementToUi(config.entitlement || null);
       const templateSelect = document.getElementById('sportsPosterTemplate');
       if (templateSelect) {
-        const desired = String(config.sportsPosterTemplate || 'ticket-stub').trim() || 'ticket-stub';
-        const allowed = Array.from(templateSelect.options).map((opt) => opt.value);
-        templateSelect.value = allowed.includes(desired) ? desired : 'ticket-stub';
+        syncSportsPosterTemplateSelectValue(templateSelect, config.sportsPosterTemplate);
         refreshSportsPosterTemplateStatus();
       }
       if (config.localHostname) {
@@ -7172,6 +7170,16 @@
     let debridAutoSaveSeq = 0;
     let sportsPosterTemplateAutoSaveTimer = null;
     let sportsPosterTemplateAutoSaveSeq = 0;
+    const SPORTS_POSTER_TEMPLATE_ORDER = ['editorial', 'broadcast', 'sportsbook', 'trading-card', 'brutalist', 'ticket-stub', 'glitch'];
+    const SPORTS_POSTER_TEMPLATE_LABELS = {
+      editorial: 'Editorial',
+      broadcast: 'Broadcast',
+      sportsbook: 'Sportsbook',
+      'trading-card': 'Trading Card',
+      brutalist: 'Brutalist',
+      'ticket-stub': 'Ticket Stub',
+      glitch: 'Glitch'
+    };
 
     function setDebridSaveStatus(text, type) {
       ['debridAutoSaveStatus', 'cacheSearchAutoSaveStatus'].forEach((id) => {
@@ -7245,33 +7253,58 @@
       }, 800);
     }
 
-    function refreshSportsPosterTemplateStatus(typeOverride, messageOverride) {
-      const entitlement = window.__pvtkrrxSportsPosterEntitlement || null;
-      const allowed = entitlement && Array.isArray(entitlement.allowedSportsPosterTemplates)
+    function normalizeAllowedSportsPosterTemplates(entitlement) {
+      const rawAllowed = entitlement && Array.isArray(entitlement.allowedSportsPosterTemplates)
         ? entitlement.allowedSportsPosterTemplates
         : ['ticket-stub'];
+      const allowed = rawAllowed
+        .map((template) => String(template || '').trim())
+        .filter((template) => SPORTS_POSTER_TEMPLATE_LABELS[template]);
+      if (!allowed.includes('ticket-stub')) allowed.push('ticket-stub');
+      const unique = Array.from(new Set(allowed));
+      return SPORTS_POSTER_TEMPLATE_ORDER.filter((template) => unique.includes(template));
+    }
+
+    function resolveAppliedSportsPosterTemplate(entitlement, requestedTemplate) {
+      const allowed = normalizeAllowedSportsPosterTemplates(entitlement);
+      const requested = String(requestedTemplate || '').trim();
+      const resolved = String(entitlement?.resolvedSportsPosterTemplate || '').trim();
+      if (requested && allowed.includes(requested)) return requested;
+      if (resolved && allowed.includes(resolved)) return resolved;
+      return 'ticket-stub';
+    }
+
+    function labelSportsPosterTemplate(template) {
+      return SPORTS_POSTER_TEMPLATE_LABELS[template] || template || 'Ticket Stub';
+    }
+
+    function syncSportsPosterTemplateSelectValue(select, requestedTemplate) {
+      const entitlement = window.__pvtkrrxSportsPosterEntitlement || null;
+      const applied = resolveAppliedSportsPosterTemplate(
+        entitlement,
+        requestedTemplate !== undefined ? requestedTemplate : select?.value
+      );
+      if (select && select.value !== applied) {
+        select.value = applied;
+      }
+      return applied;
+    }
+
+    function refreshSportsPosterTemplateStatus(typeOverride, messageOverride) {
+      const entitlement = window.__pvtkrrxSportsPosterEntitlement || null;
       const select = document.getElementById('sportsPosterTemplate');
-      const value = select && allowed.includes(select.value) ? select.value : 'ticket-stub';
-      const labels = {
-        editorial: 'Editorial',
-        broadcast: 'Broadcast',
-        sportsbook: 'Sportsbook',
-        'trading-card': 'Trading Card',
-        brutalist: 'Brutalist',
-        'ticket-stub': 'Ticket Stub',
-        glitch: 'Glitch'
-      };
+      const value = syncSportsPosterTemplateSelectValue(select);
       const sourceLabel = entitlement && entitlement.source ? entitlement.source : 'none';
       if (messageOverride) {
         setSportsPosterTemplateStatus(typeOverride || 'info', messageOverride);
         return;
       }
       if (sourceLabel === 'owner_override' || sourceLabel === 'admin_override') {
-        setSportsPosterTemplateStatus('ok', 'Owner/admin entitlement active. Selected style: ' + (labels[value] || value) + '.');
+        setSportsPosterTemplateStatus('ok', 'Owner/admin entitlement active. Applied style: ' + labelSportsPosterTemplate(value) + '.');
       } else if (sourceLabel === 'manual_grant' || sourceLabel === 'member_token' || sourceLabel === 'trial') {
-        setSportsPosterTemplateStatus('ok', 'Entitlement source: ' + sourceLabel.replace('_', ' ') + '. Selected style: ' + (labels[value] || value) + '.');
+        setSportsPosterTemplateStatus('ok', 'Entitlement source: ' + sourceLabel.replace(/_/g, ' ') + '. Applied style: ' + labelSportsPosterTemplate(value) + '.');
       } else {
-        setSportsPosterTemplateStatus('ok', 'Included sports style: Ticket Stub. Other templates require an entitlement (owner override, admin override, manual grant, member token, or trial).');
+        setSportsPosterTemplateStatus('ok', 'Applied sports style: Ticket Stub. Other templates require an entitlement (owner override, admin override, manual grant, member token, or trial).');
       }
     }
 
@@ -7319,13 +7352,12 @@
         updateSavedSecretState(data.savedSecrets || {});
         applySportsPosterEntitlementToUi(data.entitlement || null);
         const select = document.getElementById('sportsPosterTemplate');
+        let appliedTemplate = 'ticket-stub';
         if (select) {
-          const savedTemplate = String(data.sportsPosterTemplate || config.sportsPosterTemplate || 'ticket-stub').trim() || 'ticket-stub';
-          const allowedAfterSave = Array.from(select.options).map((opt) => opt.value);
-          select.value = allowedAfterSave.includes(savedTemplate) ? savedTemplate : 'ticket-stub';
+          appliedTemplate = syncSportsPosterTemplateSelectValue(select, data.sportsPosterTemplate || config.sportsPosterTemplate);
         }
         const stamp = new Date().toLocaleTimeString();
-        refreshSportsPosterTemplateStatus('ok', 'Saved sports poster style at ' + stamp + '.');
+        refreshSportsPosterTemplateStatus('ok', 'Saved at ' + stamp + '. Applied style: ' + labelSportsPosterTemplate(appliedTemplate) + '.');
       } catch (err) {
         if (mySeq !== sportsPosterTemplateAutoSaveSeq) return;
         refreshSportsPosterTemplateStatus('err', 'Save failed: ' + err.message);
@@ -7345,12 +7377,8 @@
       const safeFallback = String(fallback || 'ticket-stub').trim() || 'ticket-stub';
       const select = document.getElementById('sportsPosterTemplate');
       const entitlement = window.__pvtkrrxSportsPosterEntitlement || null;
-      const allowed = entitlement && Array.isArray(entitlement.allowedSportsPosterTemplates)
-        ? entitlement.allowedSportsPosterTemplates
-        : ['ticket-stub'];
       if (!select) return safeFallback;
-      const value = String(select.value || '').trim();
-      return value && allowed.includes(value) ? value : safeFallback;
+      return resolveAppliedSportsPosterTemplate(entitlement, select.value) || safeFallback;
     }
 
     function applySportsPosterEntitlementToUi(entitlement) {
@@ -7359,36 +7387,27 @@
         : { source: 'none', allowed: false, allowedSportsPosterTemplates: ['ticket-stub'], resolvedSportsPosterTemplate: 'ticket-stub' };
       const select = document.getElementById('sportsPosterTemplate');
       if (!select) return;
-      const allowed = Array.isArray(window.__pvtkrrxSportsPosterEntitlement.allowedSportsPosterTemplates)
-        ? window.__pvtkrrxSportsPosterEntitlement.allowedSportsPosterTemplates.slice()
-        : ['ticket-stub'];
-      const labels = {
-        editorial: 'Editorial',
-        broadcast: 'Broadcast',
-        sportsbook: 'Sportsbook',
-        'trading-card': 'Trading Card',
-        brutalist: 'Brutalist',
-        'ticket-stub': 'Ticket Stub',
-        glitch: 'Glitch'
-      };
-      const present = new Set(Array.from(select.options).map((opt) => opt.value));
+      const requestedBeforeRebuild = select.value;
+      const allowed = normalizeAllowedSportsPosterTemplates(window.__pvtkrrxSportsPosterEntitlement);
+      const nextOptions = [];
       for (const template of allowed) {
-        if (present.has(template)) continue;
         const opt = document.createElement('option');
         opt.value = template;
-        opt.textContent = labels[template] || template;
-        select.appendChild(opt);
-        present.add(template);
+        opt.textContent = labelSportsPosterTemplate(template);
+        nextOptions.push(opt);
       }
+      select.replaceChildren(...nextOptions);
+      select.value = resolveAppliedSportsPosterTemplate(window.__pvtkrrxSportsPosterEntitlement, requestedBeforeRebuild);
       const showSelector = allowed.length > 1;
+      const label = document.querySelector('label[for="sportsPosterTemplate"]');
       if (showSelector) {
         select.removeAttribute('disabled');
         select.removeAttribute('aria-disabled');
-        const label = document.querySelector('label[for="sportsPosterTemplate"]');
         if (label) label.textContent = 'Sports Poster Style';
       } else {
         select.setAttribute('disabled', 'disabled');
         select.setAttribute('aria-disabled', 'true');
+        if (label) label.textContent = 'Included Sports Style';
       }
     }
 

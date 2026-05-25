@@ -128,6 +128,21 @@ async function main() {
     /sportsPosterTemplate:\s*resolveSelectedSportsPosterTemplate\(\s*'ticket-stub'\s*\)/,
     'configure save payload must default to ticket-stub when entitlement is absent'
   )
+  assert.match(
+    configureHtml,
+    /function applySportsPosterEntitlementToUi[\s\S]*select\.replaceChildren\(\.\.\.nextOptions\)[\s\S]*label\.textContent = 'Included Sports Style'/,
+    'configure UI must rebuild the sports style selector and relock the label when entitlement is absent'
+  )
+  assert.match(
+    configureHtml,
+    /function refreshSportsPosterTemplateStatus[\s\S]*syncSportsPosterTemplateSelectValue\(select\)[\s\S]*Applied sports style: Ticket Stub/,
+    'configure status must report the applied free style, not a stale requested style'
+  )
+  assert.match(
+    configureHtml,
+    /function fillConfig[\s\S]*applySportsPosterEntitlementToUi\(config\.entitlement \|\| null\)[\s\S]*syncSportsPosterTemplateSelectValue\(templateSelect, config\.sportsPosterTemplate\)/,
+    'configure readback must clamp the visible selector through the entitlement-aware applied value'
+  )
   for (const template of BLOCKED_TEMPLATES) {
     assert.doesNotMatch(configureHtml, new RegExp(`value="${template}"`, 'i'), `configure page leaks ${template}`)
   }
