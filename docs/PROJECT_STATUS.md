@@ -4,7 +4,14 @@ Updated: 2026-05-25
 
 ## Current Stage
 
-PVTKRRX is on the `1.3.5` release line. v1.3 adds optional Debrid (Real-Debrid, AllDebrid, Premiumize) + Cache Search (put.io, Premiumize cache check) + Newznab (Usenet) support. v1.3.5 makes debrid the first downloader when configured: cached debrid links surface first, uncached playback clicks hand the torrent/NZB to the configured debrid provider before local/qBittorrent/seedbox fallback, and qBittorrent streams remain in the list underneath. Installs without any debrid/cache config are unchanged from v1.2.
+PVTKRRX is on the `1.3.6` release line. v1.3 adds optional Debrid (Real-Debrid, AllDebrid, Premiumize) + Cache Search (put.io, Premiumize cache check) + Newznab (Usenet) support. v1.3.5 makes debrid the first downloader when configured: cached debrid links surface first, uncached playback clicks hand the torrent/NZB to the configured debrid provider before local/qBittorrent/seedbox fallback, and qBittorrent streams remain in the list underneath. v1.3.6 hardens sports stream search so supplemental sports lookups cannot fall back to all Prowlarr categories or emit adult tracker results. Installs without any debrid/cache config are unchanged from v1.2.
+
+## 2026-05-25: v1.3.6 sports stream search adult-leak hotfix
+
+- Root cause: the `On Couch` Australian Football stream had no live availability anchor after service restart. The stream handler then ran supplemental sports search for `On Couch` in TV/Sport category `5060`, and when that was not enough it also ran a broad all-category Prowlarr fallback. IPTorrents returned adult category results for the broad query, and those were emitted as sports streams.
+- Backend fix: `src/handlers/stream.js` no longer does an all-category Prowlarr fallback for supplemental sports stream searches. Sports supplemental results stay category-constrained.
+- Backend guard: `src/utils/adultContentFilter.js` blocks Torznab adult category ids (`6000-6999`), adult category names, and adult title/studio terms before a sports stream can be emitted. This guard is applied to supplemental sports search and custom sports re-search.
+- Regression proof: `scripts/smoke-sports-stream-hygiene.js` proves normal sports and WWE Raw pass, adult category/title fixtures are blocked, and the sports supplemental path no longer calls broad all-category Prowlarr search.
 
 ## 2026-05-25: v1.3.5 debrid-first playback routing fix
 

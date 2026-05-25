@@ -23,6 +23,7 @@ const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require(
 const { applyHostedServiceOverrides } = require('../utils/hostedServiceOverrides')
 const { getMappedLeagueEntry } = require('../utils/leagueMap')
 const { applyV13Routing } = require('../utils/streamRouter')
+const { isAdultContentResult } = require('../utils/adultContentFilter')
 
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '10000', 10))
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '12000', 10))
@@ -910,11 +911,18 @@ async function runSportsProwlarrSearch(torznab, query, useCategories, contextLab
 }
 
 async function searchSportsProwlarrVariants(torznab, query, contextLabel) {
-  const [categoryItems, broadItems] = await Promise.all([
-    runSportsProwlarrSearch(torznab, query, true, contextLabel),
-    runSportsProwlarrSearch(torznab, query, false, `${contextLabel} broad fallback`)
-  ])
-  return mergeUniqueSourceItems(categoryItems, broadItems)
+  const categoryItems = await runSportsProwlarrSearch(torznab, query, true, contextLabel)
+  return filterUnsafeSportsSearchItems(categoryItems, contextLabel)
+}
+
+function filterUnsafeSportsSearchItems(items, contextLabel = 'Sports search') {
+  const list = Array.isArray(items) ? items : []
+  const filtered = list.filter(item => !isAdultContentResult(item))
+  const removed = list.length - filtered.length
+  if (removed > 0) {
+    console.warn(`[stream] ${contextLabel}: suppressed ${removed} adult/non-sports source(s)`)
+  }
+  return filtered
 }
 
 async function buildSupplementalSportsStreams({
@@ -1745,6 +1753,7 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
 
       const filtered = results.filter(r => {
         if (!r?.link) return false
+        if (isAdultContentResult(r)) return false
         if (!allowSupplementalSportsResults && !isSportsCultIndexer(r.indexer)) return false
         if (infoHash && String(r.infohash || '').toLowerCase() === infoHash) return true
         if (isLikelyPackedReleaseTitle(r.title)) return false

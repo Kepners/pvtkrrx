@@ -1,7 +1,16 @@
 # PVTKRRX v1.3 — Debrid + Cache Search + Newznab
 
-**Released:** 2026-05-23 (v1.3.0) → patched 2026-05-25 (v1.3.5 — debrid-first downloader routing)
+**Released:** 2026-05-23 (v1.3.0) → patched 2026-05-25 (v1.3.6 — sports search adult-leak hotfix)
 **Type:** Feature release (purely additive, fully backward-compatible with v1.2)
+
+## v1.3.6 patch - sports stream search hygiene
+
+v1.3.6 fixes a backend sports search leak where an ambiguous sports title could fall through from TV/Sport category search into a broad all-category Prowlarr search. That allowed adult tracker results to appear as sports streams for the Australian Football `On Couch` item.
+
+- Supplemental sports stream search no longer falls back to all Prowlarr categories.
+- Sports stream candidates from Torznab adult categories (`6000-6999`) are blocked.
+- Adult category names and adult title/studio terms are blocked before sports stream emission.
+- qBittorrent/local/debrid playback routing is unchanged.
 
 ## v1.3.5 patch - debrid-first downloader routing
 
