@@ -124,14 +124,13 @@ function isWeakCanonicalId(value = '') {
 }
 
 function resolveConfiguredSportsPosterTemplate(input = {}) {
-  // Honour the stamped entitlement on the encrypted config token.
-  // Owner/admin sources are re-verified against the current env so revoking
-  // PVTKRRX_OWNER_EMAILS instantly downgrades a leaked token. Anything
-  // without a verified stamp falls back to the free `ticket-stub` style.
   const config = input && typeof input.config === 'object' ? input.config : null
   const requestedTemplate = String(
     input?.sportsPosterTemplate || config?.sportsPosterTemplate || ''
   ).trim()
+  if (requestedTemplate) {
+    return resolveSportsPosterTemplate(requestedTemplate)
+  }
   const stampedSource = String(
     input?.entitlementSource || config?.entitlementSource || ''
   ).trim()
@@ -159,6 +158,7 @@ function appendEntitlementStampParams(url, input = {}) {
   const requestedTemplate = String(input?.sportsPosterTemplate || config?.sportsPosterTemplate || '').trim()
   const stampedSource = String(input?.entitlementSource || config?.entitlementSource || '').trim()
   const stampedHash = String(input?.entitlementOwnerEmailHash || config?.entitlementOwnerEmailHash || '').trim()
+  if (!stampedSource) return
   const verified = verifyStampedSportsPosterEntitlement({
     requestedTemplate,
     stampedSource,

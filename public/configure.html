@@ -2611,12 +2611,18 @@
           <p class="simple-flow-copy" id="simpleFlowCopy">Do the next required action for the selected route. PVTKRRX keeps the install path short here and leaves lower-priority rescue tools below.</p>
           <div class="simple-flow-status info" id="simpleFlowStatus">Checking this PC so the simple install path can stay short.</div>
           <div class="simple-flow-setting" id="sportsPosterTemplateMain">
-            <label for="sportsPosterTemplate">Included Sports Style</label>
-            <select id="sportsPosterTemplate" disabled aria-disabled="true">
+            <label for="sportsPosterTemplate">Sports Poster Style</label>
+            <select id="sportsPosterTemplate">
+              <option value="editorial">Editorial</option>
+              <option value="broadcast">Broadcast</option>
+              <option value="sportsbook">Sportsbook</option>
+              <option value="trading-card">Trading Card</option>
+              <option value="brutalist">Brutalist</option>
               <option value="ticket-stub" selected>Ticket Stub</option>
+              <option value="glitch">Glitch</option>
             </select>
-            <p class="hint">Sports uses a logo/artwork-based presentation, with one included visual style in the free version. SportsMeta stays the sports metadata/artwork backend.</p>
-            <div class="simple-flow-status info" id="sportsPosterTemplateStatus">Ticket Stub is included with this PVTKRRX install. Playback, streams, and tracker results are unchanged.</div>
+            <p class="hint">Sports uses a logo/artwork-based presentation. Pick the visual style you want; playback, streams, and tracker results are unchanged.</p>
+            <div class="simple-flow-status info" id="sportsPosterTemplateStatus">Applied sports style: Ticket Stub. Pick any style to change the sports posters.</div>
           </div>
           <div class="simple-flow-actions">
             <button class="btn-copy" type="button" id="simpleCheckStremioBtn" onclick="checkAndLinkStremioOnThisPc(this)">Check Stremio Login On This PC</button>
@@ -7304,7 +7310,7 @@
       } else if (sourceLabel === 'manual_grant' || sourceLabel === 'member_token' || sourceLabel === 'trial') {
         setSportsPosterTemplateStatus('ok', 'Entitlement source: ' + sourceLabel.replace(/_/g, ' ') + '. Applied style: ' + labelSportsPosterTemplate(value) + '.');
       } else {
-        setSportsPosterTemplateStatus('ok', 'Applied sports style: Ticket Stub. Other templates require an entitlement (owner override, admin override, manual grant, member token, or trial).');
+        setSportsPosterTemplateStatus('ok', 'Applied sports style: ' + labelSportsPosterTemplate(value) + '. Pick any style; playback, streams, and tracker results are unchanged.');
       }
     }
 
@@ -7384,7 +7390,7 @@
     function applySportsPosterEntitlementToUi(entitlement) {
       window.__pvtkrrxSportsPosterEntitlement = entitlement && typeof entitlement === 'object'
         ? entitlement
-        : { source: 'none', allowed: false, allowedSportsPosterTemplates: ['ticket-stub'], resolvedSportsPosterTemplate: 'ticket-stub' };
+        : { source: 'none', allowed: true, allowedSportsPosterTemplates: SPORTS_POSTER_TEMPLATE_ORDER.slice(), resolvedSportsPosterTemplate: 'ticket-stub' };
       const select = document.getElementById('sportsPosterTemplate');
       if (!select) return;
       const requestedBeforeRebuild = select.value;

@@ -10,13 +10,17 @@
 - SportsMeta must not create schedule-only rows inside PVTKRRX sports catalogs.
 - Sports Posters member routes, checkout, entitlement, and premium artwork remain SportsMeta-owned surfaces. They are not a paid tier inside the PVTKRRX stream addon.
 
-## Free Sports Artwork Rule
+## Sports Artwork Selection Rule
 
-PVTKRRX sports uses a logo/artwork-based presentation, with one included visual style in the free version.
+PVTKRRX sports uses a logo/artwork-based presentation. Configured users can choose any of the seven runtime poster styles:
 
-The one included PVTKRRX style is `ticket-stub`.
-
-Configured PVTKRRX users must not be able to select non-ticket sports poster templates unless a paid entitlement surface is explicitly implemented in PVTKRRX and proven. Until then, requested templates such as `glitch`, `broadcast`, `sportsbook`, `editorial`, `trading-card`, and `brutalist` normalize to `ticket-stub`.
+- `editorial`
+- `broadcast`
+- `sportsbook`
+- `trading-card`
+- `brutalist`
+- `ticket-stub`
+- `glitch`
 
 Emergency fallback remains allowed only when artwork or logo data is unavailable, broken, or unsafe to use. That fallback is not a product tier and must not be promoted as the free option.
 
@@ -24,11 +28,11 @@ Emergency fallback remains allowed only when artwork or logo data is unavailable
 
 Approved wording:
 
-> Sports uses a logo/artwork-based presentation, with one included visual style in the free version.
+> Users can pick the sports poster style they want; playback, streams, and tracker results are unchanged.
 
 Extended wording:
 
-> Sports uses a logo/artwork-based presentation, with one included visual style in the free version. Prowlarr/Torznab-compatible indexers drive what appears. SportsCult is one supported source, not a requirement, while SportsMeta enriches artwork and event presentation.
+> Sports uses a logo/artwork-based presentation with selectable poster styles. Prowlarr/Torznab-compatible indexers drive what appears. SportsCult is one supported source, not a requirement, while SportsMeta enriches artwork and event presentation.
 
 Avoid wording that implies the free sports surface is a deliberately degraded visual mode.
 
@@ -46,19 +50,19 @@ Use these claims:
 
 Do not use these claims:
 
-- PVTKRRX has an in-addon paid sports poster entitlement.
+- PVTKRRX requires paid entitlement to choose built-in poster styles.
 - PVTKRRX free sports is intentionally degraded.
 - PVTKRRX free sports is a text-card tier.
 - SportsMeta creates PVTKRRX catalog rows without Prowlarr/Torznab availability from the user's configured indexers.
 
 ## Proof Expectations
 
-Before public wording says the free sports artwork rule is fixed, prove:
+Before public wording says sports artwork selection is fixed, prove:
 
 - default configured sports template resolves to `ticket-stub`;
-- configured `sportsPosterTemplate=glitch` resolves to `ticket-stub`;
-- configured `sportsPosterTemplate=broadcast` resolves to `ticket-stub`;
-- configured sports meta emits `posterTemplate=ticket-stub` and `layoutFamily=TICKET_STUB` for the canonical acceptance sample;
-- public configure UI exposes only the included Ticket Stub style;
+- configured `sportsPosterTemplate=glitch` resolves to `glitch`;
+- configured `sportsPosterTemplate=broadcast` resolves to `broadcast`;
+- configured sports meta emits the selected `posterTemplate` and matching layout family for canonical acceptance samples;
+- public configure UI exposes all seven poster styles;
 - public copy does not present emergency fallback as a free option;
 - the 7-family renderer contract remains covered by template-render smoke tests.

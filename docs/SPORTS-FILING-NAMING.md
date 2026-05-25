@@ -109,7 +109,7 @@ Never put title acronyms in the pill (e.g. `ICS` from "Islas Canarias Saturday H
 
 ## Template names
 
-Seven sports poster templates exist. The free tier defaults to `ticket-stub`; member tier can pick any.
+Seven sports poster templates exist. `ticket-stub` is the default, and configured PVTKRRX users can pick any of the seven.
 
 | Template | Source repo path | Visual character |
 |---|---|---|

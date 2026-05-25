@@ -39,7 +39,7 @@
 ## Sports Posters Template Guardrail
 - Before changing Sports Posters layouts, inspect `C:\Users\kepne\projects\L - PVTKRRX\PCnestspeaker\python-templates`.
 - Treat those Python template generators as the current source of truth for `editorial`, `broadcast`, `sportsbook`, `trading-card`, `brutalist`, `ticket-stub`, and `glitch`.
-- `ticket-stub` is the free/default layout. The paid/member Sports Posters surface can use all seven layouts.
+- `ticket-stub` is the default layout. Configured PVTKRRX installs can use all seven layouts; the separate paid/member Sports Posters surface remains SportsMeta-owned.
 - Real SportsMeta/SportsDB logo images must replace placeholder text in league/team slots when present; glyph fallback is only for missing images.
 
 ## Audit-And-Proof Standard
@@ -77,6 +77,6 @@ For technical/product/deployment work, use this output structure unless told oth
 
 - PASS 5 targeted free-tier sports artwork repair has local proof, but is not committed or deployed yet.
 - Do not claim the live Coolify image is fixed until this dirty tree is committed, pushed, deployed, and live routes are reprobed.
-- Product rule enforced locally: PVTKRRX configured/free sports artwork has exactly one included style, `ticket-stub`; requested non-ticket templates such as `glitch`, `broadcast`, `sportsbook`, `editorial`, `trading-card`, and `brutalist` normalize to `ticket-stub` until a paid entitlement surface exists inside PVTKRRX and is proven.
+- Product rule enforced locally: PVTKRRX configured sports artwork renders the valid user-selected template. `ticket-stub` is only the default, not a clamp; `glitch`, `broadcast`, `sportsbook`, `editorial`, `trading-card`, and `brutalist` remain selectable built-in templates.
 - Emergency glyph/text fallback may remain only for missing or broken artwork/logo data. It is not a free tier and must not be advertised as one.
 

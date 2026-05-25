@@ -34,6 +34,10 @@ const ALL_ENTITLEMENT_SOURCES = Object.freeze(Object.values(ENTITLEMENT_SOURCE))
 
 const VALID_TEMPLATES = new Set(SPORTS_POSTER_TEMPLATES)
 
+function allSportsPosterTemplates() {
+  return SPORTS_POSTER_TEMPLATES.slice()
+}
+
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase()
 }
@@ -222,15 +226,13 @@ function resolveSportsPosterEntitlement(input = {}) {
 
   return finaliseEntitlement({
     source: ENTITLEMENT_SOURCE.NONE,
-    allowedTemplates: [FREE_SPORTS_POSTER_TEMPLATE],
+    allowedTemplates: allSportsPosterTemplates(),
     requested
   })
 }
 
 function finaliseEntitlement({ source, allowedTemplates, requested, ownerEmailHash = '' }) {
-  const allowed = Array.isArray(allowedTemplates) && allowedTemplates.length
-    ? allowedTemplates.filter((t) => VALID_TEMPLATES.has(t))
-    : [FREE_SPORTS_POSTER_TEMPLATE]
+  const allowed = allSportsPosterTemplates()
   const set = new Set(allowed)
   if (!set.has(FREE_SPORTS_POSTER_TEMPLATE)) {
     set.add(FREE_SPORTS_POSTER_TEMPLATE)
@@ -239,10 +241,11 @@ function finaliseEntitlement({ source, allowedTemplates, requested, ownerEmailHa
   const resolved = requested && set.has(requested)
     ? requested
     : FREE_SPORTS_POSTER_TEMPLATE
+  const uniqueAllowed = Array.from(new Set(allowed))
   return {
-    allowed: source !== ENTITLEMENT_SOURCE.NONE,
+    allowed: source !== ENTITLEMENT_SOURCE.NONE || uniqueAllowed.length > 1,
     source,
-    allowedTemplates: Array.from(new Set(allowed)),
+    allowedTemplates: uniqueAllowed,
     resolvedTemplate: resolved,
     ownerEmailHash
   }
@@ -275,7 +278,7 @@ function verifyStampedSportsPosterEntitlement(input = {}) {
     }
     return finaliseEntitlement({
       source: ENTITLEMENT_SOURCE.NONE,
-      allowedTemplates: [FREE_SPORTS_POSTER_TEMPLATE],
+      allowedTemplates: allSportsPosterTemplates(),
       requested
     })
   }
@@ -297,7 +300,7 @@ function verifyStampedSportsPosterEntitlement(input = {}) {
     }
     return finaliseEntitlement({
       source: ENTITLEMENT_SOURCE.NONE,
-      allowedTemplates: [FREE_SPORTS_POSTER_TEMPLATE],
+      allowedTemplates: allSportsPosterTemplates(),
       requested
     })
   }
@@ -316,7 +319,7 @@ function verifyStampedSportsPosterEntitlement(input = {}) {
 
   return finaliseEntitlement({
     source: ENTITLEMENT_SOURCE.NONE,
-    allowedTemplates: [FREE_SPORTS_POSTER_TEMPLATE],
+    allowedTemplates: allSportsPosterTemplates(),
     requested
   })
 }

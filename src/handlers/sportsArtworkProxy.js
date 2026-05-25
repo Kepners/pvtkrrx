@@ -3718,6 +3718,8 @@ function requestArtworkPath(req = null) {
 }
 
 function resolveSportsPosterTemplateFromConfig(config = {}, req = null) {
+  // User-selected templates render as selected. URL-forwarded stamped entitlement
+  // remains accepted for older generated artwork links.
   // (1) URL-forwarded stamped entitlement. The configured catalog/meta
   // handler decrypted the user's token and forwarded the stamp
   // (entSource/entHash + reqTemplate) on the artwork URL because this route
@@ -3728,6 +3730,11 @@ function resolveSportsPosterTemplateFromConfig(config = {}, req = null) {
   // stamp unlocks the selected style. This is what makes a fresh configured
   // install that selected broadcast/glitch/etc. actually render it.
   const q = req && typeof req.query === 'object' ? req.query : {}
+  const plainUrlTemplate = String(q.template || '').trim()
+  if (plainUrlTemplate) {
+    return resolveSportsPosterTemplate(plainUrlTemplate)
+  }
+
   const urlReqTemplate = String(q.reqTemplate || '').trim()
   const urlEntSource = String(q.entSource || '').trim()
   const urlEntHash = String(q.entHash || '').trim()
