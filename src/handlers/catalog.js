@@ -40,6 +40,7 @@ const { classifySportsEvent } = require('../utils/sportsEventClassifier')
 const { buildSportsDisplayName } = require('../utils/sportsDisplayName')
 const { buildMetaPlaceholder } = require('../utils/metaPlaceholder')
 const { applyHostedServiceOverrides } = require('../utils/hostedServiceOverrides')
+const { isAdultContentResult } = require('../utils/adultContentFilter')
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
@@ -417,7 +418,17 @@ function mergeUniqueProwlarrItems(...batches) {
   return [...byKey.values()]
 }
 
-async function searchSportsCatalogItems(config, torznab, query, limit) {
+function filterUnsafeSportsCatalogItems(items, contextLabel = 'sports catalog') {
+  const list = Array.isArray(items) ? items : []
+  const filtered = list.filter(item => !isAdultContentResult(item))
+  const removed = list.length - filtered.length
+  if (removed > 0) {
+    console.warn(`[sports-catalog] ${contextLabel}: suppressed ${removed} adult/non-sports source(s)`)
+  }
+  return filtered
+}
+
+async function searchSportsCatalogItems(config, torznab, query) {
   const strictItems = await cachedProwlarrSearch(
     config,
     torznab,
@@ -426,22 +437,11 @@ async function searchSportsCatalogItems(config, torznab, query, limit) {
     'search',
     { useCategories: true }
   )
-  const strictEnoughThreshold = Math.max(20, Math.min(80, limit + 10))
-  if (strictItems.length >= strictEnoughThreshold) return strictItems
-
-  const broadItems = await cachedProwlarrSearch(
-    config,
-    torznab,
-    query,
-    SPORT_CATS,
-    'search',
-    { useCategories: false }
-  )
-  return mergeUniqueProwlarrItems(strictItems, broadItems)
+  return filterUnsafeSportsCatalogItems(strictItems, 'sports catalog search')
 }
 
 async function searchSportsCatalogSeedItems(config, torznab, query) {
-  return cachedProwlarrSearch(
+  const items = await cachedProwlarrSearch(
     config,
     torznab,
     query,
@@ -452,6 +452,7 @@ async function searchSportsCatalogSeedItems(config, torznab, query) {
       timeoutMs: SPORTS_SEED_QUERY_TIMEOUT_MS
     }
   )
+  return filterUnsafeSportsCatalogItems(items, 'sports catalog seed search')
 }
 
 async function mapLimit(items, limit, mapper) {
@@ -711,6 +712,7 @@ function normalizeSportsCatalogItems(items = []) {
 
 function filterSportsCatalogItems(normalizedItems = [], catalogSportHint = '', requestedDetail = '', limit = 50) {
   const strictFiltered = normalizedItems.filter(item =>
+    !isAdultContentResult(item) &&
     itemMatchesSportsCatalog(item, catalogSportHint) &&
     itemMatchesSportsDetail(item, requestedDetail) &&
     isLikelySportsEventTitle(item.title, item.sportHint) &&
@@ -723,6 +725,7 @@ function filterSportsCatalogItems(normalizedItems = [], catalogSportHint = '', r
     // noise rejection so the catalog isn't empty on default browse or sparse
     // genre/search results.
     filtered = normalizedItems.filter(item =>
+      !isAdultContentResult(item) &&
       itemMatchesSportsCatalog(item, catalogSportHint) &&
       itemMatchesSportsDetail(item, requestedDetail) &&
       !isSportsNoiseTitle(item.title) &&
@@ -732,6 +735,7 @@ function filterSportsCatalogItems(normalizedItems = [], catalogSportHint = '', r
 
   const otherIndexerCandidates = normalizedItems.filter(item =>
     item.trackerSourceType !== 'sportscult' &&
+    !isAdultContentResult(item) &&
     itemMatchesSportsCatalog(item, catalogSportHint) &&
     itemMatchesSportsDetail(item, requestedDetail) &&
     !isSportsNoiseTitle(item.title) &&
@@ -1206,13 +1210,15 @@ async function sportsCatalog(config, extra, options = {}, catalogType = 'movie',
   const requestedSportHint = catalogSportHint || resolveSportHint({ explicitHint: requestedDetail })
   const query = requestedDetail
   const limit = getCatalogLimit(config)
-  let items = await searchSportsCatalogItems(config, torznab, query, limit)
+  let items = await searchSportsCatalogItems(config, torznab, query)
+  items = filterUnsafeSportsCatalogItems(items, 'sports catalog initial')
 
   // Fallback: many indexers don't support empty-query text search — try
   // tvsearch browse (Torznab browse mode) then seed with popular sport terms
   if (items.length === 0 && !query) {
-    const browseItems = await cachedProwlarrSearch(
-      config, torznab, '', SPORT_CATS, 'tvsearch', { useCategories: true }
+    const browseItems = filterUnsafeSportsCatalogItems(
+      await cachedProwlarrSearch(config, torznab, '', SPORT_CATS, 'tvsearch', { useCategories: true }),
+      'sports catalog browse'
     )
     if (browseItems.length > 0) {
       items = browseItems

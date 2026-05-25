@@ -1,7 +1,16 @@
 # PVTKRRX v1.3 — Debrid + Cache Search + Newznab
 
-**Released:** 2026-05-23 (v1.3.0) → patched 2026-05-25 (v1.3.6 — sports search adult-leak hotfix)
+**Released:** 2026-05-23 (v1.3.0) → patched 2026-05-25 (v1.3.7 — sports catalog/search adult-leak hotfix)
 **Type:** Feature release (purely additive, fully backward-compatible with v1.2)
+
+## v1.3.7 patch - sports catalog search hygiene
+
+v1.3.7 closes the remaining catalog-side leak for ambiguous sports searches such as Australian Football `On Couch`. The v1.3.6 stream handler fix blocked adult results from stream emission, but catalog search could still run an all-category Prowlarr fallback and show adult tracker entries as sports metadata results.
+
+- Sports catalog search no longer falls back to all Prowlarr categories.
+- Sports catalog browse, search, and seed results apply the same adult category/title guard as stream results.
+- The regression smoke now exercises a real catalog call with an adult decoy and a legitimate `On Couch` sports result.
+- Debrid/qBittorrent/local playback routing is unchanged.
 
 ## v1.3.6 patch - sports stream search hygiene
 

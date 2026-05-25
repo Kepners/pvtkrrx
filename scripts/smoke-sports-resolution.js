@@ -110,8 +110,8 @@ async function run() {
     'sports catalog should first attempt the category-constrained sports search'
   )
   assert.ok(
-    sportsSearchCalls.some((call) => call.useCategories === false),
-    'sports catalog should broaden the fallback search when the constrained pass is sparse'
+    sportsSearchCalls.every((call) => call.useCategories === true),
+    'sports catalog must not broaden sports searches into all Prowlarr categories'
   )
 
   const burnsId = 'sportsmeta:event:mma|2026-04-18|ufc|ufc-fight-night-273-burns|malott'

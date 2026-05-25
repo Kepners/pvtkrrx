@@ -4,8 +4,8 @@ const assert = require('node:assert/strict')
 // Simulates a slow Prowlarr by stubbing ProwlarrClient.search with a fixed
 // per-call delay, and measures how long a sport-specific catalog takes to
 // return. Football / motorsport / MMA each carry 3–4 seed terms, and each
-// seed term calls `searchSportsCatalogItems` which issues strict+broad
-// Prowlarr requests. Sequential execution multiplies into a cascade that
+// seed term calls `searchSportsCatalogItems` with sports categories.
+// Sequential execution multiplies into a cascade that
 // breaks catalog reliability when Prowlarr is slow.
 //
 // The acceptance bar: with a simulated 400ms-per-call Prowlarr, the
