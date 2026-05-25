@@ -7,6 +7,13 @@ const LEAGUE_CODES = Object.freeze({
   'english premier league': 'EPL',
   'premier league': 'EPL',
   epl: 'EPL',
+  'efl championship': 'ELC',
+  'english championship': 'ELC',
+  'english football league championship': 'ELC',
+  'english league championship': 'ELC',
+  'sky bet championship': 'ELC',
+  'the championship': 'ELC',
+  elc: 'ELC',
   'fa cup': 'FAC',
   'major league soccer': 'MLS',
   mls: 'MLS',
@@ -265,7 +272,7 @@ function sportIconFor(input = {}) {
   if (/wrestling|wwe|aew|smackdown|raw|nxt|wrestlemania|royal rumble/.test(text)) return 'wrestling'
   if (/snooker|crucible|world snooker|table tennis|billiards/.test(text)) return 'snooker'
   if (/american.*football|nfl|super bowl/.test(text)) return 'football'
-  if (/football|soccer|premier|fa cup|mls|champions league|europa|nations league|world cup/.test(text)) return 'soccer'
+  if (/football|soccer|premier|efl|english league championship|english championship|sky bet championship|fa cup|mls|champions league|europa|nations league|world cup/.test(text)) return 'soccer'
   if (/hockey|nhl/.test(text)) return 'hockey'
   if (/basketball|nba|wnba|euroleague/.test(text)) return 'basketball'
   if (/baseball|mlb|world series/.test(text)) return 'baseball'

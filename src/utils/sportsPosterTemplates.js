@@ -45,6 +45,13 @@ const { stripSportsReleaseNoise } = require('./sportsReleaseNoise')
 const LEAGUE_CODE_ALIASES = Object.freeze({
   'english premier league': 'EPL',
   'premier league': 'EPL',
+  'efl championship': 'ELC',
+  'english championship': 'ELC',
+  'english football league championship': 'ELC',
+  'english league championship': 'ELC',
+  'sky bet championship': 'ELC',
+  'the championship': 'ELC',
+  elc: 'ELC',
   'uefa champions league': 'UCL',
   'champions league': 'UCL',
   ucl: 'UCL',
@@ -368,7 +375,7 @@ function sportIconFor(event = {}, facts = {}) {
   if (/rugby|nrl|six nations|super rugby/.test(text)) return 'rugby'
   if (/wrestling|wwe|aew|smackdown|raw|nxt/.test(text)) return 'wrestling'
   if (/american.*football|nfl/.test(text)) return 'football'
-  if (/football|soccer|premier|fa cup|mls|champions league|europa/.test(text)) return 'soccer'
+  if (/football|soccer|premier|efl|english league championship|english championship|sky bet championship|fa cup|mls|champions league|europa/.test(text)) return 'soccer'
   if (/hockey|nhl/.test(text)) return 'hockey'
   if (/basketball|nba/.test(text)) return 'basketball'
   if (/baseball|mlb/.test(text)) return 'baseball'

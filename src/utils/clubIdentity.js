@@ -69,6 +69,33 @@ function stripSponsorPrefix(value = '') {
 //   - spaced-letter forms: "n e c" -> NEC Nijmegen
 //   - 3-letter league codes: NBA / NHL / MLB tricodes
 //   - common short club names
+const EFL_CHAMPIONSHIP_CLUBS = Object.freeze([
+  ['Birmingham City', ['birmingham', 'birmingham city']],
+  ['Blackburn Rovers', ['blackburn', 'blackburn rovers']],
+  ['Bristol City', ['bristol', 'bristol city']],
+  ['Charlton Athletic', ['charlton', 'charlton athletic']],
+  ['Coventry City', ['coventry', 'coventry city']],
+  ['Derby County', ['derby', 'derby county']],
+  ['Hull City', ['hull', 'hull city']],
+  ['Ipswich Town', ['ipswich', 'ipswich town']],
+  ['Leicester City', ['leicester', 'leicester city']],
+  ['Middlesbrough', ['boro', 'middlesbrough']],
+  ['Millwall', ['millwall']],
+  ['Norwich City', ['norwich', 'norwich city']],
+  ['Oxford United', ['oxford', 'oxford united', 'oxford utd']],
+  ['Portsmouth', ['pompey', 'portsmouth']],
+  ['Preston North End', ['preston', 'preston north end']],
+  ['Queens Park Rangers', ['qpr', 'queens park rangers']],
+  ['Sheffield United', ['sheffield united', 'sheffield utd', 'sheff utd']],
+  ['Sheffield Wednesday', ['sheffield wednesday', 'sheffield wed', 'wednesday']],
+  ['Southampton', ['saints', 'southampton']],
+  ['Stoke City', ['stoke', 'stoke city']],
+  ['Swansea City', ['swansea', 'swansea city']],
+  ['Watford', ['watford']],
+  ['West Bromwich Albion', ['west brom', 'west bromwich albion', 'wba']],
+  ['Wrexham', ['wrexham', 'wrexham afc']]
+])
+
 const CLUB_ALIASES = new Map([
   // --- Eredivisie / Dutch (spaced-letter, Batch 16) ---
   ['n e c', 'NEC Nijmegen'],
@@ -104,10 +131,7 @@ const CLUB_ALIASES = new Map([
   ['ross county', 'Ross County'],
 
   // --- EFL Championship (club override for bad tracker sport hints) ---
-  ['hull', 'Hull City'],
-  ['hull city', 'Hull City'],
-  ['middlesbrough', 'Middlesbrough'],
-  ['boro', 'Middlesbrough'],
+  ...EFL_CHAMPIONSHIP_CLUBS.flatMap(([club, aliases]) => aliases.map((alias) => [alias, club])),
 
   // --- MLS / U.S. Open Cup (avoid tennis "US Open" misrouting) ---
   ['atlanta united', 'Atlanta United FC'],
@@ -175,8 +199,10 @@ const CLUB_COMPETITION = new Map([
   ['st johnstone', { competition: 'Scottish Premiership', sportKey: 'football' }],
   ['livingston', { competition: 'Scottish Premiership', sportKey: 'football' }],
   ['ross county', { competition: 'Scottish Premiership', sportKey: 'football' }],
-  ['hull city', { competition: 'EFL Championship', sportKey: 'football' }],
-  ['middlesbrough', { competition: 'EFL Championship', sportKey: 'football' }],
+  ...EFL_CHAMPIONSHIP_CLUBS.map(([club]) => [
+    normalizeKey(club),
+    { competition: 'EFL Championship', sportKey: 'football' }
+  ]),
   ['atlanta united fc', { competition: 'U.S. Open Cup', sportKey: 'football' }],
   ['columbus crew', { competition: 'U.S. Open Cup', sportKey: 'football' }],
   ['colorado rapids', { competition: 'U.S. Open Cup', sportKey: 'football' }],

@@ -15,7 +15,7 @@ const {
   signSportsPosterEntitlementStamp
 } = require('./entitlement')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260523-logo-routing-v31'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260525-efl-championship-v32'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()

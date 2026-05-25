@@ -47,6 +47,16 @@ const CASES = [
     }
   },
   {
+    slug: 'efl-championship-current-matchup',
+    expected: 'team_vs_team',
+    input: {
+      rawTitle: 'English League Championship Coventry City vs Bristol City 2026 05 24 1080p',
+      sportHint: 'football',
+      competition: 'English League Championship',
+      date: '2026-05-24'
+    }
+  },
+  {
     slug: 'f1-british-grand-prix-session',
     expected: 'motorsport_event',
     input: {
@@ -633,6 +643,13 @@ for (const testCase of [
     expectedCompetition: 'EFL Championship',
     expectedHome: 'West Brom',
     expectedAway: 'Leeds'
+  },
+  {
+    slug: 'sportcult-english-league-championship-stripped',
+    rawTitle: '[English League Championship] Coventry City vs Bristol City 1080p',
+    expectedCompetition: 'EFL Championship',
+    expectedHome: 'Coventry City',
+    expectedAway: 'Bristol City'
   },
   {
     slug: 'sportcult-ucl-round-noise-stripped',

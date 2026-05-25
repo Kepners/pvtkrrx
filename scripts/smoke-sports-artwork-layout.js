@@ -1060,6 +1060,33 @@ async function assertTeamBadgeArtworkProxy() {
         expectedSources: [/\/soccer\/500\/182\.png/i, /\/soccer\/500\/21812\.png/i]
       },
       {
+        slug: 'direct-efl-championship-team-logos',
+        sport: 'football.png',
+        query: {
+          league: 'EFL Championship',
+          title: 'Coventry City vs Bristol City',
+          date: '2026-05-24',
+          home: 'Coventry City',
+          away: 'Bristol City',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/soccer\/500\/388\.png/i, /\/soccer\/500\/333\.png/i],
+        expectedSlots: [/home:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/soccer\/500\/388\.png/i, /away:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/soccer\/500\/333\.png/i],
+        unexpectedSlots: [/fallback-glyph/i, /home:real-league/i, /away:real-league/i]
+      },
+      {
+        slug: 'direct-efl-championship-league-logo',
+        sport: 'football.png',
+        query: {
+          league: 'English League Championship',
+          title: 'EFL Championship Review',
+          date: '2026-05-24',
+          eventClass: 'tournament_event'
+        },
+        expectedSources: [/leaguelogos\/soccer\/500\/24\.png/i],
+        unexpectedSlots: [/fallback-glyph/i]
+      },
+      {
         slug: 'direct-champions-league-team-logos',
         sport: 'football.png',
         query: {

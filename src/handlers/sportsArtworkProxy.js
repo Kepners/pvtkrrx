@@ -52,7 +52,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260523-logo-routing-v31'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260525-efl-championship-v32'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -921,6 +921,15 @@ function leagueSlugFor(value = '') {
 const LEAGUE_SLUG_ALIASES = Object.freeze({
   'epl': 'english-premier-league',
   'premier league': 'english-premier-league',
+  'championship': 'english-league-championship',
+  'efl': 'english-league-championship',
+  'efl championship': 'english-league-championship',
+  'elc': 'english-league-championship',
+  'english championship': 'english-league-championship',
+  'english football league championship': 'english-league-championship',
+  'english league championship': 'english-league-championship',
+  'sky bet championship': 'english-league-championship',
+  'the championship': 'english-league-championship',
   'champions league': 'uefa-champions-league',
   'uefa champions league': 'uefa-champions-league',
   'ucl': 'uefa-champions-league',
@@ -1675,6 +1684,7 @@ const DIRECT_LEAGUE_LOGO_OVERRIDES = Object.freeze([
   { sport: 'football', league: 'UEFA Conference League', pattern: /\b(?:uefa\s+conference\s+league|conference\s+league|uecl)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/ymfo5j1718775759.png'] },
   { sport: 'football', league: 'UEFA Europa League', pattern: /\b(?:uefa\s+europa\s+(?:and|&)\s+conference\s+league|europa\s+(?:and|&)\s+conference\s+league|uefa\s+europa\s+league|europa\s+league|uel)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/mlsr7d1718774547.png'] },
   { sport: 'football', league: 'FA Cup', pattern: /\b(?:the\s+emirates\s+fa\s+cup|emirates\s+fa\s+cup|fa\s+cup)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/vk7isd1598802862.png'] },
+  { sport: 'football', league: 'EFL Championship', pattern: /\b(?:efl\s+championship|english\s+(?:football\s+league\s+)?championship|english\s+league\s+championship|sky\s+bet\s+championship|the\s+championship|elc)\b/i, urls: ['https://a.espncdn.com/i/leaguelogos/soccer/500/24.png'] },
   { sport: 'football', league: 'English Womens Super League', pattern: /\b(?:barclays\s+women'?s?\s+super\s+league|english\s+women'?s?\s+super\s+league|women'?s?\s+super\s+league|fa\s+wsl|wsl)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/lpsm6p1751723311.png'] },
   { sport: 'football', league: 'English National League', pattern: /\b(?:english\s+national\s+league|national\s+league|conference\s+national|vanarama\s+national\s+league)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/5mq9v01752167973.png'] },
   { sport: 'football', league: 'Scottish Premiership', pattern: /\b(?:scottish\s+premiership|scottish\s+premier\s+league|cinch\s+premiership|celtic|motherwell|falkirk|heart\s+of\s+midlothian|hibernian|rangers)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/72d3zc1688333496.png'] },
@@ -1711,6 +1721,39 @@ const DIRECT_LEAGUE_LOGO_OVERRIDES = Object.freeze([
 
 const AFL_GOLD_COAST_SUNS_LOGO_URL = 'https://www.goldcoastfc.com.au/resources/v5.48.18/i/svg-output/icons.svg#icn-aflc-gcfc'
 const AFL_NORTH_MELBOURNE_LOGO_URL = 'https://www.nmfc.com.au/resources/v5.48.18/i/svg-output/icons.svg#icn-aflc-nmfc'
+
+const EFL_CHAMPIONSHIP_TEAM_LOGO_ROWS = Object.freeze([
+  ['football', '', 'Birmingham City', ['birmingham'], 'https://a.espncdn.com/i/teamlogos/soccer/500/392.png'],
+  ['football', '', 'Blackburn Rovers', ['blackburn'], 'https://a.espncdn.com/i/teamlogos/soccer/500/365.png'],
+  ['football', '', 'Bristol City', ['bristol'], 'https://a.espncdn.com/i/teamlogos/soccer/500/333.png'],
+  ['football', '', 'Burnley', ['burnley'], 'https://a.espncdn.com/i/teamlogos/soccer/500/379.png'],
+  ['football', '', 'Cardiff City', ['cardiff'], 'https://a.espncdn.com/i/teamlogos/soccer/500/347.png'],
+  ['football', '', 'Charlton Athletic', ['charlton'], 'https://a.espncdn.com/i/teamlogos/soccer/500/372.png'],
+  ['football', '', 'Coventry City', ['coventry'], 'https://a.espncdn.com/i/teamlogos/soccer/500/388.png'],
+  ['football', '', 'Derby County', ['derby'], 'https://a.espncdn.com/i/teamlogos/soccer/500/374.png'],
+  ['football', '', 'Hull City', ['hull', 'hul'], 'https://a.espncdn.com/i/teamlogos/soccer/500/306.png'],
+  ['football', '', 'Ipswich Town', ['ipswich'], 'https://a.espncdn.com/i/teamlogos/soccer/500/373.png'],
+  ['football', '', 'Leeds United', ['leeds', 'lufc'], 'https://a.espncdn.com/i/teamlogos/soccer/500/341.png'],
+  ['football', '', 'Leicester City', ['leicester'], 'https://a.espncdn.com/i/teamlogos/soccer/500/375.png'],
+  ['football', '', 'Luton Town', ['luton'], 'https://a.espncdn.com/i/teamlogos/soccer/500/301.png'],
+  ['football', '', 'Middlesbrough', ['boro', 'mid'], 'https://a.espncdn.com/i/teamlogos/soccer/500/369.png'],
+  ['football', '', 'Millwall', ['millwall'], 'https://a.espncdn.com/i/teamlogos/soccer/500/391.png'],
+  ['football', '', 'Norwich City', ['norwich'], 'https://a.espncdn.com/i/teamlogos/soccer/500/381.png'],
+  ['football', '', 'Oxford United', ['oxford', 'oxford utd'], 'https://a.espncdn.com/i/teamlogos/soccer/500/311.png'],
+  ['football', '', 'Plymouth Argyle', ['plymouth'], 'https://a.espncdn.com/i/teamlogos/soccer/500/384.png'],
+  ['football', '', 'Portsmouth', ['pompey'], 'https://a.espncdn.com/i/teamlogos/soccer/500/385.png'],
+  ['football', '', 'Preston North End', ['preston', 'pne'], 'https://a.espncdn.com/i/teamlogos/soccer/500/394.png'],
+  ['football', '', 'Queens Park Rangers', ['qpr'], 'https://a.espncdn.com/i/teamlogos/soccer/500/334.png'],
+  ['football', '', 'Sheffield United', ['sheffield utd', 'sheff utd', 'blades'], 'https://a.espncdn.com/i/teamlogos/soccer/500/398.png'],
+  ['football', '', 'Sheffield Wednesday', ['sheffield wed', 'wednesday'], 'https://a.espncdn.com/i/teamlogos/soccer/500/399.png'],
+  ['football', '', 'Southampton', ['saints'], 'https://a.espncdn.com/i/teamlogos/soccer/500/376.png'],
+  ['football', '', 'Stoke City', ['stoke'], 'https://a.espncdn.com/i/teamlogos/soccer/500/336.png'],
+  ['football', '', 'Sunderland', ['sunderland'], 'https://a.espncdn.com/i/teamlogos/soccer/500/366.png'],
+  ['football', '', 'Swansea City', ['swansea'], 'https://a.espncdn.com/i/teamlogos/soccer/500/318.png'],
+  ['football', '', 'Watford', ['watford'], 'https://a.espncdn.com/i/teamlogos/soccer/500/395.png'],
+  ['football', '', 'West Bromwich Albion', ['west brom', 'wba'], 'https://a.espncdn.com/i/teamlogos/soccer/500/383.png'],
+  ['football', '', 'Wrexham', ['wrexham afc'], 'https://a.espncdn.com/i/teamlogos/soccer/500/352.png']
+])
 
 const DIRECT_TEAM_LOGO_OVERRIDES = Object.freeze([
   ...[
@@ -1758,6 +1801,7 @@ const DIRECT_TEAM_LOGO_OVERRIDES = Object.freeze([
     ['american-football', 'UFL', 'Houston Gamblers', ['houston gamblers', 'gamblers'], 'https://r2.thesportsdb.com/images/media/team/badge/bt36gy1770671084.png'],
     ['american-football', 'UFL', 'Louisville Kings', ['louisville kings', 'kings'], 'https://r2.thesportsdb.com/images/media/team/badge/4ysomp1770670283.png'],
     ['american-football', 'UFL', 'Orlando Storm', ['orlando storm', 'storm'], 'https://r2.thesportsdb.com/images/media/team/badge/pbiyq21770670499.png'],
+    ...EFL_CHAMPIONSHIP_TEAM_LOGO_ROWS,
     ['football', '', 'Ajax Amsterdam', ['ajax', 'aja'], 'https://a.espncdn.com/i/teamlogos/soccer/500/139.png'],
     ['football', '', 'Arsenal', ['arsenal', 'ars'], 'https://a.espncdn.com/i/teamlogos/soccer/500/359.png'],
     ['football', '', 'AS Monaco', ['monaco', 'asm', 'mon'], 'https://a.espncdn.com/i/teamlogos/soccer/500/174.png'],

@@ -6,6 +6,21 @@ const LEAGUE_MAP = Object.freeze({
     sportsDbSport: 'Soccer',
     aliases: ['Premier League', 'EPL']
   },
+  eflchampionship: {
+    name: 'EFL Championship',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    sportsDbName: 'English League Championship',
+    aliases: [
+      'Championship',
+      'ELC',
+      'English Championship',
+      'English Football League Championship',
+      'English League Championship',
+      'Sky Bet Championship',
+      'The Championship'
+    ]
+  },
   ucl: {
     name: 'UEFA Champions League',
     idLeague: '4480',

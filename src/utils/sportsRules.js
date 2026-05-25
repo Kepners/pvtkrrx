@@ -41,10 +41,17 @@ function normalizeSportKey(value) {
     ['united football league', 'american-football'],
     ['ncaa football', 'american-football'],
     ['soccer', 'football'],
+    ['efl', 'football'],
+    ['efl championship', 'football'],
+    ['elc', 'football'],
     ['epl', 'football'],
+    ['english championship', 'football'],
+    ['english football league championship', 'football'],
+    ['english league championship', 'football'],
     ['mls', 'football'],
     ['major league soccer', 'football'],
     ['american major league soccer', 'football'],
+    ['sky bet championship', 'football'],
     ['ufc', 'mma'],
     ['bellator', 'mma'],
     ['pfl', 'mma'],
@@ -81,7 +88,7 @@ function detectStrongSportHintFromTitle(title) {
     ['darts', /\b(?:pdc|bdo|darts|premier[\s._-]*league[\s._-]*darts)\b/i],
     ['cricket', /\b(?:cricket|ipl|indian[\s._-]*premier[\s._-]*league|t20|odi|ashes|big[\s._-]*bash|the[\s._-]*hundred)\b/i],
     ['basketball', /\b(?:basketball[\s._-]*champions[\s._-]*league|easycredit[\s._-]*bbl|nba(?:[\s._-]*(?:playoffs?|postseason))?|wnba|euroleague|ncaa[\s._-]*basketball|slb)\b/i],
-    ['football', /\b(?:efl|elc|epl|mls|major[\s._-]*league[\s._-]*soccer|uefa|english[\s._-]*football[\s._-]*league|la[\s._-]*liga|serie[\s._-]*a|bundesliga|champions[\s._-]*league|europa[\s._-]*league|conference[\s._-]*league|fa[\s._-]*cup|carabao[\s._-]*cup|community[\s._-]*shield|fifa[\s._-]*world[\s._-]*cup|world[\s._-]*cup[\s._-]*qualifiers?|uefa[\s._-]*nations[\s._-]*league|european[\s._-]*championship|euros?|euro[\s._-]*qualifiers?|copa[\s._-]*america|afcon|asian[\s._-]*cup|conmebol[\s._-]*qualifiers?|concacaf[\s._-]*qualifiers?|international[\s._-]*friendlies?)\b/i],
+    ['football', /\b(?:efl(?:[\s._-]*championship)?|elc|epl|mls|major[\s._-]*league[\s._-]*soccer|uefa|english[\s._-]*(?:football[\s._-]*league[\s._-]*championship|football[\s._-]*league|league[\s._-]*championship|championship)|sky[\s._-]*bet[\s._-]*championship|la[\s._-]*liga|serie[\s._-]*a|bundesliga|champions[\s._-]*league|europa[\s._-]*league|conference[\s._-]*league|fa[\s._-]*cup|carabao[\s._-]*cup|community[\s._-]*shield|fifa[\s._-]*world[\s._-]*cup|world[\s._-]*cup[\s._-]*qualifiers?|uefa[\s._-]*nations[\s._-]*league|european[\s._-]*championship|euros?|euro[\s._-]*qualifiers?|copa[\s._-]*america|afcon|asian[\s._-]*cup|conmebol[\s._-]*qualifiers?|concacaf[\s._-]*qualifiers?|international[\s._-]*friendlies?)\b/i],
     ['american-football', /\b(?:nfl|ncaaf|ncaa[\s._-]*football|college[\s._-]*football|super[\s._-]*bowl|cfl|ufl|xfl)\b/i],
     ['baseball', /\b(?:mlb|major[\s._-]*league[\s._-]*baseball|baseball)\b/i],
     ['hockey', /\b(?:nhl|ice[\s._-]*hockey)\b/i],
@@ -151,7 +158,7 @@ function scoreSportsEventSignals(title, sportHint = '') {
   const sport = normalizeSportKey(sportHint)
   if (sport) {
     if (sport === 'tennis' && /\b(?:atp|wta|wimbledon|roland[\s.\-_]*garros|us[\s.\-_]*open|australian[\s.\-_]*open|davis[\s.\-_]*cup|laver[\s.\-_]*cup)\b/i.test(value)) score += 2
-    if (sport === 'football' && /\b(?:epl|mls|major[\s.\-_]*league[\s.\-_]*soccer|premier[\s.\-_]*league|fa[\s.\-_]*cup|la[\s.\-_]*liga|serie[\s.\-_]*a|bundesliga|champions[\s.\-_]*league|europa[\s.\-_]*league|fifa[\s.\-_]*world[\s.\-_]*cup|world[\s.\-_]*cup[\s.\-_]*qualifiers?|uefa[\s.\-_]*nations[\s.\-_]*league|euro[\s.\-_]*qualifiers?|copa[\s.\-_]*america|afcon|asian[\s.\-_]*cup|conmebol|concacaf|international[\s.\-_]*friendlies?)\b/i.test(value)) score += 2
+    if (sport === 'football' && /\b(?:efl(?:[\s.\-_]*championship)?|elc|epl|mls|major[\s.\-_]*league[\s.\-_]*soccer|english[\s.\-_]*(?:league[\s.\-_]*championship|championship)|sky[\s.\-_]*bet[\s.\-_]*championship|premier[\s.\-_]*league|fa[\s.\-_]*cup|la[\s.\-_]*liga|serie[\s.\-_]*a|bundesliga|champions[\s.\-_]*league|europa[\s.\-_]*league|fifa[\s.\-_]*world[\s.\-_]*cup|world[\s.\-_]*cup[\s.\-_]*qualifiers?|uefa[\s.\-_]*nations[\s.\-_]*league|euro[\s.\-_]*qualifiers?|copa[\s.\-_]*america|afcon|asian[\s.\-_]*cup|conmebol|concacaf|international[\s.\-_]*friendlies?)\b/i.test(value)) score += 2
     if (sport === 'basketball' && /\b(?:nba(?:[\s.\-_]*(?:playoffs?|postseason))?|wnba|euroleague|ncaa)\b/i.test(value)) score += 2
     if (sport === 'baseball' && /\b(?:mlb|major[\s.\-_]*league[\s.\-_]*baseball)\b/i.test(value)) score += 2
     if (sport === 'american-football' && /\b(?:nfl|ncaa|cfl|ufl)\b/i.test(value)) score += 2

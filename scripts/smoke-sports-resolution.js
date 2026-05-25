@@ -1059,6 +1059,19 @@ async function run() {
   assert.equal(badMotorsportFootballProfile.league, 'EFL Championship', 'Hull City vs Middlesbrough should resolve to EFL Championship')
   assert.equal(badMotorsportFootballProfile.event_class, 'team_vs_team', 'Hull City vs Middlesbrough should render as a team-vs-team football poster')
 
+  const badMotorsportChampionshipProfile = parseSportsTorrentProfile({
+    title: 'Coventry City vs Bristol City',
+    pubDate: '2026-05-24T12:00:00.000Z',
+    sportHint: 'motorsport',
+    categoryNames: ['MotorSport'],
+    seeders: 12
+  })
+  assert.equal(badMotorsportChampionshipProfile.sport, 'football', 'Championship club identity should override a bad motorsport category for Coventry City vs Bristol City')
+  assert.equal(badMotorsportChampionshipProfile.league, 'EFL Championship', 'current Championship clubs should resolve to EFL Championship')
+  assert.equal(badMotorsportChampionshipProfile.home_team, 'Coventry City', 'Championship club override should preserve the home club')
+  assert.equal(badMotorsportChampionshipProfile.away_team, 'Bristol City', 'Championship club override should preserve the away club')
+  assert.equal(badMotorsportChampionshipProfile.event_class, 'team_vs_team', 'Championship club override should render as a team-vs-team football poster')
+
   const wimbledonProfile = parseSportsTorrentProfile({
     title: 'Wimbledon 2025 07 06 Day 7 Court #2 1080p BBC',
     pubDate: '2025-07-06T12:00:00.000Z',
