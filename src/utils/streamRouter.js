@@ -2,7 +2,7 @@
 
 // v1.3 stream routing post-processor.
 //
-// PURELY ADDITIVE. We ADD debrid + cache streams to the existing v1.2 output.
+// Debrid is the first downloader layer when configured.
 // qBit streams are NEVER removed — they always stay as the underlying backup.
 //
 // Behaviour, uniform across movies, TV, and sports:
@@ -102,6 +102,15 @@ function pickReadyStreamName(hit) {
   return `⚡ READY · ${source}`
 }
 
+function prioritizeProviderForCacheSource(sourceId, providers) {
+  const list = Array.isArray(providers) ? providers.filter(Boolean) : []
+  const source = String(sourceId || '').toLowerCase()
+  if (source !== 'pm') return list
+  const pm = list.filter(p => String(p?.type || '').toLowerCase() === 'pm')
+  const rest = list.filter(p => String(p?.type || '').toLowerCase() !== 'pm')
+  return [...pm, ...rest]
+}
+
 async function resolveCacheHitToStreamUrl(hit, configuredSources, playbackBaseUrl, providersForDebrid, configToken = '') {
   if (hit.directStreamUrl) return hit.directStreamUrl
   // PM cache hits don't have a direct URL — they need the debrid add+poll cycle.
@@ -109,7 +118,8 @@ async function resolveCacheHitToStreamUrl(hit, configuredSources, playbackBaseUr
   if (hit.sourceId === 'pm' && hit.infohash) {
     const magnet = buildMagnetFromHash(hit.infohash, hit.name)
     if (!magnet) return null
-    return buildDebridPlaybackUrl(playbackBaseUrl, providersForDebrid, {
+    const providerOrder = prioritizeProviderForCacheSource(hit.sourceId, providersForDebrid)
+    return buildDebridPlaybackUrl(playbackBaseUrl, providerOrder, {
       src: magnet,
       name: hit.name,
       protocol: DEBRID_PROTOCOL_TORRENT,
@@ -132,12 +142,38 @@ async function resolveCacheHitToStreamUrl(hit, configuredSources, playbackBaseUr
   return null
 }
 
+function resolveEnabledCacheSources(cacheConfig = {}, enabledDebrid = []) {
+  const sources = []
+  const seen = new Set()
+  const pmDebridKey = String(
+    (Array.isArray(enabledDebrid) ? enabledDebrid : [])
+      .find(p => String(p?.type || '').toLowerCase() === 'pm')?.apiKey || ''
+  ).trim()
+  const rawSources = Array.isArray(cacheConfig.sources) ? cacheConfig.sources : []
+
+  for (const raw of rawSources) {
+    if (!raw || typeof raw !== 'object') continue
+    const type = String(raw.type || '').trim().toLowerCase()
+    if (!type || seen.has(type)) continue
+    const apiKey = String(raw.apiKey || '').trim() || (type === 'pm' ? pmDebridKey : '')
+    if (raw.enabled !== true || !apiKey) continue
+    seen.add(type)
+    sources.push({ ...raw, type, apiKey, enabled: true })
+  }
+
+  if (pmDebridKey && !seen.has('pm')) {
+    sources.push({ type: 'pm', apiKey: pmDebridKey, enabled: true, implicit: true })
+  }
+
+  return sources
+}
+
 async function buildCacheSearchStreams(query, enabledSources, playbackBaseUrl, providersForDebrid, configToken = '') {
   if (!enabledSources.length) return []
   let hits = []
   try {
     hits = await searchAllSources(
-      enabledSources.map(s => ({ type: s.type, apiKey: s.apiKey, enabled: true })),
+      enabledSources.map(s => ({ type: s.type, apiKey: s.apiKey, enabled: true, source: s.source })),
       query
     )
   } catch (err) {
@@ -171,16 +207,8 @@ async function applyV13Routing(result, ctx = {}) {
   const debridConfig = config.debrid || { providers: [], preferDebridOverSeedbox: true }
   const cacheConfig = config.cacheSearch || { sources: [] }
   const enabledDebrid = (debridConfig.providers || []).filter(p => p && p.enabled && String(p.apiKey || '').trim())
-  // PM uses ONE account: cacheSearch PM source shares the debrid PM apiKey when its own apiKey is blank.
-  const pmDebridKey = (enabledDebrid.find(p => p.type === 'pm')?.apiKey || '').trim()
-  const enabledCache = (cacheConfig.sources || [])
-    .filter(s => s && s.enabled)
-    .map(s => (s.type === 'pm' && !String(s.apiKey || '').trim() && pmDebridKey)
-      ? { ...s, apiKey: pmDebridKey }
-      : s)
-    .filter(s => String(s.apiKey || '').trim())
+  const enabledCache = resolveEnabledCacheSources(cacheConfig, enabledDebrid)
   const hasDebrid = enabledDebrid.length > 0
-  const preferDebrid = debridConfig.preferDebridOverSeedbox !== false
 
   // Backward compat: install has NOT opted into v1.3 (no debrid + no cache search
   // configured). Pass through with v1.2 behavior — no routing changes at all.
@@ -190,6 +218,7 @@ async function applyV13Routing(result, ctx = {}) {
 
   const existing = Array.isArray(result.streams) ? result.streams : []
   const providersForDebrid = enabledDebrid.map(p => ({ type: p.type, apiKey: p.apiKey }))
+  const debridMetas = []
 
   // Build debrid variants from existing streams (where we can derive a hash/magnet).
   const debridStreams = []
@@ -198,6 +227,7 @@ async function applyV13Routing(result, ctx = {}) {
     for (const stream of existing) {
       const meta = tryExtractDebridMetaFromStreamUrl(stream?.url, playbackBaseUrl, configToken)
       if (!meta) continue
+      debridMetas.push(meta)
       const torrentSource = meta.link || (meta.hash ? buildMagnetFromHash(meta.hash, meta.name) : null)
       if (!torrentSource) continue
       const debridUrl = buildDebridPlaybackUrl(playbackBaseUrl, providersForDebrid, {
@@ -223,7 +253,9 @@ async function applyV13Routing(result, ctx = {}) {
     }
   }
 
-  // Build cache-search READY streams. Use first existing stream's title as the search query.
+  // Build cache-search READY streams. Hash checks run first because Premiumize
+  // cache lookup is hash-based; title search is only a fallback for sources
+  // that support it, such as put.io.
   const queryTitle = (() => {
     for (const s of existing) {
       const candidate = String(s?.title || s?.name || '').split('\n')[0].trim()
@@ -231,19 +263,38 @@ async function applyV13Routing(result, ctx = {}) {
     }
     return ''
   })()
-  const cacheStreams = enabledCache.length > 0
-    ? await buildCacheSearchStreams({ title: queryTitle }, enabledCache, playbackBaseUrl, providersForDebrid, configToken)
-    : []
+  const cacheStreams = []
+  if (enabledCache.length > 0) {
+    const seenHashes = new Set()
+    for (const meta of debridMetas) {
+      const hash = String(meta?.hash || '').trim().toLowerCase()
+      if (!/^[a-f0-9]{40}$/.test(hash) || seenHashes.has(hash)) continue
+      seenHashes.add(hash)
+      cacheStreams.push(...await buildCacheSearchStreams(
+        { infohash: hash, title: meta.name || queryTitle },
+        enabledCache,
+        playbackBaseUrl,
+        providersForDebrid,
+        configToken
+      ))
+    }
+    if (queryTitle) {
+      cacheStreams.push(...await buildCacheSearchStreams(
+        { title: queryTitle },
+        enabledCache,
+        playbackBaseUrl,
+        providersForDebrid,
+        configToken
+      ))
+    }
+  }
 
-  // qBit ALWAYS remains available for every content type (movies, TV, sports).
-  // Debrid is additive. Ready cache hits stay first; provider handoffs derived
-  // from tracker/playback tokens can sit above qBit, while handoffs derived
-  // only from a ready /file/ token sit below that file because the provider may
-  // still need to fetch the uncached torrent.
+  // qBit remains available for every content type (movies, TV, sports), but
+  // debrid is the first downloader target when configured.
   const baseStreams = existing
-  const finalStreams = preferDebrid
-    ? [...cacheStreams, ...debridStreams, ...baseStreams, ...debridFileStreams]
-    : [...cacheStreams, ...baseStreams, ...debridStreams, ...debridFileStreams]
+  const finalStreams = hasDebrid
+    ? [...cacheStreams, ...debridStreams, ...debridFileStreams, ...baseStreams]
+    : [...cacheStreams, ...baseStreams]
 
   // Dedupe by URL to prevent the same /playback/debrid token from appearing twice.
   const seen = new Set()
@@ -266,5 +317,7 @@ module.exports = {
   // exported for tests
   _tryExtractDebridMetaFromStreamUrl: tryExtractDebridMetaFromStreamUrl,
   _buildDebridPlaybackUrl: buildDebridPlaybackUrl,
-  _buildMagnetFromHash: buildMagnetFromHash
+  _buildMagnetFromHash: buildMagnetFromHash,
+  _resolveEnabledCacheSources: resolveEnabledCacheSources,
+  _prioritizeProviderForCacheSource: prioritizeProviderForCacheSource
 }

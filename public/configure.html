@@ -2823,8 +2823,8 @@
 
       <!-- v1.3 Debrid providers (optional). COPY DRAFT — pending docs/copy.md approval. -->
       <div class="service-card" id="serviceCard-debrid" data-service-visible="pc lan seedbox">
-        <h2>Debrid providers (optional)</h2>
-        <p class="hint">Add a debrid service to skip the wait. Real-Debrid is currently filtering some scene releases (May 2026); Premiumize and AllDebrid are unaffected.</p>
+        <h2>Debrid downloader</h2>
+        <p class="hint">Debrid is checked before local qBit or seedbox playback. Cached links show first; uncached links start a provider transfer when you click play. qBit remains below as fallback.</p>
 
         <div class="debrid-provider-row" data-debrid-provider="rd" style="border:1px solid var(--surface-border,#333);border-radius:6px;padding:0.9rem;margin-top:0.8rem;">
           <label style="display:flex;align-items:center;gap:0.5rem;font-weight:600;">
@@ -2871,7 +2871,7 @@
 
         <label style="display:flex;align-items:flex-start;gap:0.6rem;margin-top:1rem;">
           <input type="checkbox" id="debridPreferOverSeedbox" checked style="width:auto;transform:scale(1.15);margin-top:0.15rem;">
-          <span>Prefer debrid streams above qBit in the list. (qBit always remains as backup either way.)</span>
+          <span>Put debrid cached links and downloader links before local qBit or seedbox fallback.</span>
         </label>
         <p class="hint" id="debridAutoSaveStatus" style="margin-top:0.8rem;"></p>
       </div>
@@ -5583,7 +5583,7 @@
       } else if (next === 'qbit') {
         hint.textContent = 'qBittorrent settings are open.';
       } else if (next === 'debrid') {
-        hint.textContent = 'Debrid providers are open. Optional — adds debrid streams above qBit when linked.';
+        hint.textContent = 'Debrid downloader is open. Cached links and provider transfers are listed before qBit fallback when linked.';
       } else if (next === 'cacheSearch') {
         hint.textContent = 'Cache search sources are open. Optional — surfaces instant-ready hits at the top of the list.';
       } else if (next === 'storage') {
@@ -6693,7 +6693,7 @@
       return {
         providers,
         preferOrder: ['rd', 'ad', 'pm'],
-        preferDebridOverSeedbox: Boolean(document.getElementById('debridPreferOverSeedbox')?.checked)
+        preferDebridOverSeedbox: true
       };
     }
 
@@ -6825,7 +6825,7 @@
       });
       const preferEl = document.getElementById('debridPreferOverSeedbox');
       if (preferEl) {
-        preferEl.checked = debridConfig?.preferDebridOverSeedbox !== false;
+        preferEl.checked = true;
       }
     }
 

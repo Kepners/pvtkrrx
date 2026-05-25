@@ -80,6 +80,16 @@ async function promptValue(rl, label, defaultValue = '', options = {}) {
   return text
 }
 
+async function promptRetainedSecret(rl, label, existingValue = '') {
+  const existing = String(existingValue || '').trim()
+  const suffix = existing ? ' [saved, Enter keeps, "-" clears]' : ''
+  const raw = await rl.question(`${label}${suffix}: `)
+  const text = String(raw || '').trim()
+  if (!text) return existing
+  if (text === '-') return ''
+  return text
+}
+
 async function promptBoolean(rl, label, defaultValue = true) {
   const suffix = defaultValue ? ' [Y/n]' : ' [y/N]'
   const raw = await rl.question(`${label}${suffix}: `)
@@ -88,6 +98,51 @@ async function promptBoolean(rl, label, defaultValue = true) {
   if (['y', 'yes', 'true', '1'].includes(text)) return true
   if (['n', 'no', 'false', '0'].includes(text)) return false
   return defaultValue
+}
+
+async function promptDebridConfig(rl, existingConfig = {}) {
+  console.log('')
+  console.log('Debrid downloader')
+  console.log('Cached debrid hits and debrid transfers are listed before qBittorrent/local fallback.')
+
+  const existingProviders = Array.isArray(existingConfig?.debrid?.providers)
+    ? existingConfig.debrid.providers
+    : []
+  const providerDefs = [
+    ['pm', 'Premiumize'],
+    ['rd', 'Real-Debrid'],
+    ['ad', 'AllDebrid']
+  ]
+  const providers = []
+
+  for (const [type, label] of providerDefs) {
+    const existing = existingProviders.find(p => String(p?.type || '').toLowerCase() === type) || null
+    const defaultEnabled = Boolean(existing?.enabled || String(existing?.apiKey || '').trim())
+    const enabled = await promptBoolean(rl, `Enable ${label} downloader`, defaultEnabled)
+    const apiKey = enabled
+      ? await promptRetainedSecret(rl, `${label} API key`, existing?.apiKey || '')
+      : ''
+    if (enabled || apiKey) providers.push({ type, apiKey, enabled })
+  }
+
+  const pmEnabled = providers.some(p => p.type === 'pm' && p.enabled && p.apiKey)
+  const existingSources = Array.isArray(existingConfig?.cacheSearch?.sources)
+    ? existingConfig.cacheSearch.sources.filter(s => String(s?.type || '').toLowerCase() !== 'pm')
+    : []
+
+  return {
+    debrid: {
+      providers,
+      preferOrder: ['pm', 'rd', 'ad'],
+      preferDebridOverSeedbox: true
+    },
+    cacheSearch: {
+      sources: pmEnabled
+        ? [...existingSources, { type: 'pm', apiKey: '', enabled: true }]
+        : existingSources,
+      preferOrder: ['pm', 'putio']
+    }
+  }
 }
 
 function loadExistingServerConfig(runtimeDir, secret) {
@@ -150,6 +205,7 @@ async function run() {
       'Self-host config password',
       existingSelfHostPassword || randomSecret()
     )
+    const debridSetup = await promptDebridConfig(rl, existingConfig || {})
     const prowlarrDetectedHere = Boolean(prowlarr.installed)
     const qbitDetectedHere = Boolean(qbit.installed)
     if (!prowlarrDetectedHere) {
@@ -268,6 +324,8 @@ async function run() {
       provider: String(existingConfig?.provider || 'custom').trim() || 'custom',
       fileServerUrl,
       fileServerAuth,
+      debrid: debridSetup.debrid,
+      cacheSearch: debridSetup.cacheSearch,
       maxResults: Math.max(10, Math.min(200, maxResults)),
       autoDeleteWatched,
       watchedDeleteGraceSeconds: Math.max(0, watchedDeleteGraceSeconds),
