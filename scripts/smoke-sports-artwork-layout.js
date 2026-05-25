@@ -604,6 +604,37 @@ async function assertTeamBadgeArtworkProxy() {
   try {
     global.fetch = async (input) => {
       const url = new URL(String(input))
+      if (url.hostname === 'site.web.api.espn.com' && /\/sports\/soccer\/eng\.2\/standings$/i.test(url.pathname)) {
+        return new Response(JSON.stringify({
+          children: [
+            {
+              standings: {
+                entries: [
+                  {
+                    team: {
+                      displayName: 'Future Town',
+                      abbreviation: 'FTN',
+                      shortDisplayName: 'Future Town',
+                      logos: [{ href: 'https://a.espncdn.com/i/teamlogos/soccer/500/99991.png' }]
+                    }
+                  },
+                  {
+                    team: {
+                      displayName: 'Another FC',
+                      abbreviation: 'AFC',
+                      shortDisplayName: 'Another FC',
+                      logos: [{ href: 'https://a.espncdn.com/i/teamlogos/soccer/500/99992.png' }]
+                    }
+                  }
+                ]
+              }
+            }
+          ]
+        }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        })
+      }
       if (
         url.hostname === 'a.espncdn.com' ||
         url.hostname === 'r2.thesportsdb.com' ||
@@ -1087,6 +1118,21 @@ async function assertTeamBadgeArtworkProxy() {
         unexpectedSlots: [/fallback-glyph/i]
       },
       {
+        slug: 'dynamic-efl-championship-future-team-logos',
+        sport: 'football.png',
+        query: {
+          league: 'English League Championship',
+          title: 'Future Town vs Another FC',
+          date: '2026-08-15',
+          home: 'Future Town',
+          away: 'Another FC',
+          eventClass: 'team_vs_team'
+        },
+        expectedSources: [/\/soccer\/500\/99991\.png/i, /\/soccer\/500\/99992\.png/i],
+        expectedSlots: [/home:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/soccer\/500\/99991\.png/i, /away:real-team:https:\/\/a\.espncdn\.com\/i\/teamlogos\/soccer\/500\/99992\.png/i],
+        unexpectedSlots: [/fallback-glyph/i, /home:real-league/i, /away:real-league/i]
+      },
+      {
         slug: 'direct-champions-league-team-logos',
         sport: 'football.png',
         query: {
@@ -1425,6 +1471,39 @@ async function assertTeamBadgeArtworkProxy() {
       }
       assert.deepEqual(pngDimensions(response.body), dimensions.poster, `${testCase.slug} poster dimensions`)
       fs.writeFileSync(path.join(PREVIEW_DIR, `${testCase.slug}.png`), response.body)
+    }
+
+    for (const template of SPORTS_POSTER_TEMPLATES) {
+      const response = makeMockResponse()
+      await handleDefaultSportsArtwork(
+        {
+          params: {
+            variant: 'poster',
+            sport: 'football.png'
+          },
+          query: {
+            league: 'English League Championship',
+            title: 'Future Town vs Another FC',
+            date: '2026-08-15',
+            home: 'Future Town',
+            away: 'Another FC',
+            eventClass: 'team_vs_team'
+          }
+        },
+        response,
+        {
+          sportsmetaBaseUrl: 'https://sportsmeta.test',
+          sportsPosterTemplate: template,
+          entitlementSource: 'manual_grant'
+        }
+      )
+      assert.equal(response.statusCode, 200, `dynamic EFL ${template} should return 200`)
+      assert.equal(response.headers['content-type'], 'image/png', `dynamic EFL ${template} should return PNG`)
+      assert.equal(response.headers['x-pvtkrrx-artwork-template'], template, `dynamic EFL ${template} should honour entitled template`)
+      assert.match(String(response.headers['x-pvtkrrx-logo-source-urls'] || ''), /\/soccer\/500\/99991\.png/i, `dynamic EFL ${template} should expose the home team source`)
+      assert.match(String(response.headers['x-pvtkrrx-logo-source-urls'] || ''), /\/soccer\/500\/99992\.png/i, `dynamic EFL ${template} should expose the away team source`)
+      assert.doesNotMatch(String(response.headers['x-pvtkrrx-logo-slots'] || ''), /fallback-glyph/i, `dynamic EFL ${template} should not fall back to glyph logos`)
+      assert.deepEqual(pngDimensions(response.body), dimensions.poster, `dynamic EFL ${template} poster dimensions`)
     }
   } finally {
     global.fetch = originalFetch

@@ -52,7 +52,7 @@ const VARIANT_DIMENSIONS = {
 }
 
 const ALLOWED_VARIANTS = new Set(Object.keys(VARIANT_DIMENSIONS))
-const LOCAL_ARTWORK_RENDER_VERSION = '20260525-efl-championship-v32'
+const LOCAL_ARTWORK_RENDER_VERSION = '20260525-efl-championship-dynamic-v33'
 
 const UPSTREAM_TIMEOUT_MS = Math.max(
   1500,
@@ -1755,6 +1755,24 @@ const EFL_CHAMPIONSHIP_TEAM_LOGO_ROWS = Object.freeze([
   ['football', '', 'Wrexham', ['wrexham afc'], 'https://a.espncdn.com/i/teamlogos/soccer/500/352.png']
 ])
 
+const DYNAMIC_TEAM_LOGO_SOURCES = Object.freeze([
+  {
+    key: 'espn-soccer-eng-2',
+    sport: 'football',
+    league: 'EFL Championship',
+    leagueSlugs: ['english-league-championship'],
+    url: 'https://site.web.api.espn.com/apis/v2/sports/soccer/eng.2/standings?region=us&lang=en&contentorigin=espn&type=0&level=2&sort=rank%3Aasc'
+  }
+])
+const DYNAMIC_TEAM_LOGO_CACHE_TTL_RAW = Number(process.env.PVTKRRX_DYNAMIC_TEAM_LOGO_CACHE_TTL_MS || 0)
+const DYNAMIC_TEAM_LOGO_CACHE_TTL_MS = Math.max(
+  5 * 60 * 1000,
+  Number.isFinite(DYNAMIC_TEAM_LOGO_CACHE_TTL_RAW) && DYNAMIC_TEAM_LOGO_CACHE_TTL_RAW > 0
+    ? DYNAMIC_TEAM_LOGO_CACHE_TTL_RAW
+    : 6 * 60 * 60 * 1000
+)
+const dynamicTeamLogoCache = new Map()
+
 const DIRECT_TEAM_LOGO_OVERRIDES = Object.freeze([
   ...[
     ['hockey', 'NHL', 'Anaheim Ducks', ['ducks', 'ana'], 'https://a.espncdn.com/i/teamlogos/nhl/500/ana.png'],
@@ -2125,6 +2143,120 @@ function directTeamLogoUrlFor({ sport = '', league = '', team = '' } = {}) {
   return ''
 }
 
+function dynamicTeamLogoSourcesForInput({ sport = '', league = '' } = {}) {
+  const sportSlug = resolveSportSlug(sport)
+  const leagueSlug = normalizedLeagueSlug(league)
+  if (!sportSlug || !leagueSlug || isGenericLeagueSlug(leagueSlug)) return []
+  return DYNAMIC_TEAM_LOGO_SOURCES.filter((source) => {
+    if (resolveSportSlug(source.sport) !== sportSlug) return false
+    const sourceLeagueSlug = normalizedLeagueSlug(source.league)
+    const acceptedLeagueSlugs = [
+      sourceLeagueSlug,
+      ...(Array.isArray(source.leagueSlugs) ? source.leagueSlugs : [])
+    ].map(normalizedLeagueSlug).filter(Boolean)
+    return acceptedLeagueSlugs.some((accepted) =>
+      accepted === leagueSlug ||
+      slugContainsToken(leagueSlug, accepted) ||
+      slugContainsToken(accepted, leagueSlug)
+    )
+  })
+}
+
+function addEspnTeamLogoAlias(index, alias = '', entry = {}) {
+  const slug = leagueSlugFor(alias)
+  if (!slug || index.has(slug)) return
+  index.set(slug, entry)
+}
+
+function buildEspnTeamLogoIndex(payload = null, source = {}) {
+  const index = new Map()
+  const children = Array.isArray(payload?.children) ? payload.children : []
+  const containers = [payload, ...children]
+  for (const container of containers) {
+    const entries = Array.isArray(container?.standings?.entries)
+      ? container.standings.entries
+      : (Array.isArray(container?.entries) ? container.entries : [])
+    for (const row of entries) {
+      const team = row?.team || {}
+      const sourceUrl = normalizeSpace(
+        (Array.isArray(team.logos) ? team.logos.find((logo) => normalizeSpace(logo?.href))?.href : '') ||
+        team.logo ||
+        team.logoUrl
+      )
+      if (!sourceUrl) continue
+      const displayName = normalizeSpace(team.displayName || team.name || team.shortDisplayName)
+      const entry = {
+        sourceUrl,
+        team: displayName,
+        sourceKey: source.key || 'dynamic-team-logo'
+      }
+      const aliases = [
+        displayName,
+        team.name,
+        team.shortDisplayName,
+        team.abbreviation,
+        team.location,
+        team.nickname
+      ]
+      for (const alias of aliases) addEspnTeamLogoAlias(index, alias, entry)
+    }
+  }
+  return index
+}
+
+async function loadDynamicTeamLogoIndex(source = {}) {
+  const url = normalizeSpace(source.url)
+  if (!url) return new Map()
+  const cached = dynamicTeamLogoCache.get(url)
+  if (cached && cached.expiresAt > Date.now()) return cached.index
+  try {
+    const response = await fetch(url, {
+      headers: { accept: 'application/json' },
+      signal: AbortSignal.timeout(UPSTREAM_TIMEOUT_MS)
+    })
+    if (!response.ok) throw new Error(`HTTP ${response.status}`)
+    const payload = await response.json().catch(() => null)
+    const index = buildEspnTeamLogoIndex(payload, source)
+    dynamicTeamLogoCache.set(url, { index, expiresAt: Date.now() + DYNAMIC_TEAM_LOGO_CACHE_TTL_MS })
+    return index
+  } catch (_) {
+    if (cached?.index) return cached.index
+    const index = new Map()
+    dynamicTeamLogoCache.set(url, { index, expiresAt: Date.now() + Math.min(DYNAMIC_TEAM_LOGO_CACHE_TTL_MS, 5 * 60 * 1000) })
+    return index
+  }
+}
+
+async function dynamicTeamLogoSourceFor({ sport = '', league = '', team = '' } = {}) {
+  const teamSlug = leagueSlugFor(team)
+  if (!teamSlug) return null
+  const sources = dynamicTeamLogoSourcesForInput({ sport, league })
+  for (const source of sources) {
+    const index = await loadDynamicTeamLogoIndex(source)
+    const direct = index.get(teamSlug)
+    if (direct?.sourceUrl) return direct
+    for (const [aliasSlug, entry] of index.entries()) {
+      if (
+        aliasSlug.length >= 4 &&
+        (slugContainsToken(teamSlug, aliasSlug) || slugContainsToken(aliasSlug, teamSlug))
+      ) return entry
+    }
+  }
+  return null
+}
+
+async function teamLogoSourceUrlsForInput({ sport = '', league = '', team = '', text = '' } = {}) {
+  const urls = []
+  const add = (url) => {
+    const clean = normalizeSpace(url)
+    if (clean && !urls.includes(clean)) urls.push(clean)
+  }
+  add(directTeamLogoUrlFor({ sport, league, team, text }))
+  const dynamic = await dynamicTeamLogoSourceFor({ sport, league, team })
+  add(dynamic?.sourceUrl)
+  return urls
+}
+
 function teamLogoSearchTerms({ sport = '', league = '', team = '', text = '' } = {}) {
   const terms = []
   const seen = new Set()
@@ -2238,13 +2370,13 @@ async function searchSportsMetaTeamBadgeSourceUrl({ sportsmetaBaseUrl = '', spor
 async function resolveDefaultTeamLogoImage({ sportsmetaBaseUrl = '', fallbackInput = {}, role = '', team = '', size = 260 } = {}) {
   const logoLookupAttempts = []
   const text = defaultLogoLookupText(fallbackInput)
-  const directUrl = directTeamLogoUrlFor({
+  const directUrls = await teamLogoSourceUrlsForInput({
     sport: fallbackInput.sport,
     league: fallbackInput.league || fallbackInput.competition,
     team,
     text
   })
-  if (directUrl) {
+  for (const directUrl of directUrls) {
     const directCandidate = await fetchLogoCandidate({
       url: directUrl,
       key: role === 'awayBadge' ? 'away' : 'home',
@@ -2852,18 +2984,20 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
     event.homeTeam,
     event.awayTeam
   ].filter(Boolean).join(' '))
-  const directHomeBadgeUrl = directTeamLogoUrlFor({
-    sport: event.sport,
-    league: event.league,
-    team: event.homeTeam,
-    text: directLookupText
-  })
-  const directAwayBadgeUrl = directTeamLogoUrlFor({
-    sport: event.sport,
-    league: event.league,
-    team: event.awayTeam,
-    text: directLookupText
-  })
+  const [directHomeBadgeUrls, directAwayBadgeUrls] = await Promise.all([
+    teamLogoSourceUrlsForInput({
+      sport: event.sport,
+      league: event.league,
+      team: event.homeTeam,
+      text: directLookupText
+    }),
+    teamLogoSourceUrlsForInput({
+      sport: event.sport,
+      league: event.league,
+      team: event.awayTeam,
+      text: directLookupText
+    })
+  ])
   const directLeagueLogoUrls = directLeagueLogoUrlsForInput({
     sport: event.sport,
     league: event.league,
@@ -2881,10 +3015,10 @@ async function renderTeamBadgeArtworkPng({ canonicalId = '', sportsmetaBaseUrl =
   const eventLogoSize = Math.max(logoSize, leagueLogoSize)
   const candidateResults = await Promise.all([
     hasMatchup
-      ? fetchLogoCandidateFromUrls({ urls: [directHomeBadgeUrl, homeBadgeUrl], key: 'home', role: 'homeBadge', size: logoSize, fallbackColor: colorForLabel(event.homeTeam, '#0f766e') })
+      ? fetchLogoCandidateFromUrls({ urls: [...directHomeBadgeUrls, homeBadgeUrl], key: 'home', role: 'homeBadge', size: logoSize, fallbackColor: colorForLabel(event.homeTeam, '#0f766e') })
       : Promise.resolve({ image: null, attempt: { role: 'homeBadge', kind: 'real-team', url: homeBadgeUrl, status: 0, result: 'not_applicable_no_matchup' } }),
     hasMatchup
-      ? fetchLogoCandidateFromUrls({ urls: [directAwayBadgeUrl, awayBadgeUrl], key: 'away', role: 'awayBadge', size: logoSize, fallbackColor: colorForLabel(event.awayTeam, '#123c69') })
+      ? fetchLogoCandidateFromUrls({ urls: [...directAwayBadgeUrls, awayBadgeUrl], key: 'away', role: 'awayBadge', size: logoSize, fallbackColor: colorForLabel(event.awayTeam, '#123c69') })
       : Promise.resolve({ image: null, attempt: { role: 'awayBadge', kind: 'real-team', url: awayBadgeUrl, status: 0, result: 'not_applicable_no_matchup' } }),
     fetchLogoCandidateFromUrls({ urls: [...directLeagueLogoUrls, leagueLogoUrl], key: 'league', role: 'leagueLogo', size: leagueLogoSize, fallbackColor: '#b58b2a' }),
     fetchLogoCandidate({ url: eventLogoUrl, key: 'event', role: 'eventLogo', size: eventLogoSize, fallbackColor: '#b58b2a' }),
