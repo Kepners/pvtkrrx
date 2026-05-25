@@ -9,16 +9,18 @@
 //   - Debrid linked (at least one enabled provider with apiKey):
 //       Cache hits (⚡ READY) prepend the list, then ⬇ debrid playback
 //       variants are ADDED above the existing qBit streams. qBit stays in
-//       place underneath as the always-on fallback.
+//       place underneath as the always-on fallback. Debrid variants derived
+//       from an already-ready /file/ stream stay under that ready file so
+//       Stremio opens the path that can play immediately.
 //   - Debrid NOT linked:
 //       Existing qBit stream list passes through untouched (v1.2 behavior).
 //       Cache hits still prepend if a cache source is configured.
 //
-// Implementation note: existing streams carry encrypted playback tokens that
-// embed {h: hash, l: link, p: path}. The router decodes those to derive the
-// magnet URI for parallel debrid playback URLs. No upstream call-site edits.
+// Implementation note: existing streams carry encrypted playback/file tokens
+// that embed {h: hash, l: link, p: path}. The router decodes those to derive
+// the magnet URI for parallel debrid playback URLs. No upstream call-site edits.
 
-const { decodePlaybackStateToken, encodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT } = require('./opaqueState')
+const { decodeFileStateToken, decodePlaybackStateToken, encodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT } = require('./opaqueState')
 const { searchAllSources } = require('./debridCache')
 const { redactSensitiveText } = require('./logRedaction')
 
@@ -42,7 +44,19 @@ function tryExtractDebridMetaFromStreamUrl(url, playbackBaseUrl, configToken) {
   if (text.startsWith(playbackPrefix)) {
     token = text.slice(playbackPrefix.length).split(/[?#]/)[0]
   } else if (text.startsWith(filePrefix)) {
-    return null // direct file URL; nothing to derive
+    token = text.slice(filePrefix.length).split(/[?#]/)[0]
+    try {
+      const state = decodeFileStateToken(token)
+      if (!state?.h) return null
+      return {
+        hash: String(state.h || '').toLowerCase(),
+        link: '',
+        name: String(state.p || ''),
+        sourceKind: 'file'
+      }
+    } catch (_) {
+      return null
+    }
   } else {
     return null
   }
@@ -52,7 +66,8 @@ function tryExtractDebridMetaFromStreamUrl(url, playbackBaseUrl, configToken) {
     return {
       hash: String(state.h || '').toLowerCase(),
       link: String(state.l || ''),
-      name: String(state.p || '')
+      name: String(state.p || ''),
+      sourceKind: 'playback'
     }
   } catch (_) {
     return null
@@ -178,6 +193,7 @@ async function applyV13Routing(result, ctx = {}) {
 
   // Build debrid variants from existing streams (where we can derive a hash/magnet).
   const debridStreams = []
+  const debridFileStreams = []
   if (hasDebrid) {
     for (const stream of existing) {
       const meta = tryExtractDebridMetaFromStreamUrl(stream?.url, playbackBaseUrl, configToken)
@@ -186,7 +202,7 @@ async function applyV13Routing(result, ctx = {}) {
       if (!torrentSource) continue
       const debridUrl = buildDebridPlaybackUrl(playbackBaseUrl, providersForDebrid, {
         src: torrentSource,
-        name: stream.title || stream.name || meta.name || '',
+        name: stream.title || meta.name || stream.name || '',
         protocol: DEBRID_PROTOCOL_TORRENT,
         configToken
       })
@@ -197,11 +213,13 @@ async function applyV13Routing(result, ctx = {}) {
         : enabledDebrid[0]?.type === 'ad'
           ? 'AD'
           : 'PM'
-      debridStreams.push({
+      const routedStream = {
         ...stream,
         name: `⬇ ${providerLabel} · ${(stream.name || '').replace(/^[⚡⬇] [A-Za-z.]+ · /, '')}`,
         url: debridUrl
-      })
+      }
+      if (meta.sourceKind === 'file') debridFileStreams.push(routedStream)
+      else debridStreams.push(routedStream)
     }
   }
 
@@ -217,13 +235,15 @@ async function applyV13Routing(result, ctx = {}) {
     ? await buildCacheSearchStreams({ title: queryTitle }, enabledCache, playbackBaseUrl, providersForDebrid, configToken)
     : []
 
-  // qBit ALWAYS remains as the backup, for every content type (movies, TV,
-  // sports). Debrid is purely additive — when configured it appears ABOVE
-  // qBit; when not configured the original qBit list flows through untouched.
+  // qBit ALWAYS remains available for every content type (movies, TV, sports).
+  // Debrid is additive. Ready cache hits stay first; provider handoffs derived
+  // from tracker/playback tokens can sit above qBit, while handoffs derived
+  // only from a ready /file/ token sit below that file because the provider may
+  // still need to fetch the uncached torrent.
   const baseStreams = existing
   const finalStreams = preferDebrid
-    ? [...cacheStreams, ...debridStreams, ...baseStreams]
-    : [...cacheStreams, ...baseStreams, ...debridStreams]
+    ? [...cacheStreams, ...debridStreams, ...baseStreams, ...debridFileStreams]
+    : [...cacheStreams, ...baseStreams, ...debridStreams, ...debridFileStreams]
 
   // Dedupe by URL to prevent the same /playback/debrid token from appearing twice.
   const seen = new Set()

@@ -6,7 +6,7 @@ process.env.ENCRYPTION_SECRET = process.env.ENCRYPTION_SECRET || 'debrid-routing
 process.env.PVTKRRX_OPAQUE_STATE_SECRET = process.env.PVTKRRX_OPAQUE_STATE_SECRET || process.env.ENCRYPTION_SECRET
 
 const { applyV13Routing, _buildMagnetFromHash, _tryExtractDebridMetaFromStreamUrl, _buildDebridPlaybackUrl } = require('../src/utils/streamRouter')
-const { encodePlaybackStateToken, decodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT } = require('../src/utils/opaqueState')
+const { encodeFileStateToken, encodePlaybackStateToken, decodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT } = require('../src/utils/opaqueState')
 
 const PLAYBACK_BASE = 'https://example.test'
 const CONFIG_TOKEN = 'cfgtoken123'
@@ -23,6 +23,11 @@ function check(label, fn) {
 function makeQbitStream(label = 'On Seedbox', title = 'sample 1080p') {
   const token = encodePlaybackStateToken({ h: SAMPLE_HASH, l: '', p: 'm.mkv' })
   return { name: label, title, url: `${PLAYBACK_BASE}/${CONFIG_TOKEN}/playback/${token}` }
+}
+
+function makeQbitFileStream(label = 'On Seedbox', title = '') {
+  const token = encodeFileStateToken({ h: SAMPLE_HASH, p: 'completed/m.mkv' })
+  return { name: label, title, url: `${PLAYBACK_BASE}/${CONFIG_TOKEN}/file/${token}` }
 }
 
 async function run() {
@@ -74,9 +79,14 @@ async function run() {
     assert.equal(decoded.src, torrentUrl)
   })
 
-  await check('tryExtractDebridMetaFromStreamUrl returns null for /file/ URLs', () => {
-    const url = `${PLAYBACK_BASE}/${CONFIG_TOKEN}/file/somefiletoken`
-    assert.equal(_tryExtractDebridMetaFromStreamUrl(url, PLAYBACK_BASE, CONFIG_TOKEN), null)
+  await check('tryExtractDebridMetaFromStreamUrl decodes a file token', () => {
+    const token = encodeFileStateToken({ h: SAMPLE_HASH, p: 'completed/movie.mkv' })
+    const url = `${PLAYBACK_BASE}/${CONFIG_TOKEN}/file/${token}`
+    const meta = _tryExtractDebridMetaFromStreamUrl(url, PLAYBACK_BASE, CONFIG_TOKEN)
+    assert.ok(meta)
+    assert.equal(meta.hash, SAMPLE_HASH)
+    assert.equal(meta.link, '')
+    assert.equal(meta.name, 'completed/movie.mkv')
   })
 
   await check('tryExtractDebridMetaFromStreamUrl returns null for /playback/debrid/ URLs (avoid rewrite loop)', () => {
@@ -161,6 +171,24 @@ async function run() {
     assert.equal(result.streams.length, 2)
     assert.match(result.streams[0].url, /\/playback\/debrid\//, 'debrid first')
     assert.equal(result.streams[1].name, 'On Seedbox', 'qBit kept as fallback')
+  })
+
+  await check('completed /file/ stream + debrid linked → qBit file stays first, debrid stays available', async () => {
+    const baseResult = { streams: [makeQbitFileStream('PVTKRRX [SERVER] AUTO MKV')] }
+    const result = await applyV13Routing(baseResult, {
+      config: {
+        debrid: { providers: [{ type: 'pm', apiKey: 'pmkey', enabled: true }], preferDebridOverSeedbox: true },
+        cacheSearch: { sources: [] }
+      },
+      addonUrl: PLAYBACK_BASE,
+      playbackBaseUrl: PLAYBACK_BASE,
+      configToken: CONFIG_TOKEN,
+      id: 'sportsmeta:nba'
+    })
+    assert.equal(result.streams.length, 2)
+    assert.match(result.streams[0].url, /\/file\//, 'ready qBit file first')
+    assert.match(result.streams[1].url, /\/playback\/debrid\//, 'debrid handoff still available')
+    assert.match(result.streams[1].name, /^⬇ PM/)
   })
 
   await check('preferDebridOverSeedbox=false → qBit FIRST, debrid added below', async () => {
