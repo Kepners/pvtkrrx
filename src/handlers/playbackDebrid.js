@@ -42,6 +42,12 @@ async function handleDebridPlayback(req, res) {
 
   const providerOrder = payload.providers || []
   let lastError = null
+  const srcKind = payload.protocol === DEBRID_PROTOCOL_USENET
+    ? 'nzb'
+    : /^magnet:/i.test(payload.src || '')
+      ? 'magnet'
+      : 'torrent-file'
+  console.log(`[playback-debrid] start token=${maskToken(tokenParam)} protocol=${payload.protocol || DEBRID_PROTOCOL_TORRENT} source=${srcKind} providers=${providerOrder.length}`)
 
   for (const cred of providerOrder) {
     let provider
@@ -79,6 +85,7 @@ async function handleDebridPlayback(req, res) {
         const added = await provider.addTorrentFile(torrent.bytes, torrent.fileName)
         addedId = added.addedId
       }
+      console.log(`[playback-debrid] added provider=${cred.type} id=${maskToken(addedId)}`)
     } catch (err) {
       console.warn(`[playback-debrid] add failed provider=${cred.type} reason=${redactSensitiveText(err.message)}`)
       lastError = err
@@ -101,6 +108,7 @@ async function handleDebridPlayback(req, res) {
     }
 
     if (!status || status.state !== 'ready') {
+      console.log(`[playback-debrid] preparing provider=${cred.type} state=${status?.state || 'unknown'} progress=${status?.progress || 0}`)
       res.setHeader('Retry-After', '15')
       return res.status(503).json({
         error: 'Debrid item still preparing',

@@ -59,6 +59,12 @@ function tryExtractDebridMetaFromStreamUrl(url, playbackBaseUrl, configToken) {
   }
 }
 
+function buildRouteBase(playbackBaseUrl, configToken = '') {
+  const base = String(playbackBaseUrl || '').replace(/\/+$/, '')
+  const token = String(configToken || '').trim().replace(/^\/+|\/+$/g, '')
+  return token ? `${base}/${token}` : base
+}
+
 function buildDebridPlaybackUrl(playbackBaseUrl, providers, payload) {
   try {
     const token = encodeDebridPlaybackToken({
@@ -68,7 +74,7 @@ function buildDebridPlaybackUrl(playbackBaseUrl, providers, payload) {
       providers,
       name: payload.name || ''
     })
-    return `${String(playbackBaseUrl || '').replace(/\/+$/, '')}/playback/debrid/${token}`
+    return `${buildRouteBase(playbackBaseUrl, payload.configToken)}/playback/debrid/${token}`
   } catch (err) {
     console.warn(`[stream-router] debrid token encode failed: ${redactSensitiveText(err.message)}`)
     return null
@@ -81,7 +87,7 @@ function pickReadyStreamName(hit) {
   return `⚡ READY · ${source}`
 }
 
-async function resolveCacheHitToStreamUrl(hit, configuredSources, playbackBaseUrl, providersForDebrid) {
+async function resolveCacheHitToStreamUrl(hit, configuredSources, playbackBaseUrl, providersForDebrid, configToken = '') {
   if (hit.directStreamUrl) return hit.directStreamUrl
   // PM cache hits don't have a direct URL — they need the debrid add+poll cycle.
   // Route through /playback/debrid so the existing handler does add+select+unrestrict.
@@ -91,7 +97,8 @@ async function resolveCacheHitToStreamUrl(hit, configuredSources, playbackBaseUr
     return buildDebridPlaybackUrl(playbackBaseUrl, providersForDebrid, {
       src: magnet,
       name: hit.name,
-      protocol: DEBRID_PROTOCOL_TORRENT
+      protocol: DEBRID_PROTOCOL_TORRENT,
+      configToken
     })
   }
   // put.io fileId path — fetch fresh signed URL from the source
@@ -110,7 +117,7 @@ async function resolveCacheHitToStreamUrl(hit, configuredSources, playbackBaseUr
   return null
 }
 
-async function buildCacheSearchStreams(query, enabledSources, playbackBaseUrl, providersForDebrid) {
+async function buildCacheSearchStreams(query, enabledSources, playbackBaseUrl, providersForDebrid, configToken = '') {
   if (!enabledSources.length) return []
   let hits = []
   try {
@@ -126,7 +133,7 @@ async function buildCacheSearchStreams(query, enabledSources, playbackBaseUrl, p
   for (const hit of hits) {
     let url
     try {
-      url = await resolveCacheHitToStreamUrl(hit, enabledSources, playbackBaseUrl, providersForDebrid)
+      url = await resolveCacheHitToStreamUrl(hit, enabledSources, playbackBaseUrl, providersForDebrid, configToken)
     } catch (err) {
       console.warn(`[stream-router] cache hit resolve failed: ${redactSensitiveText(err.message)}`)
       continue
@@ -180,7 +187,8 @@ async function applyV13Routing(result, ctx = {}) {
       const debridUrl = buildDebridPlaybackUrl(playbackBaseUrl, providersForDebrid, {
         src: torrentSource,
         name: stream.title || stream.name || meta.name || '',
-        protocol: DEBRID_PROTOCOL_TORRENT
+        protocol: DEBRID_PROTOCOL_TORRENT,
+        configToken
       })
       if (!debridUrl) continue
       // COPY DRAFT — pending docs/copy.md approval. Brief §3 stream-prefix lock.
@@ -206,7 +214,7 @@ async function applyV13Routing(result, ctx = {}) {
     return ''
   })()
   const cacheStreams = enabledCache.length > 0
-    ? await buildCacheSearchStreams({ title: queryTitle }, enabledCache, playbackBaseUrl, providersForDebrid)
+    ? await buildCacheSearchStreams({ title: queryTitle }, enabledCache, playbackBaseUrl, providersForDebrid, configToken)
     : []
 
   // qBit ALWAYS remains as the backup, for every content type (movies, TV,

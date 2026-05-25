@@ -37,6 +37,17 @@ async function run() {
     assert.equal(_buildMagnetFromHash('not-a-hash', 'x'), null)
   })
 
+  await check('buildDebridPlaybackUrl can scope playback under the config route', () => {
+    const magnet = _buildMagnetFromHash(SAMPLE_HASH, 'Sample')
+    const url = _buildDebridPlaybackUrl(PLAYBACK_BASE, [{ type: 'pm', apiKey: 'pmkey' }], {
+      src: magnet,
+      name: 'Sample',
+      protocol: DEBRID_PROTOCOL_TORRENT,
+      configToken: CONFIG_TOKEN
+    })
+    assert.ok(url.startsWith(`${PLAYBACK_BASE}/${CONFIG_TOKEN}/playback/debrid/`))
+  })
+
   await check('tryExtractDebridMetaFromStreamUrl decodes a playback token', () => {
     const token = encodePlaybackStateToken({ h: SAMPLE_HASH, l: '', p: 'movie.mkv' })
     const url = `${PLAYBACK_BASE}/${CONFIG_TOKEN}/playback/${token}`
@@ -115,6 +126,7 @@ async function run() {
     // ADDITIVE: 2 streams — debrid first, original qBit kept below as fallback
     assert.equal(result.streams.length, 2, 'should have both debrid and qBit streams')
     assert.match(result.streams[0].url, /\/playback\/debrid\//, 'debrid first')
+    assert.ok(result.streams[0].url.startsWith(`${PLAYBACK_BASE}/${CONFIG_TOKEN}/playback/debrid/`))
     assert.match(result.streams[0].name, /^⬇ RD/)
     assert.equal(result.streams[1].name, 'On Seedbox', 'qBit backup kept underneath')
     assert.doesNotMatch(result.streams[1].url, /\/playback\/debrid\//)
