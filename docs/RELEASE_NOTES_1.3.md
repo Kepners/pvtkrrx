@@ -1,7 +1,17 @@
 # PVTKRRX v1.3 — Debrid + Cache Search + Newznab
 
-**Released:** 2026-05-23 (v1.3.0) → patched 2026-05-24 (v1.3.1 — additive routing fix)
+**Released:** 2026-05-23 (v1.3.0) → patched 2026-05-25 (v1.3.5 — debrid-first downloader routing)
 **Type:** Feature release (purely additive, fully backward-compatible with v1.2)
+
+## v1.3.5 patch - debrid-first downloader routing
+
+v1.3.5 corrects the real playback priority for Premiumize/Real-Debrid/AllDebrid installs. When a debrid provider is configured, debrid is the first downloader layer: cached links show first, and uncached tracker sports links are handed to the debrid provider on play before falling back to local/qBittorrent/seedbox.
+
+- Premiumize cache search is implicit when a Premiumize downloader key is saved.
+- Premiumize cache checks query by infohash before title fallback.
+- Debrid `/playback/debrid` streams now sort above completed `/file/` streams when debrid is configured.
+- qBittorrent/local/seedbox streams are still kept underneath as fallback.
+- The self-host installer now asks for debrid downloader credentials before local/qBit/seedbox settings.
 
 ## What's new
 

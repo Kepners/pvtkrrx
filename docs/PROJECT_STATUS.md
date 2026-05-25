@@ -1,10 +1,20 @@
 # PVTKRRX Project Status
 
-Updated: 2026-05-24
+Updated: 2026-05-25
 
 ## Current Stage
 
-PVTKRRX is on the `1.3.3` release line. v1.3 adds optional Debrid (Real-Debrid, AllDebrid, Premiumize) + Cache Search (put.io, Premiumize cache check) + Newznab (Usenet) support — all purely additive: qBittorrent streams always remain in the list, debrid streams are ADDED above them when configured. Installs without any debrid/cache config are unchanged from v1.2.
+PVTKRRX is on the `1.3.5` release line. v1.3 adds optional Debrid (Real-Debrid, AllDebrid, Premiumize) + Cache Search (put.io, Premiumize cache check) + Newznab (Usenet) support. v1.3.5 makes debrid the first downloader when configured: cached debrid links surface first, uncached playback clicks hand the torrent/NZB to the configured debrid provider before local/qBittorrent/seedbox fallback, and qBittorrent streams remain in the list underneath. Installs without any debrid/cache config are unchanged from v1.2.
+
+## 2026-05-25: v1.3.5 debrid-first playback routing fix
+
+- Owner correction: for sports and other uncached tracker content, Stremio play should activate debrid as the downloader first. Local/qBittorrent/seedbox remains fallback, not the primary route when a debrid provider is configured.
+- Router (`src/utils/streamRouter.js`): debrid playback streams now sort above completed `/file/` streams when debrid is configured, Premiumize cache source is implicit when a Premiumize provider key exists, cache checks query Premiumize by infohash before title fallback, and `/playback/debrid` tokens prioritize the provider that produced the cache hit.
+- Installer/setup (`scripts/server-installer.js`, `scripts/server-setup.js`): the self-host seedbox install flow now prompts for Debrid downloader credentials before local/qBit/seedbox settings and writes `preferDebridOverSeedbox=true` with Premiumize first in provider order.
+- Configure UI (`public/configure.html`): the Debrid panel is now labeled as a downloader, states that cached links show first, and states that uncached links start a provider transfer when play is clicked.
+- Local proof before release: `node scripts/smoke-debrid-routing.js`, `node scripts/smoke-debrid-config.js`, `node --check scripts/server-setup.js`, `node --check scripts/server-installer.js`, `node --check src/utils/streamRouter.js`, `npm run smoke:playback`, `npm run smoke:debrid-all`, `node scripts/smoke-selfhost-server.js`, and `node scripts/__tests__/debrid/premiumize.test.js` passed.
+- Live proof before release cut: public Coolify container and native Contabo `/opt/pvtkrrx` were moved to behavior commit `c5f272647a87980aa08de5f3bd25fd4b4df388a4`; `/selfhost/configure` served the new Debrid downloader copy; native `pvtkrrx.service` was active and server-side `smoke-debrid-routing` passed.
+- Caveat: the live Contabo config had no Premiumize/Real-Debrid/AllDebrid key saved during the Supercars probe, so the live stream list correctly stayed on qBit `/selfhost/file/...`. Premiumize download activation is not live-proven until a provider key is saved and `[playback-debrid]` logs show the transfer.
 
 ## 2026-05-24: v1.3.3 torrent-file debrid and poster entitlement repair
 
