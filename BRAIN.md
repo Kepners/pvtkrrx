@@ -1,5 +1,85 @@
 # PVTKRRX Brain
 
+## 2026-05-25: v1.3.4 playback/poster release
+
+- Scope: durable `main` release for the public Coolify surface, native Contabo
+  self-host runtime, and Windows desktop release artifacts. No DNS/Caddy routing
+  change was made.
+- Source state:
+  - Release commit `f3a2b7da7f4bb09957ae5d74215c5cbab9d8f11f` was pushed to
+    `Kepners/pvtkrrx` `main`.
+  - Package version and release index now point at `1.3.4`.
+- Product fixes:
+  - qBit-ready `/file/` streams are preserved as the first playable option.
+  - When a qBit `/file/` stream came from a tracker torrent URL, PVTKRRX can now
+    derive the original tracker handoff and add the debrid stream beside it for
+    configured Premiumize/Real-Debrid/AllDebrid installs.
+  - Config-route playback now keeps debrid routing on the same configured route.
+  - Sports poster style readback no longer clamps an entitled `glitch` request
+    to the free `ticket-stub` layout.
+  - EFL Championship logo lookup was made dynamic instead of relying on one
+    hard-coded case.
+- Local proof before deploy:
+  - PASS: `npm run smoke:debrid-routing`
+  - PASS: `npm run smoke:debrid-config`
+  - PASS: `npm run smoke:playback`
+  - PASS: `npm run smoke:pipeline`
+  - PASS: `npm run smoke:config`
+  - PASS: `npm run smoke:selfhost`
+  - PASS: `npm run smoke:entitlement`
+  - PASS: `npm run smoke:free-tier-artwork`
+  - PASS: `npm run smoke:sports-poster-render`
+  - PASS: `npm run smoke:sports-artwork`
+  - PASS: `npm run smoke:debrid-all`
+  - PASS: `npm run smoke:guards`
+  - PASS: `npm run smoke:security`
+  - PASS: `npm run smoke:win-installer-path`
+  - PASS: `npm run dist:win` produced `PVTKRRX Setup 1.3.4.exe`,
+    `PVTKRRX 1.3.4.exe`, `latest.yml`, and the setup blockmap.
+- Public Coolify proof:
+  - Deployment queue row `881` finished for
+    `f3a2b7da7f4bb09957ae5d74215c5cbab9d8f11f`.
+  - Running public container:
+    `w14jewmw5ubscrxh8zzfhq7d-170703390558`, image
+    `w14jewmw5ubscrxh8zzfhq7d:f3a2b7da7f4bb09957ae5d74215c5cbab9d8f11f`.
+  - Container env verified `SOURCE_COMMIT=f3a2b7da7f4bb09957ae5d74215c5cbab9d8f11f`,
+    `COOLIFY_BRANCH=main`, and `PVTKRRX_HOSTED_RELAY=true`.
+  - `https://www.pvtkrrx.cc/manifest.json?probe=f3a2b7d` returned bootstrap
+    version `1.3.4` and locked name `PVTKRR`.
+  - Live poster probe from the Contabo `/selfhost` catalog returned
+    `HTTP 200 image/png`, `X-PVTKRRX-Revision=f3a2b7d...`, and
+    `X-PVTKRRX-Artwork-Template=glitch`.
+- Native Contabo proof:
+  - Source archive SHA-256 before extraction:
+    `ff9d39aec8a1b3ea7839e305cb69a7eecefd2f220ed1007a23b9748a8d76a7c4`.
+  - Source backup before extraction:
+    `/opt/pvtkrrx-backups/20260525T170929Z-pre-1.3.4-f3a2b7da7f4b-source.tgz`.
+  - `/opt/pvtkrrx/REVISION` contains
+    `f3a2b7da7f4bb09957ae5d74215c5cbab9d8f11f`; package version is `1.3.4`;
+    `pvtkrrx.service` is active.
+  - The stable `/selfhost` disk config was restored from local Contabo services:
+    Prowlarr on loopback, qBittorrent on loopback, built-in file serving, and
+    self-host admin poster entitlement for `glitch`. No debrid provider API key
+    was present in server state, so debrid handoff remains enabled for token
+    configs that carry a debrid key.
+  - Startup warmup after restore logged qBittorrent ready with 8 torrents and
+    Prowlarr ready with 8 indexers.
+  - `https://www.pvtkrrx.cc/selfhost/catalog/sports/pvtkrrx-sports-basketball.json`
+    returned `HTTP 200` with 12 metas; the first item was
+    `NBA Playoffs: Oklahoma City Thunder vs San Antonio Spurs`.
+  - The May 25 Spurs/Thunder qBit source queued, downloaded, changed to a ready
+    `✅ [SERVER]` stream, and its `/selfhost/file/...` URL returned
+    `HTTP 206 Partial Content`, `Content-Type: video/x-matroska`,
+    `Content-Range: bytes 0-65535/12034063938`, `X-Pvtkrrx-Progress: 100`,
+    and 65,536 bytes.
+- Weak points:
+  - `npm ci` still reports existing dependency audit findings; this release did
+    not change dependency versions.
+  - The restored stable `/selfhost` alias has no debrid provider because no
+    debrid API key was available on the server. Existing encrypted Stremio
+    token installs that include Premiumize/Real-Debrid/AllDebrid keys use the
+    v1.3.4 debrid handoff code.
+
 ## 2026-05-24: Debrid torrent-file upload and poster entitlement fix deployed
 
 - Scope: PVTKRRX public Coolify container and native `/opt/pvtkrrx` Contabo
