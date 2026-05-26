@@ -2490,6 +2490,14 @@ app.get('/playback/waiting-room.mp4', (req, res) => {
   if (sendWaitingRoomVideo(req, res, { kind: 'direct' })) return
   return res.status(404).json({ error: 'Waiting room video not available' })
 })
+app.head('/:config/playback/waiting-room.mp4', (req, res) => {
+  if (sendWaitingRoomHead(req, res, { kind: 'direct', reason: req.params.config })) return
+  return res.status(404).end()
+})
+app.get('/:config/playback/waiting-room.mp4', (req, res) => {
+  if (sendWaitingRoomVideo(req, res, { kind: 'direct', reason: req.params.config })) return
+  return res.status(404).json({ error: 'Waiting room video not available' })
+})
 
 // Used when no external fileServerUrl is configured (e.g. local qBit setup).
 app.head('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('file'), handleFileHead)

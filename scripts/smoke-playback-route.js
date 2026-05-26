@@ -607,6 +607,9 @@ async function run() {
     const waitingRoomRangeResponse = await request(server.address().port, '/playback/waiting-room.mp4', { headers: { Range: 'bytes=0-31' } })
     assert.equal(waitingRoomRangeResponse.status, 206, 'waiting-room route should support range probes')
     assert.match(String(waitingRoomRangeResponse.headers['content-range'] || ''), /^bytes 0-31\/\d+$/, 'waiting-room range response should describe the served clip bytes')
+    const configWaitingRoomHeadResponse = await request(server.address().port, `/${configToken}/playback/waiting-room.mp4`, { method: 'HEAD' })
+    assert.equal(configWaitingRoomHeadResponse.status, 200, 'config-prefixed waiting-room HEAD should not be parsed as a playback token')
+    assert.equal(String(configWaitingRoomHeadResponse.headers['x-pvtkrrx-waiting-room'] || ''), '1')
 
     const response = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(playbackToken)}`)
     assert.equal(response.status, 302, 'completed playback should redirect instead of crashing')
