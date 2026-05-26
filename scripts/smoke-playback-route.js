@@ -64,11 +64,13 @@ function request(port, reqPath, options = {}) {
       const chunks = []
       res.on('data', chunk => chunks.push(Buffer.from(chunk)))
       res.on('end', () => {
-        const text = Buffer.concat(chunks).toString('utf8')
+        const body = Buffer.concat(chunks)
+        const text = body.toString('utf8')
         resolve({
           status: Number(res.statusCode || 0),
           headers: res.headers || {},
-          text
+          text,
+          bodyLength: body.length
         })
       })
     })
@@ -604,9 +606,22 @@ async function run() {
     assert.equal(waitingRoomHeadResponse.text, '', 'waiting-room HEAD should not send a body')
     assert.equal(String(waitingRoomHeadResponse.headers['content-type'] || ''), 'video/mp4', 'waiting-room route should expose MP4 content')
     assert.ok(Number(waitingRoomHeadResponse.headers['content-length'] || 0) > 0, 'waiting-room route should expose a real bundled video asset')
+    assert.equal(String(waitingRoomHeadResponse.headers['accept-ranges'] || ''), 'bytes', 'waiting-room HEAD should advertise byte ranges')
+    const waitingRoomFullResponse = await request(server.address().port, '/playback/waiting-room.mp4')
+    assert.equal(waitingRoomFullResponse.status, 200, 'waiting-room full GET should return 200')
+    assert.equal(String(waitingRoomFullResponse.headers['content-type'] || ''), 'video/mp4', 'waiting-room full GET should expose MP4 content')
+    assert.equal(String(waitingRoomFullResponse.headers['accept-ranges'] || ''), 'bytes', 'waiting-room full GET should advertise byte ranges')
+    assert.equal(Number(waitingRoomFullResponse.headers['content-length'] || 0), waitingRoomFullResponse.bodyLength, 'waiting-room full GET Content-Length should match body bytes')
     const waitingRoomRangeResponse = await request(server.address().port, '/playback/waiting-room.mp4', { headers: { Range: 'bytes=0-31' } })
     assert.equal(waitingRoomRangeResponse.status, 206, 'waiting-room route should support range probes')
     assert.match(String(waitingRoomRangeResponse.headers['content-range'] || ''), /^bytes 0-31\/\d+$/, 'waiting-room range response should describe the served clip bytes')
+    assert.equal(String(waitingRoomRangeResponse.headers['content-length'] || ''), '32', 'waiting-room range response should send the requested byte count')
+    assert.equal(String(waitingRoomRangeResponse.headers['accept-ranges'] || ''), 'bytes', 'waiting-room range response should advertise byte ranges')
+    assert.equal(waitingRoomRangeResponse.bodyLength, 32, 'waiting-room range response body should match Content-Length')
+    const waitingRoomInvalidRangeResponse = await request(server.address().port, '/playback/waiting-room.mp4', { headers: { Range: 'bytes=999999999999-' } })
+    assert.equal(waitingRoomInvalidRangeResponse.status, 416, 'waiting-room invalid ranges should return 416')
+    assert.match(String(waitingRoomInvalidRangeResponse.headers['content-range'] || ''), /^bytes \*\/\d+$/, 'waiting-room invalid range should include unsatisfied Content-Range')
+    assert.equal(String(waitingRoomInvalidRangeResponse.headers['content-length'] || ''), '0', 'waiting-room invalid range should not send a body')
     const configWaitingRoomHeadResponse = await request(server.address().port, `/${configToken}/playback/waiting-room.mp4`, { method: 'HEAD' })
     assert.equal(configWaitingRoomHeadResponse.status, 200, 'config-prefixed waiting-room HEAD should not be parsed as a playback token')
     assert.equal(String(configWaitingRoomHeadResponse.headers['x-pvtkrrx-waiting-room'] || ''), '1')

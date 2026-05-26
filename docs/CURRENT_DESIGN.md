@@ -1,6 +1,6 @@
 # PVTKRRX Current Design
 
-Updated: 2026-05-25
+Updated: 2026-05-26
 
 ## Purpose
 
@@ -270,6 +270,9 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 - Local `/file` can continue serving a known absolute local file path even after qBittorrent no longer reports the torrent row, as long as the file still exists on disk.
 - Local `/playback` is the queued-download path for tracker content that is not yet ready. It fetches the `.torrent` payload, adds it to qBittorrent, and as soon as qBittorrent exposes the target file on a built-in playback-capable runtime it 302-redirects into `/file`, letting the shared file route hold the HTTP connection open while bytes arrive. Already-matched in-progress streams on playback-capable runtimes now also stay on `/playback` first, carrying the chosen file path in the opaque token so Stremio does not hit `/file` prematurely and trip a player-side `liberror` while the partial file is still forming. When built-in buffering is not possible, `/playback` still waits for ready-file thresholds before redirecting.
 - If `/playback` times out before it can identify/redirect to a playable file route, it uses the same waiting-room MP4 fallback with progress headers. The real handoff still happens only on the next route request; this MP4 does not magically switch itself into the target media.
+- The bundled waiting-room asset is also exposed directly at `/playback/waiting-room.mp4` and `/:config/playback/waiting-room.mp4`. Those asset routes must stay registered before the generic `/:config/playback/:info` token route so the filename is never parsed as a playback token.
+- The waiting-room response is a normal finite `video/mp4` with `Accept-Ranges: bytes`, `Content-Length`, `Content-Range` on partial responses, and `416` on unsatisfied ranges. It is intentionally a keep-alive/loading surface only: it does not emulate Stremio's native torrent progress ring, does not proxy provider media, does not loop by itself, and does not switch the same HTTP response into the real media when qBittorrent or Debrid becomes ready.
+- The current asset is an 8-second MP4. That is acceptable as a first-layer player keep-alive, but if real Stremio clients stop on the loader's natural end before retrying the stream URL, the next hardening step is an explicit looping/HLS/retry handoff rather than claiming native progress behavior.
 - Playback priming now explicitly resumes the selected incomplete torrent, moves it to the top of qBittorrent's queue when queueing is enabled, keeps sequential download enabled, disables first+last piece priority unless explicitly opted in, and promotes only the chosen playable video/archive files to high file priority while demoting unrelated files.
 - Completed-file playback correctly checks torrent completion state before redirecting into `/file`.
 - Sports stream playback now prefers the original Prowlarr availability anchor carried in either the unresolved custom id or the canonical-id anchor cache, so canonical SportsMeta grouping does not break the link back to the real tracker torrent.

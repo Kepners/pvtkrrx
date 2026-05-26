@@ -75,6 +75,8 @@ Same behaviour for movies, TV, AND sports. PVTKRR's v1.3 router is purely additi
 
 When an uncached debrid handoff is accepted but still preparing after the poll window, PVTKRR returns the bundled waiting-room MP4 rather than only a JSON 503 response. The response carries `X-PVTKRRX-Waiting-*`, `X-PVTKRRX-Progress`, and `Retry-After` headers for debugging, but Stremio still sees a normal HTTP video stream. This is a keep-alive/loading fallback, not the native torrent progress ring.
 
+The waiting room is only for provider-preparing states. Once the provider has a playable media URL, PVTKRR redirects Stremio to that provider URL and does not proxy the provider's media bytes. The current loader asset is a finite 8-second MP4, so it is a first-layer keep-alive rather than a guaranteed long-running loop; real-client proof is still required before claiming more than that.
+
 ## Verifying
 
 After saving config, open any movie or TV episode in Stremio. If debrid is configured, you should see streams labelled like `⬇ RD · ...` or `⬇ PM · ...` ahead of the existing seedbox streams. If put.io has the file already, you should see `⚡ READY · put.io · ...` at the very top.
