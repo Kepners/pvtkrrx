@@ -20,6 +20,7 @@ const {
 const { getBrowserConfig, trackEvent } = require('./src/utils/analytics')
 const { scheduleSportsCatalogPrewarm } = require('./src/utils/sportsCatalogPrewarm')
 const { handleDebridPlayback, handleDebridPlaybackHead, handleDebridTest } = require('./src/handlers/playbackDebrid')
+const { sendWaitingRoomHead, sendWaitingRoomVideo } = require('./src/handlers/waitingRoom')
 
 // Legacy direct TheSportsDB paths (sports-image cache, 15-min autofill job,
 // /sports/image proxy, and the experimental internal SportsMeta handler) were
@@ -191,6 +192,12 @@ function handlePlaybackHead(req, res) {
     return res.status(400).end()
   }
   return sendPlaybackHead(res, playbackContentTypeForPath(info?.p || info?.name || ''))
+}
+
+function sendWaitingRoomOrJson(req, res, details, fallbackStatus, fallbackBody) {
+  if (sendWaitingRoomVideo(req, res, details)) return true
+  res.status(fallbackStatus).json(fallbackBody)
+  return true
 }
 
 function trackServerSockets(server, sockets) {
@@ -2475,6 +2482,15 @@ app.post('/:config/qbit/postprocess', withConfig, requireLocalQbitControl, async
 })
 
 // ─── Built-in file server — serves local files with Range support ───
+app.head('/playback/waiting-room.mp4', (req, res) => {
+  if (sendWaitingRoomHead(req, res, { kind: 'direct' })) return
+  return res.status(404).end()
+})
+app.get('/playback/waiting-room.mp4', (req, res) => {
+  if (sendWaitingRoomVideo(req, res, { kind: 'direct' })) return
+  return res.status(404).json({ error: 'Waiting room video not available' })
+})
+
 // Used when no external fileServerUrl is configured (e.g. local qBit setup).
 app.head('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('file'), handleFileHead)
 app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('file'), async (req, res) => {
@@ -2498,6 +2514,8 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
     res.setHeader('Accept-Ranges', 'bytes')
     res.setHeader('Cache-Control', 'no-store')
     res.setHeader('Connection', 'keep-alive')
+    const requestedRangeHeader = req.headers.range
+    const isInitialPlaybackRequest = !requestedRangeHeader || /^bytes=0(?:-|$)/i.test(String(requestedRangeHeader || '').trim())
     const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
     const playback = await loadTorrentPlaybackState(qbit, String(h || '').toLowerCase(), p, req.config.additionalStorageRoots)
     let isOrphanFile = false
@@ -2675,7 +2693,12 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
       const becameAvailable = await waitForFileState(() => Boolean(fileExists && resolvedFilePath))
       if (!becameAvailable) {
         console.warn('[file-route] file not found on disk')
-        return res.status(425).json({
+        return sendWaitingRoomOrJson(req, res, {
+          kind: 'qbit',
+          reason: 'buffering-metadata',
+          progress: Number(file?.progress || torrent.progress || 0),
+          retryAfterSeconds: 2
+        }, 425, {
           error: 'Buffering torrent metadata',
           progress: Number(file?.progress || torrent.progress || 0)
         })
@@ -2685,8 +2708,8 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
     const ext = path.extname(resolvedFilePath).toLowerCase()
     const mime = { '.mp4': 'video/mp4', '.mkv': 'video/x-matroska', '.avi': 'video/x-msvideo', '.wmv': 'video/x-ms-wmv', '.ts': 'video/mp2t', '.m4v': 'video/x-m4v' }
     const contentType = mime[ext] || 'application/octet-stream'
-    const range = req.headers.range
-    const initialRequest = !range || /^bytes=0(?:-|$)/i.test(String(range || '').trim())
+    const range = requestedRangeHeader
+    const initialRequest = isInitialPlaybackRequest
     const initialReady = () => Boolean(isComplete || isPlaybackReady(file, readableBytes))
 
     if (!isComplete && initialRequest && !initialReady()) {
@@ -2700,7 +2723,12 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
           `[file-route] initial buffer not ready hash=${torrentHash.slice(0, 8)} ` +
           `readable=${readableBytes} required=${requiredBytes} progress=${Math.round(Number(file?.progress || torrent.progress || 0) * 100)}%`
         )
-        return res.status(425).json({
+        return sendWaitingRoomOrJson(req, res, {
+          kind: 'qbit',
+          reason: 'initial-buffer',
+          progress: Number(file?.progress || torrent.progress || 0),
+          retryAfterSeconds: 2
+        }, 425, {
           error: 'Download active - waiting for continuous start buffer',
           progress: Number(file?.progress || torrent.progress || 0)
         })
@@ -2708,7 +2736,12 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
     } else if (!isComplete && readableBytes <= 0) {
       const hasReadableBytes = await waitForFileState(() => Boolean(fileExists && resolvedFilePath && (isComplete || readableBytes > 0)))
       if (!hasReadableBytes) {
-        return res.status(425).json({
+        return sendWaitingRoomOrJson(req, res, {
+          kind: 'qbit',
+          reason: 'initial-readable-bytes',
+          progress: Number(file?.progress || torrent.progress || 0),
+          retryAfterSeconds: 2
+        }, 425, {
           error: 'Download started — waiting for initial buffer',
           progress: Number(file?.progress || torrent.progress || 0)
         })
@@ -2778,7 +2811,12 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
         if (maxReadable <= 0) {
           const hasReadableBytes = await waitForFileState(() => Boolean(fileExists && resolvedFilePath && (isComplete || readableBytes > 0)))
           if (!hasReadableBytes) {
-            return res.status(425).json({
+            return sendWaitingRoomOrJson(req, res, {
+              kind: 'qbit',
+              reason: 'initial-readable-bytes',
+              progress: Number(file?.progress || torrent.progress || 0),
+              retryAfterSeconds: 2
+            }, 425, {
               error: 'Download started — waiting for initial buffer',
               progress: Number(file?.progress || torrent.progress || 0)
             })
@@ -3110,7 +3148,13 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
       `progress=${Math.round(lastProgress * 100)}% availability=${maxAvailability.toFixed(3)} ` +
       `seeders=${maxSeedersSeen} peers=${maxPeersSeen}`
     )
-    res.status(503).json({
+    return sendWaitingRoomOrJson(req, res, {
+      kind: 'qbit',
+      reason: stalledNoPieces ? 'stalled-no-pieces' : 'playback-timeout',
+      state: stalledNoPieces ? 'stalled' : 'buffering',
+      progress: lastProgress,
+      retryAfterSeconds: 4
+    }, 503, {
       error: stalledNoPieces
         ? 'Source stalled - no available pieces from peers. Pick another source.'
         : 'Download queued - still buffering start of file',

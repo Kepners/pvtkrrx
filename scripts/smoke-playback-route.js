@@ -599,6 +599,15 @@ async function run() {
     assert.equal(fileHeadResponse.text, '', 'file HEAD should not send a body')
     assert.equal(String(fileHeadResponse.headers['content-type'] || ''), 'video/mp4', 'file HEAD should expose the expected video content type')
 
+    const waitingRoomHeadResponse = await request(server.address().port, '/playback/waiting-room.mp4', { method: 'HEAD' })
+    assert.equal(waitingRoomHeadResponse.status, 200, 'waiting-room HEAD should be cheap and successful')
+    assert.equal(waitingRoomHeadResponse.text, '', 'waiting-room HEAD should not send a body')
+    assert.equal(String(waitingRoomHeadResponse.headers['content-type'] || ''), 'video/mp4', 'waiting-room route should expose MP4 content')
+    assert.ok(Number(waitingRoomHeadResponse.headers['content-length'] || 0) > 0, 'waiting-room route should expose a real bundled video asset')
+    const waitingRoomRangeResponse = await request(server.address().port, '/playback/waiting-room.mp4', { headers: { Range: 'bytes=0-31' } })
+    assert.equal(waitingRoomRangeResponse.status, 206, 'waiting-room route should support range probes')
+    assert.match(String(waitingRoomRangeResponse.headers['content-range'] || ''), /^bytes 0-31\/\d+$/, 'waiting-room range response should describe the served clip bytes')
+
     const response = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(playbackToken)}`)
     assert.equal(response.status, 302, 'completed playback should redirect instead of crashing')
     assert.match(String(response.headers.location || ''), new RegExp(`/${configToken}/file/`), 'playback redirect should target the shared file route')
@@ -644,8 +653,10 @@ async function run() {
     assert.equal(coldIncompleteResponse.status, 302, 'incomplete playback should hand Stremio to /file as soon as qBit exposes the target file path')
     assert.match(String(coldIncompleteResponse.headers.location || ''), new RegExp(`/${configToken}/file/`), 'cold incomplete playback should let the shared file route handle byte-range readiness')
     const coldIncompleteFileResponse = await request(server.address().port, String(coldIncompleteResponse.headers.location || ''))
-    assert.equal(coldIncompleteFileResponse.status, 425, 'shared file route should not hand Stremio a tiny non-playable head chunk before the startup buffer is ready')
-    assert.match(String(coldIncompleteFileResponse.text || ''), /continuous start buffer/i)
+    assert.equal(coldIncompleteFileResponse.status, 200, 'shared file route should keep Stremio alive with the waiting-room MP4 before the startup buffer is ready')
+    assert.equal(String(coldIncompleteFileResponse.headers['content-type'] || ''), 'video/mp4')
+    assert.equal(String(coldIncompleteFileResponse.headers['x-pvtkrrx-waiting-room'] || ''), '1')
+    assert.equal(String(coldIncompleteFileResponse.headers['x-pvtkrrx-waiting-kind'] || ''), 'qbit')
     const coldIncompleteTailResponse = await request(
       server.address().port,
       String(coldIncompleteResponse.headers.location || ''),
@@ -662,7 +673,8 @@ async function run() {
     assert.equal(unverifiedResponse.status, 302, 'incomplete playback may still enter /file when qBit exposes the target path but cannot prove pieces yet')
     assert.match(String(unverifiedResponse.headers.location || ''), new RegExp(`/${configToken}/file/`), 'unverified incomplete playback should still use the shared file route for range-level proof')
     const unverifiedFileResponse = await request(server.address().port, String(unverifiedResponse.headers.location || ''))
-    assert.equal(unverifiedFileResponse.status, 425, 'shared file route should fail closed if qBit cannot prove any readable bytes for the requested file')
+    assert.equal(unverifiedFileResponse.status, 200, 'shared file route should keep Stremio alive with the waiting-room MP4 when readable bytes cannot be proved yet')
+    assert.equal(String(unverifiedFileResponse.headers['x-pvtkrrx-waiting-room'] || ''), '1')
 
     incompletePieceStates = [2, 2, 2, 2, 2, 2]
     const incompleteResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(incompletePlaybackToken)}`)

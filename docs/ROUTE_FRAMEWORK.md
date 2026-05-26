@@ -55,7 +55,7 @@ Implementation note: the current user-facing `LAN Bridge` route is the code-faci
 - Cache-search sources are put.io and Premiumize cache check.
 - `/playback/debrid` handles add/check/poll handoff and redirects to the provider when ready.
 - The public hosted relay must not proxy Debrid provider media bytes.
-- If the provider is still downloading, `/playback/debrid` can return a preparing/`503` response until the provider exposes playable data.
+- If the provider is still downloading after the poll window, `/playback/debrid` returns the bundled PVTKRRX waiting-room MP4 with progress/provider headers when possible, falling back to the old preparing/`503` JSON only if the loader asset cannot be served.
 - If no Debrid provider is configured, route behavior falls back to the qBittorrent/local rules below.
 
 ## What Each Route Exposes
@@ -79,6 +79,7 @@ There is no per-route catalog filtering. The Library catalog queries qBittorrent
 - Config loaded from disk (`local-config.json`)
 - Built-in `/file` route serves bytes with HTTP Range support
 - Built-in `/playback` route queues torrents via tracker link, polls qBit, and 302-redirects to `/file` when ready
+- Built-in `/file` and `/playback` now use the bundled waiting-room MP4 for initial not-ready states so Stremio can stay on a playable loading surface while qBit continues downloading. Unavailable seek/tail byte ranges still return retryable range errors because substituting a loader clip for a requested real-media byte range would corrupt playback semantics.
 - Playback priming resumes the selected incomplete torrent, moves it to the top of qBittorrent's queue when queueing is enabled, keeps sequential download on, explicitly disables first+last piece priority unless opted in, and sets only the chosen playable video/archive files to high file priority
 - Tracker `/playback` streams emitted for on-tracker content
 - Completed packed RAR releases start background extraction when possible; the extracted direct video is the supported path once ready, and the source stays hidden while extraction is pending or unavailable unless the experimental native archive override is enabled
@@ -140,8 +141,8 @@ For playback-capable runtimes, the `In-progress unpacked video` row applies both
 | Endpoint | PC Local | LAN Bridge (home network) | Remote Seedbox (public hosted relay) |
 |---|---|---|---|
 | `/:config/file/:info` | Serves bytes (200/206) | 307 -> local `/file` | 403 Forbidden |
-| `/:config/playback/:info` | Queue + comet poll (503 -> 302) | 307 -> local `/playback` | 403 Forbidden |
-| `/:config/playback/debrid/:token` | Provider add/check/poll -> redirect when ready | 307 -> local provider handoff when home redirect applies | Provider add/check/poll -> redirect when ready; never proxies media bytes |
+| `/:config/playback/:info` | Queue + comet poll (waiting-room MP4 fallback -> 302) | 307 -> local `/playback` | 403 Forbidden |
+| `/:config/playback/debrid/:token` | Provider add/check/poll -> redirect when ready, waiting-room MP4 fallback while preparing | 307 -> local provider handoff when home redirect applies | Provider add/check/poll -> redirect when ready, waiting-room MP4 fallback while preparing; never proxies provider media bytes |
 | `/:config/stream/:type/:id.json` | All stream types emitted | 307 -> local stream handler | Ready-file streams only |
 | `/:config/catalog/:type/:id.json` | All catalogs | 307 -> local catalog handler | All catalogs (direct from hosted) |
 | `/:config/meta/:type/:id.json` | All meta | 307 -> local meta handler | All meta (direct from hosted) |

@@ -73,6 +73,8 @@ Same behaviour for movies, TV, AND sports. PVTKRR's v1.3 router is purely additi
 | NZB results | Routed to Premiumize when PM is configured (RD/AD skip — neither supports NZB). | Skipped (no qBit fallback for Usenet). |
 | Cached items (via cache search) | `⚡ READY` prefix, top of list. | Same — cache search runs independently of debrid. |
 
+When an uncached debrid handoff is accepted but still preparing after the poll window, PVTKRR returns the bundled waiting-room MP4 rather than only a JSON 503 response. The response carries `X-PVTKRRX-Waiting-*`, `X-PVTKRRX-Progress`, and `Retry-After` headers for debugging, but Stremio still sees a normal HTTP video stream. This is a keep-alive/loading fallback, not the native torrent progress ring.
+
 ## Verifying
 
 After saving config, open any movie or TV episode in Stremio. If debrid is configured, you should see streams labelled like `⬇ RD · ...` or `⬇ PM · ...` ahead of the existing seedbox streams. If put.io has the file already, you should see `⚡ READY · put.io · ...` at the very top.
