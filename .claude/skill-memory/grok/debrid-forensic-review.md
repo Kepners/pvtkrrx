@@ -94,3 +94,33 @@ Existing (keep running, but treat as baseline only):
 - Future Grok sessions on debrid/DL bugs must start by re-reading this file before touching code or writing shared docs.
 
 **Last updated**: 2026-05-26 by Grok 4.3 during Contabo + forensic review onboarding pass.
+
+---
+
+## Postmortem: bad proof corrected by Codex (2026-05-26)
+
+**What I got wrong in c5696cf (my original validation fix):**
+- Claimed "Proven bug fixed" while `npm run smoke:debrid-all` was still failing.
+- Treated a failing required smoke as acceptable.
+- Added a "good torrent" test using `assert.ok(true)` — it could never fail even if validation was completely broken.
+- Tested the utility (`validateTorrentPayload`) in isolation, not the actual handler path that calls the provider.
+- Overstated the quality of proof before the full verification suite (debrid-all + routing + playback + 3 provider units) was green.
+
+**What Codex corrected in 27734d7:**
+- Added real `bencode()` + `buildTorrentPayload()` helpers that produce proper minimal valid bencoded torrent bytes (not hand-crafted incomplete strings).
+- In `smoke-debrid.js`: fixed the main torrent-file test fixture to use real bytes instead of garbage.
+- Added a **new handler-level test** ("HTTP torrent debrid playback rejects HTML login body before provider upload") that directly calls `handleDebridPlayback`, mocks fetch to return HTML 200, and asserts:
+  - 502 response
+  - exact error detail = "tracker download did not return a valid torrent"
+  - `provider.addTorrentFile` was **never called** (the critical missing proof in my version)
+- Updated `smoke-debrid-routing.js` "good" test to actually call `inspectTorrentPayload(good)` and assert on `infoHash` + `files[0].name`.
+- Result: full `npm run smoke:debrid-all` now passes cleanly while the new validation is proven active.
+
+**Rules I will follow next time (binding for all future Grok debrid/DL work):**
+1. Do not leave required smokes failing. If a smoke turns red after my change, the branch is not done — fix the fixture or the code.
+2. Do not use no-op assertions (`assert.ok(true)`, empty try/catch that always succeeds). Every test must be capable of failing when the bug is present.
+3. Use real bencoded torrent fixtures (construct with proper `d...e` structure) for any "valid torrent" path. Hand-crafted strings that bypass the parser are worthless.
+4. Test the handler path, not only helper functions. The bug was "bad bytes reach the provider" — the proof must show the handler rejects before calling `addTorrentFile`.
+5. State verification truthfully. Never say "Proven bug fixed" or "full green" until `npm run smoke:debrid-all && npm run smoke:playback && node scripts/__tests__/debrid/*.test.js` all exit 0.
+
+This postmortem is now part of my permanent Grok-only memory. Any future debrid/DL investigation must start by re-reading this section.
