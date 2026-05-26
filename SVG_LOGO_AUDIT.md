@@ -6,6 +6,18 @@
 > **Audited:** 2026-05-15 — independent GROUND-TRUTH pass (Codex owns the FIX; this artifact is the verifiable gate)
 > **Status:** 🔴 OPEN — GROUND TRUTH ESTABLISHED, FIX PENDING (Codex)
 
+## 2026-05-26 Sync Note
+
+This is a historical ground-truth audit. Source-level sports parser/artwork smokes passed on 2026-05-26, but this live per-league table has not been re-run against Coolify/Stremio after the main merge. Treat rows below as the original failure baseline, not current proof.
+
+Current local proof:
+- PASS: `npm run smoke:sports-parser`
+- PASS: `npm run smoke:sports-resolution`
+- PASS: `npm run smoke:sports-artwork`
+- PASS: `npm run smoke:free-tier-artwork`
+
+Remaining caveat: no live Coolify/Stremio visual re-audit was performed in this cleanup pass. Do not use this file to claim current live failure or current live success without re-running the table.
+
 This table is the proof artifact. A poster family is **PASS** only if it shows real crests/marks, OR clean deterministic initials with a proven upstream data gap. **BLANK** squares and **DUP-LEAGUE / SAME-TEAM** (same crest both sides) are automatic **FAIL** and block release.
 
 ---

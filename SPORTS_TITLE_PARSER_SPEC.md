@@ -3,6 +3,7 @@
 > **Governed by:** [MD_DIRECTIVES.md](MD_DIRECTIVES.md) DIRECTIVE 002
 > **Owner:** MD (Mr Gurr). Execution: Production/Codex. Verification: Auditor.
 > **Created:** 2026-05-15. **Updated:** 2026-05-16. **Status:** 🟢 SATURATED — 14 client-annotated batches logged, ~20 defect classes, all field decisions locked. Taxonomy stable; ready for the staged implementation plan. Still LIVING (append new genuinely-novel formats), but recent batches confirm existing classes rather than reveal new ones.
+> **2026-05-26 source status:** Implemented in current source; `npm run smoke:sports-parser` passed 27/27. This remains a living contract for new formats, but settled field decisions should not be re-opened without explicit client correction.
 > **Source code under correction:** `src/utils/sportsTitleParser.js` (`parseSportsTitle`, `parseSportsEventTitle`), consumed by `src/handlers/catalog.js:628`.
 
 This is the contract the corrected parser MUST satisfy. It is built from the client's own annotated examples — not assumptions. Each example is logged with: raw title → what the current code produces → what the client requires → defect classes.

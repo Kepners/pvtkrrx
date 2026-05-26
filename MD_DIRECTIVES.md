@@ -3,8 +3,14 @@
 > **AUTHORITY:** These directives come from the Managing Director (Mr Gurr).
 > **COMPLIANCE:** All `/ccc:` and `/cu:` utilities MUST read and follow these.
 > **OVERRIDE:** These override utility defaults and engineer instinct. Follow the directive, not your preference.
-> **LAST UPDATED:** 2026-05-15
-> **STATUS:** ACTIVE
+> **LAST UPDATED:** 2026-05-26
+> **STATUS:** ACTIVE, SOURCE-SYNCED - parser/spec implementation has local smoke proof; live Coolify/Stremio visual proof remains separate.
+
+## 2026-05-26 Sync Note
+
+- DIRECTIVE 002 is implemented in current source and `npm run smoke:sports-parser` passed 27/27 on 2026-05-26.
+- DIRECTIVE 001 has local source smoke coverage (`smoke:sports-resolution`, `smoke:sports-artwork`, `smoke:free-tier-artwork`) after the main merge, but the live per-league `SVG_LOGO_AUDIT.md` table has not been re-run against Coolify/Stremio in this cleanup pass.
+- The `/asset/team/...` and `/asset/league/...` endpoint correction below remains binding: do not reintroduce those fictional routes into future prompts or docs.
 
 ---
 
@@ -102,6 +108,8 @@ The client is mapping the truth title-by-title because prior passes guessed. Thi
 ---
 
 ## Active Directive Index
+
+**2026-05-26 status override:** DIRECTIVE 001 has local source-smoke proof but still needs live visual re-audit; DIRECTIVE 002 is implemented in source and `smoke:sports-parser` passed 27/27. The original table rows below are retained as historical issuer context.
 
 | # | Title | Priority | Owner | Status |
 |---|-------|----------|-------|--------|

@@ -1,5 +1,7 @@
 # PVTKRRX — Senior Code Audit (Read-Only Forensic Report)
 
+> **Current status note (2026-05-26):** This is a historical forensic audit of `package.json` version `1.1.73`. It remains useful as a risk inventory, but it is not current release status. Several referenced sports/debrid/parser fixes and smoke proofs landed later on `main`; verify each finding against current source before treating it as open.
+
 **Date:** 2026-05-17
 **Scope:** Full repository — `index.js`, `src/` (72 files, ~29.8k LOC), `src/lib/shared.js`, the sports-artwork pipeline, data/clients layer, Electron wrapper, repo-root web directories.
 **Method:** Five parallel deep-dive passes, every large file read in full, imports traced, inbound `require()` graph rebuilt, git-tracked vs untracked verified. No file was modified, refactored, or committed. This report (`AUDIT.md`) is the only artifact created, as the brief permits.

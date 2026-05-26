@@ -4,6 +4,7 @@ node_modules/
 # Local editor/workspace state
 .vscode/
 *.code-workspace
+.claude/*.lock
 
 # Reference images and screenshots
 *.png

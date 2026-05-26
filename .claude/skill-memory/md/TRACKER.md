@@ -1,5 +1,12 @@
 # MD Tracker
 
+## 2026-05-26 Sync
+- **Status**: Root directive/spec artifacts synced after the codex branch was merged into `main`.
+- **Parser**: DIRECTIVE 002 now has current-source proof; `npm run smoke:sports-parser` passed 27/27 on 2026-05-26.
+- **Sports artwork**: DIRECTIVE 001 has source-level smoke proof (`smoke:sports-resolution`, `smoke:sports-artwork`, `smoke:free-tier-artwork`) but still needs live Coolify/Stremio visual proof before public claims.
+- **Cleanup**: Removed committed `.claude/scheduled_tasks.lock`, `GEMINI.md`, and stale `AUDIT_IMPLEMENTATION_PLAN.md`. Added `.claude/*.lock` to `.gitignore`.
+- **Historical docs kept with warnings**: `AUDIT.md`, `SVG_LOGO_AUDIT.md`, `ISSUE_FOCUSED_REVIEW.md`.
+
 ## Current State
 - **Last session**: 2026-05-15 → 2026-05-16
 - **Status**: active — parser contract SHIPPED LIVE (client-authorised test deploy); Coolify build pipeline FIXED; DIRECTIVE 001 (logo readiness) audit gate still OPEN

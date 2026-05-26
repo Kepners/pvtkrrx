@@ -29,6 +29,11 @@
 2. Do not claim live release proof until Coolify/systemd/Stremio routes are probed against the target revision.
 3. Reconcile older docs that still describe the historical "free tier clamps to ticket-stub" behavior if they are still considered source-of-truth.
 
+### 2026-05-26 Artifact Cleanup
+- Merged branch to `origin/main` at `8d2cb2b`.
+- Removed superseded/runtime artifacts: `.claude/scheduled_tasks.lock`, `GEMINI.md`, `AUDIT_IMPLEMENTATION_PLAN.md`.
+- Synced retained artifacts with current-status notes: `AUDIT.md`, `MD_DIRECTIVES.md`, `SPORTS_TITLE_PARSER_SPEC.md`, `SVG_LOGO_AUDIT.md`, `.claude/skill-memory/md/TRACKER.md`.
+
 ## Current State
 - **Last session**: 2026-05-17 (initial session for this focused review)
 - **Status**: active
