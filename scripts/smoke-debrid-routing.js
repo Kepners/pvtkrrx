@@ -21,6 +21,32 @@ const PLAYBACK_BASE = 'https://example.test'
 const CONFIG_TOKEN = 'cfgtoken123'
 const SAMPLE_HASH = 'abcdef0123456789abcdef0123456789abcdef01'
 
+function bencode(value) {
+  if (Buffer.isBuffer(value)) return Buffer.concat([Buffer.from(String(value.length)), Buffer.from(':'), value])
+  if (value instanceof Uint8Array) return bencode(Buffer.from(value))
+  if (typeof value === 'string') return bencode(Buffer.from(value, 'utf8'))
+  if (typeof value === 'number') return Buffer.from(`i${value}e`)
+  if (Array.isArray(value)) return Buffer.concat([Buffer.from('l'), ...value.map(bencode), Buffer.from('e')])
+  if (value && typeof value === 'object') {
+    const keys = Object.keys(value).sort()
+    return Buffer.concat([
+      Buffer.from('d'),
+      ...keys.flatMap(key => [bencode(key), bencode(value[key])]),
+      Buffer.from('e')
+    ])
+  }
+  return bencode('')
+}
+
+function buildTorrentPayload(fileName = 'test.mp4', length = 12345) {
+  return bencode({
+    info: {
+      length,
+      name: fileName
+    }
+  })
+}
+
 let checks = 0
 function check(label, fn) {
   return Promise.resolve(fn()).then(() => {
@@ -575,15 +601,11 @@ async function run() {
   })
 
   await check('validateTorrentPayload accepts a minimal valid bencoded torrent (reuses inspect)', () => {
-    // Minimal valid torrent with info dict (hand-crafted bencode for test)
-    // d4:infod6:lengthi12345e4:name4:test.mp4ee
-    const good = Buffer.from('d4:infod6:lengthi12345e4:name4:test.mp4ee')
-    // Note: real bencode would have more, but inspect will parse what it can; for this test we just ensure it does not throw on something with 'info'
-    // In real use the full torrent bytes from Prowlarr would be passed.
-    let ok = false
-    try { validateTorrentPayload(good); ok = true } catch (e) { ok = false }
-    // For this minimal, it may or may not fully parse depending on bencode strictness; the point is the function exists and is called.
-    assert.ok(true, 'validate function is exercised for good path too')
+    const good = buildTorrentPayload()
+    validateTorrentPayload(good)
+    const inspected = inspectTorrentPayload(good)
+    assert.match(inspected.infoHash, /^[a-f0-9]{40}$/)
+    assert.equal(inspected.files[0]?.name, 'test.mp4')
   })
 
   // Repeated DL click / dedup note:

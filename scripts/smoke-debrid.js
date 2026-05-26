@@ -39,6 +39,32 @@ function jsonResponse(body, status = 200) {
   });
 }
 
+function bencode(value) {
+  if (Buffer.isBuffer(value)) return Buffer.concat([Buffer.from(String(value.length)), Buffer.from(':'), value]);
+  if (value instanceof Uint8Array) return bencode(Buffer.from(value));
+  if (typeof value === 'string') return bencode(Buffer.from(value, 'utf8'));
+  if (typeof value === 'number') return Buffer.from(`i${value}e`);
+  if (Array.isArray(value)) return Buffer.concat([Buffer.from('l'), ...value.map(bencode), Buffer.from('e')]);
+  if (value && typeof value === 'object') {
+    const keys = Object.keys(value).sort();
+    return Buffer.concat([
+      Buffer.from('d'),
+      ...keys.flatMap(key => [bencode(key), bencode(value[key])]),
+      Buffer.from('e')
+    ]);
+  }
+  return bencode('');
+}
+
+function buildTorrentPayload(fileName = 'SportsCult.Match.mkv', length = 12345) {
+  return bencode({
+    info: {
+      length,
+      name: fileName
+    }
+  });
+}
+
 function createMockRes() {
   return {
     statusCode: 200,
@@ -97,6 +123,7 @@ async function run() {
 
   await check('HTTP torrent debrid playback fetches .torrent and uploads it to Premiumize', async () => {
     const torrentUrl = 'https://prowlarr.example/api?t=download&id=sportscult-123&apikey=secret';
+    const torrentBytes = buildTorrentPayload();
     const token = encodeDebridPlaybackToken({
       protocol: DEBRID_PROTOCOL_TORRENT,
       src: torrentUrl,
@@ -114,7 +141,7 @@ async function run() {
       });
       const target = String(url);
       if (target === torrentUrl) {
-        return new Response(new Uint8Array([1, 2, 3]), {
+        return new Response(torrentBytes, {
           status: 200,
           headers: { 'content-disposition': 'attachment; filename="sportscult.torrent"' }
         });
@@ -149,6 +176,44 @@ async function run() {
       assert.equal(calls[1].method, 'POST');
       assert.equal(calls[1].body, '[object FormData]');
       assert.equal(calls[1].contentType, undefined);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  await check('HTTP torrent debrid playback rejects HTML login body before provider upload', async () => {
+    const torrentUrl = 'https://prowlarr.example/api?t=download&id=login-page&apikey=secret';
+    const token = encodeDebridPlaybackToken({
+      protocol: DEBRID_PROTOCOL_TORRENT,
+      src: torrentUrl,
+      providers: [{ type: 'pm', apiKey: 'pm-secret' }],
+      name: 'SportsCult Match'
+    });
+    const calls = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url, options = {}) => {
+      calls.push({
+        url: String(url),
+        method: options.method || 'GET'
+      });
+      const target = String(url);
+      if (target === torrentUrl) {
+        return new Response('<!doctype html><html><body>Please log in</body></html>', {
+          status: 200,
+          headers: { 'content-type': 'text/html' }
+        });
+      }
+      throw new Error(`Provider should not be called after invalid torrent payload: ${target}`);
+    };
+
+    try {
+      const res = createMockRes();
+      await handleDebridPlayback({ params: { token } }, res);
+      assert.equal(res.statusCode, 502);
+      assert.equal(res.redirected, null);
+      assert.equal(calls.length, 1);
+      assert.equal(calls[0].url, torrentUrl);
+      assert.equal(res.body?.detail, 'tracker download did not return a valid torrent');
     } finally {
       globalThis.fetch = originalFetch;
     }
