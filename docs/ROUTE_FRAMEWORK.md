@@ -55,7 +55,7 @@ Implementation note: the current user-facing `LAN Bridge` route is the code-faci
 - Cache-search sources are put.io and Premiumize cache check.
 - `/playback/debrid` handles add/check/poll handoff and redirects to the provider when ready.
 - The public hosted relay must not proxy Debrid provider media bytes.
-- If the provider is still downloading after the poll window, `/playback/debrid` returns retryable preparing/`503` JSON with `Retry-After` and progress. It must not return the waiting-room MP4 from the active handoff URL because Stremio can treat that placeholder as the selected media and stop re-requesting the route that would later redirect to the provider.
+- If the provider is still downloading after the poll window, `/playback/debrid` defaults to retryable preparing/`503` JSON with `Retry-After` and progress. If `PVTKRRX_DEBRID_PREPARING_RESPONSE=loader` is enabled, the route polls briefly and then serves the bundled waiting-room MP4 with progress headers while the provider continues preparing. That loader is a prepare screen only; a single HTTP video response cannot later turn into the provider redirect.
 - When the provider is ready, playback redirects to the provider URL; PVTKRRX must not proxy those media bytes.
 - If no Debrid provider is configured, route behavior falls back to the qBittorrent/local rules below.
 
@@ -81,7 +81,7 @@ There is no per-route catalog filtering. The Library catalog queries qBittorrent
 - Built-in `/file` route serves bytes with HTTP Range support
 - Built-in `/playback` route queues torrents via tracker link, polls qBit, and 302-redirects to `/file` when ready
 - Built-in `/file` and `/playback` keep initial not-ready states retryable with `425`/`503` plus `Retry-After` while qBit continues downloading. They must not substitute a loader clip for active playback responses because the client needs to retry the original route to receive the eventual real-media response.
-- The direct waiting-room asset lives at `/playback/waiting-room.mp4` and `/:config/playback/waiting-room.mp4`. It supports `HEAD`, full `GET`, single byte ranges, and `416` for unsatisfied ranges. It must remain an asset route ahead of `/:config/playback/:info`, not a real playback token, and is reserved for diagnostics/future loader work.
+- The direct waiting-room asset lives at `/playback/waiting-room.mp4` and `/:config/playback/waiting-room.mp4`. It supports `HEAD`, full `GET`, single byte ranges, and `416` for unsatisfied ranges. It must remain an asset route ahead of `/:config/playback/:info`, not a real playback token. Debrid may use the same asset only when the explicit loader mode is enabled.
 - Playback priming resumes the selected incomplete torrent, moves it to the top of qBittorrent's queue when queueing is enabled, keeps sequential download on, explicitly disables first+last piece priority unless opted in, and sets only the chosen playable video/archive files to high file priority
 - Tracker `/playback` streams emitted for on-tracker content
 - Completed packed RAR releases start background extraction when possible; the extracted direct video is the supported path once ready, and the source stays hidden while extraction is pending or unavailable unless the experimental native archive override is enabled

@@ -105,7 +105,7 @@ Debrid is optional. If you configure Real-Debrid, AllDebrid, or Premiumize, PVTK
 
 This does not make PVTKRRX a debrid service. PVTKRRX stores your provider credentials in your encrypted config, asks the provider to add/check the torrent or NZB, and redirects the client when the provider has a playable URL.
 
-While qBittorrent or a Debrid provider is still preparing, PVTKRRX keeps the real playback URL retryable (`425`/`503` plus `Retry-After`) so Stremio can re-request it and eventually receive the real `/file` or provider redirect. The bundled waiting-room MP4 remains available only as a direct diagnostic/future-loader asset; active playback routes must not substitute it for the target media because a static MP4 response can leave Stremio stuck on the placeholder.
+While qBittorrent or a Debrid provider is still preparing, PVTKRRX keeps the real playback URL retryable (`425`/`503` plus `Retry-After`) by default so Stremio can re-request it and eventually receive the real `/file` or provider redirect. For controlled Debrid testing, `PVTKRRX_DEBRID_PREPARING_RESPONSE=loader` makes `/playback/debrid` poll briefly and then serve the bundled waiting-room MP4 while the provider continues preparing. That loader is a prepare screen only; a later request is still needed once the provider is ready.
 
 For setup details see [docs/DEBRID_SETUP.md](docs/DEBRID_SETUP.md). For the implementation/proof worklog see [docs/POSTERS_AND_DEBRID_WORKLOG_2026-05.md](docs/POSTERS_AND_DEBRID_WORKLOG_2026-05.md).
 

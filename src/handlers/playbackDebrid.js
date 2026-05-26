@@ -5,6 +5,7 @@ const { decodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT, DEBRID_PROTOCOL_USEN
 const { getDebridProvider } = require('../clients/debrid/base')
 const { redactSensitiveText } = require('../utils/logRedaction')
 const { fetchTorrentPayload, validateTorrentPayload } = require('../utils/torrentPayload')
+const { sendWaitingRoomVideo } = require('./waitingRoom')
 
 const POLL_INTERVAL_MS = Math.max(500, Number.parseInt(process.env.PVTKRRX_DEBRID_POLL_INTERVAL_MS || '2000', 10))
 const POLL_TIMEOUT_MS = Math.max(2000, Number.parseInt(
@@ -13,6 +14,7 @@ const POLL_TIMEOUT_MS = Math.max(2000, Number.parseInt(
   '120000',
   10
 ))
+const DEBRID_LOADER_AFTER_MS_DEFAULT = 8000
 const JOB_TTL_MS = Math.max(POLL_TIMEOUT_MS, Number.parseInt(process.env.PVTKRRX_DEBRID_JOB_TTL_MS || '600000', 10))
 const READY_JOB_TTL_MS = Math.max(30000, Number.parseInt(process.env.PVTKRRX_DEBRID_READY_JOB_TTL_MS || '900000', 10))
 const debridPlaybackJobs = new Map()
@@ -33,6 +35,24 @@ function playbackContentTypeFor(value = '') {
   if (/\.m4v(?:$|[?\s])|\bm4v\b/.test(text)) return 'video/x-m4v'
   if (/\.ts(?:$|[?\s])|\b(?:mpegts|transport stream)\b/.test(text)) return 'video/mp2t'
   return 'application/octet-stream'
+}
+
+function debridPreparingResponseMode() {
+  const value = String(process.env.PVTKRRX_DEBRID_PREPARING_RESPONSE || 'retry').trim().toLowerCase()
+  return value === 'loader' || value === 'waiting-room' || value === 'waiting_room'
+    ? 'loader'
+    : 'retry'
+}
+
+function getDebridLoaderAfterMs() {
+  const parsed = Number.parseInt(
+    process.env.PVTKRRX_DEBRID_LOADER_AFTER_MS ||
+    process.env.PVTKRRX_DEBRID_WAITING_ROOM_AFTER_MS ||
+    String(DEBRID_LOADER_AFTER_MS_DEFAULT),
+    10
+  )
+  if (!Number.isFinite(parsed)) return DEBRID_LOADER_AFTER_MS_DEFAULT
+  return Math.max(1000, parsed)
 }
 
 function handleDebridPlaybackHead(req, res) {
@@ -206,7 +226,11 @@ async function handleDebridPlayback(req, res) {
 
     let status = null
     try {
-      status = await pollUntilReady(provider, job.addedId, Date.now() + POLL_TIMEOUT_MS)
+      const preparingMode = debridPreparingResponseMode()
+      const pollWindowMs = preparingMode === 'loader'
+        ? Math.min(POLL_TIMEOUT_MS, getDebridLoaderAfterMs())
+        : POLL_TIMEOUT_MS
+      status = await pollUntilReady(provider, job.addedId, Date.now() + pollWindowMs)
       job.status = status
     } catch (err) {
       if (job?.key) debridPlaybackJobs.delete(job.key)
@@ -218,6 +242,17 @@ async function handleDebridPlayback(req, res) {
     if (!status || status.state !== 'ready') {
       console.log(`[playback-debrid] preparing provider=${cred.type} state=${status?.state || 'unknown'} progress=${status?.progress || 0}`)
       res.setHeader('Retry-After', '15')
+      if (debridPreparingResponseMode() === 'loader') {
+        const sent = sendWaitingRoomVideo(req, res, {
+          kind: 'debrid',
+          provider: cred.type,
+          reason: 'provider-preparing',
+          state: status?.state || 'unknown',
+          progress: status?.progress || 0,
+          retryAfterSeconds: 15
+        })
+        if (sent) return
+      }
       return res.status(503).json({
         error: 'Debrid item still preparing',
         state: status?.state || 'unknown',

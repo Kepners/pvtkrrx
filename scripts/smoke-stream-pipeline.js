@@ -470,7 +470,7 @@ async function run() {
       assert.match(String(result.streams[0]?.url || ''), /\/local\/playback\//)
       assert.match(String(result.streams[0]?.name || ''), /\[PC\]/, '#4 tracker stream should show the PC origin badge')
       assert.match(String(result.streams[0]?.name || ''), /⬇️/, '#4 tracker stream should show the download-and-play badge before the file is downloaded')
-      assert.match(String(result.streams[0]?.description || ''), /Download and play/i, '#4 tracker stream description should say download and play while it is not downloaded yet')
+      assert.match(String(result.streams[0]?.description || ''), /DL \| 1080P \| 12\.0 GB \| Tracker: SmokeTracker \| 42 seeders/i, '#4 tracker stream description should expose DL quality, size, tracker, and seeders while it is not downloaded yet')
       assert.match(String(result.streams[0]?.description || ''), /Source: Host PC/i, '#4 tracker stream description should say the host PC will do the work')
       assert.equal(String(result.streams[0]?.behaviorHints?.sourceOrigin || ''), 'pc', '#4 tracker stream should expose the PC origin hint')
     })
@@ -502,10 +502,10 @@ async function run() {
       assert.match(String(result.streams[0]?.name || ''), /\[PC\]/, '#4b buffering stream should show the PC origin badge')
       assert.match(String(result.streams[0]?.name || ''), /⏳/, '#4b buffering stream should show the buffering badge')
       assert.match(String(result.streams[0]?.name || ''), /🎬MKV/, '#4b buffering stream should show the detected file format badge')
-      assert.match(String(result.streams[0]?.description || ''), /Buffering/i, '#4b buffering stream description should say buffering')
+      assert.match(String(result.streams[0]?.description || ''), /BUFFERING 25%/i, '#4b buffering stream description should say buffering with progress')
       assert.match(String(result.streams[0]?.description || ''), /Download: slow \| 25% \| 512 KiB\/s \| ETA 9m/i, '#4b buffering stream description should expose live qBit speed and ETA')
       assert.match(String(result.streams[0]?.description || ''), /Source: Host PC/i, '#4b buffering stream description should say the host PC is serving the stream')
-      assert.match(String(result.streams[0]?.description || ''), /Format: MKV/i, '#4b buffering stream description should surface the file format')
+      assert.match(String(result.streams[0]?.description || ''), /\| MKV \|/i, '#4b buffering stream description should surface the file format')
       assert.equal(String(result.streams[0]?.behaviorHints?.sourceDownloadState || ''), 'slow', '#4b buffering stream should expose slow-download state')
       assert.equal(Number(result.streams[0]?.behaviorHints?.sourceDownloadSpeed || 0), 524288, '#4b buffering stream should expose download speed')
       assert.equal(Number(result.streams[0]?.behaviorHints?.sourceDownloadEta || 0), 540, '#4b buffering stream should expose download ETA')
@@ -922,9 +922,9 @@ async function run() {
       assert.match(String(result.streams[0]?.name || ''), /\[PC\]/, '#4j completed direct-video stream should show the PC origin badge')
       assert.match(String(result.streams[0]?.name || ''), /✅/, '#4j completed direct-video stream should show the downloaded badge')
       assert.match(String(result.streams[0]?.name || ''), /🎬MP4/, '#4j completed direct-video stream should show the detected file format badge')
-      assert.match(String(result.streams[0]?.description || ''), /Downloaded/i, '#4j completed direct-video stream description should replace queue-and-buffer with downloaded')
+      assert.match(String(result.streams[0]?.description || ''), /READY/i, '#4j completed direct-video stream description should replace queue-and-buffer with ready')
       assert.match(String(result.streams[0]?.description || ''), /Source: Host PC/i, '#4j completed direct-video stream description should say the host PC already has the file')
-      assert.match(String(result.streams[0]?.description || ''), /Format: MP4/i, '#4j completed direct-video stream description should surface the file format')
+      assert.match(String(result.streams[0]?.description || ''), /\| MP4 \|/i, '#4j completed direct-video stream description should surface the file format')
     })
 
     await withScenario(async () => {
@@ -1068,10 +1068,10 @@ async function run() {
       const playbackLinks = result.streams
         .filter(stream => /\/playback\//.test(String(stream?.url || '')))
         .map(stream => String(decodeOpaquePlaybackState(stream?.url || '')?.l || ''))
-      assert.equal(playbackLinks.length, 3, '#4m sports streams should include category and broad Prowlarr matches')
+      assert.equal(playbackLinks.length, 1, '#4m sports streams should stay category-constrained after sports stream hygiene')
       assert.ok(playbackLinks.includes('https://tracker.example/download/motogp-sportscult.torrent'), '#4m keeps the original SportsCult source')
-      assert.ok(playbackLinks.includes('https://tracker.example/download/motogp-torrentleech.torrent'), '#4m includes broad TorrentLeech sports source')
-      assert.ok(playbackLinks.includes('https://tracker.example/download/motogp-torrenting.torrent'), '#4m includes broad Torrenting sports source')
+      assert.ok(!playbackLinks.includes('https://tracker.example/download/motogp-torrentleech.torrent'), '#4m does not add broad TorrentLeech sports source')
+      assert.ok(!playbackLinks.includes('https://tracker.example/download/motogp-torrenting.torrent'), '#4m does not add broad Torrenting sports source')
     })
 
     await withScenario(async () => {

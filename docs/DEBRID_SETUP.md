@@ -73,9 +73,9 @@ Same behaviour for movies, TV, AND sports. PVTKRR's v1.3 router is purely additi
 | NZB results | Routed to Premiumize when PM is configured (RD/AD skip — neither supports NZB). | Skipped (no qBit fallback for Usenet). |
 | Cached items (via cache search) | `⚡ READY` prefix, top of list. | Same — cache search runs independently of debrid. |
 
-When an uncached debrid handoff is accepted but still preparing after the poll window, PVTKRR returns a retryable JSON `503` with `Retry-After`, state, and progress. This keeps the original `/playback/debrid` URL as the contract Stremio can re-request until the provider is ready.
+When an uncached debrid handoff is accepted but still preparing after the poll window, the default mode returns retryable JSON `503` with `Retry-After`, state, and progress. This keeps the original `/playback/debrid` URL as the contract Stremio can re-request until the provider is ready.
 
-Do not substitute the bundled waiting-room MP4 for an active debrid handoff. A real-client test on 2026-05-26 showed that a finite MP4 placeholder can leave Stremio stuck on the placeholder instead of retrying the debrid URL that would later redirect to the provider. Once the provider has a playable media URL, PVTKRR redirects Stremio to that provider URL and does not proxy the provider's media bytes.
+For controlled testing, `PVTKRRX_DEBRID_PREPARING_RESPONSE=loader` makes `/playback/debrid` poll briefly, then serve the bundled waiting-room MP4 while the provider continues preparing. `PVTKRRX_DEBRID_LOADER_AFTER_MS` controls that short poll window and defaults to 8000 ms. This is a prepare screen only: a single HTTP video response cannot later turn into a provider redirect. Once the provider has a playable media URL, a later request to the same debrid stream redirects Stremio to that provider URL. PVTKRR does not proxy the provider's media bytes.
 
 ## Verifying
 

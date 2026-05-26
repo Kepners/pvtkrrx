@@ -181,6 +181,50 @@ function detectContainerLabel(...values) {
   return 'VIDEO'
 }
 
+function detectQualityLabel(parsed = {}, ...fallbackValues) {
+  const explicit = String(parsed?.quality || '').trim()
+  if (explicit) return explicit.toUpperCase()
+  const text = fallbackValues.map(value => String(value || '')).join(' ')
+  const match = text.match(/\b(2160p|1080p|720p|576p|540p|480p|4k)\b/i)
+  return match ? String(match[1]).toUpperCase() : ''
+}
+
+function cleanIndexerLabel(value = '') {
+  return String(value || '')
+    .replace(/\b(?:prowlarr|torznab|indexer)\b/ig, ' ')
+    .replace(/[_-]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function buildCompactStreamFacts(item, parsed, mode, progressPercent = null, fileName = '', options = {}) {
+  const sizeBytes = Math.max(0, Number(options.videoSizeBytes || item?.size || 0))
+  const downloadTelemetry = resolveDownloadTelemetry(mode, options, progressPercent)
+  const quality = detectQualityLabel(parsed, fileName, item?.title)
+  const indexer = cleanIndexerLabel(item?.indexer)
+  const seeders = Math.max(0, Number(item?.seeders || 0))
+  const container = detectContainerLabel(fileName, parsed?.container, parsed?.titleHint, parsed?.title, item?.title)
+  const state = options.extracted === true
+    ? 'Downloaded and extracted'
+    : mode === 'seedbox'
+      ? 'READY'
+      : mode === 'buffering'
+        ? `BUFFERING ${Number.isFinite(progressPercent) ? progressPercent : 0}%`
+        : 'DL'
+
+  return uniqueNonEmpty([
+    state,
+    quality,
+    sizeBytes > 0 ? formatSize(sizeBytes) : '',
+    container !== 'VIDEO' ? container : '',
+    indexer ? `Tracker: ${indexer}` : '',
+    seeders > 0 && mode !== 'seedbox' ? `${seeders} seeders` : '',
+    options.sourceLabel ? `Source: ${options.sourceLabel}` : '',
+    downloadTelemetry.speedBytes > 0 ? formatByteRate(downloadTelemetry.speedBytes) : '',
+    downloadTelemetry.etaSeconds > 0 ? `ETA ${formatDuration(downloadTelemetry.etaSeconds)}` : ''
+  ]).join(' | ')
+}
+
 function buildStateBadge(mode, options = {}) {
   if (options.extracted === true) return '📦'
   if (mode === 'seedbox') return '✅'
@@ -211,45 +255,26 @@ function buildStreamName(parsed, mode, fileName = '', options = {}) {
 
 function buildDescription(item, parsed, mode, progressPercent = null, fileName = '', options = {}) {
   const title = truncateTitle(item.title)
-  const tech = uniqueNonEmpty([parsed.codec, parsed.hdr, parsed.bitDepth]).join(' • ')
-  const source = uniqueNonEmpty([
+  const compactFactsLine = buildCompactStreamFacts(item, parsed, mode, progressPercent, fileName, options)
+  const compactTechLine = uniqueNonEmpty([
+    parsed.codec,
+    parsed.hdr,
+    parsed.bitDepth,
     parsed.source,
     parsed.remux ? 'REMUX' : '',
-    parsed.audio ? `🔊 ${parsed.audio}` : ''
-  ]).join(' • ')
-
-  const modeLabel = buildStateLabel(mode, options, progressPercent)
-  const downloadTelemetry = resolveDownloadTelemetry(mode, options, progressPercent)
-
-  const peerLabel = formatPeerLabel(item.seeders, mode)
-  const stats = uniqueNonEmpty([
-    modeLabel,
-    peerLabel,
-    `💾 ${formatSize(item.size)}`,
-    item.indexer ? `🛰 ${item.indexer}` : '',
-    parsed.languages ? `🌐 ${parsed.languages}` : ''
-  ]).join(' | ')
-  const enrichedStats = uniqueNonEmpty([
-    modeLabel,
-    options.sourceLabel ? `Source: ${options.sourceLabel}` : '',
-    `Format: ${detectContainerLabel(fileName, parsed?.container, parsed?.titleHint, parsed?.title)}`,
-    peerLabel,
-    `Size: ${formatSize(item.size)}`,
-    item.indexer ? `Indexer: ${item.indexer}` : '',
+    parsed.audio ? `Audio: ${parsed.audio}` : '',
     parsed.languages ? `Lang: ${parsed.languages}` : ''
   ]).join(' | ')
-
-  const detailLine = uniqueNonEmpty([tech, source]).join(' | ')
-  const tail = uniqueNonEmpty([enrichedStats, downloadTelemetry.label]).join('\n')
-  if (!title) return detailLine ? `${detailLine}\n${tail}` : tail
-  return detailLine ? `${title}\n${detailLine}\n${tail}` : `${title}\n${tail}`
+  const compactTelemetry = resolveDownloadTelemetry(mode, options, progressPercent)
+  const compactTail = uniqueNonEmpty([compactFactsLine, compactTechLine, compactTelemetry.label]).join('\n')
+  return title ? `${title}\n${compactTail}` : compactTail
 }
 
 function buildOnSeedboxStream(item, fileUrl, fileName, videoSize, config, parsed, options = {}) {
   const containerLabel = detectContainerLabel(fileName, parsed?.container, parsed?.titleHint, parsed?.title)
   const stream = {
     name: buildStreamName(parsed, 'seedbox', fileName, options),
-    description: buildDescription(item, parsed, 'seedbox', null, fileName, options),
+    description: buildDescription(item, parsed, 'seedbox', null, fileName, { ...options, videoSizeBytes: videoSize }),
     url: fileUrl,
     thumbnail: PVTKRRX_LOGO_URL,
     behaviorHints: {
@@ -286,7 +311,7 @@ function buildOnBufferingStream(item, fileUrl, fileName, videoSize, config, pars
   const downloadTelemetry = resolveDownloadTelemetry('buffering', telemetryOptions, progressPercent)
   const stream = {
     name: buildStreamName(parsed, 'buffering', fileName, telemetryOptions),
-    description: buildDescription(item, parsed, 'buffering', progressPercent, fileName, telemetryOptions),
+    description: buildDescription(item, parsed, 'buffering', progressPercent, fileName, { ...telemetryOptions, videoSizeBytes: videoSize }),
     url: fileUrl,
     thumbnail: PVTKRRX_LOGO_URL,
     behaviorHints: {

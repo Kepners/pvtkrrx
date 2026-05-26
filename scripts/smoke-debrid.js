@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const { Writable } = require('node:stream');
 const { createMockDebridProvider } = require('../src/clients/debrid/__mock__');
 const { UnsupportedCapabilityError } = require('../src/clients/debrid/base');
 
@@ -98,6 +99,62 @@ function createMockRes() {
       return this;
     }
   };
+}
+
+function createStreamingMockRes() {
+  const chunks = [];
+  const res = new Writable({
+    write(chunk, _encoding, callback) {
+      chunks.push(Buffer.from(chunk));
+      callback();
+    }
+  });
+  res.statusCode = 200;
+  res.headers = {};
+  res.body = null;
+  res.redirected = null;
+  res.headersSent = false;
+  res.setHeader = function setHeader(name, value) {
+    this.headers[String(name).toLowerCase()] = value;
+  };
+  res.removeHeader = function removeHeader(name) {
+    delete this.headers[String(name).toLowerCase()];
+  };
+  res.status = function status(code) {
+    this.statusCode = code;
+    return this;
+  };
+  res.json = function json(body) {
+    this.body = body;
+    this.headersSent = true;
+    this.end();
+    return this;
+  };
+  res.redirect = function redirect(status, url) {
+    this.redirected = { status, url };
+    this.headersSent = true;
+    this.end();
+    return this;
+  };
+  const baseEnd = res.end.bind(res);
+  res.end = function end(...args) {
+    this.headersSent = true;
+    return baseEnd(...args);
+  };
+  Object.defineProperty(res, 'bodyLength', {
+    get() {
+      return chunks.reduce((total, chunk) => total + chunk.length, 0);
+    }
+  });
+  return res;
+}
+
+function waitForFinish(stream) {
+  if (stream.writableEnded) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    stream.once('finish', resolve);
+    stream.once('error', reject);
+  });
 }
 
 async function run() {
@@ -279,6 +336,78 @@ async function run() {
       assert.ok(calls.filter(call => call.url.includes('/transfer/list')).length >= 1);
     } finally {
       globalThis.fetch = originalFetch;
+      _clearDebridPlaybackJobs();
+    }
+  });
+
+  await check('HTTP torrent debrid playback can serve the waiting-room loader while provider is still preparing', async () => {
+    _clearDebridPlaybackJobs();
+    const oldMode = process.env.PVTKRRX_DEBRID_PREPARING_RESPONSE;
+    const oldLoaderAfter = process.env.PVTKRRX_DEBRID_LOADER_AFTER_MS;
+    process.env.PVTKRRX_DEBRID_PREPARING_RESPONSE = 'loader';
+    process.env.PVTKRRX_DEBRID_LOADER_AFTER_MS = '1000';
+    const torrentUrl = 'https://prowlarr.example/api?t=download&id=loader-sports&apikey=secret';
+    const torrentBytes = buildTorrentPayload('Loader.Sports.Match.mkv', 98765);
+    const token = encodeDebridPlaybackToken({
+      protocol: DEBRID_PROTOCOL_TORRENT,
+      src: torrentUrl,
+      providers: [{ type: 'pm', apiKey: 'pm-secret' }],
+      name: 'Loader Sports Match'
+    });
+    const calls = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url, options = {}) => {
+      calls.push({
+        url: String(url),
+        method: options.method || 'GET'
+      });
+      const target = String(url);
+      if (target === torrentUrl) {
+        return new Response(torrentBytes, {
+          status: 200,
+          headers: { 'content-disposition': 'attachment; filename="loader-sports.torrent"' }
+        });
+      }
+      if (target.endsWith('/transfer/create')) {
+        return jsonResponse({ status: 'success', id: 'pm-loader-transfer' });
+      }
+      if (target.includes('/transfer/list')) {
+        return jsonResponse({
+          status: 'success',
+          transfers: [{
+            id: 'pm-loader-transfer',
+            name: 'Loader Sports Match.mkv',
+            status: 'running',
+            progress: 0.2231,
+            file_id: 'file-loader'
+          }]
+        });
+      }
+      throw new Error(`Unexpected fetch while serving loader: ${target}`);
+    };
+
+    try {
+      const res = createStreamingMockRes();
+      await handleDebridPlayback({ params: { token }, headers: {}, method: 'GET' }, res);
+      await waitForFinish(res);
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.redirected, null);
+      assert.equal(String(res.headers['x-pvtkrrx-waiting-room'] || ''), '1');
+      assert.equal(String(res.headers['x-pvtkrrx-waiting-kind'] || ''), 'debrid');
+      assert.equal(String(res.headers['x-pvtkrrx-waiting-provider'] || ''), 'pm');
+      assert.equal(String(res.headers['x-pvtkrrx-progress'] || ''), '22');
+      assert.equal(String(res.headers['content-type'] || ''), 'video/mp4');
+      assert.equal(String(res.headers['retry-after'] || ''), '15');
+      assert.ok(res.bodyLength > 0, 'loader response should stream the bundled waiting-room MP4 body');
+      assert.equal(calls.filter(call => call.url === torrentUrl).length, 1);
+      assert.equal(calls.filter(call => /\/transfer\/create$/.test(call.url)).length, 1);
+      assert.ok(calls.filter(call => call.url.includes('/transfer/list')).length >= 1);
+    } finally {
+      globalThis.fetch = originalFetch;
+      if (oldMode === undefined) delete process.env.PVTKRRX_DEBRID_PREPARING_RESPONSE;
+      else process.env.PVTKRRX_DEBRID_PREPARING_RESPONSE = oldMode;
+      if (oldLoaderAfter === undefined) delete process.env.PVTKRRX_DEBRID_LOADER_AFTER_MS;
+      else process.env.PVTKRRX_DEBRID_LOADER_AFTER_MS = oldLoaderAfter;
       _clearDebridPlaybackJobs();
     }
   });
