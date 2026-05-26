@@ -213,10 +213,33 @@ function inspectTorrentPayload(bytes) {
   }
 }
 
+/**
+ * Validates that the bytes represent a real bencoded torrent with an info dict and at least one file.
+ * Reuses the existing inspectTorrentPayload parser.
+ * Throws a non-leaking error if the payload is HTML, 403 page, random bytes, or otherwise invalid.
+ * Used by the /playback/debrid handler before any provider.addTorrentFile call.
+ */
+function validateTorrentPayload(bytes) {
+  if (!bytes || bytes.length === 0) {
+    throw new Error('tracker download did not return a valid torrent')
+  }
+  try {
+    const inspected = inspectTorrentPayload(bytes)
+    if (!inspected || !inspected.infoHash || !inspected.files || inspected.files.length === 0) {
+      throw new Error('tracker download did not return a valid torrent')
+    }
+    return true
+  } catch (err) {
+    // Never leak the raw bytes or the original tracker URL (caller must not log src)
+    throw new Error('tracker download did not return a valid torrent')
+  }
+}
+
 module.exports = {
   parseTorrentFileName,
   fetchTorrentPayload,
   listTorrentPayloadFiles,
   computeTorrentInfoHash,
-  inspectTorrentPayload
+  inspectTorrentPayload,
+  validateTorrentPayload
 }
