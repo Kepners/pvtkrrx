@@ -1,5 +1,34 @@
 # Review Tracker
 
+## 2026-05-26 Follow-Up State
+- **Status**: Branch parity resolved; follow-up findings committed and pushed.
+- **Branch**: `codex/make-main-20260517` rebased onto `origin/main`, then pushed with `--force-with-lease`.
+- **Follow-up source fix commit**: `163d09a`.
+- **Important note**: The original 2026-05-17 Grok verdict is now historical. It correctly described the stale branch at that time, but the branch is no longer behind main and no longer lacks the main sports/debrid hygiene fixes.
+- **Pre-existing staged docs preserved**: `.claude/scheduled_tasks.lock`, `.claude/skill-memory/md/CORRECTIONS.md`, `AUDIT.md`, `GEMINI.md`, `MD_DIRECTIVES.md`, `SPORTS_TITLE_PARSER_SPEC.md`, `SVG_LOGO_AUDIT.md`. These were not included in the follow-up fix commit.
+- **Obsolete staged release-index downgrade not reapplied**: `dist/releases/index.json` stayed on the rebased `1.3.7` main version instead of the staged `1.3.3` version.
+
+### Follow-Up Findings
+- `scripts/smoke-sports-stream-hygiene.js` exposed a real source bug: supplemental sports stream search still called all-category Prowlarr fallback. Fixed in `src/handlers/stream.js`.
+- `scripts/smoke-sports-resolution.js` exposed a stale assertion: it expected configured `sportsPosterTemplate=glitch` to normalize to `ticket-stub`. Current AGENTS/CLAUDE/docs state configured PVTKRRX installs can select all seven built-in templates, with `ticket-stub` only as the default. The smoke now keeps the no-member-token check while expecting `glitch`.
+
+### Follow-Up Proof
+- PASS: `npm run smoke:sports-stream-hygiene`
+- PASS: `npm run smoke:debrid-routing`
+- PASS: `npm run smoke:sports-parser`
+- PASS: `npm run smoke:sports-resolution`
+- PASS: `npm run smoke:free-tier-artwork`
+- PASS: `npm run smoke:config`
+- PASS: `npm run smoke:guards`
+- PASS: `npm run smoke:playback`
+- PASS: `npm run smoke:parity`
+- PASS: `npm run smoke:debrid-all`
+
+### Remaining Actions
+1. If this branch should become main, review the remaining staged audit/directive docs and then merge or fast-forward intentionally.
+2. Do not claim live release proof until Coolify/systemd/Stremio routes are probed against the target revision.
+3. Reconcile older docs that still describe the historical "free tier clamps to ticket-stub" behavior if they are still considered source-of-truth.
+
 ## Current State
 - **Last session**: 2026-05-17 (initial session for this focused review)
 - **Status**: active

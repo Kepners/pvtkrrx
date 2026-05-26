@@ -8,6 +8,33 @@
 
 ---
 
+## Postscript - 2026-05-26 Follow-Up
+
+**Current status supersedes the original branch-behind verdict below.** The original review remains useful as historical proof of why this branch was unsafe on 2026-05-17, but it no longer describes current `codex/make-main-20260517` after the 2026-05-26 follow-up.
+
+- Branch was rebased onto `origin/main` and pushed with `--force-with-lease`.
+- Follow-up source fix commit: `163d09a`.
+- The main hygiene fixes Grok identified are now present on the branch.
+- Follow-up smoke uncovered one real remaining source bug: supplemental sports stream search still called the all-category Prowlarr fallback even though `scripts/smoke-sports-stream-hygiene.js` forbids it. Fixed in `src/handlers/stream.js`.
+- Follow-up smoke uncovered one stale test assertion: `scripts/smoke-sports-resolution.js` still expected configured `sportsPosterTemplate=glitch` to normalize to `ticket-stub`. Current AGENTS/CLAUDE/docs state configured PVTKRRX installs can select all seven built-in templates, with `ticket-stub` only as default. The assertion now keeps the no-member-token rule while expecting the selected `glitch` template.
+- The staged pre-existing audit/directive docs were preserved separately and not included in the follow-up fix commit.
+
+Follow-up proof:
+- PASS: `npm run smoke:sports-stream-hygiene`
+- PASS: `npm run smoke:debrid-routing`
+- PASS: `npm run smoke:sports-parser`
+- PASS: `npm run smoke:sports-resolution`
+- PASS: `npm run smoke:free-tier-artwork`
+- PASS: `npm run smoke:config`
+- PASS: `npm run smoke:guards`
+- PASS: `npm run smoke:playback`
+- PASS: `npm run smoke:parity`
+- PASS: `npm run smoke:debrid-all`
+
+Current safe wording: "Grok correctly identified that the branch was stale and would reintroduce main's sports/debrid hygiene fixes. That branch issue has now been resolved by rebasing onto `origin/main`; one additional smoke-backed stream hygiene bug and one stale poster-template smoke assertion were fixed afterward. This is source-branch proof only, not live Coolify/Stremio release proof."
+
+---
+
 ## A. Verdict
 
 **Ready with caveats — hygiene bugs present in the review branch for the exact areas main is patching; core locks, parser contract, poster logic, and SportsMeta boundary are clean and match main.**
