@@ -152,6 +152,18 @@ function pickReadyStreamName(hit) {
   return `⚡ READY · ${source}`
 }
 
+function playbackContentTypeFor(value = '') {
+  const text = String(value || '').toLowerCase()
+  if (/\.mp4(?:$|[?\s])|\bmp4\b/.test(text)) return 'video/mp4'
+  if (/\.mkv(?:$|[?\s])|\b(?:mkv|matroska)\b/.test(text)) return 'video/x-matroska'
+  if (/\.webm(?:$|[?\s])|\bwebm\b/.test(text)) return 'video/webm'
+  if (/\.avi(?:$|[?\s])|\bavi\b/.test(text)) return 'video/x-msvideo'
+  if (/\.wmv(?:$|[?\s])|\bwmv\b/.test(text)) return 'video/x-ms-wmv'
+  if (/\.m4v(?:$|[?\s])|\bm4v\b/.test(text)) return 'video/x-m4v'
+  if (/\.ts(?:$|[?\s])|\b(?:mpegts|transport stream)\b/.test(text)) return 'video/mp2t'
+  return 'application/octet-stream'
+}
+
 function prioritizeProviderForCacheSource(sourceId, providers) {
   const list = Array.isArray(providers) ? providers.filter(Boolean) : []
   const source = String(sourceId || '').toLowerCase()
@@ -248,7 +260,12 @@ async function buildCacheSearchStreams(query, enabledSources, playbackBaseUrl, p
         notWebReady: true,
         filename: hit.name || 'cached',
         sourceMode: 'debrid-cache',
-        sourceSize: Math.max(0, Number(hit.sizeBytes || 0))
+        sourceSize: Math.max(0, Number(hit.sizeBytes || 0)),
+        proxyHeaders: {
+          response: {
+            'Content-Type': playbackContentTypeFor(hit.name || '')
+          }
+        }
       }
     })
   }

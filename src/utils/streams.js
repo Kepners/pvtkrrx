@@ -12,6 +12,45 @@ const SLOW_DOWNLOAD_BYTES_PER_SEC = Math.max(
   parseInt(process.env.PVTKRRX_SLOW_DOWNLOAD_BYTES_PER_SEC || String(1024 * 1024), 10)
 )
 
+function playbackContentTypeFor(value, container = '') {
+  const text = `${String(value || '')} ${String(container || '')}`.toLowerCase()
+  if (/\.mp4(?:$|[?\s])|\bmp4\b/.test(text)) return 'video/mp4'
+  if (/\.mkv(?:$|[?\s])|\b(?:mkv|matroska)\b/.test(text)) return 'video/x-matroska'
+  if (/\.webm(?:$|[?\s])|\bwebm\b/.test(text)) return 'video/webm'
+  if (/\.avi(?:$|[?\s])|\bavi\b/.test(text)) return 'video/x-msvideo'
+  if (/\.wmv(?:$|[?\s])|\bwmv\b/.test(text)) return 'video/x-ms-wmv'
+  if (/\.m4v(?:$|[?\s])|\bm4v\b/.test(text)) return 'video/x-m4v'
+  if (/\.ts(?:$|[?\s])|\b(?:mpegts|transport stream)\b/.test(text)) return 'video/mp2t'
+  return 'application/octet-stream'
+}
+
+function mergeProxyHeaders(stream, patch = {}) {
+  if (!stream?.behaviorHints || !patch || typeof patch !== 'object') return stream
+  const current = stream.behaviorHints.proxyHeaders || {}
+  stream.behaviorHints.proxyHeaders = {
+    ...current,
+    ...(patch.request ? { request: { ...(current.request || {}), ...patch.request } } : {}),
+    ...(patch.response ? { response: { ...(current.response || {}), ...patch.response } } : {})
+  }
+  return stream
+}
+
+function applyPlaybackResponseHeaders(stream, fileName, containerLabel) {
+  return mergeProxyHeaders(stream, {
+    response: {
+      'Content-Type': playbackContentTypeFor(fileName, containerLabel)
+    }
+  })
+}
+
+function applyFileServerAuth(stream, config) {
+  if (!config?.fileServerAuth) return stream
+  const encoded = Buffer.from(config.fileServerAuth).toString('base64')
+  return mergeProxyHeaders(stream, {
+    request: { Authorization: `Basic ${encoded}` }
+  })
+}
+
 function formatSize(bytes) {
   if (!bytes || bytes <= 0) return '0 B'
   if (bytes >= 1e12) return (bytes / 1e12).toFixed(1) + ' TB'
@@ -231,12 +270,8 @@ function buildOnSeedboxStream(item, fileUrl, fileName, videoSize, config, parsed
 
   if (videoSize) stream.behaviorHints.videoSize = videoSize
 
-  if (config.fileServerAuth) {
-    const encoded = Buffer.from(config.fileServerAuth).toString('base64')
-    stream.behaviorHints.proxyHeaders = {
-      request: { Authorization: `Basic ${encoded}` }
-    }
-  }
+  applyPlaybackResponseHeaders(stream, fileName, containerLabel)
+  applyFileServerAuth(stream, config)
 
   return stream
 }
@@ -276,12 +311,8 @@ function buildOnBufferingStream(item, fileUrl, fileName, videoSize, config, pars
   }
 
   if (videoSize) stream.behaviorHints.videoSize = videoSize
-  if (config.fileServerAuth) {
-    const encoded = Buffer.from(config.fileServerAuth).toString('base64')
-    stream.behaviorHints.proxyHeaders = {
-      request: { Authorization: `Basic ${encoded}` }
-    }
-  }
+  applyPlaybackResponseHeaders(stream, fileName, containerLabel)
+  applyFileServerAuth(stream, config)
 
   return stream
 }
@@ -289,7 +320,8 @@ function buildOnBufferingStream(item, fileUrl, fileName, videoSize, config, pars
 function buildOnTrackerStream(item, playbackUrl, parsed, options = {}) {
   const safeName = (item.title || 'download').replace(/[^\w.\-()[\] ]/g, '')
   const fileName = `${safeName}.torrent`
-  return {
+  const containerLabel = detectContainerLabel(item?.title || safeName, parsed?.container, parsed?.titleHint, parsed?.title)
+  const stream = {
     name: buildStreamName(parsed, 'tracker', fileName, options),
     description: buildDescription(item, parsed, 'tracker', null, fileName, options),
     url: playbackUrl,
@@ -303,11 +335,13 @@ function buildOnTrackerStream(item, playbackUrl, parsed, options = {}) {
       sourceQuality: String(parsed?.quality || ''),
       sourceSize: Math.max(0, Number(item?.size || 0)),
       sourceMode: 'tracker',
-      sourceContainer: detectContainerLabel(item?.title || safeName).toLowerCase(),
+      sourceContainer: containerLabel.toLowerCase(),
       sourceOrigin: String(options.sourceOrigin || ''),
       sourceOriginLabel: String(options.sourceLabel || '')
     }
   }
+  applyPlaybackResponseHeaders(stream, item?.title || safeName, containerLabel)
+  return stream
 }
 
 function buildOnArchiveStream(item, rarUrls, fileName, totalBytes, parsed, progressPercent = null, options = {}) {

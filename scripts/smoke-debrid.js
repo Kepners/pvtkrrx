@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict');
 const { createMockDebridProvider } = require('../src/clients/debrid/__mock__');
 const { UnsupportedCapabilityError } = require('../src/clients/debrid/base');
-const { handleDebridPlayback } = require('../src/handlers/playbackDebrid');
+const { handleDebridPlayback, handleDebridPlaybackHead, _clearDebridPlaybackJobs } = require('../src/handlers/playbackDebrid');
 const { encodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT } = require('../src/utils/opaqueState');
 const { createMockCacheSearchSource } = require('../src/clients/cacheSearch/__mock__');
 const {
@@ -88,11 +88,16 @@ function createMockRes() {
       this.redirected = { status, url };
       this.headersSent = true;
       return this;
+    },
+    end() {
+      this.headersSent = true;
+      return this;
     }
   };
 }
 
 async function run() {
+  _clearDebridPlaybackJobs();
   await check('RD addMagnet flow returns addedId and sanitizes dn', async () => {
     const rd = createMockDebridProvider({ id: 'rd' });
     const result = await rd.addMagnet('magnet:?xt=urn:btih:abc&dn=Movie%20WEB-DL%202026');
@@ -122,6 +127,7 @@ async function run() {
   });
 
   await check('HTTP torrent debrid playback fetches .torrent and uploads it to Premiumize', async () => {
+    _clearDebridPlaybackJobs();
     const torrentUrl = 'https://prowlarr.example/api?t=download&id=sportscult-123&apikey=secret';
     const torrentBytes = buildTorrentPayload();
     const token = encodeDebridPlaybackToken({
@@ -171,17 +177,49 @@ async function run() {
       const res = createMockRes();
       await handleDebridPlayback({ params: { token } }, res);
       assert.deepEqual(res.redirected, { status: 302, url: 'https://pm.example/SportsCult.Match.mkv' });
+      const secondRes = createMockRes();
+      await handleDebridPlayback({ params: { token } }, secondRes);
+      assert.deepEqual(secondRes.redirected, { status: 302, url: 'https://pm.example/SportsCult.Match.mkv' });
       assert.equal(calls[0].url, torrentUrl);
       assert.match(calls[1].url, /\/transfer\/create$/);
       assert.equal(calls[1].method, 'POST');
       assert.equal(calls[1].body, '[object FormData]');
       assert.equal(calls[1].contentType, undefined);
+      assert.equal(calls.filter(call => call.url === torrentUrl).length, 1, 'second DL click should reuse the debrid job without refetching .torrent');
+      assert.equal(calls.filter(call => /\/transfer\/create$/.test(call.url)).length, 1, 'second DL click should not create a duplicate provider transfer');
     } finally {
       globalThis.fetch = originalFetch;
+      _clearDebridPlaybackJobs();
+    }
+  });
+
+  await check('debrid playback HEAD is cheap and does not fetch tracker/provider URLs', async () => {
+    _clearDebridPlaybackJobs();
+    const token = encodeDebridPlaybackToken({
+      protocol: DEBRID_PROTOCOL_TORRENT,
+      src: 'https://prowlarr.example/api?t=download&id=head-check&apikey=secret',
+      providers: [{ type: 'pm', apiKey: 'pm-secret' }],
+      name: 'SportsCult.Match.1080p.mkv'
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      throw new Error(`HEAD should not fetch ${url}`);
+    };
+
+    try {
+      const res = createMockRes();
+      await handleDebridPlaybackHead({ params: { token } }, res);
+      assert.equal(res.statusCode, 200);
+      assert.equal(res.headers['content-type'], 'video/x-matroska');
+      assert.equal(res.body, null);
+    } finally {
+      globalThis.fetch = originalFetch;
+      _clearDebridPlaybackJobs();
     }
   });
 
   await check('HTTP torrent debrid playback rejects HTML login body before provider upload', async () => {
+    _clearDebridPlaybackJobs();
     const torrentUrl = 'https://prowlarr.example/api?t=download&id=login-page&apikey=secret';
     const token = encodeDebridPlaybackToken({
       protocol: DEBRID_PROTOCOL_TORRENT,

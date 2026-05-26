@@ -57,7 +57,7 @@ function request(port, reqPath, options = {}) {
     const req = http.request({
       host: '127.0.0.1',
       port,
-      method: 'GET',
+      method: options.method || 'GET',
       path: reqPath,
       headers: options.headers || {}
     }, (res) => {
@@ -585,8 +585,19 @@ async function run() {
     const packedPlaybackToken = encodePlaybackStateToken({ h: packedHash })
     const readyPackedPlaybackToken = encodePlaybackStateToken({ h: readyPackedHash })
     const targetedPlaybackToken = encodePlaybackStateToken({ h: targetedHash, p: targetedFiles[1].name })
+    const completedFileToken = encodeFileStateToken({ h: hash, p: file.name })
     const archiveFileToken = encodeFileStateToken({ h: readyPackedHash, p: 'Release/release.rar' })
     const orphanFileToken = encodeFileStateToken({ h: 'ffffffffffffffffffffffffffffffffffffffff', p: path.join(runtimeDir, file.name) })
+
+    const playbackHeadResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(playbackToken)}`, { method: 'HEAD' })
+    assert.equal(playbackHeadResponse.status, 200, 'playback HEAD should be cheap and successful')
+    assert.equal(playbackHeadResponse.text, '', 'playback HEAD should not send a body')
+    assert.equal(addFileCalls.length, 0, 'playback HEAD must not add or inspect torrents')
+
+    const fileHeadResponse = await request(server.address().port, `/${configToken}/file/${encodeURIComponent(completedFileToken)}`, { method: 'HEAD' })
+    assert.equal(fileHeadResponse.status, 200, 'file HEAD should be cheap and successful')
+    assert.equal(fileHeadResponse.text, '', 'file HEAD should not send a body')
+    assert.equal(String(fileHeadResponse.headers['content-type'] || ''), 'video/mp4', 'file HEAD should expose the expected video content type')
 
     const response = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(playbackToken)}`)
     assert.equal(response.status, 302, 'completed playback should redirect instead of crashing')

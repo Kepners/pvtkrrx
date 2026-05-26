@@ -1,17 +1,126 @@
 'use strict'
 
+const crypto = require('node:crypto')
 const { decodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT, DEBRID_PROTOCOL_USENET } = require('../utils/opaqueState')
 const { getDebridProvider } = require('../clients/debrid/base')
 const { redactSensitiveText } = require('../utils/logRedaction')
 const { fetchTorrentPayload, validateTorrentPayload } = require('../utils/torrentPayload')
 
 const POLL_INTERVAL_MS = Math.max(500, Number.parseInt(process.env.PVTKRRX_DEBRID_POLL_INTERVAL_MS || '2000', 10))
-const POLL_TIMEOUT_MS = Math.max(2000, Number.parseInt(process.env.PVTKRRX_DEBRID_POLL_TIMEOUT_MS || '30000', 10))
+const POLL_TIMEOUT_MS = Math.max(2000, Number.parseInt(
+  process.env.PVTKRRX_DEBRID_POLL_TIMEOUT_MS ||
+  process.env.PVTKRRX_DEBRID_KEEPALIVE_TIMEOUT_MS ||
+  '120000',
+  10
+))
+const JOB_TTL_MS = Math.max(POLL_TIMEOUT_MS, Number.parseInt(process.env.PVTKRRX_DEBRID_JOB_TTL_MS || '600000', 10))
+const READY_JOB_TTL_MS = Math.max(30000, Number.parseInt(process.env.PVTKRRX_DEBRID_READY_JOB_TTL_MS || '900000', 10))
+const debridPlaybackJobs = new Map()
 
 function maskToken(token) {
   const s = String(token || '')
   if (s.length <= 8) return s
   return s.slice(0, 8) + '…'
+}
+
+function playbackContentTypeFor(value = '') {
+  const text = String(value || '').toLowerCase()
+  if (/\.mp4(?:$|[?\s])|\bmp4\b/.test(text)) return 'video/mp4'
+  if (/\.mkv(?:$|[?\s])|\b(?:mkv|matroska)\b/.test(text)) return 'video/x-matroska'
+  if (/\.webm(?:$|[?\s])|\bwebm\b/.test(text)) return 'video/webm'
+  if (/\.avi(?:$|[?\s])|\bavi\b/.test(text)) return 'video/x-msvideo'
+  if (/\.wmv(?:$|[?\s])|\bwmv\b/.test(text)) return 'video/x-ms-wmv'
+  if (/\.m4v(?:$|[?\s])|\bm4v\b/.test(text)) return 'video/x-m4v'
+  if (/\.ts(?:$|[?\s])|\b(?:mpegts|transport stream)\b/.test(text)) return 'video/mp2t'
+  return 'application/octet-stream'
+}
+
+function handleDebridPlaybackHead(req, res) {
+  const tokenParam = req.params.token || req.params.info
+  let payload = null
+  try {
+    payload = decodeDebridPlaybackToken(tokenParam)
+  } catch (err) {
+    console.warn(`[playback-debrid] HEAD token decode failed token=${maskToken(tokenParam)} reason=${redactSensitiveText(err.message)}`)
+    return res.status(400).end()
+  }
+  res.setHeader('Cache-Control', 'no-store')
+  res.setHeader('Accept-Ranges', 'bytes')
+  res.setHeader('Content-Type', playbackContentTypeFor(payload.name || payload.src || ''))
+  return res.status(200).end()
+}
+
+function stableJobKey(cred, payload) {
+  const hash = crypto.createHash('sha256')
+  hash.update(String(cred?.type || ''))
+  hash.update('\0')
+  hash.update(String(cred?.apiKey || ''))
+  hash.update('\0')
+  hash.update(String(payload?.protocol || DEBRID_PROTOCOL_TORRENT))
+  hash.update('\0')
+  hash.update(String(payload?.src || ''))
+  hash.update('\0')
+  hash.update(String(payload?.fileIdx ?? 0))
+  return hash.digest('hex')
+}
+
+function cleanupDebridPlaybackJobs(now = Date.now()) {
+  for (const [key, job] of debridPlaybackJobs.entries()) {
+    if (!job || Number(job.expiresAt || 0) <= now) debridPlaybackJobs.delete(key)
+  }
+}
+
+async function addDebridSource(provider, cred, payload) {
+  if (payload.protocol === DEBRID_PROTOCOL_USENET) {
+    const added = await provider.addNzb(payload.src)
+    return added.addedId
+  }
+  if (/^magnet:/i.test(payload.src)) {
+    const added = await provider.addMagnet(payload.src)
+    return added.addedId
+  }
+  if (!provider.capabilities.torrentFile || typeof provider.addTorrentFile !== 'function') {
+    const err = new Error(`Debrid provider ${cred.type} does not support torrent file upload`)
+    err.code = 'DEBRID_PROVIDER_UNSUPPORTED'
+    throw err
+  }
+  const torrent = await fetchTorrentPayload(payload.src)
+  // Minimal validation before any provider upload (reuses existing inspect in torrentPayload).
+  // Rejects HTML/login/403/random bytes that a private tracker may return for a 200 OK.
+  validateTorrentPayload(torrent.bytes)
+  const added = await provider.addTorrentFile(torrent.bytes, torrent.fileName)
+  return added.addedId
+}
+
+function getOrCreateDebridJob(provider, cred, payload) {
+  cleanupDebridPlaybackJobs()
+  const key = stableJobKey(cred, payload)
+  const existing = debridPlaybackJobs.get(key)
+  if (existing && Number(existing.expiresAt || 0) > Date.now()) {
+    existing.lastUsedAt = Date.now()
+    return existing
+  }
+
+  const job = {
+    key,
+    providerType: String(cred?.type || ''),
+    addedId: '',
+    status: null,
+    streamUrl: '',
+    createdAt: Date.now(),
+    lastUsedAt: Date.now(),
+    expiresAt: Date.now() + JOB_TTL_MS,
+    addPromise: null,
+    selected: false
+  }
+  job.addPromise = (async () => {
+    const addedId = await addDebridSource(provider, cred, payload)
+    job.addedId = addedId
+    job.expiresAt = Date.now() + JOB_TTL_MS
+    return addedId
+  })()
+  debridPlaybackJobs.set(key, job)
+  return job
 }
 
 async function pollUntilReady(provider, addedId, deadline) {
@@ -68,43 +177,39 @@ async function handleDebridPlayback(req, res) {
       continue
     }
 
-    let addedId
+    let job = null
     try {
-      if (payload.protocol === DEBRID_PROTOCOL_USENET) {
-        const added = await provider.addNzb(payload.src)
-        addedId = added.addedId
-      } else if (/^magnet:/i.test(payload.src)) {
-        const added = await provider.addMagnet(payload.src)
-        addedId = added.addedId
-      } else {
-        if (!provider.capabilities.torrentFile || typeof provider.addTorrentFile !== 'function') {
-          console.log(`[playback-debrid] skipping ${cred.type} - does not support torrent file upload`)
-          continue
-        }
-        const torrent = await fetchTorrentPayload(payload.src)
-        // Minimal validation before any provider upload (reuses existing inspect in torrentPayload).
-        // Rejects HTML/login/403/random bytes that a private tracker may return for a 200 OK.
-        validateTorrentPayload(torrent.bytes)
-        const added = await provider.addTorrentFile(torrent.bytes, torrent.fileName)
-        addedId = added.addedId
+      job = getOrCreateDebridJob(provider, cred, payload)
+      if (job.streamUrl) {
+        job.lastUsedAt = Date.now()
+        job.expiresAt = Date.now() + READY_JOB_TTL_MS
+        console.log(`[playback-debrid] cached 302 -> ${cred.type} token=${maskToken(tokenParam)}`)
+        return res.redirect(302, job.streamUrl)
       }
-      console.log(`[playback-debrid] added provider=${cred.type} id=${maskToken(addedId)}`)
+      const addedId = await job.addPromise
+      console.log(`[playback-debrid] attached provider=${cred.type} id=${maskToken(addedId)}`)
     } catch (err) {
+      if (job?.key) debridPlaybackJobs.delete(job.key)
       console.warn(`[playback-debrid] add failed provider=${cred.type} reason=${redactSensitiveText(err.message)}`)
       lastError = err
       continue
     }
 
-    try {
-      await provider.selectFiles(addedId, 'all')
-    } catch (err) {
-      console.warn(`[playback-debrid] selectFiles failed provider=${cred.type} reason=${redactSensitiveText(err.message)}`)
+    if (!job.selected) {
+      try {
+        await provider.selectFiles(job.addedId, 'all')
+        job.selected = true
+      } catch (err) {
+        console.warn(`[playback-debrid] selectFiles failed provider=${cred.type} reason=${redactSensitiveText(err.message)}`)
+      }
     }
 
     let status = null
     try {
-      status = await pollUntilReady(provider, addedId, Date.now() + POLL_TIMEOUT_MS)
+      status = await pollUntilReady(provider, job.addedId, Date.now() + POLL_TIMEOUT_MS)
+      job.status = status
     } catch (err) {
+      if (job?.key) debridPlaybackJobs.delete(job.key)
       console.warn(`[playback-debrid] poll failed provider=${cred.type} reason=${redactSensitiveText(err.message)}`)
       lastError = err
       continue
@@ -123,18 +228,22 @@ async function handleDebridPlayback(req, res) {
 
     let streamUrl
     try {
-      streamUrl = await provider.getStreamUrl(addedId, payload.fileIdx || 0)
+      streamUrl = await provider.getStreamUrl(job.addedId, payload.fileIdx || 0)
     } catch (err) {
+      if (job?.key) debridPlaybackJobs.delete(job.key)
       console.warn(`[playback-debrid] getStreamUrl failed provider=${cred.type} reason=${redactSensitiveText(err.message)}`)
       lastError = err
       continue
     }
 
     if (!streamUrl) {
+      if (job?.key) debridPlaybackJobs.delete(job.key)
       lastError = new Error(`Debrid provider ${cred.type} returned empty stream URL`)
       continue
     }
 
+    job.streamUrl = streamUrl
+    job.expiresAt = Date.now() + READY_JOB_TTL_MS
     console.log(`[playback-debrid] 302 -> ${cred.type} token=${maskToken(tokenParam)}`)
     return res.redirect(302, streamUrl)
   }
@@ -300,5 +409,7 @@ async function handleDebridTest(req, res) {
 
 module.exports = {
   handleDebridPlayback,
+  handleDebridPlaybackHead,
+  _clearDebridPlaybackJobs: () => debridPlaybackJobs.clear(),
   handleDebridTest
 }

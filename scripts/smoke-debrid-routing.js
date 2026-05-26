@@ -351,7 +351,7 @@ async function run() {
                 assert.equal(infohash, SAMPLE_HASH)
                 return {
                   sourceId: 'pm',
-                  name: 'cached zero peer sports',
+                  name: 'cached zero peer sports.mkv',
                   infohash,
                   sizeBytes: 4_200_000_000,
                   directStreamUrl: null
@@ -372,6 +372,7 @@ async function run() {
     assert.equal(result.streams.length, 1)
     assert.match(result.streams[0].name, /READY/)
     assert.equal(result.streams[0].behaviorHints.sourceMode, 'debrid-cache')
+    assert.equal(result.streams[0].behaviorHints.proxyHeaders?.response?.['Content-Type'], 'video/x-matroska')
     _clearDebridCacheMemo()
   })
 
@@ -609,10 +610,9 @@ async function run() {
   })
 
   // Repeated DL click / dedup note:
-  // The handler (playbackDebrid.js) has no per-click dedup for provider.addTorrentFile.
-  // Each time a /playback/debrid token reaches the handler it will call add again (provider may collapse or not).
-  // The streamRouter only dedupes the *emitted stream rows* (line 365), not the provider transfer side.
-  // This is documented behavior; no change in this minimal fix.
+  // playbackDebrid.js now keeps an in-memory provider job by provider + source + fileIdx.
+  // Repeated clicks on the same /playback/debrid token attach to the existing add/poll job.
+  // The streamRouter still dedupes the *emitted stream rows* separately.
 
   // 503 provider timeout behavior is already implemented in the handler (lines 110-118: sets Retry-After, returns 503 JSON).
   // No test change needed for that path.

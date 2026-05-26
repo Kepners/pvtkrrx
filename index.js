@@ -19,7 +19,7 @@ const {
 } = require('./src/utils/qbitAutomation')
 const { getBrowserConfig, trackEvent } = require('./src/utils/analytics')
 const { scheduleSportsCatalogPrewarm } = require('./src/utils/sportsCatalogPrewarm')
-const { handleDebridPlayback, handleDebridTest } = require('./src/handlers/playbackDebrid')
+const { handleDebridPlayback, handleDebridPlaybackHead, handleDebridTest } = require('./src/handlers/playbackDebrid')
 
 // Legacy direct TheSportsDB paths (sports-image cache, 15-min autofill job,
 // /sports/image proxy, and the experimental internal SportsMeta handler) were
@@ -146,6 +146,51 @@ function pipeReadStreamToResponse(filePath, options, res, context = 'file') {
 
   stream.pipe(res)
   return stream
+}
+
+function playbackContentTypeForPath(value = '') {
+  const ext = path.extname(String(value || '').split('?')[0]).toLowerCase()
+  if (ext === '.mp4') return 'video/mp4'
+  if (ext === '.mkv') return 'video/x-matroska'
+  if (ext === '.webm') return 'video/webm'
+  if (ext === '.avi') return 'video/x-msvideo'
+  if (ext === '.wmv') return 'video/x-ms-wmv'
+  if (ext === '.m4v') return 'video/x-m4v'
+  if (ext === '.ts') return 'video/mp2t'
+  return 'application/octet-stream'
+}
+
+function sendPlaybackHead(res, contentType = 'application/octet-stream') {
+  res.setHeader('Cache-Control', 'no-store')
+  res.setHeader('Accept-Ranges', 'bytes')
+  res.setHeader('Content-Type', contentType || 'application/octet-stream')
+  return res.status(200).end()
+}
+
+function handleFileHead(req, res) {
+  if (IS_HOSTED_RELAY_RUNTIME && req.params.config !== 'local') {
+    return res.status(403).end()
+  }
+  let state = null
+  try {
+    state = decodeFileStateToken(req.params.info)
+  } catch (_) {
+    return res.status(400).end()
+  }
+  return sendPlaybackHead(res, playbackContentTypeForPath(state?.p || ''))
+}
+
+function handlePlaybackHead(req, res) {
+  if (IS_HOSTED_RELAY_RUNTIME && req.params.config !== 'local') {
+    return res.status(403).end()
+  }
+  let info = null
+  try {
+    info = decodePlaybackStateToken(req.params.info)
+  } catch (_) {
+    return res.status(400).end()
+  }
+  return sendPlaybackHead(res, playbackContentTypeForPath(info?.p || info?.name || ''))
 }
 
 function trackServerSockets(server, sockets) {
@@ -2442,6 +2487,7 @@ app.post('/:config/qbit/postprocess', withConfig, requireLocalQbitControl, async
 
 // ─── Built-in file server — serves local files with Range support ───
 // Used when no external fileServerUrl is configured (e.g. local qBit setup).
+app.head('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('file'), handleFileHead)
 app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('file'), async (req, res) => {
   try {
     if (IS_HOSTED_RELAY_RUNTIME && req.params.config !== 'local') {
@@ -2765,6 +2811,7 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
 // ─── v1.3 Debrid playback endpoint — add-and-poll, 302 to provider direct URL ──
 // Token is self-contained: carries provider creds, magnet/nzb, fileIdx.
 // Hosted relay rule: this handler MUST NOT proxy bytes. The 302 sends client direct to the debrid provider.
+app.head('/playback/debrid/:token', handleDebridPlaybackHead)
 app.get('/playback/debrid/:token', async (req, res) => {
   try {
     await handleDebridPlayback(req, res)
@@ -2773,6 +2820,7 @@ app.get('/playback/debrid/:token', async (req, res) => {
     if (!res.headersSent) res.status(500).json({ error: 'Debrid playback failed' })
   }
 })
+app.head('/:config/playback/debrid/:token', handleDebridPlaybackHead)
 app.get('/:config/playback/debrid/:token', async (req, res) => {
   // Same handler regardless of config prefix — the debrid token is self-contained.
   try {
@@ -2784,6 +2832,7 @@ app.get('/:config/playback/debrid/:token', async (req, res) => {
 })
 
 // ─── Playback endpoint — Comet pattern ──────────────────────
+app.head('/:config/playback/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('playback'), handlePlaybackHead)
 app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('playback'), async (req, res) => {
   try {
     if (IS_HOSTED_RELAY_RUNTIME && req.params.config !== 'local') {
