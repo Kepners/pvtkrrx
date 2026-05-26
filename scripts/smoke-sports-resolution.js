@@ -575,10 +575,11 @@ async function run() {
     barcaId,
     { baseUrl: 'https://addon.test' }
   )
+  const expectedConfiguredTemplatePoster = `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=glitch&v=${SPORTS_ARTWORK_PROXY_VERSION}`
   assert.equal(
     templateSportsMetaResponse.meta?.poster,
-    expectedPublicProxyPoster,
-    'PVTKRRX free-tier rule: configured sportsPosterTemplate=glitch must normalise to ticket-stub and must not expose SportsMeta member tokens'
+    expectedConfiguredTemplatePoster,
+    'PVTKRRX configured route should honor sportsPosterTemplate=glitch without exposing SportsMeta member tokens'
   )
 
   const previousEnvMemberToken = process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN

@@ -928,8 +928,7 @@ async function runSportsProwlarrSearch(torznab, query, useCategories, contextLab
 
 async function searchSportsProwlarrVariants(torznab, query, contextLabel) {
   const categoryItems = await runSportsProwlarrSearch(torznab, query, true, contextLabel)
-  const broadItems = await runSportsProwlarrSearch(torznab, query, false, contextLabel)
-  return filterUnsafeSportsSearchItems(mergeUniqueSourceItems(categoryItems, broadItems), contextLabel)
+  return filterUnsafeSportsSearchItems(categoryItems, contextLabel)
 }
 
 function filterUnsafeSportsSearchItems(items, contextLabel = 'Sports search') {
