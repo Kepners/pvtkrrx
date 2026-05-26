@@ -1,6 +1,10 @@
 const assert = require('node:assert/strict');
 const { createMockDebridProvider } = require('../src/clients/debrid/__mock__');
 const { UnsupportedCapabilityError } = require('../src/clients/debrid/base');
+
+process.env.PVTKRRX_DEBRID_POLL_INTERVAL_MS = process.env.PVTKRRX_DEBRID_POLL_INTERVAL_MS || '500';
+process.env.PVTKRRX_DEBRID_POLL_TIMEOUT_MS = process.env.PVTKRRX_DEBRID_POLL_TIMEOUT_MS || '2000';
+
 const { handleDebridPlayback, handleDebridPlaybackHead, _clearDebridPlaybackJobs } = require('../src/handlers/playbackDebrid');
 const { encodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT } = require('../src/utils/opaqueState');
 const { createMockCacheSearchSource } = require('../src/clients/cacheSearch/__mock__');
@@ -212,6 +216,67 @@ async function run() {
       assert.equal(res.statusCode, 200);
       assert.equal(res.headers['content-type'], 'video/x-matroska');
       assert.equal(res.body, null);
+    } finally {
+      globalThis.fetch = originalFetch;
+      _clearDebridPlaybackJobs();
+    }
+  });
+
+  await check('HTTP torrent debrid playback returns retryable 503 while provider is still preparing', async () => {
+    _clearDebridPlaybackJobs();
+    const torrentUrl = 'https://prowlarr.example/api?t=download&id=slow-sports&apikey=secret';
+    const torrentBytes = buildTorrentPayload('Slow.Sports.Match.mkv', 98765);
+    const token = encodeDebridPlaybackToken({
+      protocol: DEBRID_PROTOCOL_TORRENT,
+      src: torrentUrl,
+      providers: [{ type: 'pm', apiKey: 'pm-secret' }],
+      name: 'Slow Sports Match'
+    });
+    const calls = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url, options = {}) => {
+      calls.push({
+        url: String(url),
+        method: options.method || 'GET'
+      });
+      const target = String(url);
+      if (target === torrentUrl) {
+        return new Response(torrentBytes, {
+          status: 200,
+          headers: { 'content-disposition': 'attachment; filename="slow-sports.torrent"' }
+        });
+      }
+      if (target.endsWith('/transfer/create')) {
+        return jsonResponse({ status: 'success', id: 'pm-slow-transfer' });
+      }
+      if (target.includes('/transfer/list')) {
+        return jsonResponse({
+          status: 'success',
+          transfers: [{
+            id: 'pm-slow-transfer',
+            name: 'Slow Sports Match.mkv',
+            status: 'running',
+            progress: 0.1483,
+            file_id: 'file-slow'
+          }]
+        });
+      }
+      throw new Error(`Unexpected fetch while preparing: ${target}`);
+    };
+
+    try {
+      const res = createMockRes();
+      await handleDebridPlayback({ params: { token } }, res);
+      assert.equal(res.statusCode, 503);
+      assert.equal(res.redirected, null);
+      assert.equal(String(res.headers['retry-after'] || ''), '15');
+      assert.notEqual(String(res.headers['x-pvtkrrx-waiting-room'] || ''), '1', 'active debrid handoff must not substitute the waiting-room MP4 while preparing');
+      assert.equal(res.body?.error, 'Debrid item still preparing');
+      assert.equal(res.body?.state, 'downloading');
+      assert.equal(res.body?.progress, 0.1483);
+      assert.equal(calls.filter(call => call.url === torrentUrl).length, 1);
+      assert.equal(calls.filter(call => /\/transfer\/create$/.test(call.url)).length, 1);
+      assert.ok(calls.filter(call => call.url.includes('/transfer/list')).length >= 1);
     } finally {
       globalThis.fetch = originalFetch;
       _clearDebridPlaybackJobs();

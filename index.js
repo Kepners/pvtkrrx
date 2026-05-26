@@ -194,12 +194,6 @@ function handlePlaybackHead(req, res) {
   return sendPlaybackHead(res, playbackContentTypeForPath(info?.p || info?.name || ''))
 }
 
-function sendWaitingRoomOrJson(req, res, details, fallbackStatus, fallbackBody) {
-  if (sendWaitingRoomVideo(req, res, details)) return true
-  res.status(fallbackStatus).json(fallbackBody)
-  return true
-}
-
 function trackServerSockets(server, sockets) {
   if (!server || !sockets) return
   server.on('connection', (socket) => {
@@ -2701,14 +2695,11 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
       const becameAvailable = await waitForFileState(() => Boolean(fileExists && resolvedFilePath))
       if (!becameAvailable) {
         console.warn('[file-route] file not found on disk')
-        return sendWaitingRoomOrJson(req, res, {
-          kind: 'qbit',
-          reason: 'buffering-metadata',
+        res.setHeader('Retry-After', '2')
+        return res.status(425).json({
+          error: 'Buffering torrent metadata',
           progress: Number(file?.progress || torrent.progress || 0),
           retryAfterSeconds: 2
-        }, 425, {
-          error: 'Buffering torrent metadata',
-          progress: Number(file?.progress || torrent.progress || 0)
         })
       }
     }
@@ -2731,27 +2722,21 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
           `[file-route] initial buffer not ready hash=${torrentHash.slice(0, 8)} ` +
           `readable=${readableBytes} required=${requiredBytes} progress=${Math.round(Number(file?.progress || torrent.progress || 0) * 100)}%`
         )
-        return sendWaitingRoomOrJson(req, res, {
-          kind: 'qbit',
-          reason: 'initial-buffer',
+        res.setHeader('Retry-After', '2')
+        return res.status(425).json({
+          error: 'Download active - waiting for continuous start buffer',
           progress: Number(file?.progress || torrent.progress || 0),
           retryAfterSeconds: 2
-        }, 425, {
-          error: 'Download active - waiting for continuous start buffer',
-          progress: Number(file?.progress || torrent.progress || 0)
         })
       }
     } else if (!isComplete && readableBytes <= 0) {
       const hasReadableBytes = await waitForFileState(() => Boolean(fileExists && resolvedFilePath && (isComplete || readableBytes > 0)))
       if (!hasReadableBytes) {
-        return sendWaitingRoomOrJson(req, res, {
-          kind: 'qbit',
-          reason: 'initial-readable-bytes',
+        res.setHeader('Retry-After', '2')
+        return res.status(425).json({
+          error: 'Download started — waiting for initial buffer',
           progress: Number(file?.progress || torrent.progress || 0),
           retryAfterSeconds: 2
-        }, 425, {
-          error: 'Download started — waiting for initial buffer',
-          progress: Number(file?.progress || torrent.progress || 0)
         })
       }
     }
@@ -2819,14 +2804,11 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
         if (maxReadable <= 0) {
           const hasReadableBytes = await waitForFileState(() => Boolean(fileExists && resolvedFilePath && (isComplete || readableBytes > 0)))
           if (!hasReadableBytes) {
-            return sendWaitingRoomOrJson(req, res, {
-              kind: 'qbit',
-              reason: 'initial-readable-bytes',
+            res.setHeader('Retry-After', '2')
+            return res.status(425).json({
+              error: 'Download started — waiting for initial buffer',
               progress: Number(file?.progress || torrent.progress || 0),
               retryAfterSeconds: 2
-            }, 425, {
-              error: 'Download started — waiting for initial buffer',
-              progress: Number(file?.progress || torrent.progress || 0)
             })
           }
         }
@@ -3156,13 +3138,8 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
       `progress=${Math.round(lastProgress * 100)}% availability=${maxAvailability.toFixed(3)} ` +
       `seeders=${maxSeedersSeen} peers=${maxPeersSeen}`
     )
-    return sendWaitingRoomOrJson(req, res, {
-      kind: 'qbit',
-      reason: stalledNoPieces ? 'stalled-no-pieces' : 'playback-timeout',
-      state: stalledNoPieces ? 'stalled' : 'buffering',
-      progress: lastProgress,
-      retryAfterSeconds: 4
-    }, 503, {
+    res.setHeader('Retry-After', '4')
+    return res.status(503).json({
       error: stalledNoPieces
         ? 'Source stalled - no available pieces from peers. Pick another source.'
         : 'Download queued - still buffering start of file',

@@ -55,8 +55,8 @@ Implementation note: the current user-facing `LAN Bridge` route is the code-faci
 - Cache-search sources are put.io and Premiumize cache check.
 - `/playback/debrid` handles add/check/poll handoff and redirects to the provider when ready.
 - The public hosted relay must not proxy Debrid provider media bytes.
-- If the provider is still downloading after the poll window, `/playback/debrid` returns the bundled PVTKRRX waiting-room MP4 with progress/provider headers when possible, falling back to the old preparing/`503` JSON only if the loader asset cannot be served.
-- The Debrid waiting-room response is served by PVTKRRX only while the provider is preparing. When the provider is ready, playback still redirects to the provider URL; PVTKRRX must not proxy those media bytes.
+- If the provider is still downloading after the poll window, `/playback/debrid` returns retryable preparing/`503` JSON with `Retry-After` and progress. It must not return the waiting-room MP4 from the active handoff URL because Stremio can treat that placeholder as the selected media and stop re-requesting the route that would later redirect to the provider.
+- When the provider is ready, playback redirects to the provider URL; PVTKRRX must not proxy those media bytes.
 - If no Debrid provider is configured, route behavior falls back to the qBittorrent/local rules below.
 
 ## What Each Route Exposes
@@ -80,9 +80,8 @@ There is no per-route catalog filtering. The Library catalog queries qBittorrent
 - Config loaded from disk (`local-config.json`)
 - Built-in `/file` route serves bytes with HTTP Range support
 - Built-in `/playback` route queues torrents via tracker link, polls qBit, and 302-redirects to `/file` when ready
-- Built-in `/file` and `/playback` now use the bundled waiting-room MP4 for initial not-ready states so Stremio can stay on a playable loading surface while qBit continues downloading. Unavailable seek/tail byte ranges still return retryable range errors because substituting a loader clip for a requested real-media byte range would corrupt playback semantics.
-- The direct waiting-room asset lives at `/playback/waiting-room.mp4` and `/:config/playback/waiting-room.mp4`. It supports `HEAD`, full `GET`, single byte ranges, and `416` for unsatisfied ranges. It must remain an asset route ahead of `/:config/playback/:info`, not a real playback token.
-- The current asset is a finite 8-second MP4. Treat it as a first-layer keep-alive only; it is not Stremio native torrent progress, does not loop by itself, and does not replace a later `/file` or provider redirect request.
+- Built-in `/file` and `/playback` keep initial not-ready states retryable with `425`/`503` plus `Retry-After` while qBit continues downloading. They must not substitute a loader clip for active playback responses because the client needs to retry the original route to receive the eventual real-media response.
+- The direct waiting-room asset lives at `/playback/waiting-room.mp4` and `/:config/playback/waiting-room.mp4`. It supports `HEAD`, full `GET`, single byte ranges, and `416` for unsatisfied ranges. It must remain an asset route ahead of `/:config/playback/:info`, not a real playback token, and is reserved for diagnostics/future loader work.
 - Playback priming resumes the selected incomplete torrent, moves it to the top of qBittorrent's queue when queueing is enabled, keeps sequential download on, explicitly disables first+last piece priority unless opted in, and sets only the chosen playable video/archive files to high file priority
 - Tracker `/playback` streams emitted for on-tracker content
 - Completed packed RAR releases start background extraction when possible; the extracted direct video is the supported path once ready, and the source stays hidden while extraction is pending or unavailable unless the experimental native archive override is enabled
@@ -144,9 +143,9 @@ For playback-capable runtimes, the `In-progress unpacked video` row applies both
 | Endpoint | PC Local | LAN Bridge (home network) | Remote Seedbox (public hosted relay) |
 |---|---|---|---|
 | `/:config/file/:info` | Serves bytes (200/206) | 307 -> local `/file` | 403 Forbidden |
-| `/:config/playback/:info` | Queue + comet poll (waiting-room MP4 fallback -> 302) | 307 -> local `/playback` | 403 Forbidden |
-| `/playback/waiting-room.mp4`, `/:config/playback/waiting-room.mp4` | Bundled finite MP4 loader asset with safe Range semantics | Same asset after redirect target reaches local runtime | Allowed as a loader asset only; not local/qBit/provider media |
-| `/:config/playback/debrid/:token` | Provider add/check/poll -> redirect when ready, waiting-room MP4 fallback while preparing | 307 -> local provider handoff when home redirect applies | Provider add/check/poll -> redirect when ready, waiting-room MP4 fallback while preparing; never proxies provider media bytes |
+| `/:config/playback/:info` | Queue + comet poll -> 302 when ready, retryable `503` while still buffering | 307 -> local `/playback` | 403 Forbidden |
+| `/playback/waiting-room.mp4`, `/:config/playback/waiting-room.mp4` | Bundled finite MP4 asset with safe Range semantics; direct diagnostic/future-loader route only | Same asset after redirect target reaches local runtime | Allowed as an asset only; not local/qBit/provider media |
+| `/:config/playback/debrid/:token` | Provider add/check/poll -> redirect when ready, retryable `503` while preparing | 307 -> local provider handoff when home redirect applies | Provider add/check/poll -> redirect when ready, retryable `503` while preparing; never proxies provider media bytes |
 | `/:config/stream/:type/:id.json` | All stream types emitted | 307 -> local stream handler | Ready-file streams only |
 | `/:config/catalog/:type/:id.json` | All catalogs | 307 -> local catalog handler | All catalogs (direct from hosted) |
 | `/:config/meta/:type/:id.json` | All meta | 307 -> local meta handler | All meta (direct from hosted) |

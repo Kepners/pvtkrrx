@@ -73,9 +73,9 @@ Same behaviour for movies, TV, AND sports. PVTKRR's v1.3 router is purely additi
 | NZB results | Routed to Premiumize when PM is configured (RD/AD skip — neither supports NZB). | Skipped (no qBit fallback for Usenet). |
 | Cached items (via cache search) | `⚡ READY` prefix, top of list. | Same — cache search runs independently of debrid. |
 
-When an uncached debrid handoff is accepted but still preparing after the poll window, PVTKRR returns the bundled waiting-room MP4 rather than only a JSON 503 response. The response carries `X-PVTKRRX-Waiting-*`, `X-PVTKRRX-Progress`, and `Retry-After` headers for debugging, but Stremio still sees a normal HTTP video stream. This is a keep-alive/loading fallback, not the native torrent progress ring.
+When an uncached debrid handoff is accepted but still preparing after the poll window, PVTKRR returns a retryable JSON `503` with `Retry-After`, state, and progress. This keeps the original `/playback/debrid` URL as the contract Stremio can re-request until the provider is ready.
 
-The waiting room is only for provider-preparing states. Once the provider has a playable media URL, PVTKRR redirects Stremio to that provider URL and does not proxy the provider's media bytes. The current loader asset is a finite 8-second MP4, so it is a first-layer keep-alive rather than a guaranteed long-running loop; real-client proof is still required before claiming more than that.
+Do not substitute the bundled waiting-room MP4 for an active debrid handoff. A real-client test on 2026-05-26 showed that a finite MP4 placeholder can leave Stremio stuck on the placeholder instead of retrying the debrid URL that would later redirect to the provider. Once the provider has a playable media URL, PVTKRR redirects Stremio to that provider URL and does not proxy the provider's media bytes.
 
 ## Verifying
 

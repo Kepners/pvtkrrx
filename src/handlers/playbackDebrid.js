@@ -5,7 +5,6 @@ const { decodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT, DEBRID_PROTOCOL_USEN
 const { getDebridProvider } = require('../clients/debrid/base')
 const { redactSensitiveText } = require('../utils/logRedaction')
 const { fetchTorrentPayload, validateTorrentPayload } = require('../utils/torrentPayload')
-const { sendWaitingRoomVideo } = require('./waitingRoom')
 
 const POLL_INTERVAL_MS = Math.max(500, Number.parseInt(process.env.PVTKRRX_DEBRID_POLL_INTERVAL_MS || '2000', 10))
 const POLL_TIMEOUT_MS = Math.max(2000, Number.parseInt(
@@ -219,16 +218,6 @@ async function handleDebridPlayback(req, res) {
     if (!status || status.state !== 'ready') {
       console.log(`[playback-debrid] preparing provider=${cred.type} state=${status?.state || 'unknown'} progress=${status?.progress || 0}`)
       res.setHeader('Retry-After', '15')
-      if (sendWaitingRoomVideo(req, res, {
-        kind: 'debrid',
-        provider: cred.type,
-        state: status?.state || 'unknown',
-        reason: 'provider-preparing',
-        progress: status?.progress || 0,
-        retryAfterSeconds: 15
-      })) {
-        return
-      }
       return res.status(503).json({
         error: 'Debrid item still preparing',
         state: status?.state || 'unknown',

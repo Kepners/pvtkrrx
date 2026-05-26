@@ -671,10 +671,10 @@ async function run() {
     assert.equal(coldIncompleteResponse.status, 302, 'incomplete playback should hand Stremio to /file as soon as qBit exposes the target file path')
     assert.match(String(coldIncompleteResponse.headers.location || ''), new RegExp(`/${configToken}/file/`), 'cold incomplete playback should let the shared file route handle byte-range readiness')
     const coldIncompleteFileResponse = await request(server.address().port, String(coldIncompleteResponse.headers.location || ''))
-    assert.equal(coldIncompleteFileResponse.status, 200, 'shared file route should keep Stremio alive with the waiting-room MP4 before the startup buffer is ready')
-    assert.equal(String(coldIncompleteFileResponse.headers['content-type'] || ''), 'video/mp4')
-    assert.equal(String(coldIncompleteFileResponse.headers['x-pvtkrrx-waiting-room'] || ''), '1')
-    assert.equal(String(coldIncompleteFileResponse.headers['x-pvtkrrx-waiting-kind'] || ''), 'qbit')
+    assert.equal(coldIncompleteFileResponse.status, 425, 'shared file route should stay retryable before the startup buffer is ready')
+    assert.equal(String(coldIncompleteFileResponse.headers['retry-after'] || ''), '2')
+    assert.notEqual(String(coldIncompleteFileResponse.headers['x-pvtkrrx-waiting-room'] || ''), '1', 'active file route must not substitute the waiting-room MP4 for real media')
+    assert.match(String(coldIncompleteFileResponse.text || ''), /continuous start buffer/i)
     const coldIncompleteTailResponse = await request(
       server.address().port,
       String(coldIncompleteResponse.headers.location || ''),
@@ -691,8 +691,10 @@ async function run() {
     assert.equal(unverifiedResponse.status, 302, 'incomplete playback may still enter /file when qBit exposes the target path but cannot prove pieces yet')
     assert.match(String(unverifiedResponse.headers.location || ''), new RegExp(`/${configToken}/file/`), 'unverified incomplete playback should still use the shared file route for range-level proof')
     const unverifiedFileResponse = await request(server.address().port, String(unverifiedResponse.headers.location || ''))
-    assert.equal(unverifiedFileResponse.status, 200, 'shared file route should keep Stremio alive with the waiting-room MP4 when readable bytes cannot be proved yet')
-    assert.equal(String(unverifiedFileResponse.headers['x-pvtkrrx-waiting-room'] || ''), '1')
+    assert.equal(unverifiedFileResponse.status, 425, 'shared file route should stay retryable when readable bytes cannot be proved yet')
+    assert.equal(String(unverifiedFileResponse.headers['retry-after'] || ''), '2')
+    assert.notEqual(String(unverifiedFileResponse.headers['x-pvtkrrx-waiting-room'] || ''), '1', 'active file route must not substitute the waiting-room MP4 when readable bytes are not proved')
+    assert.match(String(unverifiedFileResponse.text || ''), /initial buffer|continuous start buffer/i)
 
     incompletePieceStates = [2, 2, 2, 2, 2, 2]
     const incompleteResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(incompletePlaybackToken)}`)
