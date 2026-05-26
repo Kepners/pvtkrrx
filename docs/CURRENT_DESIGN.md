@@ -121,7 +121,7 @@ Operational behavior:
 
 ## Current UX Model
 
-- The public website is now guide-only. It explains `PC Local`, `LAN Bridge`, and `Remote Seedbox`, but it is no longer the default place to paste private runtime details.
+- The public website is guide-first, but `/configure` must still serve the real configuration UI because Stremio's Configure button opens the addon's `/configure` path. Hosted validation still blocks private/localhost backend URLs unless the request is on a self-host/admin surface.
 - Desktop-local `/configure` on the Windows EXE now exposes `PC Local` and `LAN Bridge`; `Remote Seedbox` belongs to the separate server/cloud runtime.
 - The top of `/configure` now opens with a visual setup guide that separates the two real private setup surfaces: Windows host (`http://127.0.0.1:7000/configure`) and private server (`https://your-domain/configure`), while keeping the live install actions below as editable code-driven controls.
 - The top of the page focuses on the next action for the selected route.
@@ -155,7 +155,7 @@ Operational behavior:
 Verified on 2026-04-08:
 
 - `https://www.pvtkrrx.cc/` returns the landing page (`200`)
-- `https://www.pvtkrrx.cc/configure` no longer serves the public setup UI; public requests redirect back to the guide-only site
+- `https://www.pvtkrrx.cc/configure` serves the real configuration UI for Stremio's Configure button; public hosted saves still enforce hosted-route safety and reject private/localhost backend URLs where they do not belong
 - `https://www.pvtkrrx.cc/sports` returns the single public Sports Posters page (`200`) and links to SportsMeta checkout/proof while keeping PVTKRRX stream playback free
 - `https://www.pvtkrrx.cc/clockrr` returns the public Clockrr family page (`200`) for the separate Stremio subtitle clock addon and shows aggregate telemetry-derived movie/TV top-ten ticker rows
 - `https://www.pvtkrrx.cc/blog` returns the crawlable blog/status notes page (`200`)

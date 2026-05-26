@@ -429,23 +429,12 @@ app.use(express.static(publicDir, {
   }
 }))
 
-function canServeConfigureUi(req) {
-  if (SELF_HOST_SERVER_MODE) return true
-  return isSameHostRequest(req)
-}
-
 app.get('/configure', (req, res) => {
-  if (!canServeConfigureUi(req)) {
-    return res.redirect(302, '/#routes')
-  }
   ensureCsrfCookie(req, res)
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
   sendConfigurePage(req, res)
 })
 app.get('/:config/configure', (req, res) => {
-  if (!canServeConfigureUi(req)) {
-    return res.redirect(302, '/#routes')
-  }
   ensureCsrfCookie(req, res)
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
   sendConfigurePage(req, res)

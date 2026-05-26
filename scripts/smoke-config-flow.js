@@ -72,6 +72,31 @@ function requestJsonWithHostHeader(port, reqPath, hostHeader) {
   })
 }
 
+function requestTextWithHostHeader(port, reqPath, hostHeader) {
+  return new Promise((resolve, reject) => {
+    const req = http.request({
+      host: '127.0.0.1',
+      port,
+      method: 'GET',
+      path: reqPath,
+      headers: {
+        Host: hostHeader
+      }
+    }, (res) => {
+      let body = ''
+      res.setEncoding('utf8')
+      res.on('data', chunk => { body += chunk })
+      res.on('end', () => resolve({
+        status: Number(res.statusCode || 0),
+        headers: res.headers,
+        text: body
+      }))
+    })
+    req.on('error', reject)
+    req.end()
+  })
+}
+
 function requestJsonWithHeaders(port, method, reqPath, body = null, headers = {}) {
   return new Promise((resolve, reject) => {
     const payload = body === null ? null : JSON.stringify(body)
@@ -308,6 +333,10 @@ async function run() {
     assert.match(configureHtml, /auth\/stremio\/local-status/, 'configure page should check local Stremio status')
     assert.match(configureHtml, /id="qbitRuntimeStatus"/, 'configure page should render live qBittorrent runtime status')
     assert.match(configureHtml, /id="qbitAutoExtractEnabled"/, 'configure page should render the qBittorrent extraction-hook toggle')
+    const publicConfigureRes = await requestTextWithHostHeader(port, '/configure', `www.pvtkrrx.cc:${port}`)
+    assert.equal(publicConfigureRes.status, 200, 'public /configure should serve the real configure UI for Stremio Configure button')
+    assert.match(publicConfigureRes.text, /id="installActionBtn"/, 'public /configure should expose install controls instead of redirecting to the homepage')
+    assert.match(publicConfigureRes.text, /Remote Seedbox/i, 'public /configure should expose route configuration controls')
     assert.match(configureHtml, /id="openProwlarrLink"/, 'configure page should render a direct Prowlarr launch link')
     assert.match(configureHtml, /id="openQbitLink"/, 'configure page should render a direct qBittorrent launch link')
     assert.match(configureHtml, /Change the actual qBittorrent save path/i, 'configure page should explain where to change the live qBittorrent save path')
@@ -890,6 +919,9 @@ async function run() {
     assert.match(tokenConfigureHtml, /Your hardware, your trackers.*configure the bridge to Stremio/i)
     assert.match(tokenConfigureHtml, /maybePrefillFromToken/, 'token configure page should include prefill loader')
     assert.match(tokenConfigureHtml, /clearRejectedServerAdminToken/, 'configure page should clear stale self-host passwords after rejection')
+    const publicTokenConfigureRes = await requestTextWithHostHeader(port, `/${token}/configure`, `www.pvtkrrx.cc:${port}`)
+    assert.equal(publicTokenConfigureRes.status, 200, 'public /:token/configure should serve the real configure UI for installed hosted addons')
+    assert.match(publicTokenConfigureRes.text, /maybePrefillFromToken/, 'public token configure page should still prefill from the installed token')
 
     const tokenConfigRes = await fetch(`${base}/${token}/config.json`)
     assert.equal(tokenConfigRes.status, 200, 'GET /:token/config.json should return 200')
