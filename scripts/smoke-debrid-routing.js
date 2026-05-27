@@ -275,7 +275,12 @@ async function run() {
   })
 
   await check('SPORTS + explicit uncached debrid opt-in still adds debrid above qBit', async () => {
-    const baseResult = { streams: [makeQbitStream('On Seedbox', 'football 1080p')] }
+    const baseResult = {
+      streams: [{
+        ...makeQbitStream('On Seedbox', 'football 1080p'),
+        description: 'football 1080p\nDL | 1080P | 5.7 GB | TKR: SportsCult'
+      }]
+    }
     const result = await applyV13Routing(baseResult, {
       config: {
         debrid: {
@@ -293,6 +298,7 @@ async function run() {
     assert.equal(result.streams.length, 2, 'explicit opt-in should preserve old additive behavior')
     assert.match(result.streams[0].url, /\/playback\/debrid\//, 'debrid first')
     assert.ok(result.streams[0].url.startsWith(`${PLAYBACK_BASE}/${CONFIG_TOKEN}/playback/debrid/`))
+    assert.match(result.streams[0].description, /^RD DEBRID\nfootball 1080p\nDL \| 1080P/m, 'debrid provider must be visible in Stremio description text')
     assert.match(result.streams[0].name, /^⬇ RD/)
     assert.equal(result.streams[1].name, 'On Seedbox', 'qBit backup kept underneath')
   })

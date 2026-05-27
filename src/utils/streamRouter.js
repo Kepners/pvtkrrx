@@ -137,6 +137,15 @@ function buildDebridPlaybackUrl(playbackBaseUrl, providers, payload) {
   }
 }
 
+function decorateDebridDescription(description, providerLabel) {
+  const label = String(providerLabel || '').trim().toUpperCase()
+  const text = String(description || '').trim()
+  const prefix = label ? `${label} DEBRID` : 'DEBRID'
+  if (!text) return prefix
+  if (new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').test(text)) return text
+  return `${prefix}\n${text}`
+}
+
 function isSportsContext(ctx = {}) {
   const type = String(ctx.type || '').trim().toLowerCase()
   const id = String(ctx.id || '').trim().toLowerCase()
@@ -381,6 +390,7 @@ async function applyV13Routing(result, ctx = {}) {
       const routedStream = {
         ...stream,
         name: `⬇ ${providerLabel} · ${(stream.name || '').replace(/^[⚡⬇] [A-Za-z.]+ · /, '')}`,
+        description: decorateDebridDescription(stream.description, providerLabel),
         url: debridUrl
       }
       if (meta.sourceKind === 'file') debridFileStreams.push(routedStream)
