@@ -188,7 +188,7 @@ async function run() {
     assert.equal(pm.calls[0].byteLength, 3);
   });
 
-  await check('PM folder playback picks largest playable video instead of first screenshot', async () => {
+  await check('PM folder playback picks release-name video instead of first screenshot or larger unrelated video', async () => {
     const calls = [];
     const originalFetch = globalThis.fetch;
     globalThis.fetch = async (url) => {
@@ -199,7 +199,7 @@ async function run() {
           status: 'success',
           transfers: [{
             id: 'pm-folder-transfer',
-            name: 'MLB Match',
+            name: 'MLB.2026.Rockies.vs.Dodgers.1080p',
             status: 'seeding',
             folder_id: 'folder-root'
           }]
@@ -216,6 +216,13 @@ async function run() {
               name: 'mlb.2026.rockies.vs.dodgers.1080p.mkv',
               size: 7_535_511_552,
               link: 'https://pm.example/main-video.mkv'
+            },
+            {
+              type: 'file',
+              id: 'larger-unrelated-video',
+              name: 'bonus.feature.2160p.mkv',
+              size: 9_000_000_000,
+              link: 'https://pm.example/bonus-feature.mkv'
             },
             {
               type: 'file',

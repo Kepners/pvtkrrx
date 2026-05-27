@@ -54,15 +54,43 @@ function isPlayableVideoFile(file) {
   return PLAYABLE_VIDEO_EXT_RE.test(path);
 }
 
-function pickPremiumizeStreamFile(files, fileIdx) {
+function normalizeReleaseName(value = '') {
+  return String(value || '')
+    .split(/[\\/]/)
+    .pop()
+    .replace(/\.[a-z0-9]{2,5}$/i, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
+function releaseNameMatchScore(file, releaseName = '') {
+  const release = normalizeReleaseName(releaseName);
+  const candidate = normalizeReleaseName(file?.path || file?.name || '');
+  if (!release || !candidate) return 0;
+  if (candidate === release) return 100;
+  if (candidate.includes(release) || release.includes(candidate)) return 80;
+
+  const releaseTokens = new Set(release.split(/\s+/).filter(token => token.length > 2));
+  const candidateTokens = candidate.split(/\s+/).filter(token => token.length > 2);
+  if (!releaseTokens.size || !candidateTokens.length) return 0;
+  const overlap = candidateTokens.filter(token => releaseTokens.has(token)).length;
+  return Math.round((overlap / Math.max(releaseTokens.size, candidateTokens.length)) * 60);
+}
+
+function pickPremiumizeStreamFile(files, fileIdx, releaseName = '') {
   const list = Array.isArray(files) ? files : [];
   const requestedIndex = Number(fileIdx) || 0;
   const requested = list[requestedIndex];
-  if (requested?.link && isPlayableVideoFile(requested)) return requested;
+  if (requestedIndex > 0 && requested?.link && isPlayableVideoFile(requested)) return requested;
 
   const playable = list
     .filter(file => file?.link && isPlayableVideoFile(file))
-    .sort((a, b) => Number(b.size || 0) - Number(a.size || 0));
+    .sort((a, b) => {
+      const nameDelta = releaseNameMatchScore(b, releaseName) - releaseNameMatchScore(a, releaseName);
+      if (nameDelta) return nameDelta;
+      return Number(b.size || 0) - Number(a.size || 0);
+    });
   if (playable.length) return playable[0];
 
   return requested;
@@ -257,7 +285,7 @@ class PremiumizeDebridProvider {
     }
 
     const files = await this._flattenFolder(transfer.folder_id);
-    const file = pickPremiumizeStreamFile(files, fileIdx);
+    const file = pickPremiumizeStreamFile(files, fileIdx, transfer.name);
     if (!file?.link) {
       throw new ServiceApiError({ serviceId: this.id, endpoint: '/folder/list', status: 200, body: { error: 'missing Premiumize file link', fileIdx } });
     }
