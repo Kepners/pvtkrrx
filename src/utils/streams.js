@@ -212,17 +212,18 @@ function buildCompactStreamFacts(item, parsed, mode, progressPercent = null, fil
         ? `BUFFERING ${Number.isFinite(progressPercent) ? progressPercent : 0}%`
         : 'DL'
 
-  return uniqueNonEmpty([
+  const primaryLine = uniqueNonEmpty([
     state,
     quality,
     sizeBytes > 0 ? formatSize(sizeBytes) : '',
     container !== 'VIDEO' ? container : '',
-    indexer ? `Tracker: ${indexer}` : '',
-    seeders > 0 && mode !== 'seedbox' ? `${seeders} seeders` : '',
+    indexer ? `TKR: ${indexer}` : '',
     options.sourceLabel ? `Source: ${options.sourceLabel}` : '',
     downloadTelemetry.speedBytes > 0 ? formatByteRate(downloadTelemetry.speedBytes) : '',
     downloadTelemetry.etaSeconds > 0 ? `ETA ${formatDuration(downloadTelemetry.etaSeconds)}` : ''
   ]).join(' | ')
+  const seederLine = seeders > 0 && mode !== 'seedbox' ? `${seeders} seeders` : ''
+  return uniqueNonEmpty([primaryLine, seederLine]).join('\n')
 }
 
 function buildStateBadge(mode, options = {}) {
