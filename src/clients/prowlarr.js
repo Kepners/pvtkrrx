@@ -4,6 +4,39 @@ const { sportHintFromCategory } = require('../utils/sportsCategoryHint')
 const { resolveSportHint } = require('../utils/sportsRules')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 
+function splitCategoryList(cats) {
+  return String(cats || '')
+    .split(',')
+    .map(cat => cat.trim())
+    .filter(Boolean)
+}
+
+function searchResultKey(item = {}) {
+  const infohash = String(item?.infohash || '').trim().toLowerCase()
+  if (infohash) return `hash:${infohash}`
+  const link = String(item?.link || '').trim()
+  if (link) return `link:${link}`
+  return [
+    String(item?.indexer || '').trim().toLowerCase(),
+    String(item?.title || '').trim().toLowerCase(),
+    String(item?.size || '').trim()
+  ].join('|')
+}
+
+function mergeSearchResults(lists) {
+  const merged = []
+  const seen = new Set()
+  for (const list of lists) {
+    for (const item of (Array.isArray(list) ? list : [])) {
+      const key = searchResultKey(item)
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      merged.push(item)
+    }
+  }
+  return merged
+}
+
 function normalizeProwlarrBaseUrl(input) {
   let url = String(input || '').trim()
   if (!url) return ''
@@ -176,10 +209,27 @@ class ProwlarrClient {
   }
 
   async search(query, cats, type = 'search', options = {}) {
-    const params = new URLSearchParams({ query, type, indexerIds: -2, apikey: this.apiKey })
-    if (options.useCategories && String(cats || '').trim()) {
-      params.set('categories', String(cats).trim())
+    const categoryList = options.useCategories ? splitCategoryList(cats) : []
+    if (categoryList.length > 1) {
+      const settled = await Promise.allSettled(categoryList.map((cat) => {
+        const params = new URLSearchParams({ query, type, indexerIds: -2, apikey: this.apiKey })
+        params.set('categories', cat)
+        return this._search(params, { timeoutMs: options.timeoutMs })
+      }))
+
+      const values = []
+      let firstError = null
+      for (const result of settled) {
+        if (result.status === 'fulfilled') values.push(result.value)
+        else if (!firstError) firstError = result.reason
+      }
+
+      if (values.length === 0 && firstError) throw firstError
+      return mergeSearchResults(values)
     }
+
+    const params = new URLSearchParams({ query, type, indexerIds: -2, apikey: this.apiKey })
+    if (categoryList.length === 1) params.set('categories', categoryList[0])
     return this._search(params, { timeoutMs: options.timeoutMs })
   }
 

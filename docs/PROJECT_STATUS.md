@@ -16,6 +16,14 @@ PVTKRRX is on the `1.3.7` release line. v1.3 adds optional Debrid (Real-Debrid, 
 
 Detailed poster/debrid worklog: [POSTERS_AND_DEBRID_WORKLOG_2026-05.md](POSTERS_AND_DEBRID_WORKLOG_2026-05.md).
 
+## 2026-05-27: Mandalorian movie search relevance hotfix
+
+- Root cause: live `movie tt30825738` (`Star Wars: The Mandalorian and Grogu`) proved PVTKRRX was sending movie title fallback categories to the Prowlarr `/api/v1/search` endpoint as one comma-separated value. This Prowlarr rejects that shape with `HTTP 400`, after which PVTKRRX fell back to all categories and allowed an IPTorrents `Books/Other` 3D STL model because it matched the title words and sat just above the movie-size threshold.
+- Backend fix: `ProwlarrClient.search()` now splits comma-separated category groups into per-category Prowlarr searches and merges/dedupes results. Movie categories now include `Movies/Other`, `Movies/DVD`, and `Movies/WEB-DL`. Movie relevance now rejects non-movie category rows and obvious non-video asset titles such as STL / 3D model / fan-art figure releases before stream emission.
+- Regression proof: `smoke:prowlarr-search` proves Prowlarr category groups are split instead of sent as one invalid comma value. `smoke:pipeline` now includes a Mandalorian/Grogu STL fixture and proves only a real feature-sized movie candidate is inspected/emitted.
+- Live proof: after the native Contabo hotpatch, the exact configured-route probe for `tt30825738` returned `0` PVTKRRX rows and `0` bad STL rows, instead of the previous bogus PM/qBit pair for `The Mandalorian with Grogu in Hover Cot ... 3D STL`.
+- Remaining truth: the configured Contabo Prowlarr indexers currently return Mandalorian TV-series rows, but no actual movie row for `Mandalorian 2026`, `Mandalorian Grogu 2026`, the exact title, or CAM/HDTS variants. The Rutor rows visible in Torrentio are not coming from this configured Prowlarr instance.
+
 ## 2026-05-25: v1.3.7 sports catalog search adult-leak hotfix
 
 - Root cause: after the v1.3.6 stream fix, the sports catalog handler still used a broad all-category Prowlarr fallback when a sports category search was sparse. The `On Couch` catalog search could therefore show adult tracker entries before the real Australian Football result.

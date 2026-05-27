@@ -571,6 +571,15 @@ async function run() {
           indexer: 'IPTorrents'
         }),
         trackerItem({
+          title: 'The Mandalorian with Grogu in Hover Cot Star Wars Fan Art Figure Statue Model 3D STL',
+          link: 'https://tracker.example/download/mandalorian-grogu-stl.torrent',
+          size: 301_989_888,
+          seeders: 7,
+          indexer: 'IPTorrents',
+          categoryIds: ['7050', '100095'],
+          categoryNames: ['Books/Other', 'Books/Educational']
+        }),
+        trackerItem({
           title: 'The Mandalorian and Grogu 2026 1080p WEB-DL x264',
           link: 'https://tracker.example/download/mandalorian-and-grogu.torrent',
           size: 2_800_000_000,
@@ -597,7 +606,7 @@ async function run() {
       const playbackStreams = result.streams.filter(stream => /\/playback\//.test(String(stream?.url || '')))
       assert.equal(playbackStreams.length, 1, '#4b movie filter should suppress off-title/tiny merchandise rows and keep the real movie candidate')
       assert.match(String(playbackStreams[0]?.description || ''), /The Mandalorian and Grogu 2026/i)
-      assert.doesNotMatch(JSON.stringify(result.streams), /Grogu Stocking|mandalorian-not-grogu/i)
+      assert.doesNotMatch(JSON.stringify(result.streams), /Grogu Stocking|mandalorian-not-grogu|mandalorian-grogu-stl/i)
     })
 
     await withScenario(async () => {

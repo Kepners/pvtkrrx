@@ -59,6 +59,7 @@ const MOVIE_MIN_SOURCE_BYTES = Number.isFinite(parsedMovieMinSourceBytes)
 
 // Module-level constant Sets — avoid recreating on every call
 const TITLE_RELEVANT_STOPWORDS = new Set(['the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or'])
+const NON_VIDEO_ASSET_TITLE_RE = /\b(?:stl|3d\s*(?:print|model|printing)|figure\s+statue|statue\s+model|ornament|pen\s*holder|fan\s*art|model\s*design)\b/i
 const LOOSE_TEAM_NOISE = new Set([
   'epl', 'premier', 'league', 'laliga', 'la', 'liga', 'serie', 'bundesliga', 'ligue', 'champions',
   'europa', 'uefa', 'nba', 'nfl', 'ufc', 'formula', 'grand', 'prix', 'f1', 'match', 'sports',
@@ -1290,8 +1291,19 @@ function hasMatchingImdbId(item = {}, requestedImdbId = '') {
   return Boolean(requested && candidate && requested === candidate)
 }
 
+function hasMovieCompatibleCategory(item = {}) {
+  const categoryIds = Array.isArray(item?.categoryIds) ? item.categoryIds.map(id => String(id || '').trim()).filter(Boolean) : []
+  const categoryNames = Array.isArray(item?.categoryNames) ? item.categoryNames.map(name => String(name || '').trim()).filter(Boolean) : []
+  if (categoryIds.length === 0 && categoryNames.length === 0) return true
+  if (categoryIds.some(id => /^20\d{2}$/.test(id))) return true
+  if (categoryNames.some(name => /\bmovies?\b/i.test(name))) return true
+  return false
+}
+
 function isPlausibleMovieSource(item = {}) {
   const size = Number(item?.size || 0)
+  if (!hasMovieCompatibleCategory(item)) return false
+  if (NON_VIDEO_ASSET_TITLE_RE.test(String(item?.title || ''))) return false
   return !(MOVIE_MIN_SOURCE_BYTES > 0 && Number.isFinite(size) && size > 0 && size < MOVIE_MIN_SOURCE_BYTES)
 }
 

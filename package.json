@@ -48,6 +48,7 @@
     "smoke:desktop": "node scripts/smoke-desktop-provision.js",
     "smoke:win-installer-path": "node scripts/smoke-win-installer-path.js",
     "smoke:provider-discovery": "node scripts/smoke-provider-discovery.js",
+    "smoke:prowlarr-search": "node scripts/smoke-prowlarr-search.js",
     "smoke:debrid": "node scripts/smoke-debrid.js",
     "smoke:rd-sanitizer": "node scripts/smoke-rd-sanitizer.js",
     "smoke:debrid-config": "node scripts/smoke-debrid-config.js",
