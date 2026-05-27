@@ -738,6 +738,7 @@ function sortStreams(streams) {
 }
 
 module.exports = {
+  PVTKRRX_LOGO_URL,
   formatSize,
   formatByteRate,
   formatDuration,

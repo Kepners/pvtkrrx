@@ -415,6 +415,66 @@ async function run() {
     }
   });
 
+  await check('HTTP torrent debrid playback holds first click until PM becomes ready, then redirects', async () => {
+    _clearDebridPlaybackJobs();
+    const torrentUrl = 'https://prowlarr.example/api?t=download&id=eventually-ready&apikey=secret';
+    const torrentBytes = buildTorrentPayload('Eventually.Ready.Match.1080p.mkv', 98765);
+    const token = encodeDebridPlaybackToken({
+      protocol: DEBRID_PROTOCOL_TORRENT,
+      src: torrentUrl,
+      providers: [{ type: 'pm', apiKey: 'pm-secret' }],
+      name: 'Eventually Ready Match'
+    });
+    let listCalls = 0;
+    const calls = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url, options = {}) => {
+      calls.push({
+        url: String(url),
+        method: options.method || 'GET'
+      });
+      const target = String(url);
+      if (target === torrentUrl) {
+        return new Response(torrentBytes, {
+          status: 200,
+          headers: { 'content-disposition': 'attachment; filename="eventually-ready.torrent"' }
+        });
+      }
+      if (target.endsWith('/transfer/create')) {
+        return jsonResponse({ status: 'success', id: 'pm-eventual-transfer' });
+      }
+      if (target.includes('/transfer/list')) {
+        listCalls += 1;
+        const running = listCalls < 3;
+        return jsonResponse({
+          status: 'success',
+          transfers: [{
+            id: 'pm-eventual-transfer',
+            name: 'Eventually Ready Match 1080p.mkv',
+            status: running ? 'running' : 'finished',
+            progress: running ? 0.45 : 1,
+            file_id: 'file-eventual',
+            link: 'https://pm.example/eventually-ready.mkv'
+          }]
+        });
+      }
+      throw new Error(`Unexpected fetch while eventual-ready polling: ${target}`);
+    };
+
+    try {
+      const res = createMockRes();
+      await handleDebridPlayback({ params: { token } }, res);
+      assert.equal(res.statusCode, 200);
+      assert.deepEqual(res.redirected, { status: 302, url: 'https://pm.example/eventually-ready.mkv' });
+      assert.equal(calls.filter(call => call.url === torrentUrl).length, 1);
+      assert.equal(calls.filter(call => /\/transfer\/create$/.test(call.url)).length, 1);
+      assert.ok(listCalls >= 3, 'handler should keep polling the same click until ready');
+    } finally {
+      globalThis.fetch = originalFetch;
+      _clearDebridPlaybackJobs();
+    }
+  });
+
   await check('HTTP torrent debrid playback can serve the waiting-room loader while provider is still preparing', async () => {
     _clearDebridPlaybackJobs();
     const oldMode = process.env.PVTKRRX_DEBRID_PREPARING_RESPONSE;

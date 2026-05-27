@@ -23,6 +23,45 @@
 const { decodeFileStateToken, decodePlaybackStateToken, encodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT } = require('./opaqueState')
 const { searchAllSources } = require('./debridCache')
 const { redactSensitiveText } = require('./logRedaction')
+const { PVTKRRX_LOGO_URL, formatSize } = require('./streams')
+
+function detectQualityLabel(value = '') {
+  const text = String(value || '').toUpperCase()
+  const match = text.match(/\b(2160P|1080P|720P|576P|540P|480P|4K|UHD)\b/)
+  if (!match) return ''
+  return match[1] === 'UHD' ? '2160P' : match[1]
+}
+
+function detectContainerLabel(value = '') {
+  const text = String(value || '').toLowerCase()
+  if (/\.(mkv)(?:$|[?\s])|\bmkv\b/.test(text)) return 'MKV'
+  if (/\.(mp4)(?:$|[?\s])|\bmp4\b/.test(text)) return 'MP4'
+  if (/\.(webm)(?:$|[?\s])|\bwebm\b/.test(text)) return 'WEBM'
+  if (/\.(avi)(?:$|[?\s])|\bavi\b/.test(text)) return 'AVI'
+  if (/\.(m4v)(?:$|[?\s])|\bm4v\b/.test(text)) return 'M4V'
+  if (/\.(ts|m2ts)(?:$|[?\s])|\b(?:ts|m2ts)\b/.test(text)) return 'TS'
+  return ''
+}
+
+function formatCacheSourceLabel(sourceId = '') {
+  const source = String(sourceId || '').toLowerCase()
+  if (source === 'pm') return 'Premiumize'
+  if (source === 'putio') return 'put.io'
+  return sourceId ? String(sourceId) : ''
+}
+
+function buildReadyCacheDescription(hit = {}) {
+  const name = String(hit.name || 'cached').trim()
+  const sizeBytes = Math.max(0, Number(hit.sizeBytes || hit.size || 0))
+  const facts = [
+    'READY',
+    detectQualityLabel(name),
+    sizeBytes > 0 ? formatSize(sizeBytes) : '',
+    detectContainerLabel(name),
+    formatCacheSourceLabel(hit.sourceId)
+  ].filter(Boolean).join(' | ')
+  return [name, facts].filter(Boolean).join('\n')
+}
 
 function buildMagnetFromHash(hash, name) {
   const h = String(hash || '').toLowerCase().trim()
@@ -147,9 +186,8 @@ function filterSportsStreams(streams = []) {
 }
 
 function pickReadyStreamName(hit) {
-  const source = hit.sourceId === 'putio' ? 'put.io' : hit.sourceId === 'pm' ? 'Premiumize' : hit.sourceId
   // COPY DRAFT — pending docs/copy.md approval. Brief §3 stream-prefix lock.
-  return `⚡ READY · ${source}`
+  return '⚡ READY'
 }
 
 function playbackContentTypeFor(value = '') {
@@ -255,11 +293,14 @@ async function buildCacheSearchStreams(query, enabledSources, playbackBaseUrl, p
     out.push({
       name: pickReadyStreamName(hit),
       title: hit.name || 'cached',
+      description: buildReadyCacheDescription(hit),
+      thumbnail: PVTKRRX_LOGO_URL,
       url,
       behaviorHints: {
         notWebReady: true,
         filename: hit.name || 'cached',
         sourceMode: 'debrid-cache',
+        sourceOriginLabel: formatCacheSourceLabel(hit.sourceId),
         sourceSize: Math.max(0, Number(hit.sizeBytes || 0)),
         proxyHeaders: {
           response: {

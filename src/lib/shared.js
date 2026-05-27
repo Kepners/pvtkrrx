@@ -71,7 +71,7 @@ const TRUST_PROXY_HOPS = Number.isFinite(parsedTrustProxyHops) && parsedTrustPro
   ? parsedTrustProxyHops
   : 1
 const EXPRESS_TRUST_PROXY_SETTING = TRUST_PROXY_ENABLED ? TRUST_PROXY_HOPS : false
-const STREAM_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_WAIT_TIMEOUT_MS || '90000', 10)
+const STREAM_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_WAIT_TIMEOUT_MS || '600000', 10)
 const STREAM_WAIT_INTERVAL_MS = parseInt(process.env.STREAM_WAIT_INTERVAL_MS || '2000', 10)
 const STREAM_RANGE_WAIT_TIMEOUT_MS = parseInt(process.env.STREAM_RANGE_WAIT_TIMEOUT_MS || '45000', 10)
 const STREAM_RANGE_WAIT_INTERVAL_MS = parseInt(process.env.STREAM_RANGE_WAIT_INTERVAL_MS || '500', 10)

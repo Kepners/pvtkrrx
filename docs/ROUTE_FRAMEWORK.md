@@ -55,7 +55,7 @@ Implementation note: the current user-facing `LAN Bridge` route is the code-faci
 - Cache-search sources are put.io and Premiumize cache check.
 - `/playback/debrid` handles add/check/poll handoff and redirects to the provider when ready.
 - The public hosted relay must not proxy Debrid provider media bytes.
-- If the provider is still downloading after the poll window, `/playback/debrid` defaults to retryable preparing/`503` JSON with `Retry-After` and progress. If `PVTKRRX_DEBRID_PREPARING_RESPONSE=loader` is enabled, the route polls briefly and then serves the bundled waiting-room MP4 with progress headers while the provider continues preparing. That loader is a prepare screen only; a single HTTP video response cannot later turn into the provider redirect.
+- `/playback/debrid` holds the original click open during the poll window and redirects to the provider as soon as the provider is ready. If the provider is still downloading after that window, it defaults to retryable preparing/`503` JSON with `Retry-After` and progress. If `PVTKRRX_DEBRID_PREPARING_RESPONSE=loader` is enabled, the route polls briefly and then serves the bundled waiting-room MP4 with progress headers while the provider continues preparing. That loader is a prepare screen only; a single HTTP video response cannot later turn into the provider redirect.
 - When the provider is ready, playback redirects to the provider URL; PVTKRRX must not proxy those media bytes.
 - If no Debrid provider is configured, route behavior falls back to the qBittorrent/local rules below.
 

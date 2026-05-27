@@ -212,8 +212,9 @@ async function run() {
                 assert.equal(infohash, SAMPLE_HASH)
                 return {
                   sourceId: 'pm',
-                  name: 'cached sports match',
+                  name: 'cached sports match 1080p.mkv',
                   infohash,
+                  sizeBytes: 2_800_000_000,
                   directStreamUrl: null
                 }
               },
@@ -231,6 +232,10 @@ async function run() {
     })
     assert.equal(result.streams.length, 3)
     assert.match(result.streams[0].name, /READY/)
+    assert.doesNotMatch(result.streams[0].name, /Premiumize/)
+    assert.match(result.streams[0].description, /cached sports match 1080p\.mkv/)
+    assert.match(result.streams[0].description, /READY \| 1080P \| 2\.8 GB \| MKV \| Premiumize/)
+    assert.match(result.streams[0].thumbnail, /logo\.png$/)
     assert.match(result.streams[0].url, /\/playback\/debrid\//)
     const token = result.streams[0].url.split('/playback/debrid/')[1]
     const decoded = decodeDebridPlaybackToken(token)
@@ -371,7 +376,10 @@ async function run() {
     })
     assert.equal(result.streams.length, 1)
     assert.match(result.streams[0].name, /READY/)
+    assert.match(result.streams[0].description, /READY \| 4\.2 GB \| MKV \| Premiumize/)
+    assert.match(result.streams[0].thumbnail, /logo\.png$/)
     assert.equal(result.streams[0].behaviorHints.sourceMode, 'debrid-cache')
+    assert.equal(result.streams[0].behaviorHints.sourceOriginLabel, 'Premiumize')
     assert.equal(result.streams[0].behaviorHints.proxyHeaders?.response?.['Content-Type'], 'video/x-matroska')
     _clearDebridCacheMemo()
   })

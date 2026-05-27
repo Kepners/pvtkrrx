@@ -11,7 +11,7 @@ const POLL_INTERVAL_MS = Math.max(500, Number.parseInt(process.env.PVTKRRX_DEBRI
 const POLL_TIMEOUT_MS = Math.max(2000, Number.parseInt(
   process.env.PVTKRRX_DEBRID_POLL_TIMEOUT_MS ||
   process.env.PVTKRRX_DEBRID_KEEPALIVE_TIMEOUT_MS ||
-  '120000',
+  '600000',
   10
 ))
 const DEBRID_LOADER_AFTER_MS_DEFAULT = 8000
