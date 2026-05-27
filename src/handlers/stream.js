@@ -17,6 +17,7 @@ const { encodePlaybackStateToken, encodeFileStateToken } = require('../utils/opa
 const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
 const { buildPlaybackFileUrl, canEmitTrackerPlayback, getTrackerPlaybackRestriction } = require('../utils/fileServing')
 const { decodeCustomId } = require('../utils/customId')
+const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { isCompletedTorrent } = require('../utils/torrentState')
 const { fetchTorrentPayload, inspectTorrentPayload } = require('../utils/torrentPayload')
 const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
@@ -51,6 +52,10 @@ const STREAM_EPISODE_IMDB_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(
   process.env.PVTKRRX_STREAM_EPISODE_IMDB_FALLBACK_TIMEOUT_MS || '3000',
   10
 ))
+const parsedMovieMinSourceBytes = parseInt(process.env.PVTKRRX_MOVIE_MIN_SOURCE_BYTES || '300000000', 10)
+const MOVIE_MIN_SOURCE_BYTES = Number.isFinite(parsedMovieMinSourceBytes)
+  ? Math.max(0, parsedMovieMinSourceBytes)
+  : 300000000
 
 // Module-level constant Sets — avoid recreating on every call
 const TITLE_RELEVANT_STOPWORDS = new Set(['the', 'a', 'an', 'of', 'in', 'on', 'at', 'to', 'for', 'and', 'or'])
@@ -1227,6 +1232,30 @@ function titleRelevant(resultTitle, queryTitle, options = {}) {
   return false
 }
 
+function hasMatchingImdbId(item = {}, requestedImdbId = '') {
+  const requested = normalizeImdbId(requestedImdbId)
+  const candidate = normalizeImdbId(item?.imdbId)
+  return Boolean(requested && candidate && requested === candidate)
+}
+
+function isPlausibleMovieSource(item = {}) {
+  const size = Number(item?.size || 0)
+  return !(MOVIE_MIN_SOURCE_BYTES > 0 && Number.isFinite(size) && size > 0 && size < MOVIE_MIN_SOURCE_BYTES)
+}
+
+function sourceRelevantForContent(item = {}, contentTitle = '', options = {}) {
+  if (options?.type !== 'movie') {
+    return contentTitle ? titleRelevant(item.title, contentTitle, options) : true
+  }
+
+  if (!isPlausibleMovieSource(item)) return false
+  if (contentTitle) return titleRelevant(item.title, contentTitle, options)
+
+  // Some Prowlarr indexers ignore imdbid and return arbitrary rows. Without
+  // Cinemeta title truth, only trust rows that carry the requested imdb id.
+  return hasMatchingImdbId(item, options.imdbId)
+}
+
 function buildTitleFallbackQueries(contentTitle, type, season = null, episode = null) {
   const normalized = normalizeSearchQuery(contentTitle)
   const queries = []
@@ -1369,11 +1398,11 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
       noticeCounts.legacyAviSuppressed += beforeLegacy - items.length
       console.log(`[stream] Legacy AVI/XviD filter removed ${beforeLegacy - items.length} source(s)`)
     }
-    if (contentTitle) {
+    if (contentTitle || type === 'movie') {
       const before = items.length
-      items = items.filter(item => titleRelevant(item.title, contentTitle, { type, season, episode }))
+      items = items.filter(item => sourceRelevantForContent(item, contentTitle, { type, season, episode, imdbId }))
       if (items.length < before) {
-        console.log(`[stream] Title filter removed ${before - items.length} irrelevant results (${items.length} kept)`)
+        console.log(`[stream] Title/movie filter removed ${before - items.length} irrelevant results (${items.length} kept)`)
       }
     }
     return items

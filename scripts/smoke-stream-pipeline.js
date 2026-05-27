@@ -478,6 +478,99 @@ async function run() {
 
     await withScenario(async () => {
       delete process.env.PVTKRRX_HOSTED_RELAY
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      CinemetaClient.prototype.getMovie = async () => ({ name: 'The Mandalorian and Grogu' })
+      ProwlarrClient.prototype.searchImdb = async () => [
+        trackerItem({
+          title: 'Star Wars The Mandalorian 1080p WEB-DL',
+          link: 'https://tracker.example/download/mandalorian-not-grogu.torrent',
+          size: 209_800_000,
+          seeders: 75,
+          indexer: 'IPTorrents'
+        }),
+        trackerItem({
+          title: 'Grogu Stocking Tree Hang 1080p WEB-DL',
+          link: 'https://tracker.example/download/grogu-stocking.torrent',
+          size: 56_500_000,
+          seeders: 8,
+          indexer: 'IPTorrents'
+        }),
+        trackerItem({
+          title: 'The Mandalorian and Grogu 2026 1080p WEB-DL x264',
+          link: 'https://tracker.example/download/mandalorian-and-grogu.torrent',
+          size: 2_800_000_000,
+          seeders: 42,
+          indexer: 'IPTorrents'
+        })
+      ]
+      ProwlarrClient.prototype.search = async () => []
+      global.fetch = async (url) => {
+        assert.equal(String(url), 'https://tracker.example/download/mandalorian-and-grogu.torrent', '#4b movie filter should only inspect the relevant feature-sized source')
+        return createFetchResponse(buildTorrentPayload([
+          { path: 'The.Mandalorian.And.Grogu.2026.1080p.WEB-DL.x264.mkv', length: 2_800_000_000 }
+        ]))
+      }
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        'tt9991111',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      const playbackStreams = result.streams.filter(stream => /\/playback\//.test(String(stream?.url || '')))
+      assert.equal(playbackStreams.length, 1, '#4b movie filter should suppress off-title/tiny merchandise rows and keep the real movie candidate')
+      assert.match(String(playbackStreams[0]?.description || ''), /The Mandalorian and Grogu 2026/i)
+      assert.doesNotMatch(JSON.stringify(result.streams), /Grogu Stocking|mandalorian-not-grogu/i)
+    })
+
+    await withScenario(async () => {
+      delete process.env.PVTKRRX_HOSTED_RELAY
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      CinemetaClient.prototype.getMovie = async () => null
+      ProwlarrClient.prototype.searchImdb = async () => [
+        trackerItem({
+          title: 'Random Grogu Toy Review 2026 1080p WEB-DL',
+          link: 'https://tracker.example/download/random-grogu.torrent',
+          size: 2_000_000_000,
+          seeders: 90,
+          imdbId: ''
+        }),
+        trackerItem({
+          title: 'Localized Feature Title 2026 1080p WEB-DL',
+          link: 'https://tracker.example/download/localized-feature.torrent',
+          size: 2_000_000_000,
+          seeders: 12,
+          imdbId: 'tt7654321'
+        })
+      ]
+      ProwlarrClient.prototype.search = async () => []
+      global.fetch = async (url) => {
+        assert.equal(String(url), 'https://tracker.example/download/localized-feature.torrent', '#4c no-title movie filter should only trust matching imdb id rows')
+        return createFetchResponse(buildTorrentPayload([
+          { path: 'Localized.Feature.Title.2026.1080p.WEB-DL.mkv', length: 2_000_000_000 }
+        ]))
+      }
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        'tt7654321',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      const playbackStreams = result.streams.filter(stream => /\/playback\//.test(String(stream?.url || '')))
+      assert.equal(playbackStreams.length, 1, '#4c movie filter should not trust arbitrary imdb search rows when Cinemeta title is unavailable')
+      assert.match(String(playbackStreams[0]?.description || ''), /Localized Feature Title/i)
+      assert.doesNotMatch(JSON.stringify(result.streams), /Random Grogu Toy/i)
+    })
+
+    await withScenario(async () => {
+      delete process.env.PVTKRRX_HOSTED_RELAY
       ProwlarrClient.prototype.searchImdb = async () => [trackerItem({ infohash: matchedTorrent().hash, link: '' })]
       QBitClient.prototype.torrents = async () => [matchedTorrent({ dlspeed: 524288, eta: 540 })]
       QBitClient.prototype.files = async () => [matchedFile()]
