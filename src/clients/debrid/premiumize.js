@@ -45,6 +45,29 @@ function mapPremiumizeStatus(status) {
   return 'error';
 }
 
+const PLAYABLE_VIDEO_EXT_RE = /\.(?:mkv|mp4|m4v|webm|avi|mov|ts|m2ts|mpg|mpeg)$/i;
+const NON_PLAYABLE_EXT_RE = /\.(?:jpg|jpeg|png|gif|webp|nfo|txt|srt|sub|idx|sfv|md5|url|lnk)$/i;
+
+function isPlayableVideoFile(file) {
+  const path = String(file?.path || file?.name || '');
+  if (!path || NON_PLAYABLE_EXT_RE.test(path)) return false;
+  return PLAYABLE_VIDEO_EXT_RE.test(path);
+}
+
+function pickPremiumizeStreamFile(files, fileIdx) {
+  const list = Array.isArray(files) ? files : [];
+  const requestedIndex = Number(fileIdx) || 0;
+  const requested = list[requestedIndex];
+  if (requested?.link && isPlayableVideoFile(requested)) return requested;
+
+  const playable = list
+    .filter(file => file?.link && isPlayableVideoFile(file))
+    .sort((a, b) => Number(b.size || 0) - Number(a.size || 0));
+  if (playable.length) return playable[0];
+
+  return requested;
+}
+
 class PremiumizeDebridProvider {
   constructor(apiKey) {
     this.id = 'pm';
@@ -234,7 +257,7 @@ class PremiumizeDebridProvider {
     }
 
     const files = await this._flattenFolder(transfer.folder_id);
-    const file = files[Number(fileIdx) || 0];
+    const file = pickPremiumizeStreamFile(files, fileIdx);
     if (!file?.link) {
       throw new ServiceApiError({ serviceId: this.id, endpoint: '/folder/list', status: 200, body: { error: 'missing Premiumize file link', fileIdx } });
     }
@@ -255,5 +278,6 @@ class PremiumizeDebridProvider {
 
 module.exports = {
   PremiumizeDebridProvider,
-  mapPremiumizeStatus
+  mapPremiumizeStatus,
+  pickPremiumizeStreamFile
 };

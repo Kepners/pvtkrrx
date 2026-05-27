@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { Writable } = require('node:stream');
 const { createMockDebridProvider } = require('../src/clients/debrid/__mock__');
 const { UnsupportedCapabilityError } = require('../src/clients/debrid/base');
+const { PremiumizeDebridProvider } = require('../src/clients/debrid/premiumize');
 
 process.env.PVTKRRX_DEBRID_POLL_INTERVAL_MS = process.env.PVTKRRX_DEBRID_POLL_INTERVAL_MS || '500';
 process.env.PVTKRRX_DEBRID_POLL_TIMEOUT_MS = process.env.PVTKRRX_DEBRID_POLL_TIMEOUT_MS || '2000';
@@ -185,6 +186,73 @@ async function run() {
     assert.equal(pm.calls[0].method, 'addTorrentFile');
     assert.equal(pm.calls[0].fileName, 'sportscult.torrent');
     assert.equal(pm.calls[0].byteLength, 3);
+  });
+
+  await check('PM folder playback picks largest playable video instead of first screenshot', async () => {
+    const calls = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      const target = String(url);
+      calls.push(target);
+      if (target.includes('/transfer/list')) {
+        return jsonResponse({
+          status: 'success',
+          transfers: [{
+            id: 'pm-folder-transfer',
+            name: 'MLB Match',
+            status: 'seeding',
+            folder_id: 'folder-root'
+          }]
+        });
+      }
+      if (target.includes('/folder/list?id=folder-root')) {
+        return jsonResponse({
+          status: 'success',
+          content: [
+            { type: 'folder', id: 'screens', name: 'Screens' },
+            {
+              type: 'file',
+              id: 'main-video',
+              name: 'mlb.2026.rockies.vs.dodgers.1080p.mkv',
+              size: 7_535_511_552,
+              link: 'https://pm.example/main-video.mkv'
+            },
+            {
+              type: 'file',
+              id: 'nfo',
+              name: 'mlb.2026.rockies.vs.dodgers.nfo',
+              size: 1730,
+              link: 'https://pm.example/release.nfo'
+            }
+          ]
+        });
+      }
+      if (target.includes('/folder/list?id=screens')) {
+        return jsonResponse({
+          status: 'success',
+          content: [
+            {
+              type: 'file',
+              id: 'screen-1',
+              name: 'screen0001.jpg',
+              size: 133266,
+              link: 'https://pm.example/screen0001.jpg'
+            }
+          ]
+        });
+      }
+      throw new Error(`Unexpected Premiumize fetch: ${target}`);
+    };
+
+    try {
+      const pm = new PremiumizeDebridProvider('pm-secret');
+      const url = await pm.getStreamUrl('pm-folder-transfer', 0);
+      assert.equal(url, 'https://pm.example/main-video.mkv');
+      assert.ok(calls.some(call => call.includes('/folder/list?id=folder-root')));
+      assert.ok(calls.some(call => call.includes('/folder/list?id=screens')));
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
   });
 
   await check('HTTP torrent debrid playback fetches .torrent and uploads it to Premiumize', async () => {
