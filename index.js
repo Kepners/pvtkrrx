@@ -2850,6 +2850,37 @@ app.get('/:config/playback/debrid/:token', async (req, res) => {
 
 // ─── Playback endpoint — Comet pattern ──────────────────────
 app.head('/:config/playback/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('playback'), handlePlaybackHead)
+function isQbitTorrentErrorState(torrent) {
+  const state = String(torrent?.state || '').trim().toLowerCase()
+  return state === 'error' || state === 'missingfiles' || state === 'missing_files'
+}
+
+async function getQbitTorrentFailureDetail(qbit, hash) {
+  const normalizedHash = String(hash || '').trim().toLowerCase()
+  if (!normalizedHash) return ''
+
+  try {
+    const trackers = await qbit.request(`/api/v2/torrents/trackers?hash=${encodeURIComponent(normalizedHash)}`)
+    const trackerError = Array.isArray(trackers)
+      ? trackers.find(tracker => Number(tracker?.status || 0) === 2 && String(tracker?.msg || '').trim())
+      : null
+    return String(trackerError?.msg || '').trim()
+  } catch (_) {
+    return ''
+  }
+}
+
+async function sendQbitTorrentFailure(res, qbit, torrent) {
+  const hash = String(torrent?.hash || '').trim().toLowerCase()
+  const detail = await getQbitTorrentFailureDetail(qbit, hash)
+  const payload = {
+    error: 'Torrent failed in qBittorrent',
+    state: String(torrent?.state || 'error')
+  }
+  if (detail) payload.detail = redactSensitiveText(detail)
+  return res.status(502).json(payload)
+}
+
 app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('playback'), async (req, res) => {
   try {
     if (IS_HOSTED_RELAY_RUNTIME && req.params.config !== 'local') {
@@ -2947,6 +2978,9 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
     if (trackedHash) {
       const existing = await loadTorrentPlaybackState(qbit, trackedHash, targetPathHint, req.config.additionalStorageRoots)
       if (existing?.torrent) {
+        if (isQbitTorrentErrorState(existing.torrent)) {
+          return sendQbitTorrentFailure(res, qbit, existing.torrent)
+        }
         await primeStateForPlayback(existing)
         if (!existing.file && existing.packedArchive && existing.archiveReady) {
           return res.status(422).json({
@@ -3041,6 +3075,9 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
       try {
         const addedState = await loadTorrentPlaybackState(qbit, trackedHash, targetPathHint, req.config.additionalStorageRoots)
         if (addedState?.torrent) {
+          if (isQbitTorrentErrorState(addedState.torrent)) {
+            return sendQbitTorrentFailure(res, qbit, addedState.torrent)
+          }
           await primeStateForPlayback(addedState)
           hasTorrent = true
           lastProgress = Number(addedState.file?.progress || addedState.torrent.progress || 0)
@@ -3077,6 +3114,9 @@ app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeL
       if (!state?.torrent) {
         trackedHash = ''
         continue
+      }
+      if (isQbitTorrentErrorState(state.torrent)) {
+        return sendQbitTorrentFailure(res, qbit, state.torrent)
       }
       await primeStateForPlayback(state)
       if (!state.file) {

@@ -28,6 +28,7 @@ const ORIGINALS = {
   pieceStates: QBitClient.prototype.pieceStates,
   add: QBitClient.prototype.add,
   addTorrentFile: QBitClient.prototype.addTorrentFile,
+  request: QBitClient.prototype.request,
   resume: QBitClient.prototype.resume,
   topPriority: QBitClient.prototype.topPriority,
   setFilePriority: QBitClient.prototype.setFilePriority,
@@ -44,6 +45,7 @@ function restoreMocks() {
   QBitClient.prototype.pieceStates = ORIGINALS.pieceStates
   QBitClient.prototype.add = ORIGINALS.add
   QBitClient.prototype.addTorrentFile = ORIGINALS.addTorrentFile
+  QBitClient.prototype.request = ORIGINALS.request
   QBitClient.prototype.resume = ORIGINALS.resume
   QBitClient.prototype.topPriority = ORIGINALS.topPriority
   QBitClient.prototype.setFilePriority = ORIGINALS.setFilePriority
@@ -232,6 +234,7 @@ async function run() {
   const readyPackedHash = 'e1287d13cccccccccccccccccccccccccccccccc'
   const targetedHash = 'f1287d13eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
   const unverifiedHash = 'a1287d13ffffffffffffffffffffffffffffffff'
+  const qbitErrorHash = '91287d13eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee'
   const newlyQueuedTorrents = new Set()
   const addFileCalls = []
   const resumeCalls = []
@@ -270,6 +273,17 @@ async function run() {
     hash: unverifiedHash,
     name: 'UFC.328.Main.Event.1080p',
     progress: 0.9,
+    seq_dl: true,
+    f_l_piece_prio: false,
+    save_path: runtimeDir,
+    download_path: runtimeDir,
+    content_path: ''
+  }
+  const qbitErrorTorrent = {
+    hash: qbitErrorHash,
+    name: 'MLB RS 2026 Miami Marlins vs Toronto Blue Jays 26 05 720pEN60fps SN.mkv',
+    progress: 0,
+    state: 'error',
     seq_dl: true,
     f_l_piece_prio: false,
     save_path: runtimeDir,
@@ -454,6 +468,7 @@ async function run() {
     inferredTorrent,
     incompleteTorrent,
     unverifiedTorrent,
+    qbitErrorTorrent,
     packedTorrent,
     readyPackedTorrent,
     targetedTorrent,
@@ -465,6 +480,7 @@ async function run() {
     if (normalized === inferredHash) return [inferredTorrent]
     if (normalized === incompleteHash) return [incompleteTorrent]
     if (normalized === unverifiedHash) return [unverifiedTorrent]
+    if (normalized === qbitErrorHash) return [qbitErrorTorrent]
     if (normalized === packedHash) return [packedTorrent]
     if (normalized === readyPackedHash) return [readyPackedTorrent]
     if (normalized === targetedHash) return [targetedTorrent]
@@ -477,6 +493,7 @@ async function run() {
     if (normalized === inferredHash) return [file]
     if (normalized === incompleteHash) return [incompleteFile]
     if (normalized === unverifiedHash) return [unverifiedFile]
+    if (normalized === qbitErrorHash) return []
     if (normalized === packedHash) return packedFiles
     if (normalized === readyPackedHash) return readyPackedFiles
     if (normalized === targetedHash) return targetedFiles
@@ -519,6 +536,18 @@ async function run() {
     addFileCalls.push({ kind: 'file', fileName, hash: addedHash, options: { ...options } })
     if (addedHash === newQueuedHash) newlyQueuedTorrents.add(addedHash)
     return 'Ok.'
+  }
+  QBitClient.prototype.request = async (apiPath) => {
+    if (
+      String(apiPath || '').startsWith('/api/v2/torrents/trackers') &&
+      String(apiPath || '').includes(encodeURIComponent(qbitErrorHash))
+    ) {
+      return [
+        { status: 0, msg: 'This torrent is private' },
+        { status: 2, msg: 'Torrent is not authorized for use on this tracker.' }
+      ]
+    }
+    return []
   }
   QBitClient.prototype.resume = async (inputHash) => {
     resumeCalls.push(String(inputHash || '').toLowerCase())
@@ -584,6 +613,7 @@ async function run() {
     const inferredPlaybackToken = encodePlaybackStateToken({ h: '', l: 'https://tracker.example/existing-without-hash.torrent' })
     const legacyAviPlaybackToken = encodePlaybackStateToken({ h: '', l: 'https://tracker.example/legacy-avi.torrent' })
     const newQueuedPlaybackToken = encodePlaybackStateToken({ h: '', l: 'https://tracker.example/new-queued.torrent' })
+    const qbitErrorPlaybackToken = encodePlaybackStateToken({ h: qbitErrorHash })
     const packedPlaybackToken = encodePlaybackStateToken({ h: packedHash })
     const readyPackedPlaybackToken = encodePlaybackStateToken({ h: readyPackedHash })
     const targetedPlaybackToken = encodePlaybackStateToken({ h: targetedHash, p: targetedFiles[1].name })
@@ -643,6 +673,11 @@ async function run() {
     const legacyAviResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(legacyAviPlaybackToken)}`)
     assert.equal(legacyAviResponse.status, 422, 'AVI-only tracker playback should fail fast before qBit queueing instead of handing Stremio a source that never starts')
     assert.match(String(legacyAviResponse.text || ''), /Legacy AVI\/XviD source detected/i)
+
+    const qbitErrorResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(qbitErrorPlaybackToken)}`)
+    assert.equal(qbitErrorResponse.status, 502, 'qBit tracker failures should fail fast instead of holding Stremio on artwork')
+    assert.match(String(qbitErrorResponse.text || ''), /Torrent failed in qBittorrent/i)
+    assert.match(String(qbitErrorResponse.text || ''), /not authorized/i)
 
     const newQueuedResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(newQueuedPlaybackToken)}`)
     assert.equal(newQueuedResponse.status, 302, 'brand-new tracker playback should add the torrent and redirect into /file as soon as qBit exposes the video file')

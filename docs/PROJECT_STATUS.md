@@ -11,6 +11,7 @@ PVTKRRX is on the `1.3.7` release line. v1.3 adds optional Debrid (Real-Debrid, 
 - Live finding: an uncached Premiumize sports click can successfully create a provider transfer while Stremio still sees no playable media URL. In the WWE repro, Premiumize accepted the transfer but stayed at `progress=0` for the whole poll window, so Stremio remained on artwork/spinner.
 - Router correction: cached/ready Debrid remains first, but uncached sports Debrid handoff rows are hidden by default. qBit/seedbox/bridge stays the default playable route for private sports until the provider has a ready URL.
 - Native Stremio option: `PVTKRRX_NATIVE_STREMIO_TORRENT=true` can emit experimental `DIRECT P2P` rows using `infoHash`, `fileIdx`, and `sources`, matching the Stremio/Torrentio native torrent transport. The guard refuses torrent payloads marked private because this bypasses qBit/seedbox and announces from the playback device.
+- Follow-up live finding: the Toronto Blue Jays vs Miami Marlins test proved the qBit fallback can receive a valid `.torrent` but enter `state=error` when the private tracker rejects the torrent as unauthorized. `/playback` now fails fast for qBittorrent `error`/`missingFiles` states instead of holding Stremio on artwork until the wait timeout.
 - Local proof: `npm run smoke:pipeline`, `npm run smoke:debrid-routing`, `npm run smoke:debrid-all`, and `npm run smoke:sports-stream-hygiene` passed after the correction.
 
 Detailed poster/debrid worklog: [POSTERS_AND_DEBRID_WORKLOG_2026-05.md](POSTERS_AND_DEBRID_WORKLOG_2026-05.md).
