@@ -65,11 +65,12 @@ If you don't have Premiumize configured, NZB results are skipped (no Usenet fall
 
 ## Routing rules
 
-Same behaviour for movies, TV, AND sports. PVTKRR's v1.3 router is purely additive — qBit is **always** kept as the backup and never removed from the stream list.
+PVTKRR's v1.3 router is additive - qBit is **always** kept as the backup and never removed from the stream list. Sports/private-tracker rows are stricter than movies/TV because an uncached Debrid handoff can look playable in Stremio while the provider is only downloading in the background.
 
 | Content | Debrid linked | Debrid NOT linked |
 |---|---|---|
-| Movies / TV / Sports | Debrid stream ADDED above each existing qBit stream (default). Original qBit stream stays underneath as backup. Toggle "Prefer debrid over seedbox" off to put qBit first instead. | qBit only (v1.2 behavior unchanged). |
+| Movies / TV | Debrid stream ADDED above each existing qBit stream (default). Original qBit stream stays underneath as backup. Toggle "Prefer debrid over seedbox" off to put qBit first instead. | qBit only (v1.2 behavior unchanged). |
+| Sports / private tracker rows | Cached/ready Debrid hits show first. Uncached Debrid handoff rows are hidden by default; qBit/seedbox stays the playable path. Set `PVTKRRX_DEBRID_UNCACHED_SPORTS_HANDOFF=true` only for controlled testing. | qBit only (v1.2 behavior unchanged). |
 | NZB results | Routed to Premiumize when PM is configured (RD/AD skip — neither supports NZB). | Skipped (no qBit fallback for Usenet). |
 | Cached items (via cache search) | `⚡ READY` prefix, top of list. | Same — cache search runs independently of debrid. |
 
@@ -77,8 +78,10 @@ When an uncached debrid handoff is accepted, the default mode holds the original
 
 For controlled testing, `PVTKRRX_DEBRID_PREPARING_RESPONSE=loader` makes `/playback/debrid` poll briefly, then serve the bundled waiting-room MP4 while the provider continues preparing. `PVTKRRX_DEBRID_LOADER_AFTER_MS` controls that short poll window and defaults to 8000 ms. This is a prepare screen only: a single HTTP video response cannot later turn into a provider redirect. Once the provider has a playable media URL, a later request to the same debrid stream redirects Stremio to that provider URL. PVTKRR does not proxy the provider's media bytes.
 
+Torrentio-style Stremio progress is not Debrid. It comes from Stremio native torrent rows (`infoHash`, `fileIdx`, `sources`), where Stremio itself downloads the torrent and can draw the progress UI. PVTKRR can expose experimental `DIRECT P2P` rows with `PVTKRRX_NATIVE_STREMIO_TORRENT=true` for non-private torrent payloads. Those rows bypass qBit/seedbox and should not be enabled for private tracker safety unless the user explicitly accepts that Stremio will announce from the playback device.
+
 ## Verifying
 
-After saving config, open any movie or TV episode in Stremio. If debrid is configured, you should see streams labelled like `⬇ RD · ...` or `⬇ PM · ...` ahead of the existing seedbox streams. If put.io has the file already, you should see `⚡ READY · put.io · ...` at the very top.
+After saving config, open any movie or TV episode in Stremio. If debrid is configured, you should see streams labelled like `⬇ RD · ...` or `⬇ PM · ...` ahead of the existing seedbox streams. If put.io or Premiumize has the file already, you should see a `READY` stream at the very top. For sports, expect cached/ready Debrid first when available and qBit/seedbox rows for uncached private tracker playback.
 
 For programmatic verification: `node scripts/smoke-debrid-routing.js` runs the routing rules end-to-end against mocked Prowlarr/debrid responses.

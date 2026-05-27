@@ -210,7 +210,9 @@ function buildCompactStreamFacts(item, parsed, mode, progressPercent = null, fil
       ? 'READY'
       : mode === 'buffering'
         ? `BUFFERING ${Number.isFinite(progressPercent) ? progressPercent : 0}%`
-        : 'DL'
+        : mode === 'native-torrent'
+          ? 'DIRECT P2P'
+          : 'DL'
 
   const primaryLine = uniqueNonEmpty([
     state,
@@ -227,6 +229,7 @@ function buildCompactStreamFacts(item, parsed, mode, progressPercent = null, fil
 }
 
 function buildStateBadge(mode, options = {}) {
+  if (mode === 'native-torrent') return '[P2P]'
   if (options.extracted === true) return '📦'
   if (mode === 'seedbox') return '✅'
   if (mode === 'buffering') return '⏳'
@@ -234,6 +237,7 @@ function buildStateBadge(mode, options = {}) {
 }
 
 function buildStateLabel(mode, options = {}, progressPercent = null) {
+  if (mode === 'native-torrent') return 'Stremio direct torrent'
   if (options.extracted === true) return 'Downloaded and extracted'
   if (mode === 'seedbox') return 'Downloaded — ready to play'
   if (mode === 'buffering') return `Buffering ${Number.isFinite(progressPercent) ? progressPercent : 0}%`
@@ -368,6 +372,48 @@ function buildOnTrackerStream(item, playbackUrl, parsed, options = {}) {
   }
   applyPlaybackResponseHeaders(stream, item?.title || safeName, containerLabel)
   return stream
+}
+
+function buildNativeTorrentStream(item, native, parsed, options = {}) {
+  const infoHash = String(native?.infoHash || item?.infohash || '').trim().toLowerCase()
+  if (!/^[a-f0-9]{40}$/.test(infoHash)) return null
+
+  const fileIdx = Math.max(0, Number.parseInt(String(native?.fileIdx ?? 0), 10) || 0)
+  const sources = uniqueNonEmpty(
+    (Array.isArray(native?.sources) ? native.sources : [])
+      .map(source => String(source || '').trim())
+      .filter(Boolean)
+  )
+  if (sources.length === 0) sources.push(`dht:${infoHash}`)
+
+  const safeName = String(native?.fileName || item?.title || 'video')
+    .replace(/[^\w.\-()[\] ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const fileName = safeName || 'video'
+  const containerLabel = detectContainerLabel(fileName, parsed?.container, parsed?.titleHint, parsed?.title, item?.title)
+
+  return {
+    name: buildStreamName(parsed, 'native-torrent', fileName, options),
+    description: buildDescription(item, parsed, 'native-torrent', null, fileName, options),
+    infoHash,
+    fileIdx,
+    sources,
+    thumbnail: PVTKRRX_LOGO_URL,
+    behaviorHints: {
+      bingeGroup: buildBingeGroup(item, parsed, 'native-torrent'),
+      filename: fileName,
+      sourceSeeders: Math.max(0, Number(item?.seeders || 0)),
+      sourceCodec: String(parsed?.codec || ''),
+      sourceHdr: String(parsed?.hdr || ''),
+      sourceQuality: String(parsed?.quality || ''),
+      sourceSize: Math.max(0, Number(item?.size || 0)),
+      sourceMode: 'native-torrent',
+      sourceContainer: containerLabel.toLowerCase(),
+      sourceOrigin: String(options.sourceOrigin || ''),
+      sourceOriginLabel: String(options.sourceLabel || '')
+    }
+  }
 }
 
 function buildOnArchiveStream(item, rarUrls, fileName, totalBytes, parsed, progressPercent = null, options = {}) {
@@ -686,8 +732,9 @@ function sortStreams(streams) {
     const mode = String(stream?.behaviorHints?.sourceMode || '').toLowerCase()
     if (mode === 'seedbox') return 0
     if (mode === 'buffering') return 1
-    if (mode === 'tracker') return 2
-    if (mode === 'notice') return 3
+    if (mode === 'native-torrent') return 2
+    if (mode === 'tracker') return 3
+    if (mode === 'notice') return 4
     const streamName = String(stream?.name || '')
     if (streamName.includes('[EXTRACTED]') || streamName.includes('[DL]') || streamName.includes('[SB]')) return 0
     if (streamName.includes('[BUF]')) return 1
@@ -746,6 +793,7 @@ module.exports = {
   buildOnBufferingStream,
   buildOnArchiveStream,
   buildOnTrackerStream,
+  buildNativeTorrentStream,
   buildInfoStream,
   isSampleVideoName,
   isArchiveFileName,

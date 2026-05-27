@@ -190,7 +190,7 @@ async function run() {
     assert.equal(providers[1].type, 'rd')
   })
 
-  await check('PM cache hit by infohash appears before debrid downloader and qBit fallback', async () => {
+  await check('SPORTS PM cache hit appears before qBit without uncached debrid handoff', async () => {
     const baseResult = { streams: [makeQbitStream('On Seedbox', 'sports match')] }
     const result = await applyV13Routing(baseResult, {
       config: {
@@ -230,7 +230,7 @@ async function run() {
       configToken: CONFIG_TOKEN,
       id: 'sportsmeta:test'
     })
-    assert.equal(result.streams.length, 3)
+    assert.equal(result.streams.length, 2)
     assert.match(result.streams[0].name, /READY/)
     assert.doesNotMatch(result.streams[0].name, /Premiumize/)
     assert.match(result.streams[0].description, /cached sports match 1080p\.mkv/)
@@ -240,8 +240,7 @@ async function run() {
     const token = result.streams[0].url.split('/playback/debrid/')[1]
     const decoded = decodeDebridPlaybackToken(token)
     assert.equal(decoded.providers[0].type, 'pm')
-    assert.match(result.streams[1].url, /\/playback\/debrid\//, 'uncached downloader second')
-    assert.equal(result.streams[2].name, 'On Seedbox')
+    assert.equal(result.streams[1].name, 'On Seedbox')
     _clearDebridCacheMemo()
   })
 
@@ -258,7 +257,7 @@ async function run() {
     assert.equal(result.streams[0].name, 'On Seedbox')
   })
 
-  await check('SPORTS + debrid linked → debrid ADDED above qBit, qBit STAYS as backup', async () => {
+  await check('SPORTS + debrid linked defaults to qBit when source is uncached', async () => {
     const baseResult = { streams: [makeQbitStream('On Seedbox', 'football 1080p')] }
     const result = await applyV13Routing(baseResult, {
       config: {
@@ -270,13 +269,32 @@ async function run() {
       configToken: CONFIG_TOKEN,
       id: 'sportsmeta:premier-league:2026-05-23:arsenal-vs-chelsea'
     })
-    // ADDITIVE: 2 streams — debrid first, original qBit kept below as fallback
-    assert.equal(result.streams.length, 2, 'should have both debrid and qBit streams')
+    assert.equal(result.streams.length, 1, 'uncached sports debrid handoff should not be offered as a play row')
+    assert.doesNotMatch(result.streams[0].url, /\/playback\/debrid\//, 'qBit first')
+    assert.equal(result.streams[0].name, 'On Seedbox', 'qBit/seedbox remains the playable sports path')
+  })
+
+  await check('SPORTS + explicit uncached debrid opt-in still adds debrid above qBit', async () => {
+    const baseResult = { streams: [makeQbitStream('On Seedbox', 'football 1080p')] }
+    const result = await applyV13Routing(baseResult, {
+      config: {
+        debrid: {
+          providers: [{ type: 'rd', apiKey: 'k1', enabled: true }],
+          preferDebridOverSeedbox: true,
+          allowUncachedSportsHandoff: true
+        },
+        cacheSearch: { sources: [] }
+      },
+      addonUrl: PLAYBACK_BASE,
+      playbackBaseUrl: PLAYBACK_BASE,
+      configToken: CONFIG_TOKEN,
+      id: 'sportsmeta:premier-league:2026-05-23:arsenal-vs-chelsea'
+    })
+    assert.equal(result.streams.length, 2, 'explicit opt-in should preserve old additive behavior')
     assert.match(result.streams[0].url, /\/playback\/debrid\//, 'debrid first')
     assert.ok(result.streams[0].url.startsWith(`${PLAYBACK_BASE}/${CONFIG_TOKEN}/playback/debrid/`))
     assert.match(result.streams[0].name, /^⬇ RD/)
     assert.equal(result.streams[1].name, 'On Seedbox', 'qBit backup kept underneath')
-    assert.doesNotMatch(result.streams[1].url, /\/playback\/debrid\//)
   })
 
   await check('SPORTS local install hides zero-peer tracker rows before playback', async () => {

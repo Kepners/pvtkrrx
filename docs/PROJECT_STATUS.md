@@ -1,10 +1,17 @@
 # PVTKRRX Project Status
 
-Updated: 2026-05-25
+Updated: 2026-05-27
 
 ## Current Stage
 
-PVTKRRX is on the `1.3.7` release line. v1.3 adds optional Debrid (Real-Debrid, AllDebrid, Premiumize) + Cache Search (put.io, Premiumize cache check) + Newznab (Usenet) support. v1.3.5 makes debrid the first downloader when configured: cached debrid links surface first, uncached playback clicks hand the torrent/NZB to the configured debrid provider before local/qBittorrent/seedbox fallback, and qBittorrent streams remain in the list underneath. v1.3.6 hardens sports stream search so supplemental sports lookups cannot fall back to all Prowlarr categories or emit adult tracker results. v1.3.7 applies the same category-only and adult-result guard to sports catalog search/browse/seed paths so ambiguous catalog searches such as Australian Football `On Couch` cannot show adult tracker metadata entries. Installs without any debrid/cache config are unchanged from v1.2.
+PVTKRRX is on the `1.3.7` release line. v1.3 adds optional Debrid (Real-Debrid, AllDebrid, Premiumize) + Cache Search (put.io, Premiumize cache check) + Newznab (Usenet) support. Cached debrid links surface first where available, and qBittorrent streams remain in the list underneath. After live Premiumize/Stremio testing on 2026-05-27, uncached sports/private-tracker Debrid handoff rows are no longer the default because they can start a provider transfer without giving Stremio a playable URL. qBit/seedbox remains the default playable route for uncached sports; the old sports handoff is opt-in via `PVTKRRX_DEBRID_UNCACHED_SPORTS_HANDOFF=true`. An experimental Torrentio-style native Stremio torrent mode exists behind `PVTKRRX_NATIVE_STREMIO_TORRENT=true` for non-private payloads only. v1.3.6 hardens sports stream search so supplemental sports lookups cannot fall back to all Prowlarr categories or emit adult tracker results. v1.3.7 applies the same category-only and adult-result guard to sports catalog search/browse/seed paths so ambiguous catalog searches such as Australian Football `On Couch` cannot show adult tracker metadata entries. Installs without any debrid/cache config are unchanged from v1.2.
+
+## 2026-05-27: Torrentio/Stremio playback correction
+
+- Live finding: an uncached Premiumize sports click can successfully create a provider transfer while Stremio still sees no playable media URL. In the WWE repro, Premiumize accepted the transfer but stayed at `progress=0` for the whole poll window, so Stremio remained on artwork/spinner.
+- Router correction: cached/ready Debrid remains first, but uncached sports Debrid handoff rows are hidden by default. qBit/seedbox/bridge stays the default playable route for private sports until the provider has a ready URL.
+- Native Stremio option: `PVTKRRX_NATIVE_STREMIO_TORRENT=true` can emit experimental `DIRECT P2P` rows using `infoHash`, `fileIdx`, and `sources`, matching the Stremio/Torrentio native torrent transport. The guard refuses torrent payloads marked private because this bypasses qBit/seedbox and announces from the playback device.
+- Local proof: `npm run smoke:pipeline`, `npm run smoke:debrid-routing`, `npm run smoke:debrid-all`, and `npm run smoke:sports-stream-hygiene` passed after the correction.
 
 Detailed poster/debrid worklog: [POSTERS_AND_DEBRID_WORKLOG_2026-05.md](POSTERS_AND_DEBRID_WORKLOG_2026-05.md).
 

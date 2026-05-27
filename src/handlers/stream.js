@@ -12,7 +12,7 @@ const {
   getSportsAvailabilityAnchorByCanonical
 } = require('../utils/sportsAvailabilityStore')
 const { isSportsCultIndexer, isSportsOnlyIndexer } = require('../utils/sportsIndexers')
-const { buildOnSeedboxStream, buildOnBufferingStream, buildOnArchiveStream, buildOnTrackerStream, buildInfoStream, findVideoFile, findPackedArchiveFiles, arePackedArchiveFilesReady, findEpisodeFile, titleLooksLegacyAvi, hasLegacyAviVideoFiles, sortStreams } = require('../utils/streams')
+const { buildOnSeedboxStream, buildOnBufferingStream, buildOnArchiveStream, buildOnTrackerStream, buildNativeTorrentStream, buildInfoStream, findVideoFile, findPackedArchiveFiles, arePackedArchiveFilesReady, findEpisodeFile, titleLooksLegacyAvi, hasLegacyAviVideoFiles, sortStreams } = require('../utils/streams')
 const { encodePlaybackStateToken, encodeFileStateToken } = require('../utils/opaqueState')
 const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
 const { buildPlaybackFileUrl, canEmitTrackerPlayback, getTrackerPlaybackRestriction } = require('../utils/fileServing')
@@ -202,6 +202,10 @@ async function inspectTrackerLink(link) {
       const supportedDirectVideoBytes = inspection.supportedDirectVideoFiles.reduce((sum, file) => sum + Math.max(0, Number(file?.size || 0)), 0)
       return {
         infoHash: String(inspection.infoHash || '').toLowerCase(),
+        trackers: inspection.trackers,
+        private: Boolean(inspection.private),
+        selectedVideoFileIdx: Math.max(0, Number(inspection.selectedVideoFileIdx || 0)),
+        selectedVideoFileName: inspection.selectedVideoFileName,
         packedOnly: Boolean(inspection.packedOnly),
         legacyAviOnly: Boolean(inspection.legacyAviOnly),
         inspected: true,
@@ -259,6 +263,45 @@ function buildArchiveDisplayFilename(title) {
 
 function experimentalNativeRarStreamsEnabled() {
   return /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS || '').trim())
+}
+
+function nativeStremioTorrentEnabled(config = {}) {
+  if (config?.nativeStremioTorrent === true) return true
+  if (config?.experimentalNativeStremioTorrent === true) return true
+  if (config?.playback?.nativeStremioTorrent === true) return true
+  return /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_NATIVE_STREMIO_TORRENT || '').trim())
+}
+
+function buildNativeSourcesFromInspection(inspection = {}) {
+  const infoHash = String(inspection?.infoHash || '').toLowerCase()
+  const trackers = Array.isArray(inspection?.trackers) ? inspection.trackers : []
+  const sources = trackers
+    .map(tracker => String(tracker || '').trim())
+    .filter(Boolean)
+    .map(tracker => `tracker:${tracker}`)
+  if (/^[a-f0-9]{40}$/.test(infoHash)) sources.push(`dht:${infoHash}`)
+  return [...new Set(sources)]
+}
+
+function buildNativeTorrentFromInspection(item, inspection, parsed, streamSourceOptions, config = {}) {
+  if (!nativeStremioTorrentEnabled(config)) return null
+  if (!inspection?.inspected || !trackerInspectionHasPlayableVideo(inspection)) return null
+  if (inspection.private) return null
+  return buildNativeTorrentStream(
+    item,
+    {
+      infoHash: inspection.infoHash,
+      fileIdx: inspection.selectedVideoFileIdx,
+      fileName: inspection.selectedVideoFileName || item?.title || '',
+      sources: buildNativeSourcesFromInspection(inspection)
+    },
+    parsed,
+    {
+      ...streamSourceOptions,
+      sourceOrigin: 'stremio',
+      sourceLabel: 'Stremio'
+    }
+  )
 }
 
 function buildMatchedArchiveStream(config, configToken, playbackBaseUrl, matched, files, item, parsed, streamSourceOptions = {}) {
@@ -1058,7 +1101,16 @@ async function buildSupplementalSportsStreams({
       if (noticeCounts) noticeCounts.trackerLinkUnverified += 1
       continue
     }
+    if (!item.link && knownInfoHash) {
+      inspection.selectedVideoFileIdx = 0
+      inspection.selectedVideoFileName = item.title || ''
+    }
     if (item.link && !trackerInspectionHasPlayableVideo(inspection)) continue
+    const nativeStream = buildNativeTorrentFromInspection(item, inspection, parse(item.title || queries[0] || ''), streamSourceOptions, config)
+    if (nativeStream) {
+      streams.push(nativeStream)
+      continue
+    }
     if (!trackerPlaybackEnabled) {
       recordTrackerRestrictionNotice(noticeCounts, trackerPlaybackRestriction)
       break
@@ -1541,6 +1593,9 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
       const inspection = titleLooksPacked
         ? { packedOnly: true, inspected: false }
         : await inspectTrackerLink(item.link)
+      if (inspection.inspected && !inspection.infoHash && item.infohash) {
+        inspection.infoHash = String(item.infohash || '').toLowerCase()
+      }
       if (titleLooksPacked || inspection.packedOnly) {
         noticeCounts.packedArchiveLiveUnsupported += 1
         return null
@@ -1553,6 +1608,8 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
         noticeCounts.trackerLinkUnverified += 1
         return null
       }
+      const nativeStream = buildNativeTorrentFromInspection(item, inspection, parsed, streamSourceOptions, config)
+      if (nativeStream) return nativeStream
       if (trackerPlaybackEnabled) {
         // On tracker — playback URL (works with or without infohash)
         try {
@@ -1728,9 +1785,15 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
       ? { legacyAviOnly: true, inspected: true }
       : likelyPackedDirectRelease
       ? { packedOnly: true, inspected: false }
-      : infoHash
-        ? { packedOnly: false, inspected: true, infoHash }
-        : await inspectTrackerLink(directLink))
+      : directLink
+        ? await inspectTrackerLink(directLink)
+        : infoHash
+          ? { packedOnly: false, inspected: true, infoHash, selectedVideoFileIdx: 0, selectedVideoFileName: resolvedInfo.t || '' }
+          : await inspectTrackerLink(directLink))
+
+    if (inspection.inspected && !inspection.infoHash && infoHash) {
+      inspection.infoHash = infoHash
+    }
 
     if (inspection.packedOnly) {
       noticeCounts.packedArchiveLiveUnsupported += 1
@@ -1742,25 +1805,36 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
       // Suppress sports queue-and-buffer rows that have no peers or no source size.
     } else if (allowSupplementalSportsResults && directLink && !trackerInspectionHasPlayableVideo(inspection)) {
       // Suppress sports torrents whose payload has no playable video file.
-    } else if (trackerPlaybackEnabled) {
-      try {
-        const playbackUrl = buildPlaybackRouteUrl(playbackBaseUrl, configToken, {
-          h: infoHash || String(inspection.infoHash || '').toLowerCase(),
-          l: directLink
-        })
-        if (playbackUrl) {
-          streams.push(buildOnTrackerStream(
-            { title: resolvedInfo.t, size: resolvedInfo.s, seeders: resolvedInfo.d, indexer: resolvedInfo.i || '' },
-            playbackUrl,
-            parsed,
-            streamSourceOptions
-          ))
-        }
-      } catch (_) {
-        // Skip invalid playback payloads instead of leaking raw tracker URLs.
-      }
     } else {
-      recordTrackerRestrictionNotice(noticeCounts, trackerPlaybackRestriction)
+      const nativeStream = buildNativeTorrentFromInspection(
+        { title: resolvedInfo.t, size: resolvedInfo.s, seeders: resolvedInfo.d, indexer: resolvedInfo.i || '' },
+        inspection,
+        parsed,
+        streamSourceOptions,
+        effectiveConfig
+      )
+      if (nativeStream) {
+        streams.push(nativeStream)
+      } else if (trackerPlaybackEnabled) {
+        try {
+          const playbackUrl = buildPlaybackRouteUrl(playbackBaseUrl, configToken, {
+            h: infoHash || String(inspection.infoHash || '').toLowerCase(),
+            l: directLink
+          })
+          if (playbackUrl) {
+            streams.push(buildOnTrackerStream(
+              { title: resolvedInfo.t, size: resolvedInfo.s, seeders: resolvedInfo.d, indexer: resolvedInfo.i || '' },
+              playbackUrl,
+              parsed,
+              streamSourceOptions
+            ))
+          }
+        } catch (_) {
+          // Skip invalid playback payloads instead of leaking raw tracker URLs.
+        }
+      } else {
+        recordTrackerRestrictionNotice(noticeCounts, trackerPlaybackRestriction)
+      }
     }
   }
 

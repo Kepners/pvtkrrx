@@ -225,8 +225,8 @@ function bencode(value) {
   return bencode('')
 }
 
-function buildTorrentPayload(fileEntries) {
-  return bencode({
+function buildTorrentPayload(fileEntries, options = {}) {
+  const root = {
     info: {
       name: 'packed-release',
       files: fileEntries.map(entry => ({
@@ -234,7 +234,15 @@ function buildTorrentPayload(fileEntries) {
         path: entry.path.split('/').filter(Boolean)
       }))
     }
-  })
+  }
+  if (Array.isArray(options.trackers) && options.trackers.length > 0) {
+    root.announce = options.trackers[0]
+    root['announce-list'] = options.trackers.map(tracker => [tracker])
+  }
+  if (options.private === true) {
+    root.info.private = 1
+  }
+  return bencode(root)
 }
 
 function createFetchResponse(bytes, headers = {}) {
@@ -256,17 +264,21 @@ function createFetchResponse(bytes, headers = {}) {
 
 async function withScenario(setup, run) {
   resetMocks()
+  const scenarioNativeStremioTorrent = process.env.PVTKRRX_NATIVE_STREMIO_TORRENT
   await setup()
   try {
     await run()
   } finally {
     resetMocks()
+    if (scenarioNativeStremioTorrent === undefined) delete process.env.PVTKRRX_NATIVE_STREMIO_TORRENT
+    else process.env.PVTKRRX_NATIVE_STREMIO_TORRENT = scenarioNativeStremioTorrent
   }
 }
 
 async function run() {
   const originalHostedRelay = process.env.PVTKRRX_HOSTED_RELAY
   const originalExperimentalRar = process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS
+  const originalNativeStremioTorrent = process.env.PVTKRRX_NATIVE_STREMIO_TORRENT
   const originalHostedGateway = process.env.PVTKRRX_HOST_GATEWAY_HOST
   const orphanRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-stream-pipeline-'))
   const orphanFilePath = path.join(orphanRoot, 'Downloaded.Movie.2026.1080p.mp4')
@@ -474,6 +486,68 @@ async function run() {
       assert.match(String(result.streams[0]?.description || ''), /\n42 seeders\n/i, '#4 tracker stream description should put seeders on their own line')
       assert.match(String(result.streams[0]?.description || ''), /Source: Host PC/i, '#4 tracker stream description should say the host PC will do the work')
       assert.equal(String(result.streams[0]?.behaviorHints?.sourceOrigin || ''), 'pc', '#4 tracker stream should expose the PC origin hint')
+    })
+
+    await withScenario(async () => {
+      delete process.env.PVTKRRX_HOSTED_RELAY
+      process.env.PVTKRRX_NATIVE_STREMIO_TORRENT = '1'
+      ProwlarrClient.prototype.searchImdb = async () => [trackerItem({
+        link: 'https://tracker.example/download/public-movie-name.torrent'
+      })]
+      QBitClient.prototype.torrents = async () => []
+      CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
+      global.__nativeTorrentExpectedHash = ''
+      const payload = buildTorrentPayload([
+        { path: 'Movie.Name.2026.1080p.WEB-DL.x264.mkv', length: 12_000_000_000 }
+      ], {
+        trackers: ['udp://tracker.public.example:6969/announce']
+      })
+      global.__nativeTorrentExpectedHash = String(inspectTorrentPayload(payload).infoHash || '').toLowerCase()
+      global.fetch = async () => createFetchResponse(payload)
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        'tt1234567',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.length, 1, '#4a native Stremio torrent mode should emit one direct P2P stream')
+      assert.equal(result.streams[0]?.url, undefined, '#4a native stream should not be an HTTP playback URL')
+      assert.match(String(result.streams[0]?.infoHash || ''), /^[a-f0-9]{40}$/, '#4a native stream should expose infoHash')
+      assert.equal(result.streams[0]?.fileIdx, 0, '#4a native stream should expose fileIdx')
+      assert.ok((result.streams[0]?.sources || []).includes('tracker:udp://tracker.public.example:6969/announce'), '#4a native stream should expose public tracker source')
+      assert.ok((result.streams[0]?.sources || []).includes(`dht:${global.__nativeTorrentExpectedHash}`), '#4a native stream should expose DHT source')
+      assert.match(String(result.streams[0]?.description || ''), /DIRECT P2P \| 1080P \| 12\.0 GB \| MKV \| TKR: SmokeTracker/i, '#4a native stream should be labelled as direct P2P')
+      assert.match(String(result.streams[0]?.description || ''), /Source: Stremio/i, '#4a native stream should say Stremio does the downloading')
+    })
+
+    await withScenario(async () => {
+      delete process.env.PVTKRRX_HOSTED_RELAY
+      process.env.PVTKRRX_NATIVE_STREMIO_TORRENT = '1'
+      ProwlarrClient.prototype.searchImdb = async () => [trackerItem({
+        link: 'https://tracker.example/download/private-movie-name.torrent'
+      })]
+      QBitClient.prototype.torrents = async () => []
+      CinemetaClient.prototype.getMovie = async () => ({ name: 'Movie Name' })
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([
+        { path: 'Movie.Name.2026.1080p.WEB-DL.x264.mkv', length: 12_000_000_000 }
+      ], {
+        trackers: ['https://private.tracker.example/announce'],
+        private: true
+      }))
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        'tt1234567',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      assert.equal(result.streams.some(stream => stream?.infoHash && !stream?.url), false, '#4a1 private torrent payloads should not emit native Stremio P2P rows')
+      assert.equal(result.streams.filter(stream => /\/playback\//.test(String(stream?.url || ''))).length, 1, '#4a1 private payload should stay on PVTKRR playback route')
     })
 
     await withScenario(async () => {
@@ -1598,6 +1672,8 @@ async function run() {
     else process.env.PVTKRRX_HOSTED_RELAY = originalHostedRelay
     if (originalExperimentalRar === undefined) delete process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS
     else process.env.PVTKRRX_EXPERIMENTAL_RAR_STREAMS = originalExperimentalRar
+    if (originalNativeStremioTorrent === undefined) delete process.env.PVTKRRX_NATIVE_STREMIO_TORRENT
+    else process.env.PVTKRRX_NATIVE_STREMIO_TORRENT = originalNativeStremioTorrent
     if (originalHostedGateway === undefined) delete process.env.PVTKRRX_HOST_GATEWAY_HOST
     else process.env.PVTKRRX_HOST_GATEWAY_HOST = originalHostedGateway
     fs.rmSync(orphanRoot, { recursive: true, force: true })

@@ -2,16 +2,18 @@
 
 // v1.3 stream routing post-processor.
 //
-// Debrid is the first downloader layer when configured.
+// Cached Debrid is the first playable layer when configured.
+// Uncached sports Debrid handoff is opt-in only.
 // qBit streams are NEVER removed — they always stay as the underlying backup.
 //
 // Behaviour, uniform across movies, TV, and sports:
 //   - Debrid linked (at least one enabled provider with apiKey):
-//       Cache hits (⚡ READY) prepend the list, then ⬇ debrid playback
-//       variants are ADDED above the existing qBit streams. qBit stays in
-//       place underneath as the always-on fallback. Debrid variants derived
-//       from an already-ready /file/ stream stay under that ready file so
-//       Stremio opens the path that can play immediately.
+//       Cache hits prepend the list. For movies/TV, uncached debrid playback
+//       variants are ADDED above existing qBit streams. For sports, uncached
+//       debrid handoff rows are hidden unless explicitly enabled. qBit stays
+//       underneath as the always-on fallback. Debrid variants derived from an
+//       already-ready /file/ stream stay under that ready file so Stremio opens
+//       the path that can play immediately.
 //   - Debrid NOT linked:
 //       Existing qBit stream list passes through untouched (v1.2 behavior).
 //       Cache hits still prepend if a cache source is configured.
@@ -185,6 +187,11 @@ function filterSportsStreams(streams = []) {
   return (Array.isArray(streams) ? streams : []).filter(shouldKeepSportsStream)
 }
 
+function allowUncachedSportsDebridHandoff(config = {}) {
+  if (config?.debrid?.allowUncachedSportsHandoff === true) return true
+  return /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_DEBRID_UNCACHED_SPORTS_HANDOFF || '').trim())
+}
+
 function pickReadyStreamName(hit) {
   // COPY DRAFT — pending docs/copy.md approval. Brief §3 stream-prefix lock.
   return '⚡ READY'
@@ -325,6 +332,7 @@ async function applyV13Routing(result, ctx = {}) {
   const hasDebrid = enabledDebrid.length > 0
   const existing = Array.isArray(result.streams) ? result.streams : []
   const sportsContext = isSportsContext(ctx)
+  const sportsUncachedDebridHandoffAllowed = !sportsContext || allowUncachedSportsDebridHandoff(config)
 
   // Backward compat: install has NOT opted into v1.3 (no debrid + no cache search
   // configured). Pass through with v1.2 behavior — no routing changes at all.
@@ -350,6 +358,9 @@ async function applyV13Routing(result, ctx = {}) {
       if (!meta) continue
       debridMetas.push(meta)
       if (sportsContext && meta.sourceKind === 'file') {
+        continue
+      }
+      if (sportsContext && meta.sourceKind === 'playback' && !sportsUncachedDebridHandoffAllowed) {
         continue
       }
       const torrentSource = meta.link || (meta.hash ? buildMagnetFromHash(meta.hash, meta.name) : null)

@@ -101,11 +101,13 @@ The hosted public relay does not proxy video bytes and does not queue-and-buffer
 
 ## Optional Debrid
 
-Debrid is optional. If you configure Real-Debrid, AllDebrid, or Premiumize, PVTKRRX adds provider-backed streams above the qBittorrent/local fallback. Cached debrid hits show first. Uncached tracker links can start a provider transfer through `/playback/debrid` when you click Play.
+Debrid is optional. If you configure Real-Debrid, AllDebrid, or Premiumize, PVTKRRX adds provider-backed streams above the qBittorrent/local fallback when the provider already has or can quickly resolve a playable media URL. Cached debrid hits show first. For sports/private-tracker rows, uncached Debrid handoff is hidden by default because it often just starts a provider download while Stremio waits on a non-playable HTTP URL; qBittorrent/seedbox remains the safe playback path. The old uncached sports handoff can be re-enabled with `PVTKRRX_DEBRID_UNCACHED_SPORTS_HANDOFF=true` for controlled testing.
 
 This does not make PVTKRRX a debrid service. PVTKRRX stores your provider credentials in your encrypted config, asks the provider to add/check the torrent or NZB, and redirects the client when the provider has a playable URL.
 
 While qBittorrent or a Debrid provider is still preparing, PVTKRRX keeps the real playback request open for a longer default wait window so Stremio can receive the real `/file` or provider redirect from the original click when the source becomes ready. If that wait window is exhausted, the route stays retryable (`425`/`503` plus `Retry-After`). For controlled Debrid testing, `PVTKRRX_DEBRID_PREPARING_RESPONSE=loader` makes `/playback/debrid` poll briefly and then serve the bundled waiting-room MP4 while the provider continues preparing. That loader is a prepare screen only; a later request is still needed once the provider is ready.
+
+Torrentio-style native Stremio progress is a separate transport, not a Debrid handoff. When `PVTKRRX_NATIVE_STREMIO_TORRENT=true` is enabled, PVTKRRX may emit experimental `DIRECT P2P` rows using Stremio's native `infoHash`/`fileIdx`/`sources` contract for non-private torrent payloads. That lets Stremio download directly and show its own torrent progress UI. It is disabled by default and never emitted for torrent payloads marked private, because it bypasses qBittorrent/seedbox and announces from the Stremio device.
 
 For setup details see [docs/DEBRID_SETUP.md](docs/DEBRID_SETUP.md). For the implementation/proof worklog see [docs/POSTERS_AND_DEBRID_WORKLOG_2026-05.md](docs/POSTERS_AND_DEBRID_WORKLOG_2026-05.md).
 

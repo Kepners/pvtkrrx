@@ -147,16 +147,44 @@ function normalizeTorrentPathSegments(value) {
   return single ? [single] : []
 }
 
+function listTorrentPayloadTrackers(bytes) {
+  const root = parseBencode(bytes)
+  const trackers = []
+
+  function addTracker(value) {
+    const tracker = decodeTorrentText(value).trim()
+    if (!tracker) return
+    if (!/^(?:https?|udp):\/\//i.test(tracker)) return
+    trackers.push(tracker)
+  }
+
+  addTracker(root?.announce)
+
+  const announceList = root?.['announce-list']
+  if (Array.isArray(announceList)) {
+    for (const tier of announceList) {
+      if (Array.isArray(tier)) {
+        tier.forEach(addTracker)
+      } else {
+        addTracker(tier)
+      }
+    }
+  }
+
+  return Array.from(new Set(trackers))
+}
+
 function listTorrentPayloadFiles(bytes) {
   const root = parseBencode(bytes)
   const info = root?.info
   if (!info || typeof info !== 'object') return []
 
   if (Array.isArray(info.files)) {
-    return info.files.map(file => {
+    return info.files.map((file, index) => {
       const pathSegments = normalizeTorrentPathSegments(file['path.utf-8'] || file.path)
       const joinedPath = pathSegments.join('/')
       return {
+        index,
         path: joinedPath,
         name: pathSegments[pathSegments.length - 1] || '',
         size: Math.max(0, Number(file.length || 0))
@@ -167,10 +195,20 @@ function listTorrentPayloadFiles(bytes) {
   const singleName = decodeTorrentText(info['name.utf-8'] || info.name).trim()
   if (!singleName) return []
   return [{
+    index: 0,
     path: singleName,
     name: singleName,
     size: Math.max(0, Number(info.length || 0))
   }]
+}
+
+function isPrivateTorrentPayload(bytes) {
+  try {
+    const root = parseBencode(bytes)
+    return Number(root?.info?.private || 0) === 1
+  } catch (_) {
+    return false
+  }
 }
 
 function isVideoFileName(name) {
@@ -199,9 +237,17 @@ function inspectTorrentPayload(bytes) {
   const legacyAviVideoFiles = directVideoFiles.filter(file => isLegacyAviVideoName(file.name))
   const supportedDirectVideoFiles = directVideoFiles.filter(file => !isLegacyAviVideoName(file.name))
   const infoHash = computeTorrentInfoHash(bytes)
+  const trackers = listTorrentPayloadTrackers(bytes)
+  const selectedVideoFile = supportedDirectVideoFiles
+    .slice()
+    .sort((a, b) => Math.max(0, Number(b?.size || 0)) - Math.max(0, Number(a?.size || 0)))[0] || null
 
   return {
     infoHash,
+    trackers,
+    private: isPrivateTorrentPayload(bytes),
+    selectedVideoFileIdx: Number.isFinite(Number(selectedVideoFile?.index)) ? Number(selectedVideoFile.index) : 0,
+    selectedVideoFileName: String(selectedVideoFile?.name || ''),
     files,
     archiveFiles,
     videoFiles,
@@ -239,6 +285,7 @@ module.exports = {
   parseTorrentFileName,
   fetchTorrentPayload,
   listTorrentPayloadFiles,
+  listTorrentPayloadTrackers,
   computeTorrentInfoHash,
   inspectTorrentPayload,
   validateTorrentPayload

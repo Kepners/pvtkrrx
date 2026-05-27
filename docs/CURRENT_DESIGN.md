@@ -81,13 +81,15 @@ Debrid support is optional and user-supplied. PVTKRRX is not a debrid service.
 - Supported cache-search sources: put.io and Premiumize cache check.
 - Premiumize cache check is implicitly available when a Premiumize downloader key is saved.
 - Debrid and cache-search settings live inside the encrypted install/server config and old configs without those blocks remain backward-compatible.
-- When a debrid provider is configured, PVTKRRX emits debrid playback streams above existing qBittorrent/local streams. The original qBit/local stream stays underneath as fallback.
-- Cached debrid/cache-search hits are ordered first where available.
-- Uncached tracker torrents can be handed to `/playback/debrid`, which adds/polls the configured provider and redirects to the provider URL when ready.
+- When a debrid provider is configured, PVTKRRX emits debrid playback streams above existing qBittorrent/local streams for movies/TV. The original qBit/local stream stays underneath as fallback.
+- Cached debrid/cache-search hits are ordered first where available, including sports.
+- Uncached sports/private-tracker debrid handoff rows are hidden by default because Stremio only receives a playable HTTP stream after the provider has finished importing/downloading. qBit/seedbox remains the default playable route for those rows. `PVTKRRX_DEBRID_UNCACHED_SPORTS_HANDOFF=true` restores the old handoff rows for controlled testing.
+- Uncached non-sports tracker torrents can be handed to `/playback/debrid`, which adds/polls the configured provider and redirects to the provider URL when ready.
 - `/playback/debrid` holds the original click open for a longer default poll window and redirects to the provider URL as soon as the provider is ready. If the provider is still importing/downloading after that window, the route returns retryable `503` JSON with `Retry-After` and progress by default. For controlled tests, `PVTKRRX_DEBRID_PREPARING_RESPONSE=loader` makes the route poll briefly, then serve the bundled waiting-room MP4 with progress headers while the provider continues preparing. The loader is only a prepare screen; a single HTTP video response cannot later become the provider redirect, so a later request is still needed once the provider is ready.
 - Torrent download URLs from private trackers are preserved and uploaded as torrent bytes where the provider supports it. PVTKRRX does not rebuild those sources into bare magnets unless no torrent file is available.
 - NZB/Newznab results can route through Premiumize when Premiumize is configured. Real-Debrid and AllDebrid are skipped for NZB because they do not support Usenet handoff.
 - The hosted relay must not proxy provider media bytes. Provider playback must be a redirect/handoff, not PVTKRRX-hosted streaming.
+- Experimental Torrentio-style native Stremio rows are available with `PVTKRRX_NATIVE_STREMIO_TORRENT=true`. They emit `infoHash`, `fileIdx`, and `sources` instead of an HTTP `url`, so Stremio itself downloads the torrent and shows native torrent progress. They are disabled by default and are not emitted for torrent payloads marked private because they bypass qBittorrent/seedbox and announce from the Stremio device.
 - If no debrid/cache provider is configured, the stream list behaves like the v1.2 qBittorrent/local flow.
 
 Detailed implementation and release proof is tracked in [POSTERS_AND_DEBRID_WORKLOG_2026-05.md](POSTERS_AND_DEBRID_WORKLOG_2026-05.md).
