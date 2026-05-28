@@ -8,11 +8,12 @@ PVTKRRX is on the `1.3.7` release line. v1.3 adds optional Debrid (Real-Debrid, 
 
 ## 2026-05-28: movie stream relevance and fallback latency local follow-up
 
-- Status: local proof only. This is not deployed/live until committed, pushed to the release branch, and the hosted/native runtimes are updated and reprobed.
+- Status: deployed for live testing on 2026-05-28. GitHub `main`, the public Coolify runtime, and native Contabo `/opt/pvtkrrx` runtime were moved to commit `e5c02611de8fc15906f552e0d88377a9895676d4`. This is not yet a packaged Windows EXE/GitHub release revision.
 - Root cause followed from the 2026-05-27 movie search hotfix: grouped movie category fallback searches could still be held up by one slow Prowlarr category, and sequel-style numeric title words needed stricter matching so rows for an older base movie could not survive the movie relevance filter for a numbered sequel.
 - Backend fix prepared locally: grouped category searches now run per-category with a bounded group timeout and return completed partial results; movie title relevance treats numeric title words as required adjacent title tokens; movie fallback queries try `title + year` before the bare title when Cinemeta exposes a year; movie fallback category order prefers real movie release categories before broad movie buckets; movie/TV torrent payload inspection gets a longer timeout than the generic packed-release probe.
 - Regression proof added locally: `smoke:prowlarr-search` proves a slow category does not block completed partial category results, and `smoke:pipeline` proves `The Devil Wears Prada 2` suppresses the 2006 original while `The Housemaid 2025` tries title+year before bare-title fallback.
 - Local proof passed on 2026-05-28: `npm run smoke:prowlarr-search`, `npm run smoke:pipeline`, `npm run smoke:sports-stream-hygiene`, `npm run smoke:debrid-routing`, `git diff --check`, and `node --check` for the modified runtime and smoke files.
+- Live proof on 2026-05-28: Coolify deployment row `893` finished for commit `e5c02611de8fc15906f552e0d88377a9895676d4`; the public container image is `w14jewmw5ubscrxh8zzfhq7d:e5c02611de8fc15906f552e0d88377a9895676d4`; `https://www.pvtkrrx.cc/health` returned `HTTP 200`; native `/opt/pvtkrrx/REVISION` contains the same commit and `pvtkrrx.service` is active; server-side `scripts/smoke-prowlarr-search.js`, `scripts/smoke-stream-pipeline.js`, `scripts/smoke-playback-route.js`, and `scripts/smoke-debrid-routing.js` passed.
 
 ## 2026-05-27: Torrentio/Stremio playback correction
 
