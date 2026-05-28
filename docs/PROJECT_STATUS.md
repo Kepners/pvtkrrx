@@ -1,10 +1,18 @@
 # PVTKRRX Project Status
 
-Updated: 2026-05-27
+Updated: 2026-05-28
 
 ## Current Stage
 
 PVTKRRX is on the `1.3.7` release line. v1.3 adds optional Debrid (Real-Debrid, AllDebrid, Premiumize) + Cache Search (put.io, Premiumize cache check) + Newznab (Usenet) support. Cached debrid links surface first where available, and qBittorrent streams remain in the list underneath. After live Premiumize/Stremio testing on 2026-05-27, uncached sports/private-tracker Debrid handoff rows are no longer the default because they can start a provider transfer without giving Stremio a playable URL. qBit/seedbox remains the default playable route for uncached sports; the old sports handoff is opt-in via `PVTKRRX_DEBRID_UNCACHED_SPORTS_HANDOFF=true`. An experimental Torrentio-style native Stremio torrent mode exists behind `PVTKRRX_NATIVE_STREMIO_TORRENT=true` for non-private payloads only. v1.3.6 hardens sports stream search so supplemental sports lookups cannot fall back to all Prowlarr categories or emit adult tracker results. v1.3.7 applies the same category-only and adult-result guard to sports catalog search/browse/seed paths so ambiguous catalog searches such as Australian Football `On Couch` cannot show adult tracker metadata entries. Installs without any debrid/cache config are unchanged from v1.2.
+
+## 2026-05-28: movie stream relevance and fallback latency local follow-up
+
+- Status: local proof only. This is not deployed/live until committed, pushed to the release branch, and the hosted/native runtimes are updated and reprobed.
+- Root cause followed from the 2026-05-27 movie search hotfix: grouped movie category fallback searches could still be held up by one slow Prowlarr category, and sequel-style numeric title words needed stricter matching so rows for an older base movie could not survive the movie relevance filter for a numbered sequel.
+- Backend fix prepared locally: grouped category searches now run per-category with a bounded group timeout and return completed partial results; movie title relevance treats numeric title words as required adjacent title tokens; movie fallback queries try `title + year` before the bare title when Cinemeta exposes a year; movie fallback category order prefers real movie release categories before broad movie buckets; movie/TV torrent payload inspection gets a longer timeout than the generic packed-release probe.
+- Regression proof added locally: `smoke:prowlarr-search` proves a slow category does not block completed partial category results, and `smoke:pipeline` proves `The Devil Wears Prada 2` suppresses the 2006 original while `The Housemaid 2025` tries title+year before bare-title fallback.
+- Local proof passed on 2026-05-28: `npm run smoke:prowlarr-search`, `npm run smoke:pipeline`, `npm run smoke:sports-stream-hygiene`, `npm run smoke:debrid-routing`, `git diff --check`, and `node --check` for the modified runtime and smoke files.
 
 ## 2026-05-27: Torrentio/Stremio playback correction
 

@@ -30,6 +30,17 @@ function startMockProwlarr() {
         categories
       })
 
+      if (categories.includes('2050')) {
+        const timer = setTimeout(() => {
+          if (!res.writableEnded) {
+            res.setHeader('Content-Type', 'application/json')
+            res.end(JSON.stringify([]))
+          }
+        }, 5000)
+        timer.unref()
+        return
+      }
+
       if (categories.some(cat => cat.includes(','))) {
         res.statusCode = 400
         res.setHeader('Content-Type', 'application/json')
@@ -103,6 +114,16 @@ async function run() {
         'https://tracker.example/movie-name-720p.torrent'
       ]
     )
+
+    const quickStart = Date.now()
+    const partialResults = await client.search('Movie Name', '2040,2050', 'search', {
+      useCategories: true,
+      timeoutMs: 500,
+      categoryGroupTimeoutMs: 500
+    })
+    assert.ok(Date.now() - quickStart < 2000, 'grouped category search should return completed partial results instead of waiting for every slow category')
+    assert.equal(partialResults.length, 1)
+    assert.equal(partialResults[0].link, 'https://tracker.example/movie-name-1080p.torrent')
   } finally {
     server.close()
   }

@@ -28,9 +28,13 @@ const { isAdultContentResult } = require('../utils/adultContentFilter')
 
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '10000', 10))
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '12000', 10))
+const MOVIE_TITLE_FALLBACK_TIMEOUT_MS = Math.max(STREAM_TITLE_FALLBACK_TIMEOUT_MS, parseInt(
+  process.env.PVTKRRX_MOVIE_TITLE_FALLBACK_TIMEOUT_MS || '20000',
+  10
+))
 const STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS = Math.max(1000, parseInt(
   process.env.PVTKRRX_STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS ||
-  String(Math.min(2500, STREAM_TITLE_FALLBACK_TIMEOUT_MS)),
+  String(Math.min(7000, STREAM_TITLE_FALLBACK_TIMEOUT_MS)),
   10
 ))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '12', 10))
@@ -43,6 +47,10 @@ const STREAM_SPORTS_MAX_SEARCH_QUERIES_WITH_DIRECT = Math.max(1, parseInt(proces
 const STREAM_SPORTS_SUPPLEMENTAL_BUDGET_MS = Math.max(2500, parseInt(process.env.PVTKRRX_STREAM_SPORTS_SUPPLEMENTAL_BUDGET_MS || '8000', 10))
 const STREAM_SPORTS_RESPONSE_TIMEOUT_MS = Math.max(5000, parseInt(process.env.PVTKRRX_STREAM_SPORTS_RESPONSE_TIMEOUT_MS || '14000', 10))
 const TRACKER_LINK_INSPECTION_TIMEOUT_MS = Math.max(1000, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_TIMEOUT_MS || '2500', 10))
+const MOVIE_TV_TRACKER_LINK_INSPECTION_TIMEOUT_MS = Math.max(TRACKER_LINK_INSPECTION_TIMEOUT_MS, parseInt(
+  process.env.PVTKRRX_MOVIE_TV_TRACKER_LINK_INSPECTION_TIMEOUT_MS || '7000',
+  10
+))
 const TRACKER_LINK_INSPECTION_CACHE_MS = Math.max(60 * 1000, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_CACHE_MS || String(10 * 60 * 1000), 10))
 const TRACKER_LINK_INSPECTION_CACHE_MAX_KEYS = Math.max(
   50,
@@ -183,12 +191,14 @@ async function buildOrphanedCustomFileStream(config, configToken, playbackBaseUr
   )
 }
 
-async function inspectTrackerLink(link) {
+async function inspectTrackerLink(link, options = {}) {
   const target = String(link || '').trim()
   if (!target) return { packedOnly: false, inspected: false }
 
+  const timeoutMs = Math.max(1000, Number(options.timeoutMs) || TRACKER_LINK_INSPECTION_TIMEOUT_MS)
+  const cacheKey = `${target}|${timeoutMs}`
   const now = Date.now()
-  const cached = trackerLinkInspectionCache.get(target)
+  const cached = trackerLinkInspectionCache.get(cacheKey)
   if (cached && cached.expiresAt > now) {
     return cached.promise
   }
@@ -196,7 +206,7 @@ async function inspectTrackerLink(link) {
   const promise = (async () => {
     try {
       const payload = await fetchTorrentPayload(target, {
-        timeoutMs: TRACKER_LINK_INSPECTION_TIMEOUT_MS
+        timeoutMs
       })
       const inspection = inspectTorrentPayload(payload.bytes)
       const totalSizeBytes = inspection.files.reduce((sum, file) => sum + Math.max(0, Number(file?.size || 0)), 0)
@@ -226,14 +236,14 @@ async function inspectTrackerLink(link) {
     }
   })()
 
-  trackerLinkInspectionCache.set(target, {
+  trackerLinkInspectionCache.set(cacheKey, {
     expiresAt: now + TRACKER_LINK_INSPECTION_CACHE_MS,
     promise
   })
   trimTrackerLinkInspectionCache(now)
 
   const result = await promise
-  trackerLinkInspectionCache.set(target, {
+  trackerLinkInspectionCache.set(cacheKey, {
     expiresAt: Date.now() + TRACKER_LINK_INSPECTION_CACHE_MS,
     promise: Promise.resolve(result)
   })
@@ -1258,16 +1268,42 @@ function titleWords(value) {
     .toLowerCase()
     .replace(/[^\w\s]/g, ' ')
     .split(/\s+/)
-    .filter(w => w.length > 2 && !TITLE_RELEVANT_STOPWORDS.has(w))
+    .filter(w => (w.length > 2 || /^\d+$/.test(w)) && !TITLE_RELEVANT_STOPWORDS.has(w))
+}
+
+function allTitleTokens(value) {
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter(Boolean)
+}
+
+function matchesNumericTitleWord(resultTitle, queryWords, queryIndex) {
+  const word = queryWords[queryIndex]
+  if (!/^\d+$/.test(word)) return false
+
+  const previousWord = queryWords.slice(0, queryIndex).reverse().find(token => !/^\d+$/.test(token))
+  const nextWord = queryWords.slice(queryIndex + 1).find(token => !/^\d+$/.test(token))
+  const resultTokens = allTitleTokens(resultTitle)
+
+  for (let i = 0; i < resultTokens.length; i += 1) {
+    if (resultTokens[i] !== word) continue
+    if (previousWord && resultTokens[i - 1] === previousWord) return true
+    if (nextWord && resultTokens[i + 1] === nextWord) return true
+  }
+
+  return false
 }
 
 function titleRelevant(resultTitle, queryTitle, options = {}) {
   const clean = titleWords
   const queryWords = clean(queryTitle)
   if (queryWords.length === 0) return true
-  const resultLower = resultTitle.toLowerCase()
-  const hits = queryWords.reduce((acc, word) => acc + (resultLower.includes(word) ? 1 : 0), 0)
-  if (queryWords.every(w => resultLower.includes(w))) return true
+  const resultLower = String(resultTitle || '').toLowerCase()
+  const matchesWord = (word, index) => (/^\d+$/.test(word) ? matchesNumericTitleWord(resultTitle, queryWords, index) : resultLower.includes(word))
+  const hits = queryWords.reduce((acc, word, index) => acc + (matchesWord(word, index) ? 1 : 0), 0)
+  if (queryWords.every((word, index) => matchesWord(word, index))) return true
 
   // TV trackers often carry localized titles while preserving the exact
   // SxxEyy marker. Keep those results if at least two distinctive title words
@@ -1283,6 +1319,11 @@ function titleRelevant(resultTitle, queryTitle, options = {}) {
   }
 
   return false
+}
+
+function extractContentYear(value) {
+  const match = String(value || '').match(/\b(?:19|20)\d{2}\b/)
+  return match ? match[0] : ''
 }
 
 function hasMatchingImdbId(item = {}, requestedImdbId = '') {
@@ -1320,7 +1361,7 @@ function sourceRelevantForContent(item = {}, contentTitle = '', options = {}) {
   return hasMatchingImdbId(item, options.imdbId)
 }
 
-function buildTitleFallbackQueries(contentTitle, type, season = null, episode = null) {
+function buildTitleFallbackQueries(contentTitle, type, season = null, episode = null, contentYear = '') {
   const normalized = normalizeSearchQuery(contentTitle)
   const queries = []
   const seen = new Set()
@@ -1342,6 +1383,10 @@ function buildTitleFallbackQueries(contentTitle, type, season = null, episode = 
     ? `S${String(seasonNum).padStart(2, '0')}E${String(episodeNum).padStart(2, '0')}`
     : ''
 
+  const year = extractContentYear(contentYear)
+  if (type === 'movie' && year && !new RegExp(`\\b${year}\\b`).test(normalized)) {
+    add(`${normalized} ${year}`)
+  }
   if (episodeMarker) add(`${normalized} ${episodeMarker}`)
   add(normalized)
   if (type === 'series') {
@@ -1355,14 +1400,35 @@ function buildTitleFallbackQueries(contentTitle, type, season = null, episode = 
   return queries
 }
 
-async function searchTitleFallback(torznab, query, cats) {
-  console.log(`[stream] Title fallback query="${query}" cats="${cats}" useCategories=true`)
+function prioritizeMovieFallbackCategories(cats) {
+  const preferred = ['2040', '2080', '2020', '2030', '2050', '2045', '2000']
+  const input = String(cats || '')
+    .split(',')
+    .map(cat => cat.trim())
+    .filter(Boolean)
+  const seen = new Set()
+  const ordered = []
+  for (const cat of [...preferred, ...input]) {
+    if (!input.includes(cat) || seen.has(cat)) continue
+    seen.add(cat)
+    ordered.push(cat)
+  }
+  return ordered.length > 0 ? ordered.join(',') : cats
+}
+
+async function searchTitleFallback(torznab, query, cats, options = {}) {
+  const searchCats = options.type === 'movie'
+    ? prioritizeMovieFallbackCategories(cats)
+    : cats
+  console.log(`[stream] Title fallback query="${query}" cats="${searchCats}" useCategories=true`)
   const categorized = await settleWithTimeout(
-    torznab.search(query, cats, 'search', {
-      useCategories: Boolean(String(cats || '').trim()),
-      timeoutMs: STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS + 500
+    torznab.search(query, searchCats, 'search', {
+      useCategories: Boolean(String(searchCats || '').trim()),
+      timeoutMs: STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS,
+      categoryGroupTimeoutMs: STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS,
+      categorySearchConcurrency: options.type === 'movie' ? 2 : undefined
     }),
-    STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS,
+    STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS + 500,
     []
   )
   const categorizedItems = Array.isArray(categorized.value) ? categorized.value : []
@@ -1375,16 +1441,17 @@ async function searchTitleFallback(torznab, query, cats) {
   if (!categorized.error && !categorized.timedOut && categorizedItems.length > 0) return categorizedItems
 
   console.log(`[stream] Title fallback broad query="${query}" cats="all" useCategories=false`)
+  const broadTimeout = options.type === 'movie' ? MOVIE_TITLE_FALLBACK_TIMEOUT_MS : STREAM_TITLE_FALLBACK_TIMEOUT_MS
   const broad = await settleWithTimeout(
     torznab.search(query, cats, 'search', {
       useCategories: false,
-      timeoutMs: STREAM_TITLE_FALLBACK_TIMEOUT_MS + 500
+      timeoutMs: broadTimeout + 500
     }),
-    STREAM_TITLE_FALLBACK_TIMEOUT_MS,
+    broadTimeout,
     []
   )
   if (broad.timedOut) {
-    console.warn(`[stream] Title fallback broad timed out after ${STREAM_TITLE_FALLBACK_TIMEOUT_MS}ms`)
+    console.warn(`[stream] Title fallback broad timed out after ${broadTimeout}ms`)
   }
   if (broad.error) {
     console.error('[stream] Title fallback broad error:', broad.error?.message)
@@ -1435,8 +1502,12 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
   let jackettItems = Array.isArray(jackettResult.value) ? jackettResult.value : []
   const qbitTorrents = Array.isArray(qbitResult.value) ? qbitResult.value : []
   const contentTitle = cinemetaResult.value?.name || null
+  const contentYear =
+    extractContentYear(cinemetaResult.value?.releaseInfo) ||
+    extractContentYear(cinemetaResult.value?.year) ||
+    extractContentYear(cinemetaResult.value?.released)
 
-  console.log(`[stream] IMDB search returned ${jackettItems.length} results, qBit has ${qbitTorrents.length} torrents, title="${contentTitle}"`)
+  console.log(`[stream] IMDB search returned ${jackettItems.length} results, qBit has ${qbitTorrents.length} torrents, title="${contentTitle}" year="${contentYear}"`)
   if (jackettResult.skippedTitleFirst) console.log('[stream] TV episode title-first lookup: skipping initial IMDB wait')
   if (jackettResult.timedOut) console.warn(`[stream] Prowlarr IMDB lookup timed out after ${STREAM_UPSTREAM_TIMEOUT_MS}ms`)
   if (qbitResult.timedOut) console.warn(`[stream] qBit torrent lookup timed out after ${STREAM_UPSTREAM_TIMEOUT_MS}ms`)
@@ -1493,10 +1564,10 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
   // Fallback: title search if IMDB search returned nothing useful after filtering.
   // Use generic type=search — private trackers (HD-Torrents, SpeedCD) only support type=search.
   if (jackettItems.length === 0 && contentTitle) {
-    const fallbackQueries = buildTitleFallbackQueries(contentTitle, type, season, episode)
+    const fallbackQueries = buildTitleFallbackQueries(contentTitle, type, season, episode, contentYear)
     for (const fallbackQuery of fallbackQueries) {
       console.log(`[stream] Falling back to title search: "${fallbackQuery}"`)
-      const fallbackItems = await searchTitleFallback(torznab, fallbackQuery, cats)
+      const fallbackItems = await searchTitleFallback(torznab, fallbackQuery, cats, { type })
       jackettItems = applyFilters(fallbackItems)
       console.log(`[stream] Title search returned ${jackettItems.length} results after filtering`)
       if (jackettItems.length > 0) break
@@ -1604,7 +1675,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
       }
       const inspection = titleLooksPacked
         ? { packedOnly: true, inspected: false }
-        : await inspectTrackerLink(item.link)
+        : await inspectTrackerLink(item.link, { timeoutMs: MOVIE_TV_TRACKER_LINK_INSPECTION_TIMEOUT_MS })
       if (inspection.inspected && !inspection.infoHash && item.infohash) {
         inspection.infoHash = String(item.infohash || '').toLowerCase()
       }

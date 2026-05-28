@@ -613,6 +613,91 @@ async function run() {
       delete process.env.PVTKRRX_HOSTED_RELAY
       QBitClient.prototype.torrents = async () => []
       QBitClient.prototype.files = async () => []
+      CinemetaClient.prototype.getMovie = async () => ({ name: 'The Devil Wears Prada 2' })
+      ProwlarrClient.prototype.searchImdb = async () => [
+        trackerItem({
+          title: 'The Devil Wears Prada 2006 1080p USA Blu-ray MPEG-2 DTS-HD MA 5.1',
+          link: 'https://tracker.example/download/devil-wears-prada-2006.torrent',
+          size: 23_800_000_000,
+          seeders: 42,
+          imdbId: 'tt0458352'
+        }),
+        trackerItem({
+          title: 'The Devil Wears Prada 2 2026 1080p DCPRip CAM AUDIO DD2.0 x264-AOC',
+          link: 'https://tracker.example/download/devil-wears-prada-2-2026.torrent',
+          size: 12_300_000_000,
+          seeders: 613,
+          imdbId: 'tt33612209'
+        })
+      ]
+      ProwlarrClient.prototype.search = async () => []
+      global.fetch = async (url) => {
+        assert.equal(String(url), 'https://tracker.example/download/devil-wears-prada-2-2026.torrent', '#4b1 sequel number should reject the old 2006 movie before tracker payload fetch')
+        await new Promise(resolve => setTimeout(resolve, 2600))
+        return createFetchResponse(buildTorrentPayload([
+          { path: 'The.Devil.Wears.Prada.2.2026.1080p.DCPRip.CAM.mkv', length: 12_300_000_000 }
+        ]))
+      }
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        'tt33612209',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      const playbackStreams = result.streams.filter(stream => /\/playback\//.test(String(stream?.url || '')))
+      assert.equal(playbackStreams.length, 1, '#4b1 movie filter should keep the sequel and suppress the original movie')
+      assert.match(String(playbackStreams[0]?.description || ''), /The Devil Wears Prada 2 2026/i)
+      assert.doesNotMatch(JSON.stringify(result.streams), /devil-wears-prada-2006/i)
+    })
+
+    const housemaidFallbackQueries = []
+    await withScenario(async () => {
+      delete process.env.PVTKRRX_HOSTED_RELAY
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
+      CinemetaClient.prototype.getMovie = async () => ({ name: 'The Housemaid', releaseInfo: '2025' })
+      ProwlarrClient.prototype.searchImdb = async () => []
+      ProwlarrClient.prototype.search = async (query) => {
+        housemaidFallbackQueries.push(query)
+        if (query !== 'The Housemaid 2025') return []
+        return [
+          trackerItem({
+            title: 'The Housemaid 2025 1080p TELESYNC x264-SyncUP',
+            link: 'https://tracker.example/download/the-housemaid-2025.torrent',
+            size: 8_200_000_000,
+            seeders: 157,
+            imdbId: 'tt27543632'
+          })
+        ]
+      }
+      global.fetch = async (url) => {
+        assert.equal(String(url), 'https://tracker.example/download/the-housemaid-2025.torrent', '#4b2 year-qualified movie fallback should inspect the matching source')
+        return createFetchResponse(buildTorrentPayload([
+          { path: 'The.Housemaid.2025.1080p.TELESYNC.x264-SyncUP.mkv', length: 8_200_000_000 }
+        ]))
+      }
+    }, async () => {
+      const result = await handleStream(
+        makeBaseConfig({ fileServerUrl: '' }),
+        'movie',
+        'tt27543632',
+        'http://127.0.0.1:7000',
+        'local'
+      )
+
+      const playbackStreams = result.streams.filter(stream => /\/playback\//.test(String(stream?.url || '')))
+      assert.equal(playbackStreams.length, 1, '#4b2 movie fallback should try title+year before the bare title')
+      assert.match(String(playbackStreams[0]?.description || ''), /The Housemaid 2025/i)
+      assert.deepEqual(housemaidFallbackQueries.slice(0, 1), ['The Housemaid 2025'])
+    })
+
+    await withScenario(async () => {
+      delete process.env.PVTKRRX_HOSTED_RELAY
+      QBitClient.prototype.torrents = async () => []
+      QBitClient.prototype.files = async () => []
       CinemetaClient.prototype.getMovie = async () => null
       ProwlarrClient.prototype.searchImdb = async () => [
         trackerItem({

@@ -37,6 +37,10 @@ function mergeSearchResults(lists) {
   return merged
 }
 
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
 function normalizeProwlarrBaseUrl(input) {
   let url = String(input || '').trim()
   if (!url) return ''
@@ -211,20 +215,40 @@ class ProwlarrClient {
   async search(query, cats, type = 'search', options = {}) {
     const categoryList = options.useCategories ? splitCategoryList(cats) : []
     if (categoryList.length > 1) {
-      const settled = await Promise.allSettled(categoryList.map((cat) => {
-        const params = new URLSearchParams({ query, type, indexerIds: -2, apikey: this.apiKey })
-        params.set('categories', cat)
-        return this._search(params, { timeoutMs: options.timeoutMs })
-      }))
-
+      const groupTimeout = Math.max(1000, Number(options.categoryGroupTimeoutMs) || Number(options.timeoutMs) || TIMEOUT_MS)
+      const categoryConcurrency = Math.max(1, Math.min(
+        categoryList.length,
+        Number(options.categorySearchConcurrency) || categoryList.length
+      ))
       const values = []
       let firstError = null
-      for (const result of settled) {
-        if (result.status === 'fulfilled') values.push(result.value)
-        else if (!firstError) firstError = result.reason
-      }
+      let settledCount = 0
+      let nextIndex = 0
+      const workers = Array.from({ length: categoryConcurrency }, async () => {
+        while (nextIndex < categoryList.length) {
+          const cat = categoryList[nextIndex]
+          nextIndex += 1
+          const params = new URLSearchParams({ query, type, indexerIds: -2, apikey: this.apiKey })
+          params.set('categories', cat)
+          await this._search(params, { timeoutMs: groupTimeout })
+            .then((value) => {
+              values.push(value)
+            })
+            .catch((error) => {
+              if (!firstError) firstError = error
+            })
+            .finally(() => {
+              settledCount += 1
+            })
+        }
+      })
 
-      if (values.length === 0 && firstError) throw firstError
+      const completedAll = await Promise.race([
+        Promise.allSettled(workers).then(() => true),
+        wait(groupTimeout).then(() => false)
+      ])
+
+      if (values.length === 0 && firstError && completedAll && settledCount === categoryList.length) throw firstError
       return mergeSearchResults(values)
     }
 
