@@ -253,9 +253,11 @@ function buildStreamName(parsed, mode, fileName = '', options = {}) {
   const tech = uniqueNonEmpty([shortSource, shortCodec]).join(' ')
   const tag = String(options.sourceTag || '').trim()
   const tagSegment = tag ? ` ${tag}` : ''
+  // Make an already-downloaded (instant) stream unmistakable in the name box.
+  const readyWord = (mode === 'seedbox' || options.extracted === true) ? ' READY' : ''
   return tech
-    ? `PVTKRRX ${badge}${tagSegment} ${quality} ${tech} 🎬${container}`
-    : `PVTKRRX ${badge}${tagSegment} ${quality} 🎬${container}`
+    ? `PVTKRRX ${badge}${readyWord}${tagSegment} ${quality} ${tech} 🎬${container}`
+    : `PVTKRRX ${badge}${readyWord}${tagSegment} ${quality} 🎬${container}`
 }
 
 function buildDescription(item, parsed, mode, progressPercent = null, fileName = '', options = {}) {
@@ -272,7 +274,12 @@ function buildDescription(item, parsed, mode, progressPercent = null, fileName =
   ]).join(' | ')
   const compactTelemetry = resolveDownloadTelemetry(mode, options, progressPercent)
   const compactTail = uniqueNonEmpty([compactFactsLine, compactTechLine, compactTelemetry.label]).join('\n')
-  return title ? `${title}\n${compactTail}` : compactTail
+  const body = title ? `${title}\n${compactTail}` : compactTail
+  // Lead an already-downloaded stream with an unmistakable header so the user can
+  // instantly tell which row is sitting ready on their own server (instant play),
+  // the way debrid rows lead with "PM DEBRID".
+  const isReadyOnServer = mode === 'seedbox' || options.extracted === true
+  return isReadyOnServer ? `✅ READY NOW · on your server (instant play)\n${body}` : body
 }
 
 function buildOnSeedboxStream(item, fileUrl, fileName, videoSize, config, parsed, options = {}) {
