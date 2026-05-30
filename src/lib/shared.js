@@ -2117,8 +2117,14 @@ function applyHostedRouteCacheHeaders(req, res, browserMaxAgeSeconds, options = 
 }
 
 function autoDeleteWatchedEnabled(config) {
+  // An explicit env value is a kill-switch that OVERRIDES the stored self-host config,
+  // so the owner can force auto-delete off (or on) regardless of a config snapshot that
+  // set autoDeleteWatched:true. Without an explicit env, fall back to config, else off.
+  const envRaw = String(process.env.PVTKRRX_AUTO_DELETE_WATCHED ?? '').trim().toLowerCase()
+  if (envRaw === 'false' || envRaw === '0' || envRaw === 'no' || envRaw === 'off') return false
+  if (envRaw === 'true' || envRaw === '1' || envRaw === 'yes' || envRaw === 'on') return true
   if (typeof config?.autoDeleteWatched === 'boolean') return config.autoDeleteWatched
-  return parseBoolean(process.env.PVTKRRX_AUTO_DELETE_WATCHED)
+  return false
 }
 
 function watchedDeleteGraceMs(config) {
