@@ -146,6 +146,18 @@ function decorateDebridDescription(description, providerLabel) {
   return `${prefix}\n${text}`
 }
 
+// COPY: owner-approved "will download" status for uncached debrid downloader rows.
+// Keeps the existing "⬇ PM · " provider prefix (smoke-asserted) and inserts the
+// status so the user can tell, before clicking, that the row triggers a download.
+function markDebridWillDownload(name) {
+  const text = String(name || '')
+  if (/·\s*will download\b/i.test(text)) return text
+  const m = text.match(/^(⬇\s+[A-Za-z.]+)\s+·\s+(.*)$/)
+  if (m) return `${m[1]} · will download · ${m[2]}`
+  if (/^⬇/.test(text)) return `${text} · will download`
+  return text
+}
+
 function isSportsContext(ctx = {}) {
   const type = String(ctx.type || '').trim().toLowerCase()
   const id = String(ctx.id || '').trim().toLowerCase()
@@ -361,6 +373,8 @@ async function applyV13Routing(result, ctx = {}) {
   // Build debrid variants from existing streams (where we can derive a hash/magnet).
   const debridStreams = []
   const debridFileStreams = []
+  const debridPlaybackHashByStream = new Map()
+  const cachedHashes = new Set()
   if (hasDebrid) {
     for (const stream of existing) {
       const meta = tryExtractDebridMetaFromStreamUrl(stream?.url, playbackBaseUrl, configToken)
@@ -393,8 +407,12 @@ async function applyV13Routing(result, ctx = {}) {
         description: decorateDebridDescription(stream.description, providerLabel),
         url: debridUrl
       }
-      if (meta.sourceKind === 'file') debridFileStreams.push(routedStream)
-      else debridStreams.push(routedStream)
+      if (meta.sourceKind === 'file') {
+        debridFileStreams.push(routedStream)
+      } else {
+        debridStreams.push(routedStream)
+        if (meta.hash) debridPlaybackHashByStream.set(routedStream, String(meta.hash).toLowerCase())
+      }
     }
   }
 
@@ -415,13 +433,17 @@ async function applyV13Routing(result, ctx = {}) {
       const hash = String(meta?.hash || '').trim().toLowerCase()
       if (!/^[a-f0-9]{40}$/.test(hash) || seenHashes.has(hash)) continue
       seenHashes.add(hash)
-      cacheStreams.push(...await buildCacheSearchStreams(
+      const builtForHash = await buildCacheSearchStreams(
         { infohash: hash, title: meta.name || queryTitle },
         enabledCache,
         playbackBaseUrl,
         providersForDebrid,
         configToken
-      ))
+      )
+      // A cache hit means the provider already holds this exact hash -> instant,
+      // so its debrid downloader row must NOT be marked "will download".
+      if (builtForHash.length > 0) cachedHashes.add(hash)
+      cacheStreams.push(...builtForHash)
     }
     if (queryTitle) {
       cacheStreams.push(...await buildCacheSearchStreams(
@@ -431,6 +453,18 @@ async function applyV13Routing(result, ctx = {}) {
         providersForDebrid,
         configToken
       ))
+    }
+  }
+
+  // Honest labels: a debrid downloader row whose hash is NOT a confirmed cache
+  // hit will start a server-side download on click, so mark it "will download".
+  // (RD/AD have no reliable cache check, so their rows fall through to this too —
+  // which is correct, since for them everything is a fresh download.) Cached items
+  // already surface a separate "⚡ READY" row, so their downloader row stays plain.
+  for (const routedStream of debridStreams) {
+    const hash = debridPlaybackHashByStream.get(routedStream)
+    if (hash && !cachedHashes.has(hash)) {
+      routedStream.name = markDebridWillDownload(routedStream.name)
     }
   }
 
