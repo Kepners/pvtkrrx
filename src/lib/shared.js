@@ -98,6 +98,10 @@ const STREAM_PLAYBACK_TOP_PRIORITY = String(
 ).trim().toLowerCase() !== 'false'
 const WATCHED_DELETE_THRESHOLD = Math.max(0.5, Math.min(0.99, parseFloat(process.env.PVTKRRX_WATCHED_DELETE_THRESHOLD || '0.95')))
 const WATCHED_DELETE_GRACE_MS = Math.max(0, parseInt(process.env.PVTKRRX_WATCHED_DELETE_GRACE_MS || '180000', 10))
+// Max forward jump (as a fraction of file size) still treated as contiguous playback when
+// advancing the "watched" watermark. Anything beyond this is a seek/tail-probe and does NOT
+// count toward watched-through, so we never auto-delete a title the user only skimmed/probed.
+const WATCHED_PROGRESS_GAP = Math.max(0.05, Math.min(0.5, parseFloat(process.env.PVTKRRX_WATCHED_PROGRESS_GAP || '0.25')))
 // Pairing should be hash-first and stable: desktop publishes LAN endpoint, hosted token hash resolves it.
 // Keep TTL long enough to avoid noisy relay chatter; desktop still refreshes periodically.
 const LAN_PAIR_TTL_SECONDS = Math.max(300, parseInt(process.env.PVTKRRX_LAN_PAIR_TTL_SECONDS || '21600', 10))
@@ -2155,11 +2159,51 @@ function scheduleWatchedCleanup(config, hash, reason = 'watched-threshold') {
       console.warn(`[watch-cleanup] failed ${normalizedHash.slice(0, 8)}: ${err.message}`)
     } finally {
       watchedDeleteInFlight.delete(normalizedHash)
+      clearWatchedProgress(normalizedHash)
     }
   }, delay)
 
   if (typeof timer.unref === 'function') timer.unref()
   watchedDeleteTimers.set(normalizedHash, { timer, reason, scheduledAt: Date.now(), delay })
+}
+
+// Stremio decides "watched" at roughly the playback point we track here: the contiguous
+// read position. The player's range-request START is its read cursor; we advance a
+// contiguous watermark only on near-sequential forward progress (within WATCHED_PROGRESS_GAP),
+// so a tail/index probe or a forward seek — both of which jump far ahead without streaming
+// through the body — never advance it. Only a genuine watch-through crosses the threshold,
+// which is what makes auto-delete safe: an unfinished title keeps its low watermark.
+const watchedProgressStore = new Map() // hash -> { cursor, fileSize, touchedAt }
+
+function pruneWatchedProgress(now = Date.now()) {
+  if (watchedProgressStore.size < 1000) return
+  for (const [key, value] of watchedProgressStore) {
+    if (now - Number(value?.touchedAt || 0) > 6 * 60 * 60 * 1000) watchedProgressStore.delete(key)
+  }
+}
+
+function recordWatchedProgress(hash, start, _end, fileSize) {
+  const normalizedHash = String(hash || '').toLowerCase()
+  const size = Number(fileSize) || 0
+  if (!normalizedHash || size <= 0) return 0
+  const readStart = Math.max(0, Math.min(size - 1, Number(start) || 0))
+  const now = Date.now()
+  let entry = watchedProgressStore.get(normalizedHash)
+  if (!entry || entry.fileSize !== size) {
+    entry = { cursor: 0, fileSize: size, touchedAt: now }
+    watchedProgressStore.set(normalizedHash, entry)
+    pruneWatchedProgress(now)
+  }
+  entry.touchedAt = now
+  // Advance only on contiguous-ish forward progress; far-ahead jumps (probes/seeks) are ignored.
+  if (readStart <= entry.cursor + size * WATCHED_PROGRESS_GAP) {
+    entry.cursor = Math.max(entry.cursor, readStart)
+  }
+  return entry.cursor / size
+}
+
+function clearWatchedProgress(hash) {
+  watchedProgressStore.delete(String(hash || '').toLowerCase())
 }
 
 function getManifest(req) {
@@ -3147,6 +3191,8 @@ module.exports = {
   autoDeleteWatchedEnabled,
   watchedDeleteGraceMs,
   scheduleWatchedCleanup,
+  recordWatchedProgress,
+  clearWatchedProgress,
   getManifest,
   warmLocalProviders,
   scheduleLocalProviderWarmup,

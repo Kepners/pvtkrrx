@@ -95,7 +95,7 @@ const {
   pickLikelyNewTorrent, normalizeTorrentPath, findTorrentFileByPath,
   resolveTorrentFilePath, getReadableBytes, isPlaybackReady, getPlaybackReadyByteThreshold,
   primeTorrentForStreaming, loadTorrentPlaybackState,
-  autoDeleteWatchedEnabled, watchedDeleteGraceMs, scheduleWatchedCleanup,
+  autoDeleteWatchedEnabled, watchedDeleteGraceMs, scheduleWatchedCleanup, recordWatchedProgress,
   isMagnetLink, parseTorrentFileName, fetchTorrentPayload,
   mintHostedConfigToken, resolveLanPair, lanPairOfflineResponse, maybeLanPairRedirect
 } = shared
@@ -2798,9 +2798,13 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
       }
 
       if (isComplete && fileSize > 0 && !isOrphanFile) {
-        const watchedRatio = (end + 1) / fileSize
-        if (watchedRatio >= WATCHED_DELETE_THRESHOLD) {
-          scheduleWatchedCleanup(req.config, torrentHash, `range-${Math.round(watchedRatio * 100)}pct`)
+        // "Watched" = genuine contiguous stream-through to the threshold (the point Stremio
+        // marks a title watched), NOT a byte-range merely touching the tail. A seek/index
+        // probe jumps ahead and does not advance the watermark, so an unfinished title is
+        // never auto-deleted.
+        const watchedFraction = recordWatchedProgress(torrentHash, start, end, fileSize)
+        if (watchedFraction >= WATCHED_DELETE_THRESHOLD) {
+          scheduleWatchedCleanup(req.config, torrentHash, `watched-${Math.round(watchedFraction * 100)}pct`)
         }
       }
 
