@@ -1029,12 +1029,17 @@ async function buildSupplementalSportsStreams({
   const rankedKeys = new Set()
   const hasBudget = (minRemainingMs = 250) => !deadlineMs || Date.now() + minRemainingMs < deadlineMs
 
-  for (const query of queries) {
-    if (!hasBudget(750)) {
-      console.warn(`[stream] Supplemental sports search budget exhausted before query="${query}"`)
-      break
-    }
-    const items = await searchSportsProwlarrVariants(torznab, query, 'Supplemental sports search')
+  // Run the per-query Prowlarr searches concurrently instead of sequentially — they were
+  // awaited one-at-a-time and were the dominant ~6s of the stream-open lag. Same result set,
+  // just gathered in parallel; ranking/dedup below is unchanged and order-independent.
+  const searchBatches = hasBudget(750)
+    ? await Promise.all(queries.map(query =>
+      searchSportsProwlarrVariants(torznab, query, 'Supplemental sports search')
+        .then(items => ({ query, items: Array.isArray(items) ? items : [] }))
+        .catch(() => ({ query, items: [] }))
+    ))
+    : []
+  for (const { query, items } of searchBatches) {
     for (const item of items) {
       const key = sourceItemKey(item) ||
         `${String(item?.indexer || '').trim().toLowerCase()}|${String(item?.title || '').trim().toLowerCase()}`
