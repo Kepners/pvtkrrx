@@ -80,7 +80,14 @@ const STREAM_READY_START_FRACTION = parseStartFraction(
   process.env.STREAM_READY_MIN_PROGRESS ||
   '0.5%'
 )
-const STREAM_READY_MIN_BYTES = parseByteCount(process.env.STREAM_READY_MIN_BYTES || '24MB', 24 * 1024 * 1024)
+// Fast-start: begin progressive playback after a modest contiguous head buffer
+// instead of a large block, so cold private-tracker swarms start within the
+// player's first-byte tolerance instead of timing out. Tunable via env.
+const STREAM_READY_MIN_BYTES = parseByteCount(process.env.STREAM_READY_MIN_BYTES || '12MB', 12 * 1024 * 1024)
+// Upper bound on the size-scaled portion of the start buffer so very large files
+// don't demand tens of MB before they can begin playing (e.g. a 10GB movie would
+// otherwise need ~50MB at 0.5%; this caps the head at 16MB).
+const STREAM_READY_MAX_START_BYTES = parseByteCount(process.env.STREAM_READY_MAX_START_BYTES || '16MB', 16 * 1024 * 1024)
 const STREAM_PRIORITIZE_LAST_PIECES = String(
   process.env.STREAM_PRIORITIZE_LAST_PIECES ||
   'false'
@@ -2497,7 +2504,14 @@ async function getPieceVerifiedReadableBytesFromQbit(qbit, torrentHash, fileEntr
 function getPlaybackReadyByteThreshold(fileEntry) {
   const size = Number(fileEntry?.size || 0)
   if (!size) return 0
-  return Math.min(size, Math.max(1, STREAM_READY_MIN_BYTES, Math.floor(size * STREAM_READY_START_FRACTION)))
+  // Cap the size-scaled fraction so very large files don't demand a huge head
+  // before playback can start (cold-swarm fast-start). The start buffer stays
+  // within [STREAM_READY_MIN_BYTES, STREAM_READY_MAX_START_BYTES].
+  const fractionBytes = Math.min(
+    Math.floor(size * STREAM_READY_START_FRACTION),
+    STREAM_READY_MAX_START_BYTES
+  )
+  return Math.min(size, Math.max(1, STREAM_READY_MIN_BYTES, fractionBytes))
 }
 
 function isPlaybackReady(fileEntry, readableBytes) {
@@ -2989,6 +3003,7 @@ module.exports = {
   STREAM_RANGE_WAIT_INTERVAL_MS,
   STREAM_READY_START_FRACTION,
   STREAM_READY_MIN_BYTES,
+  STREAM_READY_MAX_START_BYTES,
   STREAM_PRIORITIZE_LAST_PIECES,
   STREAM_PLAYBACK_TOP_PRIORITY,
   WATCHED_DELETE_THRESHOLD,

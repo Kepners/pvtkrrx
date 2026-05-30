@@ -93,7 +93,7 @@ const {
   // Playback helpers
   sleep, extractInfoHashFromLink, extractTrackerHost,
   pickLikelyNewTorrent, normalizeTorrentPath, findTorrentFileByPath,
-  resolveTorrentFilePath, getReadableBytes, isPlaybackReady,
+  resolveTorrentFilePath, getReadableBytes, isPlaybackReady, getPlaybackReadyByteThreshold,
   primeTorrentForStreaming, loadTorrentPlaybackState,
   autoDeleteWatchedEnabled, watchedDeleteGraceMs, scheduleWatchedCleanup,
   isMagnetLink, parseTorrentFileName, fetchTorrentPayload,
@@ -2714,10 +2714,7 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
     if (!isComplete && initialRequest && !initialReady()) {
       const hasInitialBuffer = await waitForFileState(() => Boolean(fileExists && resolvedFilePath && initialReady()))
       if (!hasInitialBuffer) {
-        const requiredBytes = Math.min(
-          fileSize,
-          Math.max(1, STREAM_READY_MIN_BYTES, Math.floor(fileSize * STREAM_READY_START_FRACTION))
-        )
+        const requiredBytes = getPlaybackReadyByteThreshold(file)
         console.warn(
           `[file-route] initial buffer not ready hash=${torrentHash.slice(0, 8)} ` +
           `readable=${readableBytes} required=${requiredBytes} progress=${Math.round(Number(file?.progress || torrent.progress || 0) * 100)}%`
