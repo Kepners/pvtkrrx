@@ -1790,6 +1790,23 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
   }
   const hasExplicitTrackerSource = Boolean(infoHash || directLink)
   if (!matched && !hasExplicitTrackerSource) matched = findTorrentByTitle(torrents, resolvedInfo.t)
+  // Private trackers can bake a per-download tag into the .torrent, giving the file a
+  // different infohash than the one Prowlarr reports — so hash matching misses a file the
+  // user has already fully downloaded, and it shows as "DL" instead of "✅ READY". Fall back
+  // to a STRICT title match (exact/substring of the full, quality-specific release title;
+  // no fuzzy scoring) so completed content is recognized even when the hashes differ.
+  if (!matched && resolvedInfo.t) {
+    const matchTarget = normalizeForMatch(resolvedInfo.t)
+    if (matchTarget) {
+      matched = torrents.find(t => {
+        const name = normalizeForMatch(t.name)
+        return name && (name === matchTarget || name.includes(matchTarget) || matchTarget.includes(name))
+      }) || null
+      if (matched) {
+        console.log(`[stream] matched already-downloaded torrent by title (infohash differed) hash=${String(matched.hash).slice(0, 8)}`)
+      }
+    }
+  }
   if (matched?.hash) seenSourceKeys.add(String(matched.hash).toLowerCase())
 
   const parsed = parse(resolvedInfo.t)
