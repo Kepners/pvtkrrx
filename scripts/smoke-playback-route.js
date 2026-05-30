@@ -710,6 +710,20 @@ async function run() {
     assert.equal(String(coldIncompleteFileResponse.headers['retry-after'] || ''), '2')
     assert.notEqual(String(coldIncompleteFileResponse.headers['x-pvtkrrx-waiting-room'] || ''), '1', 'active file route must not substitute the waiting-room MP4 for real media')
     assert.match(String(coldIncompleteFileResponse.text || ''), /continuous start buffer/i)
+    // Owner-opt-in loader mode: PVTKRRX_QBIT_PREPARING_RESPONSE=loader serves the
+    // PVTKRRX "preparing" clip instead of the retryable 425 while the head buffers.
+    const prevQbitPreparing = process.env.PVTKRRX_QBIT_PREPARING_RESPONSE
+    process.env.PVTKRRX_QBIT_PREPARING_RESPONSE = 'loader'
+    try {
+      const loaderFileResponse = await request(server.address().port, String(coldIncompleteResponse.headers.location || ''))
+      assert.equal(loaderFileResponse.status, 200, 'qBit loader mode should serve the preparing clip (200) while the head buffers')
+      assert.equal(String(loaderFileResponse.headers['x-pvtkrrx-waiting-room'] || ''), '1', 'qBit loader mode response must be the waiting-room clip')
+      assert.equal(String(loaderFileResponse.headers['content-type'] || ''), 'video/mp4', 'qBit loader mode must serve MP4 video')
+      assert.equal(String(loaderFileResponse.headers['x-pvtkrrx-waiting-kind'] || ''), 'qbit', 'qBit loader clip should be tagged kind=qbit')
+    } finally {
+      if (prevQbitPreparing === undefined) delete process.env.PVTKRRX_QBIT_PREPARING_RESPONSE
+      else process.env.PVTKRRX_QBIT_PREPARING_RESPONSE = prevQbitPreparing
+    }
     const coldIncompleteTailResponse = await request(
       server.address().port,
       String(coldIncompleteResponse.headers.location || ''),

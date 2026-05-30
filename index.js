@@ -2720,6 +2720,22 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
           `readable=${readableBytes} required=${requiredBytes} progress=${Math.round(Number(file?.progress || torrent.progress || 0) * 100)}%`
         )
         res.setHeader('Retry-After', '2')
+        // Owner-opt-in (PVTKRRX_QBIT_PREPARING_RESPONSE=loader): play the PVTKRRX
+        // "preparing" clip instead of a bare retryable spinner while the head
+        // buffers, so the user sees "downloading — check back" rather than an
+        // info-less spinner. Default 'retry' keeps the proven retryable-425 path
+        // (Stremio auto-retries and auto-starts when the head lands). The clip
+        // is a deliberate "stick + re-click" UX (Stremio stays on the clip), so
+        // it is opt-in per runtime, not the global default.
+        if (
+          /^(loader|waiting-room|waiting_room)$/i.test(String(process.env.PVTKRRX_QBIT_PREPARING_RESPONSE || 'retry').trim()) &&
+          sendWaitingRoomVideo(req, res, {
+            kind: 'qbit',
+            reason: 'buffering-head',
+            state: 'downloading',
+            progress: Number(file?.progress || torrent.progress || 0)
+          })
+        ) return
         return res.status(425).json({
           error: 'Download active - waiting for continuous start buffer',
           progress: Number(file?.progress || torrent.progress || 0),
