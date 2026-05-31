@@ -145,7 +145,8 @@ function buildSportsCatalogDescription(input = {}) {
   if (title) pushUniqueCatalogLine(lines, `Event: ${title}`)
   if (detail) pushUniqueCatalogLine(lines, `Session: ${detail}`)
   if (date) pushUniqueCatalogLine(lines, `Date: ${date}`)
-  if (homeTeam && awayTeam) pushUniqueCatalogLine(lines, `Teams: ${homeTeam} vs ${awayTeam}`)
+  const teamsLine = homeTeam && awayTeam ? `${homeTeam} vs ${awayTeam}` : ''
+  if (teamsLine && teamsLine.toLowerCase() !== title.toLowerCase()) pushUniqueCatalogLine(lines, `Teams: ${teamsLine}`)
   if (Number(input.seeders) > 0) availability.push(`${Number(input.seeders)} seeders`)
   if (input.size) availability.push(String(input.size).trim())
   if (Number(input.sourceCount) > 0) {

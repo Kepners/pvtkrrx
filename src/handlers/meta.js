@@ -100,7 +100,9 @@ function buildSportsDescriptionLines(input = {}) {
   if (round) pushUniqueLine(lines, `Round: ${round}`)
   if (venue) pushUniqueLine(lines, `Venue: ${venue}`)
   if (time) pushUniqueLine(lines, `Time: ${time}`)
-  if (homeTeam && awayTeam) pushUniqueLine(lines, `Teams: ${homeTeam} vs ${awayTeam}`)
+  const teamsLine = homeTeam && awayTeam ? `${homeTeam} vs ${awayTeam}` : ''
+  // Don't repeat the matchup when the event title is already "X vs Y".
+  if (teamsLine && teamsLine.toLowerCase() !== title.toLowerCase()) pushUniqueLine(lines, `Teams: ${teamsLine}`)
   if (releaseTitle) pushUniqueLine(lines, `Release: ${releaseTitle}`)
   if (indexer) pushUniqueLine(lines, `Indexer: ${indexer}`)
 
@@ -113,10 +115,8 @@ function buildSportsDescriptionLines(input = {}) {
   }
   if (availability.length > 0) pushUniqueLine(lines, `Availability: ${availability.join(' | ')}`)
 
-  const status = String(input.resolutionStatus || '').trim()
-  const source = String(input.source || '').trim()
-  if (status && status !== 'resolved') pushUniqueLine(lines, `Artwork status: ${status}`)
-  else if (source) pushUniqueLine(lines, `Metadata source: ${source === 'sportsmeta' ? 'SportsMeta' : source}`)
+  // Description is event-facing only — no internal artwork/resolution status or
+  // metadata-source debug lines (per owner direction 2026-05-31).
 
   return lines
 }
