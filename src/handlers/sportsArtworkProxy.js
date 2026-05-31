@@ -981,8 +981,10 @@ const LEAGUE_SLUG_ALIASES = Object.freeze({
   'easycredit bbl': 'german-bbl',
   'easycredit bbl germany': 'german-bbl',
   'basketball bundesliga': 'german-bbl',
-  'motogp': 'moto-gp',
-  'moto gp': 'moto-gp',
+  'motogp': 'motogp',
+  'moto gp': 'motogp',
+  'pga': 'pga-tour',
+  'pga tour': 'pga-tour',
   'f1': 'formula-1',
   'formula 1': 'formula-1',
   'indycar': 'indycar-series',
@@ -1408,13 +1410,15 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
     sport: 'motorsport',
     pattern: /\b(?:moto\s*2|moto2)\b/i,
     canonicalIds: ['sportsmeta:league:motorsport|moto2'],
-    searchTerms: ['Moto2']
+    searchTerms: ['Moto2'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/logo/86s2zb1768486157.png']
   },
   {
     sport: 'motorsport',
     pattern: /\b(?:moto\s*3|moto3)\b/i,
     canonicalIds: ['sportsmeta:league:motorsport|moto3'],
-    searchTerms: ['Moto3']
+    searchTerms: ['Moto3'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/logo/qd46ri1768487278.png']
   },
   {
     sport: 'motorsport',
@@ -2021,11 +2025,28 @@ function buildDefaultLogoRequests(fallbackInput = {}) {
 
   for (const directUrl of directLeagueLogoUrlsForInput(fallbackInput)) addDirect(directUrl)
 
+  // Durable dynamic league-logo resolution for ANY league, even ones with no rule-table
+  // entry. Runs AFTER directs (so hardcoded URLs still win and short-circuit) but BEFORE
+  // the rule loop. (1) a fast canonical-id inspect when the derived slug matches SportsMeta;
+  // then (2) a name-search of SportsMeta by the league text, which resolves leagues whose
+  // slug form differs (e.g. "Serie A" -> italian-serie-a) or whose namespace differs
+  // (e.g. PFL/ONE under fighting) because it searches by NAME instead of guessing the slug.
+  const derivedLeagueCanonicalId = deriveLeagueCanonicalId(
+    fallbackInput.sport,
+    fallbackInput.competition || fallbackInput.league
+  )
+  if (derivedLeagueCanonicalId) addInspect(derivedLeagueCanonicalId)
+  const dynamicLeagueSearch = normalizeSpace(fallbackInput.competition || fallbackInput.league)
+  if (dynamicLeagueSearch && !isGenericLeagueSlug(dynamicLeagueSearch)) {
+    addSearch(sport, dynamicLeagueSearch)
+  }
+
   for (const rule of DEFAULT_LEAGUE_LOGO_RULES) {
     if (!sportMatchesLogoRule(rule.sport, sport)) continue
-    const ruleLeagueSlug = Array.isArray(rule.canonicalIds)
+    const rawRuleLeagueSlug = Array.isArray(rule.canonicalIds)
       ? rule.canonicalIds.map((id) => String(id || '').match(/^sportsmeta:league:[^|]+\|(.+)$/i)?.[1]).find(Boolean)
       : ''
+    const ruleLeagueSlug = normalizedLeagueSlug(rawRuleLeagueSlug)
     if (
       ruleLeagueSlug &&
       inputLeagueSlug &&
