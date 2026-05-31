@@ -69,17 +69,31 @@ Use this when your Windows PC is the playback bridge.
 
 For PC Local and LAN Bridge, the built-in file server can serve completed local files when the runtime can read qBittorrent's download directory. You do not need a separate third-party file server just to get started on those routes.
 
-### Self-Hosted Server
+### Self-Hosted Server (your own VPS or seedbox)
 
-Use this when your own server or seedbox should own the runtime and keep operating without the PVTKRRX hosted relay in the request path.
+Use this when your own server or seedbox should own the runtime and keep operating without the PVTKRRX hosted relay in the request path. Everything runs on **your** box under **your** domain — no PVTKRRX-owned infrastructure stays in the path once you are set up.
+
+**You need:** a Linux VPS or seedbox you control, and a domain (or subdomain) you can point at it over HTTPS.
+
+**1. Install** — on your server, run:
 
 ```bash
 curl -fsSL https://www.pvtkrrx.cc/install-selfhost.sh | sudo bash
 ```
 
-The installer sets up the app, Node runtime, production dependencies, saved server config, optional `systemd` service, and a stable `/selfhost/manifest.json?mode=hosted` install path. That self-host install uses its own Stremio addon id, separate from hosted Remote Seedbox token installs.
+The installer sets up the app, the Node runtime, production dependencies, your saved server config, an optional `systemd` service, and — if you pick the custom-domain option — a local Caddy reverse proxy with automatic HTTPS for your hostname. It writes `PVTKRRX_PUBLIC_BASE_URL=https://<your-domain>` so every manifest, poster, and playback URL uses **your** domain, not ours. (If you skip that and reach the server through a hostname directly, the runtime auto-detects that hostname instead — it is never hard-coded to a PVTKRRX domain.)
 
-Self-hosted server mode can use private or localhost Prowlarr/qBittorrent URLs after server-admin authentication, but the Stremio-facing install origin still needs a real public HTTPS hostname.
+**2. Configure** — open `https://<your-domain>/configure` and enter your Prowlarr + qBittorrent details. Self-host mode can use private/localhost service URLs after server-admin authentication.
+
+**3. Install in Stremio** — add this manifest URL (swap in your own domain):
+
+```
+https://<your-domain>/selfhost/manifest.json?mode=hosted
+```
+
+That self-host install uses its own Stremio addon id, separate from hosted Remote Seedbox token installs.
+
+The Stremio-facing install origin needs a real public HTTPS hostname — Stremio rejects a plain `http://IP:port` as a stable install path (except same-PC `127.0.0.1`). No domain yet? See **Setup Paths If You Do Not Have A Domain** below.
 
 ### Setup Paths If You Do Not Have A Domain
 
@@ -101,7 +115,15 @@ The hosted public relay does not proxy video bytes and does not queue-and-buffer
 
 ## Optional Debrid
 
-Debrid is optional. If you configure Real-Debrid, AllDebrid, or Premiumize, PVTKRRX adds provider-backed streams above the qBittorrent/local fallback when the provider already has or can quickly resolve a playable media URL. Cached debrid hits show first. For sports/private-tracker rows, uncached Debrid handoff is hidden by default because it often just starts a provider download while Stremio waits on a non-playable HTTP URL; qBittorrent/seedbox remains the safe playback path. The old uncached sports handoff can be re-enabled with `PVTKRRX_DEBRID_UNCACHED_SPORTS_HANDOFF=true` for controlled testing.
+**Debrid is optional and additive. You do not need it** — qBittorrent/seedbox is always a playback path, and turning debrid on never removes your qBittorrent streams. It only *adds* faster streams above them.
+
+**To turn it on:** open `/configure` and paste your Real-Debrid, AllDebrid, or Premiumize key (stored encrypted in your config). That is the whole setup.
+
+**What it does:**
+
+- **Cached hits show first.** When the provider already holds the file, PVTKRRX adds an instant provider-backed stream above the qBittorrent/local fallback.
+- **Your qBittorrent streams stay.** Debrid is layered on top, never a replacement — for movies, TV, and sports alike.
+- **Uncached sports/private-tracker handoff is hidden by default,** because it usually just starts a provider download while Stremio waits on a non-playable URL. qBittorrent/seedbox stays the safe path. Re-enable it for controlled testing with `PVTKRRX_DEBRID_UNCACHED_SPORTS_HANDOFF=true`.
 
 This does not make PVTKRRX a debrid service. PVTKRRX stores your provider credentials in your encrypted config, asks the provider to add/check the torrent or NZB, and redirects the client when the provider has a playable URL.
 
