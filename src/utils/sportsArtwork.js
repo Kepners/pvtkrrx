@@ -15,7 +15,7 @@ const {
   signSportsPosterEntitlementStamp
 } = require('./entitlement')
 
-const SPORTS_ARTWORK_PROXY_VERSION = '20260531-afl-nrl-club-badges-v36'
+const SPORTS_ARTWORK_PROXY_VERSION = '20260531-tennis-single-logo-v37'
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()

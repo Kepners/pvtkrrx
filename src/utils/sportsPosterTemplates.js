@@ -465,7 +465,7 @@ function templateData(event = {}, theme = {}, mode = '') {
   const eventFormatCandidate = ['matchup', 'single', 'solo'].includes(requestedMode)
     ? requestedMode
     : data.event_format
-  const eventFormat = eventClass === 'combat_event' ? 'solo' : eventFormatCandidate
+  const eventFormat = (eventClass === 'combat_event' || eventClass === 'tennis_or_snooker_match') ? 'solo' : eventFormatCandidate
   // Audit fix G1.3/G1.4: when the source supplies a real driver/competitor
   // pair (e.g. UFC with Makhachev vs Oliveira, tennis with Alcaraz vs Sinner),
   // per-template renderers must show the head-to-head — not the event-only
@@ -502,7 +502,13 @@ function templateData(event = {}, theme = {}, mode = '') {
   // Combat events render event-first. Fighter names can appear in the title,
   // but they are not a two-crest layout driver.
   const mmaCardNeverPair = eventClass === 'combat_event' && eventFormat === 'solo'
-  const hasMatchup = !motorsportNeverPair && !teamWithoutPair && !wrestlingNeverPair && !mmaCardNeverPair && (
+  // Tennis/snooker are individual sports with no player badge art anywhere
+  // upstream (SportsMeta has zero competitor badges). A head-to-head layout
+  // therefore renders the league logo twice ("ATP ATP"). Per user direction
+  // 2026-05-31, render these as a single league-logo event tile with the
+  // player names as text — same shape as combat events.
+  const racketNeverPair = eventClass === 'tennis_or_snooker_match' && eventFormat === 'solo'
+  const hasMatchup = !motorsportNeverPair && !teamWithoutPair && !wrestlingNeverPair && !mmaCardNeverPair && !racketNeverPair && (
     eventFormat === 'matchup' || eventFormat === 'single' || (eventFormat === 'solo' && hasRealPair)
   )
   const isTeamMatchup = eventFormat === 'matchup' && !motorsportNeverPair && !teamWithoutPair
