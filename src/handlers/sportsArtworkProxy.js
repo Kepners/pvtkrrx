@@ -1401,7 +1401,8 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
     sport: 'motorsport',
     pattern: /\b(?:moto\s*gp|motogp|moto\s+grand\s+prix)\b/i,
     canonicalIds: ['sportsmeta:league:motorsport|motogp'],
-    searchTerms: ['MotoGP']
+    searchTerms: ['MotoGP'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/logo/tkd2rt1733231583.png']
   },
   {
     sport: 'motorsport',
@@ -1701,6 +1702,7 @@ const DIRECT_LEAGUE_LOGO_OVERRIDES = Object.freeze([
   { sport: 'wrestling', league: 'WWE', pattern: /\b(?:wwe|world\s+wrestling\s+entertainment)\b/i, urls: ['https://commons.wikimedia.org/wiki/Special:Redirect/file/WWE_official_logo.svg'] },
   { sport: 'wrestling', league: 'TNA Wrestling', pattern: /\b(?:tna|tna\s+wrestling|impact\s+wrestling|total\s+nonstop\s+action)\b/i, urls: ['https://commons.wikimedia.org/wiki/Special:Redirect/file/TNA_Wrestling_%282024%29_Logo.svg'] },
   { sport: 'motorsport', league: 'Formula 1', pattern: /\b(?:formula\s*1|formula\s*one|formula1|\bf1\b)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/jiqa741556460666.png'] },
+  { sport: 'motorsport', league: 'MotoGP', pattern: /\b(?:moto\s*gp|motogp|moto\s+grand\s+prix)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/tkd2rt1733231583.png'] },
   { sport: 'motorsport', league: 'IndyCar Series', pattern: /\b(?:indy\s*car|indycar|ntt\s+indycar|indianapolis\s+500|indy\s*500)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/mkv0xb1641916982.png'] },
   { sport: 'motorsport', league: 'WRC', pattern: /\b(?:wrc|world\s+rally\s+championship)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/logo/5f36o51544372922.png'] },
   { sport: 'motorsport', league: 'Supercars Championship', pattern: /\b(?:v8\s*supercars?|v8sc|supercars?(?:\s+championship)?)\b/i, urls: ['https://r2.thesportsdb.com/images/media/league/badge/64f67s1770108650.png'] },
