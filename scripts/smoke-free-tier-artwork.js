@@ -15,22 +15,17 @@ const {
   resolveSportsPosterAsset,
   resolveSportsArtworkLayoutFamily
 } = require('../src/utils/sportsArtwork')
+const {
+  _test: sportsArtworkProxyTest
+} = require('../src/handlers/sportsArtworkProxy')
 const { encodeCustomId } = require('../src/utils/customId')
 const { handleMeta } = require('../src/handlers/meta')
 
-const DEFAULT_TEMPLATE = 'ticket-stub'
-const EXPECTED_LAYOUT = {
-  editorial: 'EDITORIAL',
-  broadcast: 'BROADCAST',
-  sportsbook: 'SPORTSBOOK',
-  'trading-card': 'TRADING_CARD',
-  brutalist: 'BRUTALIST',
-  'ticket-stub': 'TICKET_STUB',
-  glitch: 'GLITCH'
-}
+const INCLUDED_TEMPLATE = 'ticket-stub'
+const BLOCKED_TEMPLATES = ['glitch', 'broadcast', 'sportsbook', 'editorial', 'trading-card', 'brutalist']
 
-function assertTemplate(value, expected, message) {
-  assert.equal(value, expected, `${message}: expected ${expected}, got ${value}`)
+function assertTicketStub(value, message) {
+  assert.equal(value, INCLUDED_TEMPLATE, `${message}: expected ${INCLUDED_TEMPLATE}, got ${value}`)
 }
 
 function assertNoStaleCopy(file, patterns) {
@@ -56,7 +51,7 @@ function sportsEventInput(template) {
   }
 }
 
-async function assertConfiguredMetaHonours(template) {
+async function assertConfiguredMetaNormalizes(template) {
   const id = encodeCustomId({
     y: 'sports',
     k: 'sports',
@@ -79,50 +74,80 @@ async function assertConfiguredMetaHonours(template) {
     { baseUrl: 'https://www.pvtkrrx.cc' }
   )
   assert.ok(result?.meta, `${template} configured meta returned meta`)
-  assertTemplate(result.meta.sportsArtwork?.posterTemplate, template, `${template} configured meta posterTemplate`)
-  assertTemplate(new URL(result.meta.poster).searchParams.get('template'), template, `${template} configured meta poster URL template`)
-  assertTemplate(result.meta.layoutFamily, EXPECTED_LAYOUT[template], `${template} configured meta layoutFamily`)
+  assertTicketStub(result.meta.sportsArtwork?.posterTemplate, `${template} configured meta posterTemplate`)
+  assertTicketStub(new URL(result.meta.poster).searchParams.get('template'), `${template} configured meta poster URL template`)
+  assert.equal(result.meta.layoutFamily, 'TICKET_STUB', `${template} configured meta layoutFamily`)
 }
 
 async function main() {
+  assert.equal(SPORTS_POSTER_TEMPLATES.length, 7, `locked poster contract should remain 7 families, got ${SPORTS_POSTER_TEMPLATES.length}`)
   assert.deepEqual(
     SPORTS_POSTER_TEMPLATES,
     ['editorial', 'broadcast', 'sportsbook', 'trading-card', 'brutalist', 'ticket-stub', 'glitch'],
     'locked poster family list changed unexpectedly'
   )
 
-  assertTemplate(normalizeSportsPosterTemplate('free'), DEFAULT_TEMPLATE, 'free alias')
-  assertTemplate(normalizeSportsPosterTemplate('default'), DEFAULT_TEMPLATE, 'default alias')
-  assertTemplate(resolveSportsPosterTemplate('', undefined, DEFAULT_TEMPLATE), DEFAULT_TEMPLATE, 'empty/default resolver')
+  assertTicketStub(normalizeSportsPosterTemplate('free'), 'free alias')
+  assertTicketStub(normalizeSportsPosterTemplate('default'), 'default alias')
+  assertTicketStub(resolveSportsPosterTemplate('', undefined, INCLUDED_TEMPLATE), 'empty/default resolver')
 
-  for (const template of SPORTS_POSTER_TEMPLATES) {
+  // Free (unstamped) config: every selected template clamps to ticket-stub on
+  // the runtime paths — normalizeAddonConfig, the URL builder, and configured
+  // meta. Only an env-verifiable/signed entitlement stamp unlocks a style.
+  for (const template of [INCLUDED_TEMPLATE, ...BLOCKED_TEMPLATES]) {
     const normalized = normalizeAddonConfig({ sportsPosterTemplate: template })
-    assertTemplate(normalized.sportsPosterTemplate, template, `${template} normalizeAddonConfig`)
+    assertTicketStub(normalized.sportsPosterTemplate, `${template} normalizeAddonConfig`)
 
     const poster = resolveSportsPosterAsset(sportsEventInput(template))
-    assertTemplate(poster.selectedTemplate, template, `${template} resolveSportsPosterAsset selectedTemplate`)
-    assertTemplate(new URL(poster.poster).searchParams.get('template'), template, `${template} poster URL template`)
-    assertTemplate(poster.layoutFamily, EXPECTED_LAYOUT[template], `${template} poster layoutFamily`)
-    assertTemplate(resolveSportsArtworkLayoutFamily(sportsEventInput(template)), EXPECTED_LAYOUT[template], `${template} layout resolver`)
-    await assertConfiguredMetaHonours(template)
+    assertTicketStub(poster.selectedTemplate, `${template} resolveSportsPosterAsset selectedTemplate`)
+    assertTicketStub(new URL(poster.poster).searchParams.get('template'), `${template} poster URL template`)
+    assert.equal(poster.layoutFamily, 'TICKET_STUB', `${template} poster layoutFamily`)
+    assert.equal(resolveSportsArtworkLayoutFamily(sportsEventInput(template)), 'TICKET_STUB', `${template} layout resolver`)
+    await assertConfiguredMetaNormalizes(template)
   }
 
-  const configureHtml = fs.readFileSync('public/configure.html', 'utf8')
-  const optionValues = [...configureHtml.matchAll(/<option\s+value="([^"]+)"/gi)].map((match) => match[1])
-  assert.deepEqual(
-    optionValues.filter((value) => SPORTS_POSTER_TEMPLATES.includes(value)),
-    SPORTS_POSTER_TEMPLATES,
-    'public configure page must expose every sports poster option'
+  // Regression: a forged plain ?template= query with no signed/stamped
+  // entitlement must clamp to ticket-stub on the artwork proxy. This is the
+  // public route Stremio hits directly, so it carries no config token.
+  for (const template of BLOCKED_TEMPLATES) {
+    assert.equal(
+      sportsArtworkProxyTest.resolveSportsPosterTemplateFromConfig({}, { query: { template } }),
+      INCLUDED_TEMPLATE,
+      `forged plain ?template=${template} must resolve ticket-stub`
+    )
+  }
+  assert.equal(
+    sportsArtworkProxyTest.resolveSportsPosterTemplateFromConfig({}, { query: { template: INCLUDED_TEMPLATE } }),
+    INCLUDED_TEMPLATE,
+    'plain ?template=ticket-stub stays ticket-stub'
   )
-  assert.match(configureHtml, /Sports Poster Style/i, 'configure page should expose the sports style selector')
-  assert.doesNotMatch(configureHtml, /Other templates require an entitlement/i, 'configure page must not claim user styles require entitlement')
+  assert.equal(
+    sportsArtworkProxyTest.resolveSportsPosterTemplateFromConfig({}, { query: { template: 'not-real' } }),
+    INCLUDED_TEMPLATE,
+    'invalid plain ?template= resolves ticket-stub'
+  )
+
+  // Server-side admin env override must not unlock the public free-tier poster.
+  const previousAdminOverride = process.env.PVTKRRX_SPORTS_POSTER_ADMIN_OVERRIDE
+  const previousTemplateOverride = process.env.PVTKRRX_SPORTS_POSTER_TEMPLATE
+  process.env.PVTKRRX_SPORTS_POSTER_ADMIN_OVERRIDE = 'broadcast'
+  process.env.PVTKRRX_SPORTS_POSTER_TEMPLATE = 'broadcast'
+  try {
+    const poster = resolveSportsPosterAsset(sportsEventInput('broadcast'))
+    assertTicketStub(poster.selectedTemplate, 'server env override resolveSportsPosterAsset selectedTemplate')
+    assertTicketStub(new URL(poster.poster).searchParams.get('template'), 'server env override poster URL template')
+  } finally {
+    if (previousAdminOverride === undefined) delete process.env.PVTKRRX_SPORTS_POSTER_ADMIN_OVERRIDE
+    else process.env.PVTKRRX_SPORTS_POSTER_ADMIN_OVERRIDE = previousAdminOverride
+    if (previousTemplateOverride === undefined) delete process.env.PVTKRRX_SPORTS_POSTER_TEMPLATE
+    else process.env.PVTKRRX_SPORTS_POSTER_TEMPLATE = previousTemplateOverride
+  }
 
   const staleFreeTierPatterns = [
     /free[^.\n]{0,80}(?:text-only|text only|plain text|generated text|generated cards|generated svg|svg-only|svg first|svg-first)/i,
     /(?:text-only|text only|plain text|generated text|generated cards|generated svg|svg-only|svg first|svg-first)[^.\n]{0,80}free/i,
     /Free cards\s*=\s*generated,\s*generic,\s*text-only/i,
-    /Free users see text/i,
-    /configured\s+`?sportsPosterTemplate=glitch`?[^.\n]{0,80}`?ticket-stub`?/i
+    /Free users see text/i
   ]
   for (const file of ['public/sports.html', 'docs/SALES_SPEC.md']) {
     assertNoStaleCopy(file, staleFreeTierPatterns)
@@ -130,9 +155,10 @@ async function main() {
   assertNoStaleCopy('CLAUDE.md', [/all eight styles/i, /\b8 styles\b/i])
 
   console.log(
-    `Sports artwork selection smoke passed. ` +
-    `families=${SPORTS_POSTER_TEMPLATES.length} default=${DEFAULT_TEMPLATE} ` +
-    `selectable=${SPORTS_POSTER_TEMPLATES.join(',')} ui=unlocked copy=clean`
+    `Free-tier artwork smoke passed. ` +
+    `families=7 included=${INCLUDED_TEMPLATE} ` +
+    `blocked=${BLOCKED_TEMPLATES.join(',')} ` +
+    `configuredMeta=ticket-stub proxy-plain-template=clamped server-override=ignored copy=clean`
   )
 }
 
