@@ -172,6 +172,7 @@ Important playback differences:
 
 ```bash
 npm install
+# Recommended (a dev fallback secret is auto-generated if unset; required for hosted/production):
 $env:ENCRYPTION_SECRET = "replace-with-a-long-local-secret"
 npm start
 ```

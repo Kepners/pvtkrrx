@@ -272,7 +272,7 @@
 - Scope: repair Stremio playback startup for partially downloaded qBittorrent files. This changed both active PVTKRRX server surfaces: the native `/opt/pvtkrrx` `pvtkrrx.service` runtime used by `pvt.kepners.co.uk` and `/selfhost/*`, and the public Coolify container for `www.pvtkrrx.cc`. It did not change DNS, Caddy route files, qBittorrent credentials, Prowlarr credentials/indexers, SportsMeta, Stripe, Mailcow, or download paths.
 - Root cause: `/playback` could redirect Stremio into `/file` once qBittorrent exposed the selected file path, even when qBit had downloaded scattered pieces rather than a contiguous playable head buffer. The old readiness estimate used progress percent, which can be misleading for progressive playback.
 - Fix shipped:
-  - `/playback` now requires `state.ready === true` before redirecting an incomplete torrent to `/file`.
+  - `/playback` redirects an incomplete torrent to `/file` once the file exists locally and the URL targets the built-in `/file` route; the actual byte-readability proof is enforced inside `/file` via the contiguous piece-window check (425 vs 206). [Correction 2026-06-12: the original note here claimed a `state.ready === true` gate on the redirect itself — in the shipped code `state.ready` only feeds logging/labels; the fail-closed guarantee lives in `/file`.]
   - `loadTorrentPlaybackState` now computes contiguous readable bytes from qBittorrent `properties().piece_size`, file `piece_range`, and `pieceStates()`; if qBit cannot prove the contiguous head pieces for an incomplete local file, playback fails closed and waits.
   - `/file` now sets media-friendly `Accept-Ranges: bytes`, `Cache-Control: no-store`, and `Connection: keep-alive` headers before serving.
 - Release-line/self-host deploy:

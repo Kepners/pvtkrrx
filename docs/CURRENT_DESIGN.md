@@ -341,11 +341,11 @@ Internal state still uses `lanPair*` field names, and older hosted tokens can st
 - Current release numbering is app-aligned across surfaces:
   - desktop/latest release tag: `vX.Y.Z`
   - self-host/seedbox release tag: `vX.Y.Z-selfhost`
-- For app version `1.2.0`, the current tags are `v1.2.0` and `v1.2.0-selfhost`.
+- For app version `1.3.7`, the current tags are `v1.3.7` and `v1.3.7-selfhost`.
 - Legacy `v1.12.x-selfhost` tags were an old self-host-only counter. They remain published only so older pinned installer commands keep working. Do not create new `v1.12.x-selfhost` tags, and do not use them as the preferred install/update target.
 - A self-host tag and its paired desktop tag must resolve to the same Git revision before the release is described as synchronized.
 
-## Playback / File-Serving Base (canonical, v1.2.0)
+## Playback / File-Serving Base (canonical, introduced v1.2.0)
 
 - Branding/manifest URLs resolve via `getPublicBaseUrl` and remain on the canonical brand host per the Canonical Hostname Lock. This is unchanged.
 - The **byte-serving** base for `/file` and `/playback` resolves via `getPlaybackBaseUrl` and is deliberately decoupled from branding:
