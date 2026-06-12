@@ -2,40 +2,17 @@ const {
   PremiumizeContainerError,
   ServiceApiError,
   fetchWithRetry,
-  sleep
+  sleep,
+  makeUrlBuilder,
+  formBody,
+  parseJson,
+  isFormDataBody,
+  normalizeTorrentPayload
 } = require('./base');
 
 const BASE_URL = 'https://www.premiumize.me/api/';
 const RATE_LIMIT_DELAYS_MS = [500, 1500];
-
-function buildUrl(endpoint) {
-  return new URL(String(endpoint || '').replace(/^\//, ''), BASE_URL).toString();
-}
-
-function formBody(entries) {
-  const body = new URLSearchParams();
-  for (const [key, value] of Object.entries(entries || {})) {
-    body.set(key, String(value));
-  }
-  return body;
-}
-
-function parseJson(text, fallback = {}) {
-  if (!text) return fallback;
-  return JSON.parse(text);
-}
-
-function isFormDataBody(body) {
-  return typeof FormData !== 'undefined' && body instanceof FormData;
-}
-
-function normalizeTorrentPayload(bytes) {
-  const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
-  if (!payload || payload.length === 0) {
-    throw new Error('torrent payload is empty');
-  }
-  return payload;
-}
+const buildUrl = makeUrlBuilder(BASE_URL);
 
 function mapPremiumizeStatus(status) {
   const value = String(status || '').toLowerCase();

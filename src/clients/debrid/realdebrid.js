@@ -2,36 +2,16 @@ const {
   RdInfringingFileError,
   ServiceApiError,
   UnsupportedCapabilityError,
-  fetchWithRetry
+  fetchWithRetry,
+  makeUrlBuilder,
+  formBody,
+  parseJson,
+  normalizeTorrentPayload
 } = require('./base');
 const { sanitizeMagnet } = require('../../utils/rdFilenameSanitizer');
 
 const BASE_URL = 'https://api.real-debrid.com/rest/1.0/';
-
-function buildUrl(endpoint) {
-  return new URL(String(endpoint || '').replace(/^\//, ''), BASE_URL).toString();
-}
-
-function formBody(entries) {
-  const body = new URLSearchParams();
-  for (const [key, value] of Object.entries(entries || {})) {
-    body.set(key, String(value));
-  }
-  return body;
-}
-
-function parseJson(text, fallback = {}) {
-  if (!text) return fallback;
-  return JSON.parse(text);
-}
-
-function normalizeTorrentPayload(bytes) {
-  const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
-  if (!payload || payload.length === 0) {
-    throw new Error('torrent payload is empty');
-  }
-  return payload;
-}
+const buildUrl = makeUrlBuilder(BASE_URL);
 
 function isRdInfringingFile(error) {
   if (!(error instanceof ServiceApiError) || error.status !== 403) return false;

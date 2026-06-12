@@ -21,30 +21,32 @@ const { buildSportsDisplayName } = require('../utils/sportsDisplayName')
 const { getSportsAvailabilityAnchorByCanonical } = require('../utils/sportsAvailabilityStore')
 const BRAND_POSTER = BRAND_ARTWORK
 const BRAND_LOGO = BRAND_ARTWORK
+const cinemeta = new CinemetaClient()
+
+const SPORT_GENRE_LABELS = {
+  'american-football': 'American Football',
+  basketball: 'Basketball',
+  baseball: 'Baseball',
+  boxing: 'Boxing',
+  cricket: 'Cricket',
+  cycling: 'Cycling',
+  darts: 'Darts',
+  football: 'Football',
+  golf: 'Golf',
+  hockey: 'Hockey',
+  mma: 'MMA',
+  motorsport: 'Motorsport',
+  rugby: 'Rugby',
+  snooker: 'Snooker',
+  tennis: 'Tennis',
+  wrestling: 'Wrestling'
+}
 
 function formatSportGenreLabel(value) {
   const normalized = String(value || '').trim().toLowerCase()
   if (!normalized) return ''
 
-  const labels = {
-    'american-football': 'American Football',
-    basketball: 'Basketball',
-    baseball: 'Baseball',
-    boxing: 'Boxing',
-    cricket: 'Cricket',
-    cycling: 'Cycling',
-    darts: 'Darts',
-    football: 'Football',
-    golf: 'Golf',
-    mma: 'MMA',
-    motorsport: 'Motorsport',
-    rugby: 'Rugby',
-    snooker: 'Snooker',
-    tennis: 'Tennis',
-    wrestling: 'Wrestling'
-  }
-
-  return labels[normalized] || normalized
+  return SPORT_GENRE_LABELS[normalized] || normalized
     .split(/[\s-]+/)
     .filter(Boolean)
     .map(part => part[0].toUpperCase() + part.slice(1))
@@ -282,7 +284,6 @@ async function handleMeta(config, type, id, context = {}) {
 
     // IMDb ID — proxy to Cinemeta
     if (id.startsWith('tt')) {
-      const cinemeta = new CinemetaClient()
       const canonicalId = normalizeImdbId(id)
       const meta = type === 'series'
         ? await cinemeta.getSeries(canonicalId)
@@ -341,7 +342,6 @@ async function handleCustomMeta(config, id, context = {}) {
 
   if (!isSports && /^tt\d{7,10}$/i.test(imdbId)) {
     try {
-      const cinemeta = new CinemetaClient()
       const cmeta = String(info.y || '').toLowerCase() === 'series'
         ? await cinemeta.getSeries(imdbId)
         : await cinemeta.getMovie(imdbId)
@@ -509,4 +509,4 @@ async function handleCustomMeta(config, id, context = {}) {
   return { meta }
 }
 
-module.exports = { handleMeta }
+module.exports = { handleMeta, formatSportGenreLabel }

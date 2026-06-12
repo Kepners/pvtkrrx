@@ -43,6 +43,42 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, Math.max(0, Number(ms) || 0)));
 }
 
+function makeUrlBuilder(baseUrl) {
+  const base = String(baseUrl || '');
+  return function buildUrl(endpoint) {
+    return new URL(String(endpoint || '').replace(/^\//, ''), base).toString();
+  };
+}
+
+function formBody(entries) {
+  const body = new URLSearchParams();
+  for (const [key, value] of Object.entries(entries || {})) {
+    if (Array.isArray(value)) {
+      for (const item of value) body.append(key, String(item));
+    } else {
+      body.set(key, String(value));
+    }
+  }
+  return body;
+}
+
+function parseJson(text, fallback = {}) {
+  if (!text) return fallback;
+  return JSON.parse(text);
+}
+
+function isFormDataBody(body) {
+  return typeof FormData !== 'undefined' && body instanceof FormData;
+}
+
+function normalizeTorrentPayload(bytes) {
+  const payload = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes || []);
+  if (!payload || payload.length === 0) {
+    throw new Error('torrent payload is empty');
+  }
+  return payload;
+}
+
 function parseRetryAfter(headerValue) {
   const raw = String(headerValue || '').trim();
   if (!raw) return DEFAULT_RATE_LIMIT_DELAY_MS;
@@ -168,5 +204,10 @@ module.exports = {
   fetchWithRetry,
   getDebridProvider,
   readBody,
-  sleep
+  sleep,
+  makeUrlBuilder,
+  formBody,
+  parseJson,
+  isFormDataBody,
+  normalizeTorrentPayload
 };

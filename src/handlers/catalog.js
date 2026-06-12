@@ -41,6 +41,7 @@ const { buildSportsDisplayName } = require('../utils/sportsDisplayName')
 const { buildMetaPlaceholder } = require('../utils/metaPlaceholder')
 const { applyHostedServiceOverrides } = require('../utils/hostedServiceOverrides')
 const { isAdultContentResult } = require('../utils/adultContentFilter')
+const { formatSportGenreLabel: formatCatalogSportLabel } = require('./meta')
 
 function normalizeSpace(value) {
   return String(value || '').replace(/\s+/g, ' ').trim()
@@ -94,34 +95,10 @@ const SPORTS_IDENTITY_PASS_BUDGET_MS = Math.max(
   parseInt(process.env.PVTKRRX_SPORTS_IDENTITY_BUDGET_MS || '1000', 10)
 )
 const DEBUG_SPORTS_RESOLUTION = /^(1|true|yes|on)$/i.test(String(process.env.PVTKRRX_DEBUG_SPORTS_RESOLUTION || '').trim())
-
-function formatCatalogSportLabel(value) {
-  const normalized = String(value || '').trim().toLowerCase()
-  if (!normalized) return ''
-  const labels = {
-    'american-football': 'American Football',
-    basketball: 'Basketball',
-    baseball: 'Baseball',
-    boxing: 'Boxing',
-    cricket: 'Cricket',
-    cycling: 'Cycling',
-    darts: 'Darts',
-    football: 'Football',
-    golf: 'Golf',
-    hockey: 'Hockey',
-    mma: 'MMA',
-    motorsport: 'Motorsport',
-    rugby: 'Rugby',
-    snooker: 'Snooker',
-    tennis: 'Tennis',
-    wrestling: 'Wrestling'
-  }
-  return labels[normalized] || normalized
-    .split(/[\s-]+/)
-    .filter(Boolean)
-    .map((part) => part[0].toUpperCase() + part.slice(1))
-    .join(' ')
-}
+// Cap the per-page Cinemeta enrichment fan-out. Only inspect the emitted page
+// window (skip+limit) plus a small overfetch so post-sort trimming still has a
+// few spare candidates, instead of fetching up to 80+ metas per catalog page.
+const CATALOG_ENRICH_OVERFETCH = Math.max(0, parseInt(process.env.PVTKRRX_CATALOG_ENRICH_OVERFETCH || '10', 10))
 
 function pushUniqueCatalogLine(lines, value) {
   const text = String(value || '').trim()
@@ -1567,7 +1544,7 @@ async function moviesCatalog(config, extra) {
     }
   }
   const best = dedupeByImdbBest(filtered, query)
-  const inspectCount = Math.min(best.length, Math.max(80, (parseInt(extra.skip || '0', 10) + limit) * 3))
+  const inspectCount = Math.min(best.length, parseInt(extra.skip || '0', 10) + limit + CATALOG_ENRICH_OVERFETCH)
   const enriched = await enrichImdbEntries('movie', best, {
     inspectCount,
     requirePoster: !query
@@ -1619,7 +1596,7 @@ async function tvCatalog(config, extra) {
     }
   }
 
-  const titleResolveLimit = Math.min(missingImdb.length, Math.max(120, limit * 4))
+  const titleResolveLimit = Math.min(missingImdb.length, skip + limit + CATALOG_ENRICH_OVERFETCH)
   const resolvedFromTitle = await mapLimit(missingImdb.slice(0, titleResolveLimit), 6, async (item) => {
     try {
       const lookup = libraryLookupQuery(item.title) || cleanTitle(item.title)
@@ -1647,7 +1624,7 @@ async function tvCatalog(config, extra) {
 
   const merged = [...withImdb, ...resolvedFromTitle.filter(Boolean)]
   const best = dedupeByImdbBest(merged, query)
-  const inspectCount = Math.min(best.length, Math.max(80, (parseInt(extra.skip || '0', 10) + limit) * 3))
+  const inspectCount = Math.min(best.length, parseInt(extra.skip || '0', 10) + limit + CATALOG_ENRICH_OVERFETCH)
   const enriched = await enrichImdbEntries('series', best, {
     inspectCount,
     requirePoster: !query

@@ -4,6 +4,15 @@ const { sportHintFromCategory } = require('../utils/sportsCategoryHint')
 const { resolveSportHint } = require('../utils/sportsRules')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 
+// The indexer category lookup is expensive (one extra Prowlarr round-trip) and
+// rarely changes, so cache it at module scope keyed by baseUrl|apiKey. Per-request
+// ProwlarrClient instances then share the cached map instead of each rebuilding it.
+const indexerCategoryCache = new Map()
+
+function indexerCategoryCacheKey(baseUrl, apiKey) {
+  return `${String(baseUrl || '').toLowerCase()}|${String(apiKey || '')}`
+}
+
 function splitCategoryList(cats) {
   return String(cats || '')
     .split(',')
@@ -64,9 +73,16 @@ class ProwlarrClient {
     // Accept either base URL (http://host:port) or legacy torznab URL; normalize to base.
     this.baseUrl = normalizeProwlarrBaseUrl(baseUrl)
     this.apiKey = apiKey
-    this.indexerCategoryLookup = new Map()
-    this.indexerCategoryLookupExpiresAt = 0
-    this.indexerCategoryLookupInFlight = null
+    this.indexerCategoryCacheKey = indexerCategoryCacheKey(this.baseUrl, this.apiKey)
+  }
+
+  _indexerCategoryCacheEntry() {
+    let entry = indexerCategoryCache.get(this.indexerCategoryCacheKey)
+    if (!entry) {
+      entry = { lookup: new Map(), expiresAt: 0, inFlight: null }
+      indexerCategoryCache.set(this.indexerCategoryCacheKey, entry)
+    }
+    return entry
   }
 
   async _requestJson(path, options = {}) {
@@ -155,11 +171,12 @@ class ProwlarrClient {
   }
 
   async _getIndexerCategoryLookup() {
+    const entry = this._indexerCategoryCacheEntry()
     const now = Date.now()
-    if (this.indexerCategoryLookup.size > 0 && this.indexerCategoryLookupExpiresAt > now) {
-      return this.indexerCategoryLookup
+    if (entry.lookup.size > 0 && entry.expiresAt > now) {
+      return entry.lookup
     }
-    if (this.indexerCategoryLookupInFlight) return this.indexerCategoryLookupInFlight
+    if (entry.inFlight) return entry.inFlight
 
     const pending = (async () => {
       try {
@@ -188,17 +205,17 @@ class ProwlarrClient {
           }
           lookup.set(indexerId, idToName)
         }
-        this.indexerCategoryLookup = lookup
-        this.indexerCategoryLookupExpiresAt = Date.now() + INDEXER_CATEGORY_TTL_MS
-        return this.indexerCategoryLookup
+        entry.lookup = lookup
+        entry.expiresAt = Date.now() + INDEXER_CATEGORY_TTL_MS
+        return entry.lookup
       } catch (_) {
-        return this.indexerCategoryLookup
+        return entry.lookup
       } finally {
-        this.indexerCategoryLookupInFlight = null
+        entry.inFlight = null
       }
     })()
 
-    this.indexerCategoryLookupInFlight = pending
+    entry.inFlight = pending
     return pending
   }
 
