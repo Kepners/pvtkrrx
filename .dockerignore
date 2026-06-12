@@ -34,6 +34,7 @@ website/
 
 # Playwright + dev caches
 .playwright-mcp/
+tmp/
 
 # OS junk
 .DS_Store

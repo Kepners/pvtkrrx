@@ -21,6 +21,7 @@ const { getBrowserConfig, trackEvent } = require('./src/utils/analytics')
 const { scheduleSportsCatalogPrewarm } = require('./src/utils/sportsCatalogPrewarm')
 const { handleDebridPlayback, handleDebridPlaybackHead, handleDebridTest } = require('./src/handlers/playbackDebrid')
 const { sendWaitingRoomHead, sendWaitingRoomVideo } = require('./src/handlers/waitingRoom')
+const { playbackContentTypeFor } = require('./src/utils/mediaLabels')
 
 // Legacy direct TheSportsDB paths (sports-image cache, 15-min autofill job,
 // /sports/image proxy, and the experimental internal SportsMeta handler) were
@@ -74,12 +75,13 @@ const {
   getClientIp, isSameHostRequest, hashClientIp, requestClientLabel,
   isSensitiveCorsRoute, isAllowedSensitiveOrigin, normalizeOrigin,
   ensureCsrfCookie, requestHostname, isLoopbackHost, getInstallMode,
+  shouldRedirectHostedConfigure, isHostedNonLocalConfig, sendHostedBuiltinPlaybackRejection,
   shouldRejectPcLocalManifestRequest, parseHttpUrlCandidate,
   sanitizeHostForUrl, validateHostedConnectionTarget, hasServerAdminToken,
   isLocalNetworkRequest, parseBooleanLoose,
   // Middleware
   requireCsrfToken, requireLocalNetworkRoute, requireLocalConfigReadback,
-  requireLocalQbitControl, requireServerAdminToken, requireAuthUser, requireConfigSubscription,
+  requireLocalQbitControl, requireServerAdminToken, requireAuthUser,
   withConfig, withLegacyRootLocalConfig,
   // Auth
   getAuthTokenSecret, authSecretAvailable, isValidEmail, publicUserModel,
@@ -149,18 +151,6 @@ function pipeReadStreamToResponse(filePath, options, res, context = 'file') {
   return stream
 }
 
-function playbackContentTypeForPath(value = '') {
-  const ext = path.extname(String(value || '').split('?')[0]).toLowerCase()
-  if (ext === '.mp4') return 'video/mp4'
-  if (ext === '.mkv') return 'video/x-matroska'
-  if (ext === '.webm') return 'video/webm'
-  if (ext === '.avi') return 'video/x-msvideo'
-  if (ext === '.wmv') return 'video/x-ms-wmv'
-  if (ext === '.m4v') return 'video/x-m4v'
-  if (ext === '.ts') return 'video/mp2t'
-  return 'application/octet-stream'
-}
-
 function sendPlaybackHead(res, contentType = 'application/octet-stream') {
   res.setHeader('Cache-Control', 'no-store')
   res.setHeader('Accept-Ranges', 'bytes')
@@ -169,7 +159,7 @@ function sendPlaybackHead(res, contentType = 'application/octet-stream') {
 }
 
 function handleFileHead(req, res) {
-  if (IS_HOSTED_RELAY_RUNTIME && req.params.config !== 'local') {
+  if (isHostedNonLocalConfig(req)) {
     return res.status(403).end()
   }
   let state = null
@@ -178,11 +168,11 @@ function handleFileHead(req, res) {
   } catch (_) {
     return res.status(400).end()
   }
-  return sendPlaybackHead(res, playbackContentTypeForPath(state?.p || ''))
+  return sendPlaybackHead(res, playbackContentTypeFor(state?.p || ''))
 }
 
 function handlePlaybackHead(req, res) {
-  if (IS_HOSTED_RELAY_RUNTIME && req.params.config !== 'local') {
+  if (isHostedNonLocalConfig(req)) {
     return res.status(403).end()
   }
   let info = null
@@ -191,7 +181,7 @@ function handlePlaybackHead(req, res) {
   } catch (_) {
     return res.status(400).end()
   }
-  return sendPlaybackHead(res, playbackContentTypeForPath(info?.p || info?.name || ''))
+  return sendPlaybackHead(res, playbackContentTypeFor(info?.p || info?.name || ''))
 }
 
 function trackServerSockets(server, sockets) {
@@ -431,11 +421,17 @@ app.use(express.static(publicDir, {
 }))
 
 app.get('/configure', (req, res) => {
+  if (shouldRedirectHostedConfigure(req)) {
+    return res.redirect(302, '/#routes')
+  }
   ensureCsrfCookie(req, res)
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
   sendConfigurePage(req, res)
 })
 app.get('/:config/configure', (req, res) => {
+  if (shouldRedirectHostedConfigure(req)) {
+    return res.redirect(302, '/#routes')
+  }
   ensureCsrfCookie(req, res)
   setPublicCacheHeaders(res, 60, { sMaxAge: 900, staleWhileRevalidate: 86400 })
   sendConfigurePage(req, res)
@@ -2217,112 +2213,99 @@ app.get('/manifest.json', (req, res) => {
   res.json(m)
 })
 
-app.get('/catalog/:type/:id.json', withLegacyRootLocalConfig, requireConfigSubscription, async (req, res) => {
+function respondCatalog(req, res, result) {
+  const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
+  applyHostedRouteCacheHeaders(req, res, 0, {
+    sMaxAge: ttl,
+    staleWhileRevalidate: Math.min(ttl * 4, 3600),
+    staleIfError: Math.min(Math.max(ttl * 24, 3600), 86400)
+  })
+  res.json(result)
+}
+
+function respondStream(req, res, result) {
+  const ttl = parseCacheSeconds(result?.cacheMaxAge, 20, 5, 120)
+  applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: ttl, staleWhileRevalidate: Math.min(ttl * 3, 300) })
+  res.json(result)
+}
+
+function respondMeta(req, res, result) {
+  applyHostedRouteCacheHeaders(req, res, 0, {
+    sMaxAge: 300,
+    staleWhileRevalidate: 1800,
+    staleIfError: 86400
+  })
+  res.json(result)
+}
+
+app.get('/catalog/:type/:id.json', withLegacyRootLocalConfig, async (req, res) => {
   console.warn(`[stremio] compat root catalog type=${req.params.type} id=${req.params.id} from=${requestClientLabel(req)} -> /local`)
   const result = await handleCatalog(req.config, req.params.type, req.params.id, null, {
     baseUrl: getSportsArtworkBaseUrl(req)
   })
   console.log(`[stremio] compat root catalog result type=${req.params.type} id=${req.params.id} metas=${result?.metas?.length || 0}`)
-  const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
-  applyHostedRouteCacheHeaders(req, res, 0, {
-    sMaxAge: ttl,
-    staleWhileRevalidate: Math.min(ttl * 4, 3600),
-    staleIfError: Math.min(Math.max(ttl * 24, 3600), 86400)
-  })
-  res.json(result)
+  respondCatalog(req, res, result)
 })
 
-app.get('/catalog/:type/:id/:extra.json', withLegacyRootLocalConfig, requireConfigSubscription, async (req, res) => {
+app.get('/catalog/:type/:id/:extra.json', withLegacyRootLocalConfig, async (req, res) => {
   console.warn(`[stremio] compat root catalog type=${req.params.type} id=${req.params.id} extra=${req.params.extra} from=${requestClientLabel(req)} -> /local`)
   const result = await handleCatalog(req.config, req.params.type, req.params.id, req.params.extra, {
     baseUrl: getSportsArtworkBaseUrl(req)
   })
   console.log(`[stremio] compat root catalog result type=${req.params.type} id=${req.params.id} metas=${result?.metas?.length || 0}`)
-  const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
-  applyHostedRouteCacheHeaders(req, res, 0, {
-    sMaxAge: ttl,
-    staleWhileRevalidate: Math.min(ttl * 4, 3600),
-    staleIfError: Math.min(Math.max(ttl * 24, 3600), 86400)
-  })
-  res.json(result)
+  respondCatalog(req, res, result)
 })
 
-app.get('/stream/:type/:id.json', withLegacyRootLocalConfig, requireConfigSubscription, async (req, res) => {
+app.get('/stream/:type/:id.json', withLegacyRootLocalConfig, async (req, res) => {
   const addonUrl = getPublicBaseUrl(req)
   const playbackBaseUrl = getPlaybackBaseUrl(req)
   console.warn(`[stremio] compat root stream type=${req.params.type} id=${req.params.id} from=${requestClientLabel(req)} -> /local`)
   const result = await handleStream(req.config, req.params.type, req.params.id, addonUrl, 'local', playbackBaseUrl)
   console.log(`[stremio] compat root stream result type=${req.params.type} id=${req.params.id} streams=${Array.isArray(result?.streams) ? result.streams.length : 0}`)
-  const ttl = parseCacheSeconds(result?.cacheMaxAge, 20, 5, 120)
-  applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: ttl, staleWhileRevalidate: Math.min(ttl * 3, 300) })
-  res.json(result)
+  respondStream(req, res, result)
 })
 
-app.get('/meta/:type/:id.json', withLegacyRootLocalConfig, requireConfigSubscription, async (req, res) => {
+app.get('/meta/:type/:id.json', withLegacyRootLocalConfig, async (req, res) => {
   console.warn(`[stremio] compat root meta type=${req.params.type} id=${req.params.id} from=${requestClientLabel(req)} -> /local`)
   const result = await handleMeta(req.config, req.params.type, req.params.id, {
     baseUrl: getSportsArtworkBaseUrl(req)
   })
-  applyHostedRouteCacheHeaders(req, res, 0, {
-    sMaxAge: 300,
-    staleWhileRevalidate: 1800,
-    staleIfError: 86400
-  })
-  res.json(result)
+  respondMeta(req, res, result)
 })
 
-app.get('/:config/catalog/:type/:id.json', withConfig, requireConfigSubscription, maybeLanPairRedirect('catalog'), async (req, res) => {
+app.get('/:config/catalog/:type/:id.json', withConfig, maybeLanPairRedirect('catalog'), async (req, res) => {
   console.log(`[stremio] ← catalog   type=${req.params.type} id=${req.params.id} from=${req.ip || req.socket?.remoteAddress || '?'}`)
   const result = await handleCatalog(req.config, req.params.type, req.params.id, null, {
     baseUrl: getSportsArtworkBaseUrl(req)
   })
   console.log(`[stremio] → catalog   type=${req.params.type} id=${req.params.id} metas=${result?.metas?.length || 0}`)
-  const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
-  applyHostedRouteCacheHeaders(req, res, 0, {
-    sMaxAge: ttl,
-    staleWhileRevalidate: Math.min(ttl * 4, 3600),
-    staleIfError: Math.min(Math.max(ttl * 24, 3600), 86400)
-  })
-  res.json(result)
+  respondCatalog(req, res, result)
 })
 
-app.get('/:config/catalog/:type/:id/:extra.json', withConfig, requireConfigSubscription, maybeLanPairRedirect('catalog'), async (req, res) => {
+app.get('/:config/catalog/:type/:id/:extra.json', withConfig, maybeLanPairRedirect('catalog'), async (req, res) => {
   console.log(`[stremio] ← catalog   type=${req.params.type} id=${req.params.id} extra=${req.params.extra} from=${req.ip || req.socket?.remoteAddress || '?'}`)
   const result = await handleCatalog(req.config, req.params.type, req.params.id, req.params.extra, {
     baseUrl: getSportsArtworkBaseUrl(req)
   })
   console.log(`[stremio] → catalog   type=${req.params.type} id=${req.params.id} metas=${result?.metas?.length || 0}`)
-  const ttl = parseCacheSeconds(result?.cacheMaxAge, 120, 15, 900)
-  applyHostedRouteCacheHeaders(req, res, 0, {
-    sMaxAge: ttl,
-    staleWhileRevalidate: Math.min(ttl * 4, 3600),
-    staleIfError: Math.min(Math.max(ttl * 24, 3600), 86400)
-  })
-  res.json(result)
+  respondCatalog(req, res, result)
 })
 
-app.get('/:config/stream/:type/:id.json', withConfig, requireConfigSubscription, maybeLanPairRedirect('stream'), async (req, res) => {
+app.get('/:config/stream/:type/:id.json', withConfig, maybeLanPairRedirect('stream'), async (req, res) => {
   const addonUrl = getPublicBaseUrl(req)
   const playbackBaseUrl = getPlaybackBaseUrl(req)
   console.log(`[stremio] <- stream   type=${req.params.type} id=${req.params.id} from=${requestClientLabel(req)}`)
   const result = await handleStream(req.config, req.params.type, req.params.id, addonUrl, req.params.config, playbackBaseUrl)
   console.log(`[stremio] -> stream   type=${req.params.type} id=${req.params.id} streams=${Array.isArray(result?.streams) ? result.streams.length : 0}`)
-  const ttl = parseCacheSeconds(result?.cacheMaxAge, 20, 5, 120)
-  applyHostedRouteCacheHeaders(req, res, 0, { sMaxAge: ttl, staleWhileRevalidate: Math.min(ttl * 3, 300) })
-  res.json(result)
+  respondStream(req, res, result)
 })
 
-app.get('/:config/meta/:type/:id.json', withConfig, requireConfigSubscription, maybeLanPairRedirect('meta'), async (req, res) => {
+app.get('/:config/meta/:type/:id.json', withConfig, maybeLanPairRedirect('meta'), async (req, res) => {
   console.log(`[stremio] ← meta     type=${req.params.type} id=${req.params.id} from=${req.ip || req.socket?.remoteAddress || '?'}`)
   const result = await handleMeta(req.config, req.params.type, req.params.id, {
     baseUrl: getSportsArtworkBaseUrl(req)
   })
-  applyHostedRouteCacheHeaders(req, res, 0, {
-    sMaxAge: 300,
-    staleWhileRevalidate: 1800,
-    staleIfError: 86400
-  })
-  res.json(result)
+  respondMeta(req, res, result)
 })
 
 // Experimental internal SportsMeta routes removed 2026-04-22. SportsMeta is
@@ -2494,14 +2477,11 @@ app.get('/:config/playback/waiting-room.mp4', (req, res) => {
 })
 
 // Used when no external fileServerUrl is configured (e.g. local qBit setup).
-app.head('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('file'), handleFileHead)
-app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('file'), async (req, res) => {
+app.head('/:config/file/:info', withConfig, maybeLanPairRedirect('file'), handleFileHead)
+app.get('/:config/file/:info', withConfig, maybeLanPairRedirect('file'), async (req, res) => {
   try {
-    if (IS_HOSTED_RELAY_RUNTIME && req.params.config !== 'local') {
-      return res.status(403).json({
-        error: 'Built-in file serving is disabled on hosted runtime',
-        detail: 'Use File Server URL or LAN Pair local relay for playback'
-      })
+    if (isHostedNonLocalConfig(req)) {
+      return sendHostedBuiltinPlaybackRejection(res, 'Built-in file serving is disabled on hosted runtime')
     }
 
     let state = null
@@ -2704,9 +2684,7 @@ app.get('/:config/file/:info', withConfig, requireConfigSubscription, maybeLanPa
       }
     }
 
-    const ext = path.extname(resolvedFilePath).toLowerCase()
-    const mime = { '.mp4': 'video/mp4', '.mkv': 'video/x-matroska', '.avi': 'video/x-msvideo', '.wmv': 'video/x-ms-wmv', '.ts': 'video/mp2t', '.m4v': 'video/x-m4v' }
-    const contentType = mime[ext] || 'application/octet-stream'
+    const contentType = playbackContentTypeFor(resolvedFilePath)
     const range = requestedRangeHeader
     const initialRequest = isInitialPlaybackRequest
     const initialReady = () => Boolean(isComplete || isPlaybackReady(file, readableBytes))
@@ -2866,7 +2844,7 @@ app.get('/:config/playback/debrid/:token', async (req, res) => {
 })
 
 // ─── Playback endpoint — Comet pattern ──────────────────────
-app.head('/:config/playback/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('playback'), handlePlaybackHead)
+app.head('/:config/playback/:info', withConfig, maybeLanPairRedirect('playback'), handlePlaybackHead)
 function isQbitTorrentErrorState(torrent) {
   const state = String(torrent?.state || '').trim().toLowerCase()
   return state === 'error' || state === 'missingfiles' || state === 'missing_files'
@@ -2898,13 +2876,10 @@ async function sendQbitTorrentFailure(res, qbit, torrent) {
   return res.status(502).json(payload)
 }
 
-app.get('/:config/playback/:info', withConfig, requireConfigSubscription, maybeLanPairRedirect('playback'), async (req, res) => {
+app.get('/:config/playback/:info', withConfig, maybeLanPairRedirect('playback'), async (req, res) => {
   try {
-    if (IS_HOSTED_RELAY_RUNTIME && req.params.config !== 'local') {
-      return res.status(403).json({
-        error: 'Built-in playback buffering is disabled on hosted runtime',
-        detail: 'Use File Server URL or LAN Pair local relay for playback'
-      })
+    if (isHostedNonLocalConfig(req)) {
+      return sendHostedBuiltinPlaybackRejection(res, 'Built-in playback buffering is disabled on hosted runtime')
     }
 
     let info = null

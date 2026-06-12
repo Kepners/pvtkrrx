@@ -2011,6 +2011,21 @@ function isLoopbackHost(req) {
   return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'
 }
 
+function shouldRedirectHostedConfigure(req) {
+  return IS_HOSTED_RELAY_RUNTIME && !isLoopbackIp(getClientIp(req))
+}
+
+function isHostedNonLocalConfig(req) {
+  return IS_HOSTED_RELAY_RUNTIME && req?.params?.config !== 'local'
+}
+
+function sendHostedBuiltinPlaybackRejection(res, error) {
+  return res.status(403).json({
+    error,
+    detail: 'Use File Server URL or LAN Pair local relay for playback'
+  })
+}
+
 function getInstallMode(req) {
   const mode = String(req.query.mode || '').toLowerCase()
   if (mode === 'local' || mode === 'hosted') return mode
@@ -2071,12 +2086,6 @@ async function requireAuthUser(req, res, next) {
   req.authUser = user
   req.authTokenPayload = payload
   next()
-}
-
-// Billing/subscription gating removed — addon is free.
-// Kept as pass-through so route signatures don't change.
-async function requireConfigSubscription(req, res, next) {
-  return next()
 }
 
 function parseCacheSeconds(value, fallback, min = 0, max = 3600) {
@@ -3177,6 +3186,9 @@ module.exports = {
   getPlaybackBaseUrl,
   getConfigIssues,
   isLoopbackHost,
+  shouldRedirectHostedConfigure,
+  isHostedNonLocalConfig,
+  sendHostedBuiltinPlaybackRejection,
   getInstallMode,
   shouldRejectPcLocalManifestRequest,
   parseBoolean,
@@ -3184,7 +3196,6 @@ module.exports = {
   isValidEmail,
   publicUserModel,
   requireAuthUser,
-  requireConfigSubscription,
   parseCacheSeconds,
   setPublicCacheHeaders,
   applyHostedRouteCacheHeaders,

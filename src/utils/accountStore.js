@@ -49,6 +49,8 @@ function makeUserId() {
 class AccountStore {
   constructor(options = {}) {
     this.memory = new Map()
+    this.fileCache = null
+    this.fileCacheMtimeMs = null
     this.filePath = String(options.filePath || process.env.PVTKRRX_ACCOUNT_STORE_FILE || '').trim()
     this.redisUrl = normalizeBaseUrl(
       options.redisUrl ||
@@ -281,7 +283,7 @@ class AccountStore {
 
   fileSet(key, value) {
     try {
-      const store = this.fileLoad()
+      const store = { ...this.fileLoad() }
       store[key] = String(value ?? '')
       this.fileSave(store)
       return true
@@ -303,14 +305,36 @@ class AccountStore {
   }
 
   fileLoad() {
-    if (!this.filePath || !fs.existsSync(this.filePath)) return {}
+    if (!this.filePath || !fs.existsSync(this.filePath)) {
+      this.fileCache = null
+      this.fileCacheMtimeMs = null
+      return {}
+    }
+    let mtimeMs = null
+    try {
+      mtimeMs = fs.statSync(this.filePath).mtimeMs
+    } catch (_) {
+      mtimeMs = null
+    }
+    if (this.fileCache && mtimeMs !== null && mtimeMs === this.fileCacheMtimeMs) {
+      return this.fileCache
+    }
     const parsed = loadSecureJsonFile(this.filePath, { defaultValue: {} })
-    if (!parsed || typeof parsed !== 'object') return {}
-    return parsed
+    const store = parsed && typeof parsed === 'object' ? parsed : {}
+    this.fileCache = store
+    this.fileCacheMtimeMs = mtimeMs
+    return store
   }
 
   fileSave(store) {
     saveSecureJsonFile(this.filePath, store)
+    this.fileCache = store
+    try {
+      this.fileCacheMtimeMs = fs.statSync(this.filePath).mtimeMs
+    } catch (_) {
+      this.fileCache = null
+      this.fileCacheMtimeMs = null
+    }
   }
 }
 
