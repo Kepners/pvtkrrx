@@ -29,12 +29,16 @@ const { isAdultContentResult } = require('../utils/adultContentFilter')
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '10000', 10))
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '12000', 10))
 const MOVIE_TITLE_FALLBACK_TIMEOUT_MS = Math.max(STREAM_TITLE_FALLBACK_TIMEOUT_MS, parseInt(
-  process.env.PVTKRRX_MOVIE_TITLE_FALLBACK_TIMEOUT_MS || '20000',
+  process.env.PVTKRRX_MOVIE_TITLE_FALLBACK_TIMEOUT_MS || '8000',
   10
 ))
 const STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS = Math.max(1000, parseInt(
   process.env.PVTKRRX_STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS ||
   String(Math.min(7000, STREAM_TITLE_FALLBACK_TIMEOUT_MS)),
+  10
+))
+const STREAM_TITLE_FALLBACK_BUDGET_MS = Math.max(5000, parseInt(
+  process.env.PVTKRRX_STREAM_TITLE_FALLBACK_BUDGET_MS || '15000',
   10
 ))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '12', 10))
@@ -315,6 +319,89 @@ function buildNativeTorrentFromInspection(item, inspection, parsed, streamSource
   )
 }
 
+// Shared inspect -> classify -> build path for a tracker candidate. Used by the
+// movie/TV mapper, the supplemental sports loop, and the custom re-search loop.
+// Returns { stream, stop }: stream is a Stremio stream or null, stop signals the
+// caller to stop iterating (only set when tracker playback is restricted). All
+// notice bookkeeping is mutated onto ctx.noticeCounts. Behavioral knobs:
+//   - timeoutMs: inspection timeout (movie/TV uses the longer budget)
+//   - allowNative: emit a native-torrent stream when supported (sports + movie/TV)
+//   - knownInfoHashFallback: synthesize an inspection from item.infohash when
+//     there is no tracker link (sports supplemental qBit-title items)
+//   - requirePlayableVideo: skip link-backed items with no playable video file
+//   - parseTitle: pre-parsed metadata, falls back to parse(item.title)
+async function emitTrackerCandidateStream(item, ctx = {}) {
+  const {
+    playbackBaseUrl,
+    configToken,
+    config,
+    streamSourceOptions,
+    noticeCounts,
+    trackerPlaybackEnabled,
+    trackerPlaybackRestriction,
+    timeoutMs = TRACKER_LINK_INSPECTION_TIMEOUT_MS,
+    allowNative = false,
+    knownInfoHashFallback = false,
+    requirePlayableVideo = false
+  } = ctx
+  const parsed = ctx.parsed || parse(item.title || '')
+
+  const titleLooksPacked = isLikelyPackedReleaseTitle(item.title)
+  if (titleLooksLegacyAvi(item.title)) {
+    if (noticeCounts) noticeCounts.legacyAviSuppressed += 1
+    return { stream: null, stop: false }
+  }
+  const knownInfoHash = String(item?.infohash || '').toLowerCase()
+  const inspection = titleLooksPacked
+    ? { packedOnly: true, inspected: false }
+    : item.link
+      ? await inspectTrackerLink(item.link, { timeoutMs })
+      : (knownInfoHashFallback && knownInfoHash)
+        ? { packedOnly: false, inspected: true, infoHash: knownInfoHash }
+        : { packedOnly: false, inspected: false }
+  if (inspection.inspected && !inspection.infoHash && knownInfoHash) {
+    inspection.infoHash = knownInfoHash
+  }
+  if (titleLooksPacked || inspection.packedOnly) {
+    if (noticeCounts) noticeCounts.packedArchiveLiveUnsupported += 1
+    return { stream: null, stop: false }
+  }
+  if (inspection.legacyAviOnly) {
+    if (noticeCounts) noticeCounts.legacyAviSuppressed += 1
+    return { stream: null, stop: false }
+  }
+  if (!inspection.inspected) {
+    if (noticeCounts) noticeCounts.trackerLinkUnverified += 1
+    return { stream: null, stop: false }
+  }
+  if (knownInfoHashFallback && !item.link && knownInfoHash) {
+    inspection.selectedVideoFileIdx = 0
+    inspection.selectedVideoFileName = item.title || ''
+  }
+  if (requirePlayableVideo && item.link && !trackerInspectionHasPlayableVideo(inspection)) {
+    return { stream: null, stop: false }
+  }
+  if (allowNative) {
+    const nativeStream = buildNativeTorrentFromInspection(item, inspection, parsed, streamSourceOptions, config)
+    if (nativeStream) return { stream: nativeStream, stop: false }
+  }
+  if (!trackerPlaybackEnabled) {
+    recordTrackerRestrictionNotice(noticeCounts, trackerPlaybackRestriction)
+    return { stream: null, stop: true }
+  }
+  try {
+    const playbackUrl = buildPlaybackRouteUrl(playbackBaseUrl, configToken, {
+      h: item.infohash || inspection.infoHash || '',
+      l: item.link
+    })
+    if (!playbackUrl) return { stream: null, stop: false }
+    return { stream: buildOnTrackerStream(item, playbackUrl, parsed, streamSourceOptions), stop: false }
+  } catch (_) {
+    // Skip invalid playback payloads instead of leaking raw tracker URLs.
+    return { stream: null, stop: false }
+  }
+}
+
 function buildMatchedArchiveStream(config, configToken, playbackBaseUrl, matched, files, item, parsed, streamSourceOptions = {}) {
   const archiveFiles = findPackedArchiveFiles(files)
   if (archiveFiles.length === 0) return null
@@ -431,6 +518,22 @@ function createNoticeCounts() {
     trackerLinkUnverified: 0,
     legacyAviSuppressed: 0
   }
+}
+
+// Decide how long Stremio may cache a stream response. We only allow a modest
+// cache when the list has at least one ready/playable row and no in-flight
+// downloading/preparing placeholder — otherwise we keep 0 so Stremio re-queries
+// and picks up the file once it finishes downloading.
+function resolveStreamCacheMaxAge(streams, { sports = false } = {}) {
+  const list = Array.isArray(streams) ? streams : []
+  let hasReady = false
+  for (const stream of list) {
+    const mode = String(stream?.behaviorHints?.sourceMode || '').toLowerCase()
+    if (mode === 'buffering') return 0
+    if (mode === 'seedbox' || mode === 'native-torrent' || mode === 'debrid-cache') hasReady = true
+  }
+  if (!hasReady) return 0
+  return sports ? 30 : 60
 }
 
 function recordTrackerRestrictionNotice(noticeCounts, restriction) {
@@ -1084,69 +1187,46 @@ async function buildSupplementalSportsStreams({
   }
 
   const ordered = preferSeededResults(deduped, 'supplemental sports streams')
-  const streams = []
-  for (const item of ordered) {
-    if (streams.length + existingStreamCount >= STREAM_MAX_CANDIDATES) break
-    if (!sportsSourceHasPeersAndFiles(item)) continue
-    if (!hasBudget(500)) {
-      console.warn('[stream] Supplemental sports inspection budget exhausted')
-      break
-    }
-    const titleLooksPacked = isLikelyPackedReleaseTitle(item.title)
-    if (titleLooksLegacyAvi(item.title)) {
-      if (noticeCounts) noticeCounts.legacyAviSuppressed += 1
-      continue
-    }
-    const knownInfoHash = String(item?.infohash || '').toLowerCase()
-    const inspection = titleLooksPacked
-      ? { packedOnly: true, inspected: false }
-      : item.link
-        ? await inspectTrackerLink(item.link)
-        : knownInfoHash
-          ? { packedOnly: false, inspected: true, infoHash: knownInfoHash }
-          : { packedOnly: false, inspected: false }
-    if (titleLooksPacked || inspection.packedOnly) {
-      if (noticeCounts) noticeCounts.packedArchiveLiveUnsupported += 1
-      continue
-    }
-    if (inspection.legacyAviOnly) {
-      if (noticeCounts) noticeCounts.legacyAviSuppressed += 1
-      continue
-    }
-    if (!inspection.inspected) {
-      if (noticeCounts) noticeCounts.trackerLinkUnverified += 1
-      continue
-    }
-    if (!item.link && knownInfoHash) {
-      inspection.selectedVideoFileIdx = 0
-      inspection.selectedVideoFileName = item.title || ''
-    }
-    if (item.link && !trackerInspectionHasPlayableVideo(inspection)) continue
-    const nativeStream = buildNativeTorrentFromInspection(item, inspection, parse(item.title || queries[0] || ''), streamSourceOptions, config)
-    if (nativeStream) {
-      streams.push(nativeStream)
-      continue
-    }
-    if (!trackerPlaybackEnabled) {
-      recordTrackerRestrictionNotice(noticeCounts, trackerPlaybackRestriction)
-      break
-    }
-    try {
-      const playbackUrl = buildPlaybackRouteUrl(playbackBaseUrl, configToken, {
-        h: item.infohash || inspection.infoHash || '',
-        l: item.link
-      })
-      if (!playbackUrl) continue
-      streams.push(buildOnTrackerStream(
-        item,
-        playbackUrl,
-        parse(item.title || queries[0] || ''),
-        streamSourceOptions
-      ))
-    } catch (_) {
-      // Skip invalid playback payloads instead of leaking raw tracker URLs.
-    }
+  // Inspect candidates concurrently (each .torrent fetch is a 2.5s-timeout download
+  // and was the dominant serial cost). The original loop inspected candidates until
+  // it had STREAM_MAX_CANDIDATES *playable* streams — failed inspections didn't count
+  // — so we inspect the whole peers/files-eligible set (already capped at 20 by the
+  // dedupe above) in parallel, then assemble in order applying the cap, budget, and
+  // tracker-restriction "stop" semantics exactly as before.
+  const inspectable = ordered.filter(sportsSourceHasPeersAndFiles)
+  if (!hasBudget(500) && inspectable.length > 0) {
+    console.warn('[stream] Supplemental sports inspection budget exhausted')
+    return []
   }
+  const candidateResults = await mapWithConcurrency(inspectable, STREAM_CANDIDATE_CONCURRENCY, async (item) => {
+    if (!hasBudget(500)) return { skipped: true }
+    return emitTrackerCandidateStream(item, {
+      playbackBaseUrl,
+      configToken,
+      config,
+      streamSourceOptions,
+      noticeCounts,
+      trackerPlaybackEnabled,
+      trackerPlaybackRestriction,
+      allowNative: true,
+      knownInfoHashFallback: true,
+      requirePlayableVideo: true,
+      parsed: parse(item.title || queries[0] || '')
+    })
+  })
+
+  const streams = []
+  let budgetExhausted = false
+  for (const result of candidateResults) {
+    if (streams.length + existingStreamCount >= STREAM_MAX_CANDIDATES) break
+    if (result?.skipped) {
+      budgetExhausted = true
+      continue
+    }
+    if (result?.stop) break
+    if (result?.stream) streams.push(result.stream)
+  }
+  if (budgetExhausted) console.warn('[stream] Supplemental sports inspection budget exhausted')
 
   return streams
 }
@@ -1446,7 +1526,11 @@ async function searchTitleFallback(torznab, query, cats, options = {}) {
   if (!categorized.error && !categorized.timedOut && categorizedItems.length > 0) return categorizedItems
 
   console.log(`[stream] Title fallback broad query="${query}" cats="all" useCategories=false`)
-  const broadTimeout = options.type === 'movie' ? MOVIE_TITLE_FALLBACK_TIMEOUT_MS : STREAM_TITLE_FALLBACK_TIMEOUT_MS
+  const baseBroadTimeout = options.type === 'movie' ? MOVIE_TITLE_FALLBACK_TIMEOUT_MS : STREAM_TITLE_FALLBACK_TIMEOUT_MS
+  const remainingMs = Number(options.remainingMs)
+  const broadTimeout = Number.isFinite(remainingMs) && remainingMs > 0
+    ? Math.max(1000, Math.min(baseBroadTimeout, remainingMs))
+    : baseBroadTimeout
   const broad = await settleWithTimeout(
     torznab.search(query, cats, 'search', {
       useCategories: false,
@@ -1570,9 +1654,19 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
   // Use generic type=search — private trackers (HD-Torrents, SpeedCD) only support type=search.
   if (jackettItems.length === 0 && contentTitle) {
     const fallbackQueries = buildTitleFallbackQueries(contentTitle, type, season, episode, contentYear)
+    // Shared wall-clock deadline for the whole fallback chain: each searchTitleFallback
+    // can run two sequential Prowlarr searches, so without a budget a few queries could
+    // stack into tens of seconds. Pass remaining time down so the broad search uses
+    // min(its timeout, remaining), and stop iterating once the budget is spent.
+    const fallbackDeadlineMs = Date.now() + STREAM_TITLE_FALLBACK_BUDGET_MS
     for (const fallbackQuery of fallbackQueries) {
+      const remainingMs = fallbackDeadlineMs - Date.now()
+      if (remainingMs <= 0) {
+        console.warn('[stream] Title fallback budget exhausted; stopping further fallback queries')
+        break
+      }
       console.log(`[stream] Falling back to title search: "${fallbackQuery}"`)
-      const fallbackItems = await searchTitleFallback(torznab, fallbackQuery, cats, { type })
+      const fallbackItems = await searchTitleFallback(torznab, fallbackQuery, cats, { type, remainingMs })
       jackettItems = applyFilters(fallbackItems)
       console.log(`[stream] Title search returned ${jackettItems.length} results after filtering`)
       if (jackettItems.length > 0) break
@@ -1673,47 +1767,19 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
         return null
       }
     } else if (item.link) {
-      const titleLooksPacked = isLikelyPackedReleaseTitle(item.title)
-      if (titleLooksLegacyAvi(item.title)) {
-        noticeCounts.legacyAviSuppressed += 1
-        return null
-      }
-      const inspection = titleLooksPacked
-        ? { packedOnly: true, inspected: false }
-        : await inspectTrackerLink(item.link, { timeoutMs: MOVIE_TV_TRACKER_LINK_INSPECTION_TIMEOUT_MS })
-      if (inspection.inspected && !inspection.infoHash && item.infohash) {
-        inspection.infoHash = String(item.infohash || '').toLowerCase()
-      }
-      if (titleLooksPacked || inspection.packedOnly) {
-        noticeCounts.packedArchiveLiveUnsupported += 1
-        return null
-      }
-      if (inspection.legacyAviOnly) {
-        noticeCounts.legacyAviSuppressed += 1
-        return null
-      }
-      if (!inspection.inspected) {
-        noticeCounts.trackerLinkUnverified += 1
-        return null
-      }
-      const nativeStream = buildNativeTorrentFromInspection(item, inspection, parsed, streamSourceOptions, config)
-      if (nativeStream) return nativeStream
-      if (trackerPlaybackEnabled) {
-        // On tracker — playback URL (works with or without infohash)
-        try {
-          const playbackUrl = buildPlaybackRouteUrl(playbackBaseUrl, configToken, {
-            h: item.infohash || inspection.infoHash || '',
-            l: item.link
-          })
-          if (!playbackUrl) return null
-          return buildOnTrackerStream(item, playbackUrl, parsed, streamSourceOptions)
-        } catch (_) {
-          // Skip invalid playback payloads instead of leaking raw tracker URLs.
-          return null
-        }
-      } else {
-        recordTrackerRestrictionNotice(noticeCounts, trackerPlaybackRestriction)
-      }
+      const { stream } = await emitTrackerCandidateStream(item, {
+        playbackBaseUrl,
+        configToken,
+        config,
+        streamSourceOptions,
+        noticeCounts,
+        trackerPlaybackEnabled,
+        trackerPlaybackRestriction,
+        timeoutMs: MOVIE_TV_TRACKER_LINK_INSPECTION_TIMEOUT_MS,
+        allowNative: true,
+        parsed
+      })
+      return stream
     }
     return null
   })
@@ -1723,7 +1789,8 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
   }
 
   appendNoticeStreams(streams, noticeCounts, addonUrl)
-  return { streams: sortStreams(streams), cacheMaxAge: 0 }
+  const sortedStreams = sortStreams(streams)
+  return { streams: sortedStreams, cacheMaxAge: resolveStreamCacheMaxAge(sortedStreams) }
 }
 
 async function handleDecodedCustomStream(config, info, addonUrl, configToken, playbackBaseUrl = addonUrl) {
@@ -2012,45 +2079,18 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
       const ordered = preferSeededResults(deduped, `custom re-search (${query})`)
 
       for (const item of ordered) {
-        const titleLooksPacked = isLikelyPackedReleaseTitle(item.title)
-        if (titleLooksLegacyAvi(item.title)) {
-          noticeCounts.legacyAviSuppressed += 1
-          continue
-        }
-        const inspection = titleLooksPacked
-          ? { packedOnly: true, inspected: false }
-          : await inspectTrackerLink(item.link)
-        if (titleLooksPacked || inspection.packedOnly) {
-          noticeCounts.packedArchiveLiveUnsupported += 1
-          continue
-        }
-        if (inspection.legacyAviOnly) {
-          noticeCounts.legacyAviSuppressed += 1
-          continue
-        }
-        if (!inspection.inspected) {
-          noticeCounts.trackerLinkUnverified += 1
-          continue
-        }
-        if (!trackerPlaybackEnabled) {
-          recordTrackerRestrictionNotice(noticeCounts, trackerPlaybackRestriction)
-          break
-        }
-        try {
-          const playbackUrl = buildPlaybackRouteUrl(playbackBaseUrl, configToken, {
-            h: item.infohash || inspection.infoHash || '',
-            l: item.link
-          })
-          if (!playbackUrl) continue
-          streams.push(buildOnTrackerStream(
-            item,
-            playbackUrl,
-            parse(item.title || primaryTargetTitle || query),
-            streamSourceOptions
-          ))
-        } catch (_) {
-          // Skip invalid playback payloads instead of leaking raw tracker URLs.
-        }
+        const { stream, stop } = await emitTrackerCandidateStream(item, {
+          playbackBaseUrl,
+          configToken,
+          config: effectiveConfig,
+          streamSourceOptions,
+          noticeCounts,
+          trackerPlaybackEnabled,
+          trackerPlaybackRestriction,
+          parsed: parse(item.title || primaryTargetTitle || query)
+        })
+        if (stop) break
+        if (stream) streams.push(stream)
         if (streams.length >= STREAM_MAX_CANDIDATES) break
       }
 
@@ -2059,7 +2099,11 @@ async function handleDecodedCustomStream(config, info, addonUrl, configToken, pl
   }
 
   appendNoticeStreams(streams, noticeCounts, addonUrl)
-  return { streams: sortStreams(streams), cacheMaxAge: 0 }
+  const sortedStreams = sortStreams(streams)
+  return {
+    streams: sortedStreams,
+    cacheMaxAge: resolveStreamCacheMaxAge(sortedStreams, { sports: allowSupplementalSportsResults })
+  }
 }
 
 async function handleCustomStream(config, id, addonUrl, configToken, playbackBaseUrl = addonUrl) {

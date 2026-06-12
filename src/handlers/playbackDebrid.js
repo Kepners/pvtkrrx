@@ -6,6 +6,7 @@ const { getDebridProvider } = require('../clients/debrid/base')
 const { redactSensitiveText } = require('../utils/logRedaction')
 const { fetchTorrentPayload, validateTorrentPayload } = require('../utils/torrentPayload')
 const { sendWaitingRoomVideo } = require('./waitingRoom')
+const { playbackContentTypeFor } = require('../utils/mediaLabels')
 
 const POLL_INTERVAL_MS = Math.max(500, Number.parseInt(process.env.PVTKRRX_DEBRID_POLL_INTERVAL_MS || '2000', 10))
 const POLL_TIMEOUT_MS = Math.max(2000, Number.parseInt(
@@ -15,6 +16,7 @@ const POLL_TIMEOUT_MS = Math.max(2000, Number.parseInt(
   10
 ))
 const DEBRID_LOADER_AFTER_MS_DEFAULT = 8000
+const PING_TIMEOUT_MS = Math.max(1000, Number.parseInt(process.env.PVTKRRX_DEBRID_PING_TIMEOUT_MS || '8000', 10))
 const JOB_TTL_MS = Math.max(POLL_TIMEOUT_MS, Number.parseInt(process.env.PVTKRRX_DEBRID_JOB_TTL_MS || '600000', 10))
 const READY_JOB_TTL_MS = Math.max(30000, Number.parseInt(process.env.PVTKRRX_DEBRID_READY_JOB_TTL_MS || '900000', 10))
 const debridPlaybackJobs = new Map()
@@ -23,18 +25,6 @@ function maskToken(token) {
   const s = String(token || '')
   if (s.length <= 8) return s
   return s.slice(0, 8) + '…'
-}
-
-function playbackContentTypeFor(value = '') {
-  const text = String(value || '').toLowerCase()
-  if (/\.mp4(?:$|[?\s])|\bmp4\b/.test(text)) return 'video/mp4'
-  if (/\.mkv(?:$|[?\s])|\b(?:mkv|matroska)\b/.test(text)) return 'video/x-matroska'
-  if (/\.webm(?:$|[?\s])|\bwebm\b/.test(text)) return 'video/webm'
-  if (/\.avi(?:$|[?\s])|\bavi\b/.test(text)) return 'video/x-msvideo'
-  if (/\.wmv(?:$|[?\s])|\bwmv\b/.test(text)) return 'video/x-ms-wmv'
-  if (/\.m4v(?:$|[?\s])|\bm4v\b/.test(text)) return 'video/x-m4v'
-  if (/\.ts(?:$|[?\s])|\b(?:mpegts|transport stream)\b/.test(text)) return 'video/mp2t'
-  return 'application/octet-stream'
 }
 
 function debridPreparingResponseMode() {
@@ -296,7 +286,8 @@ async function pingProvider(type, apiKey) {
 
   if (type === 'rd') {
     const res = await fetch('https://api.real-debrid.com/rest/1.0/user', {
-      headers: { Authorization: `Bearer ${trimmed}` }
+      headers: { Authorization: `Bearer ${trimmed}` },
+      signal: AbortSignal.timeout(PING_TIMEOUT_MS)
     })
     if (res.status === 401 || res.status === 403) throw new Error('Real-Debrid rejected the API key (HTTP ' + res.status + ').')
     if (!res.ok) throw new Error('Real-Debrid responded HTTP ' + res.status)
@@ -310,7 +301,8 @@ async function pingProvider(type, apiKey) {
 
   if (type === 'ad') {
     const res = await fetch('https://api.alldebrid.com/v4/user', {
-      headers: { Authorization: `Bearer ${trimmed}` }
+      headers: { Authorization: `Bearer ${trimmed}` },
+      signal: AbortSignal.timeout(PING_TIMEOUT_MS)
     })
     if (res.status === 401 || res.status === 403) throw new Error('AllDebrid rejected the API key (HTTP ' + res.status + ').')
     if (!res.ok) throw new Error('AllDebrid responded HTTP ' + res.status)
@@ -327,7 +319,8 @@ async function pingProvider(type, apiKey) {
 
   if (type === 'pm') {
     const res = await fetch('https://www.premiumize.me/api/account/info', {
-      headers: { Authorization: `Bearer ${trimmed}` }
+      headers: { Authorization: `Bearer ${trimmed}` },
+      signal: AbortSignal.timeout(PING_TIMEOUT_MS)
     })
     if (res.status === 401 || res.status === 403) throw new Error('Premiumize rejected the API key (HTTP ' + res.status + ').')
     if (!res.ok) throw new Error('Premiumize responded HTTP ' + res.status)
@@ -353,7 +346,8 @@ async function pingCacheSearchSource(type, apiKey) {
 
   if (type === 'putio') {
     const res = await fetch('https://api.put.io/v2/account/info', {
-      headers: { Authorization: `Bearer ${trimmed}` }
+      headers: { Authorization: `Bearer ${trimmed}` },
+      signal: AbortSignal.timeout(PING_TIMEOUT_MS)
     })
     if (res.status === 401 || res.status === 403) throw new Error('put.io rejected the token (HTTP ' + res.status + ').')
     if (!res.ok) throw new Error('put.io responded HTTP ' + res.status)

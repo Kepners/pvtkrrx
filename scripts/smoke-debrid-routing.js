@@ -515,7 +515,7 @@ async function run() {
     assert.match(result.streams[1].url, /\/file\//, 'ready qBit file remains fallback')
   })
 
-  await check('preferDebridOverSeedbox=false still keeps debrid first', async () => {
+  await check('preferDebridOverSeedbox=false puts seedbox/base first, debrid second', async () => {
     const baseResult = { streams: [makeQbitStream('On Seedbox', 'movie 1080p')] }
     const result = await applyV13Routing(baseResult, {
       config: {
@@ -528,8 +528,8 @@ async function run() {
       id: 'tt12345678'
     })
     assert.equal(result.streams.length, 2)
-    assert.match(result.streams[0].url, /\/playback\/debrid\//, 'debrid first')
-    assert.equal(result.streams[1].name, 'On Seedbox', 'qBit fallback second')
+    assert.equal(result.streams[0].name, 'On Seedbox', 'seedbox first when preference off')
+    assert.match(result.streams[1].url, /\/playback\/debrid\//, 'debrid second when preference off')
   })
 
   await check('TV episode + debrid + multiple qBit streams → debrid added for each, qBit ALL preserved', async () => {

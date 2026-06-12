@@ -1,5 +1,7 @@
 // Build Stremio stream objects - two patterns: on-seedbox and on-tracker
 
+const { playbackContentTypeFor } = require('./mediaLabels')
+
 const PVTKRRX_LOGO_URL = 'https://raw.githubusercontent.com/Kepners/pvtkrrx/main/public/logo.png'
 const VIDEO_EXTENSIONS = ['.mkv', '.mp4', '.avi', '.wmv', '.ts', '.m4v']
 const SAMPLE_HINT_RE = /(^|[\\/.\-_ ])[sS]ample([\\/.\-_ ]|$)|(^|[\\/.\-_ ])[tT]railer([\\/.\-_ ]|$)|(^|[\\/.\-_ ])[pP]review([\\/.\-_ ]|$)|(^|[\\/.\-_ ])[pP]roof([\\/.\-_ ]|$)/
@@ -11,18 +13,6 @@ const SLOW_DOWNLOAD_BYTES_PER_SEC = Math.max(
   1,
   parseInt(process.env.PVTKRRX_SLOW_DOWNLOAD_BYTES_PER_SEC || String(1024 * 1024), 10)
 )
-
-function playbackContentTypeFor(value, container = '') {
-  const text = `${String(value || '')} ${String(container || '')}`.toLowerCase()
-  if (/\.mp4(?:$|[?\s])|\bmp4\b/.test(text)) return 'video/mp4'
-  if (/\.mkv(?:$|[?\s])|\b(?:mkv|matroska)\b/.test(text)) return 'video/x-matroska'
-  if (/\.webm(?:$|[?\s])|\bwebm\b/.test(text)) return 'video/webm'
-  if (/\.avi(?:$|[?\s])|\bavi\b/.test(text)) return 'video/x-msvideo'
-  if (/\.wmv(?:$|[?\s])|\bwmv\b/.test(text)) return 'video/x-ms-wmv'
-  if (/\.m4v(?:$|[?\s])|\bm4v\b/.test(text)) return 'video/x-m4v'
-  if (/\.ts(?:$|[?\s])|\b(?:mpegts|transport stream)\b/.test(text)) return 'video/mp2t'
-  return 'application/octet-stream'
-}
 
 function mergeProxyHeaders(stream, patch = {}) {
   if (!stream?.behaviorHints || !patch || typeof patch !== 'object') return stream

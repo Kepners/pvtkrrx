@@ -26,24 +26,7 @@ const { decodeFileStateToken, decodePlaybackStateToken, encodeDebridPlaybackToke
 const { searchAllSources } = require('./debridCache')
 const { redactSensitiveText } = require('./logRedaction')
 const { PVTKRRX_LOGO_URL, formatSize } = require('./streams')
-
-function detectQualityLabel(value = '') {
-  const text = String(value || '').toUpperCase()
-  const match = text.match(/\b(2160P|1080P|720P|576P|540P|480P|4K|UHD)\b/)
-  if (!match) return ''
-  return match[1] === 'UHD' ? '2160P' : match[1]
-}
-
-function detectContainerLabel(value = '') {
-  const text = String(value || '').toLowerCase()
-  if (/\.(mkv)(?:$|[?\s])|\bmkv\b/.test(text)) return 'MKV'
-  if (/\.(mp4)(?:$|[?\s])|\bmp4\b/.test(text)) return 'MP4'
-  if (/\.(webm)(?:$|[?\s])|\bwebm\b/.test(text)) return 'WEBM'
-  if (/\.(avi)(?:$|[?\s])|\bavi\b/.test(text)) return 'AVI'
-  if (/\.(m4v)(?:$|[?\s])|\bm4v\b/.test(text)) return 'M4V'
-  if (/\.(ts|m2ts)(?:$|[?\s])|\b(?:ts|m2ts)\b/.test(text)) return 'TS'
-  return ''
-}
+const { playbackContentTypeFor, detectQualityLabel, detectContainerLabel } = require('./mediaLabels')
 
 function formatCacheSourceLabel(sourceId = '') {
   const source = String(sourceId || '').toLowerCase()
@@ -216,18 +199,6 @@ function allowUncachedSportsDebridHandoff(config = {}) {
 function pickReadyStreamName(hit) {
   // COPY DRAFT — pending docs/copy.md approval. Brief §3 stream-prefix lock.
   return '⚡ READY'
-}
-
-function playbackContentTypeFor(value = '') {
-  const text = String(value || '').toLowerCase()
-  if (/\.mp4(?:$|[?\s])|\bmp4\b/.test(text)) return 'video/mp4'
-  if (/\.mkv(?:$|[?\s])|\b(?:mkv|matroska)\b/.test(text)) return 'video/x-matroska'
-  if (/\.webm(?:$|[?\s])|\bwebm\b/.test(text)) return 'video/webm'
-  if (/\.avi(?:$|[?\s])|\bavi\b/.test(text)) return 'video/x-msvideo'
-  if (/\.wmv(?:$|[?\s])|\bwmv\b/.test(text)) return 'video/x-ms-wmv'
-  if (/\.m4v(?:$|[?\s])|\bm4v\b/.test(text)) return 'video/x-m4v'
-  if (/\.ts(?:$|[?\s])|\b(?:mpegts|transport stream)\b/.test(text)) return 'video/mp2t'
-  return 'application/octet-stream'
 }
 
 function prioritizeProviderForCacheSource(sourceId, providers) {
@@ -428,24 +399,39 @@ async function applyV13Routing(result, ctx = {}) {
   })()
   const cacheStreams = []
   if (enabledCache.length > 0) {
+    // Dedupe hashes first, then run the per-hash cache lookups concurrently instead
+    // of awaiting them one at a time (the old N+1). Results are re-flattened in the
+    // original hash order so emitted-row ordering stays identical.
     const seenHashes = new Set()
+    const hashMetas = []
     for (const meta of debridMetas) {
       const hash = String(meta?.hash || '').trim().toLowerCase()
       if (!/^[a-f0-9]{40}$/.test(hash) || seenHashes.has(hash)) continue
       seenHashes.add(hash)
-      const builtForHash = await buildCacheSearchStreams(
-        { infohash: hash, title: meta.name || queryTitle },
+      hashMetas.push({ hash, title: meta.name || queryTitle })
+    }
+    const builtByHash = await Promise.all(hashMetas.map(({ hash, title }) =>
+      buildCacheSearchStreams(
+        { infohash: hash, title },
         enabledCache,
         playbackBaseUrl,
         providersForDebrid,
         configToken
-      )
+      ).then(built => ({ hash, built }))
+    ))
+    let hashPassProducedHits = false
+    for (const { hash, built } of builtByHash) {
       // A cache hit means the provider already holds this exact hash -> instant,
       // so its debrid downloader row must NOT be marked "will download".
-      if (builtForHash.length > 0) cachedHashes.add(hash)
-      cacheStreams.push(...builtForHash)
+      if (built.length > 0) {
+        cachedHashes.add(hash)
+        hashPassProducedHits = true
+      }
+      cacheStreams.push(...built)
     }
-    if (queryTitle) {
+    // The title search is only a fallback for sources that resolve by name (put.io).
+    // If the hash pass already produced cache hits, skip the redundant title query.
+    if (queryTitle && !hashPassProducedHits) {
       cacheStreams.push(...await buildCacheSearchStreams(
         { title: queryTitle },
         enabledCache,
@@ -468,11 +454,17 @@ async function applyV13Routing(result, ctx = {}) {
     }
   }
 
-  // qBit remains available for every content type (movies, TV, sports), but
-  // debrid is the first downloader target when configured.
+  // qBit remains available for every content type (movies, TV, sports). By default
+  // (preferDebridOverSeedbox !== false) debrid/cache groups lead and qBit/seedbox
+  // follows. When the user explicitly turns the preference off, the same GROUPS are
+  // re-ordered so base/seedbox streams come first — no stream is ever dropped (debrid
+  // is additive; qBit always stays in the list).
   const baseStreams = existing
+  const preferDebrid = debridConfig.preferDebridOverSeedbox !== false
   const finalStreams = hasDebrid
-    ? [...cacheStreams, ...debridStreams, ...debridFileStreams, ...baseStreams]
+    ? (preferDebrid
+      ? [...cacheStreams, ...debridStreams, ...debridFileStreams, ...baseStreams]
+      : [...baseStreams, ...cacheStreams, ...debridStreams, ...debridFileStreams])
     : [...cacheStreams, ...baseStreams]
 
   // Dedupe by URL to prevent the same /playback/debrid token from appearing twice.
