@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const DEFAULT_MANIFEST_URL = 'https://pvt.kepners.co.uk/selfhost/manifest.json?mode=hosted'
+const DEFAULT_MANIFEST_URL = 'https://pvtkrr.layoutforge.app/selfhost/manifest.json?mode=hosted'
 const REQUEST_TIMEOUT_MS = Math.max(2000, Number(process.env.PVTKRRX_PROBE_TIMEOUT_MS || 15000) || 15000)
 const SPORTS_CATALOG_LIMIT = Math.max(1, Number(process.env.PVTKRRX_PROBE_CATALOG_LIMIT || 8) || 8)
 const ACCEPTABLE_STREMIO_IMAGE_RE = /^image\/(?:png|jpe?g|webp)(?:\s*;|$)/i

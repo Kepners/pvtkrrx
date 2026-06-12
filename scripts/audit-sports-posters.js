@@ -13,7 +13,7 @@ const OUT_DIR = path.join(process.cwd(), '.runtime', 'sports-poster-audit')
 // against a deployed runtime that's older than HEAD.
 const EXPECTED_VERSION = String(process.env.PVTKRRX_SPORTS_POSTER_AUDIT_VERSION || SPORTS_ARTWORK_PROXY_VERSION)
 const DEFAULT_MANIFEST = process.env.PVTKRRX_SPORTS_POSTER_AUDIT_MANIFEST ||
-  'https://pvt.kepners.co.uk/selfhost/manifest.json?mode=hosted'
+  'https://pvtkrr.layoutforge.app/selfhost/manifest.json?mode=hosted'
 const POSTER_ALLOWED_SOURCES = new Set([
   'sportsmeta-raster',
   'pvtkrrx-public-template',

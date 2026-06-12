@@ -2,7 +2,7 @@
 
 const sharp = require('sharp')
 
-const DEFAULT_MANIFEST_URL = 'https://pvt.kepners.co.uk/selfhost/manifest.json?mode=hosted'
+const DEFAULT_MANIFEST_URL = 'https://pvtkrr.layoutforge.app/selfhost/manifest.json?mode=hosted'
 const REQUEST_TIMEOUT_MS = Math.max(2000, Number(process.env.PVTKRRX_AUDIT_TIMEOUT_MS || 15000) || 15000)
 const SAMPLE_LIMIT = Math.max(1, Number(process.env.PVTKRRX_AUDIT_LIMIT || 50) || 50)
 const TARGET_TERMS = Object.freeze([

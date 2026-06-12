@@ -1,5 +1,32 @@
 # PVTKRRX Brain
 
+## 2026-06-12: Personal hostname migrated to pvtkrr.layoutforge.app
+
+- Reason: the owner no longer owns `kepners.co.uk`, so `pvt.kepners.co.uk` is dead
+  and a third party could register the domain — treat any remaining live use of it
+  as a security bug.
+- Changes made live on Contabo:
+  - Porkbun DNS: new A record `pvtkrr.layoutforge.app -> 94.72.97.251` (record ID
+    555107084) on the `layoutforge.app` zone. The zone's wildcard CNAME to
+    `pixie.porkbun.com` still exists; the specific A record overrides it.
+  - Caddy: created `/opt/stack/caddy/apps-{available,enabled}/pvtkrr.layoutforge.app.caddy`
+    (`reverse_proxy host.docker.internal:7000`), deleted both
+    `pvt.kepners.co.uk.caddy` files, reloaded Caddy in-container.
+  - `/opt/pvtkrrx/.env`: `PVTKRRX_ALLOWED_WEB_ORIGINS` now lists
+    `https://pvtkrr.layoutforge.app` instead of the dead hostname;
+    `pvtkrrx.service` restarted and active.
+- Proof: `https://pvtkrr.layoutforge.app/manifest.json` returned 200 in ~0.3s with
+  bootstrap name `PVTKRR` and no personal hostname in the body;
+  `https://www.pvtkrrx.cc/manifest.json` unchanged and clean of `kepners.co.uk`.
+- Repo updates: CLAUDE.md hostname lock + topology table, this file's surface
+  table, and the default manifest URLs in `scripts/audit-sports-posters.js`,
+  `scripts/audit-sports-artwork.js`, `scripts/probe-sports-item.js`.
+- Owner action required: any Stremio install on a phone/TV that was added via
+  `pvt.kepners.co.uk` must be reinstalled from
+  `https://pvtkrr.layoutforge.app/selfhost/manifest.json?mode=hosted` (old
+  manifest URLs in already-installed clients keep pointing at the dead hostname).
+- Historical dated entries below intentionally keep the old hostname as history.
+
 ## 2026-05-25: v1.3.4 playback/poster release
 
 - Scope: durable `main` release for the public Coolify surface, native Contabo
@@ -291,7 +318,7 @@ There are currently two PVTKRRX server surfaces on Contabo. Keep them separate w
 | Surface | Where | Watches |
 |---|---|---|
 | `https://www.pvtkrrx.cc` except `/selfhost/*` | Coolify Docker container `w14jewmw5ubscrxh8zzfhq7d-...`, bound to internal `pvtkrrx:3000`, fronted by Caddy reverse_proxy | GitHub `Kepners/pvtkrrx` branch `main` as of the 2026-05-17 branch unification |
-| `https://www.pvtkrrx.cc/selfhost/*`, `https://pvtkrrx.cc/selfhost/*`, and `https://pvt.kepners.co.uk/*` | Native systemd `pvtkrrx.service`, working directory `/opt/pvtkrrx`, port `7000`, fronted by Caddy `host.docker.internal:7000` | Manual tarball/rsync-style deploy into `/opt/pvtkrrx`, currently on `main` hotfix commit `b5b4b748611e343aa89e2ae6b3c3ae66a083e244` |
+| `https://www.pvtkrrx.cc/selfhost/*`, `https://pvtkrrx.cc/selfhost/*`, and `https://pvtkrr.layoutforge.app/*` (replaced `pvt.kepners.co.uk` on 2026-06-12 — domain no longer owned) | Native systemd `pvtkrrx.service`, working directory `/opt/pvtkrrx`, port `7000`, fronted by Caddy `host.docker.internal:7000` | Manual tarball/rsync-style deploy into `/opt/pvtkrrx`, currently on `main` hotfix commit `b5b4b748611e343aa89e2ae6b3c3ae66a083e244` |
 | `https://sportsmeta.pvtkrrx.cc` | systemd `sportsmeta.service` (no Docker, no Coolify), source at `/opt/sportsmeta/app` | manual rsync deploy |
 
 Do not use the public Coolify container as proof that the self-host playback route changed, and do not use `/opt/pvtkrrx` proof as proof that the normal public website changed. The 2026-05-16 playback fix was intentionally deployed to both surfaces.
