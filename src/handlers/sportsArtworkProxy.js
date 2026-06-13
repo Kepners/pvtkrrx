@@ -1158,6 +1158,17 @@ const DEFAULT_LEAGUE_LOGO_RULES = Object.freeze([
     directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/mlsr7d1718774547.png']
   },
   {
+    // FIFA World Cup league mark (TheSportsDB league 4429). Rule is
+    // football-sport-gated, so Cricket/Rugby "World Cup" titles never reach it.
+    // Exclude qualifier titles so the qualifier keeps its own (non-FIFA) mark.
+    // Curl-verified 2026-06-13: badge e7er5g1696521789.png -> 200 image/png.
+    sport: 'football',
+    pattern: /^(?!.*\bqualifiers?\b)(?:.*\bfifa\s+world\s+cup\b|.*\bworld\s+cup\b)/i,
+    canonicalIds: ['sportsmeta:league:football|fifa-world-cup'],
+    searchTerms: ['FIFA World Cup'],
+    directLogoUrls: ['https://r2.thesportsdb.com/images/media/league/badge/e7er5g1696521789.png']
+  },
+  {
     sport: 'football',
     pattern: /^(?!.*\bscottish\b)(?!.*\bwomen'?s?\b).*\b(?:english\s+premier\s+league|premier\s+league|epl)\b/i,
     canonicalIds: ['sportsmeta:league:football|english-premier-league'],
@@ -1815,7 +1826,7 @@ const DIRECT_TEAM_LOGO_OVERRIDES = Object.freeze([
     ['football', '', 'Bosnia-Herzegovina', ['bosnia', 'bosnia-herzegovina', 'bosnia and herzegovina'], 'https://a.espncdn.com/i/teamlogos/countries/500/bih.png'],
     ['football', '', 'Bulgaria', ['bulgaria'], 'https://a.espncdn.com/i/teamlogos/countries/500/bul.png'],
     ['football', '', 'Israel', ['israel'], 'https://a.espncdn.com/i/teamlogos/countries/500/isr.png'],
-    ['football', '', 'United States', ['united states', 'usmnt', 'usa soccer'], 'https://a.espncdn.com/i/teamlogos/countries/500/usa.png'],
+    ['football', '', 'United States', ['united states', 'usmnt', 'usa soccer', 'usa'], 'https://a.espncdn.com/i/teamlogos/countries/500/usa.png'],
     ['football', '', 'Mexico', ['mexico', 'mÃ©xico'], 'https://a.espncdn.com/i/teamlogos/countries/500/mex.png'],
     ['football', '', 'Canada', ['canada'], 'https://a.espncdn.com/i/teamlogos/countries/500/can.png'],
     ['football', '', 'Colombia', ['colombia'], 'https://a.espncdn.com/i/teamlogos/countries/500/col.png'],
@@ -1828,7 +1839,7 @@ const DIRECT_TEAM_LOGO_OVERRIDES = Object.freeze([
     ['football', '', 'Bolivia', ['bolivia'], 'https://a.espncdn.com/i/teamlogos/countries/500/bol.png'],
     ['football', '', 'Japan', ['japan'], 'https://a.espncdn.com/i/teamlogos/countries/500/jpn.png'],
     ['football', '', 'South Korea', ['south korea', 'korea republic'], 'https://a.espncdn.com/i/teamlogos/countries/500/kors.png'],
-    ['football', '', 'Australia (football)', ['socceroos'], 'https://a.espncdn.com/i/teamlogos/countries/500/aus.png'],
+    ['football', '', 'Australia (football)', ['socceroos', 'australia'], 'https://a.espncdn.com/i/teamlogos/countries/500/aus.png'],
     ['football', '', 'Morocco', ['morocco'], 'https://a.espncdn.com/i/teamlogos/countries/500/mar.png'],
     ['football', '', 'Senegal', ['senegal'], 'https://a.espncdn.com/i/teamlogos/countries/500/sen.png'],
     ['football', '', 'Nigeria', ['nigeria'], 'https://a.espncdn.com/i/teamlogos/countries/500/nga.png'],
@@ -1839,6 +1850,22 @@ const DIRECT_TEAM_LOGO_OVERRIDES = Object.freeze([
     ['football', '', 'Algeria', ['algeria'], 'https://a.espncdn.com/i/teamlogos/countries/500/alg.png'],
     ['football', '', 'Tunisia', ['tunisia'], 'https://a.espncdn.com/i/teamlogos/countries/500/tun.png'],
     ['football', '', 'South Africa (football)', ['south africa'], 'https://a.espncdn.com/i/teamlogos/countries/500/rsa.png'],
+    // === SOCCER â€” FIFA World Cup 2026 qualified nations missing above ===
+    // Authoritative TheSportsDB squad badges (eventsseason.php?id=4429&s=2026 home/away badges).
+    // All curl-verified 2026-06-13: HTTP 200 + image/png. SportsMeta supplies real badges
+    // post-import; this hardcoded table is only the fallback safety net.
+    ['football', '', 'Cape Verde', ['cape verde', 'cabo verde'], 'https://r2.thesportsdb.com/images/media/team/badge/5jn0o71593280376.png'],
+    ['football', '', 'Curacao', ['curacao', 'curaÃ§ao'], 'https://r2.thesportsdb.com/images/media/team/badge/itygvb1600955363.png'],
+    ['football', '', 'DR Congo', ['dr congo', 'democratic republic of congo', 'congo dr'], 'https://r2.thesportsdb.com/images/media/team/badge/s85jjw1728749022.png'],
+    ['football', '', 'Haiti', ['haiti'], 'https://r2.thesportsdb.com/images/media/team/badge/gml8wx1598135302.png'],
+    ['football', '', 'Iran', ['iran'], 'https://r2.thesportsdb.com/images/media/team/badge/uttpvw1455465617.png'],
+    ['football', '', 'Iraq', ['iraq'], 'https://r2.thesportsdb.com/images/media/team/badge/aqidfn1742100110.png'],
+    ['football', '', 'Jordan', ['jordan'], 'https://r2.thesportsdb.com/images/media/team/badge/59fo2s1742100034.png'],
+    ['football', '', 'New Zealand (football)', ['new zealand', 'all whites'], 'https://r2.thesportsdb.com/images/media/team/badge/91xpk81742982935.png'],
+    ['football', '', 'Panama', ['panama'], 'https://r2.thesportsdb.com/images/media/team/badge/asp2ck1715849700.png'],
+    ['football', '', 'Qatar', ['qatar'], 'https://r2.thesportsdb.com/images/media/team/badge/rs3ir31642708685.png'],
+    ['football', '', 'Saudi Arabia', ['saudi arabia', 'ksa'], 'https://r2.thesportsdb.com/images/media/team/badge/24xwpq1594125742.png'],
+    ['football', '', 'Uzbekistan', ['uzbekistan'], 'https://r2.thesportsdb.com/images/media/team/badge/u5bgze1597943605.png'],
     // === CRICKET â€” National teams (Wikimedia logos, league '' = any cricket competition) ===
     ['cricket', '', 'India', ['india', 'team india', 'men in blue'], 'https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Board_of_Control_for_Cricket_in_India_Logo_%282024%29.svg/960px-Board_of_Control_for_Cricket_in_India_Logo_%282024%29.svg.png'],
     ['cricket', '', 'Australia', ['australia', 'cricket australia'], 'https://upload.wikimedia.org/wikipedia/en/thumb/3/35/Australia_cricket_logo.svg/960px-Australia_cricket_logo.svg.png'],

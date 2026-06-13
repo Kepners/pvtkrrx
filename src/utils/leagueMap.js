@@ -631,6 +631,19 @@ const LEAGUE_MAP = Object.freeze({
     sportKey: 'football',
     sportsDbSport: 'Soccer',
     aliases: ['Womens World Cup Qualifier', "Women's World Cup Qualifiers", 'FIFA Women World Cup Qualifier']
+  },
+  fifaworldcup: {
+    name: 'FIFA World Cup',
+    idLeague: '4429',
+    sportKey: 'football',
+    sportsDbSport: 'Soccer',
+    // Aliases are deliberately FIFA-scoped. A bare 'World Cup' alias is NOT
+    // added because matching is exact-key and other sports also run a "World
+    // Cup" (Cricket/Rugby/etc.); scoping to the 'FIFA' brand keeps those out of
+    // football. The qualifier aliases above/below win for qualifier titles
+    // because findLeadingLeagueSpan picks the longest leading match (the
+    // 4-token 'fifa world cup qualifiers' span beats this 3-token entry).
+    aliases: ['FIFA World Cup 2026', 'FIFA World Cup 2030', 'FIFA Mens World Cup']
   }
 })
 
