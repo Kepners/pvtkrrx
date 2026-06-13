@@ -1589,7 +1589,7 @@ async function loadAccountHostedTakeoverConfig(config = {}) {
   }
 }
 
-function buildConfigReadback(config = {}) {
+function buildConfigReadback(config = {}, options = {}) {
   const safe = config && typeof config === 'object' ? { ...config } : {}
   const savedSecrets = {
     jackettApiKey: Boolean(String(safe.jackettApiKey || '').trim()),
@@ -1602,14 +1602,23 @@ function buildConfigReadback(config = {}) {
     cacheSearch: savedCacheSearchSourceFlags(safe.cacheSearch)
   }
 
-  // Re-verify the stamped entitlement so the frontend reflects the
-  // CURRENT server-side decision (env-removed owners get downgraded
-  // immediately) instead of trusting whatever was on disk.
-  const verifiedEntitlement = verifyStampedSportsPosterEntitlement({
-    requestedTemplate: safe.sportsPosterTemplate,
-    stampedSource: safe.entitlementSource,
-    stampedHash: safe.entitlementOwnerEmailHash
-  })
+  // Admin-authenticated readbacks (self-host admin) resolve entitlement LIVE so
+  // the configure dropdown reflects the operator's real entitlement (all
+  // templates) instead of being locked to whatever stamp is on disk — a blank
+  // or stale config must not lock the self-host admin out of paid styles.
+  // Unauthenticated/token readbacks keep the strict stored-stamp behaviour so a
+  // leaked URL still degrades to ticket-stub.
+  const verifiedEntitlement = options.selfHostAdmin === true
+    ? resolveSportsPosterEntitlement({
+        requestedTemplate: safe.sportsPosterTemplate,
+        config: safe,
+        selfHostAdmin: true
+      })
+    : verifyStampedSportsPosterEntitlement({
+        requestedTemplate: safe.sportsPosterTemplate,
+        stampedSource: safe.entitlementSource,
+        stampedHash: safe.entitlementOwnerEmailHash
+      })
 
   for (const field of SECRET_CONFIG_FIELDS) delete safe[field]
   delete safe.accountUserId
@@ -2806,6 +2815,26 @@ async function mintHostedConfigToken(relayUrl, payload) {
   }
 }
 
+// The self-host runtime serves only the operator's own /selfhost disk config.
+// The operator IS the owner, so resolve poster entitlement LIVE with
+// selfHostAdmin:true instead of trusting the on-disk stamp. This is the
+// durable fix for a stale admin_override stamp: the catalog/meta serving path
+// re-stamps each poster URL with the current source (owner_override + the real
+// owner-email hash when PVTKRRX_OWNER_EMAILS is set), which the public Coolify
+// renderer honours. Disk is never mutated here.
+async function applySelfHostAdminEntitlementToConfig(config = {}) {
+  if (!config || typeof config !== 'object') return config
+  try {
+    const { config: stamped } = await applySportsPosterEntitlement(config, {
+      requestedTemplate: config.sportsPosterTemplate,
+      selfHostAdmin: true
+    })
+    return stamped
+  } catch (_) {
+    return config
+  }
+}
+
 async function withConfig(req, res, next) {
   req.localConfigMissing = false
   req.configIssues = []
@@ -2829,6 +2858,9 @@ async function withConfig(req, res, next) {
         saveLocalConfigFile(normalizedLocal)
       }
       req.config = normalizedLocal
+      if (isSelfHostConfigAlias(req.params.config)) {
+        req.config = await applySelfHostAdminEntitlementToConfig(normalizedLocal)
+      }
       req.configIssues = getConfigIssues(req.config, {
         requestBaseUrl: getPublicBaseUrl(req),
         localDiskConfig: String(req.params?.config || '').trim().toLowerCase() === 'local',

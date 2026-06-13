@@ -526,6 +526,101 @@ function testReadbackForUnpaid() {
   })
 }
 
+// Admin-authenticated readback (self-host admin) resolves entitlement LIVE so a
+// blank or stale config still unlocks the full dropdown for the operator. A
+// stale admin_override + self-host-admin stamp must be re-resolved to
+// owner_override when owner emails are configured.
+async function testAdminReadbackUnlocksAllTemplates() {
+  await withEnv({ PVTKRRX_OWNER_EMAILS: OWNER_EMAIL, PVTKRRX_SELF_HOST_MODE: 'true' }, async () => {
+    // A blank, unstamped config (the dropdown must STILL unlock for the admin so
+    // they can pick a paid style — the prior lockout bug).
+    const blank = normalizeAddonConfig({})
+    const readback = buildConfigReadback(blank, { selfHostAdmin: true })
+    assert.equal(readback.entitlement.source, ENTITLEMENT_SOURCE.OWNER_OVERRIDE, 'admin readback resolves owner_override live')
+    assert.equal(readback.entitlement.allowed, true, 'admin readback allowed = true on blank config')
+    assert.deepEqual(
+      [...readback.entitlement.allowedSportsPosterTemplates].sort(),
+      [...SPORTS_POSTER_TEMPLATES].sort(),
+      'admin readback exposes all 7 templates (dropdown unlocked)'
+    )
+
+    // The real save path stamps the selected paid template first; the admin
+    // readback must keep it (not clamp it back to ticket-stub).
+    const { config: saved } = await applySportsPosterEntitlement(
+      normalizeAddonConfig({}),
+      { requestedTemplate: 'sportsbook', selfHostAdmin: true }
+    )
+    const savedReadback = buildConfigReadback(saved, { selfHostAdmin: true })
+    assert.equal(savedReadback.entitlement.source, ENTITLEMENT_SOURCE.OWNER_OVERRIDE, 'admin readback keeps owner_override after paid save')
+    assert.equal(savedReadback.sportsPosterTemplate, 'sportsbook', 'admin readback keeps selected paid template')
+
+    // A stale admin_override + self-host-admin stamp must re-resolve to
+    // owner_override under the admin readback (still all 7 templates).
+    const stale = {
+      sportsPosterTemplate: 'sportsbook',
+      entitlementSource: ENTITLEMENT_SOURCE.ADMIN_OVERRIDE,
+      entitlementOwnerEmailHash: 'self-host-admin'
+    }
+    const staleReadback = buildConfigReadback(stale, { selfHostAdmin: true })
+    assert.equal(staleReadback.entitlement.source, ENTITLEMENT_SOURCE.OWNER_OVERRIDE, 'stale admin stamp re-resolves to owner_override under admin readback')
+    assert.equal(staleReadback.sportsPosterTemplate, 'sportsbook', 'stale admin readback keeps the selected paid template')
+    assert.deepEqual(
+      [...staleReadback.entitlement.allowedSportsPosterTemplates].sort(),
+      [...SPORTS_POSTER_TEMPLATES].sort(),
+      'stale admin readback still unlocks all 7 templates'
+    )
+  })
+}
+
+// Non-admin / token readback on an unstamped config must stay locked to
+// ticket-stub — the dropdown only unlocks for an authenticated self-host admin.
+function testNonAdminReadbackStaysLocked() {
+  withEnv({ PVTKRRX_OWNER_EMAILS: OWNER_EMAIL, PVTKRRX_ADMIN_EMAILS: '' }, () => {
+    const unstamped = normalizeAddonConfig({ sportsPosterTemplate: 'sportsbook' })
+    const readback = buildConfigReadback(unstamped)
+    assert.equal(readback.entitlement.source, ENTITLEMENT_SOURCE.NONE, 'non-admin readback stays none on unstamped config')
+    assert.equal(readback.entitlement.allowed, false, 'non-admin readback allowed = false')
+    assert.deepEqual(
+      readback.entitlement.allowedSportsPosterTemplates,
+      ['ticket-stub'],
+      'non-admin readback keeps dropdown locked to ticket-stub'
+    )
+    assert.equal(readback.sportsPosterTemplate, 'ticket-stub', 'non-admin readback clamps paid request to ticket-stub')
+  })
+}
+
+// The self-host serving path re-stamps a stale admin_override config to
+// owner_override so the catalog/meta poster URL carries entSource=owner_override
+// (which the public Coolify renderer honours).
+async function testSelfHostServingPathStampsOwnerOverride() {
+  await withEnv({ PVTKRRX_OWNER_EMAILS: OWNER_EMAIL, PVTKRRX_SELF_HOST_MODE: 'true' }, async () => {
+    const ownerHash = hashEmailForOwnerCheck(OWNER_EMAIL)
+    const stale = normalizeAddonConfig({
+      sportsPosterTemplate: 'sportsbook',
+      entitlementSource: ENTITLEMENT_SOURCE.ADMIN_OVERRIDE,
+      entitlementOwnerEmailHash: 'self-host-admin'
+    })
+    const { config: served } = await applySportsPosterEntitlement(stale, {
+      requestedTemplate: stale.sportsPosterTemplate,
+      selfHostAdmin: true
+    })
+    assert.equal(served.entitlementSource, ENTITLEMENT_SOURCE.OWNER_OVERRIDE, 'serving path stamps owner_override')
+    assert.equal(served.entitlementOwnerEmailHash, ownerHash, 'serving path carries the real owner-email hash')
+    assert.equal(served.sportsPosterTemplate, 'sportsbook', 'serving path keeps the selected paid template')
+
+    const poster = resolveSportsPosterAsset(eventInput({
+      sportsPosterTemplate: served.sportsPosterTemplate,
+      entitlementSource: served.entitlementSource,
+      entitlementOwnerEmailHash: served.entitlementOwnerEmailHash
+    }))
+    const url = new URL(poster.poster)
+    assert.equal(url.searchParams.get('entSource'), ENTITLEMENT_SOURCE.OWNER_OVERRIDE, 'poster URL carries entSource=owner_override')
+    assert.equal(url.searchParams.get('entHash'), ownerHash, 'poster URL carries the owner-email hash')
+    assert.equal(url.searchParams.get('reqTemplate'), 'sportsbook', 'poster URL forwards sportsbook')
+    assert.ok(url.searchParams.get('entSig'), 'poster URL is signed')
+  })
+}
+
 // ────────────────────────────────────────────────────────────────────────
 // 6. Locked template family contract — must remain 7
 // ────────────────────────────────────────────────────────────────────────
@@ -583,6 +678,9 @@ async function main() {
   testRuntimeURLIgnoresStaleQueryAfterRevocation()
   await testReadbackExposesEntitlement()
   await testReadbackForUnpaid()
+  await testAdminReadbackUnlocksAllTemplates()
+  testNonAdminReadbackStaysLocked()
+  await testSelfHostServingPathStampsOwnerOverride()
   testClampHelper()
 
   console.log(

@@ -78,7 +78,7 @@ const {
   shouldRedirectHostedConfigure, isHostedNonLocalConfig, sendHostedBuiltinPlaybackRejection,
   shouldRejectPcLocalManifestRequest, parseHttpUrlCandidate,
   sanitizeHostForUrl, validateHostedConnectionTarget, hasServerAdminToken,
-  isLocalNetworkRequest, parseBooleanLoose,
+  isLocalNetworkRequest, parseBooleanLoose, isDiskBackedConfigAlias,
   // Middleware
   requireCsrfToken, requireLocalNetworkRoute, requireLocalConfigReadback,
   requireLocalQbitControl, requireServerAdminToken, requireAuthUser,
@@ -1348,7 +1348,7 @@ app.post('/local-config', requireLocalNetworkRoute, async (req, res) => {
     })
     res.json({
       ok: true,
-      ...buildConfigReadback(persisted),
+      ...buildConfigReadback(persisted, { selfHostAdmin: true }),
       localHostname
     })
   } catch (err) {
@@ -1385,7 +1385,7 @@ app.post('/server-config', requireCsrfToken, requireServerAdminToken, async (req
     res.json({
       ok: true,
       configAlias: 'selfhost',
-      ...buildConfigReadback(persisted)
+      ...buildConfigReadback(persisted, { selfHostAdmin: true })
     })
   } catch (err) {
     res.status(500).json({ error: 'Failed to save server config' })
@@ -2188,7 +2188,9 @@ app.get('/:config/manifest.json', withConfig, async (req, res) => {
 
 app.get('/:config/config.json', withConfig, requireLocalConfigReadback, (req, res) => {
   res.setHeader('Cache-Control', 'no-store')
-  res.json(buildConfigReadback(req.config))
+  res.json(buildConfigReadback(req.config, {
+    selfHostAdmin: isDiskBackedConfigAlias(req.params.config)
+  }))
 })
 
 app.get('/manifest.json', (req, res) => {
