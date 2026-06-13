@@ -1475,36 +1475,6 @@
       </div>
     </section>
 
-    <section class="section-block" id="cache-audit">
-      <div class="section-head">
-        <div class="section-kicker">SportsDB Cache Audit</div>
-        <h2 class="section-title">What has actually been audited and cleaned</h2>
-        <p class="section-copy">
-          Latest live Contabo snapshot, checked 2026-05-10. The DB has been mapped and evidence-linked, but the cache has not been blindly deleted or compacted. Cleanup must stay guarded because many cached images are still linked to generated member artwork.
-        </p>
-      </div>
-      <div class="audit-grid" aria-label="Live SportsMeta cache audit figures">
-        <article class="audit-card">
-          <div class="audit-value">31 GB</div>
-          <p class="audit-label">Current <span class="inline-code">/opt/sportsmeta/data</span> footprint, of which 25 GB is the asset cache and 5.9 GB is the SQLite DB.</p>
-        </article>
-        <article class="audit-card">
-          <div class="audit-value">157,697</div>
-          <p class="audit-label">Cached asset rows in <span class="inline-code">sportsmeta_assets</span>. The on-disk asset cache holds 320,975 files across the same path.</p>
-        </article>
-        <article class="audit-card">
-          <div class="audit-value">12,232</div>
-          <p class="audit-label">SportsMeta records currently mapped, covering events, leagues, sports, and entity rows used to attach streams and artwork.</p>
-        </article>
-        <article class="audit-card">
-          <div class="audit-value">527,905</div>
-          <p class="audit-label">Resolved image-evidence rows, including posters, logos, league logos, badges, backgrounds, and landscapes.</p>
-        </article>
-      </div>
-      <p class="audit-note">
-        Cleanup status: audited and classified, not fully purged. The safe next step is an orphan and duplicate report that proves which files have no DB reference before deletion. Missing logo fallbacks should stay logged so the DB can be improved by the sports people actually use.
-      </p>
-    </section>
 
     <section class="section-block">
       <div class="section-head">
