@@ -39,7 +39,7 @@
 ## Sports Posters Template Guardrail
 - Before changing Sports Posters layouts, inspect `C:\Users\kepne\projects\L - PVTKRRX\PCnestspeaker\python-templates`.
 - Treat those Python template generators as the current source of truth for `editorial`, `broadcast`, `sportsbook`, `trading-card`, `brutalist`, `ticket-stub`, and `glitch`.
-- `ticket-stub` is the default layout. Configured PVTKRRX installs can use all seven layouts; the separate paid/member Sports Posters surface remains SportsMeta-owned.
+- `ticket-stub` is the default layout and the included free style. The other six layouts unlock only with a verified entitlement; the separate paid/member Sports Posters surface remains SportsMeta-owned.
 - Real SportsMeta/SportsDB logo images must replace placeholder text in league/team slots when present; glyph fallback is only for missing images.
 
 ## Audit-And-Proof Standard

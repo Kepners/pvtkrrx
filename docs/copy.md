@@ -181,7 +181,7 @@ The tone should be:
 
    * every PVTKRRX user gets the same public SportsMeta SVG/default artwork
    * premium poster-grade artwork lives on the separate SportsMeta member install
-   * PVTKRRX does not currently switch artwork by entitlement
+   * PVTKRRX renders the included Ticket Stub style for free users; other poster styles unlock only with a verified entitlement
 9. If a surface cannot prove a SportsMeta entitlement enforcement point, it must not claim "paid-only posters inside PVTKRRX".
 
 Approved framing:

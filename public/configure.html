@@ -2613,16 +2613,16 @@
           <div class="simple-flow-setting" id="sportsPosterTemplateMain">
             <label for="sportsPosterTemplate">Sports Poster Style</label>
             <select id="sportsPosterTemplate">
-              <option value="editorial">Editorial</option>
-              <option value="broadcast">Broadcast</option>
-              <option value="sportsbook">Sportsbook</option>
-              <option value="trading-card">Trading Card</option>
-              <option value="brutalist">Brutalist</option>
+              <option value="editorial" disabled>Editorial (Paid)</option>
+              <option value="broadcast" disabled>Broadcast (Paid)</option>
+              <option value="sportsbook" disabled>Sportsbook (Paid)</option>
+              <option value="trading-card" disabled>Trading Card (Paid)</option>
+              <option value="brutalist" disabled>Brutalist (Paid)</option>
               <option value="ticket-stub" selected>Ticket Stub</option>
-              <option value="glitch">Glitch</option>
+              <option value="glitch" disabled>Glitch (Paid)</option>
             </select>
-            <p class="hint">Sports uses a logo/artwork-based presentation. Pick the visual style you want; playback, streams, and tracker results are unchanged.</p>
-            <div class="simple-flow-status info" id="sportsPosterTemplateStatus">Applied sports style: Ticket Stub. Pick any style to change the sports posters.</div>
+            <p class="hint">Sports uses a logo/artwork-based presentation. Ticket Stub is the included free style; paid styles unlock with a verified entitlement. Playback, streams, and tracker results are unchanged.</p>
+            <div class="simple-flow-status info" id="sportsPosterTemplateStatus">Applied sports style: Ticket Stub. Paid styles unlock with a verified entitlement.</div>
           </div>
           <div class="simple-flow-actions">
             <button class="btn-copy" type="button" id="simpleCheckStremioBtn" onclick="checkAndLinkStremioOnThisPc(this)">Check Stremio Login On This PC</button>
@@ -7310,7 +7310,7 @@
       } else if (sourceLabel === 'manual_grant' || sourceLabel === 'member_token' || sourceLabel === 'trial') {
         setSportsPosterTemplateStatus('ok', 'Entitlement source: ' + sourceLabel.replace(/_/g, ' ') + '. Applied style: ' + labelSportsPosterTemplate(value) + '.');
       } else {
-        setSportsPosterTemplateStatus('ok', 'Applied sports style: ' + labelSportsPosterTemplate(value) + '. Pick any style; playback, streams, and tracker results are unchanged.');
+        setSportsPosterTemplateStatus('ok', 'Applied sports style: ' + labelSportsPosterTemplate(value) + '. Paid styles unlock with a verified entitlement; playback, streams, and tracker results are unchanged.');
       }
     }
 
@@ -7390,31 +7390,28 @@
     function applySportsPosterEntitlementToUi(entitlement) {
       window.__pvtkrrxSportsPosterEntitlement = entitlement && typeof entitlement === 'object'
         ? entitlement
-        : { source: 'none', allowed: true, allowedSportsPosterTemplates: SPORTS_POSTER_TEMPLATE_ORDER.slice(), resolvedSportsPosterTemplate: 'ticket-stub' };
+        : { source: 'none', allowed: false, allowedSportsPosterTemplates: ['ticket-stub'], resolvedSportsPosterTemplate: 'ticket-stub' };
       const select = document.getElementById('sportsPosterTemplate');
       if (!select) return;
       const requestedBeforeRebuild = select.value;
       const allowed = normalizeAllowedSportsPosterTemplates(window.__pvtkrrxSportsPosterEntitlement);
       const nextOptions = [];
-      for (const template of allowed) {
+      for (const template of SPORTS_POSTER_TEMPLATE_ORDER) {
         const opt = document.createElement('option');
         opt.value = template;
-        opt.textContent = labelSportsPosterTemplate(template);
+        const unlocked = allowed.includes(template);
+        opt.textContent = unlocked
+          ? labelSportsPosterTemplate(template)
+          : labelSportsPosterTemplate(template) + ' (Paid)';
+        if (!unlocked) opt.disabled = true;
         nextOptions.push(opt);
       }
       select.replaceChildren(...nextOptions);
       select.value = resolveAppliedSportsPosterTemplate(window.__pvtkrrxSportsPosterEntitlement, requestedBeforeRebuild);
-      const showSelector = allowed.length > 1;
+      select.removeAttribute('disabled');
+      select.removeAttribute('aria-disabled');
       const label = document.querySelector('label[for="sportsPosterTemplate"]');
-      if (showSelector) {
-        select.removeAttribute('disabled');
-        select.removeAttribute('aria-disabled');
-        if (label) label.textContent = 'Sports Poster Style';
-      } else {
-        select.setAttribute('disabled', 'disabled');
-        select.setAttribute('aria-disabled', 'true');
-        if (label) label.textContent = 'Included Sports Style';
-      }
+      if (label) label.textContent = 'Sports Poster Style';
     }
 
     async function testConnection() {

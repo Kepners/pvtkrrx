@@ -23,6 +23,10 @@ const {
   resolveSportsPosterAsset
 } = require('../src/utils/sportsArtwork')
 const {
+  ENTITLEMENT_SOURCE,
+  hashEmailForOwnerCheck
+} = require('../src/utils/entitlement')
+const {
   clearSportsIdentityBackfillState,
   getCachedSportsIdentityBackfill,
   getSportsIdentityBackfillStats,
@@ -575,12 +579,46 @@ async function run() {
     barcaId,
     { baseUrl: 'https://addon.test' }
   )
-  const expectedConfiguredTemplatePoster = `https://addon.test/sports-artwork/id/poster/${encodeURIComponent(barcaId)}.png?template=glitch&v=${SPORTS_ARTWORK_PROXY_VERSION}`
   assert.equal(
     templateSportsMetaResponse.meta?.poster,
-    expectedConfiguredTemplatePoster,
-    'PVTKRRX configured route should honor sportsPosterTemplate=glitch without exposing SportsMeta member tokens'
+    expectedPublicProxyPoster,
+    'configured route clamps unstamped sportsPosterTemplate=glitch to ticket-stub without exposing SportsMeta member tokens'
   )
+
+  const previousAdminEmails = process.env.PVTKRRX_ADMIN_EMAILS
+  process.env.PVTKRRX_ADMIN_EMAILS = 'admin@pvtkrrx.cc'
+  try {
+    const stampedSportsMetaResponse = await handleMeta(
+      {
+        sportsmetaBaseUrl: 'https://sportsmeta.test',
+        sportsPosterTemplate: 'glitch',
+        entitlementSource: ENTITLEMENT_SOURCE.ADMIN_OVERRIDE,
+        entitlementOwnerEmailHash: hashEmailForOwnerCheck('admin@pvtkrrx.cc')
+      },
+      'sports',
+      barcaId,
+      { baseUrl: 'https://addon.test' }
+    )
+    const stampedPosterUrl = new URL(stampedSportsMetaResponse.meta?.poster || '')
+    assert.equal(
+      stampedPosterUrl.searchParams.get('template'),
+      'glitch',
+      'configured route renders env-verified admin-stamped sportsPosterTemplate=glitch as selected'
+    )
+    assert.equal(
+      stampedPosterUrl.searchParams.get('entSource'),
+      ENTITLEMENT_SOURCE.ADMIN_OVERRIDE,
+      'entitled poster URL forwards the verified entitlement stamp'
+    )
+    assert.doesNotMatch(
+      stampedPosterUrl.toString(),
+      /sm_paid_poster_token/,
+      'entitled poster URL must not expose SportsMeta member tokens'
+    )
+  } finally {
+    if (previousAdminEmails === undefined) delete process.env.PVTKRRX_ADMIN_EMAILS
+    else process.env.PVTKRRX_ADMIN_EMAILS = previousAdminEmails
+  }
 
   const previousEnvMemberToken = process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN
   process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN = 'https://sportsmeta.test/member/sm_env_poster_token'
