@@ -620,6 +620,45 @@ async function run() {
     else process.env.PVTKRRX_ADMIN_EMAILS = previousAdminEmails
   }
 
+  // Self-host operator stamps an owner_override carrying the real owner-email
+  // hash. The public Coolify host has NO self-host mode but the SAME owner
+  // email, so it must render the operator's chosen premium template — the
+  // regression was this downgrading to ticket-stub via the self-host-admin
+  // sentinel under admin_override.
+  const previousOwnerEmails = process.env.PVTKRRX_OWNER_EMAILS
+  const previousSelfHostMode = process.env.PVTKRRX_SELF_HOST_MODE
+  process.env.PVTKRRX_OWNER_EMAILS = 'kepners@gmail.com'
+  delete process.env.PVTKRRX_SELF_HOST_MODE
+  try {
+    const selfHostOwnerResponse = await handleMeta(
+      {
+        sportsmetaBaseUrl: 'https://sportsmeta.test',
+        sportsPosterTemplate: 'broadcast',
+        entitlementSource: ENTITLEMENT_SOURCE.OWNER_OVERRIDE,
+        entitlementOwnerEmailHash: hashEmailForOwnerCheck('kepners@gmail.com')
+      },
+      'sports',
+      barcaId,
+      { baseUrl: 'https://addon.test' }
+    )
+    const selfHostOwnerPosterUrl = new URL(selfHostOwnerResponse.meta?.poster || '')
+    assert.equal(
+      selfHostOwnerPosterUrl.searchParams.get('template'),
+      'broadcast',
+      'self-host owner_override stamp renders the selected premium template on a non-self-host runtime sharing the owner email'
+    )
+    assert.equal(
+      selfHostOwnerPosterUrl.searchParams.get('entSource'),
+      ENTITLEMENT_SOURCE.OWNER_OVERRIDE,
+      'self-host owner poster URL forwards the owner_override stamp'
+    )
+  } finally {
+    if (previousOwnerEmails === undefined) delete process.env.PVTKRRX_OWNER_EMAILS
+    else process.env.PVTKRRX_OWNER_EMAILS = previousOwnerEmails
+    if (previousSelfHostMode === undefined) delete process.env.PVTKRRX_SELF_HOST_MODE
+    else process.env.PVTKRRX_SELF_HOST_MODE = previousSelfHostMode
+  }
+
   const previousEnvMemberToken = process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN
   process.env.PVTKRRX_SPORTSMETA_MEMBER_TOKEN = 'https://sportsmeta.test/member/sm_env_poster_token'
   try {

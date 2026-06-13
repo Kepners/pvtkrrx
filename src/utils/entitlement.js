@@ -153,11 +153,35 @@ function resolveSportsPosterEntitlement(input = {}) {
   const selfHostAdmin = input.selfHostAdmin === true
 
   if (selfHostAdmin) {
+    if (userEmail) {
+      return finaliseEntitlement({
+        source: ENTITLEMENT_SOURCE.ADMIN_OVERRIDE,
+        allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
+        requested,
+        ownerEmailHash: hashEmailForOwnerCheck(userEmail)
+      })
+    }
+    // The self-host operator IS the owner. When the runtime has owner emails
+    // configured, stamp an owner_override carrying the real owner-email hash so
+    // the chosen template is honoured by any runtime sharing that owner list
+    // (the public Coolify host does), not just self-host runtimes. Fall back to
+    // the self-host-admin sentinel only when no owner emails are configured so
+    // non-owner self-host operators keep the existing self-host-only behaviour.
+    const ownerEmails = getOwnerEmails(env)
+    if (ownerEmails.size) {
+      const [firstOwnerEmail] = ownerEmails
+      return finaliseEntitlement({
+        source: ENTITLEMENT_SOURCE.OWNER_OVERRIDE,
+        allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
+        requested,
+        ownerEmailHash: hashEmailForOwnerCheck(firstOwnerEmail)
+      })
+    }
     return finaliseEntitlement({
       source: ENTITLEMENT_SOURCE.ADMIN_OVERRIDE,
       allowedTemplates: SPORTS_POSTER_TEMPLATES.slice(),
       requested,
-      ownerEmailHash: userEmail ? hashEmailForOwnerCheck(userEmail) : SELF_HOST_ADMIN_HASH
+      ownerEmailHash: SELF_HOST_ADMIN_HASH
     })
   }
 

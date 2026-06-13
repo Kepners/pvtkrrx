@@ -191,15 +191,48 @@ function testUnpaidUser() {
   }, 'unpaid user blocked')
 }
 
-function testSelfHostAdminFlag() {
-  const entitlement = resolveSportsPosterEntitlement({
-    user: null,
-    requestedTemplate: 'sportsbook',
-    selfHostAdmin: true
+function testSelfHostAdminFlagWithoutOwnerEmails() {
+  withEnv({ PVTKRRX_OWNER_EMAILS: '', PVTKRRX_ADMIN_EMAILS: '' }, () => {
+    const entitlement = resolveSportsPosterEntitlement({
+      user: null,
+      requestedTemplate: 'sportsbook',
+      selfHostAdmin: true
+    })
+    assert.equal(entitlement.source, ENTITLEMENT_SOURCE.ADMIN_OVERRIDE, 'self-host admin source')
+    assert.equal(entitlement.resolvedTemplate, 'sportsbook', 'self-host admin resolved template')
+    assert.equal(entitlement.ownerEmailHash, 'self-host-admin', 'self-host admin sentinel hash')
   })
-  assert.equal(entitlement.source, ENTITLEMENT_SOURCE.ADMIN_OVERRIDE, 'self-host admin source')
-  assert.equal(entitlement.resolvedTemplate, 'sportsbook', 'self-host admin resolved template')
-  assert.equal(entitlement.ownerEmailHash, 'self-host-admin', 'self-host admin sentinel hash')
+}
+
+function testSelfHostAdminFlagWithOwnerEmails() {
+  withEnv({ PVTKRRX_OWNER_EMAILS: OWNER_EMAIL, PVTKRRX_ADMIN_EMAILS: '' }, () => {
+    const ownerHash = hashEmailForOwnerCheck(OWNER_EMAIL)
+    const entitlement = resolveSportsPosterEntitlement({
+      user: null,
+      requestedTemplate: 'broadcast',
+      selfHostAdmin: true
+    })
+    assert.equal(entitlement.source, ENTITLEMENT_SOURCE.OWNER_OVERRIDE, 'self-host admin with owner emails stamps owner_override')
+    assert.equal(entitlement.resolvedTemplate, 'broadcast', 'self-host admin owner stamp keeps selected template')
+    assert.equal(entitlement.ownerEmailHash, ownerHash, 'self-host admin owner stamp carries the real owner-email hash')
+
+    // The whole point of the fix: a runtime with NO self-host mode (the public
+    // Coolify host) but the SAME owner email must honour this stamp to all
+    // templates, where the old admin_override + self-host-admin sentinel would
+    // have downgraded to ticket-stub.
+    const verified = verifyStampedSportsPosterEntitlement({
+      requestedTemplate: 'broadcast',
+      stampedSource: entitlement.source,
+      stampedHash: entitlement.ownerEmailHash,
+      env: { PVTKRRX_OWNER_EMAILS: OWNER_EMAIL }
+    })
+    assertEntitlement(verified, {
+      source: ENTITLEMENT_SOURCE.OWNER_OVERRIDE,
+      allowedTemplates: SPORTS_POSTER_TEMPLATES,
+      resolvedTemplate: 'broadcast',
+      allowed: true
+    }, 'self-host owner stamp verifies to all templates on a non-self-host runtime sharing the owner email')
+  })
 }
 
 async function testSelfHostAdminStampSurvivesRuntimeVerify() {
@@ -534,7 +567,8 @@ async function main() {
   testMemberTokenOnConfig()
   testTrialActive()
   testUnpaidUser()
-  testSelfHostAdminFlag()
+  testSelfHostAdminFlagWithoutOwnerEmails()
+  testSelfHostAdminFlagWithOwnerEmails()
   await testSelfHostAdminStampSurvivesRuntimeVerify()
   testNormalizeWithoutEntitlementClamps()
   testNormalizeWithOwnerEntitlementPreserves()
