@@ -64,11 +64,69 @@ function stripSponsorPrefix(value = '') {
   return text
 }
 
+// National football teams (FIFA World Cup 2026, 48 nations). Release titles
+// abbreviate these inconsistently (USA, KSA, UAE, DR Congo, Cote dIvoire …) and
+// some collide with noise regexes (USA -> broadcast-region strip; England ->
+// "eng"+tail "english tag" strip). Mapping each alias to its canonical name
+// keeps the side from being discarded so "<Nation> vs <Nation>" stays
+// team_vs_team. Each entry: [canonical, [aliases...]].
+const WORLD_CUP_NATIONS = Object.freeze([
+  ['United States', ['usa', 'united states', 'united states of america', 'us', 'usmnt']],
+  ['Canada', ['canada', 'can']],
+  ['Mexico', ['mexico', 'mex']],
+  ['Argentina', ['argentina', 'arg']],
+  ['Brazil', ['brazil', 'bra', 'brasil']],
+  ['Uruguay', ['uruguay', 'uru']],
+  ['Colombia', ['colombia', 'col']],
+  ['Paraguay', ['paraguay', 'par']],
+  ['Ecuador', ['ecuador', 'ecu']],
+  ['England', ['england', 'eng']],
+  ['France', ['france', 'fra']],
+  ['Spain', ['spain', 'esp']],
+  ['Portugal', ['portugal', 'por']],
+  ['Germany', ['germany', 'ger', 'deu']],
+  ['Netherlands', ['netherlands', 'ned', 'holland']],
+  ['Belgium', ['belgium', 'bel']],
+  ['Croatia', ['croatia', 'cro']],
+  ['Switzerland', ['switzerland', 'sui']],
+  ['Austria', ['austria', 'aut']],
+  ['Italy', ['italy', 'ita']],
+  ['Scotland', ['scotland', 'sco']],
+  ['Norway', ['norway', 'nor']],
+  ['Poland', ['poland', 'pol']],
+  ['Wales', ['wales', 'wal']],
+  ['Morocco', ['morocco', 'mar']],
+  ['Senegal', ['senegal', 'sen']],
+  ['Tunisia', ['tunisia', 'tun']],
+  ['Algeria', ['algeria', 'alg']],
+  ['Egypt', ['egypt', 'egy']],
+  ['Nigeria', ['nigeria', 'nga']],
+  ['Ghana', ['ghana', 'gha']],
+  ['Ivory Coast', ['ivory coast', 'civ', 'cote divoire', "cote d'ivoire", 'cote d ivoire']],
+  ['Cameroon', ['cameroon', 'cmr']],
+  ['South Africa', ['south africa', 'rsa']],
+  ['Cape Verde', ['cape verde', 'cpv', 'cabo verde']],
+  ['DR Congo', ['dr congo', 'cod', 'democratic republic of congo', 'dr congo', 'congo dr']],
+  ['Japan', ['japan', 'jpn']],
+  ['South Korea', ['south korea', 'kor', 'korea republic', 'korea']],
+  ['Iran', ['iran', 'irn', 'ir iran']],
+  ['Australia', ['australia', 'aus', 'socceroos']],
+  ['Saudi Arabia', ['saudi arabia', 'ksa', 'sau']],
+  ['Qatar', ['qatar', 'qat']],
+  ['Uzbekistan', ['uzbekistan', 'uzb']],
+  ['Jordan', ['jordan', 'jor']],
+  ['New Zealand', ['new zealand', 'nzl']],
+  ['Curacao', ['curacao', 'cuw']],
+  ['Panama', ['panama', 'pan']],
+  ['Haiti', ['haiti', 'hai']]
+])
+
 // Canonical-name lookup. Keys are normalizeKey() forms. Values are the
 // canonical club / franchise name. Includes:
 //   - spaced-letter forms: "n e c" -> NEC Nijmegen
 //   - 3-letter league codes: NBA / NHL / MLB tricodes
 //   - common short club names
+//   - FIFA World Cup nations (abbreviation / alias -> canonical nation)
 const EFL_CHAMPIONSHIP_CLUBS = Object.freeze([
   ['Birmingham City', ['birmingham', 'birmingham city']],
   ['Blackburn Rovers', ['blackburn', 'blackburn rovers']],
@@ -179,8 +237,23 @@ const CLUB_ALIASES = new Map([
   ['sas', 'San Antonio Spurs'],
   ['tor', 'Toronto Raptors'],
   ['uta', 'Utah Jazz'],
-  ['was', 'Washington Wizards']
+  ['was', 'Washington Wizards'],
+
+  // --- FIFA World Cup 2026 nations (alias -> canonical nation) ---
+  ...WORLD_CUP_NATIONS.flatMap(([nation, aliases]) =>
+    aliases.map((alias) => [normalizeKey(alias), nation]))
 ])
+
+// Keys (normalizeKey form) for every known national team, including their
+// abbreviations. Used by the title parser / normalizer to ensure a national
+// team token is never stripped as broadcast/language/region noise.
+const NATIONAL_TEAM_KEYS = Object.freeze(new Set(
+  WORLD_CUP_NATIONS.flatMap(([, aliases]) => aliases.map((alias) => normalizeKey(alias)))
+))
+
+function isKnownNationalTeam(value = '') {
+  return NATIONAL_TEAM_KEYS.has(normalizeKey(value))
+}
 
 // Competition override map. Keyed by normalizeKey(canonicalClub). When BOTH
 // sides resolve to the same competition, that competition overrides a
@@ -262,6 +335,8 @@ module.exports = {
   canonicalizeClub,
   resolveClubCompetitionOverride,
   stripSponsorPrefix,
+  isKnownNationalTeam,
   CLUB_ALIASES,
-  CLUB_COMPETITION
+  CLUB_COMPETITION,
+  NATIONAL_TEAM_KEYS
 }

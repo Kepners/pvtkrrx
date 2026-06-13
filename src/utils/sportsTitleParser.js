@@ -570,11 +570,19 @@ function normalizeTeamLabel(value, options = {}) {
 }
 
 function normalizeTeamTokens(tokens, options = {}) {
-  const normalized = trimTrailingMetadataTokens(
-    (Array.isArray(tokens) ? tokens : [])
-      .map(normalizeSegment)
-      .filter(Boolean)
-  )
+  const rawTokens = (Array.isArray(tokens) ? tokens : [])
+    .map(normalizeSegment)
+    .filter(Boolean)
+  // A known national team (FIFA World Cup nation or abbreviation) is a real
+  // side. Return its canonical name before the metadata/broadcast/language
+  // strips below can discard it (e.g. "USA" matches the usan? source/broadcast
+  // strip; "England" matches the english-language-tag strip), which would null
+  // out the whole matchup.
+  const rawNationLabel = normalizeSegment(rawTokens.join(' '))
+  if (isKnownNationalTeam(rawNationLabel)) {
+    return canonicalizeClub(rawNationLabel, { sport: 'football' })
+  }
+  const normalized = trimTrailingMetadataTokens(rawTokens)
   const leadingCleaned = trimLeadingTeamNoise(normalized)
   const trimmed = []
   for (let index = 0; index < leadingCleaned.length; index += 1) {
@@ -1148,7 +1156,7 @@ function parseSportsEventTitle(title, fallbackDate = '') {
  *   pubDate       - torrent made date (date fallback, §5)
  * ========================================================================== */
 
-const { canonicalizeClub, resolveClubCompetitionOverride } = require('./clubIdentity')
+const { canonicalizeClub, resolveClubCompetitionOverride, isKnownNationalTeam } = require('./clubIdentity')
 const { sportKeyFromCategoryName } = require('./sportsCategoryHint')
 
 const CONTRACT_SEPARATORS = new Set(['vs', 'v', 'versus', 'at', '@'])
@@ -1519,6 +1527,11 @@ function isSideNoiseToken(t) {
   const low = String(t || '').toLowerCase()
   if (!low) return true
   if (CONTRACT_SEPARATORS.has(low)) return true
+  // Known national teams (FIFA World Cup nations + abbreviations) are real
+  // sides, not noise. Guards "USA"/"England" from the broadcast-region and
+  // english-language-tag strips below (which would drop the home/away side and
+  // collapse a "<Nation> vs <Nation>" fixture to a single tournament_event).
+  if (isKnownNationalTeam(t)) return false
   if (RUBBISH_TOKENS.has(low) || TV_CHANNEL_KEEPERS.has(low)) return true
   if (QUALITY_TOKEN_RE.test(t) || SOURCE_FORMAT_RE.test(t)) return true
   if (RELEASE_COMPOUND_TOKEN_RE.test(t) || stripSportsReleaseNoise(t) === '') return true

@@ -4,6 +4,7 @@ const {
   normalizeKnownSportsTeamAlias,
   stripCompetitionSideNoise
 } = require('./sportsTitleParser')
+const { canonicalizeClub, isKnownNationalTeam } = require('./clubIdentity')
 const { normalizeSportKey, resolveSportHint } = require('./sportsRules')
 const { getMappedLeagueEntry, mapLeague } = require('./leagueMap')
 const { mapSportsCultCategory } = require('../config/sportsCultCategoryMap')
@@ -220,6 +221,11 @@ function shouldExpandKnownTeamAlias(options = {}) {
 function cleanMatchupSide(value, side = 'left', options = {}) {
   const raw = normalizeSpace(value)
   if (!raw) return ''
+  // A known national team (FIFA World Cup nation or abbreviation) is a real
+  // side. Short-circuit before noise stripping so "USA"/"England" are not
+  // discarded (usan? broadcast strip / english-tag strip) and resolve to the
+  // canonical nation name.
+  if (isKnownNationalTeam(raw)) return canonicalizeClub(raw, { sport: options.sport || options.sportHint || 'football' })
   const prefixNoise = new RegExp(MATCHUP_PREFIX_NOISE_RE.source, 'i')
   const hasNoise = prefixNoise.test(raw) ||
     MATCHUP_SIDE_EXTRA_NOISE_TEST_RE.test(raw) ||
@@ -246,8 +252,17 @@ function parseLooseMatchup(rawTitle = '', options = {}) {
   const matchupText = bracketedMatchup || cleaned
   const match = matchupText.match(/(.+?)\s+(?:vs\.?|v\.?|@)\s+(.+)/i)
   if (!match) return null
-  const homeTeam = stripMatchupSideNoise(match[1], 'left')
-  const awayTeam = stripMatchupSideNoise(match[2], 'right')
+  // Trim leading competition/league words off each side, then keep a known
+  // national-team side intact (USA/England would otherwise be nuked by the
+  // broadcast/language strips inside stripMatchupSideNoise).
+  const preserveNation = (rawSide) => {
+    const trimmed = normalizeSpace(String(rawSide || '').replace(MATCHUP_PREFIX_NOISE_RE, ' '))
+    return isKnownNationalTeam(trimmed) ? trimmed : ''
+  }
+  const homeNation = preserveNation(match[1])
+  const awayNation = preserveNation(match[2])
+  const homeTeam = homeNation || stripMatchupSideNoise(match[1], 'left')
+  const awayTeam = awayNation || stripMatchupSideNoise(match[2], 'right')
   if (!homeTeam || !awayTeam) return null
   const teamAliasContext = { ...options, rawTitle }
   return {

@@ -365,6 +365,70 @@ const CASES = [
       competition: eq('AEW'),
       date: eq('2026-05-07')
     }
+  },
+
+  // -------- WC-NATION ABBREVIATION (USA dropped -> team_vs_team fix) --------
+  // Confirmed bug: "USA" was stripped as a broadcast-region token so the home
+  // side was discarded and the fixture collapsed to a single tournament_event.
+  // The abbreviation must resolve to the canonical nation as the HOME side.
+  {
+    id: 'WC1 USA abbreviation as home (full name baseline)',
+    raw: 'FIFA World Cup United States vs Paraguay',
+    opts: { sportHint: 'football' },
+    expect: {
+      sport: eq('football'),
+      competition: eq('FIFA World Cup'),
+      home: eq('United States'),
+      away: eq('Paraguay')
+    }
+  },
+  {
+    id: 'WC2 USA abbreviation as home',
+    raw: 'FIFA World Cup USA Vs Paraguay',
+    opts: { sportHint: 'football' },
+    expect: {
+      sport: eq('football'),
+      competition: eq('FIFA World Cup'),
+      home: eq('United States'),
+      away: eq('Paraguay')
+    }
+  },
+  {
+    id: 'WC3 USA abbreviation as home with date + broadcaster',
+    raw: 'FIFA World Cup 2026 USA vs Paraguay 12 06 Fox',
+    opts: { sportHint: 'football', pubDate: '2026-06-12T00:00:00Z' },
+    expect: {
+      sport: eq('football'),
+      competition: eq('FIFA World Cup'),
+      home: eq('United States'),
+      away: (v) => /^paraguay/i.test(String(v || '')),
+      date: eq('2026-06-12'),
+      year: eq('2026')
+    }
+  },
+  {
+    id: 'WC4 England abbreviation as home (english-tag strip guard)',
+    raw: 'FIFA World Cup England vs Wales',
+    opts: { sportHint: 'football' },
+    expect: {
+      sport: eq('football'),
+      competition: eq('FIFA World Cup'),
+      home: eq('England'),
+      away: eq('Wales')
+    }
+  },
+  {
+    id: 'WC5 single-event F1 GP still a single event (no false split)',
+    raw: 'Formula 1 2026 USA Grand Prix Race 1080p',
+    opts: { sportHint: 'motorsport', pubDate: '2026-10-25T00:00:00Z' },
+    expect: {
+      sport: eq('motorsport'),
+      competition: eq('Formula 1'),
+      contentType: eq('event'),
+      home: (v) => !v,
+      away: (v) => !v,
+      event: (v) => !!String(v || '').trim()
+    }
   }
 ]
 
