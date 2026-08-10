@@ -1521,6 +1521,7 @@ async function searchTitleFallback(torznab, query, cats, options = {}) {
   console.log(`[stream] Title fallback query="${query}" cats="${searchCats}" useCategories=true`)
   const categorized = await settleWithTimeout(
     torznab.search(query, searchCats, 'search', {
+      excludeSportsIndexers: true,
       useCategories: Boolean(String(searchCats || '').trim()),
       timeoutMs: STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS,
       categoryGroupTimeoutMs: STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS,
@@ -1546,6 +1547,7 @@ async function searchTitleFallback(torznab, query, cats, options = {}) {
     : baseBroadTimeout
   const broad = await settleWithTimeout(
     torznab.search(query, cats, 'search', {
+      excludeSportsIndexers: true,
       useCategories: false,
       timeoutMs: broadTimeout + 500
     }),
@@ -1590,7 +1592,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
   const cinemeta = new CinemetaClient()
   const initialProwlarrLookup = hasEpisodeMarker
     ? Promise.resolve({ value: [], skippedTitleFirst: true })
-    : settleWithTimeout(torznab.searchImdb(imdbId, cats, searchType), STREAM_UPSTREAM_TIMEOUT_MS, [])
+    : settleWithTimeout(torznab.searchImdb(imdbId, cats, searchType, { excludeSportsIndexers: true }), STREAM_UPSTREAM_TIMEOUT_MS, [])
   const [jackettResult, qbitResult, cinemetaResult] = await Promise.all([
     initialProwlarrLookup,
     settleWithTimeout(qbit.torrents('all'), STREAM_UPSTREAM_TIMEOUT_MS, []),

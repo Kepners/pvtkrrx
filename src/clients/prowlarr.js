@@ -3,6 +3,7 @@ const INDEXER_CATEGORY_TTL_MS = 6 * 60 * 60 * 1000
 const { sportHintFromCategory } = require('../utils/sportsCategoryHint')
 const { resolveSportHint } = require('../utils/sportsRules')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
+const { isSportsOnlyIndexer } = require('../utils/sportsIndexers')
 
 // The indexer category lookup is expensive (one extra Prowlarr round-trip) and
 // rarely changes, so cache it at module scope keyed by baseUrl|apiKey. Per-request
@@ -115,7 +116,7 @@ class ProwlarrClient {
   _indexerCategoryCacheEntry() {
     let entry = indexerCategoryCache.get(this.indexerCategoryCacheKey)
     if (!entry) {
-      entry = { lookup: new Map(), expiresAt: 0, inFlight: null }
+      entry = { lookup: new Map(), names: new Map(), expiresAt: 0, inFlight: null }
       indexerCategoryCache.set(this.indexerCategoryCacheKey, entry)
     }
     return entry
@@ -240,6 +241,10 @@ class ProwlarrClient {
             }
           }
           lookup.set(indexerId, idToName)
+          // Keep the indexer's NAME too, so movie/TV searches can skip the
+          // sports-only trackers instead of waiting for them and then binning
+          // whatever they return.
+          entry.names.set(indexerId, String(row?.name || '').trim())
         }
         entry.lookup = lookup
         entry.expiresAt = Date.now() + INDEXER_CATEGORY_TTL_MS
@@ -253,6 +258,33 @@ class ProwlarrClient {
 
     entry.inFlight = pending
     return pending
+  }
+
+  // Which indexers are worth asking for a film or a TV episode.
+  //
+  // A sports-only tracker will never hold a feature film, but it was still
+  // being searched on every movie/TV request — the result filter then dropped
+  // everything it returned (`items.filter(item => !isSportsOnlyIndexer(...))`).
+  // That is a whole tracker's round-trip spent to throw the answer away, and on
+  // a slow night one tracker sets the pace for the entire search.
+  //
+  // Returns null when the list cannot be determined, so the caller falls back to
+  // "all indexers" rather than accidentally searching none.
+  async _nonSportsIndexerIds() {
+    await this._getIndexerCategoryLookup()
+    const entry = this._indexerCategoryCacheEntry()
+    if (!entry.names || entry.names.size === 0) return null
+    const keep = []
+    const skipped = []
+    for (const [id, name] of entry.names) {
+      if (isSportsOnlyIndexer(name)) skipped.push(name)
+      else keep.push(id)
+    }
+    if (keep.length === 0) return null
+    if (skipped.length > 0) {
+      console.log(`[prowlarr] skipping sports-only indexer(s) for this search: ${skipped.join(', ')}`)
+    }
+    return keep
   }
 
   async _search(params, { timeoutMs } = {}) {
@@ -331,6 +363,13 @@ class ProwlarrClient {
   }
 
   async search(query, cats, type = 'search', options = {}) {
+    // Ask only the indexers that could plausibly hold this. For a film or TV
+    // episode that means skipping the sports-only trackers entirely, rather
+    // than waiting for them and discarding whatever they send back.
+    const indexerIds = options.excludeSportsIndexers
+      ? await this._nonSportsIndexerIds()
+      : null
+    const indexerParam = indexerIds && indexerIds.length > 0 ? indexerIds.join(',') : -2
     const categoryList = options.useCategories ? splitCategoryList(cats) : []
     if (categoryList.length > 1) {
       const groupTimeout = Math.max(1000, Number(options.categoryGroupTimeoutMs) || Number(options.timeoutMs) || TIMEOUT_MS)
@@ -346,7 +385,7 @@ class ProwlarrClient {
         while (nextIndex < categoryList.length) {
           const cat = categoryList[nextIndex]
           nextIndex += 1
-          const params = new URLSearchParams({ query, type, indexerIds: -2, apikey: this.apiKey })
+          const params = new URLSearchParams({ query, type, indexerIds: indexerParam, apikey: this.apiKey })
           params.set('categories', cat)
           await this._search(params, { timeoutMs: groupTimeout })
             .then((value) => {
@@ -370,7 +409,7 @@ class ProwlarrClient {
       return mergeSearchResults(values)
     }
 
-    const params = new URLSearchParams({ query, type, indexerIds: -2, apikey: this.apiKey })
+    const params = new URLSearchParams({ query, type, indexerIds: indexerParam, apikey: this.apiKey })
     if (categoryList.length === 1) params.set('categories', categoryList[0])
     return this._search(params, { timeoutMs: options.timeoutMs })
   }
@@ -378,7 +417,11 @@ class ProwlarrClient {
   async searchImdb(imdbId, _cats, type = 'movie', options = {}) {
     const numericId = String(imdbId).replace(/^tt/i, '')
     const searchType = type === 'series' ? 'tvsearch' : 'movie'
-    const params = new URLSearchParams({ query: '', type: searchType, imdbId: numericId, indexerIds: -2, apikey: this.apiKey })
+    const imdbIndexerIds = options.excludeSportsIndexers
+      ? await this._nonSportsIndexerIds()
+      : null
+    const imdbIndexerParam = imdbIndexerIds && imdbIndexerIds.length > 0 ? imdbIndexerIds.join(',') : -2
+    const params = new URLSearchParams({ query: '', type: searchType, imdbId: numericId, indexerIds: imdbIndexerParam, apikey: this.apiKey })
     return this._search(params, { timeoutMs: options.timeoutMs })
   }
 
