@@ -27,6 +27,24 @@ const searchCache = new Map()
 // rather than each hitting the trackers.
 const inFlightSearches = new Map()
 
+// Failures get their own, much shorter memory.
+//
+// Not caching failures at all sounds safer but is what made repeat searches
+// slow. A title search fans out to one request per category; on this deployment
+// several categories are consistently rejected or time out. With successes
+// cached and failures not, every repeat search skipped straight past the cached
+// half and spent the FULL timeout on the failing half — measured as a flat 7s
+// on every request, for ever.
+//
+// 60 seconds is short enough that a tracker coming back is picked up almost
+// immediately, and long enough that one browsing session does not pay the same
+// timeout again and again.
+const SEARCH_FAILURE_TTL_MS = Math.max(0, parseInt(
+  process.env.PVTKRRX_PROWLARR_SEARCH_FAILURE_TTL_MS || '60000',
+  10
+))
+const searchFailureCache = new Map()
+
 function indexerCategoryCacheKey(baseUrl, apiKey) {
   return `${String(baseUrl || '').toLowerCase()}|${String(apiKey || '')}`
 }
@@ -260,6 +278,13 @@ class ProwlarrClient {
       return hit.value
     }
 
+    // A category that just failed is not worth waiting on again this minute.
+    const failed = searchFailureCache.get(cacheKey)
+    if (failed && (now - failed.at) < SEARCH_FAILURE_TTL_MS) {
+      console.log(`[prowlarr] skipping a search that failed ${Math.round((now - failed.at) / 1000)}s ago (${failed.reason})`)
+      throw new Error(failed.reason)
+    }
+
     // If an identical search is already in flight, wait on it instead of
     // starting a second one. Stremio fires several requests at once, so without
     // this the same query can run three or four times in parallel.
@@ -288,7 +313,18 @@ class ProwlarrClient {
         if (oldest !== undefined) searchCache.delete(oldest)
       }
       searchCache.set(cacheKey, { at: Date.now(), value })
+      searchFailureCache.delete(cacheKey)
       return value
+    } catch (err) {
+      if (searchFailureCache.size >= SEARCH_CACHE_MAX) {
+        const oldest = searchFailureCache.keys().next().value
+        if (oldest !== undefined) searchFailureCache.delete(oldest)
+      }
+      searchFailureCache.set(cacheKey, {
+        at: Date.now(),
+        reason: String(err?.message || 'Prowlarr search failed')
+      })
+      throw err
     } finally {
       inFlightSearches.delete(cacheKey)
     }
