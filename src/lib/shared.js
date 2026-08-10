@@ -2835,10 +2835,42 @@ async function applySelfHostAdminEntitlementToConfig(config = {}) {
   }
 }
 
+// The bare /selfhost alias runs on the OWNER'S saved credentials — his Prowlarr
+// account, his private tracker logins, his qBittorrent. It carries no secret,
+// so before this guard anyone who knew the path could make his server search his
+// private trackers on their behalf. Demonstrated on 2026-08-11 from an
+// unrelated machine with no credentials:
+//
+//   GET https://www.pvtkrrx.cc/selfhost/stream/movie/tt0111161.json  -> 200
+//   and the owner's server logged:
+//     [stream] Falling back to title search: "The Shawshank Redemption"
+//     [prowlarr] skipping sports-only indexer(s) for this search: SportsCult
+//
+// On private trackers that is someone else spending the owner's ratio and
+// risking his account.
+//
+// The alias exists so the owner has a stable URL on his own box, so it stays
+// available to him: same-host requests, and requests carrying the server admin
+// token, are unaffected. Everything else must use the encrypted config-token
+// route that /configure already generates, which carries its own secret.
+function selfHostAliasAllowed(req) {
+  if (!isSelfHostConfigAlias(req.params?.config)) return true
+  if (isSameHostRequest(req)) return true
+  if (hasServerAdminToken(req)) return true
+  return false
+}
+
 async function withConfig(req, res, next) {
   req.localConfigMissing = false
   req.configIssues = []
   req.cloudTakeoverConfig = null
+  if (!selfHostAliasAllowed(req)) {
+    res.setHeader('Cache-Control', 'no-store')
+    return res.status(403).json({
+      error: 'This self-host address is private to its owner.',
+      detail: 'Open /configure on the server and install the generated route manifest, which carries your own access token.'
+    })
+  }
   if (isDiskBackedConfigAlias(req.params.config)) {
     try {
       const localConfig = loadLocalConfigFile()
