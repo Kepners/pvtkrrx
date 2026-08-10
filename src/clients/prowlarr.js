@@ -9,6 +9,24 @@ const { normalizeImdbId } = require('../utils/normalizeImdbId')
 // ProwlarrClient instances then share the cached map instead of each rebuilding it.
 const indexerCategoryCache = new Map()
 
+// Search results, keyed by the exact Prowlarr query. Searching the same title
+// twice in a session should be instant the second time — the whole cost is the
+// trackers answering, and that answer does not change minute to minute.
+// 15 minutes is long enough to make browsing feel instant and short enough that
+// a newly published release still turns up on the next look.
+const SEARCH_CACHE_TTL_MS = Math.max(0, parseInt(
+  process.env.PVTKRRX_PROWLARR_SEARCH_CACHE_TTL_MS || String(15 * 60 * 1000),
+  10
+))
+const SEARCH_CACHE_MAX = Math.max(50, parseInt(
+  process.env.PVTKRRX_PROWLARR_SEARCH_CACHE_MAX || '500',
+  10
+))
+const searchCache = new Map()
+// Identical searches already running, so concurrent duplicates share one call
+// rather than each hitting the trackers.
+const inFlightSearches = new Map()
+
 function indexerCategoryCacheKey(baseUrl, apiKey) {
   return `${String(baseUrl || '').toLowerCase()}|${String(apiKey || '')}`
 }
@@ -220,13 +238,60 @@ class ProwlarrClient {
   }
 
   async _search(params, { timeoutMs } = {}) {
+    // Searching the same thing twice should not cost the same twice.
+    //
+    // Every Prowlarr query goes through here, so caching at this level covers
+    // the IMDB lookup, the categorised title search and the broad fallback, and
+    // each category sub-search caches separately.
+    //
+    // This is the single biggest win available: measured on the live server the
+    // same query took 7.4s, 32s, 47s and once timed out at 180s. The cost is
+    // entirely the trackers answering, so the only way to make a repeat search
+    // fast is not to make it again.
+    //
+    // Errors and timeouts are deliberately NOT cached — a failed search must be
+    // retried, never remembered.
+    const cacheKey = `${this.baseUrl}|${params}`
+    const now = Date.now()
+
+    const hit = searchCache.get(cacheKey)
+    if (hit && (now - hit.at) < SEARCH_CACHE_TTL_MS) {
+      console.log(`[prowlarr] cache hit (${Math.round((now - hit.at) / 1000)}s old, ${hit.value.length} results)`)
+      return hit.value
+    }
+
+    // If an identical search is already in flight, wait on it instead of
+    // starting a second one. Stremio fires several requests at once, so without
+    // this the same query can run three or four times in parallel.
+    const pending = inFlightSearches.get(cacheKey)
+    if (pending) {
+      console.log('[prowlarr] joining an identical search already in flight')
+      return pending
+    }
+
     const url = `${this.baseUrl}/api/v1/search?${params}`
     const effectiveTimeout = Math.max(1000, Number(timeoutMs) || TIMEOUT_MS)
-    const res = await fetch(url, { signal: AbortSignal.timeout(effectiveTimeout) })
-    if (!res.ok) throw new Error(`Prowlarr HTTP ${res.status}`)
-    const data = await res.json()
-    const categoryLookup = await this._getIndexerCategoryLookup()
-    return (Array.isArray(data) ? data : []).map(r => this._mapResult(r, categoryLookup))
+    const run = (async () => {
+      const res = await fetch(url, { signal: AbortSignal.timeout(effectiveTimeout) })
+      if (!res.ok) throw new Error(`Prowlarr HTTP ${res.status}`)
+      const data = await res.json()
+      const categoryLookup = await this._getIndexerCategoryLookup()
+      return (Array.isArray(data) ? data : []).map(r => this._mapResult(r, categoryLookup))
+    })()
+
+    inFlightSearches.set(cacheKey, run)
+    try {
+      const value = await run
+      if (searchCache.size >= SEARCH_CACHE_MAX) {
+        // Cheap eviction: drop the oldest insertion. Map preserves insertion order.
+        const oldest = searchCache.keys().next().value
+        if (oldest !== undefined) searchCache.delete(oldest)
+      }
+      searchCache.set(cacheKey, { at: Date.now(), value })
+      return value
+    } finally {
+      inFlightSearches.delete(cacheKey)
+    }
   }
 
   async search(query, cats, type = 'search', options = {}) {
