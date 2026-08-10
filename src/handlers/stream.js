@@ -28,7 +28,14 @@ const { isAdultContentResult } = require('../utils/adultContentFilter')
 
 const STREAM_UPSTREAM_TIMEOUT_MS = Math.max(2000, parseInt(process.env.PVTKRRX_STREAM_UPSTREAM_TIMEOUT_MS || '10000', 10))
 const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVTKRRX_STREAM_TITLE_FALLBACK_TIMEOUT_MS || '12000', 10))
-const MOVIE_TITLE_FALLBACK_TIMEOUT_MS = Math.max(STREAM_TITLE_FALLBACK_TIMEOUT_MS, parseInt(
+// Movies get their own broad-search budget, independent of the TV one.
+// This used to be Math.max(STREAM_TITLE_FALLBACK_TIMEOUT_MS, ...), which meant
+// the 8000 default could never take effect: the TV value (12000) is larger, so
+// max() always returned 12000 and every movie broad search ran to twelve
+// seconds before giving up. The floor is a floor on the value itself, not on
+// the TV timeout, so the intended 8s now applies and the env var can still
+// raise or lower it.
+const MOVIE_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(
   process.env.PVTKRRX_MOVIE_TITLE_FALLBACK_TIMEOUT_MS || '8000',
   10
 ))
@@ -42,9 +49,15 @@ const STREAM_TITLE_FALLBACK_BUDGET_MS = Math.max(5000, parseInt(
   10
 ))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '12', 10))
+// Default the inspection concurrency to the candidate cap so every candidate is
+// inspected in ONE wave. At the previous default of 10 against a cap of 12, the
+// last two candidates formed a second wave and each wave can run to the full
+// per-link timeout — measured on the live server as ~9-14s spent after the
+// search had already finished. One wave makes the inspection cost one timeout,
+// not two. Still bounded by the 16 ceiling and overridable by env.
 const STREAM_CANDIDATE_CONCURRENCY = Math.max(1, Math.min(
   16,
-  parseInt(process.env.PVTKRRX_STREAM_CANDIDATE_CONCURRENCY || '10', 10)
+  parseInt(process.env.PVTKRRX_STREAM_CANDIDATE_CONCURRENCY || String(STREAM_MAX_CANDIDATES), 10)
 ))
 const STREAM_SPORTS_MAX_SEARCH_QUERIES = Math.max(4, parseInt(process.env.PVTKRRX_STREAM_SPORTS_MAX_SEARCH_QUERIES || '12', 10))
 const STREAM_SPORTS_MAX_SEARCH_QUERIES_WITH_DIRECT = Math.max(1, parseInt(process.env.PVTKRRX_STREAM_SPORTS_MAX_SEARCH_QUERIES_WITH_DIRECT || '3', 10))
@@ -1588,6 +1601,27 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
     )
   ])
 
+  // Start the first title search the moment Cinemeta gives us a title, WITHOUT
+  // waiting to see whether the IMDB lookup produced anything.
+  //
+  // Why: most of this deployment's indexers are private trackers, and they
+  // advertise imdb search capability while ignoring the id (the filter below
+  // exists precisely because they return their whole library instead). So the
+  // IMDB lookup usually contributes nothing and the title search runs anyway —
+  // but only AFTER the IMDB call has burned its full timeout.
+  //
+  // Measured on the live server before this change: a movie took 29s —
+  // 10s IMDB timeout, then 7s categorised title search, then a 12s broad search
+  // that also timed out. Running the title search alongside removes the first
+  // wait entirely; the two now overlap instead of queueing.
+  //
+  // Nothing is discarded: if the IMDB lookup DOES return usable sources they
+  // still win, and this speculative result is simply dropped.
+  // Started further down, once we know the IMDB hit and the local qBit library
+  // cannot already answer. Declared here so the fallback loop can reuse it.
+  let speculativeTitleSearch = null
+  let speculativeQuery = null
+
   let jackettItems = Array.isArray(jackettResult.value) ? jackettResult.value : []
   const qbitTorrents = Array.isArray(qbitResult.value) ? qbitResult.value : []
   const contentTitle = cinemetaResult.value?.name || null
@@ -1650,6 +1684,34 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
     jackettItems = qbitTitleFallbackItems
   }
 
+  // Start the first title search NOW, before the fallback loop, so it overlaps
+  // whatever else remains rather than queueing behind it.
+  //
+  // Why this is here and not earlier: it must only fire when nothing else has
+  // already answered. The IMDB hit and the local qBit library are both known by
+  // this point, and if either produced sources we must not spend a Prowlarr
+  // search at all — smoke:pipeline asserts exactly that ("qBit exact-title
+  // fallback should not wait for title fallback search").
+  //
+  // Measured before this change: a movie took 29s — a 10s IMDB timeout, then a
+  // 7s categorised title search, then a 12s broad search that also timed out.
+  // Most indexers here are private trackers which advertise imdb search and
+  // then ignore the id (the filter above exists for exactly that), so the IMDB
+  // wait almost always buys nothing and the title search runs regardless.
+  if (jackettItems.length === 0 && contentTitle) {
+    const speculativeQueries = buildTitleFallbackQueries(contentTitle, type, season, episode, contentYear)
+    if (speculativeQueries.length > 0) {
+      speculativeQuery = speculativeQueries[0]
+      speculativeTitleSearch = searchTitleFallback(torznab, speculativeQuery, cats, {
+        type,
+        remainingMs: STREAM_TITLE_FALLBACK_BUDGET_MS
+      }).catch(err => {
+        console.error('[stream] title search error:', err?.message)
+        return []
+      })
+    }
+  }
+
   // Fallback: title search if IMDB search returned nothing useful after filtering.
   // Use generic type=search — private trackers (HD-Torrents, SpeedCD) only support type=search.
   if (jackettItems.length === 0 && contentTitle) {
@@ -1665,8 +1727,18 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
         console.warn('[stream] Title fallback budget exhausted; stopping further fallback queries')
         break
       }
-      console.log(`[stream] Falling back to title search: "${fallbackQuery}"`)
-      const fallbackItems = await searchTitleFallback(torznab, fallbackQuery, cats, { type, remainingMs })
+      // The first query was already started alongside the IMDB lookup, so by now
+      // it is usually finished or nearly so. Reuse it instead of running it again.
+      const reuseSpeculative = speculativeTitleSearch && fallbackQuery === speculativeQuery
+      if (reuseSpeculative) {
+        console.log(`[stream] Title search (already running in parallel): "${fallbackQuery}"`)
+      } else {
+        console.log(`[stream] Falling back to title search: "${fallbackQuery}"`)
+      }
+      const fallbackItems = reuseSpeculative
+        ? await speculativeTitleSearch
+        : await searchTitleFallback(torznab, fallbackQuery, cats, { type, remainingMs })
+      if (reuseSpeculative) speculativeTitleSearch = null
       jackettItems = applyFilters(fallbackItems)
       console.log(`[stream] Title search returned ${jackettItems.length} results after filtering`)
       if (jackettItems.length > 0) break
