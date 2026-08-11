@@ -92,8 +92,23 @@ const STREAM_SPORTS_MAX_SEARCH_QUERIES_WITH_DIRECT = Math.max(1, parseInt(proces
 const STREAM_SPORTS_SUPPLEMENTAL_BUDGET_MS = Math.max(2500, parseInt(process.env.PVTKRRX_STREAM_SPORTS_SUPPLEMENTAL_BUDGET_MS || '8000', 10))
 const STREAM_SPORTS_RESPONSE_TIMEOUT_MS = Math.max(5000, parseInt(process.env.PVTKRRX_STREAM_SPORTS_RESPONSE_TIMEOUT_MS || '14000', 10))
 const TRACKER_LINK_INSPECTION_TIMEOUT_MS = Math.max(1000, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_TIMEOUT_MS || '2500', 10))
+// Inspecting a candidate downloads its .torrent through Prowlarr, so this
+// budget has to survive a tracker that is asking us to slow down rather than
+// one that is broken. hd-torrents.org states its rule in the 429 body: "Please
+// wait 13 seconds before making another request."
+//
+// Measured on the live server 2026-08-11, the SAME links through PVTKRRX's own
+// fetcher: 70-457ms each when the trackers were idle, 5.8s median with the
+// slowest hitting the old 7000ms ceiling exactly when they were throttling.
+// A 7s budget therefore fails precisely when the tracker is telling us to wait
+// ~13s, and the candidate is discarded even though the file is fine -- proven
+// by fetching and parsing those same torrents by hand: real infohashes, real
+// playable MKVs.
+//
+// 15s clears the tracker's own stated wait. It costs nothing when they are
+// fast, because a healthy fetch still returns in well under a second.
 const MOVIE_TV_TRACKER_LINK_INSPECTION_TIMEOUT_MS = Math.max(TRACKER_LINK_INSPECTION_TIMEOUT_MS, parseInt(
-  process.env.PVTKRRX_MOVIE_TV_TRACKER_LINK_INSPECTION_TIMEOUT_MS || '7000',
+  process.env.PVTKRRX_MOVIE_TV_TRACKER_LINK_INSPECTION_TIMEOUT_MS || '15000',
   10
 ))
 const TRACKER_LINK_INSPECTION_CACHE_MS = Math.max(60 * 1000, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_CACHE_MS || String(10 * 60 * 1000), 10))
