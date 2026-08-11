@@ -2925,8 +2925,20 @@ async function withConfig(req, res, next) {
       req.config = normalizeAddonConfig(merged)
       res.setHeader('X-PVTKRRX-Account-Config-Refresh', 'sports-poster')
     }
+    // Same exemption the disk-config branch above gets, and for the same
+    // reason: on a self-host server 127.0.0.1 IS the seedbox, so loopback
+    // backend URLs are correct rather than a misconfiguration.
+    //
+    // Missing it here did not just add a warning — a config issue forces
+    // behaviorHints.configurationRequired = true and overwrites the manifest
+    // description, so Stremio showed the owner a Configure button instead of
+    // Install and refused to add a working addon, quoting "Prowlarr URL points
+    // at 127.0.0.1". The token carried a complete, valid config the whole time.
+    //
+    // SELF_HOST_SERVER_MODE is false on the public relay, so its guard stands.
     req.configIssues = getConfigIssues(req.cloudTakeoverConfig || req.config, {
-      requestBaseUrl: getPublicBaseUrl(req)
+      requestBaseUrl: getPublicBaseUrl(req),
+      selfHostDiskConfig: SELF_HOST_SERVER_MODE
     })
     next()
   } catch (err) {
@@ -3021,7 +3033,8 @@ function applyCloudTakeoverConfig(req, res, routeKind, reason) {
 
   req.config = req.cloudTakeoverConfig
   req.configIssues = getConfigIssues(req.config, {
-    requestBaseUrl: getPublicBaseUrl(req)
+    requestBaseUrl: getPublicBaseUrl(req),
+    selfHostDiskConfig: SELF_HOST_SERVER_MODE
   })
   res.setHeader('X-PVTKRRX-Cloud-Takeover', 'linked-account')
   console.log(
