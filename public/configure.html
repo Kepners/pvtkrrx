@@ -4054,8 +4054,34 @@
     }
 
     function resolveSelfHostedInstallBase() {
-      const preferredOrigin = String(serverRuntime.publicBaseUrl || '').trim();
-      const currentOrigin = preferredOrigin || getCurrentAppOrigin();
+      // An install link must point at the server that MINTED the token, which
+      // is the server serving this page. publicBaseUrl is the brand host used
+      // for manifest content (logo, background, configuration URL) and is not
+      // necessarily the same machine: on the owner's Contabo box it is pinned
+      // to https://www.pvtkrrx.cc, which reaches the public relay container.
+      // That container has a different ENCRYPTION_SECRET, so a token minted
+      // here returns 400 there -- verified 2026-08-11, same token: 200 on the
+      // self-host origin, 400 on the brand host.
+      //
+      // The old alias link survived this only because the reverse proxy
+      // special-cases the literal "/selfhost" path on the brand host and
+      // forwards it to this box. A token path gets no such rule, so it must
+      // carry the origin it can actually be redeemed on.
+      const browserOrigin = String(getCurrentAppOrigin() || '').trim();
+      const isUsableOrigin = (value) => {
+        if (!value) return false;
+        try {
+          const url = new URL(value);
+          const host = String(url.hostname || '').trim().toLowerCase();
+          return url.protocol === 'https:' || (url.protocol === 'http:' && host === '127.0.0.1');
+        } catch (_) {
+          return false;
+        }
+      };
+      const preferredOrigin = isUsableOrigin(browserOrigin)
+        ? browserOrigin
+        : String(serverRuntime.publicBaseUrl || '').trim();
+      const currentOrigin = preferredOrigin || browserOrigin;
       if (!currentOrigin) {
         return {
           ok: false,

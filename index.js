@@ -1260,7 +1260,18 @@ app.post('/encrypt', async (req, res) => {
     return res.status(400).json({ error: 'Invalid config payload' })
   }
 
-  const existingConfig = resolveExistingConfigForBody(req.body)
+  // On a self-host server the real credentials live in the server's own saved
+  // config on disk -- the configure page only ever sends masked placeholders
+  // for secrets it already stored. Without reading that file, the minted token
+  // carries the mask instead of the key and every search comes back
+  // "Prowlarr HTTP 401" while the server's own catalogues work fine, because
+  // those read the disk config directly. Verified 2026-08-11.
+  //
+  // Strictly gated on SELF_HOST_SERVER_MODE: the public relay is multi-tenant
+  // and must never fold a local config file into somebody's token.
+  const existingConfig = resolveExistingConfigForBody(req.body, {
+    preferLocal: SELF_HOST_SERVER_MODE
+  })
   const mergedConfig = mergeRetainedSecrets(req.body, existingConfig)
   const requestedSportsTemplate = String(req.body?.sportsPosterTemplate || '').trim()
   const hydratedConfig = await hydrateAccountLinkForConfig(normalizeAddonConfig(mergedConfig))

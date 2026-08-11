@@ -105,6 +105,28 @@ function normalizeProwlarrBaseUrl(input) {
   return url
 }
 
+// Prowlarr binds indexerIds as a REPEATED integer query parameter. Joining the
+// ids with commas produces one value and the API rejects the whole search with
+// HTTP 400: "The value '1,7,5,8,2,3,4,6' is not valid."
+//
+// Proven against the live Prowlarr on 2026-08-11, same query three ways:
+//   indexerIds=-2                 -> 200   (the sentinel for "every indexer")
+//   indexerIds=1,7,5,8,2,3,4,6    -> 400
+//   indexerIds=1&indexerIds=7&... -> 200
+//
+// This stayed hidden until the sports-only exclusion started sending a real
+// list, because -2 is a single value and always survived the comma path. Every
+// film and TV search returned zero streams while sports catalogues, which do
+// not filter indexers, kept working perfectly and hid the breakage.
+function applyIndexerIds(params, indexerIds) {
+  if (Array.isArray(indexerIds) && indexerIds.length > 0) {
+    for (const id of indexerIds) params.append('indexerIds', String(id))
+  } else {
+    params.set('indexerIds', '-2')
+  }
+  return params
+}
+
 class ProwlarrClient {
   constructor(baseUrl, apiKey) {
     // Accept either base URL (http://host:port) or legacy torznab URL; normalize to base.
@@ -369,7 +391,6 @@ class ProwlarrClient {
     const indexerIds = options.excludeSportsIndexers
       ? await this._nonSportsIndexerIds()
       : null
-    const indexerParam = indexerIds && indexerIds.length > 0 ? indexerIds.join(',') : -2
     const categoryList = options.useCategories ? splitCategoryList(cats) : []
     if (categoryList.length > 1) {
       const groupTimeout = Math.max(1000, Number(options.categoryGroupTimeoutMs) || Number(options.timeoutMs) || TIMEOUT_MS)
@@ -385,7 +406,10 @@ class ProwlarrClient {
         while (nextIndex < categoryList.length) {
           const cat = categoryList[nextIndex]
           nextIndex += 1
-          const params = new URLSearchParams({ query, type, indexerIds: indexerParam, apikey: this.apiKey })
+          const params = applyIndexerIds(
+            new URLSearchParams({ query, type, apikey: this.apiKey }),
+            indexerIds
+          )
           params.set('categories', cat)
           await this._search(params, { timeoutMs: groupTimeout })
             .then((value) => {
@@ -409,7 +433,10 @@ class ProwlarrClient {
       return mergeSearchResults(values)
     }
 
-    const params = new URLSearchParams({ query, type, indexerIds: indexerParam, apikey: this.apiKey })
+    const params = applyIndexerIds(
+      new URLSearchParams({ query, type, apikey: this.apiKey }),
+      indexerIds
+    )
     if (categoryList.length === 1) params.set('categories', categoryList[0])
     return this._search(params, { timeoutMs: options.timeoutMs })
   }
@@ -420,8 +447,10 @@ class ProwlarrClient {
     const imdbIndexerIds = options.excludeSportsIndexers
       ? await this._nonSportsIndexerIds()
       : null
-    const imdbIndexerParam = imdbIndexerIds && imdbIndexerIds.length > 0 ? imdbIndexerIds.join(',') : -2
-    const params = new URLSearchParams({ query: '', type: searchType, imdbId: numericId, indexerIds: imdbIndexerParam, apikey: this.apiKey })
+    const params = applyIndexerIds(
+      new URLSearchParams({ query: '', type: searchType, imdbId: numericId, apikey: this.apiKey }),
+      imdbIndexerIds
+    )
     return this._search(params, { timeoutMs: options.timeoutMs })
   }
 
