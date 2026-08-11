@@ -124,6 +124,12 @@ const MOVIE_TV_TRACKER_LINK_INSPECTION_TIMEOUT_MS = Math.max(TRACKER_LINK_INSPEC
   10
 ))
 const TRACKER_LINK_INSPECTION_CACHE_MS = Math.max(60 * 1000, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_CACHE_MS || String(10 * 60 * 1000), 10))
+// Failed inspections get their own, much shorter life. See the note where the
+// result is cached: a failure is a moment, not a fact about the torrent.
+const TRACKER_LINK_INSPECTION_FAILURE_CACHE_MS = Math.max(5000, parseInt(
+  process.env.PVTKRRX_TRACKER_LINK_INSPECTION_FAILURE_CACHE_MS || '30000',
+  10
+))
 const TRACKER_LINK_INSPECTION_CACHE_MAX_KEYS = Math.max(
   50,
   parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_CACHE_MAX_KEYS || '1000', 10)
@@ -234,6 +240,61 @@ const IMDB_LOOKUP_RETRY_EVERY = Math.max(2, parseInt(
 ))
 let imdbLookupUselessStreak = 0
 let imdbLookupSkipCount = 0
+
+// A tracker whose downloads are broken must not be allowed to fill the shortlist.
+//
+// Prowlarr returns search results and download links separately, and a tracker
+// can happily answer searches while every download fails. Seen live
+// 2026-08-11: "Torrenting" returned 30 results for House of the Dragon and
+// supplied ALL of the top candidates by seeder count, but every download came
+// back HTTP 500, with Prowlarr logging "Invalid torrent file contents" -- the
+// tracker was serving an HTML page instead of a torrent, the usual sign of an
+// expired session. Twelve candidates, twelve failures, zero streams, while the
+// same episode had perfectly good sources on TorrentLeech and IPTorrents
+// sitting just below the cut.
+//
+// That is what made it look random to the owner: titles whose best-seeded
+// copies happened to live on the broken tracker returned nothing, and titles
+// whose copies lived elsewhere worked fine.
+//
+// So a tracker earns its place in the shortlist. Consecutive download failures
+// push its results to the back rather than removing them, and a single success
+// clears the record instantly -- nothing is permanently blacklisted on the
+// strength of a bad afternoon.
+const TRACKER_DOWNLOAD_FAILURE_DEMOTE_AT = Math.max(2, parseInt(
+  process.env.PVTKRRX_TRACKER_DOWNLOAD_FAILURE_DEMOTE_AT || '4',
+  10
+))
+const trackerDownloadFailureStreak = new Map()
+
+function normalizeIndexerKey(name) {
+  return String(name || '').trim().toLowerCase()
+}
+
+function recordTrackerDownloadOutcome(indexerName, succeeded) {
+  const key = normalizeIndexerKey(indexerName)
+  if (!key) return
+  if (succeeded) {
+    if (trackerDownloadFailureStreak.get(key) >= TRACKER_DOWNLOAD_FAILURE_DEMOTE_AT) {
+      console.log(`[stream] ${indexerName} is serving torrent files again; restoring it`)
+    }
+    trackerDownloadFailureStreak.delete(key)
+    return
+  }
+  const next = (trackerDownloadFailureStreak.get(key) || 0) + 1
+  trackerDownloadFailureStreak.set(key, next)
+  if (next === TRACKER_DOWNLOAD_FAILURE_DEMOTE_AT) {
+    console.warn(
+      `[stream] ${indexerName} has failed ${next} downloads in a row; ` +
+      'moving its results below other trackers until one succeeds'
+    )
+  }
+}
+
+function trackerDownloadsLookBroken(indexerName) {
+  return (trackerDownloadFailureStreak.get(normalizeIndexerKey(indexerName)) || 0) >=
+    TRACKER_DOWNLOAD_FAILURE_DEMOTE_AT
+}
 
 function imdbLookupWorthWaitingFor() {
   if (imdbLookupUselessStreak < IMDB_LOOKUP_USELESS_STREAK_LIMIT) return true
@@ -390,8 +451,25 @@ async function inspectTrackerLink(link, options = {}) {
   trimTrackerLinkInspectionCache(now)
 
   const result = await promise
+  // A SUCCESSFUL inspection describes the torrent itself, which does not
+  // change, so it is worth keeping for the full window. A FAILURE describes
+  // one bad moment — a throttled tracker, a timeout — and caching that for ten
+  // minutes turns a blip into ten minutes of "this title has nothing", even
+  // after the tracker recovers.
+  //
+  // Seen live 2026-08-11: House of the Dragon returned 0 streams in SIX
+  // MILLISECONDS, because all 12 candidates were serving cached failures from
+  // an earlier throttled attempt. That is exactly the "hit and miss" the owner
+  // reported — the same title working, then not, then working again.
+  //
+  // Failures therefore get a short cooldown: long enough to avoid hammering a
+  // tracker that just refused us, short enough that the next look genuinely
+  // retries. Same principle the Prowlarr search cache already follows.
+  const cacheFor = result?.inspected
+    ? TRACKER_LINK_INSPECTION_CACHE_MS
+    : TRACKER_LINK_INSPECTION_FAILURE_CACHE_MS
   trackerLinkInspectionCache.set(cacheKey, {
-    expiresAt: Date.now() + TRACKER_LINK_INSPECTION_CACHE_MS,
+    expiresAt: Date.now() + cacheFor,
     promise: Promise.resolve(result)
   })
   trimTrackerLinkInspectionCache()
@@ -513,6 +591,7 @@ async function emitTrackerCandidateStream(item, ctx = {}) {
     if (noticeCounts) noticeCounts.legacyAviSuppressed += 1
     return { stream: null, stop: false }
   }
+  if (item.link) recordTrackerDownloadOutcome(item.indexer, Boolean(inspection.inspected))
   if (!inspection.inspected) {
     if (noticeCounts) noticeCounts.trackerLinkUnverified += 1
     return { stream: null, stop: false }
@@ -1399,7 +1478,15 @@ function preferSeededResults(items, contextLabel, keepZeroSeederPredicate = null
 
   const preferred = []
   const delayed = []
+  // A source is only as good as our ability to fetch its torrent file, so a
+  // tracker that keeps refusing downloads is treated like a dead seed: kept,
+  // but behind everything we can actually play.
+  const brokenTracker = []
   for (const item of list) {
+    if (trackerDownloadsLookBroken(item?.indexer)) {
+      brokenTracker.push(item)
+      continue
+    }
     const keepNearTop = hasActiveSeeders(item) || (
       typeof keepZeroSeederPredicate === 'function' && keepZeroSeederPredicate(item)
     )
@@ -1407,11 +1494,18 @@ function preferSeededResults(items, contextLabel, keepZeroSeederPredicate = null
     else delayed.push(item)
   }
 
-  if (preferred.length === 0 || delayed.length === 0) return list
+  if (brokenTracker.length > 0) {
+    const names = [...new Set(brokenTracker.map(i => String(i?.indexer || '?')))].join(', ')
+    console.log(
+      `[stream] ${contextLabel}: moved ${brokenTracker.length} source(s) from ${names} to the end ` +
+      '(downloads failing)'
+    )
+  }
+  if (preferred.length === 0 && delayed.length === 0) return list
   if (delayed.length > 0) {
     console.log(`[stream] ${contextLabel}: moved ${delayed.length} zero-seeder source(s) to the end`)
   }
-  return [...preferred, ...delayed]
+  return [...preferred, ...delayed, ...brokenTracker]
 }
 
 function similarTitle(candidateTitle, targetTitle) {
