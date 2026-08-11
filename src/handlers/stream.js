@@ -67,6 +67,18 @@ const STREAM_TITLE_FALLBACK_BUDGET_MS = Math.max(5000, parseInt(
   process.env.PVTKRRX_STREAM_TITLE_FALLBACK_BUDGET_MS || '45000',
   10
 ))
+// A ceiling on the whole candidate-inspection phase, not on each link.
+// 12 candidates, 4 at a time, 15s each is 45s of worst case with nothing to
+// stop it, and every one of those seconds is spent showing the viewer
+// "1 addon still loading" next to another addon's finished list.
+// Measured cold (Interstellar, live server 2026-08-11): searches took 13.4s and
+// inspection took 22.5s of a 36s total. Ten seconds is comfortably more than a
+// healthy pass needs -- real links came back in 70-457ms each -- so this only
+// bites when something is genuinely stuck.
+const STREAM_CANDIDATE_INSPECTION_BUDGET_MS = Math.max(2000, parseInt(
+  process.env.PVTKRRX_STREAM_CANDIDATE_INSPECTION_BUDGET_MS || '10000',
+  10
+))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '12', 10))
 // Inspecting a candidate downloads its .torrent, and Prowlarr fetches that
 // from the private tracker. So this number is not "how much can our CPU take",
@@ -185,7 +197,74 @@ function canServeBuiltinFileRoute(configToken) {
   return String(configToken || '') === 'local' || !hostedRelayRuntime
 }
 
-async function mapWithConcurrency(items, limit, mapper) {
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms))
+}
+
+// Does asking Prowlarr by IMDB id actually find anything on THIS setup?
+//
+// Torznab indexers are not obliged to honour an imdbid search. A tracker that
+// ignores it does not say so -- it answers with an unfiltered listing, which
+// then gets thrown away by the relevance filter further down. Measured on the
+// owner's 7 private trackers over a morning of real lookups:
+//
+//   29 lookups -> 0 results
+//   10 lookups -> 365 results, of which 0 survived the relevance filter
+//
+// Not once did it contribute a single usable source, and a movie lookup blocked
+// on it for about 7 seconds every time -- roughly a third of the cold wait,
+// spent on nothing.
+//
+// So it earns its place instead of being assumed useful: after enough
+// consecutive fruitless lookups the blocking wait is dropped and the title
+// search leads, exactly as TV episodes already do. One useful result puts it
+// straight back. Deployments whose indexers DO support imdbid never trip this
+// and keep the precision of an id-based search.
+const IMDB_LOOKUP_USELESS_STREAK_LIMIT = Math.max(1, parseInt(
+  process.env.PVTKRRX_IMDB_LOOKUP_USELESS_STREAK_LIMIT || '3',
+  10
+))
+// Once demoted it must still get an occasional go, or "learning" is just a
+// one-way switch: never run again means never observed working again, even
+// after the owner fixes an indexer. One probe in every 20 lookups costs almost
+// nothing and lets it earn its place back on its own.
+const IMDB_LOOKUP_RETRY_EVERY = Math.max(2, parseInt(
+  process.env.PVTKRRX_IMDB_LOOKUP_RETRY_EVERY || '20',
+  10
+))
+let imdbLookupUselessStreak = 0
+let imdbLookupSkipCount = 0
+
+function imdbLookupWorthWaitingFor() {
+  if (imdbLookupUselessStreak < IMDB_LOOKUP_USELESS_STREAK_LIMIT) return true
+  imdbLookupSkipCount += 1
+  if (imdbLookupSkipCount % IMDB_LOOKUP_RETRY_EVERY === 0) {
+    console.log('[stream] retrying the IMDB lookup to see whether it works again')
+    return true
+  }
+  return false
+}
+
+function recordImdbLookupOutcome(usableCount) {
+  if (Number(usableCount) > 0) {
+    if (imdbLookupUselessStreak > 0) {
+      console.log('[stream] IMDB lookup produced usable sources again; restoring the initial IMDB wait')
+    }
+    imdbLookupUselessStreak = 0
+    return
+  }
+  imdbLookupUselessStreak += 1
+  if (imdbLookupUselessStreak === IMDB_LOOKUP_USELESS_STREAK_LIMIT) {
+    console.log(
+      `[stream] IMDB lookup produced nothing usable ${imdbLookupUselessStreak} times running; ` +
+      'searching by title first from now on'
+    )
+  }
+}
+
+// onSettled fires as each item finishes, so a caller that gives up waiting can
+// still use whatever completed before its deadline.
+async function mapWithConcurrency(items, limit, mapper, onSettled) {
   const list = Array.isArray(items) ? items : []
   const concurrency = Math.max(1, Math.min(Number(limit) || 1, list.length || 1))
   const results = new Array(list.length)
@@ -195,7 +274,15 @@ async function mapWithConcurrency(items, limit, mapper) {
     while (nextIndex < list.length) {
       const index = nextIndex
       nextIndex += 1
-      results[index] = await mapper(list[index], index)
+      const value = await mapper(list[index], index)
+      results[index] = value
+      if (typeof onSettled === 'function') {
+        try {
+          onSettled(value, index)
+        } catch (_) {
+          // A reporting hook must never break the work it is reporting on.
+        }
+      }
     }
   }
 
@@ -1633,7 +1720,7 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
   // Cinemeta runs in parallel so it adds zero latency on the happy path.
   // We always need the title to filter out sports content that leaks from non-movie indexers.
   const cinemeta = new CinemetaClient()
-  const initialProwlarrLookup = hasEpisodeMarker
+  const initialProwlarrLookup = (hasEpisodeMarker || !imdbLookupWorthWaitingFor())
     ? Promise.resolve({ value: [], skippedTitleFirst: true })
     : settleWithTimeout(torznab.searchImdb(imdbId, cats, searchType, { excludeSportsIndexers: true }), STREAM_UPSTREAM_TIMEOUT_MS, [])
   const [jackettResult, qbitResult, cinemetaResult] = await Promise.all([
@@ -1712,6 +1799,13 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
   }
 
   jackettItems = applyFilters(jackettItems)
+
+  // Only judge the IMDB lookup when we actually waited on it. A skipped lookup
+  // is not evidence either way, and scoring it would keep the streak pinned
+  // high and stop it ever being retried.
+  if (!jackettResult.skippedTitleFirst) {
+    recordImdbLookupOutcome(jackettItems.length)
+  }
 
   // Build hash lookup from qBit early so completed/in-progress local torrents can
   // still surface when Prowlarr is slow, empty, or rejects categorized TV search.
@@ -1825,7 +1919,20 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
   }
 
   const streams = []
-  const candidateStreams = await mapWithConcurrency(filtered.slice(0, STREAM_MAX_CANDIDATES), STREAM_CANDIDATE_CONCURRENCY, async (item) => {
+  // Whatever has been worked out by the deadline, in the order it finished.
+  // Inspecting candidates has no natural ceiling: 12 links, 4 at a time, each
+  // allowed 15s, is 45s in the worst case, and Stremio users stare at "1 addon
+  // still loading" for every second of it. Measured cold on the live server
+  // 2026-08-11 (Interstellar): 7.2s IMDB search + 6.2s title search + 22.5s
+  // inspecting candidates = 36s total, with inspection the largest slice by
+  // far.
+  //
+  // A slow tracker must not be able to hold up the results that are already
+  // good. Anything still outstanding when the budget runs out is dropped, and
+  // its search result stays cached, so the next look at that title picks it up
+  // for free (a repeat search returns in under 200ms).
+  const readyStreams = []
+  const candidatePromise = mapWithConcurrency(filtered.slice(0, STREAM_MAX_CANDIDATES), STREAM_CANDIDATE_CONCURRENCY, async (item) => {
     // Private trackers don't return infohashes — allow items through if they have a download link
     if (!item.infohash && !item.link) return null
     const parsed = parse(item.title)
@@ -1899,10 +2006,27 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
       return stream
     }
     return null
+  }, (stream) => {
+    if (stream) readyStreams.push(stream)
   })
 
-  for (const stream of candidateStreams) {
-    if (stream) streams.push(stream)
+  const inspectionFinished = await Promise.race([
+    candidatePromise.then((list) => list),
+    wait(STREAM_CANDIDATE_INSPECTION_BUDGET_MS).then(() => null)
+  ])
+
+  if (inspectionFinished) {
+    for (const stream of inspectionFinished) {
+      if (stream) streams.push(stream)
+    }
+  } else {
+    // Budget spent. Ship what finished rather than making the viewer wait for
+    // the stragglers; the cached search makes the next look near-instant.
+    console.warn(
+      `[stream] candidate inspection budget hit after ${STREAM_CANDIDATE_INSPECTION_BUDGET_MS}ms; ` +
+      `returning the ${readyStreams.length} source(s) that finished`
+    )
+    for (const stream of readyStreams) streams.push(stream)
   }
 
   appendNoticeStreams(streams, noticeCounts, addonUrl)
