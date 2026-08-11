@@ -1267,7 +1267,21 @@ app.post('/encrypt', async (req, res) => {
   const { config: normalizedConfig, entitlement: encryptEntitlement } =
     await applySportsPosterEntitlement(hydratedConfig, { requestedTemplate: requestedSportsTemplate })
   const issues = getConfigIssues(normalizedConfig, {
-    requestBaseUrl: getPublicBaseUrl(req)
+    requestBaseUrl: getPublicBaseUrl(req),
+    // A self-host server minting a token for ITSELF is not the hosted-relay
+    // case these checks police. REMOTE_SEEDBOX_REQUIRES_PUBLIC_URL exists to
+    // stop a public-relay token pointing at 127.0.0.1, where loopback means
+    // the relay's own box and the install would simply be broken. On an
+    // owner's self-host server, 127.0.0.1 IS the seedbox -- Prowlarr and
+    // qBittorrent really are on that machine -- so the same URLs are correct.
+    //
+    // The /:config/... path already grants this exemption (getConfigIssues is
+    // called there with selfHostDiskConfig). /encrypt did not, so once the
+    // configure page started minting a token for the self-host route instead
+    // of handing out the unauthenticated alias, every self-host install link
+    // failed with a 400. SELF_HOST_SERVER_MODE is false on the public relay,
+    // so the guard there is untouched.
+    selfHostDiskConfig: SELF_HOST_SERVER_MODE
   })
   if (issues.length > 0) {
     return res.status(400).json({

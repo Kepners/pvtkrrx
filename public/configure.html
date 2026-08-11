@@ -7579,17 +7579,29 @@
             //
             // The alias still works for the owner on the box itself; it is simply
             // no longer what gets handed out as an install link.
+            // Keep the server's own reason. Swallowing it here once cost a
+            // debugging session: the page said only "could not create your
+            // link" while the server was returning a precise 400 explaining
+            // that loopback backend URLs are rejected for hosted-relay tokens.
             let selfHostToken = '';
+            let selfHostTokenError = '';
             try {
               const tokenRes = await fetch('/encrypt', {
                 method: 'POST',
                 headers: buildJsonHeaders(),
                 body: JSON.stringify(hostedPayload)
               });
-              const tokenData = await tokenRes.json();
-              if (tokenData && tokenData.token) selfHostToken = encodeURIComponent(tokenData.token);
-            } catch (_) {
-              selfHostToken = '';
+              const tokenData = await tokenRes.json().catch(() => null);
+              if (tokenData && tokenData.token) {
+                selfHostToken = encodeURIComponent(tokenData.token);
+              } else {
+                selfHostTokenError = (tokenData && tokenData.error)
+                  ? tokenData.error
+                  : ('Server returned ' + tokenRes.status + ' with no install token.');
+              }
+            } catch (err) {
+              selfHostTokenError = 'Could not reach this server to create the link (' +
+                ((err && err.message) || 'network error') + ').';
             }
             if (!selfHostToken) {
               setPrivateLink('hostedManifest', '');
@@ -7597,7 +7609,8 @@
               setInstallAnchorState('stremioLinkHosted', '', getSeedboxInstallAnchorLabel());
               document.getElementById('installLink').style.display = 'block';
               syncInstallTargetUi();
-              return setStatus('installStatus', 'err', 'Could not create your private install link. Save again, and if it keeps failing check the server log.');
+              return setStatus('installStatus', 'err',
+                'Could not create your private install link. ' + selfHostTokenError);
             }
             const manifestPath = '/' + selfHostToken + '/manifest.json' + modeQuery;
             if (!installBase.ok) {
