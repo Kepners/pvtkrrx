@@ -7568,7 +7568,38 @@
             const configAlias = String(saveData.configAlias || serverRuntime.serverConfigAlias || 'selfhost').trim() || 'selfhost';
             const installBase = resolveSelfHostedInstallBase();
             const modeQuery = '?mode=' + encodeURIComponent(installMode);
-            const manifestPath = '/' + encodeURIComponent(configAlias) + '/manifest.json' + modeQuery;
+
+            // Mint a per-install token, exactly as the hosted-relay branch below
+            // already does. This branch used to emit the bare alias path
+            // ("/selfhost/manifest.json"), which carries no secret at all — so
+            // anyone who knew the address could drive this server on the owner's
+            // saved Prowlarr and private-tracker credentials. Demonstrated on
+            // 2026-08-11: an anonymous request from an unrelated machine made the
+            // server run a real private-tracker search.
+            //
+            // The alias still works for the owner on the box itself; it is simply
+            // no longer what gets handed out as an install link.
+            let selfHostToken = '';
+            try {
+              const tokenRes = await fetch('/encrypt', {
+                method: 'POST',
+                headers: buildJsonHeaders(),
+                body: JSON.stringify(hostedPayload)
+              });
+              const tokenData = await tokenRes.json();
+              if (tokenData && tokenData.token) selfHostToken = encodeURIComponent(tokenData.token);
+            } catch (_) {
+              selfHostToken = '';
+            }
+            if (!selfHostToken) {
+              setPrivateLink('hostedManifest', '');
+              setPrivateLink('hostedStremio', '');
+              setInstallAnchorState('stremioLinkHosted', '', getSeedboxInstallAnchorLabel());
+              document.getElementById('installLink').style.display = 'block';
+              syncInstallTargetUi();
+              return setStatus('installStatus', 'err', 'Could not create your private install link. Save again, and if it keeps failing check the server log.');
+            }
+            const manifestPath = '/' + selfHostToken + '/manifest.json' + modeQuery;
             if (!installBase.ok) {
               setPrivateLink('hostedManifest', '');
               setPrivateLink('hostedStremio', '');
