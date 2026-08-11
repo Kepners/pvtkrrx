@@ -49,15 +49,24 @@ const STREAM_TITLE_FALLBACK_BUDGET_MS = Math.max(5000, parseInt(
   10
 ))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '12', 10))
-// Default the inspection concurrency to the candidate cap so every candidate is
-// inspected in ONE wave. At the previous default of 10 against a cap of 12, the
-// last two candidates formed a second wave and each wave can run to the full
-// per-link timeout — measured on the live server as ~9-14s spent after the
-// search had already finished. One wave makes the inspection cost one timeout,
-// not two. Still bounded by the 16 ceiling and overridable by env.
+// Inspecting a candidate downloads its .torrent, and Prowlarr fetches that
+// from the private tracker. So this number is not "how much can our CPU take",
+// it is "how many requests will a private tracker accept at once".
+//
+// A previous version defaulted this to the candidate cap so all 12 went in one
+// wave. That is wrong for private trackers. Measured on the live server
+// 2026-08-11 against real tracker links:
+//   one at a time   -> HTTP 200 in 0.05-0.36s each
+//   twelve at once  -> 500s and 7s timeouts, and after a search burst
+//                      EVERY candidate failed, so Stremio got zero streams
+// hd-torrents.org states the rule outright in its 429 body: "You've reached
+// the request limit for automation tools. Please wait 13 seconds."
+//
+// Four keeps the whole cap inside three quick waves, comfortably under the 7s
+// per-link budget, without burst-tripping the trackers. Overridable by env.
 const STREAM_CANDIDATE_CONCURRENCY = Math.max(1, Math.min(
   16,
-  parseInt(process.env.PVTKRRX_STREAM_CANDIDATE_CONCURRENCY || String(STREAM_MAX_CANDIDATES), 10)
+  parseInt(process.env.PVTKRRX_STREAM_CANDIDATE_CONCURRENCY || '4', 10)
 ))
 const STREAM_SPORTS_MAX_SEARCH_QUERIES = Math.max(4, parseInt(process.env.PVTKRRX_STREAM_SPORTS_MAX_SEARCH_QUERIES || '12', 10))
 const STREAM_SPORTS_MAX_SEARCH_QUERIES_WITH_DIRECT = Math.max(1, parseInt(process.env.PVTKRRX_STREAM_SPORTS_MAX_SEARCH_QUERIES_WITH_DIRECT || '3', 10))

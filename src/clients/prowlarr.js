@@ -57,32 +57,6 @@ function splitCategoryList(cats) {
     .filter(Boolean)
 }
 
-function searchResultKey(item = {}) {
-  const infohash = String(item?.infohash || '').trim().toLowerCase()
-  if (infohash) return `hash:${infohash}`
-  const link = String(item?.link || '').trim()
-  if (link) return `link:${link}`
-  return [
-    String(item?.indexer || '').trim().toLowerCase(),
-    String(item?.title || '').trim().toLowerCase(),
-    String(item?.size || '').trim()
-  ].join('|')
-}
-
-function mergeSearchResults(lists) {
-  const merged = []
-  const seen = new Set()
-  for (const list of lists) {
-    for (const item of (Array.isArray(list) ? list : [])) {
-      const key = searchResultKey(item)
-      if (!key || seen.has(key)) continue
-      seen.add(key)
-      merged.push(item)
-    }
-  }
-  return merged
-}
-
 function wait(ms) {
   return new Promise(resolve => setTimeout(resolve, ms))
 }
@@ -392,51 +366,41 @@ class ProwlarrClient {
       ? await this._nonSportsIndexerIds()
       : null
     const categoryList = options.useCategories ? splitCategoryList(cats) : []
-    if (categoryList.length > 1) {
-      const groupTimeout = Math.max(1000, Number(options.categoryGroupTimeoutMs) || Number(options.timeoutMs) || TIMEOUT_MS)
-      const categoryConcurrency = Math.max(1, Math.min(
-        categoryList.length,
-        Number(options.categorySearchConcurrency) || categoryList.length
-      ))
-      const values = []
-      let firstError = null
-      let settledCount = 0
-      let nextIndex = 0
-      const workers = Array.from({ length: categoryConcurrency }, async () => {
-        while (nextIndex < categoryList.length) {
-          const cat = categoryList[nextIndex]
-          nextIndex += 1
-          const params = applyIndexerIds(
-            new URLSearchParams({ query, type, apikey: this.apiKey }),
-            indexerIds
-          )
-          params.set('categories', cat)
-          await this._search(params, { timeoutMs: groupTimeout })
-            .then((value) => {
-              values.push(value)
-            })
-            .catch((error) => {
-              if (!firstError) firstError = error
-            })
-            .finally(() => {
-              settledCount += 1
-            })
-        }
-      })
 
-      const completedAll = await Promise.race([
-        Promise.allSettled(workers).then(() => true),
-        wait(groupTimeout).then(() => false)
-      ])
-
-      if (values.length === 0 && firstError && completedAll && settledCount === categoryList.length) throw firstError
-      return mergeSearchResults(values)
-    }
-
+    // Ask for every category in ONE request. This used to fan out into one
+    // Prowlarr search per category, and Prowlarr forwards each of those to
+    // every configured indexer -- so a single Stremio click became roughly
+    // 10 searches x 8 trackers, twice over (once per query variant), on top of
+    // the IMDB search and the broad fallback.
+    //
+    // Private trackers rate-limit exactly that. Measured on the live server
+    // 2026-08-11, hd-torrents.org answered with
+    //   429 TooManyRequests -- "You've reached the request limit for
+    //   automation tools. Please wait 13 seconds before making another
+    //   request."
+    // and once throttled a plain search went from 4.3s to over 200s, so every
+    // internal timeout expired and Stremio got zero streams for films AND
+    // episodes while the sports catalogue -- which issues one query, not
+    // eleven -- carried on working and hid the problem.
+    //
+    // Prowlarr accepts categories as a repeated parameter and returns the same
+    // union. Proven with "Game of Thrones S01E01":
+    //   one call, all 8 TV categories -> 64 results in 4391ms
+    //   one broad call, no categories -> 64 results in 4180ms
+    // Same answer for a tenth of the tracker traffic.
     const params = applyIndexerIds(
       new URLSearchParams({ query, type, apikey: this.apiKey }),
       indexerIds
     )
+    if (categoryList.length > 1) {
+      for (const cat of categoryList) params.append('categories', cat)
+      return this._search(params, {
+        timeoutMs: Math.max(
+          1000,
+          Number(options.categoryGroupTimeoutMs) || Number(options.timeoutMs) || TIMEOUT_MS
+        )
+      })
+    }
     if (categoryList.length === 1) params.set('categories', categoryList[0])
     return this._search(params, { timeoutMs: options.timeoutMs })
   }
