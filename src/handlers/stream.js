@@ -35,17 +35,36 @@ const STREAM_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(process.env.PVT
 // seconds before giving up. The floor is a floor on the value itself, not on
 // the TV timeout, so the intended 8s now applies and the env var can still
 // raise or lower it.
+// The broad, uncategorised sweep is the expensive one -- 146s measured, versus
+// 3.7s for the same query with categories, for four fewer results. It stays as
+// a last resort for titles the categories genuinely miss, but it is never worth
+// waiting minutes for, so it keeps a tight leash while the categorised search
+// above gets the real budget.
 const MOVIE_TITLE_FALLBACK_TIMEOUT_MS = Math.max(1500, parseInt(
   process.env.PVTKRRX_MOVIE_TITLE_FALLBACK_TIMEOUT_MS || '8000',
   10
 ))
+// These budgets have to match what private trackers actually do, not what we
+// would like them to do. Measured on the live server 2026-08-11, real queries
+// against the owner's 7 non-sport trackers:
+//   categorised, all trackers, one call -> 272 results in 3.7s
+//   uncategorised, all trackers         -> 276 results in 146s
+//   each tracker alone, uncategorised   -> 0.26s to 3.9s
+//
+// So the categorised search is the one worth waiting for, and 3.7s is the good
+// case -- under any contention it climbs well past the 7s this used to allow,
+// at which point the search is abandoned and Stremio is told there is nothing
+// to watch. Zero streams is a far worse outcome than a slower spinner, and the
+// search cache means the wait is paid once per title, not once per click.
+//
+// 20s is roughly five times the measured typical, which leaves room for a slow
+// tracker without ever sitting on a genuinely dead one.
 const STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS = Math.max(1000, parseInt(
-  process.env.PVTKRRX_STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS ||
-  String(Math.min(7000, STREAM_TITLE_FALLBACK_TIMEOUT_MS)),
+  process.env.PVTKRRX_STREAM_TITLE_CATEGORY_FALLBACK_TIMEOUT_MS || '20000',
   10
 ))
 const STREAM_TITLE_FALLBACK_BUDGET_MS = Math.max(5000, parseInt(
-  process.env.PVTKRRX_STREAM_TITLE_FALLBACK_BUDGET_MS || '15000',
+  process.env.PVTKRRX_STREAM_TITLE_FALLBACK_BUDGET_MS || '45000',
   10
 ))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '12', 10))
