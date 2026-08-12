@@ -72,11 +72,21 @@ const STREAM_TITLE_FALLBACK_BUDGET_MS = Math.max(5000, parseInt(
 // stop it, and every one of those seconds is spent showing the viewer
 // "1 addon still loading" next to another addon's finished list.
 // Measured cold (Interstellar, live server 2026-08-11): searches took 13.4s and
-// inspection took 22.5s of a 36s total. Ten seconds is comfortably more than a
-// healthy pass needs -- real links came back in 70-457ms each -- so this only
-// bites when something is genuinely stuck.
+// inspection took 22.5s of a 36s total. On a healthy pass real links come back
+// in 70-457ms each, so this ceiling only bites when something is genuinely
+// throttling -- and it returns the instant the candidates finish (Promise.race),
+// so raising it costs nothing on a fast pass.
+//
+// It MUST be >= MOVIE_TV_TRACKER_LINK_INSPECTION_TIMEOUT_MS. A previous value of
+// 10s sat below that 15s per-candidate timeout, which itself was chosen to
+// outlast hd-torrents' stated "wait 13 seconds" throttle. The result: a
+// throttled-but-fine candidate was always cut off at 10s, before the 13s wait
+// the 15s was built to survive -- so the 15s was dead and legitimate torrents
+// were discarded. Proven live 2026-08-12: House of the Dragon found 139 results,
+// shortlisted 12, then "inspection budget hit after 10000ms; returning 0" ->
+// Stremio got zero streams. 16s clears the tracker's own wait with 1s headroom.
 const STREAM_CANDIDATE_INSPECTION_BUDGET_MS = Math.max(2000, parseInt(
-  process.env.PVTKRRX_STREAM_CANDIDATE_INSPECTION_BUDGET_MS || '10000',
+  process.env.PVTKRRX_STREAM_CANDIDATE_INSPECTION_BUDGET_MS || '16000',
   10
 ))
 const STREAM_MAX_CANDIDATES = Math.max(5, parseInt(process.env.PVTKRRX_STREAM_MAX_CANDIDATES || '12', 10))
