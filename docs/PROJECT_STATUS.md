@@ -1,6 +1,16 @@
 # PVTKRRX Project Status
 
-Updated: 2026-05-28
+Updated: 2026-08-15
+
+## 2026-08-15: persistent tracker-inspection cache + tracker-allowance burnout root cause
+
+- Root cause of the "hit and miss evenings" (same title 16 streams at 18:17, 0 streams at 23:10 on 2026-08-13): private trackers meter `.torrent` downloads per account per day. The external plex-debrid service on Contabo was stuck in a retry loop (Real-Debrid 403s specific torrents; plex-debrid re-scraped the watchlist every 1-2 min and re-downloaded every release's `.torrent` via Prowlarr — measured 811 grabs in <3h, TorrentLeech 345 in one day). By evening the allowances were exhausted, so PVTKRRX candidate inspection could not fetch `.torrent` files and stream responses collapsed to 0. Prowlarr itself also timed out under the load.
+- Ops fix (Contabo, outside this repo): `plex-debrid.service` stopped and disabled 2026-08-14 ~19:55 UTC until it gets failure memory. Watchlist→RD auto-fetch is paused while it is off.
+- Backend fix (commit `71cc1c9`): successful torrent inspections now persist to disk for 14 days in `tracker-inspection-cache.json` (runtime dir; knobs `PVTKRRX_TRACKER_INSPECTION_DISK_CACHE`, `_TTL_MS`, `_MAX_ENTRIES`, `_CACHE_DIR`). Key is release identity `guid|size` because Prowlarr re-encrypts `downloadUrl` per search (proven live: 50/50 URLs changed between two identical searches 3s apart; `guid` stable). Failed inspections are never persisted (existing short RAM cooldown rule unchanged). Prowlarr search cache default raised 15→30 min. New module `src/utils/trackerInspectionDiskCache.js`, wired at `src/handlers/stream.js` (`inspectTrackerLink` + candidate mapper); `ProwlarrClient._mapResult` now carries `guid`.
+- Local proof 2026-08-15: `npm run smoke:pipeline`, `smoke:config`, `smoke:guards`, `smoke:playback`, `smoke:security`, `smoke:parity`, `smoke:selfhost` all passed on `71cc1c9`.
+- Live proof 2026-08-15 (self-host `/local` route, Interstellar `tt0816692`): cold request 16 streams / 28.5s; then `systemctl restart pvtkrrx.service` (wipes all RAM caches) and the same request returned 24 streams / 11.0s with 12/12 inspections served from disk and 0 re-downloaded (verified by diffing cache-entry `at` vs `lastUsedAt` before/after). HOTD S01E01, which returned 0 streams five times pre-fix, returned 8 streams post-fix.
+- Deploy parity: `main` = `audit/speed-slop-2026-06` = Coolify public container image tag = `/opt/pvtkrrx/REVISION` = `71cc1c9`. Public manifest audited: name `PVTKRR`, id `com.kepners.pvtkrrx.bootstrap`, 0 personal-hostname leaks. Not yet a packaged Windows EXE release revision.
+- Deploy incident (resolved, rule below): pushing the audit branch and `main` back-to-back fired the Coolify webhook twice, two parallel deploys each removed the other's fresh container, and the public site served 502 with zero containers for ~10 min. Recovered by redelivering only the `main` push webhook (single deploy). See the new rule in `CLAUDE.md` Git & Deploy Workflow.
 
 ## Current Stage
 

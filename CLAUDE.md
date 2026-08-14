@@ -224,6 +224,13 @@ git push origin main
 
 Never push to a different branch expecting the live site to update.
 
+**NEVER push two refs to origin within the same minute (e.g. a feature branch and then `:main`).**
+Every push event fires the Coolify webhook (`/events/manual`, no branch filter), each event queues
+a deploy, and two parallel deploys each run "remove old containers" — on 2026-08-14 the two fresh
+containers removed EACH OTHER and the public site served 502 with zero containers. Push one ref,
+wait for the deploy to finish (~2-3 min), then push the other. Recovery if it happens: redeliver
+the `main` push webhook once via `gh api repos/Kepners/pvtkrrx/hooks/<hook>/deliveries/<id>/attempts`.
+
 ---
 
 ## Deployment Topology (verified 2026-04-30)
