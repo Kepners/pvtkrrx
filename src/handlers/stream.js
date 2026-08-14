@@ -20,6 +20,7 @@ const { decodeCustomId } = require('../utils/customId')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { isCompletedTorrent } = require('../utils/torrentState')
 const { fetchTorrentPayload, inspectTorrentPayload } = require('../utils/torrentPayload')
+const { getCachedTrackerInspection, storeTrackerInspection } = require('../utils/trackerInspectionDiskCache')
 const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
 const { applyHostedServiceOverrides } = require('../utils/hostedServiceOverrides')
 const { getMappedLeagueEntry } = require('../utils/leagueMap')
@@ -421,6 +422,22 @@ async function inspectTrackerLink(link, options = {}) {
     return cached.promise
   }
 
+  // Disk-backed identity cache: a remembered success skips the tracker
+  // download entirely, which is what the daily download allowance meters.
+  // cacheId is release identity (guid|size), not the URL — see the module
+  // note for why the URL cannot be the key.
+  const persistKey = String(options.cacheId || '').trim()
+  if (persistKey) {
+    const remembered = await getCachedTrackerInspection(persistKey)
+    if (remembered) {
+      trackerLinkInspectionCache.set(cacheKey, {
+        expiresAt: Date.now() + TRACKER_LINK_INSPECTION_CACHE_MS,
+        promise: Promise.resolve(remembered)
+      })
+      return remembered
+    }
+  }
+
   const promise = (async () => {
     try {
       const payload = await fetchTorrentPayload(target, {
@@ -483,6 +500,10 @@ async function inspectTrackerLink(link, options = {}) {
     promise: Promise.resolve(result)
   })
   trimTrackerLinkInspectionCache()
+  if (persistKey && result?.inspected) {
+    // Fire-and-forget: a lost write costs one re-download, never a request.
+    storeTrackerInspection(persistKey, result).catch(() => {})
+  }
   return result
 }
 
@@ -586,7 +607,10 @@ async function emitTrackerCandidateStream(item, ctx = {}) {
   const inspection = titleLooksPacked
     ? { packedOnly: true, inspected: false }
     : item.link
-      ? await inspectTrackerLink(item.link, { timeoutMs })
+      ? await inspectTrackerLink(item.link, {
+        timeoutMs,
+        cacheId: item.guid ? `${item.guid}|${Number(item.size || 0)}` : ''
+      })
       : (knownInfoHashFallback && knownInfoHash)
         ? { packedOnly: false, inspected: true, infoHash: knownInfoHash }
         : { packedOnly: false, inspected: false }

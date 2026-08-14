@@ -13,10 +13,11 @@ const indexerCategoryCache = new Map()
 // Search results, keyed by the exact Prowlarr query. Searching the same title
 // twice in a session should be instant the second time — the whole cost is the
 // trackers answering, and that answer does not change minute to minute.
-// 15 minutes is long enough to make browsing feel instant and short enough that
-// a newly published release still turns up on the next look.
+// 30 minutes is long enough that a family evening of browsing mostly re-uses
+// remembered searches, and short enough that a newly published release still
+// turns up within the half hour.
 const SEARCH_CACHE_TTL_MS = Math.max(0, parseInt(
-  process.env.PVTKRRX_PROWLARR_SEARCH_CACHE_TTL_MS || String(15 * 60 * 1000),
+  process.env.PVTKRRX_PROWLARR_SEARCH_CACHE_TTL_MS || String(30 * 60 * 1000),
   10
 ))
 const SEARCH_CACHE_MAX = Math.max(50, parseInt(
@@ -189,6 +190,10 @@ class ProwlarrClient {
     return {
       title: String(r.title || ''),
       link: String(r.downloadUrl || ''),
+      // The tracker's canonical torrent page URL. Unlike downloadUrl (which
+      // Prowlarr re-encrypts per search), guid is stable across searches, so
+      // it can key caches that must outlive a single result set.
+      guid: String(r.guid || ''),
       size: Number(r.size || 0),
       seeders: Number(r.seeders || 0),
       infohash,
