@@ -701,6 +701,19 @@ function findEpisodeFile(files, season, episode) {
   return null
 }
 
+// A stream whose file already exists on the server and plays the moment it is
+// clicked — completed seedbox torrents, extracted archives, direct local files.
+// The v1.3 router uses this to keep already-downloaded content at the very top
+// of the list, above debrid rows that would start a fresh transfer (owner
+// ruling 2026-08-15: "put the ones that are downloaded already and available
+// first on the list").
+function isReadyLocalStream(stream) {
+  const mode = String(stream?.behaviorHints?.sourceMode || '').toLowerCase()
+  if (mode === 'seedbox') return true
+  const streamName = String(stream?.name || '')
+  return streamName.includes('[EXTRACTED]') || streamName.includes('[DL]') || streamName.includes('[SB]')
+}
+
 // Sort: on-seedbox first, then non-zero peers first within each group.
 function sortStreams(streams) {
   function seeders(stream) {
@@ -802,5 +815,6 @@ module.exports = {
   titleLooksLegacyAvi,
   isLegacyAviVideoName,
   hasLegacyAviVideoFiles,
+  isReadyLocalStream,
   sortStreams
 }

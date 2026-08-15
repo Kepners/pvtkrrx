@@ -25,7 +25,7 @@
 const { decodeFileStateToken, decodePlaybackStateToken, encodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT } = require('./opaqueState')
 const { searchAllSources } = require('./debridCache')
 const { redactSensitiveText } = require('./logRedaction')
-const { PVTKRRX_LOGO_URL, formatSize } = require('./streams')
+const { PVTKRRX_LOGO_URL, formatSize, isReadyLocalStream } = require('./streams')
 const { playbackContentTypeFor, detectQualityLabel, detectContainerLabel } = require('./mediaLabels')
 
 function formatCacheSourceLabel(sourceId = '') {
@@ -459,13 +459,21 @@ async function applyV13Routing(result, ctx = {}) {
   // follows. When the user explicitly turns the preference off, the same GROUPS are
   // re-ordered so base/seedbox streams come first — no stream is ever dropped (debrid
   // is additive; qBit always stays in the list).
+  //
+  // Owner ruling 2026-08-15: content that is ALREADY DOWNLOADED and playable the
+  // moment it is clicked outranks everything, debrid preference included. A family
+  // clicking the top row must land on a file that exists, not on a row that starts
+  // a fresh transfer. Ready local rows are hoisted above the debrid block; every
+  // other group keeps its existing relative order.
   const baseStreams = existing
+  const readyBaseStreams = baseStreams.filter(isReadyLocalStream)
+  const restBaseStreams = baseStreams.filter(s => !isReadyLocalStream(s))
   const preferDebrid = debridConfig.preferDebridOverSeedbox !== false
   const finalStreams = hasDebrid
     ? (preferDebrid
-      ? [...cacheStreams, ...debridStreams, ...debridFileStreams, ...baseStreams]
+      ? [...readyBaseStreams, ...cacheStreams, ...debridStreams, ...debridFileStreams, ...restBaseStreams]
       : [...baseStreams, ...cacheStreams, ...debridStreams, ...debridFileStreams])
-    : [...cacheStreams, ...baseStreams]
+    : [...readyBaseStreams, ...cacheStreams, ...restBaseStreams]
 
   // Dedupe by URL to prevent the same /playback/debrid token from appearing twice.
   const seen = new Set()
