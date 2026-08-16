@@ -334,7 +334,21 @@ class ProwlarrClient {
       if (!res.ok) throw new Error(`Prowlarr HTTP ${res.status}`)
       const data = await res.json()
       const categoryLookup = await this._getIndexerCategoryLookup()
-      return (Array.isArray(data) ? data : []).map(r => this._mapResult(r, categoryLookup))
+      const mapped = (Array.isArray(data) ? data : []).map(r => this._mapResult(r, categoryLookup))
+      // One release listed under several of the requested categories comes back
+      // once per category. The old per-category fan-out merged and deduped these;
+      // folding those calls into one request (2026-08-11, to stop trackers
+      // rate-limiting us into zero streams) dropped the dedupe along with them.
+      // The same download link is the same release, so collapse them here rather
+      // than carrying visibly repeated rows down the pipeline.
+      const seenLinks = new Set()
+      return mapped.filter(item => {
+        const key = String(item?.link || '')
+        if (!key) return true
+        if (seenLinks.has(key)) return false
+        seenLinks.add(key)
+        return true
+      })
     })()
 
     inFlightSearches.set(cacheKey, run)

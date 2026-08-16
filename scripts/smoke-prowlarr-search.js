@@ -101,12 +101,23 @@ async function run() {
       timeoutMs: 5000
     })
 
-    assert.equal(state.searchCalls.length, 2, 'comma-separated category lists must be split into per-category Prowlarr searches')
+    // One request carrying every category, NOT one request per category.
+    //
+    // This assertion used to demand the opposite. The per-category fan-out was
+    // deliberately replaced on 2026-08-11 because it multiplied tracker traffic
+    // elevenfold and private trackers rate-limit exactly that: hd-torrents.org
+    // answered 429 "wait 13 seconds", a search went from 4.3s to over 200s, and
+    // Stremio got zero streams. Prowlarr returns the same union either way —
+    // measured 64 results both ways for "Game of Thrones S01E01".
+    //
+    // The test was left asserting the old shape, so it failed permanently and
+    // stopped being able to report a real regression.
+    assert.equal(state.searchCalls.length, 1, 'a multi-category search must be ONE Prowlarr call, not one call per category')
     assert.deepEqual(
-      state.searchCalls.map(call => call.categories).sort(),
-      [['2040'], ['2080']]
+      state.searchCalls.map(call => call.categories),
+      [['2040', '2080']]
     )
-    assert.equal(results.length, 2, 'split category search should merge and dedupe per-category results')
+    assert.equal(results.length, 2, 'grouped category search should merge and dedupe results')
     assert.deepEqual(
       results.map(item => item.link).sort(),
       [
@@ -115,15 +126,28 @@ async function run() {
       ]
     )
 
+    // A tracker that never answers must fail fast, not hang.
+    //
+    // This block used to assert per-category PARTIAL results: with one request
+    // per category, the fast category could return while the slow one was still
+    // running. Folding the categories into a single request (2026-08-11, to stop
+    // trackers rate-limiting us) traded that away for a tenth of the traffic, so
+    // partial results are no longer possible by design.
+    //
+    // The guarantee that still matters — and that this now protects — is that the
+    // search gives up at its own timeout instead of holding Stremio until every
+    // internal deadline expires, which is exactly how one throttled tracker used
+    // to turn into zero streams for everything.
     const quickStart = Date.now()
-    const partialResults = await client.search('Movie Name', '2040,2050', 'search', {
-      useCategories: true,
-      timeoutMs: 500,
-      categoryGroupTimeoutMs: 500
-    })
-    assert.ok(Date.now() - quickStart < 2000, 'grouped category search should return completed partial results instead of waiting for every slow category')
-    assert.equal(partialResults.length, 1)
-    assert.equal(partialResults[0].link, 'https://tracker.example/movie-name-1080p.torrent')
+    await assert.rejects(
+      client.search('Movie Name', '2040,2050', 'search', {
+        useCategories: true,
+        timeoutMs: 500,
+        categoryGroupTimeoutMs: 500
+      }),
+      'a search whose tracker never answers must reject rather than hang'
+    )
+    assert.ok(Date.now() - quickStart < 2000, 'a timing-out search must give up at its own timeout, not wait on the tracker')
   } finally {
     server.close()
   }
