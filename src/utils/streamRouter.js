@@ -212,9 +212,10 @@ function prioritizeProviderForCacheSource(sourceId, providers) {
 
 async function resolveCacheHitToStreamUrl(hit, configuredSources, playbackBaseUrl, providersForDebrid, configToken = '') {
   if (hit.directStreamUrl) return hit.directStreamUrl
-  // PM cache hits don't have a direct URL — they need the debrid add+poll cycle.
-  // Route through /playback/debrid so the existing handler does add+select+unrestrict.
-  if (hit.sourceId === 'pm' && hit.infohash) {
+  // PM and RD cache hits don't carry a direct URL — they resolve at click time
+  // through /playback/debrid. For RD the handler finds the item already on the
+  // account and unrestricts it without re-adding, so the click is instant.
+  if ((hit.sourceId === 'pm' || hit.sourceId === 'rd') && hit.infohash) {
     const magnet = buildMagnetFromHash(hit.infohash, hit.name)
     if (!magnet) return null
     const providerOrder = prioritizeProviderForCacheSource(hit.sourceId, providersForDebrid)
@@ -262,6 +263,18 @@ function resolveEnabledCacheSources(cacheConfig = {}, enabledDebrid = []) {
 
   if (pmDebridKey && !seen.has('pm')) {
     sources.push({ type: 'pm', apiKey: pmDebridKey, enabled: true, implicit: true })
+  }
+
+  // Same implicit treatment for Real-Debrid. Its cache source reads the account's
+  // own finished torrents, so configuring RD as a debrid provider is already
+  // consent to ask RD what it is holding — no extra setup, and without this an
+  // RD-only install can never show a "⚡ READY" row.
+  const rdDebridKey = String(
+    (Array.isArray(enabledDebrid) ? enabledDebrid : [])
+      .find(p => String(p?.type || '').toLowerCase() === 'rd')?.apiKey || ''
+  ).trim()
+  if (rdDebridKey && !seen.has('rd')) {
+    sources.push({ type: 'rd', apiKey: rdDebridKey, enabled: true, implicit: true })
   }
 
   return sources

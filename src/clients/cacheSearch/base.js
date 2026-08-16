@@ -13,6 +13,10 @@ function getCacheSearchSource(type, apiKey) {
       const { PremiumizeCacheSearchSource } = require('./premiumize');
       return new PremiumizeCacheSearchSource(apiKey);
     }
+    case 'rd': {
+      const { RealDebridCacheSearchSource } = require('./realdebrid');
+      return new RealDebridCacheSearchSource(apiKey);
+    }
     default:
       throw new ServiceApiError({
         serviceId: String(type || 'unknown'),

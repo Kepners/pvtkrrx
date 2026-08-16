@@ -4,7 +4,7 @@ const crypto = require('node:crypto')
 const { decodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT, DEBRID_PROTOCOL_USENET } = require('../utils/opaqueState')
 const { getDebridProvider } = require('../clients/debrid/base')
 const { redactSensitiveText } = require('../utils/logRedaction')
-const { fetchTorrentPayload, validateTorrentPayload } = require('../utils/torrentPayload')
+const { fetchTorrentPayload, validateTorrentPayload, inspectTorrentPayload } = require('../utils/torrentPayload')
 const { sendWaitingRoomVideo } = require('./waitingRoom')
 const { playbackContentTypeFor } = require('../utils/mediaLabels')
 
@@ -80,14 +80,44 @@ function cleanupDebridPlaybackJobs(now = Date.now()) {
   }
 }
 
+function extractInfoHash(magnet) {
+  const match = /\bxt=urn:btih:([0-9a-fA-F]{40}|[a-zA-Z2-7]{32})\b/.exec(String(magnet || ''))
+  return match ? match[1].toLowerCase() : ''
+}
+
+// A debrid account that already holds this exact torrent, finished.
+//
+// Real-Debrid keeps everything it has ever completed, so re-adding is not just
+// wasteful — it makes the viewer wait for a transfer that already happened, and
+// it litters the account with duplicates. Proven live 2026-08-15: one House of
+// the Dragon infohash appeared on the account four times, one three times, each
+// copy created by another click on the same row.
+//
+// Any failure here returns null, which falls through to the normal add path.
+// Being unsure must cost a redundant add, never a broken playback.
+async function findAlreadyOnAccount(provider, infohash) {
+  if (!infohash) return null
+  if (typeof provider?.findReadyByHash !== 'function') return null
+  try {
+    return await provider.findReadyByHash(infohash)
+  } catch (_) {
+    return null
+  }
+}
+
 async function addDebridSource(provider, cred, payload) {
   if (payload.protocol === DEBRID_PROTOCOL_USENET) {
     const added = await provider.addNzb(payload.src)
-    return added.addedId
+    return { addedId: added.addedId, alreadyOnAccount: false }
   }
   if (/^magnet:/i.test(payload.src)) {
+    const existing = await findAlreadyOnAccount(provider, extractInfoHash(payload.src))
+    if (existing) {
+      console.log(`[playback-debrid] already on ${cred.type} account — skipping add id=${maskToken(existing.id)}`)
+      return { addedId: existing.id, alreadyOnAccount: true }
+    }
     const added = await provider.addMagnet(payload.src)
-    return added.addedId
+    return { addedId: added.addedId, alreadyOnAccount: false }
   }
   if (!provider.capabilities.torrentFile || typeof provider.addTorrentFile !== 'function') {
     const err = new Error(`Debrid provider ${cred.type} does not support torrent file upload`)
@@ -98,8 +128,24 @@ async function addDebridSource(provider, cred, payload) {
   // Minimal validation before any provider upload (reuses existing inspect in torrentPayload).
   // Rejects HTML/login/403/random bytes that a private tracker may return for a 200 OK.
   validateTorrentPayload(torrent.bytes)
+
+  // Same account-reuse check for tracker .torrent sources. The payload has to be
+  // fetched to learn its infohash, but the upload, the transfer wait and the
+  // duplicate are all still avoided.
+  let payloadInfoHash = ''
+  try {
+    payloadInfoHash = String(inspectTorrentPayload(torrent.bytes)?.infoHash || '').toLowerCase()
+  } catch (_) {
+    payloadInfoHash = ''
+  }
+  const existing = await findAlreadyOnAccount(provider, payloadInfoHash)
+  if (existing) {
+    console.log(`[playback-debrid] already on ${cred.type} account — skipping upload id=${maskToken(existing.id)}`)
+    return { addedId: existing.id, alreadyOnAccount: true }
+  }
+
   const added = await provider.addTorrentFile(torrent.bytes, torrent.fileName)
-  return added.addedId
+  return { addedId: added.addedId, alreadyOnAccount: false }
 }
 
 function getOrCreateDebridJob(provider, cred, payload) {
@@ -124,7 +170,11 @@ function getOrCreateDebridJob(provider, cred, payload) {
     selected: false
   }
   job.addPromise = (async () => {
-    const addedId = await addDebridSource(provider, cred, payload)
+    const added = await addDebridSource(provider, cred, payload)
+    const addedId = typeof added === 'string' ? added : added?.addedId
+    // An item already finished on the account has its files selected by
+    // definition; calling selectFiles again just errors on a completed torrent.
+    if (added && typeof added === 'object' && added.alreadyOnAccount) job.selected = true
     job.addedId = addedId
     job.expiresAt = Date.now() + JOB_TTL_MS
     return addedId

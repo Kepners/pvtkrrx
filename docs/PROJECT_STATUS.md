@@ -2,6 +2,20 @@
 
 Updated: 2026-08-15
 
+## 2026-08-15: Real-Debrid rows could never be READY, and every click re-added a torrent the account already held
+
+- Owner report: "the PVTKRRX server on Stremio doesn't show any RD ready links and nothing seems to boot fast, only when they have used qBit does it boot fast", plus "the next TV episode isn't downloaded ready".
+- Root cause (proven, not inferred): cache-search sources existed only for Premiumize (`src/clients/cacheSearch/premiumize.js`) and put.io. **Real-Debrid had no cache-search source at all**, and no code anywhere listed the RD account's contents (`grep -rn "listTorrents\|/torrents'" src/` returned nothing). So for an RD-only install: no candidate could ever produce a `⚡ READY` row, every RD row was labelled `will download`, and `/playback/debrid` always ran the full add + selectFiles + poll cycle.
+- Consequence measured live on the owner's account: infohash `d2b15e4e…` (House of the Dragon S01E01 GLHF) was present **4 times** and `975b29f0…` (S03E01) **3 times**, each duplicate created by another click on the same row. Every click waited for a "download" of content Real-Debrid had already finished, which is exactly why only qBit rows started instantly.
+- Fix, in the shape the architecture already had:
+  - `RealDebridProvider.accountIndex()` / `.findReadyByHash()` — paginated listing of the account's own torrents, indexed by infohash, memoised per API key (promise-cached, default 60s, `PVTKRRX_RD_ACCOUNT_INDEX_TTL_MS`) so a 12-candidate stream list costs one request. Duplicate hashes resolve to the finished copy.
+  - `src/clients/cacheSearch/realdebrid.js` — new `RealDebridCacheSearchSource` implementing the existing `searchByHash` / `searchByTitle` / `streamUrl` contract from the account index. Title matching requires every significant term, so it cannot label the wrong episode READY. Registered as `rd` in `cacheSearch/base.js`.
+  - `resolveEnabledCacheSources()` — an `rd` cache source is now implicit whenever RD is configured as a debrid provider, mirroring the existing Premiumize behaviour.
+  - `resolveCacheHitToStreamUrl()` — RD hits resolve at click time through `/playback/debrid` (not a pre-unrestricted link, which would expire while a stream list sits on a TV).
+  - `playbackDebrid.js` — `addDebridSource()` now checks the account before adding, for both magnet and tracker `.torrent` sources, and returns `{addedId, alreadyOnAccount}`. A reused item skips the add/upload entirely and marks the job selected (calling `selectFiles` on a completed torrent only errors). Any lookup failure returns null and falls through to the normal add path: uncertainty costs a redundant add, never a broken playback.
+- Combined with the READY-first ordering shipped earlier the same day (`dfc47dc`), an episode already on Real-Debrid now appears at the top of the list as `⚡ READY` and plays without a transfer.
+- Local proof: `smoke:debrid-routing` (33 checks), `smoke:debrid-all`, `smoke:pipeline`, `smoke:playback`, `smoke:security` all passed.
+
 ## 2026-08-15: persistent tracker-inspection cache + tracker-allowance burnout root cause
 
 - Root cause of the "hit and miss evenings" (same title 16 streams at 18:17, 0 streams at 23:10 on 2026-08-13): private trackers meter `.torrent` downloads per account per day. The external plex-debrid service on Contabo was stuck in a retry loop (Real-Debrid 403s specific torrents; plex-debrid re-scraped the watchlist every 1-2 min and re-downloaded every release's `.torrent` via Prowlarr — measured 811 grabs in <3h, TorrentLeech 345 in one day). By evening the allowances were exhausted, so PVTKRRX candidate inspection could not fetch `.torrent` files and stream responses collapsed to 0. Prowlarr itself also timed out under the load.
