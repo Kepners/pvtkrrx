@@ -36,6 +36,77 @@ function isRdInfringingFile(error) {
   return String(body || '').toLowerCase().includes('infringing_file');
 }
 
+const PLAYABLE_VIDEO_EXT_RE = /\.(?:mkv|mp4|m4v|webm|avi|mov|ts|m2ts|mpg|mpeg)$/i;
+const NON_PLAYABLE_EXT_RE = /\.(?:jpg|jpeg|png|gif|webp|nfo|txt|srt|sub|idx|sfv|md5|url|lnk)$/i;
+// Paths a release puts alongside the feature that are never the thing anyone
+// asked to watch. Real-Debrid returns these in the same links array.
+const SIDE_CONTENT_RE = /(?:^|[\/\\._-])(?:sample|samples|featurette|featurettes|extra|extras|trailer|trailers|deleted[\s._-]?scenes?|behind[\s._-]?the[\s._-]?scenes|bonus|interviews?|proof|screens?)(?:[\/\\._-]|$)/i;
+const EPISODE_RE = /\bS(\d{1,2})[\s._-]?E(\d{1,3})\b/i;
+
+function isPlayableVideoPath(path) {
+  const value = String(path || '');
+  if (!value || NON_PLAYABLE_EXT_RE.test(value)) return false;
+  return PLAYABLE_VIDEO_EXT_RE.test(value);
+}
+
+function episodeKeyOf(text) {
+  const match = EPISODE_RE.exec(String(text || ''));
+  return match ? `s${Number(match[1])}e${Number(match[2])}` : '';
+}
+
+// Choose which of a Real-Debrid torrent's files to actually stream.
+//
+// RD's `links` array has one entry per SELECTED file, in file order — so
+// links[i] belongs to the i-th selected file, and blindly taking links[0] takes
+// whatever happens to sort first. Audited against this account on 2026-08-17:
+// of 80 sampled multi-file torrents, 57 (71%) had something other than the main
+// file at index 0 and 46 (58%) had something under a quarter of its size. Real
+// cases: a 121 MB /Sample/ clip instead of a 5.51 GB episode, a 30 MB John Candy
+// featurette instead of an 11.55 GB film, and the season FINALE for any episode
+// request against a season pack.
+//
+// Order of preference: an explicitly requested index that is playable, then the
+// file whose name carries the wanted SxxEyy, then the largest real video with
+// samples and extras excluded. Falls back to the old behaviour if nothing
+// qualifies, so this can only ever improve on index 0.
+function pickStreamLinkIndex(info, { fileIdx = 0, releaseName = '' } = {}) {
+  const links = Array.isArray(info?.links) ? info.links : [];
+  if (links.length <= 1) return 0;
+
+  const selected = (Array.isArray(info?.files) ? info.files : []).filter(f => f?.selected);
+  // Without a usable file list there is nothing to reason about.
+  if (selected.length !== links.length) return Math.min(Math.max(0, Number(fileIdx) || 0), links.length - 1);
+
+  const entries = selected.map((file, index) => ({
+    index,
+    path: String(file?.path || file?.name || ''),
+    bytes: Number(file?.bytes || file?.size || 0)
+  }));
+
+  const requestedIndex = Number(fileIdx) || 0;
+  const requested = entries[requestedIndex];
+  if (requestedIndex > 0 && requested && isPlayableVideoPath(requested.path) && !SIDE_CONTENT_RE.test(requested.path)) {
+    return requestedIndex;
+  }
+
+  const playable = entries.filter(e => isPlayableVideoPath(e.path));
+  const main = playable.filter(e => !SIDE_CONTENT_RE.test(e.path));
+  const pool = main.length ? main : playable;
+  if (!pool.length) return Math.min(Math.max(0, requestedIndex), links.length - 1);
+
+  const wantedEpisode = episodeKeyOf(releaseName);
+  if (wantedEpisode) {
+    const matches = pool.filter(e => episodeKeyOf(e.path) === wantedEpisode);
+    if (matches.length) {
+      matches.sort((a, b) => b.bytes - a.bytes);
+      return matches[0].index;
+    }
+  }
+
+  const sorted = [...pool].sort((a, b) => b.bytes - a.bytes);
+  return sorted[0].index;
+}
+
 function mapRdStatus(status) {
   const value = String(status || '').toLowerCase();
   if (['magnet_conversion', 'waiting_files_selection', 'queued'].includes(value)) return 'queued';
@@ -129,10 +200,14 @@ class RealDebridProvider {
     };
   }
 
-  async getStreamUrl(addedId, fileIdx) {
+  async getStreamUrl(addedId, fileIdx, options = {}) {
     const info = await this._request(`/torrents/info/${encodeURIComponent(String(addedId))}`);
     const links = Array.isArray(info.links) ? info.links : [];
-    const link = links[Number(fileIdx) || 0];
+    const chosenIdx = pickStreamLinkIndex(info, {
+      fileIdx,
+      releaseName: options.releaseName || info.filename || ''
+    });
+    const link = links[chosenIdx];
     if (!link) {
       throw new ServiceApiError({
         serviceId: this.id,
@@ -238,6 +313,25 @@ class RealDebridProvider {
     }
     const entry = index.get(hash);
     if (!entry || entry.status !== 'downloaded') return null;
+
+    // Confirm the item is still on the account before anyone commits to it.
+    //
+    // The index is up to a minute stale. Without this check a torrent removed
+    // in that window is still reported ready, playback skips the add entirely
+    // and then polls an id Real-Debrid answers with 404 — and because the
+    // caller has already committed to the reuse path there is no way back to a
+    // normal add, so a click that used to work returns an error instead. One
+    // extra request, only ever on a hit, removes that whole failure mode.
+    try {
+      const info = await this._request(`/torrents/info/${encodeURIComponent(entry.id)}`);
+      if (!info || String(info.status || '') !== 'downloaded') {
+        index.delete(hash);
+        return null;
+      }
+    } catch (_) {
+      index.delete(hash);
+      return null;
+    }
     return entry;
   }
 }

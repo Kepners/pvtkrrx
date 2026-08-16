@@ -303,7 +303,11 @@ async function handleDebridPlayback(req, res) {
 
     let streamUrl
     try {
-      streamUrl = await provider.getStreamUrl(job.addedId, payload.fileIdx || 0)
+      // The release name lets a provider pick the right file out of a pack
+      // instead of whichever one happens to sort first.
+      streamUrl = await provider.getStreamUrl(job.addedId, payload.fileIdx || 0, {
+        releaseName: payload.name || ''
+      })
     } catch (err) {
       if (job?.key) debridPlaybackJobs.delete(job.key)
       console.warn(`[playback-debrid] getStreamUrl failed provider=${cred.type} reason=${redactSensitiveText(err.message)}`)

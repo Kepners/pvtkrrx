@@ -201,13 +201,22 @@ function pickReadyStreamName(hit) {
   return '⚡ READY'
 }
 
+// The provider that reported the cache hit must be tried first.
+//
+// This used to special-case 'pm' only, which was fine while Premiumize was the
+// only cache source. Once Real-Debrid gained one, an RD-only hit on a
+// [Premiumize, Real-Debrid] install still went to Premiumize first — and
+// Premiumize accepts magnets, so it would start a brand-new transfer of a file
+// only Real-Debrid actually had, then return 503 after the poll window without
+// ever asking the provider that was holding it.
 function prioritizeProviderForCacheSource(sourceId, providers) {
   const list = Array.isArray(providers) ? providers.filter(Boolean) : []
   const source = String(sourceId || '').toLowerCase()
-  if (source !== 'pm') return list
-  const pm = list.filter(p => String(p?.type || '').toLowerCase() === 'pm')
-  const rest = list.filter(p => String(p?.type || '').toLowerCase() !== 'pm')
-  return [...pm, ...rest]
+  if (!source) return list
+  const owning = list.filter(p => String(p?.type || '').toLowerCase() === source)
+  if (!owning.length) return list
+  const rest = list.filter(p => String(p?.type || '').toLowerCase() !== source)
+  return [...owning, ...rest]
 }
 
 async function resolveCacheHitToStreamUrl(hit, configuredSources, playbackBaseUrl, providersForDebrid, configToken = '') {
