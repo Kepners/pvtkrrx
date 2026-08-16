@@ -49,7 +49,14 @@ class RealDebridCacheSearchSource {
 
   async searchByHash(infohash) {
     const entry = await this.provider.findReadyByHash(infohash);
-    return entry ? this._toHit(entry) : null;
+    if (!entry) return null;
+    // A multi-episode pack is deliberately NOT announced as ready. Which episode
+    // the viewer wants is not known at this layer, so a "⚡ READY" row here would
+    // be a confident promise pointing at an arbitrary episode. The ordinary
+    // debrid row for the same release still appears, so nothing is lost — only
+    // the false certainty.
+    if (Number(entry.distinctEpisodes || 0) > 1) return null;
+    return this._toHit(entry);
   }
 
   _toHit(entry) {

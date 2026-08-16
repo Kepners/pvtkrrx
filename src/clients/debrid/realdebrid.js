@@ -328,11 +328,22 @@ class RealDebridProvider {
         index.delete(hash);
         return null;
       }
+      // Count how many distinct episodes live inside. A season pack cannot be
+      // announced as "ready" from here, because at this layer we do not know
+      // which episode the viewer asked for — and picking the largest would hand
+      // them the wrong one. Verified on the live account: an Attack on Titan
+      // season pack has E01 first and E21 largest.
+      const episodes = new Set();
+      for (const f of (Array.isArray(info.files) ? info.files : [])) {
+        if (!f?.selected) continue;
+        const key = episodeKeyOf(f.path || '');
+        if (key) episodes.add(key);
+      }
+      return { ...entry, distinctEpisodes: episodes.size };
     } catch (_) {
       index.delete(hash);
       return null;
     }
-    return entry;
   }
 }
 
