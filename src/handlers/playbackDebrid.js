@@ -211,6 +211,13 @@ async function handleDebridPlayback(req, res) {
 
   const providerOrder = payload.providers || []
   let lastError = null
+  // First provider that accepted the source but could not get it ready inside
+  // the poll window. Only used as the response of last resort: a later provider
+  // in the order may already hold the file and can play NOW, and "being unsure
+  // must cost a redundant add, never a broken playback". Without this, a dead
+  // or expired first provider (e.g. lapsed Premiumize) that still accepts
+  // magnets swallows every click and the providers behind it are never asked.
+  let preparingFallback = null
   const srcKind = payload.protocol === DEBRID_PROTOCOL_USENET
     ? 'nzb'
     : /^magnet:/i.test(payload.src || '')
@@ -281,24 +288,9 @@ async function handleDebridPlayback(req, res) {
 
     if (!status || status.state !== 'ready') {
       console.log(`[playback-debrid] preparing provider=${cred.type} state=${status?.state || 'unknown'} progress=${status?.progress || 0}`)
-      res.setHeader('Retry-After', '15')
-      if (debridPreparingResponseMode() === 'loader') {
-        const sent = sendWaitingRoomVideo(req, res, {
-          kind: 'debrid',
-          provider: cred.type,
-          reason: 'provider-preparing',
-          state: status?.state || 'unknown',
-          progress: status?.progress || 0,
-          retryAfterSeconds: 15
-        })
-        if (sent) return
-      }
-      return res.status(503).json({
-        error: 'Debrid item still preparing',
-        state: status?.state || 'unknown',
-        progress: status?.progress || 0,
-        retryAfter: 15
-      })
+      if (!preparingFallback) preparingFallback = { providerType: cred.type, status }
+      lastError = new Error(`Debrid provider ${cred.type} is still preparing the item`)
+      continue
     }
 
     let streamUrl
@@ -325,6 +317,30 @@ async function handleDebridPlayback(req, res) {
     job.expiresAt = Date.now() + READY_JOB_TTL_MS
     console.log(`[playback-debrid] 302 -> ${cred.type} token=${maskToken(tokenParam)}`)
     return res.redirect(302, streamUrl)
+  }
+
+  // No provider could play immediately, but at least one accepted the source
+  // and is actively working on it — answer retryable "preparing", not failure.
+  if (preparingFallback) {
+    const { providerType, status } = preparingFallback
+    res.setHeader('Retry-After', '15')
+    if (debridPreparingResponseMode() === 'loader') {
+      const sent = sendWaitingRoomVideo(req, res, {
+        kind: 'debrid',
+        provider: providerType,
+        reason: 'provider-preparing',
+        state: status?.state || 'unknown',
+        progress: status?.progress || 0,
+        retryAfterSeconds: 15
+      })
+      if (sent) return
+    }
+    return res.status(503).json({
+      error: 'Debrid item still preparing',
+      state: status?.state || 'unknown',
+      progress: status?.progress || 0,
+      retryAfter: 15
+    })
   }
 
   const message = lastError ? redactSensitiveText(lastError.message) : 'No configured debrid provider could fulfill this request'

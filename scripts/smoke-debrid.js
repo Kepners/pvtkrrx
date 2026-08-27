@@ -415,6 +415,74 @@ async function run() {
     }
   });
 
+  await check('stalled first provider fails over to the next provider instead of blocking playback', async () => {
+    // A lapsed/dead first provider (e.g. expired Premiumize) still ACCEPTS
+    // magnets but never finishes the transfer. Playback must move on and ask
+    // the next configured provider (Real-Debrid here) instead of answering
+    // 503 forever while a working provider sits unused behind it.
+    _clearDebridPlaybackJobs();
+    const { _clearAccountIndexCache } = require('../src/clients/debrid/realdebrid');
+    _clearAccountIndexCache();
+    const infohash = 'abcdef0123456789abcdef0123456789abcdef01';
+    const token = encodeDebridPlaybackToken({
+      protocol: DEBRID_PROTOCOL_TORRENT,
+      src: `magnet:?xt=urn:btih:${infohash}&dn=Failover.Test.mkv`,
+      providers: [
+        { type: 'pm', apiKey: 'pm-dead-secret' },
+        { type: 'rd', apiKey: 'rd-alive-secret' }
+      ],
+      name: 'Failover Test'
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url, options = {}) => {
+      const target = String(url);
+      // Premiumize: accepts the magnet, transfer never progresses.
+      if (target.endsWith('/transfer/create')) {
+        return jsonResponse({ status: 'success', id: 'pm-dead-transfer' });
+      }
+      if (target.includes('/transfer/list')) {
+        return jsonResponse({
+          status: 'success',
+          transfers: [{ id: 'pm-dead-transfer', name: 'Failover.Test.mkv', status: 'running', progress: 0.01 }]
+        });
+      }
+      // Real-Debrid: nothing on the account yet, add + select + ready + unrestrict.
+      if (/\/torrents\?/.test(target)) {
+        return jsonResponse([]);
+      }
+      if (target.endsWith('/torrents/addMagnet')) {
+        return jsonResponse({ id: 'rd-failover-1' });
+      }
+      if (target.includes('/torrents/selectFiles/rd-failover-1')) {
+        return new Response(null, { status: 204 });
+      }
+      if (target.includes('/torrents/info/rd-failover-1')) {
+        return jsonResponse({
+          id: 'rd-failover-1',
+          status: 'downloaded',
+          progress: 100,
+          filename: 'Failover.Test.mkv',
+          links: ['https://real-debrid.com/d/FAILOVER'],
+          files: [{ id: 0, path: '/Failover.Test.mkv', bytes: 123456, selected: 1 }]
+        });
+      }
+      if (target.endsWith('/unrestrict/link')) {
+        return jsonResponse({ download: 'https://dl.real-debrid.com/dl/Failover.Test.mkv' });
+      }
+      throw new Error(`Unexpected fetch during failover: ${target}`);
+    };
+
+    try {
+      const res = createMockRes();
+      await handleDebridPlayback({ params: { token } }, res);
+      assert.deepEqual(res.redirected, { status: 302, url: 'https://dl.real-debrid.com/dl/Failover.Test.mkv' });
+    } finally {
+      globalThis.fetch = originalFetch;
+      _clearDebridPlaybackJobs();
+      _clearAccountIndexCache();
+    }
+  });
+
   await check('HTTP torrent debrid playback holds first click until PM becomes ready, then redirects', async () => {
     _clearDebridPlaybackJobs();
     const torrentUrl = 'https://prowlarr.example/api?t=download&id=eventually-ready&apikey=secret';
