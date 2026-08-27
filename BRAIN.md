@@ -430,3 +430,14 @@ Remaining caveats:
 - No PASS 5 commit or deploy has been made.
 - Existing live/selfhost poster audit still reported two live poster text failures and samples the currently deployed target, not this local repaired tree.
 - Other historical SportsMeta planning docs may still contain old SVG/free-tier wording; PASS 5 only repaired the named PVTKRRX/public surfaces.
+
+## Dual-Deploy 502 Repeat — 2026-08-27
+
+The 2026-08-14 failure mode happened again on 2026-08-27 ~22:28 UTC: a feature-branch
+push (webhook has no branch filter) and a `main` push a few minutes later queued two
+deploys whose container-removal phases overlapped, leaving zero pvtkrrx containers and
+public 502. Reminder the hard way: the one-push-at-a-time rule counts EVERY ref —
+a branch push alone queues a deploy of `main`, so a branch push followed by a merge
+push within one deploy window (~3 min) is still two parallel deploys. Recovery used
+here: one fresh `main` push (this commit) to fire a single clean deploy, per the
+documented webhook-redelivery recovery.
