@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict');
+const crypto = require('node:crypto');
 const { Writable } = require('node:stream');
 const { createMockDebridProvider } = require('../src/clients/debrid/__mock__');
 const { UnsupportedCapabilityError } = require('../src/clients/debrid/base');
@@ -8,7 +9,7 @@ process.env.PVTKRRX_DEBRID_POLL_INTERVAL_MS = process.env.PVTKRRX_DEBRID_POLL_IN
 process.env.PVTKRRX_DEBRID_POLL_TIMEOUT_MS = process.env.PVTKRRX_DEBRID_POLL_TIMEOUT_MS || '2000';
 
 const { handleDebridPlayback, handleDebridPlaybackHead, _clearDebridPlaybackJobs } = require('../src/handlers/playbackDebrid');
-const { encodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT } = require('../src/utils/opaqueState');
+const { encodeDebridPlaybackToken, encodePlaybackStateToken, DEBRID_PROTOCOL_TORRENT } = require('../src/utils/opaqueState');
 const { createMockCacheSearchSource } = require('../src/clients/cacheSearch/__mock__');
 const {
   _clearDebridCacheMemo,
@@ -358,11 +359,21 @@ async function run() {
     _clearDebridPlaybackJobs();
     const torrentUrl = 'https://prowlarr.example/api?t=download&id=slow-sports&apikey=secret';
     const torrentBytes = buildTorrentPayload('Slow.Sports.Match.mkv', 98765);
+    const fallbackConfig = 'cfg-slow-sports';
+    const fallbackToken = encodePlaybackStateToken({
+      h: '1234512345123451234512345123451234512345',
+      l: torrentUrl,
+      p: 'Slow.Sports.Match.mkv'
+    });
     const token = encodeDebridPlaybackToken({
       protocol: DEBRID_PROTOCOL_TORRENT,
       src: torrentUrl,
       providers: [{ type: 'pm', apiKey: 'pm-secret' }],
-      name: 'Slow Sports Match'
+      name: 'Slow Sports Match',
+      qbitFallback: {
+        token: fallbackToken,
+        configDigest: crypto.createHash('sha256').update(fallbackConfig).digest('hex')
+      }
     });
     const calls = [];
     const originalFetch = globalThis.fetch;
@@ -398,7 +409,7 @@ async function run() {
 
     try {
       const res = createMockRes();
-      await handleDebridPlayback({ params: { token } }, res);
+      await handleDebridPlayback({ params: { config: fallbackConfig, token } }, res);
       assert.equal(res.statusCode, 503);
       assert.equal(res.redirected, null);
       assert.equal(String(res.headers['retry-after'] || ''), '15');
@@ -412,6 +423,56 @@ async function run() {
     } finally {
       globalThis.fetch = originalFetch;
       _clearDebridPlaybackJobs();
+    }
+  });
+
+  await check('terminal Real-Debrid block hands the same release to qBit', async () => {
+    _clearDebridPlaybackJobs();
+    const { _clearAccountIndexCache } = require('../src/clients/debrid/realdebrid');
+    _clearAccountIndexCache();
+    const config = 'cfg-skinwalker';
+    const infohash = '5555555555555555555555555555555555555555';
+    const fallbackToken = encodePlaybackStateToken({
+      h: infohash,
+      l: `magnet:?xt=urn:btih:${infohash}&dn=Skinwalker.S07E05.mkv`,
+      p: 'Skinwalker.S07E05.mkv'
+    });
+    const token = encodeDebridPlaybackToken({
+      protocol: DEBRID_PROTOCOL_TORRENT,
+      src: `magnet:?xt=urn:btih:${infohash}&dn=Skinwalker.S07E05.mkv`,
+      providers: [{ type: 'rd', apiKey: 'rd-blocked-secret' }],
+      name: 'Skinwalker.S07E05.mkv',
+      qbitFallback: {
+        token: fallbackToken,
+        configDigest: crypto.createHash('sha256').update(config).digest('hex')
+      }
+    });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async (url) => {
+      const target = String(url);
+      if (/\/torrents\?/.test(target)) return jsonResponse([]);
+      if (target.endsWith('/torrents/addMagnet')) {
+        return jsonResponse({ error: 'unavailable for legal reasons', error_code: 35 }, 451);
+      }
+      throw new Error(`Unexpected fetch during qBit takeover: ${target}`);
+    };
+
+    try {
+      const res = createMockRes();
+      await handleDebridPlayback({ params: { config, token } }, res);
+      assert.deepEqual(res.redirected, {
+        status: 302,
+        url: `/${config}/playback/${encodeURIComponent(fallbackToken)}`
+      });
+
+      const wrongConfig = createMockRes();
+      await handleDebridPlayback({ params: { config: 'someone-else', token } }, wrongConfig);
+      assert.equal(wrongConfig.statusCode, 502, 'fallback must stay bound to its own PVTKRR config');
+      assert.equal(wrongConfig.redirected, null);
+    } finally {
+      globalThis.fetch = originalFetch;
+      _clearDebridPlaybackJobs();
+      _clearAccountIndexCache();
     }
   });
 

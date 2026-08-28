@@ -14,6 +14,7 @@ const {
   _prioritizeProviderForCacheSource
 } = require('../src/utils/streamRouter')
 const { _clearDebridCacheMemo } = require('../src/utils/debridCache')
+const { handleDebridPlayback, _clearDebridPlaybackJobs } = require('../src/handlers/playbackDebrid')
 const { encodeFileStateToken, encodePlaybackStateToken, decodeDebridPlaybackToken, DEBRID_PROTOCOL_TORRENT } = require('../src/utils/opaqueState')
 const { validateTorrentPayload, inspectTorrentPayload } = require('../src/utils/torrentPayload')
 
@@ -53,6 +54,19 @@ function check(label, fn) {
     checks++
     console.log(`  PASS ${label}`)
   })
+}
+
+function createMockRes() {
+  return {
+    statusCode: 200,
+    body: null,
+    redirected: null,
+    headersSent: false,
+    setHeader() {},
+    status(code) { this.statusCode = code; return this },
+    json(body) { this.body = body; this.headersSent = true; return this },
+    redirect(status, url) { this.redirected = { status, url }; this.headersSent = true; return this }
+  }
 }
 
 function makeQbitStream(label = 'On Seedbox', title = 'sample 1080p') {
@@ -122,6 +136,7 @@ async function run() {
     assert.ok(meta)
     assert.equal(meta.hash, SAMPLE_HASH)
     assert.equal(meta.name, 'movie.mkv')
+    assert.equal(meta.playbackToken, token)
   })
 
   await check('tryExtractDebridMetaFromStreamUrl preserves original torrent download URL', () => {
@@ -192,6 +207,7 @@ async function run() {
 
   await check('SPORTS PM cache hit appears before qBit without uncached debrid handoff', async () => {
     const baseResult = { streams: [makeQbitStream('On Seedbox', 'sports match')] }
+    const originalPlaybackToken = baseResult.streams[0].url.split('/playback/')[1]
     const result = await applyV13Routing(baseResult, {
       config: {
         debrid: {
@@ -240,7 +256,44 @@ async function run() {
     const token = result.streams[0].url.split('/playback/debrid/')[1]
     const decoded = decodeDebridPlaybackToken(token)
     assert.equal(decoded.providers[0].type, 'pm')
+    assert.equal(decoded.qbitFallback?.token, originalPlaybackToken, 'READY row must retain the exact qBit takeover token')
     assert.equal(result.streams[1].name, 'On Seedbox')
+
+    const { _clearAccountIndexCache } = require('../src/clients/debrid/realdebrid')
+    _clearDebridPlaybackJobs()
+    _clearAccountIndexCache()
+    const originalFetch = globalThis.fetch
+    globalThis.fetch = async (url) => {
+      const target = String(url)
+      if (target.endsWith('/transfer/create')) {
+        return new Response(JSON.stringify({ status: 'error', message: 'blocked' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
+      if (/\/torrents\?/.test(target)) {
+        return new Response('[]', { status: 200, headers: { 'Content-Type': 'application/json' } })
+      }
+      if (target.endsWith('/torrents/addMagnet')) {
+        return new Response(JSON.stringify({ error: 'blocked', error_code: 35 }), {
+          status: 451,
+          headers: { 'Content-Type': 'application/json' }
+        })
+      }
+      throw new Error(`Unexpected READY fallback fetch: ${target}`)
+    }
+    try {
+      const res = createMockRes()
+      await handleDebridPlayback({ params: { config: CONFIG_TOKEN, token } }, res)
+      assert.deepEqual(res.redirected, {
+        status: 302,
+        url: `/${CONFIG_TOKEN}/playback/${encodeURIComponent(originalPlaybackToken)}`
+      })
+    } finally {
+      globalThis.fetch = originalFetch
+      _clearDebridPlaybackJobs()
+      _clearAccountIndexCache()
+    }
     _clearDebridCacheMemo()
   })
 
@@ -476,6 +529,10 @@ async function run() {
     })
     assert.equal(result.streams.length, 2)
     assert.match(result.streams[0].url, /\/playback\/debrid\//, 'debrid first')
+    const debridToken = result.streams[0].url.split('/playback/debrid/')[1]
+    const decoded = decodeDebridPlaybackToken(debridToken)
+    assert.ok(decoded.qbitFallback?.token, 'debrid row must retain its exact qBit takeover token')
+    assert.match(decoded.qbitFallback.configDigest, /^[a-f0-9]{64}$/)
     assert.equal(result.streams[1].name, 'On Seedbox', 'qBit kept as fallback')
   })
 
@@ -511,6 +568,8 @@ async function run() {
     })
     assert.equal(result.streams.length, 2)
     assert.match(result.streams[0].url, /\/playback\/debrid\//, 'debrid downloader first')
+    const decoded = decodeDebridPlaybackToken(result.streams[0].url.split('/playback/debrid/')[1])
+    assert.equal(decoded.qbitFallback, undefined, 'completed file rows must never become qBit add fallbacks')
     assert.match(result.streams[0].name, /^⬇ PM/)
     assert.match(result.streams[1].url, /\/file\//, 'ready qBit file remains fallback')
   })

@@ -27,6 +27,17 @@ function maskToken(token) {
   return s.slice(0, 8) + '…'
 }
 
+function qbitFallbackPath(req, payload) {
+  const config = String(req?.params?.config || '').trim()
+  const fallback = payload?.qbitFallback
+  if (!config || !fallback?.token || !fallback?.configDigest) return ''
+  const actualDigest = crypto.createHash('sha256').update(config).digest('hex')
+  const expected = Buffer.from(String(fallback.configDigest), 'hex')
+  const actual = Buffer.from(actualDigest, 'hex')
+  if (expected.length !== actual.length || !crypto.timingSafeEqual(expected, actual)) return ''
+  return `/${encodeURIComponent(config)}/playback/${encodeURIComponent(fallback.token)}`
+}
+
 function debridPreparingResponseMode() {
   const value = String(process.env.PVTKRRX_DEBRID_PREPARING_RESPONSE || 'retry').trim().toLowerCase()
   return value === 'loader' || value === 'waiting-room' || value === 'waiting_room'
@@ -341,6 +352,14 @@ async function handleDebridPlayback(req, res) {
       progress: status?.progress || 0,
       retryAfter: 15
     })
+  }
+
+  // Every debrid provider failed terminally. Hand the exact release from this
+  // row to qBit. Providers that are still downloading keep the 503 above.
+  const fallbackPath = qbitFallbackPath(req, payload)
+  if (fallbackPath) {
+    console.log(`[playback-debrid] all providers failed -> qbit token=${maskToken(tokenParam)}`)
+    return res.redirect(302, fallbackPath)
   }
 
   const message = lastError ? redactSensitiveText(lastError.message) : 'No configured debrid provider could fulfill this request'

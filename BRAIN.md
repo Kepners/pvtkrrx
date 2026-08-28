@@ -441,3 +441,10 @@ a branch push alone queues a deploy of `main`, so a branch push followed by a me
 push within one deploy window (~3 min) is still two parallel deploys. Recovery used
 here: one fresh `main` push (this commit) to fire a single clean deploy, per the
 documented webhook-redelivery recovery.
+## 2026-08-28: Debrid failure now hands the same click to qBittorrent
+
+- Root cause proven live with `The Secret of Skinwalker Ranch` S07E05: search returned 22 rows, but a debrid click ended after Real-Debrid returned HTTP 451. The qBittorrent row underneath was never invoked.
+- The debrid row now retains its original signed qBittorrent playback token. If every debrid provider fails terminally, the request redirects internally to that exact qBittorrent item. A provider that is still downloading keeps its retry response; completed `/file/` rows never become add fallbacks.
+- The fallback is bound to the PVTKRR configuration that created it and is rejected under a different configuration or the unscoped compatibility route.
+- Premiumize was removed from Matt's live PVTKRR cache settings and plex-debrid credentials. The obsolete Premiumize rescue timer was disabled. Backups were retained.
+- Local proof: `smoke:debrid-all`, `smoke:pipeline`, `smoke:security`, and `smoke:config` all pass. Live S07E05 proof remains pending deployment.

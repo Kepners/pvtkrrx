@@ -1,5 +1,7 @@
 'use strict'
 
+const crypto = require('node:crypto')
+
 // v1.3 stream routing post-processor.
 //
 // Cached Debrid is the first playable layer when configured.
@@ -91,7 +93,8 @@ function tryExtractDebridMetaFromStreamUrl(url, playbackBaseUrl, configToken) {
       hash: String(state.h || '').toLowerCase(),
       link: String(state.l || ''),
       name: String(state.p || ''),
-      sourceKind: 'playback'
+      sourceKind: 'playback',
+      playbackToken: token
     }
   } catch (_) {
     return null
@@ -106,12 +109,20 @@ function buildRouteBase(playbackBaseUrl, configToken = '') {
 
 function buildDebridPlaybackUrl(playbackBaseUrl, providers, payload) {
   try {
+    const fallbackToken = String(payload.qbitFallbackToken || '').trim()
+    const fallbackConfig = String(payload.configToken || '').trim()
     const token = encodeDebridPlaybackToken({
       protocol: payload.protocol || DEBRID_PROTOCOL_TORRENT,
       src: payload.src,
       fileIdx: payload.fileIdx || 0,
       providers,
-      name: payload.name || ''
+      name: payload.name || '',
+      qbitFallback: fallbackToken && fallbackConfig
+        ? {
+            token: fallbackToken,
+            configDigest: crypto.createHash('sha256').update(fallbackConfig).digest('hex')
+          }
+        : undefined
     })
     return `${buildRouteBase(playbackBaseUrl, payload.configToken)}/playback/debrid/${token}`
   } catch (err) {
@@ -219,7 +230,7 @@ function prioritizeProviderForCacheSource(sourceId, providers) {
   return [...owning, ...rest]
 }
 
-async function resolveCacheHitToStreamUrl(hit, configuredSources, playbackBaseUrl, providersForDebrid, configToken = '') {
+async function resolveCacheHitToStreamUrl(hit, configuredSources, playbackBaseUrl, providersForDebrid, configToken = '', qbitFallbackToken = '') {
   if (hit.directStreamUrl) return hit.directStreamUrl
   // PM and RD cache hits don't carry a direct URL — they resolve at click time
   // through /playback/debrid. For RD the handler finds the item already on the
@@ -232,7 +243,8 @@ async function resolveCacheHitToStreamUrl(hit, configuredSources, playbackBaseUr
       src: magnet,
       name: hit.name,
       protocol: DEBRID_PROTOCOL_TORRENT,
-      configToken
+      configToken,
+      qbitFallbackToken
     })
   }
   // put.io fileId path — fetch fresh signed URL from the source
@@ -289,7 +301,7 @@ function resolveEnabledCacheSources(cacheConfig = {}, enabledDebrid = []) {
   return sources
 }
 
-async function buildCacheSearchStreams(query, enabledSources, playbackBaseUrl, providersForDebrid, configToken = '') {
+async function buildCacheSearchStreams(query, enabledSources, playbackBaseUrl, providersForDebrid, configToken = '', qbitFallbackToken = '') {
   if (!enabledSources.length) return []
   let hits = []
   try {
@@ -305,7 +317,7 @@ async function buildCacheSearchStreams(query, enabledSources, playbackBaseUrl, p
   for (const hit of hits) {
     let url
     try {
-      url = await resolveCacheHitToStreamUrl(hit, enabledSources, playbackBaseUrl, providersForDebrid, configToken)
+      url = await resolveCacheHitToStreamUrl(hit, enabledSources, playbackBaseUrl, providersForDebrid, configToken, qbitFallbackToken)
     } catch (err) {
       console.warn(`[stream-router] cache hit resolve failed: ${redactSensitiveText(err.message)}`)
       continue
@@ -385,7 +397,8 @@ async function applyV13Routing(result, ctx = {}) {
         src: torrentSource,
         name: stream.title || meta.name || stream.name || '',
         protocol: DEBRID_PROTOCOL_TORRENT,
-        configToken
+        configToken,
+        qbitFallbackToken: meta.sourceKind === 'playback' ? meta.playbackToken : ''
       })
       if (!debridUrl) continue
       // COPY DRAFT — pending docs/copy.md approval. Brief §3 stream-prefix lock.
@@ -424,21 +437,25 @@ async function applyV13Routing(result, ctx = {}) {
     // Dedupe hashes first, then run the per-hash cache lookups concurrently instead
     // of awaiting them one at a time (the old N+1). Results are re-flattened in the
     // original hash order so emitted-row ordering stays identical.
-    const seenHashes = new Set()
-    const hashMetas = []
+    const hashMetaByHash = new Map()
     for (const meta of debridMetas) {
       const hash = String(meta?.hash || '').trim().toLowerCase()
-      if (!/^[a-f0-9]{40}$/.test(hash) || seenHashes.has(hash)) continue
-      seenHashes.add(hash)
-      hashMetas.push({ hash, title: meta.name || queryTitle })
+      if (!/^[a-f0-9]{40}$/.test(hash)) continue
+      const qbitFallbackToken = meta.sourceKind === 'playback' ? String(meta.playbackToken || '') : ''
+      const existingMeta = hashMetaByHash.get(hash)
+      if (!existingMeta || (!existingMeta.qbitFallbackToken && qbitFallbackToken)) {
+        hashMetaByHash.set(hash, { hash, title: meta.name || queryTitle, qbitFallbackToken })
+      }
     }
-    const builtByHash = await Promise.all(hashMetas.map(({ hash, title }) =>
+    const hashMetas = [...hashMetaByHash.values()]
+    const builtByHash = await Promise.all(hashMetas.map(({ hash, title, qbitFallbackToken }) =>
       buildCacheSearchStreams(
         { infohash: hash, title },
         enabledCache,
         playbackBaseUrl,
         providersForDebrid,
-        configToken
+        configToken,
+        qbitFallbackToken
       ).then(built => ({ hash, built }))
     ))
     let hashPassProducedHits = false

@@ -177,13 +177,28 @@ function sanitizeDebridPayload(input) {
   if (!sanitizedProviders.length) {
     throw new Error('Debrid token must reference at least one configured provider')
   }
-  return {
+  const qbitFallbackInput = input?.qbitFallback
+  let qbitFallback = null
+  if (qbitFallbackInput !== undefined && qbitFallbackInput !== null) {
+    const token = String(qbitFallbackInput?.token || '').trim()
+    const configDigest = String(qbitFallbackInput?.configDigest || '').trim().toLowerCase()
+    if (!token || token.length > 16384 || !/^[a-f0-9]{64}$/.test(configDigest)) {
+      throw new Error('Debrid qBit fallback is invalid')
+    }
+    // Only a genuine, unexpired PVTKRR playback token can become a fallback.
+    // This keeps the field from becoming an open redirect.
+    decodePlaybackStateToken(token)
+    qbitFallback = { token, configDigest }
+  }
+  const payload = {
     protocol,
     src,
     fileIdx: Number.isFinite(fileIdx) && fileIdx >= 0 ? fileIdx : 0,
     providers: sanitizedProviders,
     name: String(input?.name || '').slice(0, 512)
   }
+  if (qbitFallback) payload.qbitFallback = qbitFallback
+  return payload
 }
 
 function encodeDebridPlaybackToken(input) {
