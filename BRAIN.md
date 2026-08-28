@@ -447,4 +447,5 @@ documented webhook-redelivery recovery.
 - The debrid row now retains its original signed qBittorrent playback token. If every debrid provider fails terminally, the request redirects internally to that exact qBittorrent item. A provider that is still downloading keeps its retry response; completed `/file/` rows never become add fallbacks.
 - The fallback is bound to the PVTKRR configuration that created it and is rejected under a different configuration or the unscoped compatibility route.
 - Premiumize was removed from Matt's live PVTKRR cache settings and plex-debrid credentials. The obsolete Premiumize rescue timer was disabled. Backups were retained.
-- Local proof: `smoke:debrid-all`, `smoke:pipeline`, `smoke:security`, and `smoke:config` all pass. Live S07E05 proof remains pending deployment.
+- Local proof: `smoke:debrid-all`, `smoke:pipeline`, `smoke:security`, and `smoke:config` all pass.
+- Live proof on native revision `a69ec42`: S07E05 returned RD HTTP 451, logged `all providers failed -> qbit`, downloaded the exact EDITH 1080p release to `/opt/pvtkrrx/downloads`, copied and size-verified it on Google Drive, retained the qBit seed for 7 days, and refreshed Plex. Plex indexed `Home Sweet Homestead` as S07E05 and returned HTTP 206 video bytes from the Drive copy.
