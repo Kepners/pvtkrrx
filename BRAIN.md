@@ -449,3 +449,57 @@ documented webhook-redelivery recovery.
 - Premiumize was removed from Matt's live PVTKRR cache settings and plex-debrid credentials. The obsolete Premiumize rescue timer was disabled. Backups were retained.
 - Local proof: `smoke:debrid-all`, `smoke:pipeline`, `smoke:security`, and `smoke:config` all pass.
 - Live proof on native revision `a69ec42`: S07E05 returned RD HTTP 451, logged `all providers failed -> qbit`, downloaded the exact EDITH 1080p release to `/opt/pvtkrrx/downloads`, copied and size-verified it on Google Drive, retained the qBit seed for 7 days, and refreshed Plex. Plex indexed `Home Sweet Homestead` as S07E05 and returned HTTP 206 video bytes from the Drive copy.
+
+## 2026-09-02: Google Drive library live, and a downloaded copy no longer cancels the search
+
+Released to both surfaces. `main` and the public Coolify container are on `055150e2`; the Contabo
+systemd self-host runtime went `a69ec42` → `055150e`.
+
+### New runtime env on the self-host box
+
+```
+PVTKRRX_DRIVE_LIBRARY_ROOT=/opt/stack/gdrive-media/media
+```
+
+**This must be an env var, not a config value.** A configured install carries its settings inside
+the addon URL, so `req.config` is decrypted from that token and never reads
+`data/pvtkrrx/local-config.json`. A library root set only in the disk config reaches nothing. It
+must also never be written into a config that gets encoded into a shareable token — that would
+publish a server filesystem path. `buildDriveLibraryStream()` therefore reads the server-level
+default at the point of use, and an explicitly configured `driveLibraryRoot` still wins.
+
+Debugging note: that function only logs on a hit or an error, so an empty root produced **zero** log
+lines and looked like the lookup was never wired up. Prove the matcher separately before suspecting
+it — `findDriveEpisode()` resolved S07E01 and S07E13 correctly against the live mount while the
+route was still emitting nothing.
+
+### Why the Drive library matters
+
+`archive-torrents-to-gdrive` deletes the local torrent 7 days after the Drive copy verifies. For
+anything older than a week the Drive copy is the only copy, so those episodes were unplayable in
+Stremio while still playing fine in Plex off the same mount. Skinwalker Ranch S07E01–E04 were in
+exactly that state and now return a ready row first; E01 serves a 60 MB mid-file range off the
+rclone mount at 7.16 MB/s.
+
+### A local copy must never cancel the search
+
+`src/handlers/stream.js` assigned the qBit exact-title fallback **into** `jackettItems` before the
+two `jackettItems.length === 0` gates, so a local copy made both the speculative and the fallback
+title searches read as already-answered and neither ran. Measured live: an episode with a local copy
+returned **2** streams, one without returned **22**. It is now merged in after the search, deduped
+by infohash and placed first — additive, never a replacement, same rule as debrid rows.
+
+`smoke:pipeline` #4o2 previously asserted the opposite ("qBit exact-title fallback should not wait
+for title fallback search"). **That assertion was the bug written down as a contract.** It now
+asserts the search IS called, that alternatives are emitted alongside the ready file row, and that
+the downloaded copy ranks first.
+
+### Not proven
+
+The reported stutter (plays 1:47, buffers, plays ~10s, repeats) was **not reproduced server-side**.
+The complete S07E13 transfers to the owner's house in 59s (~160 Mbps sustained, reproduced with the
+exact `stagefright/1.2` request shape) against a 3.97 Mbps requirement; disk reads at 244 MB/s;
+Caddy does not compress video; every torrent is 100% complete. The only failures are Caddy
+`write: connection timed out` writing to the NVIDIA SHIELD, i.e. the player stopped reading. Stremio
+server 4.21.0 on that device had `cacheSize = 0`; set to 5 GB. The frontier fix in `dc7ffd2` targets
+a still-downloading file and is therefore deployed unproven against this symptom.

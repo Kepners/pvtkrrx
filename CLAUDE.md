@@ -231,6 +231,13 @@ containers removed EACH OTHER and the public site served 502 with zero container
 wait for the deploy to finish (~2-3 min), then push the other. Recovery if it happens: redeliver
 the `main` push webhook once via `gh api repos/Kepners/pvtkrrx/hooks/<hook>/deliveries/<id>/attempts`.
 
+**Time the gap from when the FIRST push COMPLETES, not from when you issued it.** On 2026-09-02 two
+pushes that felt three minutes apart were 2m57s apart measured properly — the push itself takes
+time, and `git push` returning is the only moment you can count from. That release survived (one
+container throughout, no 502, both deliveries 200), but it survived on luck, not on the margin.
+Verify the swap by polling `docker ps` for the image tag AND the public status code together: a
+count of exactly 1 container at every sample is what proves the two deploys did not overlap.
+
 ---
 
 ## Deployment Topology (verified 2026-04-30)
