@@ -34,7 +34,7 @@ const { ensureServerAdminToken } = require('../utils/serverAdminToken')
 const { parseTorrentFileName, fetchTorrentPayload } = require('../utils/torrentPayload')
 const { findVideoFile, hasPackedArchiveFiles, isSampleVideoName, isArchiveFileName, findPackedArchiveFiles } = require('../utils/streams')
 const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
-const { buildPlaybackFileUrl } = require('../utils/fileServing')
+const { buildPlaybackFileUrl, resolvePreferredPlaybackFileUrl } = require('../utils/fileServing')
 const { normalizeLocalStorageRoots, findExistingLocalFilePath } = require('../utils/localStorageRoots')
 const { PairStore } = require('../utils/pairStore')
 const { StremioLinkStore } = require('../utils/stremioLinkStore')
@@ -3382,6 +3382,7 @@ module.exports = {
   hasPackedArchiveFiles,
   isSampleVideoName,
   buildPlaybackFileUrl,
+  resolvePreferredPlaybackFileUrl,
   normalizeLocalStorageRoots,
   findExistingLocalFilePath,
   PairStore,

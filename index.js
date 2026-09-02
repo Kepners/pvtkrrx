@@ -54,6 +54,7 @@ const {
   // URL & network helpers
   buildLocalModeUrls, normalizeRelayUrl, stripRemoteSeedboxLanFields,
   buildPlaybackFileUrl, normalizeLocalStorageRoots,
+  resolvePreferredPlaybackFileUrl,
   findVideoFile, hasPackedArchiveFiles, isSampleVideoName,
   // Account
   normalizeStremioUserId, createAuthToken,
@@ -2737,6 +2738,43 @@ app.get('/:config/file/:info', withConfig, maybeLanPairRedirect('file'), async (
     let isComplete = isOrphanFile || Number(file?.progress || torrent.progress || 0) >= 0.999
     let maxReadable = isComplete ? fileSize : Math.max(0, Math.min(fileSize, readableBytes))
     let pieceRangeContext = null
+
+    // A still-downloading local file must not beat a finished copy on the
+    // configured file server (e.g. an rclone-served Google Drive mount). The
+    // local-disk check is only an existence test and qBittorrent creates the
+    // file the moment a download starts, so without this the player spends the
+    // whole episode chasing the download frontier while a complete copy sits
+    // on the mount. The remote copy is only used once a HEAD proves it is
+    // byte-for-byte the same size; otherwise we fall through to local bytes.
+    if (!isComplete && !isOrphanFile && fileSize > 0) {
+      const playbackBaseUrl = getPlaybackBaseUrl(req)
+      const builtinPrefix = `${playbackBaseUrl}/${req.params.config}/file/`
+      let preferredUrl = null
+      try {
+        preferredUrl = await resolvePreferredPlaybackFileUrl(
+          req.config,
+          req.params.config,
+          playbackBaseUrl,
+          torrentHash,
+          torrent,
+          file?.name || p,
+          {
+            multipleFiles: Array.isArray(files) && files.length > 1,
+            expectedSize: fileSize,
+            localComplete: false
+          }
+        )
+      } catch (err) {
+        console.warn('[file-route] remote copy probe failed:', redactSensitiveText(err.message))
+      }
+      if (preferredUrl && !String(preferredUrl).startsWith(builtinPrefix)) {
+        console.log(
+          `[file-route] complete remote copy available hash=${torrentHash.slice(0, 8)} ` +
+          `— redirecting instead of streaming the partial local file`
+        )
+        return res.redirect(302, preferredUrl)
+      }
+    }
 
     const applyRefreshedPlayback = (refreshed) => {
       if (!refreshed?.torrent || !refreshed?.file) return false

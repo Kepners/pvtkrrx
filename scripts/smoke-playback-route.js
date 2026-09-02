@@ -643,6 +643,7 @@ async function run() {
     const readyPackedPlaybackToken = encodePlaybackStateToken({ h: readyPackedHash })
     const targetedPlaybackToken = encodePlaybackStateToken({ h: targetedHash, p: targetedFiles[1].name })
     const completedFileToken = encodeFileStateToken({ h: hash, p: file.name })
+    const incompleteFileToken = encodeFileStateToken({ h: incompleteHash, p: incompleteFile.name })
     const archiveFileToken = encodeFileStateToken({ h: readyPackedHash, p: 'Release/release.rar' })
     const orphanFileToken = encodeFileStateToken({ h: 'ffffffffffffffffffffffffffffffffffffffff', p: path.join(runtimeDir, file.name) })
 
@@ -877,6 +878,91 @@ async function run() {
       'a follow response that starves past the stall timeout must be torn down, not ended short of its Content-Length'
     )
     incompletePieceStates = [2, 2, 2, 2, 2, 2]
+
+    // Google Drive (or any fileServerUrl-backed mount): a still-downloading local
+    // file must lose to a proven-complete remote copy. Without this the
+    // existence-only local check makes a 4%-downloaded file win and playback
+    // chases the download frontier for the whole episode.
+    const { clearRemoteCopyProbeCache } = require('../src/utils/fileServing')
+    const driveConfigToken = encodeURIComponent(encrypt({
+      qbitUrl: 'http://127.0.0.1:8080',
+      qbitUsername: 'admin',
+      qbitPassword: 'adminadmin',
+      fileServerUrl: 'https://drive.example/media',
+      pathMapping: { from: runtimeDir, to: '' },
+      additionalStorageRoots: [runtimeDir],
+      lanPairEnabled: false,
+      lanPairRequired: false
+    }, process.env.ENCRYPTION_SECRET))
+    const driveFileUrl = `https://drive.example/media/${incompleteFile.name.split('/').map(encodeURIComponent).join('/')}`
+    const headProbes = []
+    global.fetch = async (url, init = {}) => {
+      headProbes.push({ url: String(url), method: String(init.method || 'GET') })
+      if (String(url) === driveFileUrl) {
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: (name) => (String(name).toLowerCase() === 'content-length' ? String(incompleteFile.size) : null) }
+        }
+      }
+      return { ok: false, status: 404, headers: { get: () => null } }
+    }
+
+    incompletePieceStates = [2, 2, 2, 0, 0, 0]
+    clearRemoteCopyProbeCache()
+    const driveResponse = await request(
+      server.address().port,
+      `/${driveConfigToken}/file/${encodeURIComponent(incompleteFileToken)}`
+    )
+    assert.equal(driveResponse.status, 302, 'an incomplete local file should redirect to the proven-complete file-server copy')
+    assert.equal(
+      String(driveResponse.headers.location || ''),
+      driveFileUrl,
+      'the redirect should target the mapped file-server URL for the final save path'
+    )
+    assert.ok(
+      headProbes.some(probe => probe.url === driveFileUrl && probe.method === 'HEAD'),
+      'the remote copy must be proven with a HEAD probe before Stremio is redirected to it'
+    )
+
+    // A half-copied remote file must never win — fall back to local bytes.
+    clearRemoteCopyProbeCache()
+    global.fetch = async (url) => {
+      if (String(url) === driveFileUrl) {
+        return {
+          ok: true,
+          status: 200,
+          headers: { get: (name) => (String(name).toLowerCase() === 'content-length' ? '1024' : null) }
+        }
+      }
+      return { ok: false, status: 404, headers: { get: () => null } }
+    }
+    const partialRemoteResponse = await request(
+      server.address().port,
+      `/${driveConfigToken}/file/${encodeURIComponent(incompleteFileToken)}`,
+      { headers: { Range: 'bytes=0-1048575' } }
+    )
+    assert.equal(
+      partialRemoteResponse.status,
+      206,
+      'a size-mismatched remote copy is still being written and must not take over playback'
+    )
+
+    // File server unreachable — playback must still work off local bytes.
+    clearRemoteCopyProbeCache()
+    global.fetch = async () => { throw new Error('file server down') }
+    const unreachableRemoteResponse = await request(
+      server.address().port,
+      `/${driveConfigToken}/file/${encodeURIComponent(incompleteFileToken)}`,
+      { headers: { Range: 'bytes=0-1048575' } }
+    )
+    assert.equal(
+      unreachableRemoteResponse.status,
+      206,
+      'an unreachable file server must fall back to local playback rather than breaking the stream'
+    )
+    clearRemoteCopyProbeCache()
+    global.fetch = ORIGINALS.fetch
 
     const packedResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(packedPlaybackToken)}`)
     assert.equal(packedResponse.status, 422, 'incomplete packed archives should fail fast with a truthful packed-release message instead of stalling')
