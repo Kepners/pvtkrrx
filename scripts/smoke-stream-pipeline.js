@@ -1633,9 +1633,19 @@ async function run() {
       ]
       CinemetaClient.prototype.getSeries = async () => ({ name: 'The Curse of Oak Island' })
       ProwlarrClient.prototype.searchImdb = async () => []
+      let titleSearchCalls = 0
       ProwlarrClient.prototype.search = async () => {
-        throw new Error('qBit exact-title fallback should not wait for title fallback search')
+        titleSearchCalls += 1
+        return Array.from({ length: 3 }, (_, index) => trackerItem({
+          title: `The Curse of Oak Island S12E17 1080p WEB-DL x264 Alt ${index}`,
+          link: `https://tracker.example/download/oak-island-alt-${index}.torrent`,
+          seeders: 30 - index
+        }))
       }
+      global.fetch = async () => createFetchResponse(buildTorrentPayload([
+        { path: 'The.Curse.of.Oak.Island.S12E17.1080p.WEB-DL.x264.mkv', length: 1_700_000_000 }
+      ]))
+      global.__pvtkrrxTitleSearchCalls = () => titleSearchCalls
     }, async () => {
       const result = await handleStream(
         makeBaseConfig({ fileServerUrl: '' }),
@@ -1645,8 +1655,18 @@ async function run() {
         'local'
       )
 
-      assert.ok(result.streams.some(stream => /\/file\//.test(String(stream?.url || ''))), '#4o2 qBit title fallback should emit a ready file stream when Prowlarr is empty')
-      assert.ok(result.streams.every(stream => String(stream?.name || '').startsWith('PVTKRRX ') || !stream?.name), '#4o2 qBit title fallback should keep PVTKRRX source naming')
+      const fileStreams = result.streams.filter(stream => /\/file\//.test(String(stream?.url || '')))
+      const trackerStreams = result.streams.filter(stream => /\/playback\//.test(String(stream?.url || '')))
+
+      assert.ok(fileStreams.length > 0, '#4o2 qBit title fallback should emit a ready file stream when Prowlarr IMDB search is empty')
+      assert.ok(fileStreams.every(stream => String(stream?.name || '').startsWith('PVTKRRX ') || !stream?.name), '#4o2 qBit title fallback should keep PVTKRRX source naming')
+      // A local copy answers "can I watch it now", not "what else is out there".
+      // It must never cancel the title search, or an already-downloaded episode
+      // comes back with one row while an undownloaded one returns twenty.
+      assert.ok(global.__pvtkrrxTitleSearchCalls() > 0, '#4o2 a local copy must not cancel the title fallback search')
+      assert.ok(trackerStreams.length > 0, '#4o2 tracker alternatives should be offered alongside the already-downloaded copy')
+      assert.ok(/\/file\//.test(String(result.streams[0]?.url || '')), '#4o2 the already-downloaded copy should rank first')
+      delete global.__pvtkrrxTitleSearchCalls
     })
 
     await withScenario(async () => {

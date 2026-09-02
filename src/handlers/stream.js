@@ -2028,10 +2028,13 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
     ? buildQbitTitleFallbackItems(qbitTorrents, contentTitle, { type, season, episode })
     : []
 
-  if (jackettItems.length === 0 && qbitTitleFallbackItems.length > 0) {
-    console.log('[stream] using qBit title fallback before slow title search')
-    jackettItems = qbitTitleFallbackItems
-  }
+  // Deliberately NOT folded into jackettItems here. Doing so made the two
+  // `jackettItems.length === 0` gates below read as "we already have results"
+  // and skip the title search entirely, so any episode with a local copy came
+  // back with just that one row and no alternatives — while an episode without
+  // one returned 22. A local copy answers "can I watch it now", never "what
+  // else is out there". It is merged in alongside the tracker results further
+  // down, and still ranked first.
 
   // Start the first title search NOW, before the fallback loop, so it overlaps
   // whatever else remains rather than queueing behind it.
@@ -2114,8 +2117,20 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
     ? jackettItems.filter(item => matchesEpisode(item.title, season, episode))
     : jackettItems
 
-  if (filtered.length === 0 && qbitTitleFallbackItems.length > 0) {
-    filtered = qbitTitleFallbackItems
+  // Additive, never a replacement: the already-downloaded copy leads the list
+  // so it is the first thing playable, and the tracker results stay underneath
+  // it so a different release is still one click away.
+  if (qbitTitleFallbackItems.length > 0) {
+    const knownHashes = new Set(
+      filtered.map(item => String(item?.infohash || '').toLowerCase()).filter(Boolean)
+    )
+    const localOnly = qbitTitleFallbackItems.filter(
+      item => !knownHashes.has(String(item?.infohash || '').toLowerCase())
+    )
+    if (localOnly.length > 0) {
+      console.log(`[stream] ${localOnly.length} already-downloaded source(s) added ahead of ${filtered.length} tracker result(s)`)
+      filtered = [...localOnly, ...filtered]
+    }
   }
 
   filtered = preferSeededResults(filtered, 'imdb candidates', (item) => {
