@@ -35,6 +35,7 @@ const { parseTorrentFileName, fetchTorrentPayload } = require('../utils/torrentP
 const { findVideoFile, hasPackedArchiveFiles, isSampleVideoName, isArchiveFileName, findPackedArchiveFiles } = require('../utils/streams')
 const { findExtractedArchiveVideoPath, ensurePackedArchiveExtracted } = require('../utils/archiveExtraction')
 const { buildPlaybackFileUrl, resolvePreferredPlaybackFileUrl } = require('../utils/fileServing')
+const { normalizeDriveLibraryRoot } = require('../utils/driveLibrary')
 const { normalizeLocalStorageRoots, findExistingLocalFilePath } = require('../utils/localStorageRoots')
 const { PairStore } = require('../utils/pairStore')
 const { StremioLinkStore } = require('../utils/stremioLinkStore')
@@ -1115,6 +1116,7 @@ function normalizeAddonConfig(config = {}, options = {}) {
   const normalized = {
     ...stripLegacySportsMetadataConfigFields(config),
     additionalStorageRoots: normalizeLocalStorageRoots(config.additionalStorageRoots),
+    driveLibraryRoot: normalizeDriveLibraryRoot(config.driveLibraryRoot),
     debrid: normalizeDebridConfig(config.debrid),
     cacheSearch: normalizeCacheSearchConfig(config.cacheSearch)
   }

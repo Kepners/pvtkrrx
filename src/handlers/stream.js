@@ -7,6 +7,7 @@ const { SportsMetaClient } = require('../clients/sportsmeta')
 const { normalizeTeamName } = require('../utils/teamName')
 const { SPORT_CATS, MOVIE_CATS, TV_CATS } = require('../config/categories')
 const { parse, matchesEpisode, isLikelyPackedReleaseTitle, cleanTitle } = require('../utils/parser')
+const { findDriveEpisode, findDriveMovie, normalizeDriveLibraryRoot } = require('../utils/driveLibrary')
 const {
   getSportsAvailabilityAnchor,
   getSportsAvailabilityAnchorByCanonical
@@ -15,7 +16,7 @@ const { isSportsCultIndexer, isSportsOnlyIndexer } = require('../utils/sportsInd
 const { buildOnSeedboxStream, buildOnBufferingStream, buildOnArchiveStream, buildOnTrackerStream, buildNativeTorrentStream, buildInfoStream, findVideoFile, findPackedArchiveFiles, arePackedArchiveFilesReady, findEpisodeFile, titleLooksLegacyAvi, hasLegacyAviVideoFiles, sortStreams } = require('../utils/streams')
 const { encodePlaybackStateToken, encodeFileStateToken } = require('../utils/opaqueState')
 const { parseSportsTitle, parseSportsEventTitle } = require('../utils/sportsTitleParser')
-const { buildPlaybackFileUrl, canEmitTrackerPlayback, getTrackerPlaybackRestriction } = require('../utils/fileServing')
+const { buildPlaybackFileUrl, canEmitTrackerPlayback, getTrackerPlaybackRestriction, canServePlaybackRoute } = require('../utils/fileServing')
 const { decodeCustomId } = require('../utils/customId')
 const { normalizeImdbId } = require('../utils/normalizeImdbId')
 const { isCompletedTorrent } = require('../utils/torrentState')
@@ -114,6 +115,9 @@ const STREAM_SPORTS_MAX_SEARCH_QUERIES = Math.max(4, parseInt(process.env.PVTKRR
 const STREAM_SPORTS_MAX_SEARCH_QUERIES_WITH_DIRECT = Math.max(1, parseInt(process.env.PVTKRRX_STREAM_SPORTS_MAX_SEARCH_QUERIES_WITH_DIRECT || '3', 10))
 const STREAM_SPORTS_SUPPLEMENTAL_BUDGET_MS = Math.max(2500, parseInt(process.env.PVTKRRX_STREAM_SPORTS_SUPPLEMENTAL_BUDGET_MS || '8000', 10))
 const STREAM_SPORTS_RESPONSE_TIMEOUT_MS = Math.max(5000, parseInt(process.env.PVTKRRX_STREAM_SPORTS_RESPONSE_TIMEOUT_MS || '14000', 10))
+// The Drive library sits behind a FUSE mount whose readdir is a Drive API
+// round trip, so the lookup is budgeted and never blocks the stream list.
+const STREAM_DRIVE_LIBRARY_TIMEOUT_MS = Math.max(1000, parseInt(process.env.PVTKRRX_STREAM_DRIVE_LIBRARY_TIMEOUT_MS || '5000', 10))
 const TRACKER_LINK_INSPECTION_TIMEOUT_MS = Math.max(1000, parseInt(process.env.PVTKRRX_TRACKER_LINK_INSPECTION_TIMEOUT_MS || '2500', 10))
 // Inspecting a candidate downloads its .torrent through Prowlarr, so this
 // budget has to survive a tracker that is asking us to slow down rather than
@@ -1821,6 +1825,68 @@ async function searchTitleFallback(torznab, query, cats, options = {}) {
   return mergeUniqueSourceItems(categorizedItems, Array.isArray(broad.value) ? broad.value : [])
 }
 
+// Resolve a title against the owner's Google Drive media library.
+//
+// The archiver deletes the local torrent 7 days after the verified Drive copy
+// lands, so for anything older than a week the Drive copy is the ONLY copy.
+// Without this the episode vanishes from Stremio while still playing in Plex.
+//
+// The file is served through the built-in /file route's orphan-path branch, so
+// it needs no qBittorrent row — which is the whole point, the torrent is gone.
+async function buildDriveLibraryStream(config, {
+  type,
+  contentTitle,
+  contentYear,
+  season,
+  episode,
+  configToken,
+  playbackBaseUrl
+}) {
+  const libraryRoot = normalizeDriveLibraryRoot(config?.driveLibraryRoot)
+  if (!libraryRoot || !contentTitle) return null
+
+  // Playback is a local absolute path on this host, so a hosted relay (which
+  // must never serve bytes) has no business emitting it.
+  if (!canServePlaybackRoute(configToken)) return null
+
+  let found = null
+  try {
+    found = type === 'series'
+      ? await findDriveEpisode(libraryRoot, { title: contentTitle, season, episode })
+      : await findDriveMovie(libraryRoot, { title: contentTitle, year: contentYear })
+  } catch (err) {
+    console.warn('[stream] drive library lookup failed:', err.message)
+    return null
+  }
+  if (!found?.path || !(found.size > 0)) return null
+
+  let fileUrl = null
+  try {
+    const token = encodeFileStateToken({ h: found.hash, p: found.path })
+    fileUrl = `${String(playbackBaseUrl || '').replace(/\/+$/, '')}/${configToken}/file/${token}`
+  } catch (err) {
+    console.warn('[stream] drive library token failed:', err.message)
+    return null
+  }
+
+  const parsed = parse(found.name)
+  console.log(`[stream] drive library hit "${found.name}" (${found.size} bytes)`)
+
+  return buildOnSeedboxStream(
+    { title: found.name, seeders: 0, size: found.size },
+    fileUrl,
+    found.name,
+    found.size,
+    config,
+    parsed,
+    {
+      sourceTag: '☁️',
+      sourceOrigin: 'drive-library',
+      sourceLabel: 'Google Drive'
+    }
+  )
+}
+
 async function handleImdbStream(config, type, id, addonUrl, configToken, playbackBaseUrl = addonUrl) {
   const torznab = new ProwlarrClient(config.jackettUrl, config.jackettApiKey)
   const qbit = new QBitClient(config.qbitUrl, config.qbitUsername, config.qbitPassword)
@@ -1889,6 +1955,22 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
     extractContentYear(cinemetaResult.value?.releaseInfo) ||
     extractContentYear(cinemetaResult.value?.year) ||
     extractContentYear(cinemetaResult.value?.released)
+
+  // Start the Drive library lookup the moment the title is known so a FUSE
+  // round trip overlaps the tracker searches instead of adding to them.
+  const driveLibraryLookup = settleWithTimeout(
+    buildDriveLibraryStream(config, {
+      type,
+      contentTitle,
+      contentYear,
+      season,
+      episode,
+      configToken,
+      playbackBaseUrl
+    }),
+    STREAM_DRIVE_LIBRARY_TIMEOUT_MS,
+    null
+  )
 
   console.log(`[stream] IMDB search returned ${jackettItems.length} results, qBit has ${qbitTorrents.length} torrents, title="${contentTitle}" year="${contentYear}"`)
   if (jackettResult.skippedTitleFirst) console.log('[stream] TV episode title-first lookup: skipping initial IMDB wait')
@@ -2156,6 +2238,12 @@ async function handleImdbStream(config, type, id, addonUrl, configToken, playbac
     )
     for (const stream of readyStreams) streams.push(stream)
   }
+
+  const driveLibraryResult = await driveLibraryLookup
+  if (driveLibraryResult.timedOut) {
+    console.warn(`[stream] drive library lookup exceeded ${STREAM_DRIVE_LIBRARY_TIMEOUT_MS}ms`)
+  }
+  if (driveLibraryResult.value) streams.push(driveLibraryResult.value)
 
   appendNoticeStreams(streams, noticeCounts, addonUrl)
   const sortedStreams = sortStreams(streams)

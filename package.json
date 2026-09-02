@@ -56,7 +56,8 @@
     "smoke:debrid-all": "node scripts/smoke-debrid.js && node scripts/smoke-rd-sanitizer.js && node scripts/smoke-debrid-config.js && node scripts/smoke-debrid-routing.js",
     "probe:sports-item": "node scripts/probe-sports-item.js",
     "desktop:dev": "electron electron/main.js",
-    "dist:win": "node scripts/build-win.js"
+    "dist:win": "node scripts/build-win.js",
+    "smoke:drive-library": "node scripts/smoke-drive-library.js"
   },
   "repository": {
     "type": "git",

@@ -2688,7 +2688,16 @@ app.get('/:config/file/:info', withConfig, maybeLanPairRedirect('file'), async (
     const requestedRangeHeader = req.headers.range
     const isInitialPlaybackRequest = !requestedRangeHeader || /^bytes=0(?:-|$)/i.test(String(requestedRangeHeader || '').trim())
     const qbit = new QBitClient(req.config.qbitUrl, req.config.qbitUsername, req.config.qbitPassword)
-    const playback = await loadTorrentPlaybackState(qbit, String(h || '').toLowerCase(), p, req.config.additionalStorageRoots)
+    // A Google Drive library file is served through the orphan-path branch below
+    // and has no qBittorrent row at all, so a qBit outage must not take it down
+    // with it. Any other token still surfaces the real error.
+    let playback = null
+    try {
+      playback = await loadTorrentPlaybackState(qbit, String(h || '').toLowerCase(), p, req.config.additionalStorageRoots)
+    } catch (err) {
+      if (!path.isAbsolute(p)) throw err
+      console.warn('[file-route] qBittorrent unavailable, trying direct path:', redactSensitiveText(err.message))
+    }
     let isOrphanFile = false
     let orphanFileStat = null
 
