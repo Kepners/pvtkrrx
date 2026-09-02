@@ -1,4 +1,5 @@
 const assert = require('node:assert/strict')
+const crypto = require('node:crypto')
 const fs = require('node:fs')
 const http = require('node:http')
 const os = require('node:os')
@@ -11,6 +12,9 @@ process.env.STREAM_WAIT_TIMEOUT_MS = '50'
 process.env.STREAM_WAIT_INTERVAL_MS = '10'
 process.env.STREAM_RANGE_WAIT_TIMEOUT_MS = '100'
 process.env.STREAM_RANGE_WAIT_INTERVAL_MS = '10'
+process.env.STREAM_FOLLOW_POLL_INTERVAL_MS = '50'
+process.env.STREAM_FOLLOW_STALL_TIMEOUT_MS = '2000'
+process.env.STREAM_FOLLOW_RESUME_MAX_WAIT_MS = '1000'
 delete process.env.PVTKRRX_HOSTED_RELAY
 
 const { encrypt } = require('../src/utils/crypto')
@@ -64,17 +68,26 @@ function request(port, reqPath, options = {}) {
       headers: options.headers || {}
     }, (res) => {
       const chunks = []
-      res.on('data', chunk => chunks.push(Buffer.from(chunk)))
-      res.on('end', () => {
+      let settled = false
+      // A progressive follow response that starves is torn down mid-body on
+      // purpose, so resolve with what arrived instead of failing the run.
+      const settle = (aborted) => {
+        if (settled) return
+        settled = true
         const body = Buffer.concat(chunks)
-        const text = body.toString('utf8')
         resolve({
           status: Number(res.statusCode || 0),
           headers: res.headers || {},
-          text,
-          bodyLength: body.length
+          text: body.toString('utf8'),
+          bodyLength: body.length,
+          bodySha256: crypto.createHash('sha256').update(body).digest('hex'),
+          aborted
         })
-      })
+      }
+      res.on('data', chunk => chunks.push(Buffer.from(chunk)))
+      res.on('end', () => settle(false))
+      res.on('aborted', () => settle(true))
+      res.on('error', () => settle(true))
     })
     req.on('error', reject)
     req.end()
@@ -244,11 +257,17 @@ async function run() {
   const sequentialToggleCalls = []
   const payload = Buffer.from('smoke playback bytes', 'utf8')
   const targetedPayload = Buffer.from('smoke episode two bytes', 'utf8')
-  const partialPayload = Buffer.alloc(30 * 1024 * 1024, 7)
+  // Position-dependent bytes, so the progressive-playback hash assertion catches
+  // reordered, duplicated, or overwritten chunks — not just a wrong total length.
+  const partialPayload = Buffer.alloc(30 * 1024 * 1024)
+  for (let offset = 0; offset < partialPayload.length; offset += 4) {
+    partialPayload.writeUInt32BE((offset * 2654435761) >>> 0, offset)
+  }
   const archivePayload = Buffer.from('smoke rar bytes', 'utf8')
   const extractedPayload = Buffer.from('smoke extracted bytes', 'utf8')
   let incompletePieceStates = [2, 2, 0, 0, 0, 0]
   let promoteIncompleteSeekWindow = false
+  let advanceIncompleteFrontierAfterCalls = 0
   const torrent = {
     hash,
     name: 'UFC Fight Night 270 Main Card 21 03 26 Z3R0 1080p',
@@ -521,6 +540,12 @@ async function run() {
         incompletePieceStates = [2, 2, 0, 2, 2, 2]
         promoteIncompleteSeekWindow = false
       }
+      if (advanceIncompleteFrontierAfterCalls > 0) {
+        advanceIncompleteFrontierAfterCalls -= 1
+        if (advanceIncompleteFrontierAfterCalls === 0) {
+          incompletePieceStates = [2, 2, 2, 2, 2, 2]
+        }
+      }
       return states
     }
     if (normalized === unverifiedHash) return []
@@ -788,6 +813,70 @@ async function run() {
       firstLastToggleCalls.includes(incompleteHash),
       'progressive playback should turn off qBit first/last-piece priority so new playback stays head-first'
     )
+
+    // Progressive follow-streaming: an in-progress file must promise the whole
+    // requested range and keep feeding the SAME response as pieces land. If the
+    // response instead stops at the download frontier, playback stutters every
+    // few seconds once it catches up with the download.
+    incompletePieceStates = [2, 2, 2, 0, 0, 0]
+    advanceIncompleteFrontierAfterCalls = 3
+    const followResponse = await request(
+      server.address().port,
+      String(incompleteResponse.headers.location || ''),
+      {
+        headers: {
+          Range: 'bytes=0-'
+        }
+      }
+    )
+    assert.equal(followResponse.status, 206, 'progressive playback should answer an open-ended range with partial content')
+    assert.equal(
+      String(followResponse.headers['content-range'] || ''),
+      'bytes 0-31457279/31457280',
+      'progressive playback must advertise the full requested range, not stop at the current download frontier'
+    )
+    assert.equal(
+      String(followResponse.headers['content-length'] || ''),
+      '31457280',
+      'progressive playback must advertise the full requested length so the player keeps one connection open'
+    )
+    assert.equal(
+      followResponse.bodyLength,
+      31457280,
+      'progressive playback should keep feeding the open response with bytes that arrive after it started'
+    )
+    assert.equal(
+      followResponse.bodySha256,
+      crypto.createHash('sha256').update(partialPayload).digest('hex'),
+      'progressive playback must deliver the file bytes intact — no duplicated, dropped, or overwritten chunks'
+    )
+    assert.equal(followResponse.aborted, false, 'a follow response that reaches the end of the range should close cleanly')
+
+    // A frontier that never advances must not hold the connection forever — the
+    // response is torn down so the player reconnects and re-evaluates.
+    incompletePieceStates = [2, 2, 2, 0, 0, 0]
+    advanceIncompleteFrontierAfterCalls = 0
+    const stalledFollowResponse = await request(
+      server.address().port,
+      String(incompleteResponse.headers.location || ''),
+      {
+        headers: {
+          Range: 'bytes=0-'
+        }
+      }
+    )
+    assert.equal(stalledFollowResponse.status, 206, 'a stalled swarm should still start the partial-content response')
+    assert.equal(
+      stalledFollowResponse.bodyLength,
+      15728640,
+      'a stalled follow response should deliver everything downloaded before giving up'
+    )
+    assert.equal(
+      stalledFollowResponse.aborted,
+      true,
+      'a follow response that starves past the stall timeout must be torn down, not ended short of its Content-Length'
+    )
+    incompletePieceStates = [2, 2, 2, 2, 2, 2]
 
     const packedResponse = await request(server.address().port, `/${configToken}/playback/${encodeURIComponent(packedPlaybackToken)}`)
     assert.equal(packedResponse.status, 422, 'incomplete packed archives should fail fast with a truthful packed-release message instead of stalling')

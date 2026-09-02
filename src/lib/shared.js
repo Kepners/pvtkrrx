@@ -88,6 +88,41 @@ const STREAM_READY_MIN_BYTES = parseByteCount(process.env.STREAM_READY_MIN_BYTES
 // don't demand tens of MB before they can begin playing (e.g. a 10GB movie would
 // otherwise need ~50MB at 0.5%; this caps the head at 16MB).
 const STREAM_READY_MAX_START_BYTES = parseByteCount(process.env.STREAM_READY_MAX_START_BYTES || '16MB', 16 * 1024 * 1024)
+// Progressive follow-streaming. While a torrent is still downloading, hold a
+// single HTTP response open and keep feeding bytes as pieces land, instead of
+// ending the response at the current download frontier. Ending the response at
+// the frontier is what produces the "plays a few seconds, buffers, plays a few
+// seconds" loop: once playback catches up with the download, every response is
+// only worth a second or two of video, and the player has to open a brand new
+// request (plus a fresh qBittorrent state round-trip) for each one.
+const STREAM_FOLLOW_ENABLED = String(
+  process.env.STREAM_FOLLOW_ENABLED ||
+  'true'
+).trim().toLowerCase() !== 'false'
+const STREAM_FOLLOW_CHUNK_BYTES = parseByteCount(process.env.STREAM_FOLLOW_CHUNK_BYTES || '1MB', 1024 * 1024)
+const STREAM_FOLLOW_POLL_INTERVAL_MS = Math.max(
+  50,
+  parseInt(process.env.STREAM_FOLLOW_POLL_INTERVAL_MS || '500', 10) || 500
+)
+// How long an open response may sit with no new pieces before it is closed so
+// the player can reconnect and re-evaluate (dead swarm, paused torrent, etc.).
+const STREAM_FOLLOW_STALL_TIMEOUT_MS = Math.max(
+  1000,
+  parseInt(process.env.STREAM_FOLLOW_STALL_TIMEOUT_MS || '60000', 10) || 60000
+)
+// After the stream has actually starved, wait for this much readable runway
+// before resuming writes, so a starved player rebuffers once instead of
+// stuttering forward a piece at a time.
+const STREAM_FOLLOW_RESUME_AHEAD_BYTES = parseByteCount(
+  process.env.STREAM_FOLLOW_RESUME_AHEAD_BYTES || '8MB',
+  8 * 1024 * 1024
+)
+// Upper bound on that rebuffer wait — past this the stream resumes with
+// whatever runway exists rather than holding a silent connection open.
+const STREAM_FOLLOW_RESUME_MAX_WAIT_MS = Math.max(
+  0,
+  parseInt(process.env.STREAM_FOLLOW_RESUME_MAX_WAIT_MS || '20000', 10) || 20000
+)
 const STREAM_PRIORITIZE_LAST_PIECES = String(
   process.env.STREAM_PRIORITIZE_LAST_PIECES ||
   'false'
@@ -3140,6 +3175,12 @@ module.exports = {
   STREAM_READY_START_FRACTION,
   STREAM_READY_MIN_BYTES,
   STREAM_READY_MAX_START_BYTES,
+  STREAM_FOLLOW_ENABLED,
+  STREAM_FOLLOW_CHUNK_BYTES,
+  STREAM_FOLLOW_POLL_INTERVAL_MS,
+  STREAM_FOLLOW_STALL_TIMEOUT_MS,
+  STREAM_FOLLOW_RESUME_AHEAD_BYTES,
+  STREAM_FOLLOW_RESUME_MAX_WAIT_MS,
   STREAM_PRIORITIZE_LAST_PIECES,
   STREAM_PLAYBACK_TOP_PRIORITY,
   WATCHED_DELETE_THRESHOLD,

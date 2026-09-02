@@ -37,6 +37,8 @@ const {
   IS_HOSTED_RELAY_RUNTIME, SELF_HOST_SERVER_MODE, EXPRESS_TRUST_PROXY_SETTING, DEFAULT_LOCAL_HOSTNAME,
   STREAM_WAIT_TIMEOUT_MS, STREAM_WAIT_INTERVAL_MS,
   STREAM_RANGE_WAIT_TIMEOUT_MS, STREAM_RANGE_WAIT_INTERVAL_MS,
+  STREAM_FOLLOW_ENABLED, STREAM_FOLLOW_CHUNK_BYTES, STREAM_FOLLOW_POLL_INTERVAL_MS,
+  STREAM_FOLLOW_STALL_TIMEOUT_MS, STREAM_FOLLOW_RESUME_AHEAD_BYTES, STREAM_FOLLOW_RESUME_MAX_WAIT_MS,
   STREAM_PRIORITIZE_LAST_PIECES,
   WATCHED_DELETE_THRESHOLD, WATCHED_DELETE_GRACE_MS,
   LAN_PAIR_TTL_SECONDS, LAN_PAIR_BIND_PUBLIC_IP, LAN_PAIR_LOCK_HOST,
@@ -149,6 +151,165 @@ function pipeReadStreamToResponse(filePath, options, res, context = 'file') {
 
   stream.pipe(res)
   return stream
+}
+
+// Progressive "follow" streamer for a file that is still downloading.
+//
+// The plain read-stream path can only serve bytes that already exist, so a
+// range response for an in-progress torrent has to stop at the download
+// frontier. Once playback catches up with the download that means every
+// response is worth a second or two of video and the player has to reconnect
+// for the next one — the buffer / play 3s / buffer loop.
+//
+// This holds one response open for the whole requested range and feeds it as
+// pieces land, so the player keeps a single connection and simply waits when
+// the swarm is slower than the bitrate.
+async function streamFollowingRange(filePath, start, end, res, options = {}) {
+  const context = options.context || 'file'
+  const chunkBytes = Math.max(64 * 1024, Number(options.chunkBytes || STREAM_FOLLOW_CHUNK_BYTES))
+  const pollIntervalMs = Math.max(50, Number(options.pollIntervalMs || STREAM_FOLLOW_POLL_INTERVAL_MS))
+  const stallTimeoutMs = Math.max(1000, Number(options.stallTimeoutMs || STREAM_FOLLOW_STALL_TIMEOUT_MS))
+  const resumeAheadBytes = Math.max(0, Number(
+    options.resumeAheadBytes === undefined ? STREAM_FOLLOW_RESUME_AHEAD_BYTES : options.resumeAheadBytes
+  ))
+  const resumeMaxWaitMs = Math.max(0, Number(
+    options.resumeMaxWaitMs === undefined ? STREAM_FOLLOW_RESUME_MAX_WAIT_MS : options.resumeMaxWaitMs
+  ))
+  const refreshAvailableEnd = typeof options.refreshAvailableEnd === 'function' ? options.refreshAvailableEnd : null
+  const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null
+
+  let clientGone = false
+  const markClientGone = () => { clientGone = true }
+  res.on('close', markClientGone)
+
+  let handle = null
+  try {
+    handle = await fs.promises.open(filePath, 'r')
+  } catch (err) {
+    res.off('close', markClientGone)
+    console.error(`[${context}] follow open failed:`, safeLogMessage(err))
+    if (!res.headersSent) {
+      try {
+        res.removeHeader('Content-Length')
+        res.removeHeader('Content-Range')
+      } catch (_) {}
+      return res.status(500).json({ error: 'File stream failed' })
+    }
+    try { res.destroy(err) } catch (_) {}
+    return
+  }
+
+  let position = start
+  let availableEnd = Number.isFinite(options.initialAvailableEnd) ? Number(options.initialAvailableEnd) : -1
+  let lastAdvanceAt = Date.now()
+  let starvedSince = 0
+
+  const waitForDrain = () => new Promise(resolve => {
+    const done = () => {
+      res.off('drain', done)
+      res.off('close', done)
+      res.off('error', done)
+      resolve()
+    }
+    res.once('drain', done)
+    res.once('close', done)
+    res.once('error', done)
+  })
+
+  try {
+    while (position <= end && !clientGone && !res.writableEnded) {
+      if (position > availableEnd) {
+        // Caught up with the download frontier — ask qBittorrent where it is now.
+        let refreshed = -1
+        if (refreshAvailableEnd) {
+          try {
+            refreshed = Number(await refreshAvailableEnd(position))
+          } catch (err) {
+            console.warn(`[${context}] follow refresh failed:`, safeLogMessage(err))
+            refreshed = -1
+          }
+        }
+        if (clientGone) break
+        if (Number.isFinite(refreshed) && refreshed > availableEnd) {
+          availableEnd = refreshed
+          lastAdvanceAt = Date.now()
+        }
+
+        // Once starved, hold until there is real runway again so the player
+        // rebuffers once instead of stuttering forward a piece at a time.
+        const now = Date.now()
+        if (!starvedSince) starvedSince = now
+        const waitedTooLong = resumeMaxWaitMs > 0 && (now - starvedSince) >= resumeMaxWaitMs
+        const requiredRunway = waitedTooLong
+          ? 1
+          : Math.max(1, Math.min(resumeAheadBytes, end - position + 1))
+
+        if ((availableEnd - position + 1) < requiredRunway) {
+          if (now - lastAdvanceAt >= stallTimeoutMs) {
+            console.warn(
+              `[${context}] follow stalled ${stallTimeoutMs}ms at byte ${position} — closing so the player can retry`
+            )
+            break
+          }
+          await sleep(pollIntervalMs)
+          continue
+        }
+        starvedSince = 0
+      }
+
+      const readEnd = Math.min(end, availableEnd)
+      const toRead = Math.min(chunkBytes, readEnd - position + 1)
+      if (toRead <= 0) continue
+
+      // A fresh buffer per chunk: res.write() keeps a reference to what it was
+      // handed until the socket flushes it, so a reused scratch buffer would be
+      // overwritten by the next read and corrupt the video mid-flight.
+      const buffer = Buffer.allocUnsafe(toRead)
+      let bytesRead = 0
+      try {
+        ({ bytesRead } = await handle.read(buffer, 0, toRead, position))
+      } catch (err) {
+        console.error(`[${context}] follow read failed:`, safeLogMessage(err))
+        break
+      }
+      if (clientGone || res.writableEnded) break
+
+      if (bytesRead <= 0) {
+        // Pieces are verified but qBittorrent has not flushed them to disk yet.
+        if (Date.now() - lastAdvanceAt >= stallTimeoutMs) {
+          console.warn(`[${context}] follow saw no bytes on disk at ${position} — closing so the player can retry`)
+          break
+        }
+        await sleep(pollIntervalMs)
+        continue
+      }
+
+      position += bytesRead
+      lastAdvanceAt = Date.now()
+      if (onProgress) {
+        try { onProgress(position - 1) } catch (_) {}
+      }
+
+      if (!res.write(buffer.subarray(0, bytesRead))) {
+        // Backpressure: the player's own buffer is full. This is the healthy
+        // steady state — wait for it to drain rather than tearing down.
+        await waitForDrain()
+      }
+    }
+  } finally {
+    res.off('close', markClientGone)
+    try { await handle.close() } catch (_) {}
+  }
+
+  if (clientGone || res.writableEnded) return
+
+  if (position > end) {
+    return res.end()
+  }
+
+  // Short of the advertised Content-Length — destroy rather than end cleanly so
+  // the player treats it as an interrupted transfer and re-requests the range.
+  try { res.destroy() } catch (_) {}
 }
 
 function sendPlaybackHead(res, contentType = 'application/octet-stream') {
@@ -2664,6 +2825,39 @@ app.get('/:config/file/:info', withConfig, maybeLanPairRedirect('file'), async (
       return Math.max(startByte, lastDownloadedByteInTorrent - fileOffset)
     }
 
+    // Re-read qBittorrent's piece map and report the last byte that is readable
+    // from `position` onward. Used by the follow streamer to walk the download
+    // frontier forward without ending the response.
+    const refreshAvailableEnd = async (position) => {
+      if (isComplete || isOrphanFile) return fileSize - 1
+      const refreshed = await loadTorrentPlaybackState(qbit, torrentHash, file?.name || p, req.config.additionalStorageRoots)
+      if (!applyRefreshedPlayback(refreshed)) return -1
+      if (isComplete) return fileSize - 1
+      return getRequestedPieceWindowEnd(position)
+    }
+
+    const followRange = (rangeStart, rangeEnd, initialAvailableEnd) => streamFollowingRange(
+      resolvedFilePath,
+      rangeStart,
+      rangeEnd,
+      res,
+      {
+        context: 'file-route',
+        initialAvailableEnd,
+        refreshAvailableEnd,
+        onProgress: (deliveredEnd) => {
+          // Watched tracking mirrors the completed-file path: only a genuine
+          // contiguous stream-through of a finished download counts, so an
+          // unfinished title is never auto-deleted.
+          if (!isComplete || isOrphanFile || fileSize <= 0) return
+          const watchedFraction = recordWatchedProgress(torrentHash, deliveredEnd, deliveredEnd, fileSize)
+          if (watchedFraction >= WATCHED_DELETE_THRESHOLD) {
+            scheduleWatchedCleanup(req.config, torrentHash, `watched-${Math.round(watchedFraction * 100)}pct`)
+          }
+        }
+      }
+    )
+
     let seekPriorityRequested = false
     const waitForRequestedRange = async (startByte) => {
       let availableRangeEnd = await getRequestedPieceWindowEnd(startByte)
@@ -2795,7 +2989,14 @@ app.get('/:config/file/:info', withConfig, maybeLanPairRedirect('file'), async (
         })
       }
 
-      const end = Math.min(requestedEnd, availableRangeEnd)
+      // While the torrent is still downloading, promise the whole requested
+      // range and follow the download frontier instead of truncating the
+      // response at it. Truncating is what makes playback stutter every few
+      // seconds once it catches up with the download.
+      const followFrontier = STREAM_FOLLOW_ENABLED && !isComplete && !isOrphanFile
+      const end = followFrontier
+        ? Math.min(requestedEnd, fileSize - 1)
+        : Math.min(requestedEnd, availableRangeEnd)
       if (end < start) {
         res.setHeader('Content-Range', `bytes */${fileSize}`)
         res.setHeader('Retry-After', '2')
@@ -2816,6 +3017,9 @@ app.get('/:config/file/:info', withConfig, maybeLanPairRedirect('file'), async (
       res.status(206)
       res.setHeader('Content-Range', `bytes ${start}-${end}/${fileSize}`)
       res.setHeader('Content-Length', String(end - start + 1))
+      if (followFrontier) {
+        return followRange(start, end, availableRangeEnd)
+      }
       pipeReadStreamToResponse(resolvedFilePath, { start, end }, res, 'file-route')
     } else {
       if (isComplete) {
@@ -2834,10 +3038,14 @@ app.get('/:config/file/:info', withConfig, maybeLanPairRedirect('file'), async (
             })
           }
         }
-        const end = maxReadable - 1
+        const followFrontier = STREAM_FOLLOW_ENABLED && !isOrphanFile
+        const end = followFrontier ? fileSize - 1 : maxReadable - 1
         res.status(206)
         res.setHeader('Content-Range', `bytes 0-${end}/${fileSize}`)
-        res.setHeader('Content-Length', String(maxReadable))
+        res.setHeader('Content-Length', String(end + 1))
+        if (followFrontier) {
+          return followRange(0, end, maxReadable - 1)
+        }
         pipeReadStreamToResponse(resolvedFilePath, { start: 0, end }, res, 'file-route')
       }
     }
