@@ -1842,7 +1842,16 @@ async function buildDriveLibraryStream(config, {
   configToken,
   playbackBaseUrl
 }) {
-  const libraryRoot = normalizeDriveLibraryRoot(config?.driveLibraryRoot)
+  // The library root is a property of THIS machine, not of the user's install.
+  // A configured install carries its settings inside the addon URL, so a root
+  // set only in the server's own config never reaches a request and the Drive
+  // rows silently never appear. It must also never be written into a config
+  // that gets encoded into a shareable token — that would publish a server
+  // path — so the server-level default is read here, at the point of use, and
+  // an explicitly configured root still wins.
+  const libraryRoot = normalizeDriveLibraryRoot(
+    config?.driveLibraryRoot || process.env.PVTKRRX_DRIVE_LIBRARY_ROOT
+  )
   if (!libraryRoot || !contentTitle) return null
 
   // Playback is a local absolute path on this host, so a hosted relay (which

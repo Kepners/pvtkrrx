@@ -1669,6 +1669,60 @@ async function run() {
       delete global.__pvtkrrxTitleSearchCalls
     })
 
+    // The Drive library root is a property of the machine, not of the install.
+    // A configured install carries its settings inside the addon URL, so a root
+    // that only exists in the server's own config never reaches a request — the
+    // rows then silently never appear, which is exactly how it failed live.
+    {
+      const driveRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'pvtkrrx-drive-env-'))
+      const seasonDir = path.join(driveRoot, 'Films and TV', 'TV', 'The Curse of Oak Island', 'Season 12')
+      fs.mkdirSync(seasonDir, { recursive: true })
+      fs.writeFileSync(
+        path.join(seasonDir, 'The Curse of Oak Island - S12E17 - 1080p WEB h264-EDITH.mkv'),
+        Buffer.alloc(4096, 7)
+      )
+      const runDriveScenario = async (envRoot) => {
+        let result = null
+        await withScenario(async () => {
+          delete process.env.PVTKRRX_HOSTED_RELAY
+          if (envRoot) process.env.PVTKRRX_DRIVE_LIBRARY_ROOT = envRoot
+          else delete process.env.PVTKRRX_DRIVE_LIBRARY_ROOT
+          QBitClient.prototype.torrents = async () => []
+          QBitClient.prototype.files = async () => []
+          CinemetaClient.prototype.getSeries = async () => ({ name: 'The Curse of Oak Island' })
+          ProwlarrClient.prototype.searchImdb = async () => []
+          ProwlarrClient.prototype.search = async () => []
+        }, async () => {
+          result = await handleStream(
+            makeBaseConfig({ fileServerUrl: '' }),
+            'series',
+            'tt3455408:12:17',
+            'http://127.0.0.1:7000',
+            'local'
+          )
+        })
+        return result
+      }
+
+      try {
+        const withEnv = await runDriveScenario(driveRoot)
+        assert.ok(
+          withEnv.streams.some(stream => /\/file\//.test(String(stream?.url || ''))),
+          '#4o6 a Drive library row must appear from the server-level root when the install config carries none'
+        )
+
+        const withoutEnv = await runDriveScenario(null)
+        assert.equal(
+          withoutEnv.streams.filter(stream => /\/file\//.test(String(stream?.url || ''))).length,
+          0,
+          '#4o6 no Drive rows when no library root is configured anywhere'
+        )
+      } finally {
+        delete process.env.PVTKRRX_DRIVE_LIBRARY_ROOT
+        fs.rmSync(driveRoot, { recursive: true, force: true })
+      }
+    }
+
     await withScenario(async () => {
       delete process.env.PVTKRRX_HOSTED_RELAY
       QBitClient.prototype.torrents = async () => []
