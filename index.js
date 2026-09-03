@@ -2796,7 +2796,13 @@ app.get('/:config/file/:info', withConfig, maybeLanPairRedirect('file'), async (
       readableBytes = Number(refreshed.readableBytes || 0)
       isComplete = Number(refreshed.file?.progress || refreshed.torrent.progress || 0) >= 0.999
       maxReadable = isComplete ? fileSize : Math.max(0, Math.min(fileSize, readableBytes))
-      pieceRangeContext = null
+      // piece_size is fixed for this torrent (set once, never changes) — a
+      // refresh only needs fresh piece COMPLETION states. Every frontier
+      // catch-up was re-fetching both, doubling the qBittorrent round trips
+      // needed to resume a still-downloading stream.
+      pieceRangeContext = pieceRangeContext?.pieceSize
+        ? { pieceSize: pieceRangeContext.pieceSize, pieceStates: null }
+        : null
       return true
     }
 
@@ -2832,14 +2838,14 @@ app.get('/:config/file/:info', withConfig, maybeLanPairRedirect('file'), async (
       if (!pieceSize || !pieceStates) {
         try {
           const [properties, states] = await Promise.all([
-            qbit.properties(torrentHash),
+            pieceSize ? Promise.resolve(null) : qbit.properties(torrentHash),
             qbit.pieceStates(torrentHash)
           ])
-          pieceSize = Math.max(0, Number(properties?.piece_size || 0))
+          if (!pieceSize) pieceSize = Math.max(0, Number(properties?.piece_size || 0))
           pieceStates = Array.isArray(states) ? states.map(value => Number(value)) : null
           pieceRangeContext = { pieceSize, pieceStates }
         } catch (_) {
-          pieceRangeContext = { pieceSize: 0, pieceStates: null }
+          pieceRangeContext = { pieceSize, pieceStates: null }
           return -1
         }
       }

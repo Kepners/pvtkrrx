@@ -2625,13 +2625,47 @@ function isPlaybackReady(fileEntry, readableBytes) {
   return readableBytes >= required || Number(fileEntry?.progress || 0) >= 0.999
 }
 
+// A player that reconnects every few seconds (network hiccup, seek, buffer
+// check) was re-running the full resume/sequential/priority dance on every
+// single reconnect, even when nothing about the torrent had changed since
+// moments earlier — extra qBittorrent round trips a still-downloading
+// reconnect pays that a complete-file reconnect mostly does not. Skip the
+// repeat within a short window; anything longer re-primes as before, so a
+// genuine external change (paused in qBit's own UI, etc.) is still corrected
+// promptly.
+const RECENT_PRIME_WINDOW_MS = Math.max(
+  0,
+  parseInt(process.env.PVTKRRX_PRIME_SKIP_WINDOW_MS || '5000', 10) || 5000
+)
+const RECENT_PRIME_CACHE_MAX_KEYS = 500
+const recentPrimeState = new Map()
+
+function rememberPrimed(hash, complete, now) {
+  recentPrimeState.set(hash, { at: now, complete })
+  for (const [cachedHash, entry] of recentPrimeState) {
+    if (!entry?.at || (now - entry.at) >= RECENT_PRIME_WINDOW_MS) recentPrimeState.delete(cachedHash)
+  }
+  while (recentPrimeState.size > RECENT_PRIME_CACHE_MAX_KEYS) {
+    const oldestHash = recentPrimeState.keys().next().value
+    if (!oldestHash) break
+    recentPrimeState.delete(oldestHash)
+  }
+}
+
 async function primeTorrentForStreaming(qbit, torrent, videoFile, allFiles = null) {
   const hash = String(torrent?.hash || '').toLowerCase()
   if (!hash) return
 
+  const playbackComplete = Number(torrent?.progress || 0) >= 0.999 || Number(videoFile?.progress || 0) >= 0.999
+  if (RECENT_PRIME_WINDOW_MS > 0) {
+    const now = Date.now()
+    const recent = recentPrimeState.get(hash)
+    if (recent && recent.complete === playbackComplete && (now - recent.at) < RECENT_PRIME_WINDOW_MS) return
+    rememberPrimed(hash, playbackComplete, now)
+  }
+
   const seqEnabled = torrent?.seq_dl === true
   const firstLastEnabled = torrent?.f_l_piece_prio === true
-  const playbackComplete = Number(torrent?.progress || 0) >= 0.999 || Number(videoFile?.progress || 0) >= 0.999
   const shouldPrioritizeLastPieces = STREAM_PRIORITIZE_LAST_PIECES && !playbackComplete
   const files = Array.isArray(allFiles) ? allFiles : []
   const archiveFiles = findPackedArchiveFiles(files)
