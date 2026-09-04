@@ -739,6 +739,14 @@ function sortStreams(streams) {
   }
 
   function rank(stream) {
+    // Owner ruling 2026-09-04: an archived Google Drive copy is the source of
+    // truth once a title is archived, and must win outright over a local
+    // qBittorrent copy of the same release — not just tie-break against it.
+    // Both build as sourceMode 'seedbox' (both are ready-to-play-now), so
+    // without this they tied on file size and fell back to push order, which
+    // silently handed playback to whichever the code happened to look up
+    // first — not a real preference.
+    if (String(stream?.behaviorHints?.sourceOrigin || '').toLowerCase() === 'drive-library') return -1
     const mode = String(stream?.behaviorHints?.sourceMode || '').toLowerCase()
     if (mode === 'seedbox') return 0
     if (mode === 'buffering') return 1
