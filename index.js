@@ -39,6 +39,7 @@ const {
   STREAM_RANGE_WAIT_TIMEOUT_MS, STREAM_RANGE_WAIT_INTERVAL_MS,
   STREAM_FOLLOW_ENABLED, STREAM_FOLLOW_CHUNK_BYTES, STREAM_FOLLOW_POLL_INTERVAL_MS,
   STREAM_FOLLOW_STALL_TIMEOUT_MS, STREAM_FOLLOW_RESUME_AHEAD_BYTES, STREAM_FOLLOW_RESUME_MAX_WAIT_MS,
+  STREAM_FOLLOW_REANNOUNCE_AFTER_MS,
   STREAM_PRIORITIZE_LAST_PIECES,
   WATCHED_DELETE_THRESHOLD, WATCHED_DELETE_GRACE_MS,
   LAN_PAIR_TTL_SECONDS, LAN_PAIR_BIND_PUBLIC_IP, LAN_PAIR_LOCK_HOST,
@@ -178,6 +179,10 @@ async function streamFollowingRange(filePath, start, end, res, options = {}) {
   ))
   const refreshAvailableEnd = typeof options.refreshAvailableEnd === 'function' ? options.refreshAvailableEnd : null
   const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null
+  const reannounce = typeof options.reannounce === 'function' ? options.reannounce : null
+  const reannounceAfterMs = Math.max(0, Number(
+    options.reannounceAfterMs === undefined ? STREAM_FOLLOW_REANNOUNCE_AFTER_MS : options.reannounceAfterMs
+  ))
 
   let clientGone = false
   const markClientGone = () => { clientGone = true }
@@ -204,6 +209,7 @@ async function streamFollowingRange(filePath, start, end, res, options = {}) {
   let availableEnd = Number.isFinite(options.initialAvailableEnd) ? Number(options.initialAvailableEnd) : -1
   let lastAdvanceAt = Date.now()
   let starvedSince = 0
+  let reannouncedThisStall = false
 
   const waitForDrain = () => new Promise(resolve => {
     const done = () => {
@@ -246,6 +252,21 @@ async function streamFollowingRange(filePath, start, end, res, options = {}) {
           : Math.max(1, Math.min(resumeAheadBytes, end - position + 1))
 
         if ((availableEnd - position + 1) < requiredRunway) {
+          // A stuck piece (the swarm has moved on past it and never delivers
+          // it to us) leaves the frontier frozen no matter how long we wait —
+          // ask the tracker for fresh peers once, partway through the stall,
+          // before giving up. Cheap and safe even when it doesn't help.
+          if (
+            reannounce && !reannouncedThisStall &&
+            reannounceAfterMs > 0 && (now - lastAdvanceAt) >= reannounceAfterMs
+          ) {
+            reannouncedThisStall = true
+            try {
+              await reannounce()
+            } catch (err) {
+              console.warn(`[${context}] follow reannounce failed:`, safeLogMessage(err))
+            }
+          }
           if (now - lastAdvanceAt >= stallTimeoutMs) {
             console.warn(
               `[${context}] follow stalled ${stallTimeoutMs}ms at byte ${position} — closing so the player can retry`
@@ -256,6 +277,7 @@ async function streamFollowingRange(filePath, start, end, res, options = {}) {
           continue
         }
         starvedSince = 0
+        reannouncedThisStall = false
       }
 
       const readEnd = Math.min(end, availableEnd)
@@ -2898,6 +2920,7 @@ app.get('/:config/file/:info', withConfig, maybeLanPairRedirect('file'), async (
         context: 'file-route',
         initialAvailableEnd,
         refreshAvailableEnd,
+        reannounce: torrentHash ? () => qbit.reannounce(torrentHash) : undefined,
         onProgress: (deliveredEnd) => {
           // Watched tracking mirrors the completed-file path: only a genuine
           // contiguous stream-through of a finished download counts, so an

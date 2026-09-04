@@ -230,6 +230,16 @@ class QBitClient {
     }
   }
 
+  async reannounce(hashes) {
+    const value = Array.isArray(hashes) ? hashes.join('|') : String(hashes || '')
+    return this.request('/api/v2/torrents/reannounce', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `hashes=${encodeURIComponent(value)}`,
+      expect: 'text'
+    })
+  }
+
   async topPriority(hashes) {
     const value = Array.isArray(hashes) ? hashes.join('|') : String(hashes || '')
     return this.request('/api/v2/torrents/topPrio', {

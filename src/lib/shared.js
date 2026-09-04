@@ -124,6 +124,18 @@ const STREAM_FOLLOW_RESUME_MAX_WAIT_MS = Math.max(
   0,
   parseInt(process.env.STREAM_FOLLOW_RESUME_MAX_WAIT_MS || '20000', 10) || 20000
 )
+// Proven 2026-09-04: qBittorrent's own piece map can leave an isolated piece
+// stuck at "not downloaded" indefinitely (10+ minutes observed) even while
+// the swarm keeps completing pieces well past it at a healthy speed — the
+// peer(s) we're connected to simply never deliver that one piece. PVTKRRX's
+// frontier is the contiguous run from piece 0, so that single stuck piece
+// pins it forever; waiting alone never resolves it. Partway through a stall
+// (well before the full stallTimeoutMs give-up), ask the tracker for a fresh
+// peer list once — a peer we're not yet connected to may hold it.
+const STREAM_FOLLOW_REANNOUNCE_AFTER_MS = Math.max(
+  0,
+  parseInt(process.env.STREAM_FOLLOW_REANNOUNCE_AFTER_MS || '15000', 10) || 15000
+)
 const STREAM_PRIORITIZE_LAST_PIECES = String(
   process.env.STREAM_PRIORITIZE_LAST_PIECES ||
   'false'
@@ -3217,6 +3229,7 @@ module.exports = {
   STREAM_FOLLOW_STALL_TIMEOUT_MS,
   STREAM_FOLLOW_RESUME_AHEAD_BYTES,
   STREAM_FOLLOW_RESUME_MAX_WAIT_MS,
+  STREAM_FOLLOW_REANNOUNCE_AFTER_MS,
   STREAM_PRIORITIZE_LAST_PIECES,
   STREAM_PLAYBACK_TOP_PRIORITY,
   WATCHED_DELETE_THRESHOLD,
